@@ -1822,6 +1822,11 @@ const STRING_DEFS = {
   'loanAccount.loanTerm': { en: 'Loan Term (Months)', beanie: 'loan term (months)' },
   'loanAccount.startDate': { en: 'Loan Start Date', beanie: 'loan start date' },
 
+  // Joint ownership + "for whom" (account form)
+  'accounts.jointOwnerAdd': { en: 'Add joint owner', beanie: 'add joint owner' },
+  'accounts.jointOwners': { en: 'Joint Owners', beanie: 'joint owners' },
+  'accounts.forWhom': { en: 'For', beanie: 'for' },
+
   // Account details (optional reference info under "More Details")
   'accountDetails.section.caption': {
     en: 'Optional. Everything here is safe to leave blank — beanies stores it encrypted in your Family Data File.',

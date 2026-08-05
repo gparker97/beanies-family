@@ -30,6 +30,7 @@ import {
   buildAccountDetailsPatch,
   validateAccountDetails,
   hasAccountDetails,
+  showsForWhomField,
 } from '@/utils/accountDetails';
 import type {
   Account,
@@ -71,6 +72,17 @@ const isActive = ref(true);
 const includeInNetWorth = ref(true);
 const showMoreDetails = ref(false);
 
+// Joint ownership (descriptive) + "for whom". Both optional/additive.
+const coOwnerIds = ref<string[]>([]);
+const forMemberIds = ref<string[]>([]);
+// Subtle opt-in: the joint-owner picker only appears once the user asks for it
+// (or when editing an account that already has co-owners) — no clutter by default.
+const showCoOwners = ref(false);
+// Co-owners exclude the primary owner (they're the OTHER owners).
+const coOwnerMembers = computed(() =>
+  familyStore.sortedHumans.filter((m) => m.id !== memberId.value)
+);
+
 // Loan state (for loan-type accounts)
 const interestRate = ref<number | undefined>(undefined);
 const monthlyPayment = ref<number | undefined>(undefined);
@@ -111,6 +123,9 @@ const { isEditing, isSubmitting } = useFormModal(
       institutionCountry.value = account.institutionCountry ?? '';
       isActive.value = account.isActive;
       includeInNetWorth.value = account.includeInNetWorth;
+      coOwnerIds.value = account.coOwnerIds ? [...account.coOwnerIds] : [];
+      forMemberIds.value = account.forMemberIds ? [...account.forMemberIds] : [];
+      showCoOwners.value = coOwnerIds.value.length > 0;
       Object.assign(details, extractAccountDetails(account));
       // Auto-expand "More Details" if toggles differ from defaults or details exist
       showMoreDetails.value =
@@ -138,6 +153,9 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       includeInNetWorth.value = true;
       showMoreDetails.value = false;
+      coOwnerIds.value = [];
+      forMemberIds.value = [];
+      showCoOwners.value = false;
       Object.assign(details, emptyAccountDetails());
 
       // Loan fields reset
@@ -184,6 +202,17 @@ async function handleSave() {
       institutionCountry: institutionCountry.value || undefined,
       isActive: isActive.value,
       includeInNetWorth: includeInNetWorth.value,
+      // Joint owners (excl. the primary owner); undefined when none so the repo
+      // clears the key on update. Descriptive only — not wired to net-worth.
+      coOwnerIds: (() => {
+        const co = coOwnerIds.value.filter((id) => id && id !== memberId.value);
+        return co.length ? co : undefined;
+      })(),
+      // "For whom" — only persisted on the qualifying types; cleared otherwise.
+      forMemberIds:
+        showsForWhomField(type.value) && forMemberIds.value.length
+          ? [...forMemberIds.value]
+          : undefined,
       ...(type.value === 'loan' && interestRate.value !== undefined
         ? { interestRate: interestRate.value }
         : {}),
@@ -243,6 +272,21 @@ function handleDelete() {
       <FamilyChipPicker v-model="memberId" mode="single" />
     </FormFieldGroup>
 
+    <!-- Joint owners — subtle opt-in. Nothing shows unless the user asks for it
+         (or the account already has co-owners), so solely-owned accounts stay
+         uncluttered. -->
+    <button
+      v-if="!showCoOwners && coOwnerMembers.length > 0"
+      type="button"
+      class="font-outfit text-primary-500 -mt-2 text-xs font-semibold transition-colors hover:underline"
+      @click="showCoOwners = true"
+    >
+      + {{ t('accounts.jointOwnerAdd') }}
+    </button>
+    <FormFieldGroup v-else-if="showCoOwners" :label="t('accounts.jointOwners')">
+      <FamilyChipPicker v-model="coOwnerIds" mode="multi" :members="coOwnerMembers" />
+    </FormFieldGroup>
+
     <!-- 2. Institution + Country -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <BaseCombobox
@@ -282,6 +326,11 @@ function handleDelete() {
     <!-- 4. Category / Type (two-level picker) -->
     <FormFieldGroup :label="t('modal.selectCategory')" required>
       <AccountCategoryPicker v-model="type" />
+    </FormFieldGroup>
+
+    <!-- "For whom" — savings / investment / education / retirement only -->
+    <FormFieldGroup v-if="showsForWhomField(type)" :label="t('accounts.forWhom')">
+      <FamilyChipPicker v-model="forMemberIds" mode="multi" />
     </FormFieldGroup>
 
     <!-- 5. Currency + Balance -->
