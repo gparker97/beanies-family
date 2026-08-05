@@ -1824,6 +1824,7 @@ const STRING_DEFS = {
 
   // Joint ownership + "for whom" (account form)
   'accounts.jointOwnerAdd': { en: 'Add joint owner', beanie: 'add joint owner' },
+  'accounts.jointOwnerRemove': { en: 'Remove joint owners', beanie: 'remove joint owners' },
   'accounts.jointOwners': { en: 'Joint Owners', beanie: 'joint owners' },
   'accounts.forWhom': { en: 'For', beanie: 'for' },
 
