@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-05",
-    "translationCount": 3890
+    "translationCount": 3891
   },
   "translations": {
     "app.name": {
@@ -19454,6 +19454,11 @@
     "accounts.forWhom": {
       "translation": "对于",
       "hash": "1ind",
+      "lastUpdated": "2026-08-05"
+    },
+    "accounts.jointOwnerRemove": {
+      "translation": "移除联名所有者",
+      "hash": "1ndlrm",
       "lastUpdated": "2026-08-05"
     }
   }
