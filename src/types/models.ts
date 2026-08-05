@@ -674,6 +674,9 @@ export interface FamilyActivity {
   // Location
   location?: string;
 
+  // Link — optional URL (booking page, class info, event page, etc.)
+  link?: string;
+
   // Fees
   feeSchedule: FeeSchedule;
   feeAmount?: number;

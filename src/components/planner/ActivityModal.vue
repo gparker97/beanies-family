@@ -134,6 +134,7 @@ const instructorContact = ref('');
 // ReminderMinutes at the getter (the single read site every consumer uses).
 const reminderMinutes = ref<ReminderMinutes>(settingsStore.activityReminderLead);
 const notes = ref('');
+const link = ref('');
 const isActive = ref(true);
 const color = ref('');
 const showMoreDetails = ref(false);
@@ -238,6 +239,7 @@ function setRecurrenceMode(mode: 'recurring' | 'one-off'): void {
 function hasDetailData(activity: FamilyActivity): boolean {
   return !!(
     activity.notes ||
+    activity.link ||
     activity.instructorName ||
     activity.instructorContact ||
     (activity.feeAmount && activity.feeAmount > 0) ||
@@ -282,6 +284,7 @@ const { isEditing, isSubmitting } = useFormModal(
       instructorContact.value = activity.instructorContact ?? '';
       reminderMinutes.value = activity.reminderMinutes;
       notes.value = activity.notes ?? '';
+      link.value = activity.link ?? '';
       isActive.value = activity.isActive;
       color.value = activity.color ?? getActivityCategoryColor(activity.category);
       showMoreDetails.value = hasDetailData(activity);
@@ -321,6 +324,7 @@ const { isEditing, isSubmitting } = useFormModal(
       instructorContact.value = '';
       reminderMinutes.value = settingsStore.activityReminderLead;
       notes.value = '';
+      link.value = '';
       isActive.value = true;
       color.value = '';
       showMoreDetails.value = false;
@@ -544,6 +548,7 @@ function buildPayload(): CreateFamilyActivityInput {
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,
     notes: notes.value.trim() || undefined,
+    link: link.value.trim() || undefined,
     ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
     isActive: isActive.value,
     color: color.value || undefined,
@@ -1136,6 +1141,22 @@ function handleSave() {
               class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
               :placeholder="t('planner.field.notes')"
             />
+          </FormFieldGroup>
+
+          <!-- Link -->
+          <FormFieldGroup :label="t('planner.field.link')" optional>
+            <div class="flex items-center gap-2">
+              <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+              <a
+                v-if="link"
+                :href="link.startsWith('http') ? link : `https://${link}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--tint-slate-5)] text-sm transition-colors hover:bg-[var(--tint-slate-10)] dark:bg-slate-700"
+                :title="t('action.visitLink')"
+                >🔗</a
+              >
+            </div>
           </FormFieldGroup>
 
           <!-- Active toggle -->

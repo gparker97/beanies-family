@@ -5907,6 +5907,7 @@ const STRING_DEFS = {
   'planner.field.instructorContact': { en: 'Contact', beanie: 'contact' },
   'planner.field.reminder': { en: 'Reminder', beanie: 'reminder' },
   'planner.field.notes': { en: 'Notes', beanie: 'notes' },
+  'planner.field.link': { en: 'Link', beanie: 'link' },
   'planner.field.moreDetails': { en: 'Add more details', beanie: 'add more details' },
   'planner.field.color': { en: 'Highlight Color', beanie: 'highlight color' },
   'planner.field.active': { en: 'Active', beanie: 'active' },

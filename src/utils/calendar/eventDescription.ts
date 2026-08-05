@@ -74,6 +74,10 @@ export function buildEventDescription(
     lines.push(`Cost: ${activity.feeAmount}${currency}${schedule}`);
   }
 
+  if (activity.link && activity.link.trim()) {
+    lines.push(`Link: ${activity.link.trim()}`);
+  }
+
   if (activity.notes && activity.notes.trim()) {
     if (lines.length > 0) lines.push('');
     lines.push(activity.notes.trim());

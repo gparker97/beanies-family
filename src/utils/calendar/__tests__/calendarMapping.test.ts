@@ -115,6 +115,7 @@ describe('buildEventDescription', () => {
       feeAmount: 80,
       feeCurrency: 'SGD',
       feeSchedule: 'per_session',
+      link: 'https://club.example.com/soccer',
       notes: 'Bring shin guards',
     });
     const desc = buildEventDescription(activity, ctx);
@@ -123,6 +124,7 @@ describe('buildEventDescription', () => {
     expect(desc).toContain('Pick-up: Mum');
     expect(desc).toContain('Instructor: Coach Lee (+65 9123 4567)');
     expect(desc).toContain('Cost: 80 SGD (per_session)');
+    expect(desc).toContain('Link: https://club.example.com/soccer');
     expect(desc).toContain('Bring shin guards');
     expect(desc).toContain(SYNCED_MARKER);
     expect(desc).toContain('https://app.beanies.family/activities?activity=' + activity.id);
@@ -208,6 +210,10 @@ describe('computePushHash', () => {
     expect(computePushHash(a)).toBe(computePushHash(makeActivity()));
     expect(computePushHash(a)).not.toBe(computePushHash(makeActivity({ title: 'Changed' })));
     expect(computePushHash(a)).not.toBe(computePushHash(makeActivity({ startTime: '09:00' })));
+    // `link` is rendered into the description, so a link edit must re-push (F4).
+    expect(computePushHash(a)).not.toBe(
+      computePushHash(makeActivity({ link: 'https://new.example.com' }))
+    );
   });
 
   it('includes resolved member names — a rename changes the hash for a referencing activity only (F3)', () => {
