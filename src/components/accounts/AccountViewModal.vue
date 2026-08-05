@@ -19,6 +19,8 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import AccountDetailsView from '@/components/accounts/AccountDetailsView.vue';
+import { hasAccountDetails } from '@/utils/accountDetails';
 import EntityActivityLog, {
   type ActivityEntry,
   type ActivityFilterDef,
@@ -226,6 +228,9 @@ watch(
           </div>
         </div>
       </div>
+
+      <!-- Optional account details (reference info) -->
+      <AccountDetailsView v-if="hasAccountDetails(account)" :account="account" />
 
       <!-- Activity section (shared renderer) -->
       <div class="space-y-3">

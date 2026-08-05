@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-05",
-    "translationCount": 3842
+    "translationCount": 3889
   },
   "translations": {
     "app.name": {
@@ -19214,6 +19214,241 @@
     "planner.field.link": {
       "translation": "链接",
       "hash": "1erkq",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.section.caption": {
+      "translation": "可选。这里的所有内容都可以安全地留空— beanies将其加密存储在您的家庭数据文件中。",
+      "hash": "vzfp92",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.accountNumber": {
+      "translation": "账号",
+      "hash": "kzgzl0",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.onlineBankingUrl": {
+      "translation": "网上银行",
+      "hash": "1er1tk",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.onlineBankingUserId": {
+      "translation": "网银用户",
+      "hash": "2klv13",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.customerServicePhone": {
+      "translation": "客户服务电话",
+      "hash": "a8sjv0",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.notes": {
+      "translation": "注 意 事 项",
+      "hash": "18xach",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.notesPlaceholder": {
+      "translation": "关于此帐户的任何值得记住的事情……",
+      "hash": "30xqx9",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.bank.title": {
+      "translation": "银行详情",
+      "hash": "5837fi",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.routingNumber": {
+      "translation": "路由/分类代码",
+      "hash": "o69g5g",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.iban": {
+      "translation": "IBAN",
+      "hash": "1c0li",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.swiftBic": {
+      "translation": "Swift/BIC",
+      "hash": "vctc76",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.interestRate": {
+      "translation": "利率(%)",
+      "hash": "g31neq",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.interestRateHint": {
+      "translation": "年度% —储蓄账户。",
+      "hash": "pr9a4n",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.card.title": {
+      "translation": "信用卡信息：",
+      "hash": "ctpn89",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.cardNetwork": {
+      "translation": "Card Network",
+      "hash": "4rh2oy",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.cardLast4": {
+      "translation": "后4位数字",
+      "hash": "1qxx98",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.cardExpiry": {
+      "translation": "到期 (MM/YY)",
+      "hash": "h16phn",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.creditLimit": {
+      "translation": "信用额度",
+      "hash": "tvu6l0",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.statementDay": {
+      "translation": "对账单日",
+      "hash": "jwwrvv",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.field.paymentDueDay": {
+      "translation": "付款-到期日",
+      "hash": "mrb4c7",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.card.cvvNote": {
+      "translation": "您的CVV/安全码永远不会被存储— Beanies只会保留您识别卡所需的内容。",
+      "hash": "912byg",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.crypto.title": {
+      "translation": "钱包",
+      "hash": "ozw3gm",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.crypto.publicOnly": {
+      "translation": "仅限公共地址—切勿使用种子短语或私钥。",
+      "hash": "qrxaqb",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.walletLabel": {
+      "translation": "钱包",
+      "hash": "savmxz",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.labelField": {
+      "translation": "标号",
+      "hash": "17kdzo",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.labelPlaceholder": {
+      "translation": "例如：冷藏—分类帐",
+      "hash": "k23yqi",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.address": {
+      "translation": "公共地址",
+      "hash": "rpjnn",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.addressPlaceholder": {
+      "translation": "0x…/bc1…",
+      "hash": "dxdvdj",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.chain": {
+      "translation": "用作弹出链中的链接",
+      "hash": "12qowx",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.chainOptional": {
+      "translation": "链条（可选）",
+      "hash": "x5h5s0",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.add": {
+      "translation": "添加钱包",
+      "hash": "iu3a08",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.wallets.remove": {
+      "translation": "移除钱包",
+      "hash": "z869e3",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.err.last4": {
+      "translation": "输入最后4位数字（仅限数字）。",
+      "hash": "jsbbnw",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.err.expiry": {
+      "translation": "使用MM/YY ，例如08/27。",
+      "hash": "b9ibbs",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.err.day": {
+      "translation": "输入从1到31的日期。",
+      "hash": "etidxh",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.err.walletIncomplete": {
+      "translation": "同时添加标签和地址，或删除此钱包。",
+      "hash": "v9aprv",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.title": {
+      "translation": "账户详细信息",
+      "hash": "ng8ttd",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.card": {
+      "translation": "卡片",
+      "hash": "18uuo",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.expiry": {
+      "translation": "到期",
+      "hash": "yk4zmb",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.statementDue": {
+      "translation": "对账单/到期日",
+      "hash": "r94daq",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.onlineBanking": {
+      "translation": "网上银行",
+      "hash": "iehhzt",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.userId": {
+      "translation": "用户ID",
+      "hash": "p3gepc",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.view.customerService": {
+      "translation": "客户服务",
+      "hash": "rhgvbh",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.copyAddress": {
+      "translation": "复制地址",
+      "hash": "hg00h5",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.copied": {
+      "translation": "地址已复制",
+      "hash": "g7194g",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.copyFailedTitle": {
+      "translation": "无法复制",
+      "hash": "idzwu3",
+      "lastUpdated": "2026-08-05"
+    },
+    "accountDetails.copyFailedMsg": {
+      "translation": "手动复制地址。",
+      "hash": "d1owbv",
       "lastUpdated": "2026-08-05"
     }
   }

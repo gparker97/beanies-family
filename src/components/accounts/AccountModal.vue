@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import AccountDetailsFields from '@/components/accounts/AccountDetailsFields.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -23,7 +24,20 @@ import {
 import { COUNTRIES } from '@/constants/countries';
 import { OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getSubtypeEmoji } from '@/constants/accountCategories';
-import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
+import {
+  emptyAccountDetails,
+  extractAccountDetails,
+  buildAccountDetailsPatch,
+  validateAccountDetails,
+  hasAccountDetails,
+} from '@/utils/accountDetails';
+import type {
+  Account,
+  AccountDetails,
+  AccountType,
+  CreateAccountInput,
+  UpdateAccountInput,
+} from '@/types/models';
 
 const props = defineProps<{
   open: boolean;
@@ -65,6 +79,12 @@ const loanStartDate = ref('');
 const createRecurringPayment = ref(false);
 const loanPayFromAccountId = ref('');
 
+// Account-details tier (optional reference info under "More Details").
+// Single reactive object bridged to/from Account by the pure mappers.
+const details = reactive<AccountDetails>(emptyAccountDetails());
+const detailErrors = computed(() => validateAccountDetails(details, type.value));
+const detailsValid = computed(() => Object.keys(detailErrors.value).length === 0);
+
 // MRU: find most recent institution/country from existing accounts
 function getMruDefaults() {
   const latest = accountsStore.accounts
@@ -91,8 +111,10 @@ const { isEditing, isSubmitting } = useFormModal(
       institutionCountry.value = account.institutionCountry ?? '';
       isActive.value = account.isActive;
       includeInNetWorth.value = account.includeInNetWorth;
-      // Auto-expand "More Details" if toggles differ from defaults
-      showMoreDetails.value = !account.includeInNetWorth || !account.isActive;
+      Object.assign(details, extractAccountDetails(account));
+      // Auto-expand "More Details" if toggles differ from defaults or details exist
+      showMoreDetails.value =
+        !account.includeInNetWorth || !account.isActive || hasAccountDetails(account);
 
       // Loan fields
       if (account.type === 'loan') {
@@ -116,6 +138,7 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       includeInNetWorth.value = true;
       showMoreDetails.value = false;
+      Object.assign(details, emptyAccountDetails());
 
       // Loan fields reset
       interestRate.value = undefined;
@@ -147,7 +170,7 @@ async function handleRemoveCustomInstitution(instName: string) {
 }
 
 async function handleSave() {
-  if (!canSave.value) return;
+  if (!canSave.value || !detailsValid.value) return;
   isSubmitting.value = true;
   try {
     const data = {
@@ -176,6 +199,9 @@ async function handleSave() {
       ...(type.value === 'loan' && loanPayFromAccountId.value
         ? { payFromAccountId: loanPayFromAccountId.value }
         : {}),
+      // Optional account-details tier — type-gated; omits off-type keys, emits
+      // `undefined` only for in-type cleared fields (never wipes a loan's rate).
+      ...buildAccountDetailsPatch(details, type.value),
     };
 
     await persistCustomInstitutionIfNeeded(institution.value);
@@ -309,6 +335,9 @@ function handleDelete() {
       </button>
 
       <div v-if="showMoreDetails" class="mt-3 space-y-3">
+        <!-- Optional account details (reference info) -->
+        <AccountDetailsFields :details="details" :type="type" :currency="currency" />
+
         <!-- Include in Net Worth toggle -->
         <div
           class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
