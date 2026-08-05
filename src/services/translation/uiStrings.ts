@@ -1837,10 +1837,6 @@ const STRING_DEFS = {
     en: 'Online Banking User ID',
     beanie: 'online banking user id',
   },
-  'accountDetails.field.customerServicePhone': {
-    en: 'Customer-Service Phone',
-    beanie: 'customer-service phone',
-  },
   'accountDetails.field.notes': { en: 'Notes', beanie: 'notes' },
   'accountDetails.field.notesPlaceholder': {
     en: 'Anything worth remembering about this account…',
@@ -1906,7 +1902,6 @@ const STRING_DEFS = {
   'accountDetails.view.statementDue': { en: 'Statement / Due Day', beanie: 'statement / due day' },
   'accountDetails.view.onlineBanking': { en: 'Online Banking', beanie: 'online banking' },
   'accountDetails.view.userId': { en: 'User ID', beanie: 'user id' },
-  'accountDetails.view.customerService': { en: 'Customer Service', beanie: 'customer service' },
   'accountDetails.copyAddress': { en: 'Copy address', beanie: 'copy address' },
   'accountDetails.copied': { en: 'Address copied', beanie: 'address copied' },
   'accountDetails.copyFailedTitle': { en: "Couldn't copy", beanie: "couldn't copy" },

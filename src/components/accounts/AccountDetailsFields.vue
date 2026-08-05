@@ -76,31 +76,23 @@ function setNetwork(value: string | number) {
     <FormFieldGroup :label="t('accountDetails.field.onlineBankingUserId')">
       <BaseInput v-model="details.onlineBankingUserId" type="text" />
     </FormFieldGroup>
-    <FormFieldGroup :label="t('accountDetails.field.customerServicePhone')">
-      <BaseInput v-model="details.customerServicePhone" type="tel" placeholder="+1 800 …" />
-    </FormFieldGroup>
 
-    <!-- Bank details (checking / savings) -->
+    <!-- Bank details (checking / savings). Fields stack full-width — the long
+         uppercase labels ("ROUTING / SORT CODE") overlap in a tight 3-column
+         grid inside the drawer. -->
     <div v-if="bankFieldsApply(type)" class="space-y-3 rounded-2xl bg-[var(--tint-orange-8)] p-4">
       <div class="font-outfit text-sm font-semibold text-[var(--color-text)]">
         {{ t('accountDetails.bank.title') }}
       </div>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <FormFieldGroup :label="t('accountDetails.field.routingNumber')">
-          <BaseInput v-model="details.routingNumber" type="text" placeholder="021000021" />
-        </FormFieldGroup>
-        <FormFieldGroup :label="t('accountDetails.field.iban')">
-          <BaseInput
-            v-model="details.iban"
-            type="text"
-            class="font-mono"
-            placeholder="GB29 NWBK …"
-          />
-        </FormFieldGroup>
-        <FormFieldGroup :label="t('accountDetails.field.swiftBic')">
-          <BaseInput v-model="details.swiftBic" type="text" placeholder="CHASUS33" />
-        </FormFieldGroup>
-      </div>
+      <FormFieldGroup :label="t('accountDetails.field.routingNumber')">
+        <BaseInput v-model="details.routingNumber" type="text" placeholder="021000021" />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('accountDetails.field.iban')">
+        <BaseInput v-model="details.iban" type="text" class="font-mono" placeholder="GB29 NWBK …" />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('accountDetails.field.swiftBic')">
+        <BaseInput v-model="details.swiftBic" type="text" placeholder="CHASUS33" />
+      </FormFieldGroup>
       <FormFieldGroup v-if="type === 'savings'" :label="t('accountDetails.field.interestRate')">
         <BaseInput
           v-model="details.savingsInterestRate"
@@ -147,7 +139,7 @@ function setNetwork(value: string | number) {
           </div>
         </FormFieldGroup>
       </div>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormFieldGroup :label="t('accountDetails.field.cardExpiry')" :error="!!err('cardExpiry')">
           <BaseInput
             v-model="details.cardExpiry"
