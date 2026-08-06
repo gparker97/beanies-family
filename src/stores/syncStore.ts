@@ -115,6 +115,12 @@ export type MigrateStorageResult =
   | { outcome: 'failed'; reason: string }
   | { outcome: 'recovery-needed'; reason: string };
 
+/**
+ * Presentation status for the sidebar SaveStatusIndicator. Distinct from the
+ * store's `syncStatus` (see the `saveStatus` computed for the rationale).
+ */
+export type SaveStatus = 'saving' | 'critical' | 'degraded' | 'saved' | 'hidden';
+
 export const useSyncStore = defineStore('sync', () => {
   // State
   const isInitialized = ref(false);
@@ -224,6 +230,10 @@ export const useSyncStore = defineStore('sync', () => {
   const saveFailureLevel = ref<'none' | 'warning' | 'critical'>('none');
   const lastSaveError = ref<string | null>(null);
   const showSaveFailureBanner = ref(false);
+  // Consecutive save-failure count mirrored from syncService's per-attempt
+  // channel (see the onSaveAttempt subscription below). Drives the sidebar
+  // save-status indicator's one-retry debounce (amber only at >= 2).
+  const consecutiveSaveFailures = ref(syncService.getConsecutiveSaveFailures());
 
   // Banner is mutually exclusive with the GoogleReconnectToast (the canonical
   // surface for permanent expiry). When the toast is up, the toast handles
@@ -364,6 +374,25 @@ export const useSyncStore = defineStore('sync', () => {
     return 'ready';
   });
 
+  // Presentation status for the sidebar SaveStatusIndicator (row + popover +
+  // hamburger dot). DISTINCT from `syncStatus` above: that answers "what sync
+  // lifecycle state are we in?" for other consumers; this answers "what should
+  // the quiet save indicator show?". Do not merge them — they drive different UI.
+  //
+  // Total function — always returns a SaveStatus, never undefined. The final
+  // `'hidden'` covers both "no data file" AND the transient first-launch window
+  // where the pod is configured but the first save hasn't completed (lastSync
+  // still null, no failures) — so the presentation map is never indexed by a
+  // missing key. `needsPermission` is intentionally NOT a distinct state: a
+  // stale Drive permission surfaces through the ordinary failure escalation.
+  const saveStatus = computed<SaveStatus>(() => {
+    if (isSyncing.value) return 'saving';
+    if (saveFailureLevel.value === 'critical') return 'critical';
+    if (consecutiveSaveFailures.value >= 2) return 'degraded';
+    if (isConfigured.value && lastSync.value) return 'saved';
+    return 'hidden';
+  });
+
   // Subscribe to sync service state changes
   syncService.onStateChange((state) => {
     isInitialized.value = state.isInitialized;
@@ -383,6 +412,26 @@ export const useSyncStore = defineStore('sync', () => {
 
   // Subscribe to save failure level changes — see handleSaveFailureChange above.
   syncService.onSaveFailureChange(handleSaveFailureChange);
+
+  // Mirror the per-attempt consecutive-failure count (drives `saveStatus`).
+  syncService.onSaveAttempt((count) => {
+    consecutiveSaveFailures.value = count;
+  });
+
+  // Single owner of save-status transition telemetry. Lives in the store — NOT
+  // in SaveStatusIndicator.vue, which mounts twice (desktop sidebar + mobile
+  // drawer) — so each transition is logged exactly once. Emits on the success
+  // path too so degraded/recovery rates are measurable. `provider_type` and
+  // `save_failure_level` are auto-injected by diagnosticContext.
+  watch(saveStatus, (next, prev) => {
+    if (next === prev) return;
+    logEvent({
+      level: 'info',
+      surface: 'save-status',
+      message: 'save status transition',
+      context: { save_status: next, consecutive_failures: consecutiveSaveFailures.value },
+    });
+  });
 
   // Background sync state (cache-first loading)
   const isBackgroundSyncing = ref(false);
@@ -3470,6 +3519,8 @@ export const useSyncStore = defineStore('sync', () => {
     capabilities,
     supportsAutoSync,
     syncStatus,
+    saveStatus,
+    consecutiveSaveFailures,
     hasSessionPassword,
     hasPendingEncryptedFile,
     storageProviderType,

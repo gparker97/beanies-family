@@ -2822,6 +2822,38 @@ const STRING_DEFS = {
     beanie: 'data file not encrypted',
   },
 
+  // Save-status indicator (sidebar security cluster + mobile drawer)
+  'saveStatus.saved': { en: 'Saved', beanie: 'saved' },
+  'saveStatus.savedAgo': { en: 'Saved · {time}', beanie: 'saved · {time}' },
+  'saveStatus.saving': { en: 'Saving…', beanie: 'saving…' },
+  'saveStatus.degraded': { en: 'Having trouble saving', beanie: 'having trouble saving' },
+  'saveStatus.rowAria': {
+    en: 'Save status — tap for details',
+    beanie: 'save status — tap for details',
+  },
+  'saveStatus.needsAttention': { en: 'save needs attention', beanie: 'save needs attention' },
+  // Popover
+  'saveStatus.titleSafe': { en: 'Your beans are safe', beanie: 'your beans are safe' },
+  'saveStatus.connection': { en: 'Connection', beanie: 'connection' },
+  'saveStatus.connected': { en: 'Connected', beanie: 'connected' },
+  'saveStatus.reconnecting': { en: 'Reconnecting…', beanie: 'reconnecting…' },
+  'saveStatus.lastSaved': { en: 'Last saved', beanie: 'last saved' },
+  'saveStatus.lastGoodSave': { en: 'Last good save', beanie: 'last good save' },
+  'saveStatus.never': { en: 'Not saved yet', beanie: 'not saved yet' },
+  'saveStatus.manageConnection': { en: 'Manage connection', beanie: 'manage connection' },
+  'saveStatus.reassuranceOk': {
+    en: 'Everything is saving normally.',
+    beanie: 'everything is saving normally.',
+  },
+  'saveStatus.reassuranceDegradedOwner': {
+    en: 'Your recent changes are held safely on this device until the next save lands.',
+    beanie: 'your recent changes are held safely on this device until the next save lands.',
+  },
+  'saveStatus.reassuranceDegradedMember': {
+    en: 'Your changes are safe on this device. If it keeps up, let your family owner know.',
+    beanie: 'your changes are safe on this device. if it keeps up, let your family owner know.',
+  },
+
   // Transactions (additional)
   'transactions.showing': { en: 'Showing:', beanie: 'showing:' },
   'transactions.income': { en: 'Income', beanie: 'beans in' },
@@ -7418,6 +7450,11 @@ const STRING_DEFS = {
     en: 'This trip has wrapped up',
     beanie: 'this trip has wrapped up — welcome home',
   },
+  // timeline phase markers (past "done" tag + ongoing-span "staying now" chip)
+  'travel.timeline.done': { en: 'Done', beanie: 'done' },
+  'travel.timeline.stayingNow': { en: 'Staying now', beanie: 'staying now' },
+  'travel.timeline.until': { en: 'until {date}', beanie: 'until {date}' },
+  'travel.timeline.nextDay': { en: '+1 day', beanie: '+1 day' },
 
   // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
   'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },
@@ -8471,6 +8508,10 @@ const STRING_DEFS = {
   'segmentRow.pickupTime': { en: 'Pickup time', beanie: 'pickup time' },
   'segmentRow.returnDate': { en: 'Return date', beanie: 'return date' },
   'segmentRow.returnTime': { en: 'Return time', beanie: 'return time' },
+  // when-band cell captions (travel timeline hero band)
+  'segmentRow.starts': { en: 'Starts', beanie: 'starts' },
+  'segmentRow.pickup': { en: 'Pick-up', beanie: 'pick-up' },
+  'segmentRow.return': { en: 'Return', beanie: 'return' },
   // ── i18n: transaction category + group names (constants/categories.ts) ──
   'category.freelance': { en: 'Freelance', beanie: 'freelance' },
   'category.salary': { en: 'Salary', beanie: 'salary' },

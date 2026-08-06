@@ -233,6 +233,17 @@ export type SaveFailureLevel = 'none' | 'warning' | 'critical';
 type SaveFailureCallback = (level: SaveFailureLevel, error: string | null) => void;
 const saveFailureCallbacks: SaveFailureCallback[] = [];
 
+// Per-attempt save notification (drives the sidebar SaveStatusIndicator).
+// Fires on EVERY save outcome carrying the fresh `consecutiveFailures` count.
+// Deliberately SEPARATE from `onStateChange`: doSave() calls
+// updateState({ isSyncing: false }) — which fires onStateChange — BEFORE
+// recordSaveSuccess/recordSaveFailure mutate the count, so an onStateChange
+// subscriber would read the *previous* count. This channel fires from inside
+// recordSaveSuccess/recordSaveFailure with the updated value. Do NOT consolidate
+// it into onStateChange or the count goes stale (off-by-one).
+type SaveAttemptCallback = (consecutiveFailures: number) => void;
+const saveAttemptCallbacks: SaveAttemptCallback[] = [];
+
 let consecutiveFailures = 0;
 let lastSaveError: string | null = null;
 let saveFailureLevel: SaveFailureLevel = 'none';
@@ -251,16 +262,33 @@ function updateSaveFailureLevel(): void {
   }
 }
 
+/**
+ * Notify per-attempt subscribers of the current consecutive-failure count.
+ * Each subscriber is dispatched inside try/catch so a throwing consumer can
+ * never break the save path (unlike the older `saveFailureCallbacks.forEach`).
+ */
+function notifySaveAttempt(): void {
+  saveAttemptCallbacks.forEach((cb) => {
+    try {
+      cb(consecutiveFailures);
+    } catch (err) {
+      console.error('[syncService] save-attempt subscriber threw', err);
+    }
+  });
+}
+
 function recordSaveSuccess(): void {
   consecutiveFailures = 0;
   lastSaveError = null;
   updateSaveFailureLevel();
+  notifySaveAttempt();
 }
 
 function recordSaveFailure(error: string): void {
   consecutiveFailures++;
   lastSaveError = error;
   updateSaveFailureLevel();
+  notifySaveAttempt();
 }
 
 /** Get the current save failure level. */
@@ -278,6 +306,24 @@ export function resetSaveFailures(): void {
   consecutiveFailures = 0;
   lastSaveError = null;
   updateSaveFailureLevel();
+  notifySaveAttempt();
+}
+
+/** Current consecutive save-failure count (0 = last attempt succeeded). */
+export function getConsecutiveSaveFailures(): number {
+  return consecutiveFailures;
+}
+
+/**
+ * Subscribe to per-save-attempt outcomes. The callback receives the fresh
+ * consecutive-failure count on every success/failure. Returns an unsubscribe fn.
+ */
+export function onSaveAttempt(callback: SaveAttemptCallback): () => void {
+  saveAttemptCallbacks.push(callback);
+  return () => {
+    const index = saveAttemptCallbacks.indexOf(callback);
+    if (index > -1) saveAttemptCallbacks.splice(index, 1);
+  };
 }
 
 /** Subscribe to save failure level changes. Returns unsubscribe function. */

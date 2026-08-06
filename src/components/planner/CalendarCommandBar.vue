@@ -22,9 +22,11 @@ import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import SearchButton from '@/components/common/SearchButton.vue';
 import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
+import { useSyncStore } from '@/stores/syncStore';
+import { SAVE_STATUS_PRESENTATION } from '@/components/ui/saveStatusPresentation';
 import type { PlannerView } from '@/composables/usePlannerNavigation';
 
 defineProps<{
@@ -59,6 +61,10 @@ const { t } = useTranslation();
 // predicate (see useMobileMenu) so App.vue and this bar can't disagree.
 const { toggle: toggleMenu } = useMobileMenu();
 const headerReclaimed = useHeaderReclaimed();
+
+// Collapsed-state save cue on the hamburger (degraded/critical only).
+const syncStore = useSyncStore();
+const saveNeedsAttention = computed(() => SAVE_STATUS_PRESENTATION[syncStore.saveStatus].attention);
 
 // Publish this bar's rendered height as a CSS var so the views can dock their
 // own column headers (weekday row / member row) right beneath it via
@@ -109,7 +115,7 @@ onBeforeUnmount(() => {
       <div class="flex items-center gap-2 sm:justify-start">
         <!-- Mobile only: the planner reclaims the top bar, so the hamburger that
              opens the shared MobileHamburgerMenu lives here (AppHeader is hidden). -->
-        <HamburgerButton v-if="headerReclaimed" @click="toggleMenu" />
+        <HamburgerButton v-if="headerReclaimed" :alert="saveNeedsAttention" @click="toggleMenu" />
 
         <h1
           class="font-outfit text-secondary-500 min-w-0 flex-1 truncate text-xl font-extrabold sm:flex-none sm:text-2xl dark:text-gray-100"
