@@ -32,6 +32,11 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       export_team_id: ENV["APPLE_TEAM_ID"],
+      # Pass the App Store Connect API key to the ARCHIVE step too, not just the
+      # upload. Without it, `xcodebuild -allowProvisioningUpdates` has no account
+      # to authenticate with, so it can't create/download the distribution
+      # provisioning profile ("No Accounts" / "No profiles for family.beanies.app").
+      api_key: api_key,
       # Cloud-managed automatic signing via the App Store Connect API key. The
       # version/build numbers are stamped here (rather than via agvtool) so the
       # lane doesn't depend on the project's versioning system being configured.
