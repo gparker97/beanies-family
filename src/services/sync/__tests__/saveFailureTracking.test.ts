@@ -251,6 +251,74 @@ describe('syncService — save failure tracking', () => {
     });
   });
 
+  describe('per-attempt notification (onSaveAttempt / getConsecutiveSaveFailures)', () => {
+    function failingProvider(error = 'Network error') {
+      return {
+        type: 'google_drive' as const,
+        write: vi.fn().mockRejectedValue(new Error(error)),
+        read: vi.fn(),
+        getLastModified: vi.fn(),
+        isReady: vi.fn().mockResolvedValue(true),
+        requestAccess: vi.fn(),
+        persist: vi.fn(),
+        clearPersisted: vi.fn(),
+        disconnect: vi.fn(),
+        getDisplayName: vi.fn(() => 'test.beanpod'),
+        getFileId: vi.fn(() => 'file-123'),
+        getAccountEmail: vi.fn(() => null),
+      };
+    }
+
+    it('reports the fresh consecutive-failure count on every attempt (drives the 1-retry debounce)', async () => {
+      const counts: number[] = [];
+      syncService.onSaveAttempt((n) => counts.push(n));
+      syncService.setProvider(failingProvider());
+
+      await syncService.save();
+      await syncService.save();
+
+      // 1 then 2 — the store maps >= 2 to the amber "degraded" state.
+      expect(counts).toEqual([1, 2]);
+      expect(syncService.getConsecutiveSaveFailures()).toBe(2);
+    });
+
+    it('reports 0 on a successful save', async () => {
+      const provider = failingProvider();
+      syncService.setProvider(provider);
+      await syncService.save();
+      expect(syncService.getConsecutiveSaveFailures()).toBe(1);
+
+      const counts: number[] = [];
+      syncService.onSaveAttempt((n) => counts.push(n));
+      provider.write.mockResolvedValue(undefined);
+      await syncService.save();
+
+      expect(syncService.getConsecutiveSaveFailures()).toBe(0);
+      expect(counts).toEqual([0]);
+    });
+
+    it('a throwing subscriber cannot break the save path or starve other subscribers', async () => {
+      const good = vi.fn();
+      syncService.onSaveAttempt(() => {
+        throw new Error('subscriber boom');
+      });
+      syncService.onSaveAttempt(good);
+      syncService.setProvider(failingProvider());
+
+      const result = await syncService.save();
+
+      expect(result).toBe(false); // save path unaffected by the throwing subscriber
+      expect(good).toHaveBeenCalledWith(1); // the other subscriber still fired
+    });
+
+    it('resetSaveFailures notifies subscribers with 0 (so the indicator clears on reconnect)', () => {
+      const cb = vi.fn();
+      syncService.onSaveAttempt(cb);
+      syncService.resetSaveFailures();
+      expect(cb).toHaveBeenCalledWith(0);
+    });
+  });
+
   describe('cache persistence failure tracking', () => {
     it('isCachePersistFailed returns false initially', () => {
       expect(syncService.isCachePersistFailed()).toBe(false);

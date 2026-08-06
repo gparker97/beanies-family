@@ -616,6 +616,69 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'knowing-your-data-is-saved',
+    category: 'security',
+    title: 'Knowing Your Data Is Saved',
+    excerpt:
+      'The save indicator in the sidebar shows everyone — not just the family owner — that your latest changes were saved, and quietly flags it if a save is struggling.',
+    icon: '\u{1F4BE}',
+    readTime: 3,
+    updatedDate: '2026-08-06',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Where to find it',
+        level: 2,
+        id: 'where',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "At the bottom of the sidebar — just above your data file name and the encryption badge — there's a small save indicator. On a phone it lives inside the menu you open with the ☰ button. Everyone in the family can see it, whatever their role.",
+      },
+      {
+        type: 'heading',
+        content: 'What the states mean',
+        level: 2,
+        id: 'states',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Saved · a few minutes ago</strong> — your latest changes are safely stored. Tap it any time to see when the last save happened.',
+          '<strong>Saving…</strong> — a save is in progress. This is normal and usually flashes by.',
+          "<strong>Having trouble saving</strong> — a save didn't go through and beanies is retrying. It's shown in warm orange, never alarming red, because your work isn't lost — it's held safely on your device until the next save lands.",
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          "A single hiccup won't bother you — the indicator only speaks up if a save keeps failing. If it does escalate, a full banner appears at the top of the screen with next steps.",
+        title: "We won't nag over a blip",
+        icon: '\u{1F343}',
+      },
+      {
+        type: 'heading',
+        content: 'Tap for details',
+        level: 2,
+        id: 'details',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "Tapping the indicator opens a small panel showing your connection (for Google Drive) and when you last saved. If you're the family owner, you'll also see a shortcut to reconnect or switch your data file. Other members see the status but not those controls — recovering a save is the owner's job, so nobody hits a dead end.",
+      },
+      {
+        type: 'callout',
+        content:
+          "Local files don't show a “connection” line — there's nothing to connect to. They simply show when you last saved to your device.",
+        title: 'Local files vs Google Drive',
+        icon: '\u{1F4C1}',
+      },
+    ],
+  },
   ...(CALENDAR_SYNC_HELP_LIVE ? [CALENDAR_SYNC_ARTICLE] : []),
   ...(CLASH_NUDGE_HELP_LIVE ? [CLASH_NUDGE_ARTICLE] : []),
 ];

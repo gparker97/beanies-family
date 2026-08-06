@@ -15,6 +15,11 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// The command bar reads syncStore.saveStatus to drive the hamburger's save cue.
+vi.mock('@/stores/syncStore', () => ({
+  useSyncStore: () => ({ saveStatus: 'saved' }),
+}));
+
 // Stub the composed children so we don't need their stores / overlays.
 const stubs = {
   HamburgerButton: {

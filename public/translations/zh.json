@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-05",
-    "translationCount": 3891
+    "lastUpdated": "2026-08-06",
+    "translationCount": 3915
   },
   "translations": {
     "app.name": {
@@ -19460,6 +19460,126 @@
       "translation": "移除联名所有者",
       "hash": "1ndlrm",
       "lastUpdated": "2026-08-05"
+    },
+    "saveStatus.saved": {
+      "translation": "已保存",
+      "hash": "1bfcyv",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.savedAgo": {
+      "translation": "已保存 · {time}",
+      "hash": "urj1ux",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.saving": {
+      "translation": "正在保存…",
+      "hash": "ciwss4",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.degraded": {
+      "translation": "保存时遇到问题",
+      "hash": "fxa7ia",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.rowAria": {
+      "translation": "保存状态—轻触以查看详情",
+      "hash": "scmtgp",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.needsAttention": {
+      "translation": "需要注意",
+      "hash": "fyxyyw",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.titleSafe": {
+      "translation": "您的豆子很安全",
+      "hash": "rwx33x",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.connection": {
+      "translation": "连接状态",
+      "hash": "k51ypq",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.connected": {
+      "translation": "已连接",
+      "hash": "nk9hwp",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.reconnecting": {
+      "translation": "正在重新连接",
+      "hash": "bp0lvp",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.lastSaved": {
+      "translation": "上次保存时间",
+      "hash": "u5ixk3",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.lastGoodSave": {
+      "translation": "上次成功保存",
+      "hash": "dsjkeu",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.never": {
+      "translation": "尚未保存",
+      "hash": "3ufrtu",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.manageConnection": {
+      "translation": "管理连接",
+      "hash": "p7cw2h",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.reassuranceOk": {
+      "translation": "一切正常保存。",
+      "hash": "1kl5ml",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.reassuranceDegradedOwner": {
+      "translation": "您最近的更改将安全地保存在此设备上，直到下一次保存。",
+      "hash": "cqpiqu",
+      "lastUpdated": "2026-08-06"
+    },
+    "saveStatus.reassuranceDegradedMember": {
+      "translation": "您所做的更改在此设备上是安全的。如果情况持续，请告知家庭所有者。",
+      "hash": "68o8h5",
+      "lastUpdated": "2026-08-06"
+    },
+    "travel.timeline.done": {
+      "translation": "完成",
+      "hash": "19s4i",
+      "lastUpdated": "2026-08-06"
+    },
+    "travel.timeline.stayingNow": {
+      "translation": "入住中",
+      "hash": "lgjldt",
+      "lastUpdated": "2026-08-06"
+    },
+    "travel.timeline.until": {
+      "translation": "至 {date}",
+      "hash": "jqqtiu",
+      "lastUpdated": "2026-08-06"
+    },
+    "travel.timeline.nextDay": {
+      "translation": "+1天",
+      "hash": "l4i86a",
+      "lastUpdated": "2026-08-06"
+    },
+    "segmentRow.starts": {
+      "translation": "开始",
+      "hash": "twsxan",
+      "lastUpdated": "2026-08-06"
+    },
+    "segmentRow.pickup": {
+      "translation": "提车",
+      "hash": "hyx293",
+      "lastUpdated": "2026-08-06"
+    },
+    "segmentRow.return": {
+      "translation": "还车",
+      "hash": "ulr9o0",
+      "lastUpdated": "2026-08-06"
     }
   }
 }

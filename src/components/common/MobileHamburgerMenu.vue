@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
 import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -519,6 +520,9 @@ const encryptionLabel = computed(() => {
                   </p>
                 </div>
               </div>
+
+              <!-- Save status -->
+              <SaveStatusIndicator />
 
               <!-- Encryption status -->
               <div class="flex items-center gap-1.5">

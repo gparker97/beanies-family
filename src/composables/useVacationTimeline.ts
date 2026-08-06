@@ -1,4 +1,4 @@
-import { computed, type ComputedRef } from 'vue';
+import { computed, type ComputedRef, type Ref } from 'vue';
 import {
   formatNookDate,
   formatDateShort,
@@ -11,11 +11,22 @@ import {
   buildTravelSegmentTitle,
   buildAccommodationTitle,
   buildTransportationTitle,
+  buildWhenBand,
+  segmentSpan,
+  classifySegmentPhase,
+  type WhenBand,
+  type SegmentPhase,
+  type TimingSegment,
 } from '@/utils/vacation';
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
+import type {
+  FamilyVacation,
+  VacationTravelSegment,
+  VacationAccommodation,
+  VacationTransportation,
+} from '@/types/models';
 
 /** Translator threaded into the detail-row builders so labels + enum values
  *  localize (they render in the read-only timeline, not just the edit modal). */
@@ -59,6 +70,19 @@ export interface TimelineItem {
   travellers: string[];
   /** True only when `travellers` is a strict subset of the trip — gates the collapsed avatar row. */
   showTravellers: boolean;
+  /**
+   * When-band + past/now/future phase for the expanded card. Present ONLY for
+   * dated items — undated ("still deciding") items omit it entirely, so they can
+   * never be tinted "past" or marked "staying now". Grouped so the invariant is
+   * structural: no half-populated state.
+   */
+  timing?: {
+    /** the departs→arrives (or single "starts") hero band shown atop the card */
+    band: WhenBand;
+    phase: SegmentPhase;
+    /** an ongoing multi-day span (today inside a stay with a distinct end) */
+    isOngoingSpan: boolean;
+  };
 }
 
 export interface DateGroup {
@@ -189,6 +213,12 @@ export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] 
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
   if (isF) {
+    // where → which order (date/time now lead in the hero band, so route + carrier
+    // come first in the row list). Date/time rows are still pushed below but the
+    // band-consumed filter drops them — the band is their single display home.
+    if (seg.departureAirport)
+      rows.push({ label: t('segmentRow.from'), value: seg.departureAirport });
+    if (seg.arrivalAirport) rows.push({ label: t('segmentRow.to'), value: seg.arrivalAirport });
     if (seg.airline) rows.push({ label: t('segmentRow.airline'), value: seg.airline });
     if (seg.flightNumber)
       rows.push({
@@ -196,9 +226,6 @@ export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] 
         value: seg.flightNumber,
         field: 'flightNumber',
       });
-    if (seg.departureAirport)
-      rows.push({ label: t('segmentRow.from'), value: seg.departureAirport });
-    if (seg.arrivalAirport) rows.push({ label: t('segmentRow.to'), value: seg.arrivalAirport });
     if (seg.terminal) rows.push({ label: t('segmentRow.terminal'), value: seg.terminal });
     if (seg.departureDate)
       rows.push({
@@ -333,9 +360,134 @@ export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] 
   return enrichRows(rows);
 }
 
+/** Detail rows for an accommodation. Check-in/out rows are pushed here but the
+ *  when-band promotes (and the `withTiming` filter then drops) them. */
+export function accommodationDetailRows(acc: VacationAccommodation, t: T): DetailRow[] {
+  const rows: DetailRow[] = [];
+  if (acc.address) rows.push({ label: t('segmentRow.address'), value: acc.address, mapLink: true });
+  if (acc.checkInDate)
+    rows.push({
+      label: t('segmentRow.checkIn'),
+      value: acc.checkInDate,
+      field: 'checkInDate',
+      inputType: 'date',
+    });
+  if (acc.checkOutDate)
+    rows.push({
+      label: t('segmentRow.checkOut'),
+      value: acc.checkOutDate,
+      field: 'checkOutDate',
+      inputType: 'date',
+    });
+  if (acc.roomType) rows.push({ label: t('segmentRow.room'), value: acc.roomType });
+  if (acc.confirmationNumber)
+    rows.push({
+      label: t('segmentRow.confirmation'),
+      value: acc.confirmationNumber,
+      copyable: true,
+    });
+  if (acc.contactPhone)
+    rows.push({ label: t('segmentRow.phone'), value: acc.contactPhone, field: 'contactPhone' });
+  if (acc.breakfastIncluded)
+    rows.push({ label: t('segmentRow.breakfast'), value: t('segmentRow.included') });
+  if (acc.link) rows.push({ label: t('segmentRow.link'), value: acc.link, isLink: true });
+  if (acc.notes) rows.push({ label: t('segmentRow.notes'), value: acc.notes, field: 'notes' });
+  return enrichRows(rows);
+}
+
+/** Detail rows for a transportation segment. Pick-up (and rental return) date/
+ *  time rows are pushed here; `withTiming` drops exactly the ones the band shows,
+ *  so a non-rental `returnDate` survives as a row. */
+export function transportationDetailRows(trans: VacationTransportation, t: T): DetailRow[] {
+  const rows: DetailRow[] = [];
+  if (trans.agencyAddress)
+    rows.push({ label: t('segmentRow.address'), value: trans.agencyAddress, mapLink: true });
+  if (trans.operator) rows.push({ label: t('segmentRow.operator'), value: trans.operator });
+  if (trans.route) rows.push({ label: t('segmentRow.route'), value: trans.route });
+  if (trans.departureStation)
+    rows.push({ label: t('segmentRow.from'), value: trans.departureStation });
+  if (trans.arrivalStation) rows.push({ label: t('segmentRow.to'), value: trans.arrivalStation });
+  if (trans.pickupDate)
+    rows.push({
+      label: t('segmentRow.pickupDate'),
+      value: trans.pickupDate,
+      field: 'pickupDate',
+      inputType: 'date',
+    });
+  if (trans.pickupTime)
+    rows.push({
+      label: t('segmentRow.pickupTime'),
+      value: trans.pickupTime,
+      field: 'pickupTime',
+      inputType: 'time',
+    });
+  if (trans.returnDate)
+    rows.push({
+      label: t('segmentRow.returnDate'),
+      value: trans.returnDate,
+      field: 'returnDate',
+      inputType: 'date',
+    });
+  if (trans.returnTime)
+    rows.push({
+      label: t('segmentRow.returnTime'),
+      value: trans.returnTime,
+      field: 'returnTime',
+      inputType: 'time',
+    });
+  if (trans.departureDate && !trans.pickupDate)
+    rows.push({
+      label: t('segmentRow.date'),
+      value: trans.departureDate,
+      field: 'departureDate',
+      inputType: 'date',
+    });
+  if (trans.departureTime && !trans.pickupTime)
+    rows.push({
+      label: t('segmentRow.departs'),
+      value: trans.departureTime,
+      field: 'departureTime',
+      inputType: 'time',
+    });
+  if (trans.bookingReference)
+    rows.push({ label: t('segmentRow.bookingRef'), value: trans.bookingReference, copyable: true });
+  if (trans.link) rows.push({ label: t('segmentRow.link'), value: trans.link, isLink: true });
+  if (trans.notes) rows.push({ label: t('segmentRow.notes'), value: trans.notes, field: 'notes' });
+  return enrichRows(rows);
+}
+
+/**
+ * Attach the when-band + phase to a dated segment and drop the rows the band now
+ * displays (drop set = exactly the fields the band reported consuming, so nothing
+ * is orphaned or duplicated). Undated items (no date) get no band/phase and keep
+ * every row. `today` is passed in so the caller controls reactivity.
+ */
+function withTiming(
+  kind: 'travel' | 'accommodation' | 'transportation',
+  seg: TimingSegment,
+  rows: DetailRow[],
+  dated: boolean,
+  today: string
+): { detailRows: DetailRow[]; timing?: TimelineItem['timing'] } {
+  if (!dated) return { detailRows: rows };
+  const built = buildWhenBand(kind, seg);
+  if (!built) return { detailRows: rows };
+  const consumed = new Set(built.consumed);
+  const detailRows = rows.filter((r) => !r.field || !consumed.has(r.field));
+  const span = segmentSpan(kind, seg);
+  const phase = classifySegmentPhase(span, today);
+  const isOngoingSpan = phase === 'now' && !!span.end && span.end !== span.start;
+  return { detailRows, timing: { band: built.band, phase, isOngoingSpan } };
+}
+
 // ── Composable ──────────────────────────────────────────────────────────────
 
-export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undefined>) {
+export function useVacationTimeline(
+  vacation: ComputedRef<FamilyVacation | undefined>,
+  /** Today's local date (`YYYY-MM-DD`), reactive. Read inside the computed so
+   *  segment phase (`past`/`now`/`future`) re-derives on the midnight day-roll. */
+  today: Ref<string>
+) {
   // Reading `t` inside the computeds below makes them re-evaluate on a language
   // switch, so the read-only timeline localizes live.
   const { t } = useTranslationStore();
@@ -361,6 +513,13 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     for (let i = 0; i < v.travelSegments.length; i++) {
       const seg = v.travelSegments[i]!;
       const date = seg.sortDate || seg.departureDate || seg.embarkationDate || '';
+      const { detailRows, timing } = withTiming(
+        'travel',
+        seg,
+        travelDetailRows(seg, t),
+        !!date,
+        today.value
+      );
       items.push({
         id: seg.id,
         kind: 'travel',
@@ -373,7 +532,8 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         status: seg.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
         stepNumber: 2,
-        detailRows: travelDetailRows(seg, t),
+        detailRows,
+        timing,
         arrayIndex: i,
         photoIds: seg.photoIds,
         ...travellersFor(seg.travellerIds),
@@ -383,36 +543,13 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     for (let i = 0; i < v.accommodations.length; i++) {
       const acc = v.accommodations[i]!;
       const date = acc.checkInDate || '';
-      const rows: DetailRow[] = [];
-      if (acc.address)
-        rows.push({ label: t('segmentRow.address'), value: acc.address, mapLink: true });
-      if (acc.checkInDate)
-        rows.push({
-          label: t('segmentRow.checkIn'),
-          value: acc.checkInDate,
-          field: 'checkInDate',
-          inputType: 'date',
-        });
-      if (acc.checkOutDate)
-        rows.push({
-          label: t('segmentRow.checkOut'),
-          value: acc.checkOutDate,
-          field: 'checkOutDate',
-          inputType: 'date',
-        });
-      if (acc.roomType) rows.push({ label: t('segmentRow.room'), value: acc.roomType });
-      if (acc.confirmationNumber)
-        rows.push({
-          label: t('segmentRow.confirmation'),
-          value: acc.confirmationNumber,
-          copyable: true,
-        });
-      if (acc.contactPhone)
-        rows.push({ label: t('segmentRow.phone'), value: acc.contactPhone, field: 'contactPhone' });
-      if (acc.breakfastIncluded)
-        rows.push({ label: t('segmentRow.breakfast'), value: t('segmentRow.included') });
-      if (acc.link) rows.push({ label: t('segmentRow.link'), value: acc.link, isLink: true });
-      if (acc.notes) rows.push({ label: t('segmentRow.notes'), value: acc.notes, field: 'notes' });
+      const { detailRows, timing } = withTiming(
+        'accommodation',
+        acc,
+        accommodationDetailRows(acc, t),
+        !!date,
+        today.value
+      );
 
       const kvParts: string[] = [];
       if (acc.checkInDate && acc.checkOutDate)
@@ -430,7 +567,8 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         status: acc.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
         stepNumber: 3,
-        detailRows: enrichRows(rows),
+        detailRows,
+        timing,
         arrayIndex: i,
         photoIds: acc.photoIds,
         ...travellersFor(acc.travellerIds),
@@ -440,66 +578,13 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     for (let i = 0; i < v.transportation.length; i++) {
       const trans = v.transportation[i]!;
       const date = trans.pickupDate || trans.departureDate || '';
-      const rows: DetailRow[] = [];
-      if (trans.agencyAddress)
-        rows.push({ label: t('segmentRow.address'), value: trans.agencyAddress, mapLink: true });
-      if (trans.operator) rows.push({ label: t('segmentRow.operator'), value: trans.operator });
-      if (trans.route) rows.push({ label: t('segmentRow.route'), value: trans.route });
-      if (trans.departureStation)
-        rows.push({ label: t('segmentRow.from'), value: trans.departureStation });
-      if (trans.arrivalStation)
-        rows.push({ label: t('segmentRow.to'), value: trans.arrivalStation });
-      if (trans.pickupDate)
-        rows.push({
-          label: t('segmentRow.pickupDate'),
-          value: trans.pickupDate,
-          field: 'pickupDate',
-          inputType: 'date',
-        });
-      if (trans.pickupTime)
-        rows.push({
-          label: t('segmentRow.pickupTime'),
-          value: trans.pickupTime,
-          field: 'pickupTime',
-          inputType: 'time',
-        });
-      if (trans.returnDate)
-        rows.push({
-          label: t('segmentRow.returnDate'),
-          value: trans.returnDate,
-          field: 'returnDate',
-          inputType: 'date',
-        });
-      if (trans.returnTime)
-        rows.push({
-          label: t('segmentRow.returnTime'),
-          value: trans.returnTime,
-          field: 'returnTime',
-          inputType: 'time',
-        });
-      if (trans.departureDate && !trans.pickupDate)
-        rows.push({
-          label: t('segmentRow.date'),
-          value: trans.departureDate,
-          field: 'departureDate',
-          inputType: 'date',
-        });
-      if (trans.departureTime && !trans.pickupTime)
-        rows.push({
-          label: t('segmentRow.departs'),
-          value: trans.departureTime,
-          field: 'departureTime',
-          inputType: 'time',
-        });
-      if (trans.bookingReference)
-        rows.push({
-          label: t('segmentRow.bookingRef'),
-          value: trans.bookingReference,
-          copyable: true,
-        });
-      if (trans.link) rows.push({ label: t('segmentRow.link'), value: trans.link, isLink: true });
-      if (trans.notes)
-        rows.push({ label: t('segmentRow.notes'), value: trans.notes, field: 'notes' });
+      const { detailRows, timing } = withTiming(
+        'transportation',
+        trans,
+        transportationDetailRows(trans, t),
+        !!date,
+        today.value
+      );
 
       const kvParts: string[] = [];
       if (trans.route) kvParts.push(trans.route);
@@ -537,7 +622,8 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         status: trans.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
         stepNumber: 4,
-        detailRows: enrichRows(rows),
+        detailRows,
+        timing,
         arrayIndex: i,
         photoIds: trans.photoIds,
         ...travellersFor(trans.travellerIds),
