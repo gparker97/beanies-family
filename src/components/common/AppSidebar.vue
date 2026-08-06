@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
 import NavBadge from '@/components/ui/NavBadge.vue';
 import AppSidebarSubNav from '@/components/common/AppSidebarSubNav.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
@@ -315,6 +316,9 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
 
     <!-- Security Indicators -->
     <div class="mt-3 space-y-1 px-1">
+      <!-- Save status -->
+      <SaveStatusIndicator />
+
       <!-- File name -->
       <CloudProviderBadge
         v-if="syncStore.isConfigured && syncStore.fileName"

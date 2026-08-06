@@ -416,6 +416,234 @@ export function tripDayProgress(
   return { day, total };
 }
 
+// ── Timeline "when" band + segment phase ─────────────────────────────────────
+// Single source of per-kind date/time knowledge for the expanded-segment band
+// and the past/now/future classification. Adding a segment kind is one row in
+// SEGMENT_TIMING (mirrors SIDE_FIELDS). All pure — no reactivity, no store.
+
+export type SegmentPhase = 'past' | 'now' | 'future';
+
+/** One cell of the "when" band. Raw values — `SegmentWhenBand.vue` formats them. */
+export interface WhenCell {
+  captionKey: UIStringKey;
+  /** HH:mm, unformatted */
+  time?: string;
+  /** ISO date-part (YYYY-MM-DD), unformatted */
+  date?: string;
+  /** arrival lands the next calendar day (flight/train/ferry) */
+  nextDay?: boolean;
+}
+
+export interface WhenBand {
+  start: WhenCell;
+  /** second cell — arrival, or the span end (check-out / disembark / return) */
+  end?: WhenCell;
+}
+
+/** Field names are model keys read off travel / accommodation / transportation
+ *  segments; typed loosely because one descriptor spans all three entities. */
+interface TimingCellSpec {
+  captionKey: UIStringKey;
+  /** Date fields that make the cell "present" (first present wins). A real
+   *  fallback chain, e.g. transport `pickupDate → departureDate`. */
+  dateFields: string[];
+  /** Display-only date fields, appended after `dateFields` for the shown date but
+   *  NOT counted for presence — e.g. a flight arrival borrows the departure date
+   *  for display, but must not force an arrival cell when there's no arrival time. */
+  fallbackDateFields?: string[];
+  timeFields?: string[];
+  /** boolean model field that, when true, flags a next-day arrival */
+  nextDayField?: string;
+}
+interface TimingSpec {
+  start: TimingCellSpec;
+  /** the band's second cell; ALSO the span end when `spanning` is true */
+  second?: TimingCellSpec;
+  /** true ONLY when `second` is a multi-day span end (drives past/now/`staying now`).
+   *  A flight has a second cell (arrival) but is NOT spanning. */
+  spanning?: boolean;
+}
+
+/** The one place per-kind date/time knowledge lives (see SIDE_FIELDS precedent).
+ *  Keyed by a resolved timing key (`resolveTimingKey`), not the raw segment type. */
+const SEGMENT_TIMING: Record<string, TimingSpec> = {
+  // flights + train + ferry: departs → arrives, same-day (never a multi-day span)
+  flightlike: {
+    start: {
+      captionKey: 'segmentRow.departs',
+      dateFields: ['departureDate'],
+      timeFields: ['departureTime'],
+    },
+    second: {
+      captionKey: 'segmentRow.arrives',
+      dateFields: ['arrivalDate'],
+      // borrow the departure date for display when arrival lands the same day —
+      // but only decorate an arrival cell that already exists (has a time)
+      fallbackDateFields: ['departureDate'],
+      timeFields: ['arrivalTime'],
+      nextDayField: 'arrivesNextDay',
+    },
+  },
+  cruise: {
+    start: {
+      captionKey: 'segmentRow.embark',
+      dateFields: ['embarkationDate'],
+      timeFields: ['embarkationTime'],
+    },
+    // schema has no disembarkationTime — disembark cell is date-only
+    second: { captionKey: 'segmentRow.disembark', dateFields: ['disembarkationDate'] },
+    spanning: true,
+  },
+  car: {
+    start: {
+      captionKey: 'segmentRow.starts',
+      dateFields: ['departureDate'],
+      timeFields: ['leavingTime'],
+    },
+  },
+  activity: {
+    start: {
+      captionKey: 'segmentRow.starts',
+      dateFields: ['departureDate'],
+      timeFields: ['startTime'],
+    },
+  },
+  accommodation: {
+    start: { captionKey: 'segmentRow.checkIn', dateFields: ['checkInDate'] },
+    second: { captionKey: 'segmentRow.checkOut', dateFields: ['checkOutDate'] },
+    spanning: true,
+  },
+  rental_car: {
+    start: {
+      captionKey: 'segmentRow.pickup',
+      dateFields: ['pickupDate'],
+      timeFields: ['pickupTime'],
+    },
+    second: {
+      captionKey: 'segmentRow.return',
+      dateFields: ['returnDate'],
+      timeFields: ['returnTime'],
+    },
+    spanning: true,
+  },
+  // non-rental transport (shuttle / taxi / bus): a single "starts" cell.
+  // Bus carries departureDate; shuttle/taxi carry pickupDate — fallback chain.
+  transport: {
+    start: {
+      captionKey: 'segmentRow.starts',
+      dateFields: ['pickupDate', 'departureDate'],
+      timeFields: ['pickupTime', 'departureTime'],
+    },
+  },
+};
+
+/** Map a timeline item's kind + raw segment type onto a SEGMENT_TIMING key. */
+export function resolveTimingKey(
+  kind: 'travel' | 'accommodation' | 'transportation',
+  type: string | undefined
+): string {
+  if (kind === 'accommodation') return 'accommodation';
+  if (kind === 'transportation') return type === 'rental_car' ? 'rental_car' : 'transport';
+  if (type?.startsWith('flight')) return 'flightlike';
+  if (type === 'cruise') return 'cruise';
+  if (type === 'car') return 'car';
+  if (type === 'activity') return 'activity';
+  // train / ferry share the flight departs→arrives shape
+  return 'flightlike';
+}
+
+/** Any of the three timeline segment entities — read generically by field name. */
+export type TimingSegment = VacationTravelSegment | VacationAccommodation | VacationTransportation;
+
+/** First present, non-empty string field from a fallback chain. */
+function readField(
+  seg: Record<string, unknown>,
+  fields: string[] | undefined
+): { value?: string; field?: string } {
+  if (!fields) return {};
+  for (const f of fields) {
+    const v = seg[f];
+    if (typeof v === 'string' && v) return { value: v, field: f };
+  }
+  return {};
+}
+
+/**
+ * Start / end DATE span for phase classification. `end` is returned ONLY when
+ * the kind is a multi-day span (accommodation / cruise / rental_car) — flights
+ * have a second band cell but are not spans. Date-parts only. Total: missing
+ * dates yield `undefined`, never throws.
+ */
+export function segmentSpan(
+  kind: 'travel' | 'accommodation' | 'transportation',
+  seg: TimingSegment
+): { start?: string; end?: string } {
+  const rec = seg as unknown as Record<string, unknown>;
+  const spec = SEGMENT_TIMING[resolveTimingKey(kind, seg.type)];
+  if (!spec) return {};
+  const start = readField(rec, spec.start.dateFields).value;
+  const end = spec.spanning ? readField(rec, spec.second?.dateFields).value : undefined;
+  return {
+    start: start ? extractDatePart(start) : undefined,
+    end: end ? extractDatePart(end) : undefined,
+  };
+}
+
+/**
+ * Phase of a segment relative to `today` (`YYYY-MM-DD`). A span is `past` once
+ * its END date is before today — this is the ongoing-stay fix (a hotel mid-stay
+ * is `now`, not `past`). Single-point items use their own date. Pure, `today`
+ * injected, TOTAL: a missing/blank date never hides a segment (falls to `now`).
+ */
+export function classifySegmentPhase(
+  span: { start?: string; end?: string },
+  today: string
+): SegmentPhase {
+  const end = span.end ?? span.start;
+  if (end && end < today) return 'past';
+  if (span.start && span.start > today) return 'future';
+  return 'now';
+}
+
+/**
+ * Build the when-band plus the exact model fields it consumed, so the row list
+ * can drop precisely those (never orphaning or duplicating a date). Returns
+ * `null` when the start cell has neither a date nor a time. A kind with a
+ * `second` cell but no second value degrades to a single-cell band. Raw values —
+ * `SegmentWhenBand.vue` does the formatting.
+ */
+export function buildWhenBand(
+  kind: 'travel' | 'accommodation' | 'transportation',
+  seg: TimingSegment
+): { band: WhenBand; consumed: string[] } | null {
+  const rec = seg as unknown as Record<string, unknown>;
+  const spec = SEGMENT_TIMING[resolveTimingKey(kind, seg.type)];
+  if (!spec) return null;
+  const consumed: string[] = [];
+
+  const buildCell = (cell: TimingCellSpec): WhenCell | null => {
+    const tm = readField(rec, cell.timeFields);
+    // presence: a time, or a date from the presence-counting fields
+    const present = readField(rec, cell.dateFields);
+    if (!tm.value && !present.value) return null;
+    // display date: presence fields first, then display-only fallbacks
+    const shown = readField(rec, [...cell.dateFields, ...(cell.fallbackDateFields ?? [])]);
+    if (shown.field) consumed.push(shown.field);
+    if (tm.field) consumed.push(tm.field);
+    return {
+      captionKey: cell.captionKey,
+      date: shown.value ? extractDatePart(shown.value) : undefined,
+      time: tm.value,
+      nextDay: cell.nextDayField ? rec[cell.nextDayField] === true : undefined,
+    };
+  };
+
+  const start = buildCell(spec.start);
+  if (!start) return null;
+  const end = spec.second ? buildCell(spec.second) : null;
+  return { band: end ? { start, end } : { start }, consumed };
+}
+
 /**
  * The ONE badge a trip card shows, by construction.
  *

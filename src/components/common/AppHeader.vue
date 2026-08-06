@@ -7,6 +7,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
+import { SAVE_STATUS_PRESENTATION } from '@/components/ui/saveStatusPresentation';
 import SearchButton from '@/components/common/SearchButton.vue';
 import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
@@ -49,6 +50,9 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+
+// Collapsed-state save cue on the hamburger (degraded/critical only).
+const saveNeedsAttention = computed(() => SAVE_STATUS_PRESENTATION[syncStore.saveStatus].attention);
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
 const { today, lastVisibleAt } = useToday();
@@ -235,7 +239,7 @@ async function confirmSignOutAndClearData() {
     <!-- ═══ MOBILE / TABLET HEADER ═══ -->
     <template v-if="!isDesktop">
       <!-- Left: Hamburger -->
-      <HamburgerButton @click="toggleMenu" />
+      <HamburgerButton :alert="saveNeedsAttention" @click="toggleMenu" />
 
       <!-- Center: Greeting or page title (truncated) -->
       <div class="mx-3 min-w-0 flex-1 text-center">

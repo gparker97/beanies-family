@@ -21,9 +21,25 @@ interface Props {
   hint?: string;
   /** Count of attached booking documents — shows a 📎 N chip in the header when > 0. */
   attachmentCount?: number;
+  /** Past segment — a barely-there tint (text stays full contrast). Lowest
+   *  precedence: a pending/hinted card keeps its amber treatment. */
+  past?: boolean;
 }
 
 const props = defineProps<Props>();
+
+/**
+ * Card background, in precedence order: a hint/pending card is amber (needs
+ * attention), then a past card gets a subtle slate wash (done, but still fully
+ * legible), otherwise the default surface.
+ */
+const cardClass = computed(() => {
+  if (props.hint || props.status === 'pending')
+    return 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-900/5';
+  if (props.past)
+    return 'border-[var(--tint-slate-10)] bg-[var(--tint-slate-5)] dark:border-slate-700 dark:bg-slate-800/60';
+  return 'border-[var(--tint-slate-10)] bg-white dark:border-slate-700 dark:bg-slate-800';
+});
 
 const emit = defineEmits<{
   'update:title': [value: string];
@@ -63,14 +79,7 @@ async function handleDelete() {
 </script>
 
 <template>
-  <div
-    class="group/card rounded-2xl border transition-shadow hover:shadow-md"
-    :class="
-      hint || status === 'pending'
-        ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-900/5'
-        : 'border-[var(--tint-slate-10)] bg-white dark:border-slate-700 dark:bg-slate-800'
-    "
-  >
+  <div class="group/card rounded-2xl border transition-shadow hover:shadow-md" :class="cardClass">
     <!-- Header -->
     <div class="cursor-pointer px-4 py-3" @click="toggleCollapse">
       <div class="flex items-center gap-2">

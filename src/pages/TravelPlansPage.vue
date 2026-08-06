@@ -57,6 +57,8 @@ import {
   overrideTripTarget,
 } from '@/utils/vacation';
 import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
+import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
+import StayingNowChip from '@/components/travel/StayingNowChip.vue';
 import ExpandableText from '@/components/ui/ExpandableText.vue';
 import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
@@ -376,7 +378,11 @@ const selectedVacation = computed(() =>
   selectedVacationId.value ? vacationStore.getVacationById(selectedVacationId.value) : undefined
 );
 
-const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(selectedVacation);
+const { today: todayISO } = useToday();
+const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(
+  selectedVacation,
+  todayISO
+);
 
 /** Merged timeline: interleave date groups with gap warnings.
  *  The "you are here" today indicator is rendered inline inside today's
@@ -420,10 +426,6 @@ function scrollToOutOfRange(): void {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
-
-/** Which hint tooltip is currently expanded */
-
-const { today: todayISO } = useToday();
 
 /** True when today falls inside `[tripStart, tripEnd]` inclusive. */
 const isMidTrip = computed(() => {
@@ -1230,10 +1232,7 @@ function addQuickIdea() {
                      consistent place on the timeline. -->
                 <div
                   v-if="!groupDates.has(entry.date)"
-                  :class="[
-                    'relative flex items-center pt-3 pb-1',
-                    classifyTripDay(entry.date) === 'past' ? 'opacity-55 saturate-50' : '',
-                  ]"
+                  class="relative flex items-center pt-3 pb-1"
                 >
                   <!-- Gap circle. Today/future use the dashed orange warning
                        style ("you need to book this"). Past gaps fall back to
@@ -1256,12 +1255,7 @@ function addQuickIdea() {
                     {{ entry.label }}
                   </span>
                 </div>
-                <div
-                  :class="[
-                    'relative mb-2',
-                    classifyTripDay(entry.date) === 'past' ? 'opacity-55 saturate-50' : '',
-                  ]"
-                >
+                <div class="relative mb-2">
                   <div
                     class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[var(--heritage-orange)] opacity-25"
                   />
@@ -1286,33 +1280,36 @@ function addQuickIdea() {
 
               <!-- ── Date group with segment cards ── -->
               <template v-else>
-                <!-- Classification only drives past-day muting now. Today's
-                     emphasis comes from the inline <TodayTimelineMarker>
-                     chip below the date header and the orange connector
-                     dots on today's segments. -->
-                <div
-                  :class="{
-                    'opacity-55 saturate-50': classifyTripDay(entry.data.date) === 'past',
-                  }"
-                >
-                  <!-- Date header — consistent for every day including today.
-                       Today shares the same circle + 📅 + size as every other
-                       day, but swaps the teal border for Heritage Orange and
-                       gets a pulsing halo to signal "you are here" without
-                       breaking the rail's rhythm. -->
+                <!-- Past days now read via a subtle grey ✓ rail dot + "done" tag
+                     (Option B1) instead of a fade — the segment text stays at
+                     full contrast. Today's emphasis comes from the inline
+                     <TodayTimelineMarker> chip + the orange connector dots. -->
+                <div>
+                  <!-- Date header — consistent for every day. Past: grey ✓ circle
+                       + muted label + "done" pill. Today: Heritage-Orange halo
+                       ("you are here"). Future: teal 📅. -->
                   <div class="relative flex items-center pt-3 pb-1">
                     <div
                       :class="[
                         'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
                         classifyTripDay(entry.data.date) === 'today'
                           ? 'today-date-circle'
-                          : 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]',
+                          : classifyTripDay(entry.data.date) === 'past'
+                            ? 'border-[#9aa9b5] text-[#9aa9b5]'
+                            : 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]',
                       ]"
                     >
-                      📅
+                      <span aria-hidden="true">{{
+                        classifyTripDay(entry.data.date) === 'past' ? '✓' : '📅'
+                      }}</span>
                     </div>
                     <span
-                      class="font-outfit flex items-baseline gap-1.5 text-[0.8125rem] font-bold text-gray-900 dark:text-gray-100"
+                      class="font-outfit flex items-baseline gap-1.5 text-[0.8125rem] font-bold"
+                      :class="
+                        classifyTripDay(entry.data.date) === 'past'
+                          ? 'text-[var(--color-text-muted)]'
+                          : 'text-gray-900 dark:text-gray-100'
+                      "
                     >
                       <span
                         v-if="
@@ -1326,6 +1323,12 @@ function addQuickIdea() {
                         ·
                       </span>
                       {{ entry.data.label }}
+                      <span
+                        v-if="classifyTripDay(entry.data.date) === 'past'"
+                        class="font-outfit ml-1 rounded-full bg-[var(--tint-success-10)] px-2 py-0.5 text-[0.625rem] font-semibold text-green-700 dark:text-green-400"
+                      >
+                        {{ t('travel.timeline.done') }}
+                      </span>
                     </span>
                   </div>
 
@@ -1342,12 +1345,12 @@ function addQuickIdea() {
 
                   <!-- Segment cards within this date -->
                   <div v-for="item in entry.data.items" :key="item.id" class="relative mb-2">
-                    <!-- Connector dot — Heritage Orange on today's segments
-                         to echo the banner, teal otherwise. -->
+                    <!-- Connector dot — Heritage Orange on today's segments AND
+                         on an ongoing multi-day span (staying now), teal otherwise. -->
                     <div
                       class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full"
                       :class="
-                        classifyTripDay(entry.data.date) === 'today'
+                        classifyTripDay(entry.data.date) === 'today' || item.timing?.isOngoingSpan
                           ? 'bg-[rgba(241,93,34,0.45)]'
                           : 'bg-[#00B4D8] opacity-25'
                       "
@@ -1355,16 +1358,24 @@ function addQuickIdea() {
                     <div
                       class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px]"
                       :class="
-                        classifyTripDay(entry.data.date) === 'today'
+                        classifyTripDay(entry.data.date) === 'today' || item.timing?.isOngoingSpan
                           ? 'bg-[rgba(241,93,34,0.20)]'
                           : 'bg-[rgba(0,180,216,0.12)]'
                       "
+                    />
+
+                    <!-- "Staying now" chip for an ongoing stay/cruise/rental —
+                         sits above the card so it shows collapsed or expanded. -->
+                    <StayingNowChip
+                      v-if="item.timing?.isOngoingSpan && item.timing.band.end?.date"
+                      :end-date="item.timing.band.end.date"
                     />
 
                     <VacationSegmentCard
                       :icon="item.icon"
                       :title="item.title"
                       :status="item.status"
+                      :past="item.timing?.phase === 'past'"
                       :data-segment-id="item.id"
                       :key-value="
                         item.keyValue +
@@ -1401,6 +1412,9 @@ function addQuickIdea() {
                           />
                         </div>
                       </template>
+
+                      <!-- "When" hero band — date/time leads, above the detail rows -->
+                      <SegmentWhenBand v-if="item.timing?.band" :band="item.timing.band" />
 
                       <!-- Expanded: always list who's travelling -->
                       <div class="divide-y divide-gray-100 dark:divide-slate-700/40">

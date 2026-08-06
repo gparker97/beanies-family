@@ -43,6 +43,8 @@ export const registerDocPersistCallback = vi.fn();
 export const getSaveFailureLevel = vi.fn(() => 'none');
 export const getLastSaveError = vi.fn(() => null);
 export const resetSaveFailures = vi.fn();
+export const getConsecutiveSaveFailures = vi.fn(() => 0);
+export const onSaveAttempt = vi.fn(() => () => {});
 
 // Cache persistence failure tracking
 export const isCachePersistFailed = vi.fn(() => false);

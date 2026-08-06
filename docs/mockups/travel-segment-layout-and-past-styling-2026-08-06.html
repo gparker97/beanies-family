@@ -1,0 +1,858 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Travel segment layout + past styling — options · beanies.family</title>
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --ocean: #00b4d8;
+    --ocean-deep: #0077b6;
+    --orange: #f15d22;
+    --gold: #b8860b;
+    --gold-tint: rgba(255, 217, 61, 0.14);
+    --slate: #2c3e50;
+    --cloud: #f8f9fa;
+    --ink: #1f2b38;
+    --muted: #7a8b99;
+    --line: rgba(44, 62, 80, 0.1);
+    --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+    --page: #eef2f5;
+    --surface: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #ecf0f1;
+      --muted: #93a4b2;
+      --line: rgba(255, 255, 255, 0.1);
+      --page: #1a252f;
+      --surface: #24313d;
+      --cloud: #2c3e50;
+    }
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 96px;
+  }
+  h1,
+  h2,
+  h3,
+  .of {
+    font-family: 'Outfit', sans-serif;
+  }
+  .kicker {
+    font-family: 'Caveat', cursive;
+    color: var(--orange);
+    font-size: 1.6rem;
+    line-height: 1;
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0 0 10px;
+    letter-spacing: -0.02em;
+  }
+  .lede {
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+  }
+  .problem-list {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    margin: 28px 0 8px;
+  }
+  .problem {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-shadow: var(--card-shadow);
+  }
+  .problem b {
+    font-family: 'Outfit', sans-serif;
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 3px;
+  }
+  .problem span {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .problem .tag {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ocean-deep);
+    background: rgba(0, 180, 216, 0.1);
+    border-radius: 20px;
+    padding: 2px 9px;
+    margin-bottom: 8px;
+  }
+
+  section.block {
+    margin-top: 56px;
+  }
+  .section-head {
+    border-top: 2px solid var(--line);
+    padding-top: 18px;
+    margin-bottom: 22px;
+  }
+  .section-head h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  .section-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    max-width: 70ch;
+  }
+
+  .cols {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+  }
+  .opt {
+    background: transparent;
+  }
+  .opt-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .opt-label .pill {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .pill.before {
+    background: rgba(44, 62, 80, 0.08);
+    color: var(--muted);
+  }
+  .pill.a {
+    background: rgba(0, 180, 216, 0.14);
+    color: var(--ocean-deep);
+  }
+  .pill.b {
+    background: var(--gold-tint);
+    color: var(--gold);
+  }
+  .pill.rec {
+    background: rgba(241, 93, 34, 0.12);
+    color: var(--orange);
+  }
+  .opt-label .name {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .opt-note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin: 10px 2px 0;
+  }
+  .opt-note b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* ── Faithful segment card ─────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+  }
+  .card.pending {
+    border-color: rgba(245, 178, 44, 0.5);
+    background: rgba(255, 244, 214, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    .card.pending {
+      background: rgba(120, 90, 10, 0.08);
+    }
+  }
+  .card-head {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-head .ico {
+    font-size: 1.05rem;
+  }
+  .status {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 20px;
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  .status.booked {
+    background: rgba(39, 174, 96, 0.1);
+    color: #1e874b;
+  }
+  .status.pend {
+    background: var(--gold-tint);
+    color: var(--gold);
+  }
+  .card-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chev {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  .card-body {
+    padding: 2px 14px 12px;
+  }
+  .rows {
+    display: flex;
+    flex-direction: column;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+  }
+  .row:first-child {
+    border-top: 0;
+  }
+  .row .lbl {
+    font-family: 'Outfit', sans-serif;
+    width: 84px;
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+  }
+  .row .val {
+    font-size: 0.86rem;
+    font-weight: 500;
+  }
+  .row .val.link {
+    color: var(--ocean);
+  }
+  .row .val.ref {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 2px 9px;
+    font-size: 0.82rem;
+  }
+
+  /* When-band signature (option A) */
+  .when-band {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 4px 0 12px;
+    border: 1px solid rgba(0, 180, 216, 0.28);
+  }
+  .when-cell {
+    flex: 1;
+    padding: 9px 14px;
+    background: rgba(0, 180, 216, 0.06);
+  }
+  .when-cell + .when-cell {
+    border-left: 1px solid rgba(0, 180, 216, 0.18);
+  }
+  .when-cell .cap {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ocean-deep);
+    opacity: 0.75;
+    margin-bottom: 2px;
+  }
+  .when-cell .big {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+  .when-cell .sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .when-arrow {
+    align-self: center;
+    color: var(--ocean);
+    font-size: 1rem;
+    padding: 0 6px;
+    background: rgba(0, 180, 216, 0.06);
+    display: flex;
+    align-items: center;
+  }
+
+  /* emphasized reordered date rows (option B) */
+  .row.hero .lbl {
+    color: var(--ocean-deep);
+  }
+  .row.hero .val {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  /* ── timeline rail (past-styling section) ─────────── */
+  .rail {
+    position: relative;
+    padding-left: 40px;
+  }
+  .rail::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--ocean), rgba(0, 180, 216, 0.3));
+  }
+  .day {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .dot {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2.5px solid var(--ocean);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(0, 180, 216, 0.12);
+  }
+  .day-label {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 0 8px;
+  }
+  .day-label .dayn {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* current heavy past treatment */
+  .day.past-current {
+    opacity: 0.55;
+    filter: saturate(0.5);
+  }
+
+  /* proposed subtle past treatments */
+  .day.past-b1 .dot {
+    border-color: #9aa9b5;
+    box-shadow: none;
+    color: #9aa9b5;
+  }
+  .day.past-b1 .day-label {
+    color: var(--muted);
+  }
+  .day.past-b1 .done {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #1e874b;
+    background: rgba(39, 174, 96, 0.1);
+    border-radius: 20px;
+    padding: 1px 8px;
+    margin-left: 2px;
+  }
+  .day.past-b1 .card {
+    background: color-mix(in srgb, var(--surface) 96%, var(--slate));
+  }
+
+  .day.past-b2 .dot {
+    border-color: #9aa9b5;
+    box-shadow: none;
+    color: #9aa9b5;
+  }
+  .day.past-b2 .card {
+    opacity: 0.9;
+    border-style: dashed;
+  }
+  .day.past-b2 .day-label {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: rgba(122, 139, 153, 0.4);
+    text-decoration-thickness: 1px;
+  }
+
+  /* ongoing / staying-now treatment */
+  .dot.now {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 4px rgba(241, 93, 34, 0.12);
+    color: var(--orange);
+  }
+  .now-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--orange);
+    background: rgba(241, 93, 34, 0.1);
+    border-radius: 20px;
+    padding: 3px 10px;
+    margin: 2px 0 8px;
+  }
+  .now-chip .live {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--orange);
+    animation: livepulse 1.6s ease-in-out infinite;
+  }
+  @keyframes livepulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .now-chip .live {
+      animation: none;
+    }
+  }
+
+  .legend {
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 16px;
+    margin-top: 22px;
+  }
+  .legend b {
+    color: var(--ink);
+    font-family: 'Outfit', sans-serif;
+  }
+  .foot {
+    margin-top: 64px;
+    border-top: 2px solid var(--line);
+    padding-top: 18px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .rec-banner {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(241, 93, 34, 0.07);
+    border: 1px solid rgba(241, 93, 34, 0.22);
+    border-radius: 14px;
+    padding: 12px 16px;
+    margin-top: 18px;
+    font-size: 0.85rem;
+  }
+  .rec-banner b {
+    font-family: 'Outfit', sans-serif;
+    color: var(--orange);
+  }
+</style>
+
+<div class="wrap">
+  <p class="kicker">let's make the plans easier to read ✈️</p>
+  <h1>Travel segment layout &amp; past styling</h1>
+  <p class="lede">
+    Three fixes for the trip timeline, each shown as <b>before → option</b> so you can compare on the
+    same card. Everything stays inside the existing ocean-teal travel identity — no new palette.
+  </p>
+
+  <div class="problem-list">
+    <div class="problem">
+      <span class="tag">Problem 1 · layout</span>
+      <b>The key info is buried</b>
+      <span
+        >Date and time sit <i>below</i> airline, flight #, from/to and terminal. The thing you scan
+        for first is last.</span
+      >
+    </div>
+    <div class="problem">
+      <span class="tag">Problem 2 · bug</span>
+      <b>Ongoing stays look finished</b>
+      <span
+        >A hotel is muted the moment its <i>check-in</i> passes — even mid-stay. "Past" should mean
+        <i>check-out</i> has passed.</span
+      >
+    </div>
+    <div class="problem">
+      <span class="tag">Problem 3 · legibility</span>
+      <b>Past plans are hard to read</b>
+      <span
+        >The past treatment fades the whole day to 55% + desaturated — it reads as
+        <i>disabled</i>, but you still need to read past plans while travelling.</span
+      >
+    </div>
+  </div>
+
+  <!-- ══════════════ SECTION 1: LAYOUT ══════════════ -->
+  <section class="block">
+    <div class="section-head">
+      <h2>1 · Put “when” first, then a natural order</h2>
+      <p>
+        Same flight on every card: <b>NH 802, Singapore → Tokyo Narita</b>. The current order leads
+        with the airline; both options lead with the date and time, then fall into a natural
+        when → where → which → reference order.
+      </p>
+    </div>
+
+    <div class="cols">
+      <!-- BEFORE -->
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill before">Today</span>
+          <span class="name">Current order</span>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="ico">🛫</span>
+            <span class="status booked">Booked</span>
+            <span class="card-title">Flight to Tokyo</span>
+            <span class="chev">▾</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row"><span class="lbl">Airline</span><span class="val">All Nippon Airways</span></div>
+              <div class="row"><span class="lbl">Flight #</span><span class="val">NH 802</span></div>
+              <div class="row"><span class="lbl">From</span><span class="val">Singapore (SIN)</span></div>
+              <div class="row"><span class="lbl">To</span><span class="val">Tokyo Narita (NRT)</span></div>
+              <div class="row"><span class="lbl">Terminal</span><span class="val">Terminal 1</span></div>
+              <div class="row"><span class="lbl">Date</span><span class="val">Mon, 3 Aug 2026</span></div>
+              <div class="row"><span class="lbl">Departs</span><span class="val">9:15 AM</span></div>
+              <div class="row"><span class="lbl">Arrives</span><span class="val">5:30 PM</span></div>
+              <div class="row"><span class="lbl">Booking ref</span><span class="val ref">X7QF2P 📋</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">Date/time are rows 6–8 of 9. You scroll past everything to find them.</p>
+      </div>
+
+      <!-- OPTION A -->
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill a">Option A</span>
+          <span class="name">“When” band on top</span>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="ico">🛫</span>
+            <span class="status booked">Booked</span>
+            <span class="card-title">Flight to Tokyo</span>
+            <span class="chev">▾</span>
+          </div>
+          <div class="card-body">
+            <div class="when-band">
+              <div class="when-cell">
+                <div class="cap">Departs</div>
+                <div class="big">9:15 AM</div>
+                <div class="sub">Mon, 3 Aug · SIN T1</div>
+              </div>
+              <div class="when-arrow">→</div>
+              <div class="when-cell">
+                <div class="cap">Arrives</div>
+                <div class="big">5:30 PM</div>
+                <div class="sub">Mon, 3 Aug · NRT</div>
+              </div>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="lbl">Route</span><span class="val">Singapore → Tokyo Narita</span></div>
+              <div class="row"><span class="lbl">Flight</span><span class="val">All Nippon Airways · NH 802</span></div>
+              <div class="row"><span class="lbl">Terminal</span><span class="val">Terminal 1</span></div>
+              <div class="row"><span class="lbl">Booking ref</span><span class="val ref">X7QF2P 📋</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">
+          <b>Departure &amp; arrival become a hero band</b> — the signature moment. Date/time leave the
+          row list entirely, so the rows collapse to route → flight → terminal → ref. Fewer rows,
+          scannable at a glance. Also cleanly answers "what time do I land?".
+        </p>
+      </div>
+
+      <!-- OPTION B -->
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill b">Option B</span>
+          <span class="name">Reordered rows, date emphasised</span>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="ico">🛫</span>
+            <span class="status booked">Booked</span>
+            <span class="card-title">Flight to Tokyo</span>
+            <span class="chev">▾</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row hero"><span class="lbl">Date</span><span class="val">Mon, 3 Aug 2026</span></div>
+              <div class="row hero"><span class="lbl">Departs</span><span class="val">9:15 AM</span></div>
+              <div class="row hero"><span class="lbl">Arrives</span><span class="val">5:30 PM</span></div>
+              <div class="row"><span class="lbl">From</span><span class="val">Singapore (SIN)</span></div>
+              <div class="row"><span class="lbl">To</span><span class="val">Tokyo Narita (NRT)</span></div>
+              <div class="row"><span class="lbl">Terminal</span><span class="val">Terminal 1</span></div>
+              <div class="row"><span class="lbl">Flight</span><span class="val">All Nippon · NH 802</span></div>
+              <div class="row"><span class="lbl">Booking ref</span><span class="val ref">X7QF2P 📋</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">
+          <b>Lighter-touch:</b> keeps the row list, just reorders it (when → where → which → ref) and
+          gives the three date/time rows bigger Outfit weight. Least code, no new component — but
+          more rows than A and the "reading order" is still a vertical list.
+        </p>
+      </div>
+    </div>
+
+    <div class="rec-banner">
+      <span>💡</span>
+      <div>
+        <b>My lean: Option A.</b> The when-band is the one bold element (per our "spend boldness in
+        one place" rule), it removes 3–4 rows, and departure/arrival side-by-side is genuinely how
+        you read a flight. Option B is the safe fallback if you'd rather not introduce a new block.
+        The same pattern generalises: a stay shows <i>check-in → check-out</i>, a car shows
+        <i>pick-up → drop-off</i>, an activity shows a single <i>starts</i> cell.
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SECTION 2: ONGOING BUG ══════════════ -->
+  <section class="block">
+    <div class="section-head">
+      <h2>2 · An ongoing stay is “now”, not “past”</h2>
+      <p>
+        Today is <b>Thu, 6 Aug</b>. The hotel checked in on the 3rd and checks out on the 8th — you
+        are staying there right now. Today it's grouped under its check-in day (the 3rd) and muted as
+        past. The fix: classify a spanning segment by its <b>end</b> date, and mark a live one.
+      </p>
+    </div>
+
+    <div class="cols">
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill before">Today (bug)</span>
+          <span class="name">Muted as past mid-stay</span>
+        </div>
+        <div class="rail">
+          <div class="day past-current">
+            <div class="dot">📅</div>
+            <div class="day-label"><span class="dayn">Day 1 ·</span> Mon, 3 Aug</div>
+            <div class="card">
+              <div class="card-head">
+                <span class="ico">🏨</span>
+                <span class="status booked">Booked</span>
+                <span class="card-title">Shinjuku Granbell Hotel</span>
+                <span class="chev">▸</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">
+          Faded to 55% + desaturated even though tonight's bed is <i>this</i> hotel. Reads as
+          "done / cancelled".
+        </p>
+      </div>
+
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill rec">Fix</span>
+          <span class="name">“Staying now” — full contrast</span>
+        </div>
+        <div class="rail">
+          <div class="day">
+            <div class="dot now">🏨</div>
+            <div class="day-label">
+              <span class="dayn">Nights 1–5 ·</span> 3 Aug → 8 Aug
+            </div>
+            <div class="now-chip"><span class="live"></span> Staying now · checkout Sat 8th</div>
+            <div class="card">
+              <div class="card-head">
+                <span class="ico">🏨</span>
+                <span class="status booked">Booked</span>
+                <span class="card-title">Shinjuku Granbell Hotel</span>
+                <span class="chev">▸</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">
+          A multi-night stay is classified by <b>check-out</b>. While today is inside the stay it gets
+          the Heritage-Orange "now" dot + a live chip — matching the "you are here" language already
+          used for today's day-marker. It only goes past after the 8th.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SECTION 3: PAST STYLING ══════════════ -->
+  <section class="block">
+    <div class="section-head">
+      <h2>3 · Past plans: subtle indicator, not a fade</h2>
+      <p>
+        A genuinely past day (the outbound flight, now that we've landed). It should read as
+        <i>done</i> at a glance while staying fully legible — you still open past segments for
+        terminals, refs and addresses mid-trip.
+      </p>
+    </div>
+
+    <div class="cols">
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill before">Today</span>
+          <span class="name">Fade whole day 55% + desaturate</span>
+        </div>
+        <div class="rail">
+          <div class="day past-current">
+            <div class="dot">📅</div>
+            <div class="day-label"><span class="dayn">Day 1 ·</span> Mon, 3 Aug</div>
+            <div class="card">
+              <div class="card-head">
+                <span class="ico">🛫</span>
+                <span class="status booked">Booked</span>
+                <span class="card-title">Flight to Tokyo · NH 802</span>
+                <span class="chev">▸</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">Low contrast — looks disabled, hard to read the title and ref.</p>
+      </div>
+
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill a">Option B1</span>
+          <span class="name">Muted rail + “done” tag</span>
+        </div>
+        <div class="rail">
+          <div class="day past-b1">
+            <div class="dot">✓</div>
+            <div class="day-label">
+              <span class="dayn">Day 1 ·</span> Mon, 3 Aug <span class="done">done</span>
+            </div>
+            <div class="card">
+              <div class="card-head">
+                <span class="ico">🛫</span>
+                <span class="status booked">Booked</span>
+                <span class="card-title">Flight to Tokyo · NH 802</span>
+                <span class="chev">▸</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">
+          <b>Signal moves to the rail, not the content.</b> The dot goes grey + becomes a ✓, the date
+          gets a soft "done" tag, the card keeps a barely-there tint. Text stays full contrast &amp;
+          readable. My lean.
+        </p>
+      </div>
+
+      <div class="opt">
+        <div class="opt-label">
+          <span class="pill b">Option B2</span>
+          <span class="name">Grey rail + dashed card</span>
+        </div>
+        <div class="rail">
+          <div class="day past-b2">
+            <div class="dot">📅</div>
+            <div class="day-label"><span class="dayn">Day 1 ·</span> Mon, 3 Aug</div>
+            <div class="card">
+              <div class="card-head">
+                <span class="ico">🛫</span>
+                <span class="status booked">Booked</span>
+                <span class="card-title">Flight to Tokyo · NH 802</span>
+                <span class="chev">▸</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="opt-note">
+          Grey dot, struck-through date, dashed card border — a "ghost" outline that reads past
+          without touching text contrast. Slightly more decorative than B1.
+        </p>
+      </div>
+    </div>
+
+    <div class="legend">
+      <b>Rail vocabulary across the three states</b> — teal solid dot = upcoming · Heritage-Orange
+      halo dot = today / staying now · grey ✓ dot = done. One consistent rail tells the whole
+      past → now → future story, and the segment text never drops below readable contrast.
+    </div>
+  </section>
+
+  <p class="foot">
+    Mockup · beanies.family · 2026-08-06 · options for the travel-timeline layout review. Static
+    HTML — data is illustrative (NH 802 SIN→NRT, Shinjuku Granbell). Once a direction is picked this
+    becomes a <code>/beanies-pre-plan</code> → <code>/beanies-plan</code> change to
+    <code>travelDetailRows()</code>, the timeline day-classification, and
+    <code>VacationSegmentCard</code>.
+  </p>
+</div>

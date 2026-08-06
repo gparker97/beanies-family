@@ -77,6 +77,11 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'online',
   'connection_type',
   'save_failure_level',
+  // Sidebar save-status indicator transitions (surface: 'save-status', added
+  // 2026-08-06). `save_status` is a fixed enum (saving|critical|degraded|saved|
+  // hidden); `consecutive_failures` is a small integer count. No user content.
+  'save_status',
+  'consecutive_failures',
   'drive_file_not_found',
   'context_build_error',
   'vue_info',

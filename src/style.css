@@ -583,6 +583,29 @@
   animation: attention-pulse 1.5s ease-out;
 }
 
+/* ───── Live dot pulse ───────────────────────────────────────────────────────
+   Shared "live / happening now" heartbeat for a small status dot (e.g. the
+   travel-timeline "staying now" chip). One definition of the motion + its
+   accessibility gate: the pulse runs only when the user hasn't asked to reduce
+   motion (opt-in convention, matching .today-date-circle). Base dot size/colour
+   live on the consuming component; this class only adds the animation. */
+@keyframes live-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .live-dot {
+    animation: live-dot-pulse 1.6s ease-in-out infinite;
+  }
+}
+
 /* ───── Bell ring (#55) ─────────────────────────────────────────────────────
    One-shot swing when a new reminder arrives — a quick ring-and-settle, pivoting
    from the top of the bell (the hat knob). Not a loop; the calm unread waves are

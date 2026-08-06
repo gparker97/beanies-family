@@ -65,6 +65,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'online',
   'connection_type',
   'save_failure_level',
+  'save_status',
+  'consecutive_failures',
   'drive_file_not_found',
   'context_build_error',
   'vue_info',

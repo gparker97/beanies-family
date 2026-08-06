@@ -8,6 +8,7 @@ import { showToast } from '@/composables/useToast';
 import { useSyncStore } from '@/stores/syncStore';
 import { hardReload } from '@/utils/hardReload';
 import { reportError } from '@/utils/errorReporter';
+import { FAMILY_DATA_DEEP_LINK } from '@/constants/deepLinks';
 
 const props = defineProps<{
   show: boolean;
@@ -61,7 +62,7 @@ function handleRefresh(): void {
 function goToSettings() {
   // Land directly inside the Family Data modal so the user can see their
   // current Google account + reconnect/switch options without hunting.
-  router.push({ path: '/settings', query: { open: 'family-data' } });
+  router.push(FAMILY_DATA_DEEP_LINK);
 }
 </script>
 

@@ -8,6 +8,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-06
+
+### Added
+
+- **See at a glance that your data is saved — everyone, not just the owner.** A quiet save indicator now sits at the bottom of the sidebar (and inside the mobile menu), alongside your data file name and encryption badge. It shows "Saved · <time>" at rest, "Saving…" during a save, and warms to orange (never alarming red) as "Having trouble saving" if a save keeps failing — your changes are held safely on your device until the next save lands. Tapping it shows your connection and last-saved time; family owners also get a shortcut to reconnect or switch the data file, while other members see the status without a dead-end button. Previously only owners could see any positive save status (buried in Settings), and the only always-on signal was a failure banner that waited for three strikes. A new Help Center article, "Knowing Your Data Is Saved," explains it.
+
+### Changed
+
+- **Trip plans now lead with the date and time.** Opening any travel plan (a flight, stay, cruise, car, or activity) now shows its when — departure → arrival, or check-in → check-out — as a clear band at the top, before the flight number, terminal, and other details. Whatever you're scanning for while travelling is now first, not last.
+- **Past trip days are easier to read.** A day that's already happened now reads as done via a subtle grey ✓ and a small "done" tag, instead of fading the whole day to a hard-to-read grey. You can still open past plans for terminals, confirmation numbers, and addresses at full clarity while on the go.
+
+### Fixed
+
+- **An ongoing hotel stay no longer looks finished.** A stay, cruise, or rental car you're currently in is now shown as active with a "staying now" marker (until its check-out / drop-off date) instead of being greyed out as "past" the moment it started. Whether something is past is now judged by when it ends, not when it began.
+
 ## 2026-08-05
 
 ### Fixed

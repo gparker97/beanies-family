@@ -293,6 +293,40 @@ export function timeAgo(isoString: ISODateString): string {
 }
 
 /**
+ * Localized relative time ("2 minutes ago" / "2分钟前") via
+ * `Intl.RelativeTimeFormat`, keyed to the active locale. Use this — not the
+ * English-only `timeAgo()` — for user-visible relative timestamps.
+ *
+ * Never throws and never returns a blank for a valid timestamp: an empty/invalid
+ * ISO returns `''` (the caller renders nothing), and if `Intl.RelativeTimeFormat`
+ * is unavailable it falls back to the English `timeAgo()`.
+ *
+ * @param isoString — ISO timestamp (or null/empty → `''`)
+ * @param locale    — BCP-47 locale (e.g. 'en', 'zh'); defaults to 'en'
+ */
+export function formatRelativeTime(isoString: string | null | undefined, locale = 'en'): string {
+  if (!isoString) return '';
+  try {
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return '';
+    if (typeof Intl === 'undefined' || typeof Intl.RelativeTimeFormat !== 'function') {
+      return timeAgo(isoString as ISODateString);
+    }
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    const diffSec = Math.round((date.getTime() - Date.now()) / 1000); // negative = past
+    if (Math.abs(diffSec) < 60) return rtf.format(diffSec, 'second');
+    const diffMin = Math.round(diffSec / 60);
+    if (Math.abs(diffMin) < 60) return rtf.format(diffMin, 'minute');
+    const diffHr = Math.round(diffMin / 60);
+    if (Math.abs(diffHr) < 24) return rtf.format(diffHr, 'hour');
+    const diffDay = Math.round(diffHr / 24);
+    return rtf.format(diffDay, 'day');
+  } catch {
+    return timeAgo(isoString as ISODateString);
+  }
+}
+
+/**
  * Graduated timestamp format for log-entry rows (dose log, future food /
  * sleep / mood logs). Today reads as relative time; prior days surface
  * an absolute date + time so the day-separation between entries is
