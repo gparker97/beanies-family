@@ -35,7 +35,15 @@ platform :ios do
       # Cloud-managed automatic signing via the App Store Connect API key. The
       # version/build numbers are stamped here (rather than via agvtool) so the
       # lane doesn't depend on the project's versioning system being configured.
+      #
+      # DEVELOPMENT_TEAM + CODE_SIGN_STYLE=Automatic are injected here (from the
+      # APPLE_TEAM_ID var) because the checked-in project has no team set — the
+      # archive step needs a team to sign, and `export_team_id` only covers the
+      # export step, not the archive. Keeping the team out of project.pbxproj
+      # avoids hardcoding greg's Team ID in the repo.
       xcargs: "-allowProvisioningUpdates " \
+              "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
+              "CODE_SIGN_STYLE=Automatic " \
               "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
               "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
       output_directory: "build",
