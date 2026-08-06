@@ -32,6 +32,13 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       export_team_id: ENV["APPLE_TEAM_ID"],
+      # Build the archive UNSIGNED, then sign at the export step for App Store
+      # distribution. Xcode's `archive` action signs development-style, which
+      # would require a registered device to mint a development profile ("your
+      # team has no devices") - pointless for a CI distribution build. Skipping
+      # codesign on the archive and letting export_method: app-store handle
+      # distribution signing (App Store profiles need no devices) sidesteps it.
+      skip_codesigning: true,
       # Cloud-managed automatic signing via the App Store Connect API key. The
       # version/build numbers are stamped here (rather than via agvtool) so the
       # lane doesn't depend on the project's versioning system being configured.
