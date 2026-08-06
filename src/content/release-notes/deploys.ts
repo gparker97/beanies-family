@@ -17,6 +17,49 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.06',
+    date: '2026-08-06',
+    month: '6 august 2026',
+    summary: {
+      en: 'Trip plans now lead with the date and time, and everyone can see their data is saved.',
+      beanie:
+        'trip plans now lead with the date and time, and everyone can see their data is saved.',
+    },
+    features: [
+      {
+        icon: '✈️',
+        title: { en: 'Trip plans lead with the when', beanie: 'trip plans lead with the when' },
+        description: {
+          en: "Open any travel plan - a flight, stay, cruise, car, or activity - and its times come first, shown as a clear band at the top: departure to arrival, or check-in to check-out. Past days read as done with a quiet grey check instead of fading out, and a stay you're currently in shows a 'staying now' marker until you check out, so nothing you're in the middle of looks finished.",
+          beanie:
+            "open any travel plan - a flight, stay, cruise, car, or activity - and its times come first, shown as a clear band at the top: departure to arrival, or check-in to check-out. past days read as done with a quiet grey check instead of fading out, and a stay you're currently in shows a 'staying now' marker until you check out, so nothing you're in the middle of looks finished.",
+        },
+      },
+      {
+        icon: '💾',
+        title: { en: 'Always know your data is saved', beanie: 'always know your data is saved' },
+        description: {
+          en: 'A quiet save indicator now sits at the bottom of the sidebar (and in the mobile menu) for everyone in the family, not just the owner. It shows when you last saved, flags it gently in orange if a save is struggling (your changes stay safe on your device), and lets owners reconnect or switch the data file in a tap.',
+          beanie:
+            'a quiet save indicator now sits at the bottom of the sidebar (and in the mobile menu) for everyone in the family, not just the owner. it shows when you last saved, flags it gently in orange if a save is struggling (your changes stay safe on your device), and lets owners reconnect or switch the data file in a tap.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.08.05',
     date: '2026-08-05',
     month: '5 august 2026',
