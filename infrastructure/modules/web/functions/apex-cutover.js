@@ -78,6 +78,17 @@ function handler(event) {
   var uri = request.uri;
   var qs = buildQueryString(request.querystring || {});
 
+  // 0. /.well-known/* files (apple-app-site-association, assetlinks.json) are
+  //    served VERBATIM and are frequently EXTENSIONLESS. They must never be
+  //    redirected or rewritten to `.html` — a rewrite 404s the file. The AASA is
+  //    the iOS Universal Link association: if it 404s, iOS never verifies the
+  //    link, so Universal Links (incl. the native Google OAuth return at
+  //    /oauth/native) fall back to opening in an in-app Safari sheet instead of
+  //    the app. Must run BEFORE the /oauth app-path redirect below too.
+  if (uri.indexOf('/.well-known/') === 0) {
+    return request;
+  }
+
   // 1. Legacy /beanstalk* → /blog*
   if (uri === '/beanstalk' || uri.indexOf('/beanstalk/') === 0) {
     var newUri = uri.replace(/^\/beanstalk/, '/blog');
