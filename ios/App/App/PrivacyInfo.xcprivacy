@@ -17,6 +17,9 @@
       (correlated by a random family_id); the critical-error path additionally
       carries the owner email, so these types are marked Linked.
     - User ID (family_id): a random per-family UUID used to correlate diagnostics.
+    - Product Interaction (last-login date + approx .beanpod size): a low-frequency
+      usage heartbeat sent to the family registry, used for analytics (gauge active
+      usage + data growth). Linked to family_id; never for ads or tracking.
   Family CONTENT (accounts, activities, documents) never leaves the device to us —
   it lives in the user's own encrypted .beanpod / their Google Drive.
 
@@ -91,6 +94,18 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 	</array>
