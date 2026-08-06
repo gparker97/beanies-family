@@ -59,6 +59,26 @@ export const PROFILES: DeviceProfile[] = [
     deviceScaleFactor: 2,
     isMobile: false,
   },
+  // ── Apple App Store profiles ──────────────────────────────────────────────
+  // The CSS viewport is the device's logical (point) resolution; × dsf lands on
+  // Apple's EXACT required pixel size, which App Store Connect enforces on upload:
+  //
+  //   profile     css point vp   dsf   output       Apple slot
+  //   iphone69    430x932        3     1290x2796    iPhone 6.9" (16 Pro Max) — required
+  //   iphone65    414x896        3     1242x2688    iPhone 6.5" (11/XS Max)  — fallback slot
+  //   ipad13      1032x1376      2     2064x2752    iPad 13" (Pro M4)        — needed (universal app)
+  //
+  // iPhones are < 768px CSS → mobile layout (bottom tab bar); the iPad is
+  // >= 1024px CSS → desktop layout (sidebar) — same two layouts the Android
+  // phone + tablet10 profiles already exercise, so capture.ts branches correctly.
+  { name: 'iphone69', viewport: { width: 430, height: 932 }, deviceScaleFactor: 3, isMobile: true },
+  { name: 'iphone65', viewport: { width: 414, height: 896 }, deviceScaleFactor: 3, isMobile: true },
+  {
+    name: 'ipad13',
+    viewport: { width: 1032, height: 1376 },
+    deviceScaleFactor: 2,
+    isMobile: false,
+  },
 ];
 
 export default defineConfig({
