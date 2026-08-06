@@ -58,10 +58,9 @@ platform :ios do
               "CODE_SIGN_STYLE=Automatic " \
               "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
               "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
-      export_xcargs: "-allowProvisioningUpdates " \
-                     "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
-                     "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
-                     "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']}",
+      # NB: no `export_xcargs` — gym applies `xcargs` to the export xcodebuild
+      # invocation too, so repeating the auth flags there passes
+      # `-authenticationKeyID` twice ("may only be provided once").
       output_directory: "build",
       output_name: "beanies.ipa"
     )
