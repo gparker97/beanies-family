@@ -40,6 +40,17 @@ function handler(event) {
   var request = event.request;
   var uri = request.uri;
 
+  // /.well-known/* files (apple-app-site-association, assetlinks.json) are
+  // served VERBATIM and are frequently EXTENSIONLESS. They must never be
+  // rewritten to `.html` or 301'd — a rewrite 404s the file. The AASA is the
+  // iOS Universal Link association: if it 404s, iOS never verifies the link and
+  // Universal Links (incl. the native OAuth return) fall back to opening in
+  // an in-app Safari browser instead of the app. `assetlinks.json` survived
+  // only because it has an extension; the extensionless AASA did not.
+  if (uri.indexOf('/.well-known/') === 0) {
+    return request;
+  }
+
   if (uri === '/') {
     request.uri = '/index.html';
     return request;
