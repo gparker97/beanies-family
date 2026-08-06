@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["<APPLE_TEAM_ID>.family.beanies.app"],
+        "appIDs": ["V2CKCNM3S7.family.beanies.app"],
         "components": [
           { "/": "/oauth/native" },
           { "/": "/oauth/native/*" }

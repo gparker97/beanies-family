@@ -5,11 +5,14 @@ name: Mobile — iOS TestFlight release
 # Store Connect API key exist — both gated on the D-U-N-S number. This is
 # manual-dispatch ONLY, so it never auto-runs on a push and can sit here ready.
 #
-# Before the first run, add these repo SECRETS (Settings → Secrets → Actions):
-#   APP_STORE_CONNECT_API_KEY_ID      — the key's Key ID (App Store Connect → Users and Access → Integrations → App Store Connect API)
-#   APP_STORE_CONNECT_API_ISSUER_ID   — the Issuer ID on that same page
-#   APP_STORE_CONNECT_API_KEY_P8      — base64 of the downloaded AuthKey_XXXX.p8  (`base64 -i AuthKey_XXXX.p8 | pbcopy`)
-#   APPLE_TEAM_ID                     — the 10-char Team ID (Apple Developer → Membership)
+# Before the first run, add these in Settings → Secrets and variables → Actions.
+# The three identifiers are non-sensitive (useless without the .p8 private key),
+# so they live as VARIABLES; only the private key is a SECRET.
+#   [Variable] APP_STORE_CONNECT_API_KEY_ID    — the key's Key ID (App Store Connect → Users and Access → Integrations → App Store Connect API)
+#   [Variable] APP_STORE_CONNECT_API_ISSUER_ID — the Issuer ID on that same page
+#   [Variable] APPLE_TEAM_ID                   — the 10-char Team ID (Apple Developer → Membership)
+#   [Secret]   APP_STORE_CONNECT_API_KEY_P8    — base64 of the downloaded AuthKey_XXXX.p8
+#                                                (Linux/WSL: `base64 -w0 AuthKey_XXXX.p8`; macOS: `base64 -i AuthKey_XXXX.p8 | pbcopy`)
 # The API key needs the "App Manager" (or Admin) role so cloud-managed signing
 # (`-allowProvisioningUpdates`) can create the distribution profile. The VITE_*
 # build secrets are already set (shared with the web + Android lanes).
@@ -93,10 +96,10 @@ jobs:
       - name: Build + upload to TestFlight (Fastlane)
         working-directory: ios/App
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ vars.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/asc/AuthKey.p8
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           # Monotonic build number from the run; marketing version tracks
           # APP_VERSION (derived above, R-suffix stripped).
           BUILD_NUMBER: ${{ github.run_number }}
