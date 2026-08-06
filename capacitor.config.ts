@@ -10,15 +10,17 @@ const config: CapacitorConfig = {
   // api.beanies.family / googleapis, so there's no local-vs-network proxy
   // conflict, and OAuth requests originate from the already-CORS-allowlisted
   // app origin. See ADR-029 and docs/plans/2026-05-23-native-pwa-biometric-login.md.
-  // `iosScheme` is NOT optional here: without it iOS falls back to the
-  // `capacitor://` scheme, so the real WebView origin was
-  // `capacitor://app.beanies.family` while every in-app URL, the OAuth CORS
-  // allowlist and the comment above all assume `https://app.beanies.family`.
-  // That cross-scheme mismatch made the first navigating tap after login
-  // cross-origin, so Capacitor's nav delegate handed the app to in-app Safari.
+  // NOTE (2026-08-06): do NOT add `iosScheme: 'https'` here — it is silently
+  // ignored, so it looks like a fix and changes nothing. `CAPInstanceDescriptor
+  // .normalize()` accepts a scheme only when `WKWebView.handlesURLScheme(scheme)
+  // == false`; `https` is reserved by WKWebView, so the value is discarded and
+  // reset to the default `capacitor`. The iOS origin therefore IS and must stay
+  // `capacitor://app.beanies.family` — the comment above describes ANDROID only
+  // (Android's WebViewAssetLoader does support an https scheme). Tried and
+  // reverted in build 8; the real iOS nav bugs are the /oauth/native universal
+  // link, not the scheme.
   server: {
     androidScheme: 'https',
-    iosScheme: 'https',
     hostname: 'app.beanies.family',
   },
   // Native biometric uses the hardware Keystore via the custom `BiometricKeystore`
