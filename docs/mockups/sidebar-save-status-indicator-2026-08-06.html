@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sidebar save-status indicator — beanies.family mockup</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+         beanies.family — CIG-clamped mockup
+         Palette (five-colour): Deep Slate / Heritage Orange / Sky Silk
+         / Terracotta / Cloud White. Soft green #6EE7B7 = existing
+         encryption-badge precedent (the "felt not seen" security row).
+         All sizes rem-based. Outfit = display/labels/values, Inter = body.
+         ============================================================ */
+      :root {
+        --slate: #2c3e50;
+        --slate-900: #1a252f;
+        --slate-800: #243342;
+        --slate-700: #34495e;
+        --orange: #f15d22;
+        --orange-hover: #d14d1a;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --green: #6ee7b7;
+        --border-dark: rgba(255, 255, 255, 0.08);
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.12);
+        --pop-shadow: 0 12px 44px rgba(26, 37, 47, 0.28);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+        color: var(--slate);
+        background: var(--cloud);
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
+      }
+      .font-outfit {
+        font-family: 'Outfit', system-ui, sans-serif;
+      }
+
+      /* ---------- page scaffold ---------- */
+      .page {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 5rem;
+      }
+      .masthead {
+        border-bottom: 1px solid rgba(44, 62, 80, 0.08);
+        padding-bottom: 1.75rem;
+        margin-bottom: 2.5rem;
+      }
+      .eyebrow {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--orange);
+        margin: 0 0 0.75rem;
+      }
+      h1 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 2.25rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin: 0 0 0.75rem;
+        letter-spacing: -0.01em;
+      }
+      h1 .dot {
+        color: var(--orange);
+      }
+      .lede {
+        font-size: 1rem;
+        max-width: 46rem;
+        color: rgba(44, 62, 80, 0.72);
+        margin: 0;
+      }
+      .lede strong {
+        color: var(--slate);
+        font-weight: 600;
+      }
+
+      /* ---------- section rhythm ---------- */
+      section {
+        margin-top: 3.25rem;
+      }
+      .sec-label {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+      }
+      .sec-num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: var(--orange);
+        background: rgba(241, 93, 34, 0.1);
+        border-radius: 999px;
+        padding: 0.15rem 0.6rem;
+      }
+      .sec-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+      }
+      .sec-sub {
+        font-size: 0.9375rem;
+        color: rgba(44, 62, 80, 0.66);
+        margin: 0.35rem 0 0;
+        max-width: 44rem;
+      }
+      .recommend {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #1f8f5f;
+        background: rgba(39, 174, 96, 0.12);
+        border-radius: 999px;
+        padding: 0.2rem 0.65rem;
+        vertical-align: middle;
+      }
+
+      /* ---------- the sidebar frame (real AppSidebar geometry: w-64 = 16rem) ---------- */
+      .stage {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+      }
+      .stage-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .stage-caption {
+        font-size: 0.8125rem;
+        color: rgba(44, 62, 80, 0.6);
+        max-width: 16rem;
+      }
+      .stage-caption b {
+        color: var(--slate);
+        font-weight: 600;
+      }
+      .sidebar {
+        width: 17rem;
+        background: var(--slate);
+        border-radius: 1.5rem;
+        padding: 1rem;
+        box-shadow: var(--soft-shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        color: #fff;
+      }
+      .sidebar--tall {
+        min-height: 30rem;
+        justify-content: flex-end;
+      }
+      /* condensed nav hint so the footer reads in context without noise */
+      .nav-hint {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        opacity: 0.5;
+        margin-bottom: auto;
+      }
+      .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.5rem;
+      }
+      .nav-mark {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.75rem;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 1.1rem;
+      }
+      .nav-word {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .nav-word .dot {
+        color: var(--orange);
+      }
+      .nav-row {
+        height: 0.7rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+      }
+      .nav-row.w1 {
+        width: 80%;
+      }
+      .nav-row.w2 {
+        width: 62%;
+      }
+      .nav-row.w3 {
+        width: 72%;
+      }
+
+      /* member card (existing) */
+      .member {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 1rem;
+        padding: 0.7rem 0.75rem;
+      }
+      .member .avatar {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--silk), #7fb8e0);
+        display: grid;
+        place-items: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      .member .m-name {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9375rem;
+        font-weight: 600;
+      }
+      .member .m-role {
+        font-size: 0.8125rem;
+        color: rgba(255, 255, 255, 0.35);
+      }
+
+      /* security-indicator cluster (existing rows + the NEW save-status row) */
+      .sec-cluster {
+        padding: 0 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .sec-row {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+      }
+      .sec-ico {
+        width: 0.85rem;
+        height: 0.85rem;
+        flex-shrink: 0;
+      }
+      /* existing rows sit quiet at ~30% — "felt, not seen" */
+      .sec-row.quiet {
+        color: rgba(255, 255, 255, 0.3);
+      }
+      .sec-row.quiet.enc {
+        color: rgba(110, 231, 183, 0.5);
+      }
+      .divider {
+        height: 1px;
+        background: var(--border-dark);
+        margin: 0.15rem 0;
+      }
+      .version {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.2);
+        padding: 0 0.25rem;
+      }
+
+      /* ============ Direction A — quiet status row ============ */
+      .save-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        background: transparent;
+        border: 0;
+        padding: 0.3rem 0.35rem;
+        margin: -0.3rem -0.35rem;
+        border-radius: 0.65rem;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        transition:
+          background 150ms ease,
+          opacity 150ms ease;
+      }
+      .save-row:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .save-row:focus-visible {
+        outline: 2px solid var(--silk);
+        outline-offset: 2px;
+      }
+      .save-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+      .save-label {
+        font-size: 0.75rem;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        flex: 1;
+        min-width: 0;
+      }
+      .save-chev {
+        width: 0.75rem;
+        height: 0.75rem;
+        flex-shrink: 0;
+        opacity: 0.4;
+      }
+
+      /* state: saved (quiet green, like the encryption badge) */
+      .state-saved .save-dot {
+        background: var(--green);
+        box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.14);
+      }
+      .state-saved .save-label {
+        color: rgba(255, 255, 255, 0.42);
+      }
+      .state-saved .save-label b {
+        color: rgba(255, 255, 255, 0.62);
+        font-weight: 500;
+      }
+
+      /* state: saving (sky silk, gentle pulse) */
+      .state-saving .save-dot {
+        background: var(--silk);
+        animation: breathe 1.4s ease-in-out infinite;
+      }
+      .state-saving .save-label {
+        color: rgba(174, 214, 241, 0.85);
+      }
+      @keyframes breathe {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: scale(0.85);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* state: degraded (Heritage Orange — the ONE moment the row speaks up, warmth not alarm) */
+      .state-degraded {
+        background: rgba(241, 93, 34, 0.12) !important;
+      }
+      .state-degraded .save-dot {
+        background: var(--orange);
+        box-shadow: 0 0 0 3px rgba(241, 93, 34, 0.22);
+        animation: breathe 1.4s ease-in-out infinite;
+      }
+      .state-degraded .save-label {
+        color: #ffb48c;
+        font-weight: 500;
+      }
+      .state-degraded .save-chev {
+        opacity: 0.8;
+      }
+
+      /* ============ Direction B — defined pill ============ */
+      .save-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        border-radius: 999px;
+        padding: 0.4rem 0.7rem 0.4rem 0.55rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: filter 150ms ease;
+        max-width: 100%;
+      }
+      .save-pill:hover {
+        filter: brightness(1.08);
+      }
+      .save-pill:focus-visible {
+        outline: 2px solid var(--silk);
+        outline-offset: 2px;
+      }
+      .save-pill .save-dot {
+        width: 0.45rem;
+        height: 0.45rem;
+      }
+      .pill-saved {
+        background: rgba(110, 231, 183, 0.12);
+        color: rgba(110, 231, 183, 0.85);
+      }
+      .pill-saved .save-dot {
+        background: var(--green);
+      }
+      .pill-saving {
+        background: rgba(174, 214, 241, 0.14);
+        color: rgba(174, 214, 241, 0.9);
+      }
+      .pill-saving .save-dot {
+        background: var(--silk);
+        animation: breathe 1.4s ease-in-out infinite;
+      }
+      .pill-degraded {
+        background: rgba(241, 93, 34, 0.16);
+        color: #ffb48c;
+      }
+      .pill-degraded .save-dot {
+        background: var(--orange);
+        animation: breathe 1.4s ease-in-out infinite;
+      }
+
+      /* ---------- state legend chips over each sidebar ---------- */
+      .state-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(44, 62, 80, 0.55);
+      }
+      .state-tag .swatch {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+      }
+      .sw-green {
+        background: var(--green);
+      }
+      .sw-silk {
+        background: var(--silk);
+      }
+      .sw-orange {
+        background: var(--orange);
+      }
+
+      /* ---------- popover ---------- */
+      .pop-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+      }
+      .pop-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 20rem;
+        max-width: 100%;
+      }
+      .pop-head {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .popover {
+        background: var(--cloud);
+        border-radius: 1.25rem;
+        box-shadow: var(--pop-shadow);
+        padding: 1.1rem 1.15rem 1.15rem;
+        border: 1px solid rgba(44, 62, 80, 0.06);
+        position: relative;
+      }
+      /* little pointer nub toward the sidebar row below */
+      .popover::after {
+        content: '';
+        position: absolute;
+        left: 1.5rem;
+        bottom: -0.5rem;
+        width: 1rem;
+        height: 1rem;
+        background: var(--cloud);
+        transform: rotate(45deg);
+        border-right: 1px solid rgba(44, 62, 80, 0.06);
+        border-bottom: 1px solid rgba(44, 62, 80, 0.06);
+      }
+      .pop-title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-bottom: 0.85rem;
+      }
+      .pop-badge {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.65rem;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        font-size: 1rem;
+      }
+      .pop-badge.drive {
+        background: rgba(174, 214, 241, 0.25);
+      }
+      .pop-badge.local {
+        background: rgba(44, 62, 80, 0.08);
+      }
+      .pop-badge.warn {
+        background: rgba(241, 93, 34, 0.14);
+      }
+      .pop-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .pop-sub {
+        font-size: 0.75rem;
+        color: rgba(44, 62, 80, 0.55);
+      }
+      .pop-lines {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.6rem 0;
+        border-top: 1px solid rgba(44, 62, 80, 0.07);
+      }
+      .pop-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        font-size: 0.8125rem;
+      }
+      .pop-line .k {
+        color: rgba(44, 62, 80, 0.5);
+      }
+      .pop-line .v {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        color: var(--slate);
+        text-align: right;
+      }
+      .v-green {
+        color: #1f8f5f !important;
+      }
+      .v-orange {
+        color: var(--orange) !important;
+      }
+      .pop-note {
+        font-size: 0.75rem;
+        color: rgba(44, 62, 80, 0.55);
+        background: rgba(174, 214, 241, 0.14);
+        border-radius: 0.75rem;
+        padding: 0.55rem 0.7rem;
+        margin-top: 0.6rem;
+      }
+      .pop-note.warn {
+        background: rgba(241, 93, 34, 0.1);
+        color: #a8461b;
+      }
+      .pop-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.85rem;
+      }
+      .btn {
+        border: 0;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        border-radius: 0.85rem;
+        padding: 0.55rem 0.85rem;
+        flex: 1;
+      }
+      .btn-primary {
+        background: var(--orange);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--orange-hover);
+      }
+      .btn-ghost {
+        background: rgba(44, 62, 80, 0.06);
+        color: var(--slate);
+      }
+      .btn-ghost:hover {
+        background: rgba(44, 62, 80, 0.11);
+      }
+      .role-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        border-radius: 999px;
+        padding: 0.15rem 0.55rem;
+        margin-bottom: 0.6rem;
+      }
+      .role-owner {
+        background: rgba(241, 93, 34, 0.12);
+        color: var(--orange);
+      }
+      .role-member {
+        background: rgba(44, 62, 80, 0.08);
+        color: rgba(44, 62, 80, 0.6);
+      }
+
+      /* ---------- collapsed-state cue ---------- */
+      .cue-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        align-items: flex-start;
+      }
+      .cue-card {
+        background: #fff;
+        border-radius: 1.25rem;
+        box-shadow: var(--card-shadow);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        width: 15rem;
+      }
+      .cue-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+      .cue-sub {
+        font-size: 0.75rem;
+        color: rgba(44, 62, 80, 0.55);
+        text-align: center;
+      }
+      /* mobile header strip */
+      .m-header {
+        width: 100%;
+        background: var(--cloud);
+        border: 1px solid rgba(44, 62, 80, 0.08);
+        border-radius: 1rem;
+        padding: 0.75rem 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .hamburger {
+        position: relative;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.75rem;
+        background: rgba(44, 62, 80, 0.06);
+        display: grid;
+        place-items: center;
+        gap: 0.22rem;
+        flex-shrink: 0;
+      }
+      .ham-line {
+        height: 0.15rem;
+        border-radius: 999px;
+        background: rgba(44, 62, 80, 0.5);
+      }
+      .ham-line.l1 {
+        width: 1.1rem;
+      }
+      .ham-line.l2 {
+        width: 1.1rem;
+      }
+      .ham-line.l3 {
+        width: 0.7rem;
+        background: var(--orange);
+        justify-self: start;
+        margin-left: 0.7rem;
+      }
+      .cue-dot {
+        position: absolute;
+        top: 0.3rem;
+        right: 0.3rem;
+        width: 0.6rem;
+        height: 0.6rem;
+        border-radius: 999px;
+        background: var(--orange);
+        border: 2px solid var(--cloud);
+        box-shadow: 0 0 0 2px rgba(241, 93, 34, 0.25);
+      }
+      .m-greet {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.9375rem;
+      }
+      .m-bell {
+        margin-left: auto;
+        font-size: 1.1rem;
+        opacity: 0.5;
+      }
+      /* desktop collapse toggle rail */
+      .rail {
+        position: relative;
+        width: 3rem;
+        height: 8rem;
+        background: var(--slate);
+        border-radius: 1rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 0.6rem;
+        gap: 0.8rem;
+      }
+      .rail-toggle {
+        position: relative;
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: 0.6rem;
+        background: rgba(255, 255, 255, 0.08);
+        display: grid;
+        place-items: center;
+        color: #fff;
+      }
+      .rail-ico {
+        width: 1rem;
+        opacity: 0.6;
+      }
+
+      /* ---------- mobile drawer frame ---------- */
+      .phone {
+        width: 19rem;
+        max-width: 100%;
+        border-radius: 2rem;
+        background: var(--slate);
+        padding: 0.75rem;
+        box-shadow: var(--soft-shadow);
+      }
+      .phone-screen {
+        background: var(--slate);
+        border-radius: 1.4rem;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 24rem;
+      }
+      .drawer-top {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 1rem 1rem 0.75rem;
+      }
+      .drawer-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 0.25rem 0.9rem 0.6rem;
+        opacity: 0.5;
+      }
+      .drawer-nav {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9375rem;
+        padding: 0.5rem 0.6rem;
+        border-radius: 0.85rem;
+      }
+      .drawer-foot {
+        margin-top: auto;
+        padding: 0.9rem;
+        border-top: 1px solid var(--border-dark);
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+
+      /* ---------- callout / rationale ---------- */
+      .note-card {
+        background: #fff;
+        border-radius: 1.25rem;
+        box-shadow: var(--card-shadow);
+        padding: 1.4rem 1.5rem;
+        border-left: 4px solid var(--orange);
+      }
+      .note-card h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0 0 0.6rem;
+      }
+      .note-card ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        font-size: 0.9375rem;
+        color: rgba(44, 62, 80, 0.78);
+      }
+      .note-card li {
+        margin-bottom: 0.45rem;
+      }
+      .note-card b {
+        color: var(--slate);
+      }
+      .pod-strip {
+        display: flex;
+        gap: 0.3rem;
+        margin-top: 2.5rem;
+        justify-content: center;
+      }
+      .pod-bean {
+        width: 0.9rem;
+        height: 1.2rem;
+        border-radius: 50% 50% 45% 45%;
+      }
+      .pod-bean:nth-child(1) {
+        background: var(--slate);
+      }
+      .pod-bean:nth-child(2) {
+        background: var(--terracotta);
+      }
+      .pod-bean:nth-child(3) {
+        background: var(--orange);
+      }
+      .pod-bean:nth-child(4) {
+        background: var(--silk);
+      }
+
+      @media (max-width: 640px) {
+        h1 {
+          font-size: 1.75rem;
+        }
+        .page {
+          padding: 2rem 1.1rem 4rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- ============ MASTHEAD ============ -->
+      <header class="masthead">
+        <p class="eyebrow">Notion #60 · pre-plan mockup · 2026-08-06</p>
+        <h1>A save-status you can glance at<span class="dot">.</span></h1>
+        <p class="lede">
+          Today only owners see positive save status — it's locked inside the Family Data modal — and the
+          only always-on signal is a negative banner that waits for three failures. This puts a
+          <strong>quiet, all-roles save indicator in the sidebar</strong>, right in the security cluster
+          that already shows your file name and encryption. It follows the CIG's security-UI rule:
+          <strong>felt, not seen</strong> — a whisper at rest that only warms to Heritage Orange when a
+          save is actually struggling. Never Alert Red for this routine state.
+        </p>
+      </header>
+
+      <!-- ============ THE INDICATOR — quiet status row (approved direction) ============ -->
+      <section>
+        <div class="sec-label">
+          <span class="sec-num">UI</span>
+          <div>
+            <h2 class="sec-title">Quiet status row <span class="recommend">● approved</span></h2>
+            <p class="sec-sub">
+              A single left-aligned row that matches the existing security-indicator rows exactly — same
+              weight, same low opacity. It reads as part of the seatbelt cluster, not a new widget. This is
+              the most on-brand fit for "security indicators should be felt, not seen."
+            </p>
+          </div>
+        </div>
+
+        <div class="stage">
+          <!-- SAVED -->
+          <div class="stage-col">
+            <span class="state-tag"><span class="swatch sw-green"></span>Saved · at rest</span>
+            <div class="sidebar sidebar--tall">
+              <div class="nav-hint">
+                <div class="nav-brand">
+                  <div class="nav-mark">🌱</div>
+                  <div class="nav-word">beanies<span class="dot">.family</span></div>
+                </div>
+                <div class="nav-row w1"></div>
+                <div class="nav-row w2"></div>
+                <div class="nav-row w3"></div>
+              </div>
+              <div class="member">
+                <div class="avatar">🧑</div>
+                <div>
+                  <div class="m-name">greg</div>
+                  <div class="m-role">Owner</div>
+                </div>
+              </div>
+              <div class="sec-cluster">
+                <!-- NEW save-status row -->
+                <button class="save-row state-saved" aria-label="Saved 2 minutes ago. Tap for details.">
+                  <span class="save-dot"></span>
+                  <span class="save-label"><b>Saved</b> · 2 min ago</span>
+                  <svg class="save-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6" /></svg>
+                </button>
+                <div class="divider"></div>
+                <!-- existing rows -->
+                <div class="sec-row quiet">
+                  <svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 4v16"/></svg>
+                  bean_pod_greg.beanpod
+                </div>
+                <div class="sec-row quiet enc">
+                  <svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Data encrypted
+                </div>
+              </div>
+              <div class="version">v0.9.9R1</div>
+            </div>
+          </div>
+
+          <!-- SAVING -->
+          <div class="stage-col">
+            <span class="state-tag"><span class="swatch sw-silk"></span>Saving… in-flight</span>
+            <div class="sidebar sidebar--tall">
+              <div class="nav-hint">
+                <div class="nav-brand">
+                  <div class="nav-mark">🌱</div>
+                  <div class="nav-word">beanies<span class="dot">.family</span></div>
+                </div>
+                <div class="nav-row w1"></div>
+                <div class="nav-row w2"></div>
+                <div class="nav-row w3"></div>
+              </div>
+              <div class="member">
+                <div class="avatar">🧑</div>
+                <div>
+                  <div class="m-name">greg</div>
+                  <div class="m-role">Owner</div>
+                </div>
+              </div>
+              <div class="sec-cluster">
+                <button class="save-row state-saving" aria-label="Saving now.">
+                  <span class="save-dot"></span>
+                  <span class="save-label">Saving…</span>
+                  <svg class="save-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6" /></svg>
+                </button>
+                <div class="divider"></div>
+                <div class="sec-row quiet">
+                  <svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 4v16"/></svg>
+                  bean_pod_greg.beanpod
+                </div>
+                <div class="sec-row quiet enc">
+                  <svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Data encrypted
+                </div>
+              </div>
+              <div class="version">v0.9.9R1</div>
+            </div>
+          </div>
+
+          <!-- DEGRADED -->
+          <div class="stage-col">
+            <span class="state-tag"><span class="swatch sw-orange"></span>Degraded · after failed retry</span>
+            <div class="sidebar sidebar--tall">
+              <div class="nav-hint">
+                <div class="nav-brand">
+                  <div class="nav-mark">🌱</div>
+                  <div class="nav-word">beanies<span class="dot">.family</span></div>
+                </div>
+                <div class="nav-row w1"></div>
+                <div class="nav-row w2"></div>
+                <div class="nav-row w3"></div>
+              </div>
+              <div class="member">
+                <div class="avatar">🧑</div>
+                <div>
+                  <div class="m-name">greg</div>
+                  <div class="m-role">Owner</div>
+                </div>
+              </div>
+              <div class="sec-cluster">
+                <button class="save-row state-degraded" aria-label="Having trouble saving. Tap for details.">
+                  <span class="save-dot"></span>
+                  <span class="save-label">Having trouble saving</span>
+                  <svg class="save-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6" /></svg>
+                </button>
+                <div class="divider"></div>
+                <div class="sec-row quiet">
+                  <svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 4v16"/></svg>
+                  bean_pod_greg.beanpod
+                </div>
+                <div class="sec-row quiet enc">
+                  <svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Data encrypted
+                </div>
+              </div>
+              <div class="version">v0.9.9R1</div>
+            </div>
+          </div>
+        </div>
+        <p class="stage-caption" style="max-width: 44rem; margin-top: 1rem;">
+          <b>One-retry debounce:</b> a single transient blip stays in "Saving…" through the first automatic
+          retry — the row only warms to orange if that retry also fails, so flaky links don't nag. At the
+          3-strike critical tier the existing full-width <b>SaveFailureBanner</b> still takes over
+          (out of scope for this component).
+        </p>
+      </section>
+
+      <!-- ============ POPOVER ============ -->
+      <section>
+        <div class="sec-label">
+          <span class="sec-num">TAP</span>
+          <div>
+            <h2 class="sec-title">The popover — everyone sees status, only owners get actions</h2>
+            <p class="sec-sub">
+              Tapping the row/pill opens a small popover. Connection + last-saved show for
+              <em>every</em> role. Recovery actions (reconnect, switch file) appear only for owners
+              (<code>canManagePod</code>). Copy differs for Google Drive vs a local file.
+            </p>
+          </div>
+        </div>
+
+        <div class="pop-grid">
+          <!-- Drive · owner -->
+          <div class="pop-col">
+            <span class="pop-head">Google Drive · owner</span>
+            <div class="popover">
+              <span class="role-tag role-owner">◆ owner view</span>
+              <div class="pop-title-row">
+                <div class="pop-badge drive">☁️</div>
+                <div>
+                  <div class="pop-title">Google Drive</div>
+                  <div class="pop-sub">greg@gmail.com</div>
+                </div>
+              </div>
+              <div class="pop-lines">
+                <div class="pop-line"><span class="k">Connection</span><span class="v v-green">Connected</span></div>
+                <div class="pop-line"><span class="k">Last saved</span><span class="v">2 min ago</span></div>
+              </div>
+              <div class="pop-note">Your family's beans are safe and encrypted.</div>
+              <div class="pop-actions">
+                <button class="btn btn-ghost">Switch file</button>
+                <button class="btn btn-ghost">Reconnect</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drive · member -->
+          <div class="pop-col">
+            <span class="pop-head">Google Drive · member</span>
+            <div class="popover">
+              <span class="role-tag role-member">member view</span>
+              <div class="pop-title-row">
+                <div class="pop-badge drive">☁️</div>
+                <div>
+                  <div class="pop-title">Google Drive</div>
+                  <div class="pop-sub">Your family's data file</div>
+                </div>
+              </div>
+              <div class="pop-lines">
+                <div class="pop-line"><span class="k">Connection</span><span class="v v-green">Connected</span></div>
+                <div class="pop-line"><span class="k">Last saved</span><span class="v">2 min ago</span></div>
+              </div>
+              <div class="pop-note">Everything's saving normally. No action needed on your end.</div>
+              <!-- no owner actions -->
+            </div>
+          </div>
+
+          <!-- Local · everyone (no connection line) -->
+          <div class="pop-col">
+            <span class="pop-head">Local file · any role</span>
+            <div class="popover">
+              <span class="role-tag role-member">local file</span>
+              <div class="pop-title-row">
+                <div class="pop-badge local">💾</div>
+                <div>
+                  <div class="pop-title">This device</div>
+                  <div class="pop-sub">bean_pod_greg.beanpod</div>
+                </div>
+              </div>
+              <div class="pop-lines">
+                <!-- NO "Connection" line — a local file has no persistent connection -->
+                <div class="pop-line"><span class="k">Last saved</span><span class="v">2 min ago</span></div>
+              </div>
+              <div class="pop-note">Saved to this device. Keep a backup copy somewhere safe.</div>
+              <div class="pop-actions">
+                <button class="btn btn-ghost">Switch to a different file</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Degraded · owner -->
+          <div class="pop-col">
+            <span class="pop-head">Degraded · owner (Drive)</span>
+            <div class="popover">
+              <span class="role-tag role-owner">◆ owner view</span>
+              <div class="pop-title-row">
+                <div class="pop-badge warn">⚠️</div>
+                <div>
+                  <div class="pop-title">Having trouble saving</div>
+                  <div class="pop-sub">We'll keep trying automatically</div>
+                </div>
+              </div>
+              <div class="pop-lines">
+                <div class="pop-line"><span class="k">Connection</span><span class="v v-orange">Reconnecting…</span></div>
+                <div class="pop-line"><span class="k">Last good save</span><span class="v">6 min ago</span></div>
+              </div>
+              <div class="pop-note warn">Your recent changes are held safely on this device until the next save lands.</div>
+              <div class="pop-actions">
+                <button class="btn btn-ghost">Switch file</button>
+                <button class="btn btn-primary">Reconnect now</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Degraded · member -->
+          <div class="pop-col">
+            <span class="pop-head">Degraded · member</span>
+            <div class="popover">
+              <span class="role-tag role-member">member view</span>
+              <div class="pop-title-row">
+                <div class="pop-badge warn">⚠️</div>
+                <div>
+                  <div class="pop-title">Having trouble saving</div>
+                  <div class="pop-sub">We'll keep trying automatically</div>
+                </div>
+              </div>
+              <div class="pop-lines">
+                <div class="pop-line"><span class="k">Connection</span><span class="v v-orange">Reconnecting…</span></div>
+                <div class="pop-line"><span class="k">Last good save</span><span class="v">6 min ago</span></div>
+              </div>
+              <div class="pop-note warn">Your changes are safe on this device. If it keeps up, let greg (your family owner) know.</div>
+              <!-- no dead-end action for members -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ COLLAPSED-STATE CUE ============ -->
+      <section>
+        <div class="sec-label">
+          <span class="sec-num">CUE</span>
+          <div>
+            <h2 class="sec-title">When the sidebar is closed — a tiny amber dot</h2>
+            <p class="sec-sub">
+              The row lives in the sidebar, so on mobile it's behind the hamburger and the desktop sidebar
+              can be collapsed. A small Heritage-Orange dot appears on the toggle
+              <em>only while degraded</em> — a passive "worth a look," no popup, no text. It clears itself
+              the moment a save succeeds.
+            </p>
+          </div>
+        </div>
+        <div class="cue-grid">
+          <div class="cue-card">
+            <div class="m-header">
+              <div class="hamburger">
+                <span class="ham-line l1"></span><span class="ham-line l2"></span><span class="ham-line l3"></span>
+                <span class="cue-dot"></span>
+              </div>
+              <span class="m-greet">Hi, greg</span>
+              <span class="m-bell">🔔</span>
+            </div>
+            <div class="cue-title">Mobile header</div>
+            <div class="cue-sub">Amber dot on the hamburger when a save is degraded.</div>
+          </div>
+
+          <div class="cue-card">
+            <div class="rail">
+              <div class="rail-toggle">
+                <svg class="rail-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+                <span class="cue-dot"></span>
+              </div>
+            </div>
+            <div class="cue-title">Collapsed desktop rail</div>
+            <div class="cue-sub">Same dot on the sidebar expand toggle.</div>
+          </div>
+
+          <div class="cue-card">
+            <div class="m-header">
+              <div class="hamburger">
+                <span class="ham-line l1"></span><span class="ham-line l2"></span><span class="ham-line l3"></span>
+              </div>
+              <span class="m-greet">Hi, greg</span>
+              <span class="m-bell">🔔</span>
+            </div>
+            <div class="cue-title">At rest — nothing</div>
+            <div class="cue-sub">No dot when saves are healthy. Stays out of the way.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MOBILE DRAWER IN CONTEXT ============ -->
+      <section>
+        <div class="sec-label">
+          <span class="sec-num">DRAWER</span>
+          <div>
+            <h2 class="sec-title">Inside the mobile hamburger drawer</h2>
+            <p class="sec-sub">
+              Same treatment across all surfaces: on mobile the row lives in the drawer's footer, right
+              above the file name and encryption line — open the drawer to check, exactly as greg intended.
+            </p>
+          </div>
+        </div>
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="drawer-top">
+              <div class="nav-mark" style="width: 2rem; height: 2rem; font-size: 1rem;">🌱</div>
+              <div class="nav-word" style="color: #fff;">beanies<span class="dot">.family</span></div>
+            </div>
+            <div class="drawer-body">
+              <div class="drawer-nav">🏡 The Nook</div>
+              <div class="drawer-nav">📅 Family Planner</div>
+              <div class="drawer-nav">🐷 The Piggy Bank</div>
+            </div>
+            <div class="drawer-foot">
+              <button class="save-row state-degraded" style="color: #fff;" aria-label="Having trouble saving. Tap for details.">
+                <span class="save-dot"></span>
+                <span class="save-label">Having trouble saving</span>
+                <svg class="save-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6" /></svg>
+              </button>
+              <div class="sec-row quiet"><svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 4v16"/></svg>bean_pod_greg.beanpod</div>
+              <div class="sec-row quiet enc"><svg class="sec-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Data encrypted</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ RATIONALE ============ -->
+      <section>
+        <div class="note-card">
+          <h3>Why this shape</h3>
+          <ul>
+            <li><b>It joins a cluster that already exists.</b> The sidebar footer already carries the file name (<code>CloudProviderBadge</code>), encryption status, and version. The save row slots in as one more security indicator — no new widget, strong reuse.</li>
+            <li><b>Quiet by default, warm when it matters.</b> At rest it sits at the same low opacity as its neighbours (seatbelt principle). Degraded is the one moment it speaks up — in Heritage Orange, never Alert Red, because it's a routine "still trying," not a disaster.</li>
+            <li><b>Everyone sees status; only owners act.</b> The gap this fixes is that non-admins saw <em>nothing</em> positive. Now they do — while recovery stays owner-scoped, so members never hit a dead-end button.</li>
+            <li><b>No new auto-popup.</b> It's passive chrome. Nothing pops; the amber dot is the loudest it gets until the existing 3-strike banner takes over. Respects one-popup-per-session.</li>
+          </ul>
+        </div>
+        <div class="pod-strip" aria-hidden="true">
+          <span class="pod-bean"></span><span class="pod-bean"></span><span class="pod-bean"></span><span class="pod-bean"></span>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
