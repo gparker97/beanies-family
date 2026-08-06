@@ -9,6 +9,7 @@
 # here makes Terraform the source of truth and prevents that footgun. Keep in sync with DNS.
 site_verification_txt_records = [
   "google-site-verification=LVmQNVWGix-5Phslce3sPP2SBggNf3S0jwLvFwxA4Vk",
+  "pinterest-site-verification=cc987067a09e9f8e0a9e782bbcc657ef",
   "hosted-email-verify=8uetlptp",
   "v=spf1 include:spf.migadu.com -all",
 ]
