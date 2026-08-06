@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-06
 
+### Fixed
+
+- **iPhone and iPad: the app no longer jumps out into a browser after signing in.** On the iOS app, the first tap after signing in that moved you to another screen could reload the whole app inside an in-app Safari window, complete with browser chrome. The app now runs under its true `https://app.beanies.family` address on iOS, so moving around the app stays in the app. iOS only — the web app and Android were never affected.
+
 ### Added
 
 - **See at a glance that your data is saved — everyone, not just the owner.** A quiet save indicator now sits at the bottom of the sidebar (and inside the mobile menu), alongside your data file name and encryption badge. It shows "Saved · <time>" at rest, "Saving…" during a save, and warms to orange (never alarming red) as "Having trouble saving" if a save keeps failing — your changes are held safely on your device until the next save lands. Tapping it shows your connection and last-saved time; family owners also get a shortcut to reconnect or switch the data file, while other members see the status without a dead-end button. Previously only owners could see any positive save status (buried in Settings), and the only always-on signal was a failure banner that waited for three strikes. A new Help Center article, "Knowing Your Data Is Saved," explains it.
