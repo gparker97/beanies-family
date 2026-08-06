@@ -32,25 +32,29 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       export_team_id: ENV["APPLE_TEAM_ID"],
-      # Pass the App Store Connect API key to the ARCHIVE step too, not just the
-      # upload. Without it, `xcodebuild -allowProvisioningUpdates` has no account
-      # to authenticate with, so it can't create/download the distribution
-      # provisioning profile ("No Accounts" / "No profiles for family.beanies.app").
-      api_key: api_key,
       # Cloud-managed automatic signing via the App Store Connect API key. The
       # version/build numbers are stamped here (rather than via agvtool) so the
       # lane doesn't depend on the project's versioning system being configured.
       #
-      # DEVELOPMENT_TEAM + CODE_SIGN_STYLE=Automatic are injected here (from the
-      # APPLE_TEAM_ID var) because the checked-in project has no team set — the
-      # archive step needs a team to sign, and `export_team_id` only covers the
-      # export step, not the archive. Keeping the team out of project.pbxproj
-      # avoids hardcoding greg's Team ID in the repo.
+      # `-allowProvisioningUpdates` lets Xcode create/download the distribution
+      # profile, and the `-authenticationKey*` flags give xcodebuild the App Store
+      # Connect API-key credentials to do it headlessly (no signed-in Xcode
+      # account on the CI runner). DEVELOPMENT_TEAM + CODE_SIGN_STYLE=Automatic are
+      # injected from the APPLE_TEAM_ID var because the checked-in project has no
+      # team set (keeps the Team ID out of project.pbxproj). Same auth flags on
+      # export_xcargs so the export step can re-resolve signing too.
       xcargs: "-allowProvisioningUpdates " \
+              "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
+              "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
+              "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']} " \
               "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
               "CODE_SIGN_STYLE=Automatic " \
               "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
               "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
+      export_xcargs: "-allowProvisioningUpdates " \
+                     "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
+                     "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
+                     "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']}",
       output_directory: "build",
       output_name: "beanies.ipa"
     )
