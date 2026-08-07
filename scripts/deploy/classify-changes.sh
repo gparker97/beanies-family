@@ -47,7 +47,7 @@
 #       src/**, public/**, root build files (index.html, vite/ts/tailwind/postcss
 #       config, package*.json) — i.e. everything NOT in the exclude set below.
 #   Astro marketing (→ WEB only, NOT embedded in the native apps):
-#       web/**, packages/**, content/blog/**, src/content/help/**
+#       web/**, packages/**, content/** (blog + guides), src/content/help/**
 #   iOS native shell:     ios/**  + shared-native
 #   Android native shell: android/**  + shared-native
 #   Shared-native (→ both apps): capacitor.config.*, patches/** (patch-package
@@ -94,10 +94,10 @@ WEB_CHANGES=$(diff_since "$LAST_WEB_SHA" || true)
 IOS_CHANGES=$(diff_since "$LAST_IOS_SHA" || true)
 ANDROID_CHANGES=$(diff_since "$LAST_ANDROID_SHA" || true)
 
-WEB_PATTERNS='^(web/|packages/|content/blog/|src/content/help/)'
+WEB_PATTERNS='^(web/|packages/|content/|src/content/help/)'
 # The embedded web bundle = everything NOT excluded. Native-shell paths are excluded
 # here (they are matched separately, per platform, below) so they are not double-counted.
-BUNDLE_EXCLUDE='^(web/|content/blog/|src/content/help/|android/|ios/|capacitor\.config\.|patches/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)'
+BUNDLE_EXCLUDE='^(web/|content/|src/content/help/|android/|ios/|capacitor\.config\.|patches/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)'
 IOS_NATIVE='^(ios/|capacitor\.config\.|patches/|scripts/build-native-app-assets)'
 ANDROID_NATIVE='^(android/|capacitor\.config\.|patches/|scripts/build-native-app-assets)'
 
