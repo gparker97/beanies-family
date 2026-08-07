@@ -40,6 +40,11 @@ vi.mock('@capacitor/browser', () => ({ Browser: { open: browserOpen, close: brow
 vi.mock('@capacitor/app', () => ({ App: { addListener } }));
 
 const NATIVE_REDIRECT = 'https://beanies.family/oauth/native';
+// The iOS custom-scheme bridge target — the second transport the same handler
+// must accept. Kept as a literal here on purpose: this suite is the contract
+// test for the deep-link shape, so importing the constant would make it assert
+// against itself.
+const NATIVE_BRIDGE = 'family.beanies.app://oauth/native';
 const STATE_KEY = 'beanies_redirect_auth';
 
 let googleAuth: typeof import('../googleAuth');
@@ -186,5 +191,102 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
     await Promise.resolve();
     expect(addListener).toHaveBeenCalledTimes(1);
     expect(addListener).toHaveBeenCalledWith('appUrlOpen', expect.any(Function));
+  });
+
+  // ── Custom-scheme bridge transport ──────────────────────────────────────
+  // On iOS the return arrives on `family.beanies.app://oauth/native` rather than
+  // the https Universal Link, because Apple fires Universal Links only on
+  // user-initiated taps. Both must behave identically; these parameterise the
+  // load-bearing cases over the two transports rather than duplicating the suite.
+  describe.each([
+    ['universal', NATIVE_REDIRECT, 'return_universal'],
+    ['custom_scheme', NATIVE_BRIDGE, 'return_custom_scheme'],
+  ])('transport: %s', (_label, base, expectedAction) => {
+    it('completes the exchange and navigates to returnPath', async () => {
+      setPending('good', '/welcome?resume=setup');
+      const { exchangeCodeForTokens } = await import('../oauthProxy');
+      const onComplete = vi.fn();
+      await googleAuth.handleNativeAuthRedirect(`${base}?code=THE_CODE&state=good`, onComplete);
+      expect(exchangeCodeForTokens).toHaveBeenCalledOnce();
+      expect(browserClose).toHaveBeenCalled();
+      expect(onComplete).toHaveBeenCalledWith('/welcome?resume=setup');
+    });
+
+    it('still discards the code on a state mismatch (CSRF)', async () => {
+      setPending('expected');
+      const { reportError } = await import('@/utils/errorReporter');
+      const { exchangeCodeForTokens } = await import('../oauthProxy');
+      const onComplete = vi.fn();
+      await googleAuth.handleNativeAuthRedirect(`${base}?code=abc&state=ATTACKER`, onComplete);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ surface: 'native-oauth-state-mismatch' })
+      );
+      expect(exchangeCodeForTokens).not.toHaveBeenCalled();
+      expect(onComplete).not.toHaveBeenCalled();
+    });
+
+    it('logs which transport delivered the return', async () => {
+      setPending('good');
+      const { logEvent } = await import('@/services/telemetry');
+      await googleAuth.handleNativeAuthRedirect(`${base}?code=abc&state=good`, vi.fn());
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'native-oauth',
+          context: expect.objectContaining({ action: expectedAction }),
+        })
+      );
+    });
+
+    it('emits the success counter so the failure rate is measurable', async () => {
+      setPending('good');
+      const { logEvent } = await import('@/services/telemetry');
+      await googleAuth.handleNativeAuthRedirect(`${base}?code=abc&state=good`, vi.fn());
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ context: expect.objectContaining({ action: 'complete' }) })
+      );
+    });
+  });
+
+  // The old guard was `url.startsWith(NATIVE_REDIRECT_URI)`, which accepted these.
+  it.each([`${NATIVE_REDIRECT}xyz`, `${NATIVE_BRIDGE}xyz`, 'https://evil.com/oauth/native'])(
+    'ignores the look-alike deep link %s',
+    async (url) => {
+      setPending('good');
+      const onComplete = vi.fn();
+      await googleAuth.handleNativeAuthRedirect(`${url}?code=abc&state=good`, onComplete);
+      expect(browserClose).not.toHaveBeenCalled();
+      expect(onComplete).not.toHaveBeenCalled();
+    }
+  );
+
+  // A custom scheme is invokable by any installed app or web page, so a corrupt
+  // stash is now reachable. It used to throw into the `void`-ed promise at the
+  // listener call site (an unhandled rejection).
+  it('treats an unparseable pending-auth stash as "nothing in flight" instead of throwing', async () => {
+    sessionStorage.setItem(STATE_KEY, '{not valid json');
+    const { logEvent } = await import('@/services/telemetry');
+    const { exchangeCodeForTokens } = await import('../oauthProxy');
+    const onComplete = vi.fn();
+
+    await expect(
+      googleAuth.handleNativeAuthRedirect(`${NATIVE_BRIDGE}?code=abc&state=good`, onComplete)
+    ).resolves.toBeUndefined();
+
+    expect(exchangeCodeForTokens).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ action: 'stash_unparseable' }) })
+    );
+  });
+
+  it('emits the start counter so a never-returned flow shows as an absence', async () => {
+    const { logEvent } = await import('@/services/telemetry');
+    await googleAuth.startRedirectAuth('/welcome?resume=setup', undefined, 'create');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'native-oauth',
+        context: expect.objectContaining({ action: 'start' }),
+      })
+    );
   });
 });

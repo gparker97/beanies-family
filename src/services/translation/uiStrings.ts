@@ -8233,6 +8233,14 @@ const STRING_DEFS = {
     en: "You haven't added any trips yet — start one from Travel Plans.",
     beanie: "you haven't added any trips yet — start one from travel plans.",
   },
+  // ── OAuth native bridge backstop (OAuthNativeBridgePage) ──
+  // A diagnostic surface that should never render — see the page's comment.
+  'oauth.nativeBridgeTitle': { en: 'Almost there', beanie: 'almost there' },
+  'oauth.nativeBridgeBody': {
+    en: "We couldn't hand you back to the app automatically. Tap below to finish signing in.",
+    beanie: "we couldn't hand you back to the app automatically. tap below to finish signing in.",
+  },
+  'oauth.nativeBridgeAction': { en: 'Return to beanies', beanie: 'return to beanies' },
   // ── i18n sweep 2026-06-15: strings migrated out of hardcoded templates ──
   'plausibleExclude.title.justDone': {
     en: "Done — you're excluded",
