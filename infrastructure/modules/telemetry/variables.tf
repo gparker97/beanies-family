@@ -41,6 +41,7 @@ variable "cors_origins" {
   default = [
     "https://beanies.family",     # apex (legacy / pre-cutover)
     "https://app.beanies.family", # PWA subdomain (post-cutover primary)
+    "capacitor://app.beanies.family", # Capacitor iOS native WebView — iosScheme stays `capacitor` (ADR-029; capacitor.config.ts)
     "http://localhost:5173",      # Vite dev server
     "http://localhost:4173",      # Vite preview server
   ]

@@ -132,8 +132,18 @@ resource "aws_apigatewayv2_api" "registry" {
   name          = "${var.app_name}-registry-${var.environment}"
   protocol_type = "HTTP"
 
+  # allow_origins is "*" — NOT var.cors_origins — because API Gateway v2 rejects
+  # custom-scheme origins ("Invalid format for origin capacitor://app.beanies.family",
+  # 2026-08-07), and the iOS Capacitor WebView's origin IS `capacitor://app.beanies.family`
+  # (iosScheme stays `capacitor`; see capacitor.config.ts). The gateway's job here is
+  # ONLY the browser preflight (OPTIONS) — it is not a security boundary. The real
+  # per-origin gate is each Lambda's own CORS check (e.g. oauth/index.mjs returns
+  # `403 forbidden_origin` for any Origin not in its CORS_ORIGIN allowlist, which
+  # DOES include the capacitor origin). So a wildcard preflight admits the request,
+  # then the Lambda enforces the true allowlist and echoes only allowlisted origins
+  # on the actual response. Web/PWA/Android behaviour is unchanged. See ADR-029.
   cors_configuration {
-    allow_origins = var.cors_origins
+    allow_origins = ["*"]
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allow_headers = ["Content-Type", "x-api-key"]
     max_age       = 86400
