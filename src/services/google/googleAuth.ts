@@ -28,6 +28,11 @@ import { withTimeout } from '@/utils/timing';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
 import { isNative, isIosOrIpadOs, isStandalone } from '@/services/sync/capabilities';
+import {
+  NATIVE_REDIRECT_URI,
+  nativeOAuthTransport,
+  nativeOAuthParams,
+} from '@/constants/nativeOAuth';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
@@ -41,11 +46,16 @@ const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 // Key used to temporarily store a refresh token before a family is active
 const PENDING_FAMILY_KEY = '__pending__';
 
-// Native OAuth redirect — a verified https App Link, NOT a custom scheme. The
-// existing OAuth client is a Web-application type, which rejects custom schemes
-// ("must use either http or https"); the App Link is routed back into the app
-// via a hosted /.well-known/assetlinks.json. See ADR-029.
-const NATIVE_REDIRECT_URI = 'https://beanies.family/oauth/native';
+// Native OAuth redirect — the https App Link / Universal Link Google redirects
+// to. It MUST stay an https URL: the OAuth client is a Web-application type,
+// which rejects custom schemes ("must use either http or https").
+//
+// The return then reaches the app on one of TWO transports (see
+// `nativeOAuthTransport`): the verified link itself on Android, or — because
+// Apple fires Universal Links only on user-initiated taps — a custom-scheme hop
+// from the bridge page at that URL on iOS. Both land in
+// `handleNativeAuthRedirect`. See ADR-029 and
+// docs/plans/2026-08-06-ios-oauth-custom-scheme-bridge.md.
 
 // Shared sessionStorage key for the one-time OAuth code, written by the web
 // callback (OAuthCallbackPage) AND the native deep-link handler, and read+cleared
@@ -1862,12 +1872,18 @@ export async function startRedirectAuth(
   const scope = opts.scope; // undefined ⇒ buildAuthUrl's Drive default
 
   if (isNative()) {
-    // NATIVE: opens the system browser and returns via a verified App Link deep
-    // link. Native storage is NOT bounce-cleared (the OS routes the deep-link
-    // back into this WebView), so it keeps PKCE + a CSRF `state` nonce
-    // (defense-in-depth atop the verified link; ADR-029) + the sessionStorage
-    // stash. `mode` is not used for native routing — `returnPath` rides in the
-    // stash. `generateCodeVerifier()` is a CSPRNG high-entropy string.
+    // NATIVE: opens the system browser and returns via a deep link — the
+    // verified App Link on Android, or a custom-scheme hop from the bridge page
+    // on iOS (Apple fires Universal Links only on taps, never on an OAuth
+    // redirect). Native storage is NOT bounce-cleared (the OS routes the
+    // deep-link back into this WebView), so it keeps PKCE + a CSRF `state`
+    // nonce + the sessionStorage stash.
+    //
+    // The `state` nonce is the PRIMARY authenticity control, not
+    // defense-in-depth: the custom scheme is invokable by any installed app or
+    // web page, so it is what distinguishes our return from a spoof. Do not
+    // prune it. `mode` is not used for native routing — `returnPath` rides in
+    // the stash. `generateCodeVerifier()` is a CSPRNG high-entropy string.
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
     const state = generateCodeVerifier();
@@ -1884,6 +1900,16 @@ export async function startRedirectAuth(
     const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state, scope);
     // Resolves immediately; the redirect returns via the appUrlOpen listener.
     await Browser.open({ url: authUrl });
+    // Pairs with the `return_*` / `complete` events so a started-but-never-
+    // returned flow shows up as an ABSENCE in CloudWatch. This is the signal
+    // that would have caught the iOS Universal-Link handoff failure on build 7
+    // instead of two blind TestFlight iterations.
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: 'native oauth started',
+      context: { action: 'start' },
+    });
     return;
   }
 
@@ -2063,8 +2089,12 @@ export function __resetRedirectSettleForTesting(): void {
 
 // ─── Native (Capacitor) deep-link OAuth completion ──────────────────────────
 // On native, startRedirectAuth opens the system browser; Google redirects to
-// the verified App Link (NATIVE_REDIRECT_URI), which the OS routes back into the
-// app as an `appUrlOpen` event. This listener validates the CSRF `state`, hands
+// NATIVE_REDIRECT_URI, which reaches the app as an `appUrlOpen` event on one of
+// two transports: the verified App Link directly (Android), or a custom-scheme
+// hop from the bridge page at that URL (iOS, because Apple fires Universal
+// Links only on user-initiated taps — never on an OAuth redirect, which instead
+// loads the app inside SFSafariViewController). This listener validates the
+// CSRF `state`, hands
 // the code to the shared completeRedirectAuth(), then asks the host (App.vue) to
 // navigate to the stored returnPath — the same resume-setup continuation the web
 // full-page redirect produces. The @capacitor/browser + @capacitor/app plugin
@@ -2097,21 +2127,31 @@ export async function handleNativeAuthRedirect(
   url: string,
   onComplete: (returnPath: string) => void
 ): Promise<void> {
-  // Only our OAuth redirect; ignore any other deep link.
-  if (!url.startsWith(NATIVE_REDIRECT_URI)) return;
+  // Only our OAuth redirect, on either transport; ignore any other deep link.
+  // One call yields both the guard and the telemetry label, so they can never
+  // disagree about what counts as our URL. Exact-match, so a look-alike such as
+  // `.../oauth/nativexyz` is rejected (a plain startsWith accepted it).
+  const transport = nativeOAuthTransport(url);
+  if (!transport) return;
 
-  let params: URLSearchParams;
-  try {
-    params = new URL(url).searchParams;
-  } catch {
-    return; // malformed URL — nothing actionable
-  }
+  // Scheme-agnostic: `new URL()` yields host='oauth', pathname='/native' for the
+  // custom scheme, so params must not be derived from it. Cannot throw.
+  const params = nativeOAuthParams(url);
   const code = params.get('code');
   const error = params.get('error');
   const returnedState = params.get('state');
 
+  logEvent({
+    level: 'info',
+    surface: 'native-oauth',
+    message: 'native oauth return received',
+    context: { action: `return_${transport}` },
+  });
+
   const stateJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
-  // Close the system browser tab (best-effort — it may already be gone).
+  // Close the system browser tab (best-effort — it may already be gone). On iOS
+  // the SFSafariViewController is still presented over the app when the
+  // custom-scheme hop lands, so this is what dismisses it.
   await Browser.close().catch(() => {});
 
   // No native auth in flight (cold-launch by a stray/duplicate/spoofed link):
@@ -2121,6 +2161,7 @@ export async function handleNativeAuthRedirect(
       level: 'info',
       surface: 'native-oauth',
       message: 'deep link with no pending auth — ignored',
+      context: { action: 'no_pending' },
     });
     return;
   }
@@ -2133,13 +2174,33 @@ export async function handleNativeAuthRedirect(
       level: 'info',
       surface: 'native-oauth',
       message: `oauth declined/error on deep link: ${error}`,
+      context: { action: 'declined' },
     });
     return;
   }
 
-  const stored: RedirectAuthState = JSON.parse(stateJson);
+  // The stash is attacker-reachable state now that a custom scheme can invoke
+  // this handler, and an unparseable stash used to throw into the `void`-ed
+  // promise at the listener call site (an unhandled rejection). Treat corrupt
+  // exactly like "nothing in flight": clear it and stop.
+  let stored: RedirectAuthState;
+  try {
+    stored = JSON.parse(stateJson) as RedirectAuthState;
+  } catch {
+    await clearGoogleSessionState();
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: 'pending-auth stash was unparseable — cleared, no exchange attempted',
+      context: { action: 'stash_unparseable' },
+    });
+    return;
+  }
 
   // CSRF: the echoed state must match what we stored. Mismatch ⇒ discard.
+  // This is the PRIMARY authenticity control, not defense-in-depth: since the
+  // custom-scheme bridge landed, any installed app or web page can invoke this
+  // handler with arbitrary params. Do not prune it.
   if (!stored.state || stored.state !== returnedState) {
     await clearGoogleSessionState();
     reportError({
@@ -2175,6 +2236,14 @@ export async function handleNativeAuthRedirect(
   sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
   try {
     await completeRedirectAuth();
+    // Success counter — emitted so the FAILURE RATE is measurable. An event
+    // that only fires on failure can't tell you how often the flow works.
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: 'native oauth completed',
+      context: { action: 'complete' },
+    });
     onComplete(stored.returnPath);
   } catch (e) {
     reportError({

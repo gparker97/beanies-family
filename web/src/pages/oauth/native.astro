@@ -1,12 +1,26 @@
 ---
-// OAuth deep-link fallback (ADR-029 A2).
+// OAuth return bridge (ADR-029 A2, amended 2026-08-06).
 //
-// When the beanies.family app is installed AND the App Link is verified, Android
-// intercepts https://beanies.family/oauth/native and this page never renders —
-// the redirect goes straight into the app. This page only shows when the link
-// ISN'T intercepted (app not installed, or App Link not yet verified): the
-// marketing site can't complete the OAuth exchange (that's the app's job), so we
-// just tell the user to finish in the app. Kept out of search + sitemap.
+// ANDROID: the verified App Link intercepts https://beanies.family/oauth/native
+// and this page never renders — the redirect goes straight into the app.
+//
+// iOS: it ALWAYS renders, and that is the whole point. Apple fires Universal
+// Links only on user-initiated TAPS, so Google's OAuth *redirect* to this URL
+// never hands off to the app — it just loads here, inside the
+// SFSafariViewController that @capacitor/browser opened, which is how the entire
+// app ended up running in a browser sheet (TestFlight builds 7 and 8). Custom
+// schemes DO escape that sheet, so this page hops to NATIVE_BRIDGE_URI (the
+// scheme both native manifests register). See
+// docs/plans/2026-08-06-ios-oauth-custom-scheme-bridge.md.
+//
+// The page never completes the OAuth exchange itself (that's the app's job) — it
+// only forwards the query string. Kept out of search + sitemap.
+//
+// SECURITY: the auth `code` transits this URL. Nothing here may transmit it —
+// no analytics, no logging, no third-party script. That is deliberate and is why
+// this page has no BaseLayout import. The app-side `native-oauth` telemetry is
+// the proxy signal.
+import { NATIVE_BRIDGE_URI, OAUTH_RESULT_PARAMS } from '@/constants/nativeOAuth';
 ---
 
 <!doctype html>
@@ -58,20 +72,83 @@
         font-size: 2.5rem;
         margin-bottom: 0.75rem;
       }
+      .cta {
+        display: inline-block;
+        background: var(--orange);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+      }
+      .hint[hidden] {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <main>
       <div class="bean" aria-hidden="true">🫘</div>
       <h1>almost there</h1>
-      <p>
-        open the <strong>beanies.family</strong> app to finish signing in. you can close this
-        page — it's safe to leave.
+      <p>taking you back to the beanies.family app to finish signing in...</p>
+      <!-- PRIMARY action, and static on purpose: on iOS the manual tap is a
+           realistic path (the OS may prompt, or refuse a custom-scheme
+           navigation that wasn't user-initiated). Rendering it in the static
+           HTML means a script failure, or scripting being off entirely, cannot
+           hide the only way forward. The script appends the live query string. -->
+      <a id="bridge-link" class="cta" href={NATIVE_BRIDGE_URI}>return to beanies</a>
+      <p id="bridge-hint" class="hint" hidden>
+        if nothing happened, tap the button above to finish signing in.
       </p>
       <p>
         don't have the app yet? you can keep using beanies.family in your browser at
         <a href="https://app.beanies.family" style="color: var(--orange)">app.beanies.family</a>.
       </p>
     </main>
+
+    <!-- Placed at the end of <body> so the fallback UI above has already parsed
+         and painted before the hop is attempted. If the hop triggers an OS
+         prompt the user dismisses, they are looking at a working page. -->
+    <script
+      is:inline
+      define:vars={{ bridge: NATIVE_BRIDGE_URI, resultParams: OAUTH_RESULT_PARAMS }}
+    >
+      // Values come from src/constants/nativeOAuth.ts via define:vars — never
+      // retyped here, so this page and the app cannot disagree about the scheme
+      // or about which params mean "a result arrived". An is:inline script can't
+      // import at runtime, so only this short control flow is restated. Keep it
+      // small enough to read at a glance; if it needs to grow, that's the signal
+      // to stop using is:inline, not to keep adding.
+      try {
+        var search = window.location.search;
+        var params = new URLSearchParams(search);
+        var hasResult = resultParams.some(function (p) {
+          return params.has(p);
+        });
+
+        var link = document.getElementById('bridge-link');
+        if (link && search) link.setAttribute('href', bridge + search);
+
+        // A bare visit (no code, no error) must NOT hop: it would reach the app
+        // with no `state` and fire a spurious native-oauth-state-mismatch report.
+        if (hasResult) {
+          // replace(), not assign() — the code-bearing URL must not become a
+          // back-button entry.
+          window.location.replace(bridge + search);
+        }
+      } catch (e) {
+        // Never swallow. The scheme is interpolated from `bridge`, never
+        // retyped, so the drift tripwire on this file stays true.
+        console.error(
+          '[oauth/native] bridge hop to ' +
+            bridge +
+            ' failed — the visible "return to beanies" link is the fallback. Check that this scheme is declared in ios/App/App/Info.plist (CFBundleURLTypes) and android/app/src/main/AndroidManifest.xml.',
+          e
+        );
+        var hint = document.getElementById('bridge-hint');
+        if (hint) hint.removeAttribute('hidden');
+      }
+    </script>
   </body>
 </html>

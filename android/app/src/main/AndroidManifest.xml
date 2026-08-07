@@ -20,17 +20,39 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- OAuth deep link (ADR-029 A2): verified https App Link, NOT a
-                 custom scheme. Routes Google's redirect to
-                 https://beanies.family/oauth/native back into the app once
-                 /.well-known/assetlinks.json is hosted + verified. launchMode
-                 singleTask (above) delivers it to the running instance as an
-                 appUrlOpen event. -->
+            <!-- OAuth deep link (ADR-029 A2): verified https App Link. Routes
+                 Google's redirect to https://beanies.family/oauth/native back
+                 into the app once /.well-known/assetlinks.json is hosted +
+                 verified. launchMode singleTask (above) delivers it to the
+                 running instance as an appUrlOpen event. This filter stays
+                 FIRST — it is the preferred path on Android. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="beanies.family" android:pathPrefix="/oauth/native" />
+            </intent-filter>
+
+            <!-- OAuth custom-scheme bridge. Android does not NEED this (the
+                 verified App Link above is the normal path), but iOS does:
+                 Apple fires Universal Links only on user-initiated taps, so the
+                 OAuth *redirect* never hands off and the app ends up running
+                 inside SFSafariViewController. The fix is a bridge page at
+                 beanies.family/oauth/native that hops to this scheme.
+
+                 Registering it here too keeps BOTH platforms on one code path
+                 and gives Android a recovery route it lacks today: if App Link
+                 verification ever lapses, the device lands on the same bridge
+                 page and this filter catches the hop instead of dead-ending.
+
+                 The scheme is the bundle/application id. Keep it in sync with
+                 NATIVE_BRIDGE_URI in src/constants/nativeOAuth.ts — a tripwire
+                 test asserts this file declares exactly that scheme. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="family.beanies.app" android:host="oauth" />
             </intent-filter>
         </activity>
 

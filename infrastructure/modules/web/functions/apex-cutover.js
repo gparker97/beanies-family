@@ -46,6 +46,33 @@ function isAppPath(path) {
   return false;
 }
 
+// Paths that sit UNDER an APP_PATHS prefix but which the apex must nonetheless
+// serve itself. Expressed as data so the next exemption is a one-line list edit
+// rather than another `&& !isSomething(uri)` accreting onto the branch below.
+//
+// /oauth/native is the OAuth return the native apps use. Apple fires Universal
+// Links only on user-initiated TAPS, so Google's redirect here never hands off
+// to the iOS app — it must reach the bridge interstitial (oauth/native.html),
+// which hops to the app's custom scheme. 301ing it to app.beanies.family loads
+// the PWA inside the browser sheet instead, which is exactly the bug this
+// exemption fixes. See docs/plans/2026-08-06-ios-oauth-custom-scheme-bridge.md.
+//
+// EXACT match only (plus the trailing-slash form, which step 3 canonicalises).
+// A prefix match would let /oauth/native/<anything> fall through to the .html
+// rewrite and 403 from S3, since no such object exists.
+// prettier-ignore
+var APEX_OWNED_PATHS = [
+  '/oauth/native',
+];
+
+function isApexOwned(path) {
+  for (var i = 0; i < APEX_OWNED_PATHS.length; i++) {
+    var p = APEX_OWNED_PATHS[i];
+    if (path === p || path === p + '/') return true;
+  }
+  return false;
+}
+
 function buildQueryString(qs) {
   var parts = [];
   for (var k in qs) {
@@ -100,8 +127,9 @@ function handler(event) {
     return redirect('https://beanies.family/' + qs);
   }
 
-  // 2. Authenticated PWA paths → app.beanies.family
-  if (isAppPath(uri)) {
+  // 2. Authenticated PWA paths → app.beanies.family, EXCEPT apex-owned ones,
+  //    which fall through to the .html rewrite below and are served here.
+  if (isAppPath(uri) && !isApexOwned(uri)) {
     return redirect('https://app.beanies.family' + uri + qs);
   }
 

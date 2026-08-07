@@ -53,7 +53,9 @@ export default defineConfig({
   integrations: [
     mdx(),
     sitemap({
-      filter: (page) => !page.includes('/og/'),
+      // /oauth/* is the native OAuth return bridge — a machine-facing redirect
+      // surface that must never be indexed or surfaced to a human via search.
+      filter: (page) => !page.includes('/og/') && !page.includes('/oauth/'),
     }),
   ],
   vite: {

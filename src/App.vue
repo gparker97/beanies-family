@@ -716,8 +716,14 @@ onMounted(async () => {
     // resolve to `null` and throw (the registerGoogleAccountAssertion
     // destructure crash seen on iPhone, 2026-06-20). Skip everything; the
     // `finally` dismisses the spinner until the redirect lands.
-    if (route.name === 'OAuthCallback') {
-      initBreadcrumbs.push('oauth-callback: bounce route — skipping heavy init');
+    // OAuthNativeBridge rides the same bail for a different reason: it is the
+    // /oauth/native backstop, reached mid-sign-in by a BY-DEFINITION
+    // unauthenticated user. Without this it would fall through to the
+    // `needsAuth` block below and be replaced by /welcome — re-creating the very
+    // bug it exists to diagnose, with the auth code discarded. It must stay on
+    // screen, keep the code in the URL, and explain itself.
+    if (route.name === 'OAuthCallback' || route.name === 'OAuthNativeBridge') {
+      initBreadcrumbs.push(`${String(route.name)}: terminal oauth surface — skipping heavy init`);
       return;
     }
 
