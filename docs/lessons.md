@@ -4,6 +4,30 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Verify the platform actually ACCEPTS a setting before spending a build on it — and beware green-looking local gates
+
+**Date:** 2026-08-07
+**Context:** Two on-device iOS TestFlight bugs were parked with a confident diagnosis and a one-line fix: set `iosScheme: 'https'` in `capacitor.config.ts`. It shipped as build 8 and changed **nothing**, because the setting is **silently discarded**. `CAPInstanceDescriptor.normalize()` (`node_modules/@capacitor/ios/.../CAPInstanceDescriptor.swift:166-176`) accepts a scheme only when `WKWebView.handlesURLScheme(scheme) === false`; `https` is reserved by WKWebView, so the value resets to the default `capacitor`. **The check was a two-minute grep of `node_modules` that nobody ran before dispatching a build.** The assumed `androidScheme`/`iosScheme` symmetry does not exist — Android's `WebViewAssetLoader` supports https, WKWebView cannot.
+
+The real cause turned out to be unrelated: Apple fires Universal Links only on user-initiated **taps**, so an OAuth _redirect_ to one inside `SFSafariViewController` never hands off. Cost: a wasted TestFlight build + reinstall, a false CHANGELOG entry that shipped to `main` claiming the bug was fixed, and a wasted on-device check (below).
+
+Two more traps surfaced in the same session:
+
+- **A proposed on-device discriminator was impossible.** greg was asked to look for a separate "Safari card" in the app switcher to tell whether the app was inside `SFSafariViewController`. It **presents modally inside the host app** and never yields its own card, so that test could not produce evidence either way. The correct tell is whether a **domain is visible in a top bar** — a native `WKWebView` has no URL display. That check settled it in seconds.
+- **`npm run security:lint` looked clean while failing.** It runs `eslint .`, picks up `dist/` + `web/dist/` build output, and the stylish formatter dies with `RangeError: Invalid string length` **before printing anything** — exiting non-zero for a reason unrelated to the code. Two CI round-trips were burned before a JSON-formatter re-run found the one real error.
+- **`eslint-disable-next-line` applies to the literal next line.** A justification wrapped onto extra `//` lines made the directive target the _comment_ below it, not the code. CI failed again on the "fixed" commit.
+
+**Rules:**
+
+1. **Before spending a live-only build (iOS/Android/TestFlight) on a config or platform setting, read the platform source that consumes it** and confirm the value is accepted, not normalised away. `node_modules/@capacitor/**` is checked in and greppable. iOS is live-only — every iteration costs a build plus a reinstall, so the pre-flight grep is always cheaper.
+2. **Never write a CHANGELOG entry claiming a fix works until it is verified.** The build-8 entry ("the app no longer jumps out into a browser") shipped to `main` and was false; it had to be removed the same day.
+3. **When asking a human for on-device evidence, verify the observation is physically possible first.** A test that cannot distinguish the hypotheses wastes their time and produces false confidence either way.
+4. **Judge a local gate by its exit code AND its output, not by a grep for "error".** A formatter crash, an empty report, or a non-zero exit for an unrelated reason all read as "clean" to a naive grep. If a gate exits non-zero, read the tail before concluding anything.
+5. **Keep `eslint-disable-next-line` on ONE line**, justification included (`-- reason`). Anything wrapped silently targets the wrong line.
+6. **Build the observability that makes the NEXT failure diagnosable from logs.** The fix shipped `surface: 'native-oauth'` events (`start` → `return_universal`/`return_custom_scheme` → `complete`) specifically so a third blind build is unnecessary: a missing return event, or the wrong transport, names the failure without a rebuild.
+
+---
+
 ## Stale branches manufacture false uncertainty — delete on merge, and judge "merged" by content, not commit count
 
 **Date:** 2026-07-22
