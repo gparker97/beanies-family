@@ -18,9 +18,13 @@ import { runInNewContext } from 'node:vm';
 // the suite runs under happy-dom, where import.meta.url is an http:// URL and
 // fileURLToPath rejects it.
 //
-// eslint-disable-next-line security/detect-non-literal-fs-filename -- the path is
-// a fixed repo-relative constant joined to cwd; no external, user, or network
-// input reaches it, and this is a test-only read of a checked-in source file.
+// The security config flags the non-literal readFileSync argument. It is a fixed
+// repo-relative constant joined to cwd — no external, user, or network input
+// reaches it — and this is a test-only read of a checked-in source file. The
+// directive below must stay a SINGLE line: eslint-disable-next-line applies to
+// the line immediately after the comment, so a wrapped justification would
+// silently target the wrong line (which is exactly what happened first time).
+// eslint-disable-next-line security/detect-non-literal-fs-filename -- fixed repo path, test-only read
 const src = readFileSync(
   join(process.cwd(), 'infrastructure/modules/web/functions/apex-cutover.js'),
   'utf8'
