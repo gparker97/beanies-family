@@ -15,7 +15,7 @@ A couple months ago, I was preparing for a family vacation to China. Then disast
 
 My wife was already there, and I was deep in the doldrums of family vacation preparation for the rest of us to meet her. The kids were so excited they were nearly losing their minds, mostly because they knew Shanghai Disney was in the cards.
 
-There was about two weeks to go before the trip. I was handling school and camp runs for the kids, and driving home one day after dropping off my son at his python coding camp, when a thought smashed into my head like a ton of bricks: _**visas**_.
+There was about two weeks to go before the trip, and I was handling school and camp runs for the kids. Driving home one day in an obliviously singing mood after dropping off my son at his python coding camp, a thought smashed into my head like a ton of bricks: _**visas**_.
 
 I skidded the car into the driveway and ran upstairs, 2 steps at a time, looking to find my passport, while at the same time desperately trying to recall, in the dark corners of my rapidly aging brain, the last time I had renewed my China tourist visa. As it turns out, in a _fantastic_ stroke of luck, my 10-year tourist visa, acquired in April 2016, had expired _exactly 2 months ago_ (notice that I didn't say which kind of luck it was).
 
