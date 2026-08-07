@@ -6,30 +6,33 @@ disable-model-invocation: true
 
 # Deploy to Production (Auto-Approved)
 
-Commits all pending changes, pushes to `main`, monitors CI pipelines, fixes any failures, and deploys to production — all without pausing for user confirmation.
+Commits pending changes, gathers every decision that needs greg **up front**, then pushes, monitors CI, and deploys — running **unattended from the decision gate to completion**. Greg answers the questions in the first minute and can walk away; the long tail (test run, CI, S3 deploy, signed store builds) needs no babysitting.
 
-**All actions are pre-approved:** commit, push, and deploy will proceed automatically. The only reason to stop is an unrecoverable failure after 3 fix attempts.
+**All actions are pre-approved:** commit, push, and deploy proceed automatically. The only reasons to stop are the single decision gate (Phase 1) and an unrecoverable failure after 3 fix attempts.
+
+---
+
+## Two design principles
+
+**1. All decisions up front.** A full deploy is long — CI runs E2E, a signed iOS build takes ~5 minutes, Play/App-Store uploads follow. Greg should not have to sit and watch for a question to appear ten minutes in. So **every point where the skill needs greg is collected into ONE gate (Phase 1, Step 4)**, before any slow work starts. The two things that need him — the release-note wording + `APP_VERSION` bump, and the per-platform mobile destination — are asked together, in a single message. After that gate, the skill runs to completion without pausing (barring an unrecoverable failure it cannot fix). This ordering is the whole point of the skill; do not defer a question into the unattended phase.
+
+**2. Minimise permission prompts.** Each Bash invocation is a **single, simple command** — no inline `$(...)` subshells, no `&&` / `||` / `;` chains, no `$?` inspection, no heredocs. Classification lives in `scripts/deploy/classify-changes.sh`; commit bodies use repeated `-m` flags. If a step seems to need a chain, add a script under `scripts/deploy/` and invoke it instead — skills invoke scripts, they don't orchestrate shells.
 
 ---
 
-## Design principle: minimise permission prompts
-
-Each Bash invocation below is a **single, simple command** — no inline `$(...)` subshells, no `&&` / `||` / `;` chains, no `$?` exit-code inspection, no heredoc commit messages. Complex classification work lives in `scripts/deploy/classify-changes.sh`. Commit bodies use multiple `-m` flags rather than heredocs.
-
-If a step genuinely needs a chained command, stop and add a dedicated script under `scripts/deploy/` instead of writing the chain inline. Skills should invoke scripts, not orchestrate shells.
-
----
+# PHASE 1 — Setup & decisions (the only part that needs greg; ~1 minute)
 
 ## Step 1: Verify GitHub account
 
-Run:
 ```
 gh auth status
 ```
 
-The active account must be **`gparker97`**. If a different account is active, run `gh auth switch --user gparker97`. If `gparker97` isn't logged in at all, prompt the user to run `gh auth login`.
+The active account must be **`gparker97`**. If a different account is active, run `gh auth switch --user gparker97`. If `gparker97` isn't logged in at all, prompt greg to run `gh auth login`. (`gh` here reverts to `greg-grobrix` often — check every run.)
 
-## Step 2: Review & commit pending changes
+## Step 2: Commit pending changes (do NOT push yet)
+
+The push is deliberately deferred to Phase 2 so that the pre-push test run + CI happen **after** greg has answered everything — nothing slow runs before the decision gate.
 
 Check the working tree:
 ```
@@ -39,38 +42,24 @@ git status --short
 git diff
 ```
 
-Draft a commit message. Follow the repo's conventional-commit style (e.g. `feat(area): summary`, `fix(...)`, `chore(...)`). **Never stage** `.env`, credentials, or secrets. Per `CLAUDE.md` guidance, stage files by explicit path — avoid `git add -A` / `git add .`.
-
-Stage files:
+Stage by explicit path (**never** `git add -A` / `git add .`; **never** stage `.env`, credentials, or secrets). Draft a conventional-commit message (`feat(area):` / `fix(...)` / `chore(...)`) and commit with repeated `-m` flags:
 ```
 git add <path> <path>
 ```
-
-Commit using separate `-m` flags for subject + body paragraphs — NEVER a heredoc or `$(cat <<EOF ... EOF)`:
 ```
-git commit -m "feat(area): subject line" -m "First paragraph of the body explaining why." -m "Second paragraph if needed." -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(area): subject line" -m "Body paragraph explaining why." -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
-## Step 3: Push
+If the working tree is already clean (re-deploying an earlier commit), skip the commit — Step 3 still classifies HEAD against what's live.
 
-```
-git push
-```
+## Step 3: Classify what needs deploying
 
-The pre-push hook runs `npm run test:run` automatically. If it fails:
-1. Read the failure output.
-2. Fix the root cause — do NOT use `--no-verify`.
-3. Stage the fix, create a new commit (never amend), push again.
-4. Repeat up to 3 attempts. After 3 failures, stop and report.
-
-## Step 4: Classify what needs deploying
-
-Single command — all classification logic lives in the script:
+All classification logic is in the script — one command:
 ```
 bash scripts/deploy/classify-changes.sh
 ```
 
-The final block of the output is machine-readable:
+The final block is machine-readable:
 ```
 === Deploy targets ===
 VUE: yes|no
@@ -79,79 +68,68 @@ MOBILE_IOS: yes|no
 MOBILE_ANDROID: yes|no
 ```
 
-Record all four flags. The classifier treats each surface as an **independent distributable** and diffs HEAD against the SHA that surface last shipped from — so each flag answers "is this distributable behind HEAD?":
+Record all four flags. Each surface is an **independent distributable**; the classifier diffs HEAD against the SHA that surface last shipped from, so each flag answers "is this distributable behind HEAD?":
 
 | Flag | Distributable | Shipped by |
 |---|---|---|
-| `VUE` | the Vue PWA (`app.beanies.family`) | `deploy.yml` (Steps 6–7) |
-| `WEB` | the Astro marketing site (apex) | `deploy-web.yml` (Step 5) |
-| `MOBILE_IOS` | the iOS app (TestFlight / App Store) | `mobile-ios-release.yml` (Step 7b) |
-| `MOBILE_ANDROID` | the Android app (Google Play) | `mobile-android-release.yml` (Step 7b) |
+| `VUE` | the Vue PWA (`app.beanies.family`) | `deploy.yml` (Step 8) |
+| `WEB` | the Astro marketing site (apex) | `deploy-web.yml` (Step 6) |
+| `MOBILE_IOS` | the iOS app (TestFlight / App Store) | `mobile-ios-release.yml` (Step 9) |
+| `MOBILE_ANDROID` | the Android app (Google Play) | `mobile-android-release.yml` (Step 9) |
 
-**Why a web-only change can flip a MOBILE flag:** the native apps EMBED the built Vue bundle (`dist/`, no over-the-air layer), so a `src/**` / `index.html` change reaches store/TestFlight users only through a new signed build. The classifier therefore flags a platform when the embedded bundle OR its native shell changed since that platform's last release. The baseline is the **signed-release** lane — NOT the debug-APK lane (`mobile-android-build.yml`), which auto-runs every push and would make the flag read `no` right after a native change. The classifier also prints `N commit(s) behind` per platform — carry that into the Step 7b question.
+**Why a web-only change can flip a MOBILE flag:** the native apps EMBED the built Vue bundle (`dist/`, no over-the-air layer), so a `src/**` / `index.html` change reaches store/TestFlight users only through a new signed build. The classifier flags a platform when the embedded bundle OR its native shell changed since that platform's last release, using the **signed-release** lane as the baseline — NOT the debug-APK lane (`mobile-android-build.yml`), which auto-runs every push and would make the flag read `no` right after a native change. It also prints `N commit(s) behind` per platform — carry that into the Step 4 question.
 
-Branch on the flags:
+**If all four are `no`** — report "no runtime changes since last deploy — nothing to ship" and stop. There is nothing to decide and nothing to run.
 
-- **All four `no`** — report "no runtime changes since last deploy — nothing to ship" and stop.
-- **`VUE: yes` or `WEB: yes`** — deploy those web targets (Steps 5–7).
-- **`MOBILE_IOS: yes` or `MOBILE_ANDROID: yes`** — release the flagged app(s) in **Step 7b** (the deliberate pause — greg chooses the destination per platform per `scripts/deploy/mobile-release-guide.md`). The free unsigned debug APK still auto-builds on every push (`mobile-android-build.yml`) independent of this.
-- **Web flags `no` but a MOBILE flag `yes`** (native/web-bundle behind, but web already current) — skip the web dispatches in Steps 5–7 (they would be misleading no-ops), but **still run Step 4b (version bump) and Step 7b (mobile release)**.
+## Step 4: ⭐ DECISION GATE — ask greg everything now, in one message
 
-## Step 4b: Author the release note + bump the product version (if `VUE: yes` or either `MOBILE_*: yes`)
+This is the **only** place the skill needs greg. Gather both decisions below that apply, present them **together in a single message**, and wait for one round of answers. Then Phase 2 runs unattended. Do not trickle these out — a second question appearing ten minutes later is exactly what this skill exists to avoid.
 
-Every Vue-app deploy ships a brief, user-facing release note — it becomes the
-in-app `whats-new` notification (the bell) when clients update — **and** bumps
-the in-app product version (`APP_VERSION`). A mobile release ALSO needs the
-`APP_VERSION` bump: the Android `versionName` and the iOS marketing version both
-track `APP_VERSION`, so a build with a stale version is indistinguishable on-device.
+Honor any standing instruction greg already gave this turn (e.g. "revision bump only, no release note", "internal track", "skip Android") — fold it into the proposal instead of re-asking.
 
-- **`VUE: yes`** — full flow below (release note + `APP_VERSION` bump).
-- **`MOBILE_IOS: yes` or `MOBILE_ANDROID: yes` but `VUE: no`** (the web bundle is
-  already deployed to PWA, but a native app is behind) — still bump `APP_VERSION` so the
-  Step 7b build is identifiable; author a release note too **if** the change is
-  user-facing (judge per the guide — e.g. a visible fix like the safe-area / status-bar
-  fix qualifies; a manifest/entitlement-only change does not). Same approval pause. **Follow
-`scripts/deploy/release-note-guide.md` in full**: judge significance, draft the
-message in greg's voice (no em-dashes; en + lowercase beanie), compute the
-`YYYY.MM.DD[.N]` note version, propose the next `APP_VERSION` (§3b — patch by
-default, `R<n>` for a same-release hotfix), and **propose all of it to greg for
-approval**.
+**Decision A — release note + `APP_VERSION` bump** (needed if `VUE: yes` **or** `MOBILE_IOS: yes` **or** `MOBILE_ANDROID: yes`; skip if only `WEB: yes`):
 
-> **The one allowed pause.** This skill is otherwise no-pause, but greg has
-> explicitly asked to approve the wording before it ships. Present the drafted
-> note (✨, version, month, en + beanie lines, spotlight?, one-line rationale)
-> **and the proposed `APP_VERSION` bump** (current → next, with the
-> patch-vs-revision reason) and wait for approval / edits before continuing.
+Every Vue deploy ships a brief user-facing release note (it becomes the in-app `whats-new` bell on update) and bumps `APP_VERSION`. A mobile release needs the `APP_VERSION` bump too — the Android `versionName` and the iOS marketing version both track it, so a stale version is indistinguishable on-device. **Follow `scripts/deploy/release-note-guide.md` in full**: judge significance, draft the note in greg's voice (no em-dashes; `en` + lowercase `beanie` lines), compute the `YYYY.MM.DD[.N]` note version, and propose the next `APP_VERSION` (patch by default; `R<n>` for a same-release hotfix). Present ✨ + version + month + the en/beanie lines + spotlight? + a one-line rationale, **and** the `APP_VERSION` current → next. If greg said "no note", still propose the version bump alone (a `MOBILE`-only, non-user-facing change — e.g. manifest/entitlement — legitimately needs the bump but no note).
 
-On approval, prepend the entry to `src/content/release-notes/deploys.ts` AND edit
-`src/constants/appVersion.ts` to the approved `APP_VERSION` (Edit tool for both),
-then commit them together and push so both ride this deploy:
+**Decision B — mobile destination, per flagged platform** (needed if `MOBILE_IOS: yes` and/or `MOBILE_ANDROID: yes`):
+
+**Read `scripts/deploy/mobile-release-guide.md`** for the options/defaults, then present how far behind each flagged platform is (the classifier's `N commit(s) behind`) and ask:
+
+- **iOS** — the workflow only ever uploads to **TestFlight** (no track input). Ask **release to TestFlight now, or skip?** (Flag that external TestFlight + App Store submission — set the ASC record version to `APP_VERSION`, attach, submit — are greg's manual console steps.)
+- **Android** — ask the **track**: `internal` (no review; test devices — default for an unverified change) · `alpha` (closed testing, review) · `beta` · `production`, or **skip**. Map "closed testing" → `alpha`; keep `upload_to_play=true`.
+
+Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS release y/n; Android track or skip) — Phase 2 consumes them without asking again.
+
+---
+
+# PHASE 2 — Unattended execution (greg can walk away)
+
+No more questions from here. Work the steps in order; on failure, follow each step's recovery. Stop only on an unrecoverable failure after 3 fix attempts.
+
+## Step 5: Apply the decisions + push once
+
+If Decision A produced a note/version, prepend the entry to `src/content/release-notes/deploys.ts` (skip if "no note") and set `src/constants/appVersion.ts` to the approved `APP_VERSION` (Edit tool), then commit:
 ```
 git add src/content/release-notes/deploys.ts src/constants/appVersion.ts
 ```
 ```
 git commit -m "docs(release): note <version> (app v<APP_VERSION>) for prod deploy" -m "<the en summary>" -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
+(If the bump is version-only with no note, stage just `src/constants/appVersion.ts` and word the subject accordingly.)
+
+Then push everything — the Step 2 commit and this one ride together in a **single** push (one CI run):
 ```
 git push
 ```
-This re-triggers CI; Step 6 below watches the latest run (this commit), and the
-Step 7 deploy gate re-verifies CI for HEAD. Skip this entire step only if `VUE: no`
-**and** `MOBILE_IOS: no` **and** `MOBILE_ANDROID: no`. (Web-current-but-app-behind:
-commit + push the version bump so the Step 7b build carries it.)
+The pre-push hook runs `npm run test:run`. On failure: read the output, fix the root cause (**never** `--no-verify`), commit the fix (new commit, never amend), push again — up to 3 attempts, then stop and report.
 
-## Step 5: Deploy the Astro site (fires immediately)
+## Step 6: Deploy the Astro site (only if `WEB: yes`) — fires immediately
 
-Astro has no external CI gate — trigger in parallel with the Vue flow below.
-
-**Only if `WEB: yes`:**
+Astro has no external CI gate, so start it now and let it run alongside CI.
 ```
 gh workflow run deploy-web.yml --ref main
 ```
-
-`deploy-web.yml` accepts no `workflow_dispatch` inputs — passing `-f target=production` (or any other `-f` flag) fails with HTTP 422 "Unexpected inputs provided". If the workflow ever grows inputs, update both this command and the workflow's `on.workflow_dispatch.inputs` block together.
-
-Wait, then list + watch:
+`deploy-web.yml` accepts no `workflow_dispatch` inputs — any `-f` flag returns HTTP 422. Then:
 ```
 sleep 10
 ```
@@ -161,19 +139,17 @@ gh run list --workflow=deploy-web.yml --limit=1
 ```
 gh run watch <web-run-id> --exit-status
 ```
+If it fails, fetch logs (`gh run view <id> --log-failed`) and report — it doesn't block the Vue/mobile flow.
 
-`--exit-status` makes the process exit non-zero on failure, which the tool reports — no need to print `$?` yourself. If it fails, fetch logs (`gh run view <id> --log-failed`) and move on; it doesn't block the Vue deploy.
+## Step 7: Monitor CI + Security (if `VUE: yes` or either `MOBILE_*: yes`)
 
-## Step 6: Monitor CI (only if `VUE: yes`)
+CI green is the gate for **both** the Vue deploy (Step 8) and the mobile releases (Step 9) — never ship a red build to prod or a store. (Pure `WEB: yes` doesn't need this; Astro has no CI gate.)
 
-Two workflows run automatically on every push to `main`:
-
-| Workflow | File | What it checks |
+| Workflow | File | Checks |
 |---|---|---|
-| **Main Branch CI** | `main-ci.yml` | Type-check, lint, format, unit tests, build, E2E (Chromium + Firefox) |
-| **Security Scanning** | `security.yml` | npm audit, SAST, secrets detection, CodeQL |
+| **Main Branch CI** | `main-ci.yml` | type-check, lint, format, unit tests, build, E2E (Chromium + Firefox) |
+| **Security Scanning** | `security.yml` | npm audit, SAST, secrets, CodeQL |
 
-Wait ~30 seconds, then locate the runs:
 ```
 sleep 30
 ```
@@ -183,25 +159,16 @@ gh run list --workflow=main-ci.yml --branch=main --limit=1
 ```
 gh run list --workflow=security.yml --branch=main --limit=1
 ```
-
-Watch each in turn (they run in parallel, so watching sequentially is fine — you start watching after they've already begun):
 ```
 gh run watch <ci-run-id> --exit-status
 ```
 ```
 gh run watch <security-run-id> --exit-status
 ```
+On failure: `gh run view <run-id> --log-failed`, fix the root cause, commit (new commit) + push, then restart Step 7. Max 3 rounds, then stop and report.
 
-If a workflow fails:
-1. Fetch logs: `gh run view <run-id> --log-failed`
-2. Fix the root cause.
-3. Commit the fix (new commit, not amend), push.
-4. Restart Step 6 from the top.
-5. Max 3 rounds; after that, stop and report.
+## Step 8: Deploy the Vue app (only if `VUE: yes`) — after CI green
 
-## Step 7: Deploy the Vue app (only if `VUE: yes`)
-
-Once CI + Security are green:
 ```
 gh workflow run deploy.yml --ref main
 ```
@@ -214,35 +181,13 @@ gh run list --workflow=deploy.yml --limit=1
 ```
 gh run watch <deploy-run-id> --exit-status
 ```
+The deploy workflow re-verifies CI/Security for the commit. If it fails, report logs — do not auto-retry.
 
-The deploy workflow has its own gate that re-verifies CI/Security passed for the commit. If it fails, report logs — do not auto-retry.
+## Step 9: Release the mobile app(s) (for each flagged platform) — after CI green
 
-## Step 7b: Release the mobile app(s) (only for a flagged platform)
+Use the destinations **already chosen in Step 4** — do not ask again. Dispatch each flagged platform greg chose to release (they're independent; iOS can ship while Android is skipped). Waiting for CI green (Step 7) is why this is here and not in Phase 1.
 
-Run this for **each** platform the classifier flagged — iOS if `MOBILE_IOS: yes`,
-Android if `MOBILE_ANDROID: yes`, both if both. They are independent releases (iOS can
-ship while Android is skipped, and vice-versa). This is the **second deliberate pause**:
-native releases go to Google/Apple review and burn a version, so the destination is a
-per-release decision, never assumed.
-
-**First, read `scripts/deploy/mobile-release-guide.md`** — it holds the decision logic
-(what to ask, the options, defaults, and post-release rules). Then, for each flagged
-platform, **present how far behind it is** (the classifier's `N commit(s) behind` line +
-what would ship) and **ask greg** what to do. Per the guide, in brief:
-
-- **iOS (`MOBILE_IOS: yes`)** — the workflow always uploads to **TestFlight** (no track
-  input). Ask **release to TestFlight now, or skip?** Remind greg that external TestFlight
-  and App Store submission (set the ASC record version to match `APP_VERSION`, attach the
-  build, submit) are his manual console steps — the workflow does neither.
-- **Android (`MOBILE_ANDROID: yes`)** — ask the **track**: `internal` (no review; test
-  devices — the default for an unverified change) · `alpha` (closed testing, review) ·
-  `beta` · `production`, or **skip**. Map "closed testing" → `alpha`. Keep
-  `upload_to_play=true` (use `false` only for a brand-new app's first upload).
-
-Skipping a platform is a valid answer — the change still shipped to web/PWA; the app just
-catches up later. If greg skips one, do not dispatch it.
-
-**Dispatch Android** (with greg's chosen `<track>`), only if greg chose to release it:
+**Android** (with greg's chosen `<track>`), only if greg chose to release it:
 ```
 gh workflow run mobile-android-release.yml --ref main -f track=<track> -f upload_to_play=true
 ```
@@ -256,7 +201,7 @@ gh run list --workflow=mobile-android-release.yml --limit=1
 gh run watch <android-run-id> --exit-status
 ```
 
-**Dispatch iOS** (TestFlight), only if greg chose to release it:
+**iOS** (TestFlight), only if greg chose to release it:
 ```
 gh workflow run mobile-ios-release.yml --ref main
 ```
@@ -270,38 +215,29 @@ gh run list --workflow=mobile-ios-release.yml --limit=1
 gh run watch <ios-run-id> --exit-status
 ```
 
-On a release failure, fetch logs (`gh run view <id> --log-failed`) and report — do
-**not** auto-retry a store upload (a partial upload can consume a version code / build
-number). A successful Android upload to a review track (`alpha`/`beta`/`production`) is
-**auto-submitted for Google review**; `internal` is not. Remind greg that on-device
-verification happens on the build just shipped, and that promoting internal → a review
-track (Play) or TestFlight → App Store (Apple) is his manual console step.
+On a release failure, fetch logs (`gh run view <id> --log-failed`) and report — do **not** auto-retry a store upload (a partial upload can consume a version code / build number). A successful Android upload to a review track (`alpha`/`beta`/`production`) is **auto-submitted for Google review**; `internal` is not.
 
-## Step 8: Report
+## Step 10: Report
 
 Summarise:
-- Deployed commit SHA
-- Which workflows ran (Main CI, Security, Vue Deploy, Astro Deploy, Mobile Android/iOS Release)
-- Deploy durations (from `gh run view --json startedAt,updatedAt`)
-- The release note that shipped (if authored) — the `en` line + version
+- Deployed commit SHA + the `APP_VERSION` shipped
+- Which workflows ran (Main CI, Security, Vue Deploy, Astro Deploy, Mobile iOS/Android Release) + durations (`gh run view --json startedAt,updatedAt`)
+- The release note that shipped (if any) — the `en` line + version
 - Production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro)
-- **Mobile (per flagged platform)** — for iOS: released to TestFlight or skipped, plus the
-  ASC submission step if it's App-Store-bound; for Android: which track it went to (and
-  whether it auto-submitted for review) or skipped. Include the on-device verify +
-  promote-in-console next steps that are greg's.
+- **Mobile (per flagged platform)** — iOS released to TestFlight or skipped (+ the ASC submission step if App-Store-bound); Android track it went to (and whether auto-submitted for review) or skipped
+- The on-device verify + promote-in-console next steps that are greg's (internal → review track on Play; TestFlight → App Store on Apple)
 
 ---
 
 ## Rules
 
+- **The decision gate (Step 4) is the only pause.** Ask everything greg-facing there, together. Never surface a new question during Phase 2 — if you find yourself wanting to, it belonged in Step 4.
 - **Never use `--no-verify` or `--force`** on any git command.
-- **Never skip or silence CI failures** — always fix the root cause.
-- **Never amend published commits** — always create new fix commits.
-- **Never inline `$(...)` / `$?` / `;` / `&&` / heredocs** in Bash commands run through the tool — they trigger permission prompts. If you need compound logic, add a script under `scripts/deploy/` and invoke it.
-- **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures) — **plus the two deliberate pauses**: Step 4b (approve the release-note wording + `APP_VERSION` bump) and Step 7b (per flagged platform, choose the destination — iOS TestFlight-or-skip, Android track-or-skip).
-- **Release note + version bump on every Vue deploy, version bump on every mobile release.** When `VUE: yes`, author + ship a release note AND bump `APP_VERSION` (Step 4b). When `MOBILE_IOS: yes` or `MOBILE_ANDROID: yes`, bump `APP_VERSION` too (native `versionName` / iOS marketing version track it). The deploy emoji is always ✨.
-- **This skill ships everything the change requires** — Vue, Astro, AND the signed mobile app(s) — based on the four flags. The native apps embed the built Vue bundle, so a web change that hasn't reached a platform's last release flips its `MOBILE_*` flag; that platform's release runs in Step 7b (offered, never silently left for a manual follow-up), and skipping is greg's call.
-- **iOS and Android are independent releases.** Ask + dispatch each on its own flag; never assume a change to one means the other, and never bundle them into a single question.
-- **Mobile releases are review-gated + irreversible-ish.** Never auto-retry a failed store upload, never pick the track yourself (always the Step 7b pause), and never dispatch iOS when Apple enrolment/secrets aren't ready.
-- The Vue deploy workflow is exactly `deploy.yml` ("Deploy beanies PROD"); the mobile ones are `mobile-android-release.yml` and `mobile-ios-release.yml`.
-- The Astro deploy workflow name is exactly `deploy-web.yml`.
+- **Never skip or silence CI failures** — always fix the root cause. **Never amend published commits** — always new fix commits.
+- **Never inline `$(...)` / `$?` / `;` / `&&` / heredocs** in Bash run through the tool. Compound logic → a script under `scripts/deploy/`.
+- **Release note + version bump when `VUE: yes`; version bump when any `MOBILE_*: yes`** (native `versionName` / iOS marketing version track `APP_VERSION`). Deploy emoji is always ✨.
+- **This skill ships everything the change requires** — Vue, Astro, AND the signed mobile app(s) — from the four flags. A web change that hasn't reached a platform's last release flips its `MOBILE_*` flag; that release runs in Step 9 (offered at Step 4, never silently deferred), and skipping is greg's call.
+- **iOS and Android are independent releases.** Decide + dispatch each on its own flag; never assume one implies the other.
+- **Mobile releases are review-gated + irreversible-ish.** Never auto-retry a failed store upload; never pick the destination yourself (that's Step 4).
+- **CI green gates prod + store builds.** Vue deploy and mobile releases both wait for Step 7. Only Astro (no CI gate) and the `skip-ci` sibling skip that wait.
+- Workflow names are exactly: `deploy.yml` ("Deploy beanies PROD"), `deploy-web.yml`, `mobile-android-release.yml`, `mobile-ios-release.yml`.
