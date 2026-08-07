@@ -38,7 +38,7 @@ Schedule a travel plan on [beanies.family](https://beanies.family/?utm_source=bl
 _Helpful hints_ are those little things that seem to trigger, at least for me, constant anxiety and stress. Things like:
 
 - (The aforementioned) visas for an international trip
-- Remembering to hit the store to buy a gift for your son's preschool friend's 6-year-old birthday party
+- Remembering to hit the toy store to buy a gift for your son's preschool friend's 6-year-old birthday party
 - Planning for your own family's birthday party (or your anniversary)
 - Remembering to pack a few days ahead (and not literally at the last minute)
 - And lots more
