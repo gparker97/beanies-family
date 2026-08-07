@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-06",
-    "translationCount": 3915
+    "lastUpdated": "2026-08-07",
+    "translationCount": 3918
   },
   "translations": {
     "app.name": {
@@ -19580,6 +19580,21 @@
       "translation": "还车",
       "hash": "ulr9o0",
       "lastUpdated": "2026-08-06"
+    },
+    "oauth.nativeBridgeTitle": {
+      "translation": "还差一点儿",
+      "hash": "43y57y",
+      "lastUpdated": "2026-08-07"
+    },
+    "oauth.nativeBridgeBody": {
+      "translation": "我们无法自动将您转回应用。轻触下方以完成登录。",
+      "hash": "yyxt6r",
+      "lastUpdated": "2026-08-07"
+    },
+    "oauth.nativeBridgeAction": {
+      "translation": "返回 beanies",
+      "hash": "d03x66",
+      "lastUpdated": "2026-08-07"
     }
   }
 }

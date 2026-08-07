@@ -267,6 +267,21 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false },
   },
   {
+    // Backstop for the NATIVE OAuth return. Reaching this route in the Vue app
+    // is never expected: the apex serves /oauth/native itself (see
+    // infrastructure/modules/web/functions/apex-cutover.js). If we land here,
+    // that exemption regressed or a stale bare-URL 301 was cached on-device —
+    // so the page reports it and offers the same bridge hop the apex page does,
+    // rather than falling through to the catch-all and rendering a 404 (which
+    // is exactly what the iOS sign-in bug looked like).
+    // NOTE: App.vue bails out of init for this route name — see the terminal
+    // OAuth surfaces guard. Renaming this route requires updating that guard.
+    path: '/oauth/native',
+    name: 'OAuthNativeBridge',
+    component: () => import('@/pages/OAuthNativeBridgePage.vue'),
+    meta: { requiresAuth: false, hideQuickAdd: true, noChrome: true },
+  },
+  {
     path: '/no-access',
     name: 'NoAccess',
     component: () => import('@/pages/NoAccessPage.vue'),

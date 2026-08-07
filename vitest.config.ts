@@ -18,6 +18,11 @@ export default defineConfig({
       'src/**/*.{test,spec}.ts',
       'scripts/**/*.{test,spec}.mjs',
       'infrastructure/lambda/registry/**/*.{test,spec}.mjs',
+      // The apex CloudFront Function's routing table. It is prod-critical,
+      // hand-written ES5, and its branch ORDER is load-bearing (the /oauth/native
+      // exemption must reach the .html rewrite, not 301 or 403). The test loads
+      // the real source in a node:vm sandbox, so the shipped file gains nothing.
+      'infrastructure/modules/web/functions/**/*.{test,spec}.mjs',
     ],
   },
   resolve: {

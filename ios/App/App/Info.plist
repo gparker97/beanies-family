@@ -26,6 +26,36 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- OAuth custom-scheme bridge. This is what makes iOS route
+	     family.beanies.app://oauth/native to us, so AppDelegate's
+	     application(_:open:options:) fires Capacitor's appUrlOpen event.
+
+	     WHY A CUSTOM SCHEME AT ALL: Apple fires Universal Links only on
+	     user-initiated TAPS. The Google OAuth *redirect* to our Universal Link
+	     (https://beanies.family/oauth/native) therefore never hands off — it
+	     just loads in the SFSafariViewController that @capacitor/browser opened,
+	     so the whole app ends up running inside the browser sheet. Custom
+	     schemes do escape the sheet, so a bridge page at that https URL hops to
+	     this scheme. See docs/plans/2026-08-06-ios-oauth-custom-scheme-bridge.md.
+
+	     The scheme is the bundle id (reverse-DNS, the iOS convention; dots are
+	     legal per RFC 3986). Keep it in sync with NATIVE_BRIDGE_URI in
+	     src/constants/nativeOAuth.ts — a tripwire test asserts this file
+	     declares exactly that scheme. No LSApplicationQueriesSchemes is needed:
+	     that governs outbound canOpenURL, which the app never calls. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>family.beanies.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>family.beanies.app</string>
+			</array>
+		</dict>
+	</array>
 	<!-- Export compliance: beanies uses only standard, exempt cryptography —
 	     AES-GCM / AES-KW via the Web Crypto API and HTTPS/TLS. No proprietary or
 	     custom crypto ships. `false` declares "no non-exempt encryption" so App
