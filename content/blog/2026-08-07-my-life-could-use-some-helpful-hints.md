@@ -29,7 +29,7 @@ beanies says: yes, it would, and it would like to help.
 
 As you may know, we (why do I always say "we"?) recently introduced the [beanies lists](https://beanies.family/blog/getting-your-beans-in-a-row) feature, which allows you to create and attach any list of arbitrary things you'd like to remember for an existing travel plan or activity. That's all well and good, provided you know and can recall everything you need to do, and you're well-thought-out enough to list out every detail in advance. To those people: I envy you, I really do.
 
-For the rest of us, when it comes to those key things like visas, kid's packing, birthday gifts, and more that _always_ [slip through the cracks](/guides/family-organization), there are now: _**helpful hints**_.
+For the rest of us, when it comes to those key things like visas, kid's packing, birthday gifts, and more that seem to _always_ [slip through the cracks](/guides/family-organization), there are now: _**helpful hints**_.
 
 ## How does it work?
 
