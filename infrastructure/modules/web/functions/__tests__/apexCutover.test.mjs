@@ -17,6 +17,10 @@ import { runInNewContext } from 'node:vm';
 // Resolved from the repo root (vitest's cwd) rather than `import.meta.url`:
 // the suite runs under happy-dom, where import.meta.url is an http:// URL and
 // fileURLToPath rejects it.
+//
+// eslint-disable-next-line security/detect-non-literal-fs-filename -- the path is
+// a fixed repo-relative constant joined to cwd; no external, user, or network
+// input reaches it, and this is a test-only read of a checked-in source file.
 const src = readFileSync(
   join(process.cwd(), 'infrastructure/modules/web/functions/apex-cutover.js'),
   'utf8'
