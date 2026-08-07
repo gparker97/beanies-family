@@ -1857,10 +1857,12 @@ watch(
       <!-- Desktop sidebar -->
       <AppSidebar v-if="isDesktop" />
 
-      <!-- padding-top clears the status bar in the native edge-to-edge layout
-           (useNativeShell sets viewport-fit=cover on native, so env() is non-zero
-           there; 0 on web/PWA — no effect). The root bg paints behind the
-           transparent bar and blends. -->
+      <!-- padding-top clears the status bar in the native edge-to-edge layout.
+           env() is non-zero because viewport-fit=cover is set STATICALLY in
+           index.html (iOS WKWebView only computes safe-area insets at load — a
+           runtime injection left them 0; see index.html + useNativeShell.ts). 0 on
+           web/non-notched — no effect. The root bg paints behind the transparent
+           bar and blends. -->
       <div class="flex min-w-0 flex-1 flex-col" style="padding-top: env(safe-area-inset-top)">
         <!--
           Inline-flow banner at the top of the column. Renders above

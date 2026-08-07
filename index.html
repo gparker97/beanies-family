@@ -4,7 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/brand/beanies_small_bean_favicon_32x32.png" />
     <link rel="apple-touch-icon" href="/brand/beanies_father_son_icon_192x192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover is STATIC (not injected at runtime) on purpose: iOS
+         WKWebView computes env(safe-area-inset-*) at page load and does NOT
+         recompute them when the viewport meta is changed afterward, so a runtime
+         injection left every inset at 0 — top controls (AppHeader, side-panel
+         close buttons) rendered under the status bar and were untappable on the
+         first native iOS build (build 9). Harmless on web/desktop (no-op without
+         a notch); correct on notched iOS PWAs too. See useNativeShell.ts. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="family planning made easy — every bean counts" />
     <meta name="theme-color" content="#F8F9FA" />
 

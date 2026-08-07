@@ -62,10 +62,13 @@ export function useNativeShell(): void {
   // Reveal the web shell — hide the native splash now that App.vue is mounting.
   void SplashScreen.hide().catch(() => {});
 
-  // Enable `env(safe-area-inset-*)` for the edge-to-edge layout — set ONLY on
-  // native so the PWA/web viewport (and its current insets) are untouched. The
-  // App.vue layout reads these insets (top: status bar; bottom: nav bar) so
-  // content clears the system bars.
+  // `env(safe-area-inset-*)` is powered by `viewport-fit=cover`, which is now set
+  // STATICALLY in index.html — iOS WKWebView computes safe-area insets at page
+  // load and does NOT recompute them when the viewport meta is changed afterward,
+  // so injecting it here left every inset at 0 and put top controls under the
+  // status bar on the first native iOS build (build 9). This runtime set is kept
+  // only as a harmless fallback (the guard makes it a no-op once the static meta
+  // is present) for any build/environment where the static meta is stripped.
   const viewport = document.querySelector('meta[name="viewport"]');
   if (viewport && !viewport.getAttribute('content')?.includes('viewport-fit')) {
     viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
