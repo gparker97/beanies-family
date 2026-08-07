@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - **iPhone and iPad: Google sign-in now completes.** After the earlier fix let the app catch the sign-in handoff, sign-in still looped back to the "load your family data" screen (sometimes with a "Google sign-in failed" message) on the native iOS app. The iOS app runs under a different internal origin than the web and Android apps, and it was the first build to actually reach the token-exchange step — which the server rejected because that origin wasn't on its allowed list. The allowlist now includes the iOS app, so sign-in finishes and loads your family data. iOS only; the web app and Android were never affected.
+- **iPhone and iPad: buttons at the top of the screen are tappable again.** On the iOS app, the back arrows and the "X" to close panels (like the What's New drawer) sat under the phone's status bar and wouldn't respond to touch, so some screens couldn't be closed. They now sit clear of the status bar and work normally. iOS only.
 
 ## 2026-08-06
 
