@@ -29,9 +29,9 @@ beanies says: yes, it would, and it would like to help.
 
 As you may know, we (why do I always say "we"?) recently introduced the [beanies lists](https://beanies.family/blog/getting-your-beans-in-a-row) feature, which allows you to create and attach any list of arbitrary things you'd like to remember for an existing travel plan or activity. That's all well and good, provided you know and can recall everything you need to do, and you're well-thought-out enough to list out every detail in advance. To those people: I envy you, I really do.
 
-For the rest of us, when it comes to those key things like visas, kid's packing, birthday gifts, and more that _always_ slip through the cracks, there are now: _**helpful hints**_.
+For the rest of us, when it comes to those key things like visas, kid's packing, birthday gifts, and more that _always_ [slip through the cracks](/guides/family-organization), there are now: _**helpful hints**_.
 
-_**How does it work?**_
+## How does it work?
 
 Schedule a travel plan on [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=helpful-hints), and you might notice something - a new section on your to-do list (and, subsequently, on your [family nook daily briefing](https://beanies.family/blog/buy-fruit) as well) called _helpful hints_.
 
@@ -45,7 +45,7 @@ _Helpful hints_ are those little things that seem to trigger, at least for me, c
 
 They're also entirely dismissible (or ignorable) if you'd like, and you can always configure how things work from the settings page.
 
-_**Sounds like it might be useful. Where do I find these "helpful hints"?**_
+## Sounds like it might be useful. Where do I find these "helpful hints"?
 
 Add a travel plan, a friend's birthday, an anniversary, or something similar to your calendar, and if a helpful hint applies, you will see it in your to-do list and daily briefing.
 
@@ -57,7 +57,7 @@ _as with all features, wouldn't it have been nice if i had thought of this 2 mon
 
 Luckily, I suffered, so you don't have to. You're welcome (again).
 
-_**What if I don't want helpful hints, or I'd like to only get certain ones?**_
+## What if I don't want helpful hints, or I'd like to only get certain ones?
 
 You're in luck. You can see all the different types of helpful hints under the "reminders" box on the settings page, and you can enable or disable any hint you'd like. This is just the beginning - I expect more categories to come in the future, and perhaps even _custom_ helpful hints!
 
