@@ -80,6 +80,14 @@ useFullscreenOverlay(toRef(props, 'open'), close);
         aria-modal="true"
         class="fixed inset-y-0 flex w-full flex-col overflow-y-auto bg-white shadow-xl dark:bg-slate-800"
         :class="[panelZ, sizeClasses[size], side === 'right' ? 'right-0' : 'left-0']"
+        :style="{
+          // The panel is `inset-y-0` (full viewport height), so on native iOS its
+          // header + close button and its footer would sit UNDER the status bar /
+          // home indicator. Inset padding keeps both tappable. 0 on web/non-notched
+          // (no-op). Mirrors the App.vue content-column + MobileBottomNav pattern.
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }"
       >
         <!-- Header -->
         <div
