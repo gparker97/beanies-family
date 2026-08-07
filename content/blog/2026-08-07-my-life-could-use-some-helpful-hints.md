@@ -4,7 +4,7 @@ slug: my-life-could-use-some-helpful-hints
 date: 2026-08-07
 category: updates
 excerpt: 'I let my China visa lapse two weeks before a family trip. So beanies now nudges you about the things that always slip through the cracks: visas, gifts, packing.'
-coverImage: /blog/helpful-hints-todo-example.webp
+coverImage: /blog/shanghai-disney-family.webp
 subtitle: "i can't afford to hire an assistant, so i built one"
 featured: false
 author: greg
@@ -79,4 +79,8 @@ Thanks for your patience, and don't forget those visas, my beans.
 
 greg
 
-_ps - Do you like helpful hints, or are they annoying? Let me know your thoughts, or tell me what to build next, on the [beanies.family discord](https://discord.com/invite/NE4grWzjxV)._
+![greg's family on their Shanghai Disney trip](/blog/shanghai-disney-family.webp)
+
+_by the way, the kids enjoyed their shanghai disney adventure. especially zootopia hot pursuit, which i probably rode enough for 2 lifetimes._
+
+_ps - do you like helpful hints, or are they annoying? Let me know your thoughts, or tell me what to build next, on the [beanies.family discord](https://discord.com/invite/NE4grWzjxV)._
