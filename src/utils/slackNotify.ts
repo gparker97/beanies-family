@@ -10,7 +10,8 @@
  *
  * Both follow the same contract:
  *   - `mode: 'no-cors'` because Slack webhooks don't allow CORS preflight
- *   - Caller does NOT await — fire-and-forget by design
+ *   - Caller need not await — fire-and-forget by design. The returned promise
+ *     never rejects; awaiting it only buys a delivery-outcome signal.
  *   - Failures land in `console.warn` with the caller's scope tag
  *     (NOT a silent `catch {}`). The reporter's primary value is visibility;
  *     a webhook that fails silently defeats the purpose.
@@ -18,16 +19,39 @@
  *     env-var doesn't masquerade as a working webhook).
  */
 
+/**
+ * What happened to a `slackPost` call.
+ *
+ * ⚠️ `dispatched` means the request left the device without a NETWORK-level
+ * error — NOT that Slack accepted it. `mode: 'no-cors'` yields an opaque
+ * response, so an HTTP 404/410 from a dead or rotated webhook is
+ * indistinguishable from a 200 here. Treat it as "we tried and the network
+ * didn't refuse", nothing stronger.
+ */
+export type SlackPostOutcome = 'dispatched' | 'skipped_no_url' | 'network_error';
+
+export interface SlackPostResult {
+  outcome: SlackPostOutcome;
+  /** Present only for `network_error`. */
+  error?: unknown;
+}
+
+/**
+ * Returns a promise that NEVER rejects — callers that don't care about the
+ * outcome (errorReporter, slackNotify) can keep ignoring it exactly as before;
+ * callers that must know (feedback, whose payload is stored nowhere else) can
+ * await it to emit a delivery-outcome diagnostic.
+ */
 export function slackPost(
   url: string | null | undefined,
   payload: { text: string },
   scope = 'slackPost'
-): void {
+): Promise<SlackPostResult> {
   if (!url) {
     console.warn(`[${scope}] webhook URL not configured — skipping POST`);
-    return;
+    return Promise.resolve({ outcome: 'skipped_no_url' });
   }
-  fetch(url, {
+  return fetch(url, {
     method: 'POST',
     mode: 'no-cors',
     // `keepalive` lets the request outlive the page/WebView teardown that
@@ -38,9 +62,13 @@ export function slackPost(
     // longer, delivered fine. See the 2026-07-31 investigation.
     keepalive: true,
     body: JSON.stringify(payload),
-  }).catch((e) => {
-    console.warn(`[${scope}] webhook POST failed`, e);
-  });
+  }).then(
+    () => ({ outcome: 'dispatched' }) as SlackPostResult,
+    (e: unknown) => {
+      console.warn(`[${scope}] webhook POST failed`, e);
+      return { outcome: 'network_error', error: e } as SlackPostResult;
+    }
+  );
 }
 
 /**
