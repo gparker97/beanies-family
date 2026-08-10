@@ -22,6 +22,8 @@ jobs:
     name: Update Translations
     runs-on: ubuntu-latest
 
+    # Retained for visibility in the Actions UI / API even though no downstream
+    # job consumes it (the prod-deploy job that did was removed 2026-08-10).
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
 
@@ -61,55 +63,39 @@ jobs:
         if: steps.check.outputs.has_changes == 'true'
         run: |
           git add public/translations/*.json
-          git commit -m "chore(i18n): auto-update translations [skip ci]"
+          # NO `[skip ci]`. It skips EVERY workflow for this push, including
+          # main-ci and security — and deploy.yml gates on a green CI run for the
+          # exact SHA it deploys, so a `[skip ci]` bot commit leaves `main`
+          # un-deployable until someone dispatches CI by hand. That happened on
+          # 2026-08-10. Translations are shipped app content; validating them is
+          # not waste.
+          git commit -m "chore(i18n): auto-update translations"
           git push
 
-  deploy:
-    name: Deploy to PROD
-    needs: translate
-    if: needs.translate.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          ref: main
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build for production
-        run: npm run build
-        env:
-          VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
-          VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          # Diagnostic-logging firehose (ADR-027) — kept consistent with
-          # deploy.yml so a translation-triggered prod deploy doesn't ship a
-          # telemetry-disabled build. (This workflow's build env is otherwise a
-          # deliberately reduced subset.)
-          VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
-          VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy to S3
-        run: aws s3 sync dist/ s3://${{ vars.APP_S3_BUCKET }} --delete
-
-      - name: Invalidate CloudFront cache
+      - name: Note that a deploy is pending
+        if: steps.check.outputs.has_changes == 'true'
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.APP_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+          {
+            echo "### Translations updated"
+            echo ""
+            echo "New translations are committed to \`main\` but **not live**."
+            echo "They ship on the next manual run of **Deploy beanies PROD** (\`deploy.yml\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# NOTE (2026-08-10): a `Deploy to PROD` job used to live here. It built with a
+# "deliberately reduced subset" of env vars — no VITE_BUILD_SHA, no Slack
+# webhooks, no analytics, no AI-extract — and then ran
+# `aws s3 sync dist/ --delete` over the production bucket.
+#
+# The effect was that every translation change silently replaced the live bundle
+# with one that had error reporting, new-family pings, feedback delivery and
+# analytics all switched off, undoing whatever the last proper deploy shipped. It
+# did exactly that on 2026-08-10 and went unnoticed for hours.
+#
+# `deploy.yml` ("Deploy beanies PROD") is the ONLY sanctioned path to production:
+# it injects the full env and gates on a green CI + Security run for the exact
+# SHA. Translations now ride the next deploy of that workflow.
+#
+# This workflow deliberately does NOT dispatch deploy.yml either — production
+# deploys are manual by project rule (see CLAUDE.md), and a scheduled job that
+# ships to prod on its own is the same class of surprise in a nicer wrapper.
