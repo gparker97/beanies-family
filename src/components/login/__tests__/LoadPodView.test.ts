@@ -68,7 +68,7 @@ vi.mock('@/stores/syncStore', () => ({
     loadFromDroppedFile: vi.fn(),
     decryptPendingFile: decryptPendingFileMock,
     decryptPendingFileWithKey: vi.fn(async () => ({ success: false })),
-    establishDurableHomeAfterLoad: establishHomeMock,
+    verifyPodAccess: establishHomeMock,
     requestPermission: vi.fn(),
     addPasskeySecret: vi.fn(),
     syncNow: vi.fn(),
@@ -329,7 +329,7 @@ describe('LoadPodView — onboarding loop fix', () => {
     });
   });
 
-  describe('B2: single-member auto-sign-in establishes a durable home', () => {
+  describe('B2: single-member auto-sign-in verifies pod access', () => {
     async function driveSingleMemberDecrypt() {
       // autoLoad + a pending encrypted file → the decrypt modal opens (no cached key,
       // no biometric) so we can submit the password and exercise handleDecrypt.
@@ -345,7 +345,7 @@ describe('LoadPodView — onboarding loop fix', () => {
       return wrapper;
     }
 
-    it('calls establishDurableHomeAfterLoad before emitting signed-in (single unambiguous member)', async () => {
+    it('calls verifyPodAccess before emitting signed-in (single unambiguous member)', async () => {
       const wrapper = await driveSingleMemberDecrypt();
 
       expect(signInMock).toHaveBeenCalledWith('m1', 'pw');

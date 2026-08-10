@@ -215,7 +215,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4E6}',
     readTime: 4,
     popular: true,
-    updatedDate: '2026-07-13',
+    updatedDate: '2026-08-10',
     sections: [
       {
         type: 'heading',
@@ -289,9 +289,43 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'The file is still encrypted \u2014 opening it always asks for your family password, so a copied <code>.beanpod</code> is useless to anyone who doesn\u2019t know it. Once you open a restored backup, your currently signed-in Google Drive becomes its new home, so you\u2019re no longer tied to the old account.',
+          'The file is still encrypted \u2014 opening it always asks for your family password, so a copied <code>.beanpod</code> is useless to anyone who doesn\u2019t know it.',
         title: 'Still needs your password',
         icon: '\u{1F510}',
+      },
+      {
+        type: 'heading',
+        content: 'One file, shared by the whole family',
+        level: 2,
+        id: 'one-file-per-family',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Your family has exactly <strong>one</strong> <code>.beanpod</code> file, and everyone works on that same file. Whoever set the family up owns it in their Google Drive and shares it with everyone else \u2014 so if you joined by invite, the file lives in someone else\u2019s Drive and that is completely normal. It is still your family\u2019s file, and you can edit it just like they can.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'beanies never makes a second copy of your family\u2019s file. A copy would quietly split your family in two \u2014 each half adding to a different file, each seeing only its own changes \u2014 so it is not something the app will do on its own, and not something it will offer to do.',
+      },
+      {
+        type: 'heading',
+        content: 'If beanies can\u2019t reach your family\u2019s file',
+        level: 2,
+        id: 'cannot-reach-file',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Sometimes the app can open your data but can\u2019t confirm it is able to <em>save</em> to it \u2014 you\u2019re offline, your Google connection has expired, the file has been moved or put in the bin, or the person who shared it has stopped sharing it. When that happens you\u2019ll see a banner at the top of the app explaining which of those it is, with a button that takes you back to the original file. Your changes stay safely on your device in the meantime.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If a banner tells you you\u2019re working on a <strong>copy</strong> of your family\u2019s file, it means your changes aren\u2019t reaching everyone else. Tap \u201cSwitch to your family\u2019s file\u201d \u2014 the changes on your device come across with you, and the copy is left alone.',
+        title: 'Working on a copy',
+        icon: '\u{1F500}',
       },
     ],
   },

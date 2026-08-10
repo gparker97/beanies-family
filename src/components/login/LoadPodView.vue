@@ -215,9 +215,23 @@ function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
  */
 async function ensureDurableHome() {
   try {
-    await syncStore.establishDurableHomeAfterLoad();
+    // Verifies and REPORTS; never creates or switches files. A failure lands in
+    // `syncStore.podAccessError`, which `PodAccessBanner` renders at the app
+    // level — this view renders nothing for it, so the failure survives the
+    // transition off the login screen (which is the point: the user is now
+    // inside the app looking at data that isn't saving).
+    await syncStore.verifyPodAccess();
   } catch (e) {
-    console.error('[LoadPodView] establishDurableHomeAfterLoad failed:', e);
+    // `verifyPodAccess` has its own internal catch; this is the last resort so a
+    // throw can never block the user reaching already-decrypted data.
+    console.error('[LoadPodView] verifyPodAccess failed:', e);
+    reportError({
+      surface: 'pod-access',
+      severity: 'critical',
+      message: 'pod access verification threw at the load boundary',
+      error: e,
+      context: { action: 'VERIFY_UNAVAILABLE' },
+    });
   }
 }
 

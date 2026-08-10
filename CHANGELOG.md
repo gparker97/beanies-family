@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Your family now always works on the same data file — a member could previously end up on a private copy without knowing.** If you joined a family by invite, the family's data file lives in the Drive of whoever set the family up, and is shared with you. The app used to treat "this file isn't mine" as "make me my own copy", so on a later sign-in a member could be moved onto a duplicate — seeded with the same data, so everything looked completely normal — while their changes quietly stopped reaching the rest of the family. beanies no longer creates a second copy of a family's file under any circumstance. If it can't reach or save to your family's file, it now tells you exactly why (you're offline, your Google connection expired, the file was moved or binned, or sharing was turned off) and gives you a way back to the original file. And if you are already on a copy, a banner now says so and offers to switch you back in one tap — bringing your changes with you.
+
 - **Feedback sent from the Android and iPhone apps now actually reaches the team.** Feedback submitted from the app was being discarded before it left the device — the thank-you screen appeared as normal, but nothing was delivered and nothing was stored, so those messages are gone. Feedback sent from the website and the installed web app was never affected. Anything sent from the app between 9 July and today did not arrive; if you took the time to write something, please do send it again — it will land this time.
 
 ### Changed

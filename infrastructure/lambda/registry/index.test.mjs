@@ -141,3 +141,134 @@ describe('registry PUT — backward compatibility', () => {
     expect(item.country).toBe('SG');
   });
 });
+
+describe('registry PUT — canonical-pointer guard', () => {
+  const OWNER = { ownerEmail: 'owner@example.com', provider: 'google_drive', fileId: 'ORIGINAL' };
+
+  it('accepts the pointer when the row has no ownerEmail (legacy row falls open)', async () => {
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'NEW', ownerEmail: 'anyone@example.com' },
+      { provider: 'google_drive', fileId: 'ORIGINAL' }
+    );
+    expect(item.fileId).toBe('NEW');
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+  });
+
+  it('accepts the pointer from the registered owner', async () => {
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MOVED', ownerEmail: 'owner@example.com' },
+      OWNER
+    );
+    expect(item.fileId).toBe('MOVED');
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+  });
+
+  it('accepts the owner despite case/whitespace drift in the profile email', async () => {
+    // ownerEmail comes from a user-editable member profile — drift must never
+    // lock the real owner out of re-pointing their own pod.
+    const { item } = await put(
+      { provider: 'google_drive', fileId: 'MOVED', ownerEmail: '  Owner@Example.COM ' },
+      OWNER
+    );
+    expect(item.fileId).toBe('MOVED');
+  });
+
+  it('REFUSES the pointer from a non-owner and preserves the original', async () => {
+    // The incident: a member device re-homed onto a private copy and repointed
+    // the family's canonical row at it.
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MEMBER-PRIVATE-COPY', ownerEmail: 'member@example.com' },
+      OWNER
+    );
+    expect(item.fileId).toBe('ORIGINAL');
+    expect(item.provider).toBe('google_drive');
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+  });
+
+  it('REFUSES the pointer when the writer sends no ownerEmail at all', async () => {
+    const { item } = await put({ provider: 'local', fileId: null }, OWNER);
+    expect(item.fileId).toBe('ORIGINAL');
+    expect(item.provider).toBe('google_drive');
+  });
+
+  it('still records member activity and metadata on a refused pointer write', async () => {
+    // The guard protects the pointer only — member logins must keep stamping
+    // lastLoginAt, or families with an inactive owner read as dormant.
+    const { item } = await put(
+      {
+        provider: 'local',
+        ownerEmail: 'member@example.com',
+        isLoginEvent: true,
+        country: 'SG',
+        beanpodSizeKb: 42,
+      },
+      OWNER
+    );
+    expect(item.lastLoginAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(item.country).toBe('SG');
+    expect(item.beanpodSizeKb).toBe(42);
+    expect(item.fileId).toBe('ORIGINAL'); // …but the pointer did not move
+  });
+
+  it('makes ownerEmail genuinely write-once', async () => {
+    // Previously `body.ownerEmail ?? existing.ownerEmail` let the last writer
+    // win, which is how a re-homed device could take over the row.
+    const { item } = await put(
+      { provider: 'google_drive', ownerEmail: 'member@example.com' },
+      OWNER
+    );
+    expect(item.ownerEmail).toBe('owner@example.com');
+  });
+
+  it('preserves familyName when a write omits it', async () => {
+    const { item } = await put(
+      { provider: 'local', ownerEmail: 'owner@example.com' },
+      {
+        ...OWNER,
+        familyName: 'The Parker Beanies',
+      }
+    );
+    expect(item.familyName).toBe('The Parker Beanies');
+  });
+});
+
+describe('registry PUT — pointer guard treats a no-op write as accepted', () => {
+  const OWNER = {
+    ownerEmail: 'owner@example.com',
+    provider: 'google_drive',
+    fileId: 'ORIGINAL',
+    displayPath: 'Family.beanpod',
+  };
+
+  it('accepts a non-owner write that does not change the pointer', async () => {
+    // The common case: a member re-picks the family's CORRECT file, or simply
+    // logs in and echoes the pointer back. Reporting these as refused would page
+    // the team on every normal member recovery and drown the real signal.
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'ORIGINAL',
+        displayPath: 'Family.beanpod',
+        ownerEmail: 'member@example.com',
+        isLoginEvent: true,
+      },
+      OWNER
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('still refuses a non-owner write that WOULD move the pointer', async () => {
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MEMBER-PRIVATE-COPY',
+        displayPath: 'Family-abc.beanpod',
+        ownerEmail: 'member@example.com',
+      },
+      OWNER
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+});

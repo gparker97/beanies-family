@@ -294,6 +294,7 @@ vi.mock('@/services/registry/registryService', () => ({
   registerFamily: vi.fn(async () => {}),
   registerFamilyOrThrow: vi.fn(async () => {}),
   lookupFamily: vi.fn(async () => null),
+  lookupFamilyResult: vi.fn(async () => ({ status: 'absent' })),
   removeFamily: vi.fn(async () => {}),
 }));
 
@@ -643,7 +644,10 @@ describe('pod creation: full end-to-end flow', () => {
     // A real pod already exists for this family (e.g. a partial prior create
     // that registered, or a name-mismatch second attempt). createNewFile must
     // refuse rather than orphan it.
-    vi.mocked(registry.lookupFamily).mockResolvedValueOnce({ fileId: 'existing-file-id' } as never);
+    vi.mocked(registry.lookupFamilyResult).mockResolvedValueOnce({
+      status: 'found',
+      entry: { fileId: 'existing-file-id' },
+    } as never);
     mockProvider.write.mockClear();
     const result = await syncStore.createNewFile(
       'test.beanpod',
@@ -665,7 +669,7 @@ describe('pod creation: full end-to-end flow', () => {
     const { memberId } = await signUpAndConfigureStorage();
     const syncStore = useSyncStore();
     const registry = await import('@/services/registry/registryService');
-    vi.mocked(registry.lookupFamily).mockRejectedValueOnce(new Error('registry 503'));
+    vi.mocked(registry.lookupFamilyResult).mockRejectedValueOnce(new Error('registry 503'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
       'pod-password',

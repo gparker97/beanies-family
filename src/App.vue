@@ -33,6 +33,7 @@ import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import CalendarReconnectToast from '@/components/common/CalendarReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
+import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
@@ -1873,6 +1874,12 @@ watch(
           surface for permanent expiry; rolled up via
           `shouldShowSaveFailureBanner` in syncStore.
         -->
+        <!-- Pod access — "we can't reach your family's data file", incl. the
+             "you're working on a copy" case. Outranks SaveFailureBanner (it is
+             the root cause of any save failure it coexists with); precedence is
+             declared once in syncStore's `shouldShowPodAccessBanner`. -->
+        <PodAccessBanner v-if="!authStore.needsAuth" />
+
         <SaveFailureBanner
           :show="syncStore.shouldShowSaveFailureBanner && !authStore.needsAuth"
           :file-not-found="syncStore.driveFileNotFound"

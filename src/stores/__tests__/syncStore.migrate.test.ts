@@ -416,48 +416,13 @@ describe('syncStore.migrateStorage', () => {
   });
 });
 
-describe('syncStore.configureSyncFileGoogleDrive (exercises the shared installProvider sequence)', () => {
-  let pinia: Pinia;
-
-  beforeEach(() => {
-    pinia = createPinia();
-    setActivePinia(pinia);
-    vi.clearAllMocks();
-    mockSave.mockResolvedValue(true);
-    mockGetFileTimestamp.mockResolvedValue(null);
-    mockCreateNew.mockReset();
-    mockGetProvider.mockReturnValue(null);
-  });
-
-  it('persists the provider, installs it, writes the envelope, saves settings, and registers the family', async () => {
-    const store = useSyncStore();
-    const driveProvider = makeProvider('google_drive', 'pod.beanpod');
-    mockCreateNew.mockResolvedValue(driveProvider);
-
-    const ok = await store.configureSyncFileGoogleDrive('pod.beanpod');
-
-    expect(ok).toBe(true);
-    expect(mockCreateNew).toHaveBeenCalledWith('pod.beanpod', { forceConsent: false }); // B6: never force an interactive redirect
-    expect(driveProvider.persist).toHaveBeenCalledWith('family-123');
-    expect(mockSetProvider).toHaveBeenCalledWith(driveProvider);
-    expect(mockSave).toHaveBeenCalled();
-    expect(mockRegisterFamily).toHaveBeenCalledWith(
-      'family-123',
-      expect.objectContaining({ provider: 'google_drive' })
-    );
-  });
-
-  it('returns false (and surfaces an error) when the envelope write fails', async () => {
-    const store = useSyncStore();
-    mockCreateNew.mockResolvedValue(makeProvider('google_drive', 'pod.beanpod'));
-    mockSave.mockResolvedValue(false); // syncNow() inside installProvider fails
-
-    const ok = await store.configureSyncFileGoogleDrive('pod.beanpod');
-
-    expect(ok).toBe(false);
-    expect(store.error).toBeTruthy();
-  });
-});
+// NOTE: a `syncStore.configureSyncFileGoogleDrive` describe lived here. That
+// function existed only to serve the silent re-home path removed on 2026-08-10
+// (see docs/plans/2026-08-10-never-fork-a-family-pod.md) and had no other caller,
+// so it went with it. The shared installProvider sequence it exercised — persist
+// -> setProvider -> syncNow -> saveSettings -> registerCurrentFamily — is covered
+// by the `syncStore.migrateStorage` describe above, which together with
+// createNewFile is now the only path that reaches it.
 
 // ---------------------------------------------------------------------------
 // Registry country sync — verifies the country field flows through every

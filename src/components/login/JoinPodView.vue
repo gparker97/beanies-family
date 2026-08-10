@@ -13,10 +13,12 @@ import { useFileDrop } from '@/composables/useFileDrop';
 import { useClipboard } from '@/composables/useClipboard';
 import { isTemporaryEmail } from '@/utils/email';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { resolveErrorView } from '@/utils/structuredError';
 import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import type { FamilyMember } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
@@ -82,22 +84,12 @@ const busyLabel = computed(() => {
   return '';
 });
 
-/** Registry-driven view of the current error (or null). */
-const currentErrorView = computed(() => {
-  const err = flow.currentError.value;
-  if (!err) return null;
-  const meta = JOIN_ERRORS[err.code];
-  // Interpolate context (used by FILE_READ_FAILED, FILE_FAMILY_MISMATCH, etc.) via
-  // fillTemplate so account/family-controlled values (e.g. {actualEmail}) insert
-  // literally and can't be mangled by `$`-replacement patterns.
-  const message = err.context ? fillTemplate(t(meta.messageKey), err.context) : t(meta.messageKey);
-  return {
-    code: err.code,
-    severity: meta.severity,
-    message,
-    recoveries: meta.recoveries,
-  };
-});
+/**
+ * Registry-driven view of the current error (or null). The derivation is shared
+ * with the pod-access surface via `resolveErrorView`; the markup below and the
+ * `recoveryHandlers` map stay local because both are join-specific.
+ */
+const currentErrorView = computed(() => resolveErrorView(JOIN_ERRORS, flow.currentError.value, t));
 
 const recoveryHandlers: Record<RecoveryAction, () => void | Promise<void>> = {
   retry: () => flow.handleRetry(),
@@ -111,6 +103,25 @@ const recoveryHandlers: Record<RecoveryAction, () => void | Promise<void>> = {
     // the member grid is reachable).
   },
 };
+
+/**
+ * `resolveErrorView` returns `recoveries` as plain strings (the shared derivation
+ * has no view of any one registry's action union), so the narrowing back to
+ * `RecoveryAction` happens here — once, at the single point where an action id
+ * crosses from the shared module into join-specific handling.
+ */
+function runRecovery(action: string): void {
+  const handler = recoveryHandlers[action as RecoveryAction];
+  if (!handler) {
+    console.warn(`[JoinPodView] no handler for recovery action "${action}"`);
+    return;
+  }
+  void handler();
+}
+
+function recoveryLabel(action: string): string {
+  return t(`join.recovery.${action}` as UIStringKey);
+}
 
 function getMemberRole(member: FamilyMember): string {
   if (member.ageGroup === 'child') return t('loginV6.littleBean');
@@ -275,9 +286,9 @@ onMounted(() => {
           :key="action"
           size="sm"
           :variant="action === currentErrorView.recoveries[0] ? 'primary' : 'secondary'"
-          @click="recoveryHandlers[action]()"
+          @click="runRecovery(action)"
         >
-          {{ t(`join.recovery.${action}`) }}
+          {{ recoveryLabel(action) }}
         </BaseButton>
       </div>
       <button
