@@ -1629,7 +1629,11 @@ export interface RegistryEntry {
   displayPath?: string | null;
   familyName?: string | null;
   createdAt?: ISODateString; // write-once, set server-side on first PUT
-  ownerEmail?: string | null;
+  ownerEmail?: string | null; // ops/contact capture (added 2026-04-12) — NOT the pointer authority
+  // Write-once pointer authority: the member id allowed to move this family's
+  // canonical pod pointer. A stable UUID, unlike `ownerEmail`, which is a
+  // user-editable profile field. See infrastructure/lambda/registry/index.mjs.
+  ownerMemberId?: string | null;
   subscribeNewsletter?: boolean | null;
   country?: CountryCode | null; // mirror of family Settings.country — denormalized for ops introspection
   lastLoginAt?: ISODateString | null; // date-only (YYYY-MM-DD), server-stamped on login/resume PUTs — usage signal

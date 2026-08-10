@@ -53,6 +53,10 @@ Concretely:
 
 Only the family's registered owner may move the canonical pointer (`provider` / `fileId` / `displayPath`). Enforced in `infrastructure/lambda/registry/index.mjs`, because **the client cannot close the hole**: the propagation vector is already deployed, and native/cached builds running the old code keep sending pointer writes for as long as they run. `ownerEmail` becomes genuinely write-once (it previously claimed to be, but `body.ownerEmail ?? existing.ownerEmail` let the last writer win — which is how a re-homed device could take over a row).
 
+**The authority is `ownerMemberId`, not `ownerEmail`.** `ownerEmail` was added 2026-04-12 as an ops/contact capture (alongside the newsletter opt-in) and holds the signed-in member's _profile_ email — a field the user can edit. Using it as the permission check would mean an owner who edits their own email is refused on their next write and, because the field is write-once, has no way back. `memberId` is a stable UUID from the family document and survives profile edits. Three tiers: a row with `ownerMemberId` compares that; a row with only `ownerEmail` (registered between 2026-04-12 and this change) compares the email and _upgrades itself_ by stamping `ownerMemberId` on the owner's next accepted write; a row with neither (pre-2026-04-12, dormant since) falls open and stamps both. A non-owner cannot claim `ownerMemberId` on a legacy row — otherwise the upgrade path would be a land-grab.
+
+`ownerEmail` remains write-once so it stays a trustworthy legacy authority and a stable contact field.
+
 Members still write activity and metadata (`lastLoginAt`, `country`, `beanpodSizeKb`, `familyName`) — those are per-family facts any device may report. The pointer is not.
 
 Clients mark deliberate re-points with `pointerIntent: true`. A refused _deliberate_ write pages `#beanies-errors` (the registry now disagrees with where the pod is — data at risk); a refused _ambient_ write is counted at `info` (the expected, boring case for every member device).
