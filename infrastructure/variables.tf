@@ -63,3 +63,10 @@ variable "site_verification_txt_records" {
   type        = list(string)
   default     = []
 }
+
+variable "slack_error_webhook_url" {
+  description = "Slack incoming-webhook URL (#beanies-errors) used by the telemetry Lambda to escalate build-integrity events server-side. Set TF_VAR_slack_error_webhook_url; it is the same value as the BEANIES_ERROR_WEBHOOK_URL GitHub variable. Optional — unset means the Lambda logs the failure to CloudWatch and continues."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

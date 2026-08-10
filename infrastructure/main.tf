@@ -126,6 +126,7 @@ module "telemetry" {
   api_gateway_execution_arn = module.registry.api_gateway_execution_arn
   api_domain_name           = module.registry.api_domain_name
   log_ingest_api_key        = var.log_ingest_api_key
+  slack_error_webhook_url   = var.slack_error_webhook_url
 }
 
 # ── ai-extract — private AI document-extraction proxy (added 2026-06-03, #133) ──

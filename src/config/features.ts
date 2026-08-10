@@ -109,18 +109,63 @@ if (env.PROD && (features.drive || features.registry)) {
   // cloud host: it ships none of the CI-injected env (webhooks, analytics, build
   // SHA). Detecting it here fingerprints the June 2026 incident — a manual
   // `npm run build` synced to app.beanies.family instead of deploying through the
-  // "Deploy beanies PROD" workflow. Fix: redeploy via the workflow.
+  // "Deploy beanies PROD" workflow — which recurred on 2026-08-10. Fix: redeploy
+  // via the workflow.
+  //
+  // ⚠️ THE REPORTING PATH HERE IS DELIBERATE AND COUNTER-INTUITIVE.
+  //
+  // Until 2026-08-10 this only `console.error`d, so the 2026-08-10 recurrence ran
+  // undetected for hours until a user-facing symptom surfaced. The obvious fix —
+  // `reportError({ severity: 'critical' })` — DOES NOT WORK here: a dev build has
+  // no `VITE_BEANIES_ERROR_WEBHOOK_URL`, so the Slack path silently no-ops. The
+  // missing webhook IS the condition being reported.
+  //
+  // The telemetry firehose is the reliable channel, because its ingest endpoint is
+  // reachable independently of the Slack webhooks. `logEvent` with `flush: true`
+  // ships immediately, and the telemetry Lambda forwards `boot-integrity` events
+  // to Slack SERVER-SIDE (see infrastructure/lambda/telemetry/index.mjs) where the
+  // webhook is an environment variable this bundle can't be missing.
+  //
+  // `reportError` is still called as belt-and-braces: it costs nothing and does
+  // reach Slack in the partial-misconfiguration case (error webhook present but,
+  // say, the build SHA missing).
   const buildSha = (env.VITE_BUILD_SHA as string | undefined) ?? 'dev';
   if (
     typeof window !== 'undefined' &&
     CLOUD_HOSTS.has(window.location.hostname) &&
     buildSha === 'dev'
   ) {
-    console.error(
-      '[features] A dev/local build is live on the cloud host (VITE_BUILD_SHA is "dev"). ' +
-        'This bundle was NOT produced by the "Deploy beanies PROD" workflow, so Slack webhooks, ' +
-        'error reporting, and analytics are all disabled. Redeploy via the workflow.'
-    );
+    const message =
+      'A dev/local build is live on the cloud host (VITE_BUILD_SHA is "dev"). ' +
+      'This bundle was NOT produced by the "Deploy beanies PROD" workflow, so Slack webhooks, ' +
+      'error reporting, and analytics are all disabled. Redeploy via the workflow.';
+    console.error(`[features] ${message}`);
+    // Imported lazily so this module stays importable by the Vite config graph
+    // (vite.config.ts pulls in src/config/* at build time; a static import of the
+    // telemetry stack here would drag Pinia/Vue into that graph).
+    void import('@/services/telemetry')
+      .then(({ logEvent }) => {
+        logEvent({
+          level: 'error',
+          surface: 'boot-integrity',
+          message,
+          context: { action: 'dev-build-on-cloud-host' },
+          flush: true,
+        });
+      })
+      .catch((e) => console.warn('[features] could not report build-integrity failure', e));
+    void import('@/utils/errorReporter')
+      .then(({ reportError }) => {
+        reportError({
+          surface: 'boot-integrity',
+          severity: 'critical',
+          message,
+          context: { action: 'dev-build-on-cloud-host' },
+        });
+      })
+      .catch(() => {
+        /* logEvent above is the reliable path; this is belt-and-braces only */
+      });
   }
 }
 

@@ -28,6 +28,24 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://beanies.family')
   .map((o) => o.trim())
   .filter(Boolean);
 
+// ── Server-side Slack escalation ─────────────────────────────────────────────
+//
+// A small allowlist of surfaces that page Slack from HERE rather than from the
+// client. This exists because of a specific, recurring failure the client cannot
+// report on its own: when a dev/local build reaches the cloud host it ships no
+// `VITE_BEANIES_ERROR_WEBHOOK_URL`, so `reportError`'s Slack path silently
+// no-ops — the missing webhook IS the condition. It happened in June 2026 and
+// again on 2026-08-10, where it ran undetected for hours until a user-facing
+// symptom surfaced.
+//
+// The firehose ingest is reachable in that state, so the client emits the event
+// here and the webhook lives in THIS Lambda's environment, where a broken client
+// build cannot omit it.
+//
+// Keep this list SHORT. Every surface added becomes an un-rate-limited page.
+const SLACK_ESCALATE_SURFACES = new Set(['boot-integrity']);
+const SLACK_WEBHOOK_URL = process.env.SLACK_ERROR_WEBHOOK_URL;
+
 const SCHEMA_VERSION = 1;
 const MAX_EVENTS = 100;
 const MAX_BODY_BYTES = 256 * 1024;
@@ -233,6 +251,7 @@ export async function handler(event) {
 
   let written = 0;
   let dropped = 0;
+  const escalations = [];
   try {
     for (const evt of events) {
       const sanitized = sanitizeEvent(evt);
@@ -248,6 +267,9 @@ export async function handler(event) {
       }
       console.log(line);
       written++;
+      if (SLACK_ESCALATE_SURFACES.has(sanitized.surface)) {
+        escalations.push(sanitized);
+      }
     }
   } catch (err) {
     // Plain-text prefix (no leading `{`) so `t = "beanlog"` queries exclude it.
@@ -255,5 +277,53 @@ export async function handler(event) {
     return response(500, { error: 'Internal server error' }, event);
   }
 
+  // Fire-and-forget AFTER the log lines are written, so a Slack outage can never
+  // cost us the durable CloudWatch record — that record is the primary artifact;
+  // Slack is the notification.
+  if (escalations.length > 0) {
+    await notifySlack(escalations);
+  }
+
   return response(200, { ok: true, count: written, dropped }, event);
+}
+
+/**
+ * Escalate allowlisted events to the Slack error channel. Never throws — a
+ * failure here must not turn a successful ingest into a 500, because the client
+ * would then retry the whole batch and duplicate the log lines.
+ *
+ * Deliberately awaited (not fire-and-forget): a Lambda's execution can be frozen
+ * the moment the handler returns, which would drop an in-flight socket.
+ */
+async function notifySlack(events) {
+  if (!SLACK_WEBHOOK_URL) {
+    console.error('[telemetry-lambda] SLACK_ERROR_WEBHOOK_URL unset — cannot escalate', {
+      surfaces: events.map((e) => e.surface),
+    });
+    return;
+  }
+  // Cap the fan-out: a client loop could otherwise turn one batch into 100 posts.
+  const text = events
+    .slice(0, 3)
+    .map(
+      (e) =>
+        `🚨 *beanies build integrity* — \`${e.surface}\`\n` +
+        `${e.message || '(no message)'}\n` +
+        `_build \`${e.build_sha || 'unknown'}\` · ${e.browser || 'unknown UA'}` +
+        `${e.family_id ? ` · family ${e.family_id}` : ''}_`
+    )
+    .join('\n\n');
+  const suffix = events.length > 3 ? `\n\n_…and ${events.length - 3} more in this batch_` : '';
+  try {
+    const res = await fetch(SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text + suffix }),
+    });
+    if (!res.ok) {
+      console.error('[telemetry-lambda] Slack escalation rejected:', res.status);
+    }
+  } catch (err) {
+    console.error('[telemetry-lambda] Slack escalation failed:', err);
+  }
 }

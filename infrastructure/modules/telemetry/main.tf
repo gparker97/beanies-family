@@ -75,6 +75,10 @@ resource "aws_lambda_function" "telemetry" {
     variables = {
       LOG_INGEST_API_KEY = var.log_ingest_api_key
       CORS_ORIGINS       = join(",", var.cors_origins)
+      # Server-side Slack escalation for build-integrity events. Lives HERE, not
+      # in the client bundle, because the failure it reports (a dev build on the
+      # cloud host) is precisely the state in which the client has no webhook.
+      SLACK_ERROR_WEBHOOK_URL = var.slack_error_webhook_url
     }
   }
 

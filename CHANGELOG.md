@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **A misbuilt release now raises an alarm instead of failing quietly (developer tooling — no user-facing change).** The app has always been able to detect when a build reaches production without its proper configuration — a state in which alerting, error reporting and analytics are all silently switched off. Until now it only wrote a note to the browser console, which nobody sees, so this went unnoticed for hours when it happened today. The check now reports through the diagnostics pipeline, and the server raises it to the team channel — deliberately from the server, because the very thing missing in that state is the app's ability to send alerts at all.
 - **Feedback delivery is now monitored end to end (no user-facing change).** Every submission records whether it was delivered, and a failure to deliver now raises an immediate alert rather than passing silently. A build that is missing its feedback configuration now fails to build at all, and a check keeps the app builds in step with the website build so this class of gap cannot reopen unnoticed.
 
 ## 2026-08-07

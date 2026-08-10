@@ -39,10 +39,17 @@ variable "cors_origins" {
   description = "Allowed CORS origins (mirrors the registry/oauth default — no root pass-through)"
   type        = list(string)
   default = [
-    "https://beanies.family",     # apex (legacy / pre-cutover)
-    "https://app.beanies.family", # PWA subdomain (post-cutover primary)
+    "https://beanies.family",         # apex (legacy / pre-cutover)
+    "https://app.beanies.family",     # PWA subdomain (post-cutover primary)
     "capacitor://app.beanies.family", # Capacitor iOS native WebView — iosScheme stays `capacitor` (ADR-029; capacitor.config.ts)
-    "http://localhost:5173",      # Vite dev server
-    "http://localhost:4173",      # Vite preview server
+    "http://localhost:5173",          # Vite dev server
+    "http://localhost:4173",          # Vite preview server
   ]
+}
+
+variable "slack_error_webhook_url" {
+  description = "Slack incoming-webhook URL for server-side escalation of build-integrity events. Same channel as the client's VITE_BEANIES_ERROR_WEBHOOK_URL (#beanies-errors). Optional — the Lambda logs loudly and continues when unset."
+  type        = string
+  default     = ""
+  sensitive   = true
 }

@@ -196,6 +196,119 @@ describe('Telemetry Lambda handler', () => {
     });
   });
 
+  describe('server-side Slack escalation (build-integrity)', () => {
+    // This path exists because the CLIENT cannot report the failure it covers:
+    // a dev build on the cloud host has no VITE_BEANIES_ERROR_WEBHOOK_URL, so
+    // reportError's Slack call silently no-ops. The webhook therefore lives in
+    // the Lambda env, where a broken client build cannot omit it.
+
+    it('escalates an allowlisted surface to Slack', async () => {
+      process.env.SLACK_ERROR_WEBHOOK_URL = 'https://hooks.slack.test/abc';
+      const calls = [];
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = async (url, init) => {
+        calls.push({ url, body: JSON.parse(init.body) });
+        return { ok: true, status: 200 };
+      };
+      const mod = await import(`../index.mjs?t=${Date.now()}-esc1`);
+      const res = await mod.handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            events: [
+              {
+                level: 'error',
+                surface: 'boot-integrity',
+                message: 'A dev/local build is live on the cloud host',
+                timestamp: '2026-08-10T05:00:00.000Z',
+                build_sha: 'dev',
+              },
+            ],
+          },
+        })
+      );
+      globalThis.fetch = realFetch;
+      delete process.env.SLACK_ERROR_WEBHOOK_URL;
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(calls.length, 1);
+      assert.match(calls[0].body.text, /build integrity/i);
+      assert.match(calls[0].body.text, /dev/);
+    });
+
+    it('does NOT escalate ordinary surfaces', async () => {
+      process.env.SLACK_ERROR_WEBHOOK_URL = 'https://hooks.slack.test/abc';
+      let called = 0;
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = async () => {
+        called++;
+        return { ok: true, status: 200 };
+      };
+      const mod = await import(`../index.mjs?t=${Date.now()}-esc2`);
+      await mod.handler(makeEvent({ headers: keyHeader, body: { events: [sampleEvent] } }));
+      globalThis.fetch = realFetch;
+      delete process.env.SLACK_ERROR_WEBHOOK_URL;
+
+      assert.equal(called, 0);
+    });
+
+    it('still returns 200 (and keeps the log line) when Slack fails', async () => {
+      // The CloudWatch record is the primary artifact; Slack is the notification.
+      // A Slack outage must not 500 and make the client retry the whole batch.
+      process.env.SLACK_ERROR_WEBHOOK_URL = 'https://hooks.slack.test/abc';
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = async () => {
+        throw new Error('slack down');
+      };
+      console.error = () => {};
+      const mod = await import(`../index.mjs?t=${Date.now()}-esc3`);
+      const res = await mod.handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            events: [
+              {
+                level: 'error',
+                surface: 'boot-integrity',
+                message: 'x',
+                timestamp: '2026-08-10T05:00:00.000Z',
+              },
+            ],
+          },
+        })
+      );
+      globalThis.fetch = realFetch;
+      delete process.env.SLACK_ERROR_WEBHOOK_URL;
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(JSON.parse(res.body).count, 1);
+    });
+
+    it('logs loudly rather than throwing when the webhook is unset', async () => {
+      delete process.env.SLACK_ERROR_WEBHOOK_URL;
+      const errs = [];
+      console.error = (...a) => errs.push(a.join(' '));
+      const mod = await import(`../index.mjs?t=${Date.now()}-esc4`);
+      const res = await mod.handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            events: [
+              {
+                level: 'error',
+                surface: 'boot-integrity',
+                message: 'x',
+                timestamp: '2026-08-10T05:00:00.000Z',
+              },
+            ],
+          },
+        })
+      );
+      assert.equal(res.statusCode, 200);
+      assert.ok(errs.some((e) => e.includes('SLACK_ERROR_WEBHOOK_URL unset')));
+    });
+  });
+
   describe('allowlist drift guard', () => {
     // Pins the server-side allowlist. If a context key is added to the client
     // (src/utils/diagnosticContext.ts) it MUST be mirrored here or this fails.
