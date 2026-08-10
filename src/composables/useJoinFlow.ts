@@ -35,6 +35,7 @@ import {
 } from '@/services/google/googleAuth';
 import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { getDeviceInfo, tail } from '@/utils/diagnostics';
+import type { StructuredErrorEntry } from '@/utils/structuredError';
 import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
 
@@ -66,10 +67,14 @@ export type JoinErrorCode =
 export type RecoveryAction =
   'retry' | 'signInDifferentAccount' | 'tryAnotherDevice' | 'pickDifferentBean';
 
-export interface JoinErrorEntry {
-  messageKey: string;
+/**
+ * Alias of the shared `StructuredErrorEntry` (`@/utils/structuredError`), narrowed
+ * so this registry's `recoveries` are checked against the join flow's own action
+ * union. The shape is the ADR-024 pattern; the view derivation is shared via
+ * `resolveErrorView`.
+ */
+export interface JoinErrorEntry extends StructuredErrorEntry {
   recoveries: readonly RecoveryAction[];
-  severity: 'warning' | 'critical';
 }
 
 export interface JoinError {

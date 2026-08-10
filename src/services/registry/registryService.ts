@@ -1,5 +1,21 @@
 import type { RegistryEntry } from '@/types/models';
 import { features } from '@/config/features';
+import { logEvent } from '@/services/telemetry';
+
+/**
+ * Result of a registry write.
+ *
+ * `pointerAccepted` reports whether the server moved the family's canonical
+ * pointer (`provider` / `fileId` / `displayPath`). Only the family's registered
+ * owner may move it — see the guard in `infrastructure/lambda/registry/index.mjs`.
+ * A refusal is *expected and boring* for member devices, which send pointer
+ * fields on every login simply because the payload is uniform; it is *data at
+ * risk* when the caller deliberately meant to re-point, because the registry now
+ * disagrees with where the pod actually is.
+ */
+export interface RegistryWriteResult {
+  pointerAccepted: boolean;
+}
 
 /**
  * The shape a caller supplies when writing a registry entry. It's the stored
@@ -28,21 +44,67 @@ async function request(method: string, familyId: string, body?: object): Promise
 }
 
 /**
- * Look up a family's file location by familyId.
- * Returns null if not found or if the registry is unavailable.
+ * Typed lookup outcome. `lookupFamily` collapsed 404, non-2xx and a network
+ * throw into a single `null`, which makes "this family has no registry row"
+ * indistinguishable from "we couldn't ask". Callers that must fail OPEN — most
+ * importantly the canonical-pod check, which would otherwise accuse a user of
+ * working on a copy every time the registry hiccuped — need the difference.
  */
-export async function lookupFamily(familyId: string): Promise<RegistryEntry | null> {
-  if (!features.registry) return null;
+export type RegistryLookup =
+  | { status: 'found'; entry: RegistryEntry }
+  | { status: 'absent' }
+  | { status: 'unavailable'; error?: unknown };
+
+/**
+ * Look up a family's file location by familyId, distinguishing absent from
+ * unavailable.
+ *
+ * A disabled registry reports `absent` (not `unavailable`): on a self-host with
+ * no registry there genuinely is no canonical row, and reporting `unavailable`
+ * would make callers retry something that will never succeed.
+ */
+export async function lookupFamilyResult(familyId: string): Promise<RegistryLookup> {
+  if (!features.registry) return { status: 'absent' };
 
   try {
     const res = await request('GET', familyId);
-    if (res.status === 404) return null;
-    if (!res.ok) return null;
-    return (await res.json()) as RegistryEntry;
+    if (res.status === 404) return { status: 'absent' };
+    if (!res.ok) {
+      logEvent({
+        level: 'warn',
+        surface: 'registry',
+        message: 'family lookup failed',
+        context: { action: 'lookup-unavailable', http_status: res.status },
+      });
+      return { status: 'unavailable' };
+    }
+    return { status: 'found', entry: (await res.json()) as RegistryEntry };
   } catch (err) {
+    // Previously a bare console.warn — registry outages were invisible in the
+    // firehose, so nobody could tell a dead registry from a quiet one.
     console.warn('[registry] lookupFamily failed — registry unavailable', err);
-    return null;
+    logEvent({
+      level: 'warn',
+      surface: 'registry',
+      message: 'family lookup threw',
+      context: { action: 'lookup-unavailable' },
+      error: err,
+    });
+    return { status: 'unavailable', error: err };
   }
+}
+
+/**
+ * Look up a family's file location by familyId.
+ * Returns null if not found or if the registry is unavailable.
+ *
+ * Thin wrapper over `lookupFamilyResult` — kept so existing call sites that
+ * genuinely cannot act on the difference stay unchanged. Prefer
+ * `lookupFamilyResult` in new code.
+ */
+export async function lookupFamily(familyId: string): Promise<RegistryEntry | null> {
+  const r = await lookupFamilyResult(familyId);
+  return r.status === 'found' ? r.entry : null;
 }
 
 /**
@@ -55,11 +117,15 @@ export async function lookupFamily(familyId: string): Promise<RegistryEntry | nu
  * recovery anchor for resume-from-registry) must use
  * `registerFamilyOrThrow` instead.
  */
-export async function registerFamily(familyId: string, entry: RegistryWritePayload): Promise<void> {
+export async function registerFamily(
+  familyId: string,
+  entry: RegistryWritePayload
+): Promise<RegistryWriteResult | null> {
   try {
-    await registerFamilyOrThrow(familyId, entry);
+    return await registerFamilyOrThrow(familyId, entry);
   } catch (err) {
     console.warn('[registry] registerFamily failed — registry unavailable', err);
+    return null; // swallowed a failure — the caller learns nothing about the pointer
   }
 }
 
@@ -78,8 +144,11 @@ export async function registerFamily(familyId: string, entry: RegistryWritePaylo
 export async function registerFamilyOrThrow(
   familyId: string,
   entry: RegistryWritePayload
-): Promise<void> {
-  if (!features.registry) return;
+): Promise<RegistryWriteResult> {
+  // Registry disabled → the contract is trivially satisfied, and there is no
+  // pointer to refuse. Reporting `pointerAccepted: false` here would generate
+  // false criticals on every self-host.
+  if (!features.registry) return { pointerAccepted: true };
 
   const res = await request('PUT', familyId, entry);
   if (!res.ok) {
@@ -87,6 +156,11 @@ export async function registerFamilyOrThrow(
       `Registry PUT failed: HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''}`
     );
   }
+  // ABSENT MEANS ACCEPTED. A self-hoster on an older Lambda — and the prod window
+  // between the server hotfix and the client shipping — must not generate false
+  // `critical` reports. Only an explicit `false` is a refusal.
+  const parsed = (await res.json().catch(() => ({}))) as { pointerAccepted?: boolean };
+  return { pointerAccepted: parsed?.pointerAccepted !== false };
 }
 
 /**

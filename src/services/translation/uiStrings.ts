@@ -4227,6 +4227,66 @@ const STRING_DEFS = {
     en: 'Pick a different member',
     beanie: 'pick a different bean',
   },
+
+  // ── Pod access — reaching your family's data file ────────────────────────
+  // Shown when the app can read your data but can't confirm it can SAVE to your
+  // family's file. Tone rule for this whole block: never suggest making another
+  // copy. Every message points back at the one file the family shares.
+  'podAccess.bannerTitle': {
+    en: 'Your family data file needs attention',
+    beanie: 'your family data file needs attention',
+  },
+  'podAccess.error.offline': {
+    en: "You're offline, so we couldn't check your family data file. Your changes are safe on this device and will save when you're back online.",
+    beanie:
+      "you're offline, so we couldn't check your family data file. your changes are safe on this device and will save when you're back online.",
+  },
+  'podAccess.error.permissionDenied': {
+    en: "You no longer have permission to edit your family's data file. Ask whoever set up your family to share it with you again, then try again.",
+    beanie:
+      "you no longer have permission to edit your family's data file. ask whoever set up your family to share it with you again, then try again.",
+  },
+  'podAccess.error.consentExpired': {
+    en: "Your Google connection has expired, so we can't save to your family's data file. Reconnect to carry on.",
+    beanie:
+      "your google connection has expired, so we can't save to your family's data file. reconnect to carry on.",
+  },
+  'podAccess.error.fileNotFound': {
+    en: "We couldn't find your family's data file — it may have been moved, renamed, or put in the bin. Find it again to carry on saving.",
+    beanie:
+      "we couldn't find your family's data file — it may have been moved, renamed, or put in the bin. find it again to carry on saving.",
+  },
+  'podAccess.error.verifyUnavailable': {
+    en: "We couldn't check your family's data file just now. Your changes are held safely on this device — try again in a moment.",
+    beanie:
+      "we couldn't check your family's data file just now. your changes are held safely on this device — try again in a moment.",
+  },
+  // The incident copy. Must not promise data loss, and must not promise a merge
+  // in absolute terms — switching brings this device's changes across and leaves
+  // the other file in place.
+  'podAccess.error.canonicalMismatch': {
+    en: "You're working on a copy of your family's data file, so your changes aren't reaching the rest of your family. Switch back to your family's file — the changes on this device will come with you.",
+    beanie:
+      "you're working on a copy of your family's data file, so your changes aren't reaching the rest of your family. switch back to your family's file — the changes on this device will come with you.",
+  },
+  'podAccess.error.noHome': {
+    en: "This family isn't connected to a data file yet, so nothing is being saved. Choose your family's file to connect it.",
+    beanie:
+      "this family isn't connected to a data file yet, so nothing is being saved. choose your family's file to connect it.",
+  },
+  'podAccess.recovery.retry': { en: 'Try again', beanie: 'try again' },
+  'podAccess.recovery.reconnectAccount': {
+    en: 'Reconnect Google',
+    beanie: 'reconnect google',
+  },
+  'podAccess.recovery.pickFamilyFile': {
+    en: "Choose your family's file",
+    beanie: "choose your family's file",
+  },
+  'podAccess.recovery.switchToCanonical': {
+    en: "Switch to your family's file",
+    beanie: "switch to your family's file",
+  },
   // Diagnostic-info copy modal — shown from a small link below the error
   // block. The body is a JSON blob the user can paste back to support.
   'join.diagnostic.link': {

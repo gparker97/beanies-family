@@ -9,6 +9,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { hardReload } from '@/utils/hardReload';
 import { reportError } from '@/utils/errorReporter';
 import { FAMILY_DATA_DEEP_LINK } from '@/constants/deepLinks';
+import { POD_ACCESS_ERRORS } from '@/utils/podAccess';
 
 const props = defineProps<{
   show: boolean;
@@ -34,11 +35,14 @@ async function handleReselectFile() {
   reselectError.value = null;
   const result = await pick();
   if (result.kind !== 'picked') return; // cancelled, redirected, or pick failed
-  const recovery = await syncStore.recoverFromMissingFile(result.fileId, result.fileName);
-  if (recovery.success) {
+  const recovery = await syncStore.rebindPodFile(result.fileId, result.fileName);
+  if (recovery.ok) {
     emit('reconnected');
   } else {
-    reselectError.value = recovery.error ?? t('googleDrive.fileNotFoundReselectFailed');
+    // `rebindPodFile` now returns a typed code instead of raw English prose —
+    // the message comes from the shared registry so it is translated like
+    // everything else the user reads.
+    reselectError.value = t(POD_ACCESS_ERRORS[recovery.code].messageKey);
   }
 }
 
