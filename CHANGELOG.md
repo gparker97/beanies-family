@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-10
+
+### Fixed
+
+- **Feedback sent from the Android and iPhone apps now actually reaches the team.** Feedback submitted from the app was being discarded before it left the device — the thank-you screen appeared as normal, but nothing was delivered and nothing was stored, so those messages are gone. Feedback sent from the website and the installed web app was never affected. Anything sent from the app between 9 July and today did not arrive; if you took the time to write something, please do send it again — it will land this time.
+
+### Changed
+
+- **Feedback delivery is now monitored end to end (no user-facing change).** Every submission records whether it was delivered, and a failure to deliver now raises an immediate alert rather than passing silently. A build that is missing its feedback configuration now fails to build at all, and a check keeps the app builds in step with the website build so this class of gap cannot reopen unnoticed.
+
 ## 2026-08-07
 
 ### Fixed

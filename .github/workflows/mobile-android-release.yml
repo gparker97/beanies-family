@@ -108,6 +108,11 @@ jobs:
           VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
           VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}
+          # #45 in-app feedback/NPS. VARIABLE, not a secret (it ships in the
+          # client bundle anyway). MUST be here as well as in deploy.yml: the
+          # native app has its own build step, and omitting it made every
+          # app-submitted feedback a silent no-op from 2026-07-09 to 2026-08-10.
+          VITE_FEEDBACK_WEBHOOK_URL: ${{ vars.FEEDBACK_WEBHOOK_URL }}
           VITE_BEANIES_LOG_INGEST_URL: ${{ vars.BEANIES_LOG_INGEST_URL }}
           VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
           VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}

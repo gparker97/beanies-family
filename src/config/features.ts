@@ -59,6 +59,11 @@ export const features = {
   // request only).
   slackPodCreate: ok(env.VITE_SLACK_WEBHOOK_URL),
   errorReporter: ok(env.VITE_BEANIES_ERROR_WEBHOOK_URL),
+  // #45 in-app feedback/NPS. Gated here (rather than read only at the call site)
+  // purely so the boot warning below can see it: feedback is fire-and-forget over
+  // `no-cors`, is stored NOWHERE else, and the user sees a thank-you screen either
+  // way — so an unset webhook is undetectable from both ends without this.
+  feedbackReporter: ok(env.VITE_FEEDBACK_WEBHOOK_URL),
   analytics: ok(env.VITE_PLAUSIBLE_DOMAIN),
   translationApiUpgrade: ok(env.VITE_MYMEMORY_EMAIL),
 } as const;
@@ -70,8 +75,11 @@ export type FeatureKey = keyof typeof features;
 // notification silently no-ops: `slackPost` short-circuits on an empty URL, and
 // the client POSTs with `no-cors` so even a live-but-dead webhook can't surface
 // a failure. This exact gap hid a real iPhone onboarding break (May 2026,
-// errorReporter) and later dropped every "new family pod" Slack ping (June 2026,
-// slackPodCreate — a dev build shipped to prod with no webhook). Make it loud at
+// errorReporter), later dropped every "new family pod" Slack ping (June 2026,
+// slackPodCreate — a dev build shipped to prod with no webhook), and then
+// discarded every app-submitted feedback for a month (Aug 2026, feedbackReporter
+// — wired into deploy.yml only, never into the mobile build lanes, which is why
+// the workflow-parity tripwire test now exists). Make it loud at
 // boot so an unset GitHub secret/variable can't masquerade as working alerting.
 // Production builds only — dev/test/self-host omit these and that's fine.
 if (env.PROD && (features.drive || features.registry)) {
@@ -81,6 +89,11 @@ if (env.PROD && (features.drive || features.registry)) {
       'slackPodCreate',
       'VITE_SLACK_WEBHOOK_URL',
       'New-family pod notifications will NOT reach Slack',
+    ],
+    [
+      'feedbackReporter',
+      'VITE_FEEDBACK_WEBHOOK_URL',
+      'In-app feedback/NPS will be silently DISCARDED (it is stored nowhere else)',
     ],
   ];
   for (const [key, envVar, impact] of operationalWebhooks) {
