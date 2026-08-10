@@ -272,3 +272,102 @@ describe('registry PUT — pointer guard treats a no-op write as accepted', () =
     expect(item.fileId).toBe('ORIGINAL');
   });
 });
+
+describe('registry PUT — pointer authority is ownerMemberId, not the editable email', () => {
+  const M_OWNER = 'member-owner-uuid';
+  const M_OTHER = 'member-other-uuid';
+  const ROW = {
+    ownerEmail: 'owner@example.com',
+    ownerMemberId: M_OWNER,
+    provider: 'google_drive',
+    fileId: 'ORIGINAL',
+  };
+
+  it('lets the owner re-point AFTER they change their profile email', async () => {
+    // The lockout this field exists to prevent: `ownerEmail` is a user-editable
+    // profile field, so an owner who renames their email would otherwise be
+    // refused by their own family's registry with no way back (write-once).
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MOVED',
+        ownerMemberId: M_OWNER,
+        ownerEmail: 'brand-new-address@example.com',
+      },
+      ROW
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.fileId).toBe('MOVED');
+    expect(item.ownerEmail).toBe('owner@example.com'); // still write-once
+  });
+
+  it('refuses another member even when they send the owner’s email', async () => {
+    // memberId wins over email, so spoofing the address achieves nothing.
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MEMBER-COPY',
+        ownerMemberId: M_OTHER,
+        ownerEmail: 'owner@example.com',
+      },
+      ROW
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('upgrades a legacy email-only row to memberId on the owner’s next write', async () => {
+    const legacy = {
+      ownerEmail: 'owner@example.com',
+      provider: 'google_drive',
+      fileId: 'ORIGINAL',
+    };
+    const { item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MOVED',
+        ownerEmail: 'owner@example.com',
+        ownerMemberId: M_OWNER,
+      },
+      legacy
+    );
+    expect(item.ownerMemberId).toBe(M_OWNER);
+    expect(item.fileId).toBe('MOVED');
+  });
+
+  it('does NOT let a non-owner claim ownerMemberId on a legacy email-only row', async () => {
+    // Otherwise the upgrade path would be a land-grab: a member writing first
+    // would stamp themselves as the permanent authority.
+    const legacy = {
+      ownerEmail: 'owner@example.com',
+      provider: 'google_drive',
+      fileId: 'ORIGINAL',
+    };
+    const { item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MEMBER-COPY',
+        ownerEmail: 'member@example.com',
+        ownerMemberId: M_OTHER,
+      },
+      legacy
+    );
+    expect(item.ownerMemberId).toBeNull();
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('falls open on a pre-2026-04-12 row with neither field, and stamps both', async () => {
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'FIRST',
+        ownerEmail: 'whoever@example.com',
+        ownerMemberId: M_OWNER,
+      },
+      { provider: 'local' }
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.ownerMemberId).toBe(M_OWNER);
+    expect(item.ownerEmail).toBe('whoever@example.com');
+  });
+});

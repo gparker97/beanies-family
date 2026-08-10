@@ -105,15 +105,29 @@ export async function handler(event) {
       // took the fix — i.e. not the ones causing the damage. A curl gets the same
       // answer here too. See docs/plans/2026-08-10-never-fork-a-family-pod.md §5.
       //
-      // Legacy rows with no ownerEmail fall open (today's behaviour) so nothing
-      // breaks. Normalised compare because `ownerEmail` originates from a
-      // user-editable member profile — case/whitespace drift must never lock the
-      // real owner out of re-pointing their own pod.
+      // AUTHORITY IS `ownerMemberId`, NOT `ownerEmail`.
+      //
+      // `ownerEmail` was added (2026-04-12) as an ops/contact capture, alongside
+      // the newsletter opt-in — "who do we email about this family". It is the
+      // signed-in member's PROFILE email, which the user can edit in the app. Using
+      // it as the permission check would mean an owner who edits their own email
+      // sends a new address on their next write, gets refused, and — because the
+      // field is write-once — has no way back. `memberId` is a stable UUID from the
+      // family document and survives any profile edit, so it is the real identity.
+      //
+      // Three tiers, in order:
+      //   1. Row has ownerMemberId  -> compare memberId. The normal path.
+      //   2. Row has only ownerEmail (registered between 2026-04-12 and this
+      //      change) -> compare email, and stamp ownerMemberId on the way through
+      //      so the row upgrades itself the first time its owner writes.
+      //   3. Row has neither (pre-2026-04-12, dormant since) -> fall open, exactly
+      //      as today, and stamp both.
       const normEmail = (e) => (typeof e === 'string' ? e.trim().toLowerCase() : null);
-      const isOwner =
-        !existing.ownerEmail ||
-        (!!normEmail(body.ownerEmail) &&
-          normEmail(body.ownerEmail) === normEmail(existing.ownerEmail));
+      const isOwner = existing.ownerMemberId
+        ? body.ownerMemberId === existing.ownerMemberId
+        : !existing.ownerEmail ||
+          (!!normEmail(body.ownerEmail) &&
+            normEmail(body.ownerEmail) === normEmail(existing.ownerEmail));
 
       // A write that would not CHANGE the pointer is a no-op, not a refusal.
       // This matters: the common case is a member device re-picking the family's
@@ -129,12 +143,14 @@ export async function handler(event) {
       const pointerAccepted = isOwner || samePointer;
 
       if (!pointerAccepted) {
-        // Domains only — never full member emails in CloudWatch.
+        // Domains + id tails only — never full member emails or ids in CloudWatch.
         console.warn(
           '[registry] pointer write refused',
           familyId,
           String(existing.ownerEmail).split('@')[1],
-          String(body.ownerEmail).split('@')[1]
+          String(body.ownerEmail).split('@')[1],
+          String(existing.ownerMemberId ?? '').slice(-6),
+          String(body.ownerMemberId ?? '').slice(-6)
         );
       }
 
@@ -147,12 +163,17 @@ export async function handler(event) {
         // stored one. Same semantics as country/subscribeNewsletter below.
         familyName: body.familyName || existing.familyName || null,
         createdAt: existing.createdAt || now,
-        // Genuinely write-once now. The comment above has claimed this since the
-        // field was added, but `body.ownerEmail ?? existing.ownerEmail` let the
-        // last writer win — which is how a re-homed member device could take
-        // ownership of a family's registry row. `ownerEmail` is the authority the
-        // pointer guard above depends on, so it must not be client-movable.
+        // Write-once. Previously `body.ownerEmail ?? existing.ownerEmail` let the
+        // last writer win, so a member device could take over the row. This stays
+        // an ops/contact field (see the guard above) but is also the LEGACY
+        // authority for rows registered before `ownerMemberId` existed, so it must
+        // be stable either way.
         ownerEmail: existing.ownerEmail ?? body.ownerEmail ?? null,
+        // Write-once, and the real pointer authority. Stamped on a row's first
+        // accepted write — including the first write by the owner of a legacy
+        // email-only row, which upgrades that row off the mutable email.
+        ownerMemberId:
+          existing.ownerMemberId ?? (pointerAccepted ? body.ownerMemberId : null) ?? null,
         subscribeNewsletter:
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter

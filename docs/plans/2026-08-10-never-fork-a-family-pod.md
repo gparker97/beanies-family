@@ -690,3 +690,13 @@ Steps 1 and 2 are pure preparation with zero behaviour change; if step 3 needs t
 **Response to the "unless you feel differently" invitation:** agreed, with one nuance carried into the plan rather than treated as disagreement — removing the automatic path leaves the #47 restored-backup case (native `<input type=file>`, which stages an envelope with no provider at all) needing an _explicit_ affordance so it does not become a read-only dead end. That is satisfied by `rebindPodFile` via an explicit user file-pick, which is structurally incapable of creating a file, and never by an automatic mint.
 
 </details>
+
+## Post-approval amendment (2026-08-10, during implementation)
+
+Greg asked whether `ownerEmail` is meant to be the family admin's email, and what happens when that user changes it. Investigating produced two evidence-backed corrections to the plan:
+
+1. **`ownerEmail` was never a permission field.** It was added in `bb1069e3` (2026-04-12) as an ops/contact capture alongside the newsletter opt-in, and holds the signed-in member's _profile_ email — user-editable in the app. Using it as the pointer authority (as §5 specified) meant an owner who edited their email would be refused on their next pointer write with no way back, since the field is write-once. **Fixed by introducing `ownerMemberId`** (stable UUID, survives profile edits) as the authority, with `ownerEmail` retained as the legacy authority for rows registered before this change and as the ops/contact field it always was. Legacy rows upgrade themselves on the owner's next accepted write; a non-owner cannot claim the field on a legacy row. This had to land BEFORE the terraform apply — write-once means the choice of authority field is baked in for every active family the moment the guard ships.
+
+2. **The 9 prod rows with a null `ownerEmail` also have a null `createdAt`.** Both fields were added in the same 2026-04-12 commit, and any PUT since would have stamped `createdAt` — so those families registered before the field existed and have not written to the registry since. They are dormant, not corrupt. **Decision: do not backfill them.** The stored value must match what the client sends (the member's profile email / member id); a backfilled address that doesn't match would lock a returning family out of their own pointer with no in-app recovery — strictly worse than the current fall-open.
+
+Also found and removed during the registry inspection: a stale row (`6a08e644`, familyName "Test", written once on 2026-07-13 — the day the re-home work shipped) whose pointer was greg's real family's `.beanpod`. Two familyIds, one file. Deleted.
