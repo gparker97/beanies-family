@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-07",
-    "translationCount": 3918
+    "lastUpdated": "2026-08-10",
+    "translationCount": 3930
   },
   "translations": {
     "app.name": {
@@ -19595,6 +19595,66 @@
       "translation": "返回 beanies",
       "hash": "d03x66",
       "lastUpdated": "2026-08-07"
+    },
+    "podAccess.bannerTitle": {
+      "translation": "您的家庭数据文件需要注意",
+      "hash": "u9xlia",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.offline": {
+      "translation": "您处于离线状态，因此我们无法查看您的家庭数据文件。您的更改在此设备上是安全的，当您重新上线时将保存。",
+      "hash": "vgek7o",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.permissionDenied": {
+      "translation": "您不再拥有编辑家庭数据文件的权限。询问设置您的家人的人再次与您分享，然后重试。",
+      "hash": "oon6lb",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.consentExpired": {
+      "translation": "您的Google连接已过期，因此我们无法保存到您家庭的数据文件。重新连接以继续。",
+      "hash": "d1l9u9",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.fileNotFound": {
+      "translation": "我们找不到您的家庭数据文件—它可能已被移动、重命名或放入垃圾桶。再次查找，继续享受优惠。",
+      "hash": "3za5un",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.verifyUnavailable": {
+      "translation": "我们刚刚无法检查您家庭的数据文件。您的更改已安全地保存在此设备上，请稍后重试。",
+      "hash": "jqhsmm",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.canonicalMismatch": {
+      "translation": "您正在处理家庭数据文件的副本，因此您所做的更改无法传达给其他家庭成员。切换回您家人的文件—此设备上的更改将随您而来。",
+      "hash": "hwc8kt",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.error.noHome": {
+      "translation": "此系列尚未连接到数据文件，因此未保存任何内容。选择您的家庭文件进行连接。",
+      "hash": "3j4rbl",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.recovery.retry": {
+      "translation": "再试一次",
+      "hash": "agecuz",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.recovery.reconnectAccount": {
+      "translation": "重新连接Google",
+      "hash": "ox2avy",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.recovery.pickFamilyFile": {
+      "translation": "选择您家庭的文件",
+      "hash": "xjos4o",
+      "lastUpdated": "2026-08-10"
+    },
+    "podAccess.recovery.switchToCanonical": {
+      "translation": "切换到您家人的文件",
+      "hash": "81m42w",
+      "lastUpdated": "2026-08-10"
     }
   }
 }
