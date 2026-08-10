@@ -91,14 +91,68 @@ export async function handler(event) {
       );
       const existing = existingRaw ? unmarshall(existingRaw) : {};
 
+      // ─── Canonical-pointer guard (2026-08-10) ────────────────────────────
+      //
+      // Only the family's registered owner may move the canonical pointer
+      // (provider / fileId / displayPath). Members still write activity and
+      // metadata (lastLoginAt, country, beanpodSizeKb, familyName) — those are
+      // per-family facts any device can report. The pointer is not.
+      //
+      // This lives here, not in the client, because the client cannot close the
+      // hole: the propagation vector is ALREADY DEPLOYED. Native and cached web
+      // builds running the pre-fix code keep sending pointer writes for as long
+      // as they run, and a client-side guard protects only devices that already
+      // took the fix — i.e. not the ones causing the damage. A curl gets the same
+      // answer here too. See docs/plans/2026-08-10-never-fork-a-family-pod.md §5.
+      //
+      // Legacy rows with no ownerEmail fall open (today's behaviour) so nothing
+      // breaks. Normalised compare because `ownerEmail` originates from a
+      // user-editable member profile — case/whitespace drift must never lock the
+      // real owner out of re-pointing their own pod.
+      const normEmail = (e) => (typeof e === 'string' ? e.trim().toLowerCase() : null);
+      const isOwner =
+        !existing.ownerEmail ||
+        (!!normEmail(body.ownerEmail) &&
+          normEmail(body.ownerEmail) === normEmail(existing.ownerEmail));
+
+      // A write that would not CHANGE the pointer is a no-op, not a refusal.
+      // This matters: the common case is a member device re-picking the family's
+      // correct file, or simply logging in and echoing the pointer back. Reporting
+      // those as refused would page the team every time a member recovers normally,
+      // and would drown the one signal that means something — a device actually
+      // trying to MOVE the family's pointer somewhere it shouldn't.
+      const samePointer =
+        (body.provider || 'local') === (existing.provider || 'local') &&
+        (body.fileId || null) === (existing.fileId ?? null) &&
+        (body.displayPath || null) === (existing.displayPath ?? null);
+
+      const pointerAccepted = isOwner || samePointer;
+
+      if (!pointerAccepted) {
+        // Domains only — never full member emails in CloudWatch.
+        console.warn(
+          '[registry] pointer write refused',
+          familyId,
+          String(existing.ownerEmail).split('@')[1],
+          String(body.ownerEmail).split('@')[1]
+        );
+      }
+
       const item = {
         familyId,
-        provider: body.provider || 'local',
-        fileId: body.fileId || null,
-        displayPath: body.displayPath || null,
-        familyName: body.familyName || null,
+        provider: pointerAccepted ? body.provider || 'local' : existing.provider || 'local',
+        fileId: pointerAccepted ? body.fileId || null : (existing.fileId ?? null),
+        displayPath: pointerAccepted ? body.displayPath || null : (existing.displayPath ?? null),
+        // Preserve-on-omit (2026-08-10): an omitted name previously nulled a
+        // stored one. Same semantics as country/subscribeNewsletter below.
+        familyName: body.familyName || existing.familyName || null,
         createdAt: existing.createdAt || now,
-        ownerEmail: body.ownerEmail ?? existing.ownerEmail ?? null,
+        // Genuinely write-once now. The comment above has claimed this since the
+        // field was added, but `body.ownerEmail ?? existing.ownerEmail` let the
+        // last writer win — which is how a re-homed member device could take
+        // ownership of a family's registry row. `ownerEmail` is the authority the
+        // pointer guard above depends on, so it must not be client-movable.
+        ownerEmail: existing.ownerEmail ?? body.ownerEmail ?? null,
         subscribeNewsletter:
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter
@@ -132,7 +186,12 @@ export async function handler(event) {
           Item: marshall(item, { removeUndefinedValues: true }),
         })
       );
-      return response(200, { success: true }, event);
+      // `pointerAccepted` lets the client distinguish a refused DELIBERATE
+      // re-point (data at risk — the registry now disagrees with where the pod
+      // actually is) from the boring ambient case (every member device sends
+      // pointer fields on every login because the payload is uniform). Clients
+      // that predate this field treat its absence as accepted.
+      return response(200, { success: true, pointerAccepted }, event);
     }
 
     if (method === 'DELETE') {

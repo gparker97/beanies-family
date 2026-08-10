@@ -27,12 +27,8 @@ import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import { isLoaded as isProjectionLoaded } from '@/services/automerge/projection';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
-import { getSyncCapabilities, canAutoSync, isNative } from '@/services/sync/capabilities';
-import {
-  beginDriveAuthRedirectIfNeeded,
-  RESUME_SETUP_PATH,
-  resolveExistingBeanpod,
-} from '@/services/sync/connectStorage';
+import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
@@ -52,6 +48,7 @@ import {
   isTokenValid,
   isUserCancellation,
   whenRedirectAuthSettled,
+  tryGetSilentToken,
 } from '@/services/google/googleAuth';
 import {
   registerDriveTokenMirror,
@@ -70,7 +67,17 @@ import {
   getFileMetadata,
   DriveApiError,
 } from '@/services/google/driveService';
+import {
+  POD_ACCESS_SEVERITY,
+  classifyDriveFailure,
+  evaluatePodMetadata,
+  type PodAccessErrorCode,
+  type PodAccessFailure,
+  type PodAccessResult,
+  type PodFileMetadata,
+} from '@/utils/podAccess';
 import { clearQueue } from '@/services/sync/offlineQueue';
+import { tail } from '@/utils/diagnostics';
 import {
   createBeanpodV4,
   parseBeanpodV4,
@@ -99,8 +106,6 @@ import {
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
   CorruptPayloadError,
-  FileNameCollisionError,
-  CollisionCheckUnavailableError,
 } from '@/types/sync';
 
 /**
@@ -235,11 +240,33 @@ export const useSyncStore = defineStore('sync', () => {
   // save-status indicator's one-retry debounce (amber only at >= 2).
   const consecutiveSaveFailures = ref(syncService.getConsecutiveSaveFailures());
 
+  /**
+   * The one piece of pod-access state. Set by `verifyPodAccess` /
+   * `checkCanonicalPod`, cleared by `rebindPodFile` and `resetState`, rendered by
+   * exactly one component (`PodAccessBanner`). `LoadPodView` sets it and renders
+   * nothing — two renderers for one condition drift, can appear simultaneously,
+   * and double every future copy change.
+   */
+  const podAccessError = ref<PodAccessFailure | null>(null);
+
+  // ─── Banner precedence, declared once ────────────────────────────────────
+  //
+  //   GoogleReconnectToast > PodAccessBanner > SaveFailureBanner > DurabilityBanner
+  //
+  // A pod-access failure is the ROOT CAUSE of any save failure it coexists with
+  // (you cannot save to a file you can't reach), so it outranks the save banner —
+  // showing both would report one problem twice and bury the actionable one.
+  // The reconnect toast still wins: it owns the permanent-expiry recovery.
+  const shouldShowPodAccessBanner = computed(
+    () => podAccessError.value !== null && !showGoogleReconnect.value
+  );
+
   // Banner is mutually exclusive with the GoogleReconnectToast (the canonical
   // surface for permanent expiry). When the toast is up, the toast handles
   // recovery — no need to also alarm with a top banner.
   const shouldShowSaveFailureBanner = computed(
-    () => showSaveFailureBanner.value && !showGoogleReconnect.value
+    () =>
+      showSaveFailureBanner.value && !showGoogleReconnect.value && !shouldShowPodAccessBanner.value
   );
 
   // ─── Deferred-action primitive (shared by save-failure-banner and cold-start escalation) ──
@@ -312,6 +339,12 @@ export const useSyncStore = defineStore('sync', () => {
   const configHealDefer = createDeferredAction(CONFIG_HEAL_DEFER_MS);
   let configHealAttempts = 0;
   let configHealInFlight = false;
+  // Guards `verifyPodAccess` against overlapping runs (repeated `retry` taps).
+  let verifyInFlight = false;
+  // The canonical check runs at most once per family per session — `verifyPodAccess`
+  // runs on every load path including `retry`, so an unguarded check would turn a
+  // retry loop into a registry request loop.
+  let checkedCanonicalFor: string | null = null;
   let configHealTotalFailureReported = false;
   let configHealTokenUnsub: (() => void) | null = null;
 
@@ -542,7 +575,7 @@ export const useSyncStore = defineStore('sync', () => {
    * migration flow (`migrateStorage`) captures the previous provider and
    * re-installs it on failure.
    *
-   * Shared by `configureSyncFileGoogleDrive` and `migrateStorage` — keeps
+   * Shared by `migrateStorage` and the create flow — keeps
    * the "install this provider" sequence in one place.
    */
   async function installProvider(
@@ -574,11 +607,15 @@ export const useSyncStore = defineStore('sync', () => {
       isReloading = false;
     }
 
-    registerCurrentFamily({
-      provider: type,
-      fileId: provider.getFileId(),
-      displayPath: provider.getDisplayName(),
-    });
+    // Deliberate re-point (reached from createNewFile and migrateStorage).
+    registerCurrentFamily(
+      {
+        provider: type,
+        fileId: provider.getFileId(),
+        displayPath: provider.getDisplayName(),
+      },
+      { pointerIntent: true }
+    );
 
     if (type === 'google_drive') {
       setupTokenExpiryHandler();
@@ -1422,8 +1459,10 @@ export const useSyncStore = defineStore('sync', () => {
     // off, so this try/catch is defence-in-depth: a lookup failure must NOT
     // block a legitimate create — log and proceed (write/verify/register still
     // guard true collisions).
+    let existingLookup: registry.RegistryLookup | null = null;
     try {
-      const existing = await registry.lookupFamily(familyId);
+      existingLookup = await registry.lookupFamilyResult(familyId);
+      const existing = existingLookup.status === 'found' ? existingLookup.entry : null;
       if (existing?.fileId) {
         return {
           ok: false,
@@ -1440,6 +1479,20 @@ export const useSyncStore = defineStore('sync', () => {
         message: `existing-pod lookup failed before create (proceeding): ${(e as Error).message}`,
         error: e,
         severity: 'warning',
+      });
+    }
+    // DELIBERATE FAIL-OPEN, recorded so nobody "hardens" it without seeing the
+    // trade: when the registry is unreachable we proceed with the create. Blocking
+    // new-family creation during a registry outage would break onboarding for every
+    // new user — far more common and more damaging than the narrow duplicate risk —
+    // and `createNewFile` is one of the two creation paths that are explicitly
+    // allowed. What changed is that the residual risk is now COUNTABLE.
+    if (existingLookup?.status === 'unavailable') {
+      logEvent({
+        level: 'warn',
+        surface: 'syncStore.createNewFile',
+        message: 'existing-pod check unavailable — proceeding with create',
+        context: { action: 'existing-pod-check-unavailable' },
       });
     }
 
@@ -2308,6 +2361,9 @@ export const useSyncStore = defineStore('sync', () => {
     }
     configHealAttempts = 0;
     configHealInFlight = false;
+    verifyInFlight = false;
+    checkedCanonicalFor = null;
+    podAccessError.value = null;
     configHealTotalFailureReported = false;
     reconnecting.value = false;
     configHealFailed.value = false;
@@ -2356,244 +2412,184 @@ export const useSyncStore = defineStore('sync', () => {
 
   // --- Google Drive actions ---
 
-  /** Mint a brand-new app-owned `.beanpod` on the signed-in account's Drive and
-   * install it as the home. B6: `forceConsent:false` so a valid cached token is
-   * REUSED (never a full-page OAuth redirect mid-restore). Throws on failure
-   * (createNew's collision/error, or the installProvider write) — callers map the
-   * throw to an outcome; `configureSyncFileGoogleDrive` wraps it as a boolean. */
-  async function mintFreshOwnDrive(uniqueName: string): Promise<void> {
-    const provider = await GoogleDriveProvider.createNew(uniqueName, { forceConsent: false });
-    await installProvider(provider, 'google_drive');
-  }
-
-  /** Thin boolean wrapper over `mintFreshOwnDrive` — the shared install sequence
-   * (persist → setProvider → syncNow → saveSettings → registerFamily). Retained as
-   * the seam the migrate test exercises; B6 `forceConsent:false` flows through. */
-  async function configureSyncFileGoogleDrive(podFileName: string): Promise<boolean> {
+  /**
+   * Verify that the just-loaded family has a durable, writable home — and report
+   * when it doesn't. Called ONCE by `LoadPodView` after every successful load.
+   *
+   * ## This function MUTATES NOTHING
+   *
+   * It replaces `establishDurableHomeAfterLoad`, which "established" a home by
+   * minting a fresh `.beanpod` on the signed-in account's Drive whenever the
+   * loaded file wasn't `ownedByMe`. For every non-owner family member that is the
+   * normal state — the family's file is owned by the inviter and shared with edit
+   * access — so the old guard silently forked exactly the people it was meant to
+   * protect, seeding the copy with the live document so it looked identical. See
+   * `docs/plans/2026-08-10-never-fork-a-family-pod.md`.
+   *
+   * The rule now: a family's pod binding is established once, by an explicit user
+   * action, and is never changed by the app. This function may REPORT a problem;
+   * it may never RESOLVE one by creating or switching files. Recovery is always a
+   * user's choice, and every offered recovery restores access to the ORIGINAL
+   * file (see `POD_ACCESS_ERRORS`).
+   *
+   * Writability is `capabilities/canEdit`. Ownership is never consulted.
+   */
+  async function verifyPodAccess(): Promise<PodAccessResult> {
+    // Repeated `retry` taps must not race conflicting state onto the banner.
+    // Report what we currently believe rather than a bare `{ ok: true }` — a
+    // concurrent call learning "fine" while a check is still running would be a
+    // small lie of exactly the kind this whole change exists to remove.
+    if (verifyInFlight) return podAccessError.value ?? { ok: true };
+    verifyInFlight = true;
     try {
-      await mintFreshOwnDrive(podFileName);
-      return true;
+      const result = await runPodAccessCheck();
+      podAccessError.value = result.ok ? null : result;
+      logPodAccessResult(result);
+      // Fire-and-forget: a network round-trip the user must never wait on, and
+      // which must never throw into the load path.
+      if (result.ok) void checkCanonicalPod();
+      return result;
     } catch (e) {
-      error.value = (e as Error).message;
-      return false;
+      // A throw here must never block the user reaching already-decrypted data.
+      console.error('[syncStore.verifyPodAccess] unexpected failure:', e);
+      const result: PodAccessResult = { ok: false, code: 'VERIFY_UNAVAILABLE' };
+      podAccessError.value = result;
+      logPodAccessResult(result, e);
+      return result;
+    } finally {
+      verifyInFlight = false;
     }
   }
 
-  /** Outcome of `reHomeToOwnDrive` — the caller owns the outcome→telemetry mapping. */
-  type ReHomeOutcome =
-    | { action: 're-homed' } // minted a fresh own-account file (or a distinct one on foreign collision)
-    | { action: 'adopted-existing' } // adopted the caller's OWN same-named file (no split-brain)
-    | { action: 'collision-check-unavailable' } // couldn't verify the collision — retryable, do NOT guess
-    | { action: 'failed' }; // create/install failed for another reason — fall through to native/critical
+  /** The decision itself, split out so `verifyPodAccess` owns only state + logging. */
+  async function runPodAccessCheck(): Promise<PodAccessResult> {
+    const ctx = useFamilyContextStore();
+    const activeFamilyId = ctx.activeFamilyId;
 
-  /** B4/B6: re-home the just-loaded doc onto the signed-in account's OWN Drive.
-   * Happy path mints a fresh app-owned file; on a same-name collision it ADOPTS the
-   * existing OWNED file (never a divergent local split-brain) or mints a distinct
-   * familyId-namespaced name when the colliding file is foreign. One try / one typed
-   * catch / one flat dispatch. NOT strictly total by design: an `installProvider`
-   * write-failure inside an adopt/reject arm PROPAGATES OUT (rather than a tag) to the
-   * caller's own try/catch → its loud `critical` no-durable-save-target report. */
-  async function reHomeToOwnDrive(name: string): Promise<ReHomeOutcome> {
+    const provider = syncService.getProvider();
+    // Family-scoped, not a bare non-null: a stale provider from a previously
+    // active family must not read as this family's home.
+    if (!provider || syncService.getProviderFamilyId() !== activeFamilyId) {
+      return { ok: false, code: 'NO_HOME' };
+    }
+
+    const providerType = syncService.getProviderType();
+    if (providerType !== 'google_drive') {
+      // A local FSA / native provider WE installed for this family is a genuine
+      // own home; there is no remote permission model to check.
+      return { ok: true };
+    }
+
+    const fileId = provider.getFileId();
+    if (!fileId) return { ok: false, code: 'NO_HOME' };
+
+    // `tryGetSilentToken` — NEVER `requestAccessToken`. A background durability
+    // check must not be able to pop a consent dialog in the middle of a load.
+    const token = await tryGetSilentToken();
+    if (!token) return { ok: false, code: 'CONSENT_EXPIRED' };
+
     try {
-      await mintFreshOwnDrive(name);
-      return { action: 're-homed' };
+      // `capabilities/canEdit` is NESTED in the response — see `evaluatePodMetadata`.
+      const meta = await getFileMetadata(token, fileId, 'capabilities/canEdit,trashed');
+      const failure = evaluatePodMetadata(meta as PodFileMetadata);
+      return failure ? { ok: false, code: failure } : { ok: true };
     } catch (e) {
-      if (e instanceof FileNameCollisionError) {
-        const res = await resolveExistingBeanpod({
-          fileId: e.existingFileId,
-          ownedByCurrentAccount: e.ownedByCurrentAccount,
-        });
-        if (res.kind === 'adopt-stub' || res.kind === 'adopt-existing') {
-          // Our OWN same-named file — adopt it (installProvider re-persists the config,
-          // overwriting the foreign one decrypt installed, and flushes the loaded doc).
-          await installProvider(GoogleDriveProvider.fromExisting(res.fileId, name), 'google_drive');
-          return { action: 'adopted-existing' };
-        }
-        // reject-different-account: the same-named file is foreign → mint a DISTINCT,
-        // familyId-namespaced own file (matches B3). Never write into a file we don't own.
-        const ctx = useFamilyContextStore();
-        const suffix = ctx.activeFamilyId ? `-${ctx.activeFamilyId}` : '';
-        const base = name.replace(/\.beanpod$/, '');
-        await mintFreshOwnDrive(`${base}${suffix}.beanpod`);
-        return { action: 're-homed' };
-      }
-      if (e instanceof CollisionCheckUnavailableError) {
-        return { action: 'collision-check-unavailable' }; // retryable — never guess a home
-      }
-      return { action: 'failed' };
+      return { ok: false, code: classifyDriveFailure(e), error: e };
     }
   }
 
   /**
-   * Ensure a just-loaded (cross-account / restored-backup) family has a durable,
-   * writable save target. Called ONCE by `LoadPodView` after a successful decrypt
-   * from the "Load a saved family file" aside (#47).
+   * Is the file we're writing to actually the one the family shares?
    *
-   * The web-Picker and web-FSA load paths already install a provider inside
-   * `decryptPendingFile` (a Drive provider from `driveFileId`, or a writable
-   * `LocalStorageProvider` handle). The native `<input type=file>` fallback
-   * (`openAndLoadFileFallback`) does NOT — it stages an envelope with no provider
-   * and no handle — so without this the adopted family would have no writable home
-   * (a read-only dead-end, the exact concern the old `supportsFileSystemAccess()`
-   * gate was protecting against).
-   *
-   * Idempotent: a no-op when a provider is already installed FOR THE JUST-LOADED
-   * FAMILY (the common Picker/FSA case). The family-scoped check (not a bare
-   * non-null) guards against a stale provider from a previously-active family
-   * causing a wrong skip. Otherwise it establishes a durable home in precedence:
-   *   1. Drive available + valid token -> re-home to the signed-in account's own
-   *      Drive (a fresh app-owned `.beanpod`) via `configureSyncFileGoogleDrive`.
-   *   2. Native -> a `CapacitorFileProvider` app-managed file, then a forced write.
-   *   3. Neither -> leave the load successful but provider-less and page loudly
-   *      (data-at-risk); the existing `SaveFailureBanner` guides recovery. Never
-   *      silent.
-   *
-   * Deliberately NOT reusing `createNewFile` — its brand-new-family preconditions
-   * (owner-member presence, deferred-password sentinel refusal, and a refusal when
-   * the registry already holds a pod for the familyId) all misfire for an
-   * already-adopted, just-loaded family.
+   * Fail-open in every uncertain case. `lookupFamilyResult` distinguishes "no such
+   * row" from "couldn't ask" precisely so a registry hiccup can't accuse a user of
+   * working on a copy. Runs at most once per family per session — `verifyPodAccess`
+   * runs on every load path including `retry`, so an unguarded check would turn a
+   * retry loop into a registry request loop.
    */
-  async function establishDurableHomeAfterLoad(): Promise<void> {
-    const ctx = useFamilyContextStore();
-    const activeFamilyId = ctx.activeFamilyId;
-    const podBaseName = (ctx.activeFamilyName ?? 'my-family').trim() || 'my-family';
-
-    // ─── Guard (B5): is the installed provider already OUR OWN durable home for
-    // this family, or a foreign/absent one we must re-home? A bare "provider is for
-    // this family" check is NOT enough — a Picker-load installs
-    // `fromExisting(pickedFileId)` unconditionally (so `providerFamilyId` matches even
-    // for a file owned by ANOTHER account). We derive ownership at this one decision
-    // point from the authoritative source (Drive), off the installed provider — never
-    // captured/threaded (a threaded snapshot re-introduces the stale-cross-family bug
-    // this guard exists to kill). `useJoinFlow` never reaches this function, so the
-    // inviter's shared file stays installed there. ───
-    const provider = syncService.getProvider();
-    if (provider && syncService.getProviderFamilyId() === activeFamilyId) {
-      const providerType = syncService.getProviderType();
-      if (providerType !== 'google_drive') {
-        // A local FSA / native provider WE installed for this family → genuine own home.
-        logEvent({
-          level: 'info',
-          surface: 'load-existing-family',
-          message: 'kept own local home',
-          context: { action: 'kept-own-home', provider_type: providerType ?? undefined },
-        });
-        return;
-      }
-      // Drive provider for this family — verify it's OURS before keeping it.
-      const fileId = provider.getFileId();
-      if (fileId && isTokenValid()) {
-        try {
-          const token = await requestAccessToken(); // silent (token already valid here)
-          const meta = await getFileMetadata(token, fileId, 'ownedByMe');
-          if (meta.ownedByMe === true) {
-            logEvent({
-              level: 'info',
-              surface: 'load-existing-family',
-              message: 'kept own Drive home',
-              context: { action: 'kept-own-home', provider_type: 'google_drive' },
-            });
-            return;
-          }
-          // Owned by another account → re-home (never keep writing cross-account).
-          logEvent({
-            level: 'warn',
-            surface: 'load-existing-family',
-            message: 'loaded a Drive file owned by another account — re-homing to own Drive',
-            context: { action: 'foreign-file-load', provider_type: 'google_drive' },
-          });
-        } catch (e) {
-          // Ownership unknown → conservative re-home (never assume ours). WARNING (not
-          // info) so the rare same-account transient-blip residual is countable.
-          console.warn(
-            '[syncStore.establishDurableHomeAfterLoad] Drive ownership check failed — re-homing conservatively:',
-            e
-          );
-          logEvent({
-            level: 'warn',
-            surface: 'load-existing-family',
-            message: 'could not verify Drive file ownership — re-homing conservatively',
-            context: { action: 'ownership-unknown', provider_type: 'google_drive' },
-            error: e,
-          });
-        }
-        // fall through to re-home
-      } else {
-        // No fileId or no valid token to verify → unknown → conservative re-home.
-        logEvent({
-          level: 'warn',
-          surface: 'load-existing-family',
-          message: 'no token/fileId to verify Drive ownership — re-homing conservatively',
-          context: { action: 'ownership-unknown', provider_type: 'google_drive' },
-        });
-      }
-    }
-
-    // ─── Establish (re-home): no verified own home for this family. ───
+  async function checkCanonicalPod(): Promise<void> {
     try {
-      // (1) Prefer the signed-in account's own Drive. Collision-aware (B4): adopts an
-      // existing owned same-named file instead of dropping to a local split-brain.
-      if (isGoogleDriveAvailable.value && isTokenValid()) {
-        const outcome = await reHomeToOwnDrive(`${podBaseName}.beanpod`);
-        if (outcome.action === 're-homed' || outcome.action === 'adopted-existing') {
-          logEvent({
-            level: 'info',
-            surface: 'load-existing-family',
-            message: `re-home ${outcome.action}`,
-            context: { action: outcome.action, provider_type: 'google_drive' },
-          });
-          return;
-        }
-        if (outcome.action === 'collision-check-unavailable') {
-          // Couldn't verify a name collision — do NOT guess a home. Retryable: page
-          // loudly and let the user retry rather than risk a wrong/foreign target.
-          reportError({
-            surface: 'load-existing-family',
-            severity: 'critical',
-            message: 're-home could not verify a Drive name collision (retryable)',
-            context: {
-              action: 'collision-check-unavailable',
-              provider_type: storageProviderType.value ?? undefined,
-            },
-          });
-          return;
-        }
-        // outcome.action === 'failed' → fall through to native / provider-less.
-      }
+      const ctx = useFamilyContextStore();
+      const familyId = ctx.activeFamilyId;
+      if (!familyId || checkedCanonicalFor === familyId) return;
+      const provider = syncService.getProvider();
+      if (!provider || syncService.getProviderType() !== 'google_drive') return;
+      checkedCanonicalFor = familyId;
 
-      // (2) Native app-managed local file (no writable web handle exists here).
-      if (isNative()) {
-        const selected = await syncService.selectNativeLocalFile(podBaseName);
-        if (selected && (await syncNow(true))) {
-          logEvent({
-            level: 'info',
-            surface: 'load-existing-family',
-            message: 're-homed to native local file',
-            context: {
-              action: 're-homed',
-              provider_type: syncService.getProviderType() ?? undefined,
-            },
-          });
-          return;
-        }
-      }
+      const lookup = await registry.lookupFamilyResult(familyId);
+      if (lookup.status !== 'found') return; // absent or unavailable → raise nothing
+      const entry = lookup.entry;
+      if (entry.provider !== 'google_drive' || !entry.fileId) return;
+      if (entry.fileId === provider.getFileId()) return;
+
+      const result: PodAccessResult = {
+        ok: false,
+        code: 'CANONICAL_MISMATCH',
+        // View state, NOT telemetry — `switchToCanonical` needs the full fileId to
+        // call `rebindPodFile`. `logPodAccessResult` never spreads `data` into a
+        // report; it derives `file_id_tail` explicitly. `file_id` is not in
+        // ALLOWED_CONTEXT_KEYS, but relying on the stripper is not a policy.
+        data: {
+          canonicalFileId: entry.fileId,
+          canonicalName: entry.displayPath ?? `${entry.familyName ?? 'pod'}.beanpod`,
+        },
+      };
+      podAccessError.value = result;
+      logPodAccessResult(result);
     } catch (e) {
-      // Fall through to the critical report below — never let an unexpected throw
-      // (incl. an installProvider write-failure from reHomeToOwnDrive) leave a
-      // loaded-but-unsaveable family without a loud signal.
-      console.error('[syncStore.establishDurableHomeAfterLoad] failed:', e);
+      // The one intentional swallow in this path — and it still logs.
+      console.warn('[syncStore.checkCanonicalPod] canonical check failed:', e);
+      logEvent({
+        level: 'warn',
+        surface: 'pod-access',
+        message: 'canonical pod check failed',
+        context: { action: 'canonical-check-failed' },
+        error: e,
+      });
     }
+  }
 
-    // (3) No durable home could be established. The family is loaded and visible but
-    // cannot be saved — data at risk. Page loudly; SaveFailureBanner guides recovery.
-    reportError({
-      surface: 'load-existing-family',
-      severity: 'critical',
-      message: 'loaded a family but could not establish a durable save target',
-      context: {
-        action: 'no-backend',
-        provider_type: storageProviderType.value ?? undefined,
-      },
+  /**
+   * The ONE logging call site for pod access. Level/severity comes from
+   * `POD_ACCESS_SEVERITY`, so "which codes page Slack" is data in one table
+   * rather than a policy scattered across fifteen `reportError` calls.
+   *
+   * The success path logs too — deliberately. A failure-only event cannot tell you
+   * a failure RATE, and not being able to measure the rate is why this bug went a
+   * month without anyone knowing how many families it had reached.
+   */
+  function logPodAccessResult(result: PodAccessResult, thrown?: unknown): void {
+    const provider_type = storageProviderType.value ?? undefined;
+    if (result.ok) {
+      logEvent({
+        level: 'info',
+        surface: 'pod-access',
+        message: 'kept existing pod home',
+        context: { action: 'kept-home', provider_type },
+      });
+      return;
+    }
+    const context = {
+      action: result.code,
+      provider_type,
+      file_id_tail: tail(syncService.getProvider()?.getFileId() ?? null),
+    };
+    if (POD_ACCESS_SEVERITY[result.code] === 'critical') {
+      reportError({
+        surface: 'pod-access',
+        severity: 'critical',
+        message: `pod access failed: ${result.code}`,
+        error: thrown ?? result.error,
+        context,
+      });
+      return;
+    }
+    logEvent({
+      level: 'warn',
+      surface: 'pod-access',
+      message: `pod access degraded: ${result.code}`,
+      context,
+      error: thrown ?? result.error,
     });
   }
 
@@ -2737,15 +2733,19 @@ export const useSyncStore = defineStore('sync', () => {
     if (configHealInFlight) return false;
     configHealInFlight = true;
     try {
-      let entry: RegistryEntry | null;
-      try {
-        entry = await registry.lookupFamily(familyId);
-      } catch (e) {
+      // `lookupFamilyResult`, not `lookupFamily`: the retry below is only correct
+      // for a genuinely transient failure. The old code wrapped `lookupFamily` in
+      // a try/catch, but that function never throws — it swallows everything to
+      // `null` — so the retry path was unreachable and a registry outage became a
+      // non-retryable dead end. The typed result restores the author's intent.
+      const lookup = await registry.lookupFamilyResult(familyId);
+      if (lookup.status === 'unavailable') {
         // Transient (offline / registry 5xx) → retry on a wake event.
-        console.warn('[syncStore.attemptSilentConfigHeal] registry lookup failed', e);
+        console.warn('[syncStore.attemptSilentConfigHeal] registry lookup unavailable');
         scheduleConfigHealRetry(familyId, 'registry-error');
         return false;
       }
+      const entry: RegistryEntry | null = lookup.status === 'found' ? lookup.entry : null;
 
       if (!entry || entry.provider !== 'google_drive') {
         // Registry has no Drive home for this family (unknown, or a local pod we
@@ -3188,35 +3188,41 @@ export const useSyncStore = defineStore('sync', () => {
    * memory. Returns `{ success: true }` on success; otherwise an error
    * string suitable for showing to the user. Never throws.
    */
-  async function recoverFromMissingFile(
+  async function rebindPodFile(
     fileId: string,
     fileName_param: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ ok: true } | { ok: false; code: PodAccessErrorCode }> {
     try {
       if (!familyKey.value || !envelope.value) {
-        return {
-          success: false,
-          error: 'No active session — sign out and sign in fresh to load this file.',
-        };
+        return { ok: false, code: 'NO_HOME' };
       }
 
       const provider = GoogleDriveProvider.fromExisting(fileId, fileName_param);
       const text = await provider.read();
       if (!text) {
-        return { success: false, error: 'Picked file is empty.' };
+        return { ok: false, code: 'FILE_NOT_FOUND' };
       }
 
       const env = parseBeanpodV4(text);
       if (env.familyId !== envelope.value.familyId) {
-        return {
-          success: false,
-          error:
-            'That file belongs to a different family. Pick your own .beanpod, or sign out and sign in fresh to switch families.',
-        };
+        // The property that makes this primitive safe to expose as the recovery
+        // for five different error codes: it can bind ONLY a file that already
+        // belongs to this family. It cannot create, and it cannot adopt a
+        // stranger's pod.
+        return { ok: false, code: 'FILE_NOT_FOUND' };
       }
 
       // Verify the family key still decrypts the file (worker; current key).
       await docClient.verifyEnvelope(env, { quiet: true });
+
+      // Persist BEFORE setProvider, matching installProvider's ordering. Without
+      // this the rebind survived only until the tab closed, and the next boot with
+      // an evicted config re-entered the exact loop that caused the 2026-08-10
+      // fork. `setProvider` alone is an in-memory swap.
+      const ctx = useFamilyContextStore();
+      if (ctx.activeFamilyId) {
+        await provider.persist(ctx.activeFamilyId);
+      }
 
       // Swap the provider so subsequent saves/polls use the new fileId.
       // `replaceEnvelope` is the uniform entry point even though this is a
@@ -3228,25 +3234,47 @@ export const useSyncStore = defineStore('sync', () => {
       fileName.value = fileName_param;
       driveFileId.value = fileId;
 
-      // Clear the file-not-found banner state and resume normal sync.
+      // ONE clearing site for every recovery banner's state, so the four banners
+      // can never disagree about whether recovery succeeded.
       driveFileNotFound.value = false;
       showSaveFailureBanner.value = false;
+      podAccessError.value = null;
       error.value = null;
       syncService.resetSaveFailures();
       saveFailureLevel.value = 'none';
       lastSaveError.value = null;
+      // Deliberate re-point: the owner repairs the registry here, and a member's
+      // attempt is refused server-side and reported rather than silently dropped.
+      registerCurrentFamily(
+        { provider: 'google_drive', fileId, displayPath: fileName_param },
+        { pointerIntent: true }
+      );
+
+      // NOTE: deliberately NO syncNow() here. A blind post-install upload is
+      // exactly the mechanism that made the forked copy indistinguishable from
+      // the original. The normal poll/merge/debounced-save cycle reconciles, so
+      // this device's changes are carried across rather than discarded.
       startFilePolling();
 
-      console.warn(
-        '[syncStore] recoverFromMissingFile succeeded — swapped to',
-        fileId,
-        fileName_param
-      );
-      return { success: true };
+      console.warn('[syncStore] rebindPodFile succeeded — swapped to', fileId, fileName_param);
+      return { ok: true };
     } catch (e) {
-      const message = (e as Error).message || 'Recovery failed';
-      console.warn('[syncStore] recoverFromMissingFile failed:', message);
-      return { success: false, error: message };
+      const code = classifyDriveFailure(e);
+      console.warn('[syncStore] rebindPodFile failed:', (e as Error).message);
+      // A failed rebind is a user action that failed with data at risk — the
+      // family is loaded and visible but still not saving anywhere it should.
+      reportError({
+        surface: 'pod-access',
+        severity: 'critical',
+        message: 'rebind to the family pod file failed',
+        error: e,
+        context: {
+          action: 'rebind-failed',
+          error_code: code,
+          file_id_tail: tail(fileId),
+        },
+      });
+      return { ok: false, code };
     }
   }
 
@@ -3455,7 +3483,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function registerCurrentFamily(
     overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
-    opts: { isLoginEvent?: boolean } = {}
+    opts: { isLoginEvent?: boolean; pointerIntent?: boolean } = {}
   ): void {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) return;
@@ -3472,6 +3500,49 @@ export const useSyncStore = defineStore('sync', () => {
         country: useSettingsStore().country ?? null,
         beanpodSizeKb: currentBeanpodSizeKb(),
         isLoginEvent: opts.isLoginEvent === true,
+      })
+      .then((result) => {
+        // The server refuses to move the canonical pointer for anyone but the
+        // family's registered owner (see the guard in the registry Lambda). Two
+        // very different populations hit that refusal, and conflating them is
+        // how the original bug stayed invisible for a month:
+        //
+        //  - No intent (`ensureRegistered` on every login, the country watcher):
+        //    they send pointer fields only because the payload is uniform. A
+        //    refusal is the expected, boring case for every member device.
+        //  - Intent (`installProvider` via migrateStorage, `rebindPodFile`): the
+        //    caller deliberately meant to re-point. A refusal means the registry
+        //    now disagrees with where the pod actually is, and
+        //    `attemptSilentConfigHeal` will heal other members onto the stale
+        //    pointer. That is data at risk.
+        //
+        // `result === null` means registerFamily swallowed a transport failure —
+        // we learned nothing about the pointer, so we say nothing about it.
+        if (!result || result.pointerAccepted) return;
+        if (opts.pointerIntent) {
+          reportError({
+            surface: 'pod-access',
+            severity: 'critical',
+            message: 'registry refused a deliberate pointer write',
+            context: {
+              action: 'registry-pointer-write-refused',
+              provider_type: storageProviderType.value ?? undefined,
+              file_id_tail: tail(overrides.fileId ?? provider?.getFileId() ?? null),
+            },
+          });
+          return;
+        }
+        // Population counter for devices sitting on a forked pod — including
+        // stale clients that will never ship the client-side fix.
+        logEvent({
+          level: 'info',
+          surface: 'pod-access',
+          message: 'registry ignored an ambient pointer write',
+          context: {
+            action: 'registry-pointer-write-ignored',
+            provider_type: storageProviderType.value ?? undefined,
+          },
+        });
       })
       .catch((e: unknown) => {
         // Non-critical: registry is optional smoothness; saves proceed
@@ -3549,8 +3620,9 @@ export const useSyncStore = defineStore('sync', () => {
     // Actions
     initialize,
     requestPermission,
-    configureSyncFileGoogleDrive,
-    establishDurableHomeAfterLoad,
+    verifyPodAccess,
+    podAccessError,
+    shouldShowPodAccessBanner,
     migrateStorage,
     syncNow,
     syncNowBounded,
@@ -3567,7 +3639,7 @@ export const useSyncStore = defineStore('sync', () => {
     completeAutoLoad,
     listGoogleDriveFiles,
     beginDriveAuthRedirect,
-    recoverFromMissingFile,
+    rebindPodFile,
     decryptPendingFile,
     loadFromPersistenceCache,
     clearPendingEncryptedFile,

@@ -322,6 +322,44 @@ describe('syncStore — save-failure banner visibility', () => {
     });
   });
 
+  describe('banner precedence (one ordered list, declared once in syncStore)', () => {
+    // GoogleReconnectToast > PodAccessBanner > SaveFailureBanner > DurabilityBanner.
+    // A pod-access failure is the ROOT CAUSE of any save failure it coexists with,
+    // so showing both would report one problem twice and bury the actionable one.
+
+    it('suppresses the save-failure banner while a pod-access failure is showing', () => {
+      const store = useSyncStore();
+
+      saveFailureCallbackHolder.cb!('critical', 'err');
+      expect(store.shouldShowSaveFailureBanner).toBe(true);
+
+      store.podAccessError = { ok: false, code: 'CANONICAL_MISMATCH' };
+
+      expect(store.shouldShowPodAccessBanner).toBe(true);
+      expect(store.shouldShowSaveFailureBanner).toBe(false);
+    });
+
+    it('yields to the reconnect toast, which owns permanent-expiry recovery', () => {
+      const store = useSyncStore();
+
+      store.podAccessError = { ok: false, code: 'CONSENT_EXPIRED' };
+      expect(store.shouldShowPodAccessBanner).toBe(true);
+
+      store.showGoogleReconnect = true;
+      expect(store.shouldShowPodAccessBanner).toBe(false);
+    });
+
+    it('hides once the pod-access failure clears', () => {
+      const store = useSyncStore();
+
+      store.podAccessError = { ok: false, code: 'NO_HOME' };
+      expect(store.shouldShowPodAccessBanner).toBe(true);
+
+      store.podAccessError = null;
+      expect(store.shouldShowPodAccessBanner).toBe(false);
+    });
+  });
+
   describe('shouldShowSaveFailureBanner (computed mutual exclusion with reconnect toast)', () => {
     it('is false when showGoogleReconnect is true, even with critical save failure', () => {
       const store = useSyncStore();
