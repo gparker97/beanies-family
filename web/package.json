@@ -25,7 +25,7 @@
     "canvaskit-wasm": "^0.39.1",
     "minisearch": "^7.1.2",
     "tailwindcss": "^4.3.3",
-    "web-vitals": "^6.0.1"
+    "web-vitals": "^6.1.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
