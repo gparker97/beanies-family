@@ -2,12 +2,12 @@
   "meta": {
     "country": "AX",
     "name": "Aland Islands",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-08-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.32.0",
+    "source": "date-holidays@3.34.0",
     "primaryLanguage": "sv",
     "types": [
       "public"
@@ -18,13 +18,13 @@
       "date": "2025-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Nyårsdagen"
+      "name_local": "nyårsdagen"
     },
     {
       "date": "2025-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Trettondedag jul"
+      "name_local": "trettondedag jul"
     },
     {
       "date": "2025-03-30",
@@ -36,25 +36,25 @@
       "date": "2025-04-18",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Långfredagen"
+      "name_local": "långfredagen"
     },
     {
       "date": "2025-04-21",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "Annandag påsk"
+      "name_local": "annandag påsk"
     },
     {
       "date": "2025-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Första Maj"
+      "name_local": "första maj"
     },
     {
       "date": "2025-05-29",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Kristi himmelfärdsdag"
+      "name_local": "Kristi himmelsfärdsdag"
     },
     {
       "date": "2025-06-09",
@@ -78,25 +78,25 @@
       "date": "2025-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Juldagen"
+      "name_local": "juldagen"
     },
     {
       "date": "2025-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "Annandag jul"
+      "name_local": "annandag jul"
     },
     {
       "date": "2026-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Nyårsdagen"
+      "name_local": "nyårsdagen"
     },
     {
       "date": "2026-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Trettondedag jul"
+      "name_local": "trettondedag jul"
     },
     {
       "date": "2026-03-30",
@@ -108,25 +108,25 @@
       "date": "2026-04-03",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Långfredagen"
+      "name_local": "långfredagen"
     },
     {
       "date": "2026-04-06",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "Annandag påsk"
+      "name_local": "annandag påsk"
     },
     {
       "date": "2026-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Första Maj"
+      "name_local": "första maj"
     },
     {
       "date": "2026-05-14",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Kristi himmelfärdsdag"
+      "name_local": "Kristi himmelsfärdsdag"
     },
     {
       "date": "2026-06-09",
@@ -150,37 +150,37 @@
       "date": "2026-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Juldagen"
+      "name_local": "juldagen"
     },
     {
       "date": "2026-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "Annandag jul"
+      "name_local": "annandag jul"
     },
     {
       "date": "2027-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Nyårsdagen"
+      "name_local": "nyårsdagen"
     },
     {
       "date": "2027-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Trettondedag jul"
+      "name_local": "trettondedag jul"
     },
     {
       "date": "2027-03-26",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Långfredagen"
+      "name_local": "långfredagen"
     },
     {
       "date": "2027-03-29",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "Annandag påsk"
+      "name_local": "annandag påsk"
     },
     {
       "date": "2027-03-30",
@@ -192,13 +192,13 @@
       "date": "2027-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Första Maj"
+      "name_local": "första maj"
     },
     {
       "date": "2027-05-06",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Kristi himmelfärdsdag"
+      "name_local": "Kristi himmelsfärdsdag"
     },
     {
       "date": "2027-06-09",
@@ -222,25 +222,25 @@
       "date": "2027-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Juldagen"
+      "name_local": "juldagen"
     },
     {
       "date": "2027-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "Annandag jul"
+      "name_local": "annandag jul"
     },
     {
       "date": "2028-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Nyårsdagen"
+      "name_local": "nyårsdagen"
     },
     {
       "date": "2028-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Trettondedag jul"
+      "name_local": "trettondedag jul"
     },
     {
       "date": "2028-03-30",
@@ -252,25 +252,25 @@
       "date": "2028-04-14",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Långfredagen"
+      "name_local": "långfredagen"
     },
     {
       "date": "2028-04-17",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "Annandag påsk"
+      "name_local": "annandag påsk"
     },
     {
       "date": "2028-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Första Maj"
+      "name_local": "första maj"
     },
     {
       "date": "2028-05-25",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Kristi himmelfärdsdag"
+      "name_local": "Kristi himmelsfärdsdag"
     },
     {
       "date": "2028-06-09",
@@ -294,25 +294,25 @@
       "date": "2028-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Juldagen"
+      "name_local": "juldagen"
     },
     {
       "date": "2028-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "Annandag jul"
+      "name_local": "annandag jul"
     },
     {
       "date": "2029-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Nyårsdagen"
+      "name_local": "nyårsdagen"
     },
     {
       "date": "2029-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Trettondedag jul"
+      "name_local": "trettondedag jul"
     },
     {
       "date": "2029-03-30",
@@ -324,25 +324,25 @@
       "date": "2029-03-30",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Långfredagen"
+      "name_local": "långfredagen"
     },
     {
       "date": "2029-04-02",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "Annandag påsk"
+      "name_local": "annandag påsk"
     },
     {
       "date": "2029-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Första Maj"
+      "name_local": "första maj"
     },
     {
       "date": "2029-05-10",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Kristi himmelfärdsdag"
+      "name_local": "Kristi himmelsfärdsdag"
     },
     {
       "date": "2029-06-09",
@@ -366,13 +366,13 @@
       "date": "2029-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Juldagen"
+      "name_local": "juldagen"
     },
     {
       "date": "2029-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "Annandag jul"
+      "name_local": "annandag jul"
     }
   ]
 }
