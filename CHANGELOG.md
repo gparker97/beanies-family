@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-11
+
+### Changed
+
+- **Dependency maintenance (developer tooling — no user-facing change).** Routine dependency updates, including a major bump of the app's state-management library (Pinia 3 → 4) after confirming none of its breaking changes touch our code, plus the usual patch/minor bumps and the monthly airport/holiday dataset refresh. Verified via the full build and test suite; no behavior change.
+
 ## 2026-08-10
 
 ### Fixed
