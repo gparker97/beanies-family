@@ -72,7 +72,7 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1105.0",
+    "@aws-sdk/client-dynamodb": "^3.1106.0",
     "@aws-sdk/util-dynamodb": "^3.996.7",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.0",
@@ -83,7 +83,7 @@
     "@remotion/cli": "^4.0.507",
     "@remotion/google-fonts": "^4.0.507",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -101,7 +101,7 @@
     "eslint-plugin-security": "^4.0.1",
     "eslint-plugin-vue": "^10.10.0",
     "fake-indexeddb": "^6.2.5",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^20.11.2",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "postcss": "^8.5.26",
