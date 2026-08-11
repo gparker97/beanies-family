@@ -2,12 +2,12 @@
   "meta": {
     "country": "PY",
     "name": "Paraguay",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-08-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.32.0",
+    "source": "date-holidays@3.34.0",
     "primaryLanguage": "es",
     "types": [
       "public"
@@ -133,6 +133,12 @@
       "name": "Chaco Armistice",
       "type": "public",
       "name_local": "Día de la Paz del Chaco"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "Recognition of the historic victory of the Paraguayan national football team over Germany",
+      "type": "public",
+      "name_local": "Reconocimiento al histórico triunfo de la Selección Paraguaya de Fútbol frente a Alemania"
     },
     {
       "date": "2026-08-15",

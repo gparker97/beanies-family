@@ -2,12 +2,12 @@
   "meta": {
     "country": "KR",
     "name": "Korea, Republic of",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-08-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.32.0",
+    "source": "date-holidays@3.34.0",
     "primaryLanguage": "ko",
     "types": [
       "public"
@@ -33,6 +33,12 @@
       "name_local": "3·1절"
     },
     {
+      "date": "2025-03-03",
+      "name": "Independence Movement Day (substitute day)",
+      "type": "public",
+      "name_local": "3·1절 (대체공휴일)"
+    },
+    {
       "date": "2025-05-05",
       "name": "Buddha's Birthday",
       "type": "public",
@@ -43,6 +49,18 @@
       "name": "Children's Day",
       "type": "public",
       "name_local": "어린이날"
+    },
+    {
+      "date": "2025-05-06",
+      "name": "Buddha's Birthday (substitute day)",
+      "type": "public",
+      "name_local": "석가탄신일 (대체공휴일)"
+    },
+    {
+      "date": "2025-05-06",
+      "name": "Children's Day (substitute day)",
+      "type": "public",
+      "name_local": "어린이날 (대체공휴일)"
     },
     {
       "date": "2025-06-06",
@@ -67,6 +85,12 @@
       "name": "Korean Thanksgiving",
       "type": "public",
       "name_local": "추석"
+    },
+    {
+      "date": "2025-10-08",
+      "name": "Korean Thanksgiving (substitute day)",
+      "type": "public",
+      "name_local": "추석 (대체공휴일)"
     },
     {
       "date": "2025-10-09",
@@ -99,6 +123,12 @@
       "name_local": "3·1절"
     },
     {
+      "date": "2026-03-02",
+      "name": "Independence Movement Day (substitute day)",
+      "type": "public",
+      "name_local": "3·1절 (대체공휴일)"
+    },
+    {
       "date": "2026-05-05",
       "name": "Children's Day",
       "type": "public",
@@ -109,6 +139,12 @@
       "name": "Buddha's Birthday",
       "type": "public",
       "name_local": "석가탄신일"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "Buddha's Birthday (substitute day)",
+      "type": "public",
+      "name_local": "석가탄신일 (대체공휴일)"
     },
     {
       "date": "2026-06-06",
@@ -129,6 +165,12 @@
       "name_local": "광복절"
     },
     {
+      "date": "2026-08-17",
+      "name": "Liberation Day (substitute day)",
+      "type": "public",
+      "name_local": "광복절 (대체공휴일)"
+    },
+    {
       "date": "2026-09-24",
       "name": "Korean Thanksgiving",
       "type": "public",
@@ -139,6 +181,12 @@
       "name": "National Foundation Day",
       "type": "public",
       "name_local": "개천절"
+    },
+    {
+      "date": "2026-10-05",
+      "name": "National Foundation Day (substitute day)",
+      "type": "public",
+      "name_local": "개천절 (대체공휴일)"
     },
     {
       "date": "2026-10-09",
@@ -163,6 +211,12 @@
       "name": "Korean New Year",
       "type": "public",
       "name_local": "설날"
+    },
+    {
+      "date": "2027-02-09",
+      "name": "Korean New Year (substitute day)",
+      "type": "public",
+      "name_local": "설날 (대체공휴일)"
     },
     {
       "date": "2027-03-01",
@@ -195,10 +249,22 @@
       "name_local": "제헌절"
     },
     {
+      "date": "2027-07-19",
+      "name": "Constitution Day (substitute day)",
+      "type": "public",
+      "name_local": "제헌절 (대체공휴일)"
+    },
+    {
       "date": "2027-08-15",
       "name": "Liberation Day",
       "type": "public",
       "name_local": "광복절"
+    },
+    {
+      "date": "2027-08-16",
+      "name": "Liberation Day (substitute day)",
+      "type": "public",
+      "name_local": "광복절 (대체공휴일)"
     },
     {
       "date": "2027-09-14",
@@ -213,16 +279,34 @@
       "name_local": "개천절"
     },
     {
+      "date": "2027-10-04",
+      "name": "National Foundation Day (substitute day)",
+      "type": "public",
+      "name_local": "개천절 (대체공휴일)"
+    },
+    {
       "date": "2027-10-09",
       "name": "Hangul Day",
       "type": "public",
       "name_local": "한글날"
     },
     {
+      "date": "2027-10-11",
+      "name": "Hangul Day (substitute day)",
+      "type": "public",
+      "name_local": "한글날 (대체공휴일)"
+    },
+    {
       "date": "2027-12-25",
       "name": "Christmas Day",
       "type": "public",
       "name_local": "기독탄신일"
+    },
+    {
+      "date": "2027-12-27",
+      "name": "Christmas Day (substitute day)",
+      "type": "public",
+      "name_local": "기독탄신일 (대체공휴일)"
     },
     {
       "date": "2028-01-01",
@@ -285,6 +369,18 @@
       "name_local": "개천절"
     },
     {
+      "date": "2028-10-05",
+      "name": "Korean Thanksgiving (substitute day)",
+      "type": "public",
+      "name_local": "추석 (대체공휴일)"
+    },
+    {
+      "date": "2028-10-05",
+      "name": "National Foundation Day (substitute day)",
+      "type": "public",
+      "name_local": "개천절 (대체공휴일)"
+    },
+    {
       "date": "2028-10-09",
       "name": "Hangul Day",
       "type": "public",
@@ -321,10 +417,22 @@
       "name_local": "어린이날"
     },
     {
+      "date": "2029-05-07",
+      "name": "Children's Day (substitute day)",
+      "type": "public",
+      "name_local": "어린이날 (대체공휴일)"
+    },
+    {
       "date": "2029-05-20",
       "name": "Buddha's Birthday",
       "type": "public",
       "name_local": "석가탄신일"
+    },
+    {
+      "date": "2029-05-21",
+      "name": "Buddha's Birthday (substitute day)",
+      "type": "public",
+      "name_local": "석가탄신일 (대체공휴일)"
     },
     {
       "date": "2029-06-06",
@@ -349,6 +457,12 @@
       "name": "Korean Thanksgiving",
       "type": "public",
       "name_local": "추석"
+    },
+    {
+      "date": "2029-09-24",
+      "name": "Korean Thanksgiving (substitute day)",
+      "type": "public",
+      "name_local": "추석 (대체공휴일)"
     },
     {
       "date": "2029-10-03",
