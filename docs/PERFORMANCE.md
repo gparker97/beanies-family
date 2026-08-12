@@ -381,6 +381,20 @@ const results = await db.getAllFromIndex('transactions', 'by-date', range);
 
 ---
 
+### 9. Instant App-Open via Projection Snapshot (ADR-032)
+
+**Problem (measured, 30-day prod `load-perf`, 2026-08-12).** App open was gated on rebuilding the Automerge CRDT before anything painted: `automerge.remoteLoad` p50 ~2.6s / p95 ~4.5s (Drive fetch + decrypt + `Automerge.load` of a compacted base), and `automerge.cacheLoad` p50 ~7.1s / p90 ~24s (base + **replaying accumulated increments** — pathologically slower than a fresh remote load). Building the UI state was NOT the cost: `automerge.pushProjection` <0.27s (usually below the 250ms telemetry floor), `stores.reloadAll` p50 ~0.55s. Decrypt is negligible (tens of ms of a 2.6s load). **The multi-second cost is the CRDT engine rebuild, not crypto or projection.**
+
+**Mitigation.** Persist the materialized **projection** (the `buildFullProjection` deltas the worker already streams) as a separate encrypted row in the worker's per-family cache DB, coarse-coalesced (`SNAPSHOT_PERSIST_DEBOUNCE_MS = 3s`, own single-flight, flushed on `flush()`). On open, `syncStore.loadFromPersistenceCache` posts the snapshot RPC FIRST and the authoritative rebuild SECOND (serial worker FIFO): the snapshot hydrates the stores and paints in **well under 1s**, the existing `BackgroundSyncBar` (`isBackgroundSyncing`) shows "refreshing" for the whole window, and the authoritative `bulk reset` projection + a second `reloadAllStores()` reconcile the UI before the bar clears. The snapshot is **display-only** — never a save/mutation/upload source; the Automerge base/increments remain authoritative. A `SNAPSHOT_VERSION` (`<manual-rev>:<COLLECTION_NAMES fingerprint>`) guards a stale shape; any miss/mismatch/decrypt failure falls back to the pre-existing rebuild path (never worse than today).
+
+**Telemetry.** `snapshot.hydrate` (first-paint duration, hit) and `open-snapshot` breadcrumbs ("painted from snapshot" / "snapshot miss (reason)" / "authoritative landed") give a per-session view and a hit-rate ratio with no new allowlisted context key.
+
+**Note on increment compaction.** `INCREMENT_COMPACTION_THRESHOLD = 50` was deliberately chosen (docs/plans/2026-07-15) as a load-speed vs `automerge.saveBase`-write-amplification tradeoff, with an explicit "do not lower without re-checking `saveBase` p95" warning. Because the snapshot now hides the rebuild latency, the threshold was **left unchanged** — lowering it is unwarranted and warned-against. Native cache-hit durability is being watched via the new telemetry before any eviction work (the `remoteLoad`≫`cacheLoad` count conflates the always-runs background Drive refresh with cold opens, so it is not by itself proof of eviction).
+
+Full design + review: `docs/plans/2026-08-12-app-open-instant-projection-snapshot.md`.
+
+---
+
 ## Monitoring and Profiling
 
 ### Quick Performance Checks
