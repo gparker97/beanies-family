@@ -24,8 +24,9 @@ import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
 import { loadAndVerify, applyChanges, unframeChanges } from './docOps';
 import * as Automerge from '@automerge/automerge';
-import type { FamilyDocument } from '@/types/automerge';
+import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import type { ProjectionDelta } from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 
@@ -35,6 +36,12 @@ const BASE_KEY = 'base';
 /** Pre-B1 whole-doc row. Read as a base fallback so an in-flight upgrade loses no data. */
 const LEGACY_DOC_KEY = 'current';
 const ENVELOPE_KEY = 'envelope';
+/**
+ * The materialized-projection snapshot row (encrypted `buildFullProjection` deltas).
+ * Display-only fast first paint on open; the Automerge base/increments remain the
+ * source of truth. Dropped with everything else by `clearCache`'s whole-DB delete.
+ */
+const SNAPSHOT_KEY = 'projection-snapshot';
 /** Increment rows key on `inc:<zero-padded seq>` so IDB's lexical key order == seq order. */
 const INC_PREFIX = 'inc:';
 /** The char after ':' — upper bound (exclusive) for the `inc:*` key range. */
@@ -136,6 +143,74 @@ export async function persistIncrement(familyKey: CryptoKey, framed: Uint8Array)
 /** How many increments sit on top of the current base (the re-compaction trigger). */
 export function incrementCount(): number {
   return incSeq;
+}
+
+// ─── Projection snapshot (display-only fast first paint) ──────────────────────
+
+/**
+ * `SNAPSHOT_VERSION` guards a stored projection snapshot against a shape it can no
+ * longer be rendered into. It is `<manual-rev>:<collections-fingerprint>`:
+ *   - the fingerprint is a stable hash of `COLLECTION_NAMES`, so ADD/REMOVE/RENAME
+ *     of a collection changes the version AUTOMATICALLY (a stale snapshot naming an
+ *     unknown collection can never be applied), and
+ *   - `SNAPSHOT_MANUAL_REV` is bumped BY HAND on any change to a persisted ENTITY
+ *     shape that a stale snapshot would render wrong even though collection names
+ *     are unchanged.
+ * On any mismatch the snapshot is ignored and the authoritative rebuild is the sole
+ * source — so a forgotten manual bump only costs a one-open fallback, never a crash.
+ */
+const SNAPSHOT_MANUAL_REV = 1;
+function collectionsFingerprint(): number {
+  const s = [...COLLECTION_NAMES].sort().join(',');
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+export const SNAPSHOT_VERSION = `${SNAPSHOT_MANUAL_REV}:${collectionsFingerprint()}`;
+
+/** The stored snapshot: the `buildFullProjection` delta array + its shape version. */
+export interface ProjectionSnapshot {
+  version: string;
+  deltas: ProjectionDelta[];
+}
+
+/**
+ * Persist the materialized-projection snapshot (encrypted with the family key, same
+ * primitive as `persistDocBinary`). Single-row `put` (atomic per record — a torn
+ * payload simply fails the next decrypt and falls back). NOT the source of truth.
+ */
+export async function persistProjectionSnapshot(
+  familyKey: CryptoKey,
+  snapshot: ProjectionSnapshot
+): Promise<void> {
+  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const bytes = new TextEncoder().encode(JSON.stringify(snapshot));
+  const encrypted = await encryptPayload(familyKey, bytes);
+  const payload = bufferToBase64(encrypted);
+  await withIdbRetry('persistSnapshot', () =>
+    cacheDb!.put(STORE_NAME, { id: SNAPSHOT_KEY, payload, updatedAt: nowIso() })
+  );
+}
+
+/**
+ * Load + decrypt the stored projection snapshot. Returns `null` when absent (a clean
+ * miss); **throws** on a decrypt/parse failure so the caller logs + falls back (never
+ * a silent empty). Does NOT validate `version` — that is the caller's gate, so the
+ * caller can telemeter version-mismatch distinctly from a hard decrypt failure.
+ */
+export async function loadProjectionSnapshot(
+  familyKey: CryptoKey
+): Promise<ProjectionSnapshot | null> {
+  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const entry = (await withIdbRetry('loadSnapshot', () =>
+    cacheDb!.get(STORE_NAME, SNAPSHOT_KEY)
+  )) as { payload: string } | undefined;
+  if (!entry) return null;
+  const bytes = await decryptPayload(familyKey, new Uint8Array(base64ToBuffer(entry.payload)));
+  return JSON.parse(new TextDecoder().decode(bytes)) as ProjectionSnapshot;
 }
 
 /**

@@ -77,6 +77,12 @@ const PERSIST_DEBOUNCE_MS = 120;
  * p95 for a save-side regression. See docs/plans/2026-07-15-compaction-primary-retire-change-chunks.md. */
 const INCREMENT_COMPACTION_THRESHOLD = 50;
 
+/** The projection snapshot is a whole-projection re-serialize+encrypt (far heavier
+ * than an `inc:` delta), so it rides its OWN coarse coalescing timer — never per
+ * mutate. A few seconds' staleness is fine: it only seeds next open's first paint,
+ * and the authoritative rebuild always corrects it. */
+const SNAPSHOT_PERSIST_DEBOUNCE_MS = 3_000;
+
 // ─── Module state (one instance per realm — worker OR inline main) ───────────
 
 let currentDoc: Doc | null = null;
@@ -94,6 +100,12 @@ let lastPersistedHeads: Heads | null = null;
  * overlapping persists (e.g. a debounce firing while `flush()` runs) can't interleave
  * their shared `seq`/`lastPersistedHeads`/row mutations. */
 let persistInFlight: Promise<void> = Promise.resolve();
+
+/** Projection-snapshot persist: own coarse timer + own single-flight chain (kept
+ * separate from the doc persist so the heavy whole-projection write never rides the
+ * per-mutate `inc:` path). */
+let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
+let snapshotInFlight: Promise<void> = Promise.resolve();
 
 /** Wire the sink once (worker startup / inline adapter init). Also registers the
  * photo attach/collect family here (not at module load) so it can't hit a
@@ -130,6 +142,67 @@ function schedulePersist(): void {
 function enqueuePersist(): Promise<void> {
   persistInFlight = persistInFlight.catch(() => {}).then(() => persistOnce());
   return persistInFlight;
+}
+
+// ─── Projection snapshot persist (coarse, own single-flight) ─────────────────
+
+function scheduleSnapshotPersist(): void {
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(() => {
+    snapshotTimer = null;
+    void enqueueSnapshotPersist();
+  }, SNAPSHOT_PERSIST_DEBOUNCE_MS);
+}
+
+/** Run a snapshot persist behind its own single-flight chain (never two at once;
+ * never rejects — it catches). */
+function enqueueSnapshotPersist(): Promise<void> {
+  snapshotInFlight = snapshotInFlight.catch(() => {}).then(() => persistSnapshotOnce());
+  return snapshotInFlight;
+}
+
+/** Serialize the CURRENT full projection (`buildFullProjection` — the same deltas
+ * the worker streams) and persist it encrypted. Non-fatal on failure: the doc +
+ * Drive remain durable, so a missing snapshot only costs a slow next open. */
+async function persistSnapshotOnce(): Promise<void> {
+  if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
+  const doc = currentDoc;
+  const key = familyKey;
+  try {
+    const start = performance.now();
+    const deltas = buildFullProjection(doc);
+    await cache.persistProjectionSnapshot(key, { version: cache.SNAPSHOT_VERSION, deltas });
+    sink.perf('snapshot.persist', performance.now() - start, {
+      perf_entity_count: countEntities(doc),
+    });
+  } catch (e) {
+    // Console is the worker's only local channel; not a durability-banner event —
+    // the snapshot is display-only, so its loss never risks data.
+    console.warn('[applyAndProject] projection snapshot persist failed (non-fatal)', e);
+  }
+}
+
+/**
+ * Load + push the display-only projection snapshot for a fast first paint. Installs
+ * NO `currentDoc` (the authoritative rebuild owns that). Any failure — absent,
+ * version mismatch, or decrypt/parse — returns `{ hit: false, reason }` after
+ * logging, so the caller falls back to the rebuild and the main thread never sees a
+ * raw throw. Opens the cache DB itself (idempotent) so it does not depend on the
+ * rebuild RPC having run first.
+ */
+async function loadProjectionSnapshot(id: string): Promise<{ hit: boolean; reason?: string }> {
+  try {
+    await cache.initPersistenceDB(id);
+    const key = requireKey('loadProjectionSnapshot');
+    const snap = await time2('snapshot.workerLoad', () => cache.loadProjectionSnapshot(key));
+    if (!snap) return { hit: false, reason: 'absent' };
+    if (snap.version !== cache.SNAPSHOT_VERSION) return { hit: false, reason: 'version' };
+    pushDeltas(snap.deltas);
+    return { hit: true };
+  } catch (e) {
+    console.warn('[applyAndProject] projection snapshot load failed — falling back', e);
+    return { hit: false, reason: 'error' };
+  }
 }
 
 /** Clear the durability banner after a successful write. */
@@ -279,6 +352,7 @@ export function initDoc(): { loaded: true } {
   currentDoc = migrateDoc(Automerge.init<FamilyDocument>());
   lastPersistedHeads = null; // fresh doc → first persist writes a base
   pushProjection(currentDoc);
+  scheduleSnapshotPersist();
   return { loaded: true };
 }
 
@@ -345,6 +419,7 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
   time('automerge.pushProjection', () => pushProjection(doc), {
     perf_entity_count: countEntities(doc),
   });
+  scheduleSnapshotPersist(); // refresh the fast-paint snapshot from the authoritative load
   return { loaded: true };
 }
 
@@ -368,7 +443,10 @@ export function mutate(op: MutationOp): {
   const { doc: next, result, delta } = applyMutation(doc, op);
   const changed = !headsEqual(before, headsOf(next));
   currentDoc = next;
-  if (changed) schedulePersist();
+  if (changed) {
+    schedulePersist();
+    scheduleSnapshotPersist(); // coarse-coalesced; won't fire per-mutate
+  }
   return { result, delta, changed };
 }
 
@@ -403,6 +481,7 @@ export async function mergeRemoteEnvelope(
     lastPersistedHeads = null; // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();
+    scheduleSnapshotPersist();
     const doc = currentDoc;
     time('automerge.pushProjection', () => pushProjection(doc), {
       perf_entity_count: countEntities(doc),
@@ -418,6 +497,7 @@ export async function mergeRemoteEnvelope(
   const merged = time('automerge.merge', () => mergeDocs(local, remote));
   currentDoc = merged.doc;
   schedulePersist();
+  scheduleSnapshotPersist();
   // projectionDeltasBetween is pure and derives fully (or null) BEFORE pushDeltas
   // streams anything → a derivation failure can never leave a half-updated
   // projection. `?? buildFullProjection` is NULLISH: an empty (but valid) delta
@@ -505,7 +585,12 @@ export async function flush(): Promise<void> {
     clearTimeout(persistTimer);
     persistTimer = null;
   }
+  if (snapshotTimer) {
+    clearTimeout(snapshotTimer);
+    snapshotTimer = null;
+  }
   await enqueuePersist();
+  await enqueueSnapshotPersist(); // leave a fresh fast-paint snapshot on backgrounding
 }
 
 /** Drop the current doc but KEEP the family key + cache (replace semantics: the
@@ -571,6 +656,8 @@ export async function dispatch(
       return { result: initDoc() };
     case 'initAndLoadCache':
       return { result: await initAndLoadCache(a.familyId as string) };
+    case 'loadProjectionSnapshot':
+      return { result: await loadProjectionSnapshot(a.familyId as string) };
     case 'openCache':
       return { result: await openCache(a.familyId as string) };
     case 'mutate': {
@@ -639,6 +726,9 @@ async function time2<T>(label: string, fn: () => Promise<T>, ctx?: PerfCtx): Pro
 export function __resetApplyAndProjectForTesting(): void {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = null;
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = null;
+  snapshotInFlight = Promise.resolve();
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;

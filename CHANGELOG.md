@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Performance
 
+- **The app now opens to your data almost instantly.** Opening a larger family file used to mean watching the loading animation for several seconds (5-10s, longer on older phones) while your encrypted data was rebuilt before anything appeared. beanies now shows your data straight away from a fast local snapshot, then quietly refreshes to the very latest in the background — the same orange bar across the top tells you when a refresh is in progress. Your data is unchanged, and the snapshot is stored encrypted on your device just like the rest of your local cache.
 - **Large family data files load and sync noticeably faster.** The app's underlying data engine was upgraded to a rewritten storage engine — the biggest gains are on large files, where opening and saving are meaningfully quicker. Your files are untouched and fully compatible: the upgrade rolls out safely even while some of your family's devices are still on the previous version.
 
 ### Fixed

@@ -105,6 +105,51 @@ describe('worker/applyAndProject', () => {
     expect(chunks.some((c) => c.delta.kind === 'settings')).toBe(true);
   });
 
+  describe('projection snapshot RPC (fast first paint)', () => {
+    it('loadProjectionSnapshot → {hit:false, reason:absent} and pushes nothing when none stored', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID); // opens the DB; empty
+      chunks = [];
+      const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
+      expect(res.result).toEqual({ hit: false, reason: 'absent' });
+      expect(chunks).toHaveLength(0);
+    });
+
+    it('flush persists a snapshot that loadProjectionSnapshot then streams (hit) — without a rebuild', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
+      await flush(); // folds the coarse snapshot persist
+      // Drop the current doc: prove the snapshot streams from cache alone (no doc).
+      reset();
+      configure({
+        pushChunk: (delta, final) => chunks.push({ delta, final }),
+        perf: (label) => perf.push(label),
+        cachePersistFailed: () => {},
+      });
+      setKey(key);
+      await cache.initPersistenceDB(FAMILY_ID);
+      chunks = [];
+
+      const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
+      expect(res.result).toEqual({ hit: true });
+      expect(__hasDocForTesting()).toBe(false); // display-only: installs NO doc
+      expect(chunks.filter((c) => c.final)).toHaveLength(1);
+      expect(bulkFor('accounts').flatMap((d) => d.entities.map(([id]) => id))).toContain('a1');
+    });
+
+    it('loadProjectionSnapshot → {hit:false, reason:version} on a shape-version mismatch', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      await cache.persistProjectionSnapshot(key, { version: 'stale:0', deltas: [] });
+      chunks = [];
+      const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
+      expect(res.result).toEqual({ hit: false, reason: 'version' });
+      expect(chunks).toHaveLength(0);
+    });
+  });
+
   it('mutate returns { result, delta } and a flush persists the doc to cache', async () => {
     setKey(key);
     await initAndLoadCache(FAMILY_ID); // opens the DB; empty → loaded:false

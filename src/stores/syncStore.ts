@@ -97,7 +97,7 @@ import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 import { raceTimeout } from '@/utils/timing';
-import { measureAsync } from '@/utils/perfTiming';
+import { measureAsync, record as recordPerf } from '@/utils/perfTiming';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import {
   type CreatePodResult,
@@ -1212,6 +1212,7 @@ export const useSyncStore = defineStore('sync', () => {
     activeFamilyId: string,
     options?: { preservePermissionState?: boolean }
   ): Promise<{ success: boolean }> {
+    let paintedFromSnapshot = false;
     try {
       // Import family key directly from base64 (not password-derived), post it to
       // the worker, then open the cache DB + load the cached doc + envelope.
@@ -1220,9 +1221,48 @@ export const useSyncStore = defineStore('sync', () => {
       const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(keyB64)));
       await docClient.setFamilyKey(fk);
 
-      const { loaded } = await docClient.initAndLoadCache(activeFamilyId);
+      // ADR-032 FAST FIRST PAINT: post the projection-snapshot RPC FIRST (it decrypts
+      // + streams the last projection in <1s, NO Automerge rebuild) and the
+      // authoritative rebuild SECOND — both BEFORE any paint. The serial worker FIFO
+      // then runs snapshot → rebuild, so a user mutation issued after the snapshot
+      // paints necessarily enqueues THIRD (after the rebuild installs the doc), and
+      // `requireDoc('mutate')` succeeds. The snapshot installs NO doc; the rebuild is
+      // the sole source of truth. See docs/plans/2026-08-12-app-open-instant-projection-snapshot.md.
+      const paintStart = performance.now();
+      const snapPromise = docClient.loadProjectionSnapshot(activeFamilyId);
+      const loadedPromise = docClient.initAndLoadCache(activeFamilyId);
+
+      try {
+        const snap = await snapPromise;
+        if (snap.hit) {
+          if (!options?.preservePermissionState) {
+            isConfigured.value = true; // show the data UI now, from the snapshot
+            needsPermission.value = true;
+          }
+          await reloadAllStores();
+          paintedFromSnapshot = true;
+          isBackgroundSyncing.value = true; // reuse the existing orange bar until authoritative
+          recordPerf('snapshot.hydrate', performance.now() - paintStart);
+          logEvent({ level: 'info', surface: 'open-snapshot', message: 'painted from snapshot' });
+        } else {
+          logEvent({
+            level: 'info',
+            surface: 'open-snapshot',
+            message: `snapshot miss (${snap.reason ?? 'unknown'}) — using rebuild`,
+          });
+        }
+      } catch (e) {
+        // The worker returns {hit:false} on any failure, so reaching here is unexpected.
+        console.warn('[syncStore] snapshot fast-paint skipped:', e);
+      }
+
+      // AUTHORITATIVE rebuild result — the existing state-setup flow, unchanged.
+      const { loaded } = await loadedPromise;
       const { envelope: cachedEnvelope } = await docClient.readEnvelope();
-      if (!cachedEnvelope || !loaded) return { success: false };
+      if (!cachedEnvelope || !loaded) {
+        if (paintedFromSnapshot) isBackgroundSyncing.value = false;
+        return { success: false };
+      }
 
       // Set up state. `replaceEnvelope` is the uniform entry point even
       // for cache loads where `envelope.value` is typically null and the
@@ -1236,13 +1276,25 @@ export const useSyncStore = defineStore('sync', () => {
       }
       lastSync.value = toISODateString(new Date());
 
+      // Authoritative re-hydrate: the Pinia stores are a COPY of the projection taken
+      // here, not a reactive binding, so this MUST run after the rebuild's overwrite —
+      // and the bar clears only after it (never on the raw projection overwrite).
       await reloadAllStores();
+      if (paintedFromSnapshot) {
+        isBackgroundSyncing.value = false;
+        logEvent({
+          level: 'info',
+          surface: 'open-snapshot',
+          message: 'authoritative landed, snapshot superseded',
+        });
+      }
       await reconcileDriveTokenForMember();
       // A real pod was loaded from cache — establish the podCreated invariant
       // (covers both the normal and preservePermissionState branches above).
       useAuthStore().markPodCreated();
       return { success: true };
     } catch (e) {
+      if (paintedFromSnapshot) isBackgroundSyncing.value = false;
       console.warn('[syncStore] loadFromPersistenceCache failed:', e);
       return { success: false };
     }

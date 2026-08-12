@@ -392,6 +392,7 @@ const ENVELOPE_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope', 'pers
 // timeout tier, and clone-safety are orthogonal and change for independent reasons.
 const RETRYABLE_METHODS = new Set([
   'initAndLoadCache',
+  'loadProjectionSnapshot',
   'openCache',
   'getHeads',
   'applyChanges',
@@ -820,6 +821,21 @@ export function initDoc(): Promise<{ loaded: true }> {
 export async function initAndLoadCache(familyId: string): Promise<{ loaded: boolean }> {
   currentFamilyId = familyId;
   return request('initAndLoadCache', { familyId });
+}
+
+/**
+ * Display-only FAST-PAINT path: push the persisted projection snapshot (if present +
+ * shape-compatible) so the UI paints in <1s, WITHOUT rebuilding the Automerge doc.
+ * The streamed chunks are applied by the existing `projection` signal handler and
+ * `docVersion` bumps on the final one — identical to `initAndLoadCache`'s push. Any
+ * failure resolves `{ hit: false, reason }` (never throws); the caller falls back to
+ * the authoritative rebuild. Installs no doc — the rebuild owns the source of truth.
+ */
+export async function loadProjectionSnapshot(
+  familyId: string
+): Promise<{ hit: boolean; reason?: string }> {
+  currentFamilyId = familyId;
+  return request('loadProjectionSnapshot', { familyId });
 }
 
 /** Open the family's cache DB WITHOUT loading a cached doc (create-family — the
