@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The fast-open really shows instantly now.** The instant-open change above was preparing your data in a fraction of a second, but the loading screen wasn't stepping aside to reveal it until the full background refresh had finished — so on a large file you still watched the placeholder for several seconds. The screen now lifts the moment your data is ready, with the refresh continuing quietly behind it.
 - **Closed a latent data-integrity bug in the data engine.** The previous engine carried a rare defect that could, in edge cases, corrupt saved data without any visible error. The upgraded engine fixes it. No known files were affected — this closes the possibility going forward.
 
 ## 2026-08-11
