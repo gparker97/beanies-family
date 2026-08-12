@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-12
+
+### Performance
+
+- **Large family data files load and sync noticeably faster.** The app's underlying data engine was upgraded to a rewritten storage engine — the biggest gains are on large files, where opening and saving are meaningfully quicker. Your files are untouched and fully compatible: the upgrade rolls out safely even while some of your family's devices are still on the previous version.
+
+### Fixed
+
+- **Closed a latent data-integrity bug in the data engine.** The previous engine carried a rare defect that could, in edge cases, corrupt saved data without any visible error. The upgraded engine fixes it. No known files were affected — this closes the possibility going forward.
+
 ## 2026-08-11
 
 ### Changed
