@@ -441,14 +441,25 @@ async function loadFamilyData() {
       initBreadcrumbs.push('path1a: trying persistence cache for fast start');
       console.log('[loadFamilyData] path1a: trying cache-first load...');
       try {
+        // The snapshot fast-paint fires `onEarlyPaint` the instant the stores hold the
+        // snapshot data (well under 1s), so the placeholder lifts THEN — not after the
+        // slow authoritative rebuild that `loadFromPersistenceCache` awaits internally.
+        let earlyPainted = false;
         const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId, {
           preservePermissionState: true,
+          onEarlyPaint: () => {
+            earlyPainted = true;
+            memberFilterStore.initialize();
+            isLoadingData.value = false; // Show snapshot data immediately
+          },
         });
         if (cacheResult.success) {
           initBreadcrumbs.push('path1a: cache loaded — showing data, background sync starting');
           console.log('[loadFamilyData] path1a: cache hit — instant data');
-          memberFilterStore.initialize();
-          isLoadingData.value = false; // Show real data immediately
+          if (!earlyPainted) {
+            memberFilterStore.initialize();
+            isLoadingData.value = false; // Show real data immediately (no snapshot → after rebuild)
+          }
           const result = await processRecurringItems();
           if (result.processed > 0) {
             await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
