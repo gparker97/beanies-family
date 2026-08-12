@@ -15,6 +15,7 @@ import {
   getHeads,
   getChangesSince,
   frameChanges,
+  buildFullProjection,
 } from '../docOps';
 import {
   initPersistenceDB,
@@ -28,6 +29,9 @@ import {
   clearCache,
   closeCacheDB,
   __resetCacheForTesting,
+  persistProjectionSnapshot,
+  loadProjectionSnapshot,
+  SNAPSHOT_VERSION,
 } from '../cache';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
@@ -221,5 +225,49 @@ describe('worker/cache', () => {
         .map(([id]) => id)
         .sort()
     ).toEqual(['a1', 'a2', 'a3', 'a4']);
+  });
+
+  // ─── Projection snapshot (display-only fast first paint) ────────────────────
+
+  describe('projection snapshot', () => {
+    const snapshotOf = (doc: ReturnType<typeof base>) => ({
+      version: SNAPSHOT_VERSION,
+      deltas: buildFullProjection(doc),
+    });
+
+    it('round-trips the projection snapshot through encrypt → cache → decrypt', async () => {
+      const doc = setAccount(setAccount(base(), 'a1', 10), 'a2', 20);
+      const snap = snapshotOf(doc);
+
+      await persistProjectionSnapshot(key, snap);
+      const loaded = await loadProjectionSnapshot(key);
+
+      expect(loaded).toEqual(snap);
+      expect(loaded!.version).toBe(SNAPSHOT_VERSION);
+    });
+
+    it('returns null when no snapshot has been written (clean miss)', async () => {
+      expect(await loadProjectionSnapshot(key)).toBeNull();
+    });
+
+    it('THROWS on a wrong-key decrypt so the caller falls back (never a silent empty)', async () => {
+      await persistProjectionSnapshot(key, snapshotOf(setAccount(base(), 'a1', 1)));
+      const otherKey = await generateFamilyKey();
+      await expect(loadProjectionSnapshot(otherKey)).rejects.toThrow();
+    });
+
+    it('SNAPSHOT_VERSION is a stable `<rev>:<fingerprint>` string', () => {
+      expect(SNAPSHOT_VERSION).toMatch(/^\d+:\d+$/);
+    });
+
+    it('is dropped by clearCache (whole-DB delete), like every other cache row', async () => {
+      await persistProjectionSnapshot(key, snapshotOf(setAccount(base(), 'a1', 1)));
+      expect(await loadProjectionSnapshot(key)).not.toBeNull();
+
+      await clearCache(FAMILY_ID);
+      await initPersistenceDB(FAMILY_ID);
+
+      expect(await loadProjectionSnapshot(key)).toBeNull();
+    });
   });
 });
