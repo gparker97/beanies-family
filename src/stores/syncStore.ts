@@ -1210,7 +1210,7 @@ export const useSyncStore = defineStore('sync', () => {
   async function loadFromPersistenceCache(
     keyB64: string,
     activeFamilyId: string,
-    options?: { preservePermissionState?: boolean }
+    options?: { preservePermissionState?: boolean; onEarlyPaint?: () => void }
   ): Promise<{ success: boolean }> {
     let paintedFromSnapshot = false;
     try {
@@ -1244,6 +1244,10 @@ export const useSyncStore = defineStore('sync', () => {
           isBackgroundSyncing.value = true; // reuse the existing orange bar until authoritative
           recordPerf('snapshot.hydrate', performance.now() - paintStart);
           logEvent({ level: 'info', surface: 'open-snapshot', message: 'painted from snapshot' });
+          // Release the caller's loading gate NOW — the stores hold the snapshot data.
+          // Without this the view stays on the placeholder until the (slow) authoritative
+          // rebuild below resolves, which is exactly the wait the snapshot exists to avoid.
+          options?.onEarlyPaint?.();
         } else {
           logEvent({
             level: 'info',
