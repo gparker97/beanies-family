@@ -118,7 +118,8 @@ export type CompleteAutoLoadResult =
 // ─── Typed errors ─────────────────────────────────────────────────────────
 
 /**
- * Thrown by `decryptBeanpodPayload` when the decrypted bytes don't load as
+ * Thrown by the worker's `loadAndVerify` (`worker/docOps.ts`) when the decrypted
+ * bytes don't load as
  * a usable Automerge document. Catches silent V4-envelope-valid-but-payload-
  * corrupt cases (the Shaun-on-iOS failure mode).
  *

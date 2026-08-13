@@ -57,6 +57,11 @@ import {
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
+import {
+  bump as bumpOpenCycle,
+  noteSnapshot as noteOpenCycleSnapshot,
+  endOpen,
+} from '@/services/telemetry/openCycle';
 import { slackNotify } from '@/utils/slackNotify';
 import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
@@ -890,9 +895,28 @@ export const useSyncStore = defineStore('sync', () => {
       // If we already have a family key, the worker decrypts + merges/adopts.
       if (familyKey.value) {
         try {
+          // FAIL-SAFE DEFAULTS. This block is shared by the merge AND replace
+          // branches, and the replace branch goes through
+          // `replaceDocWithCacheRecovery`, which returns nothing — so `changed`
+          // is genuinely unknown there. Defaulting both to `true` means an
+          // unknown outcome re-projects and re-uploads exactly as it does today;
+          // only the merging branch, which has real heads-derived answers, is
+          // allowed to narrow them to `false`.
+          let changed = true;
+          let dirty = true;
           if (merging) {
             // CRDT merge remote into the worker's doc.
-            await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
+            const mergeResult = await docClient.mergeRemoteEnvelope(
+              remoteEnvelope,
+              remoteEnvelope.familyId
+            );
+            // `?? true` is deliberate, not defensive noise: an absent field means
+            // we do not KNOW the outcome, and both unknowns must resolve to the
+            // safe direction — re-project rather than show stale data, re-upload
+            // rather than drop a local change. (It also keeps older/partial test
+            // doubles honest instead of silently disabling the reload.)
+            changed = mergeResult.changed ?? true;
+            dirty = mergeResult.dirty ?? true;
           } else {
             // Replace: adopt remote (+ recover any unsynced cache) to prevent loss.
             const famId = useFamilyContextStore().activeFamilyId;
@@ -911,23 +935,37 @@ export const useSyncStore = defineStore('sync', () => {
           const merged = replaceEnvelope(remoteEnvelope);
           syncService.setFamilyKey(familyKey.value!, merged);
 
-          // Prevent next doSave() from re-fetching what we just loaded
-          const loadedTs = await syncService.getFileTimestamp();
-          if (loadedTs) syncService.setLastKnownFileTimestamp(loadedTs);
+          // NOTE: no `getFileTimestamp()` call here. `syncService.load()` already
+          // captured the file's timestamp from the same source moments ago (see its
+          // post-read capture); re-reading it was a second network round-trip that
+          // set the same variable to the same value.
 
           lastSync.value = toISODateString(new Date());
-          await reloadAllStores();
+
+          if (changed) await reloadAllStores();
 
           if (merging) {
-            // CRDT merges can produce duplicate recurring transactions
-            // (same recurringItemId + date, different UUIDs from different actors).
-            // Clean them up before saving back.
-            const dupsRemoved = await deduplicateRecurringTransactions();
-            if (dupsRemoved > 0) {
-              await reloadAllStores();
+            // Only when the merge actually moved the doc: on a no-op merge the
+            // projection is already current, so re-projecting ~21 stores and
+            // re-scanning for duplicates is pure work for an unchanged result.
+            if (changed) {
+              // CRDT merges can produce duplicate recurring transactions
+              // (same recurringItemId + date, different UUIDs from different actors).
+              // Clean them up before saving back.
+              const dupsRemoved = await deduplicateRecurringTransactions();
+              if (dupsRemoved > 0) {
+                await reloadAllStores();
+              }
             }
-            // After merge, save back to persist our local changes
-            syncService.triggerDebouncedSave();
+            // Re-upload only if the converged doc still carries local changes the
+            // remote lacks. This is a CONSISTENCY fix, not the write-coalescing the
+            // ADR-032 addendum forbids: `dirty === false` means local and remote
+            // already agree, so the write would publish nothing. The other three
+            // save call sites (`replaceDocWithCacheRecovery`, `hydrateFromEnvelope`,
+            // `syncService.fetchAndMergeRemote`) have always gated on `dirty`; this
+            // one was the outlier. Post-merge dedup mutations still save on their
+            // own via `docClient.mutate` → `localChangeHandler`.
+            if (dirty) syncService.triggerDebouncedSave();
           }
 
           if (syncService.getProviderType() === 'google_drive') {
@@ -1234,6 +1272,7 @@ export const useSyncStore = defineStore('sync', () => {
 
       try {
         const snap = await snapPromise;
+        noteOpenCycleSnapshot(snap.hit); // no-op outside an open window
         if (snap.hit) {
           if (!options?.preservePermissionState) {
             isConfigured.value = true; // show the data UI now, from the snapshot
@@ -1314,7 +1353,7 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Verify a freshly-written envelope: read it back from the provider, parse,
    * decrypt with the same family key, and ensure the resulting Automerge doc
-   * materializes cleanly (`decryptBeanpodPayload` throws `CorruptPayloadError`
+   * materializes cleanly (the worker's `loadAndVerify` throws `CorruptPayloadError`
    * if the bytes are bad — Shaun-class corruption).
    *
    * Throws on any inconsistency. Caller classifies the failure as 'verify'.
@@ -1421,7 +1460,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function classifyCreateFailure(step: CreatePodFailureReason, e: unknown): CreatePodFailureReason {
     // `verify` is also signalled by the typed `CorruptPayloadError` thrown
-    // from `decryptBeanpodPayload` — if we see it anywhere, it's a verify
+    // from the worker's `loadAndVerify` — if we see it anywhere, it's a verify
     // failure regardless of the step marker. (Defensive: the marker should
     // already be 'verify' by the time that throw happens.)
     if (e instanceof CorruptPayloadError) return 'verify';
@@ -2000,6 +2039,7 @@ export const useSyncStore = defineStore('sync', () => {
    * Reload all stores from the in-memory Automerge document.
    */
   async function reloadAllStores(): Promise<void> {
+    bumpOpenCycle('storeReload'); // no-op outside an open window
     isReloading = true;
     syncService.cancelPendingSave();
 
@@ -2198,7 +2238,14 @@ export const useSyncStore = defineStore('sync', () => {
    * Non-blocking — UI remains interactive throughout.
    */
   async function backgroundSyncFromFile(): Promise<void> {
-    if (isBackgroundSyncing.value) return;
+    if (isBackgroundSyncing.value) {
+      // A sync is already in flight. If an open handed us its telemetry window,
+      // close it here — otherwise it would stay open until the next `beginOpen`
+      // and be emitted as `open-abandoned`. No-op when there is no window (the
+      // header Refresh button and the deferred config-heal reach here too).
+      endOpen('open-complete', { detailSuffix: 'sync-already-in-flight' });
+      return;
+    }
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
@@ -2259,6 +2306,12 @@ export const useSyncStore = defineStore('sync', () => {
       if (!filePollingTimer) {
         startDeferredPolling();
       }
+      // Path 1a handed us the open-cycle terminal (see App.vue's loadFamilyData
+      // wrapper). This `finally` is the single close point for EVERY outcome —
+      // success, needs-password, network/auth failure, or a throw. No-op when no
+      // window is open, which is how the header Refresh button and the deferred
+      // config-heal reach this code without being counted as app opens.
+      endOpen('open-complete', { providerType: syncService.getProviderType() ?? undefined });
     }
   }
 

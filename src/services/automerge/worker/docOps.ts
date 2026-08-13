@@ -214,7 +214,8 @@ export function projectionDeltasBetween(
 /**
  * Load a decrypted binary as an Automerge doc, catching the "loads but the WASM
  * materializer blows up on first read" corruption at the boundary (the same
- * check the Drive read path has always had — `fileSync.decryptBeanpodPayload`).
+ * check the Drive read path has always had; this is now its ONLY home, the old
+ * main-thread `fileSync.decryptBeanpodPayload` copy having been deleted).
  * Does NOT migrate — the caller replaces/merges then migrates. Throws
  * `CorruptPayloadError` (reconstructed across `postMessage` via the protocol
  * error registry, so `instanceof` recovery dispatch on main keeps working).
