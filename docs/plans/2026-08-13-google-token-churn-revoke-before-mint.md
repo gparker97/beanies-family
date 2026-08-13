@@ -175,6 +175,27 @@ Before relying on instant self-recovery, run a one-off empirical check against a
 - **Pass 3 (Sustainability)**: Cut incidental complexity/coupling: dropped the separate per-token "already handed to revoke" marker in favour of a single dedup mechanism (endpoint idempotency); scoped the revoke helper to grant revokes only, explicitly leaving the two access-token epoch-discard sites alone rather than conflating two revoke semantics; resolved the queue "either/or" to a dedicated `revokeQueue.ts` sibling (offlineQueue is single-slot and shouldn't be generalized speculatively); made one dedicated handler the sole owner of the unified two-store write; replaced the toast gating flags threaded across App.vue + both components with a single `activeReconnectPrompt` selector (removes the both/neither failure class); and specified the single PR as six independently-revertable commits to bound the blast radius across the ~2.2k-line auth module and ~3.8k-line store.
 - **Pass 4 (Fresh-eyes sweep)**: Moved the revoke-retry queue off sessionStorage onto the **IndexedDB tier** (its own self-contained `idb` store, matching where refresh tokens already live in `fileHandleStore`) — it holds live token secrets, so a per-tab session tier was both a needless new security surface and less durable (lost on tab close); kept only offlineQueue's _trigger/coalescing_ contract. Added a cancel-safety caveat for the forceConsent seams and a standing note that cited line numbers are indicative-only and have drifted (locate seams by symbol). Propagated the persistence-tier correction through Requirement 3, Assumption 5, Approach A, Files Affected, Acceptance Criteria, and the Testing Plan (added a tab-close-survival assertion).
 
+## Outcome
+
+**Landed 2026-08-13 on `main` — the core fix (5 of the 6 changes). Commit 5 (unified consent) deliberately deferred to a focused follow-up (greg's call).**
+
+Shipped as branch `google-token-churn-fix` (7 commits), verified green (type-check + lint + **4255 tests** + `npm run build`):
+
+- **Revoke helper + IndexedDB revoke queue** (`googleRevoke.ts`, `revokeQueue.ts`) — idempotent, offline-durable, observable. Persisted in IndexedDB (not sessionStorage) per Pass 4.
+- **Drive revoke-before-mint** at `performPopupAuth`/`startRedirectAuth` (forceConsent-gated, before consent); two sign-out grant-revokes routed through the helper; `google-token-lifecycle` mint telemetry.
+- **Calendar revoke-before-mint** in `reconnect`; **Drive-safe guarded revoke** on disconnect (skip + `skipped` event when a live Drive grant shares the account).
+- **Silent self-recovery** — placed in the syncStore `onTokenPermanentlyExpired` subscriber, **deferred a macrotask** (not inside `performSilentRefresh` as first sketched): the callback fires synchronously while `attemptSilentRefresh`'s dedup is held, so an inline `tryReconnectSilently` would deadlock. Banner shows only if recovery fails.
+- **No auto-force-consent on account mismatch** — warn-once manual-switch toast instead; 5 tests updated.
+- Telemetry allowlist (client + Lambda mirror) + store-declaration runbook updated for the 5 new PII-free enum keys.
+
+**Two implementation-time discoveries the plan hadn't foreseen** (both fixed): a module init cycle `googleAuth → googleRevoke → revokeQueue → googleAuth` (broke it with a lazy `onTokenAcquired` import + fixed the telemetry import to the mockable index), and the self-recovery deadlock above.
+
+**Deferred — Commit 5 (unified Drive+Calendar reconnect consent).** Reading the completion machinery showed it needs a new `unified` grant threaded through the popup **and** redirect **and** native-deep-link **and** resume paths, plus a completion handler crossing the intentional Drive/Calendar boundary — and it is iOS-live-only. Scoped to its own focused pass rather than rushed at the tail of this session. The `activeReconnectPrompt` selector + one-prompt gating go with it. Notion #62 stays **In Progress** until it lands.
+
+**Not deployed.** Landed on `main`; deploy remains a manual, explicit step.
+
+**Still open (greg):** the revoke-breadth validation (does one programmatic revoke clear sibling grants?) — the fix is correct either way; it only decides whether stuck-user recovery is instant vs. settles over a cycle.
+
 ## Prompt Log
 
 > **No GitHub issue created** (per the Notion `github issue` = do-not-create directive). This plan is approved for direct implementation; full intake lives on Notion tracker #62.
