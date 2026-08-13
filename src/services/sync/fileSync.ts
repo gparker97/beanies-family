@@ -6,16 +6,9 @@
  * that can unwrap the family key. This replaces the V3 single-password model.
  */
 
-import {
-  decryptPayload,
-  deriveMemberKey,
-  unwrapFamilyKey,
-  SALT_LENGTH,
-} from '@/services/crypto/familyKeyService';
-import * as Automerge from '@automerge/automerge';
+import { deriveMemberKey, unwrapFamilyKey, SALT_LENGTH } from '@/services/crypto/familyKeyService';
 import { base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
-import { measureSync } from '@/utils/perfTiming';
 import { APP_VERSION } from '@/constants/appVersion';
 import type {
   BeanpodFileV4,
@@ -23,8 +16,6 @@ import type {
   WrappedPasskeyKey,
   InviteKeyPackage,
 } from '@/types/syncFileV4';
-import type { FamilyDocument } from '@/types/automerge';
-import { CorruptPayloadError } from '@/types/sync';
 
 /**
  * Create a V4 beanpod file envelope from the current Automerge document.
@@ -102,57 +93,6 @@ export function detectFileVersion(jsonString: string): '4.0' | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Decrypt the encrypted payload from a V4 envelope using the family key.
- * Returns the loaded Automerge document.
- *
- * Throws `CorruptPayloadError` if the decrypted bytes can't be loaded as
- * a usable Automerge document — catches the Shaun-class "envelope parses,
- * decrypt succeeds, but `automerge_materialize` blows up on first read"
- * failure mode at every read site (sync, load, resume).
- */
-export async function decryptBeanpodPayload(
-  envelope: BeanpodFileV4,
-  familyKey: CryptoKey
-): Promise<Automerge.Doc<FamilyDocument>> {
-  const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
-  const binary = await decryptPayload(familyKey, encrypted);
-  // Use Automerge.load() directly — NOT loadDoc() which has the side effect
-  // of replacing the in-memory currentDoc singleton. Callers that need to
-  // replace (replaceDoc) or merge (mergeDoc) do so explicitly after this returns.
-
-  let doc: Automerge.Doc<FamilyDocument>;
-  try {
-    // Timed: the remote-path deserialize (whole doc + history) — the first
-    // heavy synchronous step when a fetched .beanpod is merged in.
-    doc = measureSync('automerge.remoteLoad', () => Automerge.load<FamilyDocument>(binary), {
-      perf_doc_bytes: binary.byteLength,
-    });
-  } catch (e) {
-    throw new CorruptPayloadError(
-      `Automerge.load failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
-      'load',
-      envelope.familyId ?? null
-    );
-  }
-
-  // Materialize sanity check — `Automerge.load` can accept byte streams that
-  // are individually parseable but produce a doc whose first property read
-  // throws "Out of bounds table access" from the WASM materializer. Touching
-  // `familyMembers` (always a Record, never absent) forces the read.
-  try {
-    Object.keys(doc.familyMembers ?? {});
-  } catch (e) {
-    throw new CorruptPayloadError(
-      `Automerge materialize failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
-      'materialize',
-      envelope.familyId ?? null
-    );
-  }
-
-  return doc;
 }
 
 /**

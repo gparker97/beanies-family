@@ -106,6 +106,30 @@ let persistInFlight: Promise<void> = Promise.resolve();
  * per-mutate `inc:` path). */
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
 let snapshotInFlight: Promise<void> = Promise.resolve();
+/** Projection-snapshot cursor: heads of the doc whose projection is already in the
+ * snapshot row. Suppresses re-serializing + re-encrypting an identical projection.
+ * Advanced ONLY after a successful write (see `persistSnapshotOnce`) — an eager
+ * advance would let one transient IDB error silently disable snapshots for the whole
+ * session, since this function swallows its failures by design. */
+let lastSnapshotHeads: Heads | null = null;
+
+/**
+ * Null every in-memory, doc-derived cursor in one place.
+ *
+ * These cursors describe "what has already been written for the doc currently in
+ * memory". The moment that doc is replaced, dropped or reset they are lies, and a
+ * stale cursor is silent data loss (a skipped persist) or silent staleness (a
+ * skipped snapshot). There are five reset sites and now several cursors, so the
+ * "forgot one" bug is a matter of time — every site calls this instead.
+ *
+ * NOT for scope changes (opening a different family's DB): those clear the pending
+ * baseline explicitly at the DB-open entry points, because that is a different
+ * concern with a different correctness argument.
+ */
+function resetDocCursors(): void {
+  lastPersistedHeads = null;
+  lastSnapshotHeads = null;
+}
 
 /** Wire the sink once (worker startup / inline adapter init). Also registers the
  * photo attach/collect family here (not at module load) so it can't hit a
@@ -168,10 +192,27 @@ async function persistSnapshotOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
   const doc = currentDoc;
   const key = familyKey;
+  // Entry snapshot — everything below is computed from THIS doc, so a mutation
+  // landing mid-write cannot make us record the wrong heads (same discipline as
+  // `persistOnce`).
+  const captureHeads = headsOf(doc);
+
+  // Nothing has moved since the snapshot row was written, so re-serializing and
+  // re-encrypting the entire projection would produce byte-identical content.
+  // The standing win is the `pagehide` backgrounding flush, which until now
+  // re-wrote the whole projection on EVERY app background even when the user had
+  // only read. (The open-time double-persist this also removes largely disappears
+  // once the open-path Drive read is gated.)
+  if (lastSnapshotHeads && headsEqual(lastSnapshotHeads, captureHeads)) return;
+
   try {
     const start = performance.now();
     const deltas = buildFullProjection(doc);
     await cache.persistProjectionSnapshot(key, { version: cache.SNAPSHOT_VERSION, deltas });
+    // Advance ONLY on success, and only if the doc we captured is still the live
+    // one — this function swallows failures, so an eager or cross-doc advance
+    // would silently disable snapshots for the rest of the session.
+    if (currentDoc === doc) lastSnapshotHeads = captureHeads;
     sink.perf('snapshot.persist', performance.now() - start, {
       perf_entity_count: countEntities(doc),
     });
@@ -350,7 +391,7 @@ export function setKey(key: CryptoKey): void {
 /** Create a fresh empty document (create-family). Pushes the full projection. */
 export function initDoc(): { loaded: true } {
   currentDoc = migrateDoc(Automerge.init<FamilyDocument>());
-  lastPersistedHeads = null; // fresh doc → first persist writes a base
+  resetDocCursors(); // fresh doc → first persist writes a base, first snapshot writes fresh
   pushProjection(currentDoc);
   scheduleSnapshotPersist();
   return { loaded: true };
@@ -394,6 +435,9 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
   // cursor is DERIVED here from the reconstructed doc, never a stored value.
   const preHeads = headsOf(loaded.doc);
   currentDoc = migrateDoc(loaded.doc);
+  // A different doc is now live, so the snapshot cursor is stale. (The persist
+  // cursor is set per-branch below — it has a real derived value on the clean path.)
+  lastSnapshotHeads = null;
   if (loaded.recovered) {
     // A corrupt increment was skipped on load — rewrite a clean base to drop the
     // corrupt tail rows (base-write clears all increments). Immediate: dropping
@@ -452,15 +496,24 @@ export function mutate(op: MutationOp): {
 
 /**
  * Decrypt a fetched remote envelope and CRDT-merge it into the local doc.
- * Returns heads + heads-derived `dirty` (did the merge leave local changes the
- * converged doc must push back?). Pushes the full merged projection (chunked);
- * the caller resolves only after the final chunk → post-merge readers (e.g.
- * dedup) see the complete set. Persists the merged doc to cache.
+ * Returns heads plus two heads-derived booleans, which answer DIFFERENT questions
+ * and must not be conflated:
+ *   - `dirty`  — did the merge leave local changes the converged doc must push
+ *                BACK to the file? (drives the re-upload decision)
+ *   - `changed` — did the merge move OUR doc at all? (drives the re-projection
+ *                decision: when false, the projection the stores already hold is
+ *                still current, so re-projecting ~21 stores is pure waste)
+ * A no-op poll-merge is `{dirty:false, changed:false}`; adopting a remote into an
+ * empty slot is `{dirty:false, changed:true}` — nothing to push back, but the
+ * projection is brand new. Mirrors `applyChanges`'s existing `changed` contract.
+ * Pushes the full merged projection (chunked); the caller resolves only after the
+ * final chunk → post-merge readers (e.g. dedup) see the complete set. Persists the
+ * merged doc to cache.
  */
 export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   id: string | null
-): Promise<{ heads: Heads; dirty: boolean }> {
+): Promise<{ heads: Heads; dirty: boolean; changed: boolean }> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
     perf_doc_bytes: envelope.encryptedPayload.length,
@@ -478,7 +531,7 @@ export async function mergeRemoteEnvelope(
   // applyChanges) to deltas without the same diff+fallback guard.
   if (!currentDoc) {
     currentDoc = migrateDoc(remote);
-    lastPersistedHeads = null; // adopted a fresh doc → first persist writes a base
+    resetDocCursors(); // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();
     scheduleSnapshotPersist();
@@ -486,7 +539,10 @@ export async function mergeRemoteEnvelope(
     time('automerge.pushProjection', () => pushProjection(doc), {
       perf_entity_count: countEntities(doc),
     });
-    return { heads, dirty: false };
+    // `changed: true` — we adopted a document into an empty slot, so every
+    // consumer's projection is stale by definition, even though there is nothing
+    // to push back to the file (`dirty: false`).
+    return { heads, dirty: false, changed: true };
   }
 
   const local = currentDoc;
@@ -504,7 +560,13 @@ export async function mergeRemoteEnvelope(
   // set streams nothing rather than triggering a spurious full rebuild.
   const deltas = projectionDeltasBetween(currentDoc, localHeads, merged.heads);
   pushDeltas(deltas ?? buildFullProjection(currentDoc));
-  return { heads: merged.heads, dirty: merged.dirty };
+  // Reuses the same `headsEqual` the persist path uses, against the localHeads
+  // captured before the merge — so `changed` means precisely "our doc moved".
+  return {
+    heads: merged.heads,
+    dirty: merged.dirty,
+    changed: !headsEqual(localHeads, merged.heads),
+  };
 }
 
 /** Decrypt + materialize-check a fetched envelope WITHOUT installing it (verify
@@ -598,7 +660,7 @@ export async function flush(): Promise<void> {
  * into a stale one). Used when loading a file to REPLACE, not merge. */
 export function dropDoc(): void {
   currentDoc = null;
-  lastPersistedHeads = null;
+  resetDocCursors();
 }
 
 /** Drop the in-memory doc + cancel the debounce (sign-out). Does NOT delete the
@@ -612,7 +674,7 @@ export function reset(): void {
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;
-  lastPersistedHeads = null;
+  resetDocCursors();
 }
 
 /** Sign-out / family-switch: drop the doc AND close-then-delete the cache DB. */
@@ -627,7 +689,7 @@ export async function clearCache(id: string): Promise<void> {
 export function loadSnapshot(binary: Uint8Array): { loaded: true } {
   if (!import.meta.env.DEV) throw new Error('loadSnapshot is DEV-only');
   currentDoc = loadDoc(binary);
-  lastPersistedHeads = null; // fresh doc → first persist writes a base
+  resetDocCursors(); // fresh doc → first persist writes a base
   pushProjection(currentDoc);
   return { loaded: true };
 }
@@ -732,7 +794,7 @@ export function __resetApplyAndProjectForTesting(): void {
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;
-  lastPersistedHeads = null;
+  resetDocCursors();
   persistInFlight = Promise.resolve();
   sink = NOOP_SINK;
 }

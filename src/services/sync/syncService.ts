@@ -17,6 +17,7 @@ import * as docClient from '@/services/automerge/worker/docClient';
 import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { logEvent } from '@/services/telemetry';
+import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
@@ -977,6 +978,7 @@ async function doSave(): Promise<boolean> {
     // coalesce, skip, or reduce the frequency of this write without first
     // re-introducing a delta mechanism AND re-deriving the convergence argument,
     // or a peer can silently miss another device's edits.
+    bumpOpenCycle('driveWrite'); // counted per attempt; no-op outside an open window
     await currentProvider.write(fileContent);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
 
@@ -986,8 +988,22 @@ async function doSave(): Promise<boolean> {
       if (postWriteTimestamp) {
         lastKnownFileTimestamp = postWriteTimestamp;
       }
-    } catch {
-      // Non-critical — worst case we re-fetch on next save
+    } catch (e) {
+      // Not fatal — the next save re-fetches. But this is NOT "non-critical":
+      // a missed capture leaves `lastKnownFileTimestamp` behind the file we just
+      // wrote, so the next `fetchAndMergeRemote` re-downloads our own write.
+      // Never swallow it silently (it fed a 2026-08 investigation blind).
+      console.warn(
+        '[syncService] doSave: post-write getLastModified failed — next save will re-fetch our own write; check Drive token/network:',
+        e
+      );
+      logEvent({
+        level: 'warn',
+        surface: 'sync-save',
+        message: 'post-write timestamp capture failed — next save will re-fetch',
+        error: e,
+        context: { action: 'post-write-timestamp-failed', provider_type: currentProvider.type },
+      });
     }
 
     updateState({ isSyncing: false, lastError: null });
@@ -1043,6 +1059,7 @@ export async function load(): Promise<string | null> {
       }
     }
 
+    bumpOpenCycle('driveRead'); // counted per attempt; no-op outside an open window
     const text = await currentProvider.read();
 
     if (!text) {
@@ -1055,8 +1072,22 @@ export async function load(): Promise<string | null> {
     try {
       const fileTs = await currentProvider.getLastModified();
       if (fileTs) lastKnownFileTimestamp = fileTs;
-    } catch {
-      // Non-critical
+    } catch (e) {
+      // Not fatal — the comparison simply has no baseline and every caller then
+      // does a full read (the safe direction). But never swallow it: a silent
+      // failure here presents as "the app re-downloads the file every time" with
+      // no evidence anywhere.
+      console.warn(
+        '[syncService] load: getLastModified failed — no change-detection baseline, callers will do a full read; check Drive token/network:',
+        e
+      );
+      logEvent({
+        level: 'warn',
+        surface: 'sync-load',
+        message: 'post-read timestamp capture failed — no change-detection baseline',
+        error: e,
+        context: { action: 'post-read-timestamp-failed', provider_type: currentProvider.type },
+      });
     }
 
     updateState({ isSyncing: false, lastError: null });

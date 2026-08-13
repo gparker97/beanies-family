@@ -65,7 +65,8 @@ vi.mock('@/services/familyContext', () => ({
 }));
 // ADR-032: the worker owns decrypt/merge/cache/persist. syncStore drives it via
 // docClient. The resume/auto-load orchestrators under test call these RPCs; the
-// CorruptPayloadError that was previously thrown by fileSync.decryptBeanpodPayload
+// CorruptPayloadError that is thrown by the worker's loadAndVerify (the old
+// main-thread fileSync.decryptBeanpodPayload copy was deleted 2026-08-13)
 // now surfaces from docClient.mergeRemoteEnvelope (worker decrypt + materialize).
 vi.mock('@/services/automerge/worker/docClient', () => ({
   setFamilyKey: vi.fn(async () => {}),
@@ -391,7 +392,7 @@ describe('syncStore.completeAutoLoad', () => {
     });
     // ADR-032: decrypt + materialize-check moved into the worker; the corrupt
     // payload now surfaces from docClient.mergeRemoteEnvelope (via
-    // replaceDocWithCacheRecovery), not fileSync.decryptBeanpodPayload.
+    // replaceDocWithCacheRecovery), i.e. inside the worker, not on the main thread.
     vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(
       new CorruptPayloadError('Out of bounds', 'materialize', 'fam-resume-1')
     );
@@ -418,7 +419,13 @@ describe('syncStore.completeAutoLoad', () => {
       memberIds: ['m-1'],
     });
     vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: false }); // B never cached here
-    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], dirty: false });
+    // `changed: true` — the cache miss drops the doc, so the merge takes the
+    // fresh-adopt branch, which always installs a brand-new projection.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+      dirty: false,
+      changed: true,
+    });
 
     const syncStore = useSyncStore();
     preloadPendingFile(syncStore);
@@ -438,7 +445,12 @@ describe('syncStore.completeAutoLoad', () => {
       memberIds: ['m-1'],
     });
     vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true }); // this family's cache present
-    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], dirty: false });
+    // `changed: false` — cache and remote already agree, so this is a no-op merge.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+      dirty: false,
+      changed: false,
+    });
 
     const syncStore = useSyncStore();
     preloadPendingFile(syncStore);
@@ -446,5 +458,120 @@ describe('syncStore.completeAutoLoad', () => {
 
     expect(docClient.dropDoc).not.toHaveBeenCalled();
     expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Open-cycle gates (2026-08-13) ─────────────────────────────────────────────
+//
+// These live here rather than in a new file because this suite already builds the
+// exact harness they need — a family key unlocked via `completeAutoLoad`, a mocked
+// `docClient`, and a provider that serves a real envelope — and duplicating ~250
+// lines of mocks to re-create it would violate the project's DRY rule for the sake
+// of filename tidiness.
+//
+// What they lock: `loadFromFile({merge:true})` must re-project only when the merge
+// actually moved the doc, and re-upload only when local holds changes the remote
+// lacks. Both were unconditional before 2026-08-13, which is why every open — even
+// one where nothing had changed anywhere — re-projected ~21 stores and pushed a
+// full 2-3MB file back to Drive.
+describe('syncStore — open-cycle gates on the merge path', () => {
+  let pinia: Pinia;
+
+  beforeEach(async () => {
+    pinia = createPinia();
+    setActivePinia(pinia);
+    vi.clearAllMocks();
+    const ctx = useFamilyContextStore();
+    ctx.activeFamily = {
+      id: 'fam-resume-1',
+      name: 'LaFleur',
+      createdAt: '2026-05-10',
+      updatedAt: '2026-05-14',
+    };
+    mockProviderRead.mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+  });
+
+  /** Unlock a family key, then run the merge path with a given merge outcome. */
+  async function mergeWith(outcome: { dirty: boolean; changed: boolean }) {
+    const syncStore = useSyncStore();
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true });
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+      dirty: false,
+      changed: false,
+    });
+    syncStore.pendingEncryptedFile = {
+      envelope: JSON.parse(envelopeJsonFor('fam-resume-1', 'LaFleur')),
+      driveFileId: 'drive-file-abc',
+      driveFileName: 'LaFleur.beanpod',
+      driveAccountEmail: 'owner@example.com',
+    };
+    await syncStore.completeAutoLoad('right-pw');
+
+    const syncService = await import('@/services/sync/syncService');
+    vi.mocked(syncService.triggerDebouncedSave).mockClear();
+    // `load()` must return a real envelope or `loadFromFile` bails before the merge
+    // branch and the assertions below would pass vacuously.
+    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+    vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], ...outcome });
+
+    await syncStore.backgroundSyncFromFile();
+    // Guard against a vacuous pass: the merge branch MUST have run.
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalled();
+    return { syncStore, syncService };
+  }
+
+  it('does NOT re-upload when the merge left nothing to push back (dirty:false)', async () => {
+    const { syncService } = await mergeWith({ dirty: false, changed: false });
+    // A no-op write still costs a full saveDoc + encrypt + whole-file upload, and
+    // two clients doing it on one file is what produced the 2026-08-12 save-storm.
+    expect(syncService.triggerDebouncedSave).not.toHaveBeenCalled();
+  });
+
+  it('DOES re-upload when the converged doc still carries local changes (dirty:true)', async () => {
+    const { syncService } = await mergeWith({ dirty: true, changed: true });
+    // The invariant that matters more than the optimisation: a local change must
+    // always reach the file.
+    expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
+  });
+
+  it('re-uploads when the merge outcome is unknown (fail-safe default)', async () => {
+    const syncStore = useSyncStore();
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true });
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+      dirty: false,
+      changed: false,
+    });
+    syncStore.pendingEncryptedFile = {
+      envelope: JSON.parse(envelopeJsonFor('fam-resume-1', 'LaFleur')),
+      driveFileId: 'drive-file-abc',
+      driveFileName: 'LaFleur.beanpod',
+      driveAccountEmail: 'owner@example.com',
+    };
+    await syncStore.completeAutoLoad('right-pw');
+
+    const syncService = await import('@/services/sync/syncService');
+    vi.mocked(syncService.triggerDebouncedSave).mockClear();
+    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+    vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
+    // An older/partial worker or test double that omits the fields: "unknown"
+    // must resolve to the safe direction (upload), never to silently dropping it.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+    } as unknown as { heads: never[]; dirty: boolean; changed: boolean });
+
+    await syncStore.backgroundSyncFromFile();
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalled();
+    expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
   });
 });

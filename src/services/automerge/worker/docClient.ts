@@ -872,12 +872,18 @@ export function fireAndForgetMutate(op: MutationOp): void {
   });
 }
 
-/** Decrypt + merge a fetched remote envelope; returns heads + heads-derived dirty. */
+/**
+ * Decrypt + merge a fetched remote envelope. Returns heads plus two distinct
+ * heads-derived booleans: `dirty` (local holds changes to push BACK to the file)
+ * and `changed` (our doc moved, so consumers' projections are stale). See the
+ * worker-side doc-comment — conflating them causes either a lost upload or a
+ * pointless ~21-store re-projection.
+ */
 export function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   familyId: string | null,
   opts?: RequestOpts
-): Promise<{ heads: Heads; dirty: boolean }> {
+): Promise<{ heads: Heads; dirty: boolean; changed: boolean }> {
   return request('mergeRemoteEnvelope', { envelope, familyId }, opts);
 }
 

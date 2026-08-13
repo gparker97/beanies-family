@@ -20,6 +20,7 @@
  */
 
 import { logEvent } from '@/services/telemetry';
+import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 
 /** Console-log ops at/above this — filters sub-ms noise from hot shared utils. */
 const CONSOLE_FLOOR_MS = 1;
@@ -43,6 +44,20 @@ export interface PerfContext {
  * telemetry buffer. See ADR-032. Prefer `measureSync`/`measureAsync` in-process.
  */
 export function record(label: string, durationMs: number, ctx?: PerfContext): void {
+  // MUST be the first statement — ABOVE the CONSOLE_FLOOR_MS early return below.
+  // A sub-millisecond (or fake-timer-mocked) reconstruction would otherwise be
+  // dropped, and the "exactly one reconstruction per open" acceptance criterion
+  // would silently pass on a lie.
+  //
+  // This is also the ONLY correct place to count reconstructions: worker perf
+  // samples reach the main thread through TWO relays — `docClient` (worker realm)
+  // and `inlineBridge` (inline-fallback realm) — and both funnel into `record`.
+  // Counting at `docClient` alone reports zero on every inline-fallback device.
+  // No-ops inside the worker, where no open window exists.
+  if (label === 'automerge.cacheLoad' || label === 'automerge.remoteLoad') {
+    bumpOpenCycle('reconstruction');
+  }
+
   const ms = Math.round(durationMs);
   if (ms < CONSOLE_FLOOR_MS) return;
 
