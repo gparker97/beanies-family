@@ -164,6 +164,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'has_card_details',
   'wallet_count',
   'detail_field_count',
+  // Google token lifecycle (surface `google-token-lifecycle`, token-churn fix #62,
+  // 2026-08-13). PII-free closed enums — never a token value. Mirror of
+  // src/utils/diagnosticContext.ts.
+  'token_grant',
+  'token_op',
+  'token_outcome',
+  'token_reason',
+  'token_trigger',
 ]);
 
 function getHeaders(event) {
