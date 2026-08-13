@@ -11,25 +11,21 @@
  *      member's own OAuth response; we never infer from indirect signals.
  *   2. **Match** — member's `googleAccountEmail` equals the OAuth email.
  *      No-op.
- *   3. **Mismatch** — silent self-correction. Wipe Google session state
- *      and force a fresh consent screen, pre-filling the chooser with
- *      the *expected* email via `login_hint`. A subtle toast informs
- *      the user that the account was switched.
+ *   3. **Mismatch** — surface a manual "switch account" toast (once). We do
+ *      NOT auto-force a re-consent: that silently MINTED a fresh refresh token
+ *      on every mismatched (often background) acquisition and was a real driver
+ *      of Google's per-account token-cap churn (#62). The user re-consents on an
+ *      explicit gesture via Settings → Reconnect / "Switch Google account"
+ *      (`armAccountSwitch`).
  *
- * Re-entry guard prevents the assertion → re-consent → assertion loop
- * from spinning if the user keeps picking the wrong account at Google's
- * chooser.
+ * A warn-once latch keeps a repeating silent refresh from spamming the toast.
  *
  * The "switch Google account" flow opts out of assertion via
  * `armAccountSwitch()` — the next acquisition's email is treated as
  * the new ground truth and written to the member record.
  */
 
-import {
-  onTokenAcquired,
-  clearGoogleSessionState,
-  requestAccessToken,
-} from '@/services/google/googleAuth';
+import { onTokenAcquired } from '@/services/google/googleAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { showToast } from '@/composables/useToast';
@@ -38,10 +34,10 @@ import { useTranslationStore } from '@/stores/translationStore';
 let registered = false;
 let unsubscribe: (() => void) | null = null;
 
-// Re-entry guard — prevents an infinite assertion loop if the user keeps
-// picking the wrong account at Google's chooser. Reset to false when the
-// next acquisition either matches or is consumed by an account switch.
-let correcting = false;
+// Warn-once latch — a mismatched session fires the subscriber on every
+// (often silent) acquisition; show the manual-switch toast only once. Reset to
+// false when the next acquisition matches or is consumed by an account switch.
+let mismatchWarned = false;
 
 // One-shot flag set by the "switch Google account" flow. When set, the
 // next *interactive* token acquisition's email is written to the member
@@ -124,7 +120,7 @@ export function registerGoogleAccountAssertion(): void {
     // as a mismatch and trigger a re-consent loop.
     if (interactive && isPendingAccountSwitch()) {
       disarmAccountSwitch();
-      correcting = false;
+      mismatchWarned = false;
       await fam.updateMember(memberId, { googleAccountEmail: email });
       return;
     }
@@ -137,43 +133,29 @@ export function registerGoogleAccountAssertion(): void {
 
     // Match — happy path.
     if (member.googleAccountEmail === email) {
-      correcting = false;
+      mismatchWarned = false;
       return;
     }
 
-    // Mismatch.
-    if (correcting) {
-      // We've already attempted a re-consent in this cycle and the user
-      // (or Google) is still returning the wrong account. Stop the loop;
-      // surface a one-time toast so the user knows what's happening.
-      correcting = false;
-      const t = useTranslationStore();
-      showToast(
-        'warning',
-        t.t('auth.accountMismatchTitle'),
-        t.t('auth.accountMismatchBody').replace('{email}', member.googleAccountEmail)
-      );
-      return;
-    }
-
-    correcting = true;
+    // Mismatch — the acquired token is for a DIFFERENT Google account than this
+    // member is bound to. Do NOT auto-force a re-consent here (#62): that silently
+    // MINTED a fresh refresh token on every mismatched background acquisition,
+    // which was a real driver of Google's per-account 100-token-cap churn. Surface
+    // a manual switch instead — the user resolves it via Settings → Reconnect /
+    // "Switch Google account" (armAccountSwitch), which re-consents on an explicit
+    // gesture. Warn once so a repeating silent refresh doesn't spam the toast.
+    if (mismatchWarned) return;
+    mismatchWarned = true;
     console.warn(
-      `[accountAssertion] Token returned ${email}, expected ${member.googleAccountEmail}. Forcing re-consent.`
+      `[accountAssertion] Token returned ${email}, expected ${member.googleAccountEmail}. ` +
+        `Surfacing manual switch (no auto re-consent).`
     );
-    try {
-      await clearGoogleSessionState();
-      await requestAccessToken({
-        forceConsent: true,
-        loginHint: member.googleAccountEmail,
-      });
-      // The next acquisition will re-fire this subscriber with either
-      // the corrected email (match — correcting cleared above) or the
-      // same wrong email again (the re-entry guard above stops the loop).
-    } catch (e) {
-      correcting = false;
-      console.warn('[accountAssertion] Re-consent failed:', e);
-      // Silent — user can retry via Settings → Reconnect.
-    }
+    const t = useTranslationStore();
+    showToast(
+      'warning',
+      t.t('auth.accountMismatchTitle'),
+      t.t('auth.accountMismatchBody').replace('{email}', member.googleAccountEmail)
+    );
   });
 }
 
@@ -185,7 +167,7 @@ export function _resetGoogleAccountAssertionForTests(): void {
   if (unsubscribe) unsubscribe();
   unsubscribe = null;
   registered = false;
-  correcting = false;
+  mismatchWarned = false;
   pendingAccountSwitch = false;
   writePendingSwitchToStorage(false);
 }

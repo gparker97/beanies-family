@@ -115,38 +115,18 @@ describe('googleAccountAssertion', () => {
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
 
-  it('forces a fresh consent with login_hint on mismatch (silent self-correction)', async () => {
+  it('surfaces a manual-switch toast on mismatch — never auto-forces consent (#62)', async () => {
     familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
     assertionModule.registerGoogleAccountAssertion();
 
     await fireToken('b@example.com');
 
-    expect(mockClearGoogleSessionState).toHaveBeenCalled();
-    expect(mockRequestAccessToken).toHaveBeenCalledWith({
-      forceConsent: true,
-      loginHint: 'a@example.com',
-    });
-    // Member record should NOT be overwritten on mismatch.
+    // The whole point of #62: no silent mint on a mismatched acquisition.
+    expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
+    expect(mockRequestAccessToken).not.toHaveBeenCalled();
+    // Member record NOT overwritten on mismatch.
     expect(mockUpdateMember).not.toHaveBeenCalled();
-    // Toast should not fire on the first mismatch — we re-consent silently.
-    expect(mockShowToast).not.toHaveBeenCalled();
-  });
-
-  it('stops the loop and shows a toast if the next acquisition still mismatches', async () => {
-    familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
-    assertionModule.registerGoogleAccountAssertion();
-
-    // First mismatch → re-consent fires
-    await fireToken('b@example.com');
-    expect(mockClearGoogleSessionState).toHaveBeenCalledTimes(1);
-    expect(mockRequestAccessToken).toHaveBeenCalledTimes(1);
-
-    // Second acquisition still wrong (user picked B again at the chooser)
-    await fireToken('b@example.com');
-    // Re-entry guard prevents another forced consent.
-    expect(mockClearGoogleSessionState).toHaveBeenCalledTimes(1);
-    expect(mockRequestAccessToken).toHaveBeenCalledTimes(1);
-    // Toast surfaces the mismatch with the expected email.
+    // A manual-switch toast surfaces with the expected (bound) email.
     expect(mockShowToast).toHaveBeenCalledWith(
       'warning',
       'auth.accountMismatchTitle',
@@ -154,20 +134,29 @@ describe('googleAccountAssertion', () => {
     );
   });
 
-  it('clears the re-entry guard when an acquisition matches, allowing future corrections', async () => {
+  it('warns once on repeated mismatches — no toast spam, no re-consent (#62)', async () => {
     familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
     assertionModule.registerGoogleAccountAssertion();
 
-    // Mismatch → re-consent
     await fireToken('b@example.com');
-    expect(mockRequestAccessToken).toHaveBeenCalledTimes(1);
+    await fireToken('b@example.com');
 
-    // Match → clears guard
-    await fireToken('a@example.com');
+    expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
+    expect(mockRequestAccessToken).not.toHaveBeenCalled();
+    // Toast fires exactly once despite two mismatched acquisitions.
+    expect(mockShowToast).toHaveBeenCalledTimes(1);
+  });
 
-    // Future mismatch should trigger re-consent again.
-    await fireToken('c@example.com');
-    expect(mockRequestAccessToken).toHaveBeenCalledTimes(2);
+  it('resets the warn-once latch on a match, so a later mismatch warns again (#62)', async () => {
+    familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
+    assertionModule.registerGoogleAccountAssertion();
+
+    await fireToken('b@example.com'); // mismatch → 1st toast
+    await fireToken('a@example.com'); // match → resets the latch
+    await fireToken('c@example.com'); // mismatch again → 2nd toast
+
+    expect(mockShowToast).toHaveBeenCalledTimes(2);
+    expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
 
   it('armAccountSwitch + next acquisition writes the new email to the member record', async () => {
@@ -197,10 +186,16 @@ describe('googleAccountAssertion', () => {
     familyMembers[0]!.googleAccountEmail = 'c@example.com';
 
     // Next acquisition with a different email should be treated as a
-    // mismatch (assertion path), NOT as another switch.
+    // mismatch (assertion path), NOT as another switch → manual-switch toast,
+    // never an auto re-consent.
     await fireToken('d@example.com');
-    expect(mockClearGoogleSessionState).toHaveBeenCalled();
-    expect(mockRequestAccessToken).toHaveBeenCalled();
+    expect(mockShowToast).toHaveBeenCalledWith(
+      'warning',
+      'auth.accountMismatchTitle',
+      expect.stringContaining('c@example.com')
+    );
+    expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
+    expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
 
   it('fails open when userinfo email is null (skips assertion, no errors)', async () => {
@@ -232,12 +227,18 @@ describe('googleAccountAssertion', () => {
     assertionModule.disarmAccountSwitch();
 
     // A different email now — should be treated as a mismatch (assert,
-    // not a switch) because the flag was disarmed before consumption.
+    // not a switch) because the flag was disarmed before consumption →
+    // manual-switch toast, never an auto re-consent.
     await fireToken('b@example.com');
 
     expect(mockUpdateMember).not.toHaveBeenCalled();
-    expect(mockClearGoogleSessionState).toHaveBeenCalled();
-    expect(mockRequestAccessToken).toHaveBeenCalled();
+    expect(mockShowToast).toHaveBeenCalledWith(
+      'warning',
+      'auth.accountMismatchTitle',
+      expect.stringContaining('a@example.com')
+    );
+    expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
+    expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
 
   it('background silent refresh does NOT consume the pending account-switch flag', async () => {
