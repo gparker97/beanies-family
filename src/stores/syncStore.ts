@@ -49,11 +49,14 @@ import {
   isUserCancellation,
   whenRedirectAuthSettled,
   tryGetSilentToken,
+  getGoogleAccountEmail,
 } from '@/services/google/googleAuth';
 import {
   registerDriveTokenMirror,
   reconcileDriveTokenWithDoc,
+  tryReconnectSilently,
 } from '@/services/google/driveTokenRecovery';
+import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -3481,15 +3484,70 @@ export const useSyncStore = defineStore('sync', () => {
    *   didn't catch upstream: the next time auth is healthy, the UI
    *   reflects that without user action.
    */
+  // One-at-a-time guard for the silent self-recovery below.
+  let selfRecoveryInFlight = false;
+
+  /**
+   * Attempt a SILENT recovery from a permanent Google auth failure before the
+   * reconnect banner is shown (#62). Adopts a fresh Drive refresh token another
+   * device already mirrored into the .beanpod (`tryReconnectSilently`) — no
+   * popup, no redirect, no interactive Google UI.
+   *
+   * Deferred to a macrotask on purpose: `onTokenPermanentlyExpired` fires
+   * SYNCHRONOUSLY from inside the failing `performSilentRefresh`, while its
+   * `attemptSilentRefresh` dedup (`pendingSilentRefresh`) is still set —
+   * `tryReconnectSilently` re-enters `attemptSilentRefresh`, so running it inline
+   * would await the very refresh that just failed (deadlock). The `setTimeout`
+   * lets that unwind first. On success the existing `onTokenAcquired` handler
+   * auto-clears everything; only on failure do we raise the banner.
+   */
+  function attemptSilentSelfRecovery(): void {
+    if (selfRecoveryInFlight) return;
+    selfRecoveryInFlight = true;
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const recovered = await tryReconnectSilently(getGoogleAccountEmail());
+          logTokenLifecycle({
+            grant: 'drive',
+            op: 'recovery',
+            outcome: recovered ? 'ok' : 'failed',
+            trigger: 'recovery',
+          });
+          // recovered === true → `tryReconnectSilently` fired notifyTokenAcquired,
+          // which already cleared any banner + refreshed state. Nothing to do.
+          if (!recovered && storageProviderType.value === 'google_drive') {
+            showGoogleReconnect.value = true;
+          }
+        } catch (e) {
+          // Never leave the user stuck silently — surface the prompt on any error.
+          if (storageProviderType.value === 'google_drive') showGoogleReconnect.value = true;
+          reportError({
+            surface: 'google-self-recovery',
+            severity: 'warning',
+            message: 'silent self-recovery threw; showing reconnect banner',
+            error: e instanceof Error ? e : new Error(String(e)),
+          });
+        } finally {
+          selfRecoveryInFlight = false;
+        }
+      })();
+    }, 0);
+  }
+
   function setupTokenExpiryHandler(): void {
     // Drive is active here — register the best-effort refresh-token → beanpod
     // mirror (idempotent; only ever fires on an interactive token acquisition).
     registerDriveTokenMirror();
     if (!tokenExpiryUnsub) {
       tokenExpiryUnsub = onTokenPermanentlyExpired(() => {
-        if (storageProviderType.value === 'google_drive') {
-          showGoogleReconnect.value = true;
-        }
+        if (storageProviderType.value !== 'google_drive') return;
+        // Self-recovery (#62): before surfacing the reconnect banner, try to heal
+        // silently — adopt a fresh Drive token another device already mirrored into
+        // the .beanpod. The banner shows ONLY if that yields nothing, so a healthy
+        // multi-device user never sees a prompt they didn't need. See
+        // attemptSilentSelfRecovery for why it is deferred.
+        attemptSilentSelfRecovery();
       });
     }
     if (!tokenAcquiredUnsub) {

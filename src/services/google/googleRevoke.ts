@@ -24,7 +24,7 @@ import type { LogLevel } from '@/services/telemetry/logEvent';
 import { postRevoke, enqueueRevoke } from '@/services/sync/revokeQueue';
 
 export type TokenGrant = 'drive' | 'calendar';
-export type TokenOp = 'mint' | 'revoke';
+export type TokenOp = 'mint' | 'revoke' | 'recovery';
 /** `skipped` = deliberately not attempted (e.g. a shared live Drive grant guard). */
 export type TokenOutcome = 'ok' | 'queued' | 'failed' | 'skipped';
 
