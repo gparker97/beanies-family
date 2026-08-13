@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The iPhone app now shows the Google account you're actually signed in with.** On iOS the app could get stuck displaying (and checking against) a different Google account than the one you signed in with - even after signing out and back in - which triggered a repeated "wrong Google account" message. The app now always confirms your account against your live session, so it tracks the right one.
 - **Your Google sign-in stays connected instead of asking you to reconnect over and over.** Heavy users across several devices could find themselves pushed through a full Google sign-in on almost every open — sometimes a Drive prompt _and_ a separate Calendar prompt. The cause was that every reconnect quietly created a brand-new Google authorisation without ever retiring the old one, until Google's own per-account limit kicked in and started cancelling the working one. beanies now retires the old authorisation before creating its replacement, so the count stays flat and the loop stops. If your session ever does break, the app now tries to heal itself silently — quietly picking up a fresh connection another of your devices already has — before it ever shows you a reconnect prompt, and an account-mismatch no longer silently churns through authorisations. (Unifying the two separate reconnect prompts into a single one is a follow-up.)
 
 ### Performance
