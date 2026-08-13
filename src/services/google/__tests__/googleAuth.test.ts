@@ -1804,6 +1804,34 @@ describe('googleAuth (PKCE)', () => {
       googleAuth.setGoogleAccountEmail('test@example.com');
       expect(googleAuth.getGoogleAccountEmail()).toBe('test@example.com');
     });
+
+    it('re-verifies the email against the token instead of returning a stale primed value (#62)', async () => {
+      // A primed guess (setGoogleAccountEmail, from persisted provider config) can
+      // name a DIFFERENT Google account than the token belongs to — e.g. the file
+      // owner on a shared family. It must NOT masquerade as the verified account
+      // (the iOS "wrong account" toast). Only a userinfo response for the token proves it.
+      googleAuth.setGoogleAccountEmail('owner@example.com'); // stale prime
+      globalThis.fetch = vi
+        .fn()
+        .mockResolvedValue({ ok: true, json: async () => ({ email: 'real@example.com' }) });
+
+      expect(await googleAuth.fetchGoogleUserEmail('token-A')).toBe('real@example.com');
+      expect(googleAuth.getGoogleAccountEmail()).toBe('real@example.com');
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+      // Same token → served from the verified cache (no second network call).
+      expect(await googleAuth.fetchGoogleUserEmail('token-A')).toBe('real@example.com');
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+      // A DIFFERENT token (account switch) → re-verifies against the new token.
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'switched@example.com' }),
+      });
+      expect(await googleAuth.fetchGoogleUserEmail('token-B')).toBe('switched@example.com');
+      expect(googleAuth.getGoogleAccountEmail()).toBe('switched@example.com');
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('session-epoch guard (post-sign-out zombie tokens)', () => {
