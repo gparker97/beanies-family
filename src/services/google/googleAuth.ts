@@ -87,8 +87,12 @@ let currentFamilyId: string | null = null;
 // meant for the second verifier, causing "Invalid code verifier" errors.
 let pendingAuthPromise: Promise<string> | null = null;
 
-// Cached Google account email
+// Cached Google account email. `cachedEmailToken` records the ACCESS TOKEN the
+// email was verified against via userinfo — so a primed guess (from persisted
+// provider config, which may name a DIFFERENT account, e.g. the file owner) is
+// never mistaken for the currently-signed-in account. See `fetchGoogleUserEmail`.
 let cachedEmail: string | null = null;
+let cachedEmailToken: string | null = null;
 
 // Session-epoch guard. Bumped exactly once per session teardown
 // (`clearGoogleSessionState` / `revokeToken`). Each async token-acquisition seam
@@ -1609,6 +1613,7 @@ function clearTokenState(): void {
   expiresAt = 0;
   currentRefreshToken = null;
   cachedEmail = null;
+  cachedEmailToken = null;
   consecutiveSilentRefreshFailures = 0;
   persistFailureCounter(0);
 
@@ -1784,18 +1789,27 @@ function scheduleAutoRefresh(expiresInSeconds: number): void {
  * Caches the result in-memory so subsequent calls don't hit the network.
  */
 export async function fetchGoogleUserEmail(token: string): Promise<string | null> {
-  if (cachedEmail) return cachedEmail;
+  // Return the cache ONLY if it was verified against THIS exact token. A primed
+  // value (`setGoogleAccountEmail`, from persisted provider config) is a guess
+  // that can name a different Google account than the one `token` belongs to —
+  // e.g. the file-owner account on a shared family, which then falsely trips the
+  // account-mismatch assertion after a clean sign-in (#62, iOS "wrong account"
+  // toast). Only a userinfo response for this token proves the account.
+  if (cachedEmail && cachedEmailToken === token) return cachedEmail;
 
   try {
     const res = await fetch(USERINFO_ENDPOINT, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return cachedEmail; // network/userinfo failure → best-known value
     const data = (await res.json()) as { email?: string };
-    cachedEmail = data.email ?? null;
+    if (data.email) {
+      cachedEmail = data.email;
+      cachedEmailToken = token; // verified against this token
+    }
     return cachedEmail;
   } catch {
-    return null;
+    return cachedEmail;
   }
 }
 
@@ -1811,6 +1825,9 @@ export function getGoogleAccountEmail(): string | null {
  */
 export function setGoogleAccountEmail(email: string | null): void {
   cachedEmail = email;
+  // A primed guess is NOT verified against any token, so the next
+  // `fetchGoogleUserEmail(token)` refetches to confirm the real account.
+  cachedEmailToken = null;
 }
 
 // --- Redirect-based OAuth (mobile fallback) ---
