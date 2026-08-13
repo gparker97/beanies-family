@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-13
 
+### Fixed
+
+- **Your Google sign-in stays connected instead of asking you to reconnect over and over.** Heavy users across several devices could find themselves pushed through a full Google sign-in on almost every open — sometimes a Drive prompt _and_ a separate Calendar prompt. The cause was that every reconnect quietly created a brand-new Google authorisation without ever retiring the old one, until Google's own per-account limit kicked in and started cancelling the working one. beanies now retires the old authorisation before creating its replacement, so the count stays flat and the loop stops. If your session ever does break, the app now tries to heal itself silently — quietly picking up a fresh connection another of your devices already has — before it ever shows you a reconnect prompt, and an account-mismatch no longer silently churns through authorisations. (Unifying the two separate reconnect prompts into a single one is a follow-up.)
+
 ### Performance
 
 - **Opening the app no longer redoes work it has already done.** Opening beanies was rebuilding your family's data more than once, re-reading every part of the app several times over, and — even when you had changed nothing at all — uploading your whole data file back to Google Drive. On a 2-3MB family file that upload alone is the slowest thing an ordinary open does, and it happened every single time. It now happens only when there is genuinely something new to save. Backgrounding the app also stopped re-encrypting your entire data set on every switch away when nothing had changed. Nothing about what is stored, or how it is encrypted, has changed — the app simply stops repeating itself. Groundwork for a further change that will skip the download entirely when your file has not changed since you last opened it.
