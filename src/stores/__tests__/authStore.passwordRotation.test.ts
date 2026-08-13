@@ -104,7 +104,6 @@ vi.mock('@/services/sync/fileSync', () => ({
   // module can load (we're not exercising any of these paths).
   parseBeanpodV4: vi.fn(),
   reEncryptEnvelope: vi.fn(),
-  decryptBeanpodPayload: vi.fn(),
   detectFileVersion: vi.fn(() => '4.0'),
   tryUnwrapFamilyKey: vi.fn(),
   createBeanpodV4: vi.fn(),

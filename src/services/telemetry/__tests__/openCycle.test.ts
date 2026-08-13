@@ -4,9 +4,10 @@
  * The window discipline IS the design here: these counters exist to prove "one
  * open did exactly one CRDT reconstruction, zero redundant reads and zero
  * pointless writes", and a counter that leaks across opens — or that counts a
- * header Refresh as an app open — would quietly report the wrong numbers and let
- * a redundancy regression pass review. So the no-op-outside-a-window rule and the
- * emit-once rule are the load-bearing behaviours, not incidental.
+ * header Refresh as an app open, or lets a Refresh close the real open's window —
+ * would quietly report the wrong numbers. The bias of every such bug is toward
+ * FALSE NEGATIVES (the redundancy fix looks like it worked when it did not), so
+ * the ownership and no-op-outside-a-window rules are load-bearing, not incidental.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -19,7 +20,6 @@ import {
   bump,
   noteSnapshot,
   endOpen,
-  isOpenWindowActive,
   __resetOpenCycleForTesting,
 } from '../openCycle';
 
@@ -42,56 +42,86 @@ describe('openCycle', () => {
 
   describe('window discipline', () => {
     it('counts nothing when no window is open — the header Refresh / poll-tick case', () => {
-      // `backgroundSyncFromFile` is reachable from the header Refresh button and
-      // the deferred config-heal, neither of which is an app open. They must not
-      // inflate the next open's numbers.
       bump('reconstruction');
       bump('driveRead');
       bump('driveWrite');
       noteSnapshot(true);
-      expect(isOpenWindowActive()).toBe(false);
 
-      endOpen('open-complete');
+      endOpen('open-complete', 1);
       expect(logEvent).not.toHaveBeenCalled();
 
       // ...and the counts did not survive into the next real open.
-      beginOpen('path1a');
-      endOpen('open-complete');
+      const t = beginOpen('path1a');
+      endOpen('open-complete', t);
       expect(emitted()!.message).toContain('rec=0 reads=0 writes=0 reloads=0 snap=none');
     });
 
-    it('emits exactly once — a second endOpen is a no-op', () => {
-      beginOpen('path1a');
+    it('emits exactly once — a second endOpen with the same token is a no-op', () => {
+      const t = beginOpen('path1a');
       bump('driveRead');
-      endOpen('open-complete');
+      endOpen('open-complete', t);
       expect(logEvent).toHaveBeenCalledTimes(1);
 
-      endOpen('open-complete');
+      endOpen('open-complete', t);
       expect(logEvent).toHaveBeenCalledTimes(1);
-      expect(isOpenWindowActive()).toBe(false);
     });
 
     it('emits the stale window as open-abandoned rather than discarding its counts', () => {
       beginOpen('path1a');
       bump('reconstruction');
 
-      beginOpen('path1b'); // e.g. a family switch mid-open
+      const t2 = beginOpen('path1b'); // e.g. a family switch mid-open
 
       const abandoned = logEvent.mock.calls[0]![0] as {
+        level: string;
         message: string;
         context: { action: string };
       };
       expect(abandoned.context.action).toBe('open-abandoned');
+      expect(abandoned.level).toBe('warn');
       expect(abandoned.message).toContain('rec=1');
-      // The new window starts clean.
-      endOpen('open-complete');
+
+      endOpen('open-complete', t2);
       expect(emitted()!.message).toContain('path=path1b rec=0');
+    });
+  });
+
+  describe('ownership — a non-owner must never close the window', () => {
+    it('ignores endOpen with NO token (the header Refresh / config-heal path)', () => {
+      // Refresh reaches `backgroundSyncFromFile` mid-open and calls endOpen with
+      // `openToken === undefined`. If that closed the window, the real open's
+      // remaining reads/writes would all no-op and the record would ship
+      // `reads=0 writes=0` — the redundancy fix looking successful when it wasn't.
+      const t = beginOpen('path1a');
+      bump('driveRead');
+
+      endOpen('open-complete', undefined);
+      expect(logEvent).not.toHaveBeenCalled();
+
+      // The real open's later work is still counted.
+      bump('driveWrite');
+      endOpen('open-complete', t);
+      expect(emitted()!.message).toContain('reads=1 writes=1');
+    });
+
+    it('ignores endOpen with a STALE token from a previous window', () => {
+      const stale = beginOpen('path1a');
+      endOpen('open-complete', stale);
+      logEvent.mockClear();
+
+      const current = beginOpen('path1b');
+      bump('reconstruction');
+      endOpen('open-complete', stale); // the previous open's holder, arriving late
+      expect(logEvent).not.toHaveBeenCalled();
+
+      endOpen('open-complete', current);
+      expect(emitted()!.message).toContain('path=path1b rec=1');
     });
   });
 
   describe('counting', () => {
     it('accumulates each counter independently and reports them in message + detail', () => {
-      beginOpen('path1a');
+      const t = beginOpen('path1a');
       bump('reconstruction');
       bump('reconstruction');
       bump('driveRead');
@@ -99,7 +129,7 @@ describe('openCycle', () => {
       bump('storeReload');
       bump('storeReload');
       noteSnapshot(true);
-      endOpen('open-complete', { providerType: 'google_drive' });
+      endOpen('open-complete', t);
 
       const rec = emitted()!;
       expect(rec.surface).toBe('open-cycle');
@@ -109,13 +139,12 @@ describe('openCycle', () => {
       expect(rec.message).toContain('rec=2 reads=1 writes=0 reloads=3 snap=hit');
       expect(rec.context.detail).toContain('rec=2 reads=1 writes=0 reloads=3 snap=hit');
       expect(rec.context.action).toBe('open-complete');
-      expect(rec.context.provider_type).toBe('google_drive');
     });
 
     it('records a snapshot miss distinctly from no snapshot attempt', () => {
-      beginOpen('path1b');
+      const t = beginOpen('path1b');
       noteSnapshot(false);
-      endOpen('open-complete');
+      endOpen('open-complete', t);
       expect(emitted()!.message).toContain('snap=miss');
     });
   });
@@ -124,13 +153,13 @@ describe('openCycle', () => {
     it('relabels on fallthrough without restarting the counters', () => {
       // path1a falling through to path1b is ONE open that did BOTH pieces of work.
       // Restarting would under-count it and emit a spurious open-abandoned.
-      beginOpen();
+      const t = beginOpen();
       setOpenPath('path1a');
       bump('reconstruction'); // the cache load
       setOpenPath('path1b');
       bump('reconstruction'); // the Drive load
       bump('driveRead');
-      endOpen('open-complete');
+      endOpen('open-complete', t);
 
       expect(logEvent).toHaveBeenCalledTimes(1); // no open-abandoned
       expect(emitted()!.message).toContain('path=path1b rec=2 reads=1');
@@ -138,25 +167,34 @@ describe('openCycle', () => {
 
     it('setOpenPath outside a window is a no-op', () => {
       setOpenPath('path3');
-      expect(isOpenWindowActive()).toBe(false);
       expect(logEvent).not.toHaveBeenCalled();
     });
   });
 
   describe('outcomes', () => {
-    it('warns and carries the classified reason on a fail-open', () => {
-      beginOpen('path1a');
-      endOpen('open-fail-open', { failOpenReason: 'no-baseline' });
+    it('reports a failed open as a warn, so the failure RATE is measurable', () => {
+      // Emitting every terminal as `open-complete` would make the open-failure rate
+      // 0% by construction — the opposite of what these counters are for.
+      const t = beginOpen('path1a');
+      endOpen('open-failed', t);
 
       const rec = emitted()!;
       expect(rec.level).toBe('warn');
-      expect(rec.context.action).toBe('open-fail-open');
+      expect(rec.context.action).toBe('open-failed');
+    });
+
+    it('warns and carries the classified reason on a fail-open', () => {
+      const t = beginOpen('path1a');
+      endOpen('open-fail-open', t, { failOpenReason: 'no-baseline' });
+
+      const rec = emitted()!;
+      expect(rec.level).toBe('warn');
       expect(rec.context.error_code).toBe('no-baseline');
     });
 
     it('emits a skip at info with no error_code', () => {
-      beginOpen('path1a');
-      endOpen('open-skip', { detailSuffix: 'baseline_age_ms=1200' });
+      const t = beginOpen('path1a');
+      endOpen('open-skip', t, { detailSuffix: 'baseline_age_ms=1200' });
 
       const rec = emitted()!;
       expect(rec.level).toBe('info');
@@ -166,19 +204,15 @@ describe('openCycle', () => {
     });
   });
 
-  it('ships only pre-existing allowlisted context keys', () => {
-    // Adding a key here means updating ALLOWED_CONTEXT_KEYS in
-    // src/utils/diagnosticContext.ts AND its mirror in the telemetry Lambda AND
-    // the app-store data-collection declarations. This test is the reminder — a
-    // new key would otherwise be silently stripped server-side.
-    beginOpen('path1a');
-    endOpen('open-fail-open', { failOpenReason: 'provider-error', providerType: 'google_drive' });
+  it('ships only pre-existing allowlisted context keys, and never provider_type', () => {
+    // `enrichAndRedact` overwrites `provider_type` from the sync store on every
+    // event, so passing one here would be dead plumbing that reads as intent.
+    // Adding any OTHER key means updating ALLOWED_CONTEXT_KEYS in
+    // src/utils/diagnosticContext.ts AND its mirror in the telemetry Lambda AND the
+    // app-store data-collection declarations — otherwise it is silently stripped.
+    const t = beginOpen('path1a');
+    endOpen('open-fail-open', t, { failOpenReason: 'provider-error' });
 
-    expect(Object.keys(emitted()!.context).sort()).toEqual([
-      'action',
-      'detail',
-      'error_code',
-      'provider_type',
-    ]);
+    expect(Object.keys(emitted()!.context).sort()).toEqual(['action', 'detail', 'error_code']);
   });
 });

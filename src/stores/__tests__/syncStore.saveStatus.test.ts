@@ -90,7 +90,6 @@ vi.mock('@/services/sync/fileSync', () => ({
   detectFileVersion: vi.fn(() => 4),
   createBeanpodV4: vi.fn(),
   tryUnwrapFamilyKey: vi.fn(),
-  decryptBeanpodPayload: vi.fn(),
   downloadAsFile: vi.fn(),
 }));
 vi.mock('@/services/sync/providers/googleDriveProvider', () => ({

@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-13
+
+### Performance
+
+- **Opening the app no longer redoes work it has already done.** Opening beanies was rebuilding your family's data more than once, re-reading every part of the app several times over, and — even when you had changed nothing at all — uploading your whole data file back to Google Drive. On a 2-3MB family file that upload alone is the slowest thing an ordinary open does, and it happened every single time. It now happens only when there is genuinely something new to save. Backgrounding the app also stopped re-encrypting your entire data set on every switch away when nothing had changed. Nothing about what is stored, or how it is encrypted, has changed — the app simply stops repeating itself. Groundwork for a further change that will skip the download entirely when your file has not changed since you last opened it.
+
 ## 2026-08-12
 
 ### Performance
