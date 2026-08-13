@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.13',
+    date: '2026-08-13',
+    month: '13 august 2026',
+    summary: {
+      en: 'Your Google sign-in now stays connected reliably, so beanies stops asking you to reconnect.',
+      beanie:
+        'your google sign-in now stays connected reliably, so beanies stops asking you to reconnect.',
+    },
+  },
+  {
     version: '2026.08.06',
     date: '2026-08-06',
     month: '6 august 2026',
