@@ -34,6 +34,8 @@ vi.mock('@/services/calendar/calendarAuth', () => ({
 vi.mock('@/services/google/googleAuth', () => ({
   shouldUseRedirectAuth: () => redirectSurface.value,
   getGoogleAccountEmail: () => 'me@example.com',
+  // Consulted by the reconnect/disconnect Drive-safety guard (#62).
+  hasRefreshToken: () => false,
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 

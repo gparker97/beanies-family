@@ -194,16 +194,6 @@ async function commitAcquiredToken(args: {
         context: { action: 'persist-refresh-token' },
       });
     }
-    // A refresh_token in the response means Google just MINTED a new grant (this
-    // Drive chokepoint never handles calendar). Count it so token-pressure is
-    // measurable fleet-wide — the success-side counterpart to the revoke events,
-    // and the basis for a future "reconnect rate climbing" alert (#62).
-    logTokenLifecycle({
-      grant: 'drive',
-      op: 'mint',
-      outcome: 'ok',
-      trigger: interactive ? 'interactive' : 'silent',
-    });
   } else if (interactive) {
     // Consent should have returned a refresh token; if not, offline access wasn't
     // established. Surface instead of silently continuing.
@@ -237,6 +227,20 @@ async function commitAcquiredToken(args: {
         'discarded a Google token whose session was torn down during the refresh-token persist (post-persist rollback)',
     });
     return { committed: false };
+  }
+
+  // Count the mint only now that it has COMMITTED (survived the post-persist
+  // rollback above) — logging earlier over-counted a token that was immediately
+  // discarded/revoked. A refresh_token in the response means Google minted a new
+  // grant (this Drive chokepoint never handles calendar); the success-side
+  // counterpart to the revoke events for fleet-wide token-pressure (#62).
+  if (tokens.refresh_token) {
+    logTokenLifecycle({
+      grant: 'drive',
+      op: 'mint',
+      outcome: 'ok',
+      trigger: interactive ? 'interactive' : 'silent',
+    });
   }
 
   scheduleAutoRefresh(tokens.expires_in);
@@ -1386,11 +1390,14 @@ export async function revokeToken(): Promise<void> {
   // Per-session revocation latch — see `sawPermanentFailureThisSession`.
   clearPermanentFailureFlag();
 
-  // Revoke the grant via the shared helper (idempotent + offline-durable +
-  // observable) instead of a bare best-effort fetch (#62). Revoking the access
-  // token revokes the whole grant; `await` preserves this function's ordering.
-  if (accessToken) {
-    await revokeGrant(accessToken, { grant: 'drive', trigger: 'signout' });
+  // Revoke the GRANT durably via the shared helper (idempotent + offline-durable
+  // + observable) instead of a bare best-effort fetch (#62). Prefer the long-lived
+  // REFRESH token: an offline sign-out queues the revoke, and a queued ACCESS
+  // token would expire before the queue drains and leak the grant. Fall back to
+  // the access token when none is in memory. `await` preserves ordering.
+  const revokeTarget = currentRefreshToken?.token ?? accessToken;
+  if (revokeTarget) {
+    await revokeGrant(revokeTarget, { grant: 'drive', trigger: 'signout' });
   }
 
   // Clear stored refresh token
@@ -1441,6 +1448,9 @@ export async function clearGoogleSessionState(
   clearPermanentFailureFlag();
 
   const tokenSnapshot = accessToken;
+  // Capture the long-lived refresh token BEFORE clearTokenState() nulls it — it,
+  // not the access token, is what a durable offline revoke must target (#62).
+  const refreshSnapshot = currentRefreshToken?.token ?? null;
   const familyIdSnapshot = currentFamilyId;
 
   // 1. Clear in-memory state immediately (synchronous, fast).
@@ -1458,12 +1468,14 @@ export async function clearGoogleSessionState(
   //    "revoke everything" escape hatch is `authStore.signOutAndClearData()`,
   //    which calls this WITHOUT preserveRefreshToken (full network revoke) AND
   //    deletes the local cache + resets the trust flag. See ADR-031.
-  if (tokenSnapshot && !preserveRefreshToken) {
-    // Shared helper: idempotent, offline-durable, observable (#62). Fire-and-forget
-    // to keep the synchronous-teardown contract; a transient failure is queued for
-    // retry instead of silently leaking the grant. Revoking the access token
-    // revokes the whole grant.
-    void revokeGrant(tokenSnapshot, { grant: 'drive', trigger: 'signout' });
+  if (!preserveRefreshToken && (refreshSnapshot || tokenSnapshot)) {
+    // Shared helper: idempotent, offline-durable, observable (#62). Prefer the
+    // long-lived REFRESH token so an offline sign-out's queued revoke still kills
+    // the grant when it drains (a queued ACCESS token would expire first and leak
+    // it); fall back to the access token when no refresh token is in memory.
+    // Fire-and-forget to keep the synchronous-teardown contract; a transient
+    // failure is queued, not silently dropped.
+    void revokeGrant(refreshSnapshot ?? tokenSnapshot, { grant: 'drive', trigger: 'signout' });
   }
 
   // 3. Clear persisted refresh tokens. The pending-family slot is ALWAYS

@@ -718,6 +718,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     result: CalendarConnectSuccess,
     connectionId?: string
   ): Promise<void> {
+    // A calendar consent just MINTED a new refresh token — count it so calendar
+    // token-pressure is measurable alongside the calendar revokes (#62). Covers
+    // both connect + reconnect, popup + redirect (all converge here).
+    logTokenLifecycle({
+      grant: 'calendar',
+      op: 'mint',
+      outcome: 'ok',
+      trigger: connectionId ? 'reconnect' : 'connect',
+    });
     if (connectionId) {
       const existing = await getCalendarConnectionById(connectionId);
       if (existing) {
@@ -781,9 +790,39 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
    * this guard can be relaxed to always revoke.
    */
   function liveDriveGrantSharesAccount(accountEmail: string | undefined): boolean {
-    if (!accountEmail) return false;
+    // No live Drive grant → revoking the calendar token can't harm Drive.
+    if (!hasRefreshToken()) return false;
+    // A live Drive grant exists. FAIL SAFE: only revoke the calendar token when we
+    // can POSITIVELY confirm it belongs to a DIFFERENT Google account (a separate
+    // grant). Any uncertainty — an 'unknown' sentinel email, or a missing email on
+    // either side — is treated as shared, so we skip the revoke and protect the
+    // live Drive session rather than risk a whole-grant revoke killing it.
     const driveEmail = getGoogleAccountEmail();
-    return hasRefreshToken() && !!driveEmail && driveEmail === accountEmail;
+    if (!driveEmail || !accountEmail || accountEmail === 'unknown') return true;
+    return driveEmail === accountEmail;
+  }
+
+  /**
+   * Revoke a calendar grant, but SKIP (and log the skip) when a live Drive grant
+   * on the same account would die with it. Shared by reconnect + disconnect so the
+   * Drive-safety guard is applied identically in both places (#62).
+   */
+  function revokeCalendarGrantGuarded(
+    refreshToken: string | undefined,
+    accountEmail: string | undefined,
+    trigger: 'reconnect' | 'disconnect'
+  ): void {
+    if (liveDriveGrantSharesAccount(accountEmail)) {
+      logTokenLifecycle({
+        grant: 'calendar',
+        op: 'revoke',
+        outcome: 'skipped',
+        reason: 'shared-live-drive-grant',
+        trigger,
+      });
+      return;
+    }
+    void revokeGrant(refreshToken, { grant: 'calendar', trigger });
   }
 
   /** Re-run consent for an EXISTING connection (e.g. after needs_reconnect): updates
@@ -799,8 +838,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // token; revoke the one it replaces first so the token pool stays flat. Runs
     // before the consent (a whole-grant revoke after would kill the fresh token).
     // Usually a no-op — a needs_reconnect token is already dead at Google — but it
-    // catches the live-token case. Fire-and-forget (idempotent + offline-durable).
-    void revokeGrant(existing?.refreshToken, { grant: 'calendar', trigger: 'reconnect' });
+    // catches the live-token case. Guarded so it never kills a co-located live
+    // Drive grant (same reasoning as disconnect); the skip is logged.
+    revokeCalendarGrantGuarded(existing?.refreshToken, existing?.accountEmail, 'reconnect');
     if (shouldUseRedirectAuth()) {
       await startCalendarRedirectAuth(
         buildCalendarReturnPath(connectionId),
@@ -862,19 +902,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     if (allCleared) {
       invalidGrantCounters.delete(connectionId);
       // Revoke the calendar grant so a disconnect doesn't leak a live token (#62)
-      // — UNLESS a live Drive grant on the same account would die with it (they
-      // share an OAuth client). The skip is observable, never silent.
-      if (liveDriveGrantSharesAccount(connection.accountEmail)) {
-        logTokenLifecycle({
-          grant: 'calendar',
-          op: 'revoke',
-          outcome: 'skipped',
-          reason: 'shared-live-drive-grant',
-          trigger: 'disconnect',
-        });
-      } else {
-        void revokeGrant(connection.refreshToken, { grant: 'calendar', trigger: 'disconnect' });
-      }
+      // — UNLESS a live Drive grant on the same account would die with it. The
+      // skip is observable, never silent.
+      revokeCalendarGrantGuarded(connection.refreshToken, connection.accountEmail, 'disconnect');
       await removeCalendarConnection(connectionId);
     }
     return allCleared;
