@@ -33,6 +33,29 @@ const REVOKE_DB_NAME = 'beanies-revoke-queue';
 const REVOKE_DB_VERSION = 1;
 const REVOKE_STORE = 'tokens';
 
+// A cheap synchronous localStorage flag so the boot-restore below can skip
+// opening (and CREATING) the IndexedDB store entirely on the overwhelmingly
+// common path where nothing was ever queued — keeping cold app-open off the IDB
+// hot path (ADR-032 instant-open). Persisted (not sessionStorage) because a
+// queued revoke must survive a full restart; the IDB store stays the source of
+// truth, this is only a fast-negative gate.
+const PENDING_FLAG_KEY = 'beanies_revoke_pending';
+function setPendingFlag(v: boolean): void {
+  try {
+    if (v) localStorage.setItem(PENDING_FLAG_KEY, '1');
+    else localStorage.removeItem(PENDING_FLAG_KEY);
+  } catch {
+    /* localStorage unavailable — the IDB store remains the source of truth */
+  }
+}
+function hasPendingFlag(): boolean {
+  try {
+    return localStorage.getItem(PENDING_FLAG_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 interface QueuedRevoke {
   token: string;
   /** Which feature's grant this token belonged to — for accurate telemetry only. */
@@ -74,20 +97,34 @@ async function getRevokeDatabase(): Promise<IDBPDatabase<RevokeDB>> {
  * four pre-existing best-effort revoke sites in `googleAuth.ts`).
  */
 export async function postRevoke(token: string): Promise<'ok' | 'transient'> {
-  let res: Response;
+  let res: Response | undefined;
   try {
     res = await fetch(`${GOOGLE_REVOKE_URL}?token=${encodeURIComponent(token)}`, {
       method: 'POST',
+      // `keepalive` lets the revoke survive a synchronous navigation that may
+      // follow immediately (the web-redirect reconnect arm does
+      // `window.location.href = …` right after firing revoke-before-mint); without
+      // it the browser aborts the in-flight request on unload and the revoke is
+      // silently lost. Mirrors slackNotify's keepalive fix.
+      keepalive: true,
     });
   } catch {
     // Network error / offline — the token is still live at Google; retry later.
     return 'transient';
   }
+  // Defensive: a malformed / absent response can't happen with a real `fetch`,
+  // but this runs on fire-and-forget revoke paths (revoke-before-mint, sign-out)
+  // where a throw would surface as an UNHANDLED rejection. Treat it as transient
+  // so the queue retries rather than throwing out of a caller that never awaits.
+  if (!res) return 'transient';
   if (res.ok) return 'ok';
-  // 429 / 5xx are the only server responses worth retrying; every other status
-  // (notably 400 for an already-invalid or already-revoked token) means the
-  // grant is effectively gone — treat as done so the queue cannot spin forever.
-  if (res.status === 429 || res.status >= 500) return 'transient';
+  // Retry the responses that indicate the token may still be LIVE and the failure
+  // is transient: 429 + 5xx (server/rate) and 403 (some Google surfaces signal
+  // rate-limiting as 403). A 400 is Google's response for an already-invalid /
+  // already-revoked token → the grant is gone, treat as done so the queue cannot
+  // spin forever. (A 400 for a genuinely-malformed request is not expected here —
+  // the bare-token query form matches the four long-standing revoke sites.)
+  if (res.status === 429 || res.status === 403 || res.status >= 500) return 'transient';
   return 'ok';
 }
 
@@ -99,6 +136,7 @@ export async function enqueueRevoke(token: string, grant: TokenGrant): Promise<v
   try {
     const db = await getRevokeDatabase();
     await db.put(REVOKE_STORE, { token, grant, enqueuedAt: Date.now() });
+    setPendingFlag(true);
   } catch (e) {
     // IndexedDB unavailable (private mode / quota). We cannot durably retry, so
     // make the failure visible rather than dropping it silently.
@@ -142,14 +180,16 @@ function tryDrain(reason: DrainReason): void {
 }
 
 async function drainOnce(reason: DrainReason): Promise<void> {
+  let db: IDBPDatabase<RevokeDB>;
   let queued: QueuedRevoke[];
   try {
-    const db = await getRevokeDatabase();
+    db = await getRevokeDatabase();
     queued = await db.getAll(REVOKE_STORE);
   } catch {
     return; // DB unreadable this pass — a later trigger retries.
   }
   if (queued.length === 0) {
+    setPendingFlag(false);
     stopListening();
     return;
   }
@@ -157,7 +197,6 @@ async function drainOnce(reason: DrainReason): Promise<void> {
     const result = await postRevoke(token);
     if (result !== 'ok') continue; // still transient — keep for next trigger
     try {
-      const db = await getRevokeDatabase();
       await db.delete(REVOKE_STORE, token);
     } catch {
       // Deleting failed but the revoke landed; the next drain re-posts an
@@ -165,10 +204,13 @@ async function drainOnce(reason: DrainReason): Promise<void> {
     }
     logTokenLifecycle({ grant, op: 'revoke', outcome: 'ok', reason, trigger: 'queue-drain' });
   }
-  // If everything drained, tear the listeners down; otherwise keep waiting.
+  // If everything drained, clear the boot flag + tear the listeners down;
+  // otherwise keep waiting for the next trigger.
   try {
-    const db = await getRevokeDatabase();
-    if ((await db.count(REVOKE_STORE)) === 0) stopListening();
+    if ((await db.count(REVOKE_STORE)) === 0) {
+      setPendingFlag(false);
+      stopListening();
+    }
   } catch {
     /* leave listeners attached — safer than tearing down blind */
   }
@@ -216,18 +258,40 @@ function stopListening(): void {
 }
 
 // Startup trigger: if a revoke was queued in a previous session, resume as soon
-// as the module loads (mirrors offlineQueue's boot-time restore).
+// as the module loads (mirrors offlineQueue's boot-time restore). Gated on the
+// cheap localStorage flag so the common "nothing ever queued" cold-open never
+// touches IndexedDB.
 void (async () => {
+  if (!hasPendingFlag()) return;
   try {
     const db = await getRevokeDatabase();
     if ((await db.count(REVOKE_STORE)) > 0) {
       startListening();
       tryDrain('startup');
+    } else {
+      setPendingFlag(false); // flag was stale
     }
   } catch {
     // IndexedDB unavailable at boot — nothing to resume.
   }
 })();
+
+/**
+ * Wipe the durable revoke queue. Called by the "sign out and clear data" privacy
+ * teardown so no raw refresh-token secret survives on an untrusted device (the
+ * queued items are live tokens; leaving them would break the "cache deleted on
+ * sign-out" contract, ADR-031). Best-effort + never throws.
+ */
+export async function clearRevokeQueue(): Promise<void> {
+  stopListening();
+  setPendingFlag(false);
+  try {
+    const db = await getRevokeDatabase();
+    await db.clear(REVOKE_STORE);
+  } catch {
+    /* best-effort — DB unavailable / already gone */
+  }
+}
 
 /** Test-only: reset module state so specs don't leak listeners/handles. */
 export async function __resetRevokeQueueForTesting(): Promise<void> {
