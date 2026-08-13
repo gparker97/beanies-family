@@ -412,6 +412,11 @@ export function initDoc(): { loaded: true } {
  * familyId) and install it OVER the fresh owner doc → data loss (ADR-032 F1).
  */
 export async function openCache(id: string): Promise<{ loaded: false }> {
+  // Scope change: a different family's DB is now open, so cursors describing the
+  // previous doc must not survive. `persistSnapshotOnce` swallows its failures, so
+  // a stale cursor here would silently suppress this family's snapshot for the
+  // whole session — invisible, and it costs the fast first paint.
+  resetDocCursors();
   await cache.initPersistenceDB(id);
   return { loaded: false };
 }
@@ -427,9 +432,18 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
     // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
     await cache.clearCache(id).catch(() => {});
     await cache.initPersistenceDB(id);
+    // `clearCache` deleted the whole DB — base AND snapshot rows. Any cursor
+    // claiming those rows exist is now a lie, and only one of this function's three
+    // callers recovers with `dropDoc()`; the other two just log.
+    resetDocCursors();
     throw e;
   }
-  if (!loaded) return { loaded: false };
+  if (!loaded) {
+    // Reached AFTER `initPersistenceDB(id)` re-pointed the DB, so the cursors still
+    // describe the previous family's doc. Reset before returning.
+    resetDocCursors();
+    return { loaded: false };
+  }
   // Capture the reconstructed heads BEFORE migrate (which consumes the handle). A
   // migrate delta, if any, then persists as an increment on the next tick; the
   // cursor is DERIVED here from the reconstructed doc, never a stored value.

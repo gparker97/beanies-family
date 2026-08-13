@@ -38,6 +38,7 @@ import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
 import { beginOpen, setOpenPath, endOpen } from '@/services/telemetry/openCycle';
+import type { OpenToken } from '@/services/telemetry/openCycle';
 import {
   shouldShowAppLayout,
   isPodlessExpectedRoute,
@@ -421,17 +422,24 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
  * inner function signals that by returning `'handed-off'`.
  */
 async function loadFamilyData() {
-  beginOpen();
+  const openToken = beginOpen();
   let handedOff = false;
+  let outcome: 'open-complete' | 'open-failed' = 'open-complete';
   try {
-    handedOff = (await loadFamilyDataInner()) === 'handed-off';
+    handedOff = (await loadFamilyDataInner(openToken)) === 'handed-off';
+  } catch (e) {
+    // Both of `loadFamilyDataInner`'s failure paths rethrow, and `syncStore.initialize()`
+    // can throw before any path is set. Recording those as `open-complete` would make
+    // the open-failure rate 0% by construction — the opposite of what the counters are
+    // for. Classify, then rethrow so the recovery overlay still runs.
+    outcome = 'open-failed';
+    throw e;
   } finally {
-    // `endOpen` is idempotent, so a terminal that already emitted is unaffected.
-    if (!handedOff) endOpen('open-complete');
+    if (!handedOff) endOpen(outcome, openToken);
   }
 }
 
-async function loadFamilyDataInner(): Promise<'handed-off' | void> {
+async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' | void> {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   const activeFamilyIdStr = getActiveIdInner();
   initBreadcrumbs.push(`loadFamilyData: activeFamily=${activeFamilyIdStr ?? 'null'}`);
@@ -494,7 +502,10 @@ async function loadFamilyDataInner(): Promise<'handed-off' | void> {
           // Fire-and-forget: fetch fresh data from Drive in background.
           // It owns the open-cycle terminal from here (success, skip, or failure)
           // — see the wrapper's doc-comment.
-          syncStore.backgroundSyncFromFile();
+          // The token travels with the hand-off: `backgroundSyncFromFile` is also
+          // reachable from the header Refresh button and the config-heal, and only
+          // the holder of this token may close this open's window.
+          syncStore.backgroundSyncFromFile(openToken);
           return 'handed-off';
         }
         initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');

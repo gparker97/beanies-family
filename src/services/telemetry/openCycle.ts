@@ -16,8 +16,9 @@
  *     Refresh button and the deferred config-heal both reach the same sync code
  *     as an open, and a 03:00 poll-tick merge would otherwise be counted as
  *     tomorrow's open. No caller-side conditionals are needed anywhere.
- *   - `endOpen()` emits exactly once and closes the window; a second call, or a
- *     call with no window open, does nothing.
+ *   - `endOpen()` emits exactly once and closes the window, and ONLY for the caller
+ *     holding that window's token. A second call, a call with no window open, or a
+ *     call from a non-owner (Refresh, config-heal) does nothing.
  *   - A `beginOpen` while a window is already open emits the stale one as
  *     `open-abandoned` rather than silently discarding its counts.
  *
@@ -26,7 +27,7 @@
  * no import-time side effects; never throws.
  *
  * Context keys are all pre-existing allowlist members (`action`, `error_code`,
- * `provider_type`, `detail`) — see `src/utils/diagnosticContext.ts`. The counts
+ * `detail`; `provider_type` is supplied by `enrichAndRedact`, never by us) — see `src/utils/diagnosticContext.ts`. The counts
  * also ride in `message`, which bypasses the allowlist by design, so they survive
  * to CloudWatch even if a key is ever renamed. NO new context key ships here, so
  * no `ALLOWED_CONTEXT_KEYS` / Lambda-mirror / store-declaration change is needed.
@@ -45,8 +46,21 @@ import { logEvent } from './logEvent';
  */
 export type OpenPath = 'unknown' | 'path1a' | 'path1b' | 'path2' | 'path3';
 
+/** Opaque handle proving which window a caller opened. */
+export type OpenToken = number;
+
 /** How the open finished. */
-export type OpenOutcome = 'open-complete' | 'open-skip' | 'open-fail-open' | 'open-abandoned';
+export type OpenOutcome =
+  /** The open finished normally (whatever work it did). */
+  | 'open-complete'
+  /** The open threw or ended on an error branch — offline, auth, corrupt file. */
+  | 'open-failed'
+  /** PR 2: the read guard proved the file had not changed and skipped the download. */
+  | 'open-skip'
+  /** PR 2: the read guard could not prove it and fell open to a full read. */
+  | 'open-fail-open'
+  /** A new open started while this window was still in flight. */
+  | 'open-abandoned';
 
 /** The things we count. One bump per real occurrence. */
 export type OpenCounter =
@@ -69,6 +83,8 @@ interface OpenWindow {
 }
 
 let current: OpenWindow | null = null;
+/** Monotonic id of the current window. `endOpen` must present it to close. */
+let currentToken = 0;
 
 function fresh(path: OpenPath): OpenWindow {
   return {
@@ -91,9 +107,10 @@ function summarize(w: OpenWindow): string {
  * the path is known. An already-open window is emitted as `open-abandoned` so its
  * counts are never silently dropped.
  */
-export function beginOpen(path: OpenPath = 'unknown'): void {
-  if (current) endOpen('open-abandoned');
+export function beginOpen(path: OpenPath = 'unknown'): OpenToken {
+  if (current) endOpen('open-abandoned', currentToken);
   current = fresh(path);
+  return ++currentToken;
 }
 
 /**
@@ -123,37 +140,48 @@ export function noteSnapshot(hit: boolean): void {
   current.snapshot = hit ? 'hit' : 'miss';
 }
 
-/** True when an open is in flight — for callers that must not double-emit. */
-export function isOpenWindowActive(): boolean {
-  return current !== null;
-}
-
 /**
  * Emit the record and close the window. Idempotent: a second call, or a call with
  * no window open, does nothing. `failOpenReason` is the classified reason the
- * open-path read guard declined to skip (see `remoteChanged`).
+ * open-path read guard declined to skip. That guard lands in PR 2; until then the
+ * `open-skip` / `open-fail-open` outcomes have no production producer by design.
  */
 export function endOpen(
   outcome: OpenOutcome,
-  extra?: { failOpenReason?: string; providerType?: string; detailSuffix?: string }
+  token: OpenToken | undefined,
+  extra?: { failOpenReason?: string; detailSuffix?: string }
 ): void {
   const w = current;
   if (!w) return;
+  // OWNERSHIP: only the caller holding this window's token may close it, and an
+  // absent token can never close one. `backgroundSyncFromFile` is reachable
+  // mid-open from the header Refresh button and the deferred config-heal; without
+  // this, one of those closes and emits the real open's window early, every later
+  // bump() silently no-ops, and the record ships `reads=0 writes=0` — biasing the
+  // numbers toward "the redundancy fix worked" in exactly the cases where it did
+  // not. Non-owners are ignored, not merely deduplicated.
+  if (token === undefined || token !== currentToken) return;
   current = null;
 
   const detail = extra?.detailSuffix ? `${summarize(w)} ${extra.detailSuffix}` : summarize(w);
 
   logEvent({
-    level: outcome === 'open-fail-open' || outcome === 'open-abandoned' ? 'warn' : 'info',
+    level:
+      outcome === 'open-failed' || outcome === 'open-fail-open' || outcome === 'open-abandoned'
+        ? 'warn'
+        : 'info',
     surface: 'open-cycle',
     // Counts live in `message` too — it bypasses the context allowlist, so they
     // reach CloudWatch even if a context key is ever renamed.
     message: `${outcome}: ${detail}`,
+    // NOTE: no `provider_type` here. `enrichAndRedact` sets it from the sync store
+    // on EVERY event (`diagnosticContext.ts`), so a caller-supplied value is
+    // silently overwritten — passing one would be dead plumbing that reads as
+    // intent. The enriched value is the correct one; slice on that.
     context: {
       action: outcome,
       detail,
       ...(extra?.failOpenReason ? { error_code: extra.failOpenReason } : {}),
-      ...(extra?.providerType ? { provider_type: extra.providerType } : {}),
     },
   });
 }

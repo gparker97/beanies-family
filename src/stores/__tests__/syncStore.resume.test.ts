@@ -514,6 +514,12 @@ describe('syncStore — open-cycle gates on the merge path', () => {
 
     const syncService = await import('@/services/sync/syncService');
     vi.mocked(syncService.triggerDebouncedSave).mockClear();
+    vi.mocked(syncService.cancelPendingSave).mockClear();
+    // Clear this too: `completeAutoLoad` above already drove it to 1, so a bare
+    // `toHaveBeenCalled()` afterwards would be satisfied by the SETUP and the
+    // anti-vacuity guard would itself be vacuous (an unconditional `return` at the
+    // top of `backgroundSyncFromFile` would still pass).
+    vi.mocked(docClient.mergeRemoteEnvelope).mockClear();
     // `load()` must return a real envelope or `loadFromFile` bails before the merge
     // branch and the assertions below would pass vacuously.
     vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
@@ -521,8 +527,8 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], ...outcome });
 
     await syncStore.backgroundSyncFromFile();
-    // Guard against a vacuous pass: the merge branch MUST have run.
-    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalled();
+    // Now meaningful: exactly the merge this call made, not the setup's.
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
     return { syncStore, syncService };
   }
 
@@ -538,6 +544,33 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     // The invariant that matters more than the optimisation: a local change must
     // always reach the file.
     expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
+  });
+
+  it('re-projects the stores ONLY when the merge moved the doc (the `changed` gate)', async () => {
+    // Observed through `reloadAllStores`'s own first statement,
+    // `syncService.cancelPendingSave()` — the store function itself is internal.
+    // Asserted COMPARATIVELY because that path has an unrelated baseline call; an
+    // absolute count would encode the baseline and break on any adjacent change.
+    // This half of B2 fails UNSAFE if inverted (21 stores left showing pre-merge
+    // data), so it needs its own assertion rather than riding the `dirty` tests.
+    const quiet = await mergeWith({ dirty: false, changed: false });
+    const quietCalls = vi.mocked(quiet.syncService.cancelPendingSave).mock.calls.length;
+
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const ctx = useFamilyContextStore();
+    ctx.activeFamily = {
+      id: 'fam-resume-1',
+      name: 'LaFleur',
+      createdAt: '2026-05-10',
+      updatedAt: '2026-05-14',
+    };
+    mockProviderRead.mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+
+    const moved = await mergeWith({ dirty: false, changed: true });
+    const movedCalls = vi.mocked(moved.syncService.cancelPendingSave).mock.calls.length;
+
+    expect(movedCalls).toBeGreaterThan(quietCalls);
   });
 
   it('re-uploads when the merge outcome is unknown (fail-safe default)', async () => {

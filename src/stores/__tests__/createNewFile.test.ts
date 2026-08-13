@@ -211,7 +211,6 @@ vi.mock('@/services/sync/fileSync', () => ({
   detectFileVersion: vi.fn(() => '4.0'),
   downloadAsFile: vi.fn(),
   tryUnwrapFamilyKey: vi.fn(),
-  decryptBeanpodPayload: vi.fn(),
 }));
 
 // Crypto — mock Web Crypto API

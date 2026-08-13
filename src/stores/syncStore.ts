@@ -62,6 +62,7 @@ import {
   noteSnapshot as noteOpenCycleSnapshot,
   endOpen,
 } from '@/services/telemetry/openCycle';
+import type { OpenToken, OpenOutcome } from '@/services/telemetry/openCycle';
 import { slackNotify } from '@/utils/slackNotify';
 import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
@@ -90,7 +91,7 @@ import {
   reEncryptEnvelope,
   detectFileVersion,
 } from '@/services/sync/fileSync';
-import { preserveLocalKeyDicts } from '@/services/sync/envelopeMerge';
+import { preserveLocalKeyDicts, keyDictSize } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
   deriveMemberKey,
@@ -940,32 +941,47 @@ export const useSyncStore = defineStore('sync', () => {
           // post-read capture); re-reading it was a second network round-trip that
           // set the same variable to the same value.
 
+          // `dirty` is derived purely from Automerge doc heads, so it can NEVER be
+          // true for an envelope-only change. But a save publishes the envelope key
+          // dicts too, and `replaceEnvelope` has just merged in any local-only
+          // entries (a passkey enrolled while Drive was unreachable, a rotate-key
+          // write). Those are documented as "riding the next successful save"
+          // (PasskeySettings.vue, LoadPodView.vue), so the save trigger must
+          // consider them or the passkey never reaches Drive and the member cannot
+          // unlock the pod from another device.
+          const envelopeGainedLocalKeys = keyDictSize(merged) > keyDictSize(remoteEnvelope);
+
           lastSync.value = toISODateString(new Date());
 
           if (changed) await reloadAllStores();
 
           if (merging) {
-            // Only when the merge actually moved the doc: on a no-op merge the
-            // projection is already current, so re-projecting ~21 stores and
-            // re-scanning for duplicates is pure work for an unchanged result.
-            if (changed) {
-              // CRDT merges can produce duplicate recurring transactions
-              // (same recurringItemId + date, different UUIDs from different actors).
-              // Clean them up before saving back.
-              const dupsRemoved = await deduplicateRecurringTransactions();
-              if (dupsRemoved > 0) {
-                await reloadAllStores();
-              }
+            // Runs unconditionally, NOT gated on `changed`. It is a read-mostly scan
+            // that mutates only when it finds something, and it is the self-heal for
+            // duplicates that already exist — including a dedup interrupted midway
+            // (it deletes one row at a time). A warm-cache single-device user takes
+            // this path with `changed === false` on every open, so gating it here
+            // would mean those duplicates are never swept at all.
+            const dupsRemoved = await deduplicateRecurringTransactions();
+            if (dupsRemoved > 0) {
+              await reloadAllStores();
             }
-            // Re-upload only if the converged doc still carries local changes the
-            // remote lacks. This is a CONSISTENCY fix, not the write-coalescing the
-            // ADR-032 addendum forbids: `dirty === false` means local and remote
-            // already agree, so the write would publish nothing. The other three
-            // save call sites (`replaceDocWithCacheRecovery`, `hydrateFromEnvelope`,
-            // `syncService.fetchAndMergeRemote`) have always gated on `dirty`; this
-            // one was the outlier. Post-merge dedup mutations still save on their
-            // own via `docClient.mutate` → `localChangeHandler`.
-            if (dirty) syncService.triggerDebouncedSave();
+
+            // Re-upload when the converged doc still carries local changes the remote
+            // lacks. This is a CONSISTENCY fix, not the write-coalescing the ADR-032
+            // addendum forbids: `dirty === false` means local and remote already
+            // agree, so the write would publish nothing. The other three save call
+            // sites have always gated on `dirty`; this one was the outlier.
+            //
+            // `dupsRemoved` is NOT redundant with `dirty`, and this is subtle: the
+            // dedup's own mutations DO arm a save via `localChangeHandler`, but
+            // `reloadAllStores()` calls `syncService.cancelPendingSave()` — so the
+            // reload two lines above silently discards it. Without this term the
+            // deletions live only in the local doc + cache, Drive keeps the
+            // duplicates, and every other device keeps showing them.
+            if (dirty || dupsRemoved > 0 || envelopeGainedLocalKeys) {
+              syncService.triggerDebouncedSave();
+            }
           }
 
           if (syncService.getProviderType() === 'google_drive') {
@@ -2237,15 +2253,18 @@ export const useSyncStore = defineStore('sync', () => {
    * Fetches fresh data from Drive, CRDT-merges into the live doc.
    * Non-blocking — UI remains interactive throughout.
    */
-  async function backgroundSyncFromFile(): Promise<void> {
+  async function backgroundSyncFromFile(openToken?: OpenToken): Promise<void> {
     if (isBackgroundSyncing.value) {
-      // A sync is already in flight. If an open handed us its telemetry window,
-      // close it here — otherwise it would stay open until the next `beginOpen`
-      // and be emitted as `open-abandoned`. No-op when there is no window (the
-      // header Refresh button and the deferred config-heal reach here too).
-      endOpen('open-complete', { detailSuffix: 'sync-already-in-flight' });
+      // A sync is already in flight. If an OPEN handed us its window, close it —
+      // otherwise it stays open until the next `beginOpen` and is emitted as
+      // `open-abandoned`. Callers without a token (header Refresh, deferred
+      // config-heal) present none, so `endOpen` ignores them and the real open's
+      // window survives.
+      endOpen('open-complete', openToken, { detailSuffix: 'sync-already-in-flight' });
       return;
     }
+    // Classified at each terminal below; `finally` emits it once.
+    let openOutcome: OpenOutcome = 'open-complete';
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
@@ -2281,11 +2300,13 @@ export const useSyncStore = defineStore('sync', () => {
         backgroundSyncError.value = 'Could not refresh data — password may have changed';
         backgroundSyncErrorKind.value = 'decrypt';
         pendingEncryptedFile.value = null;
+        openOutcome = 'open-failed';
         return;
       }
 
       // Non-password failure (network, 404, auth-transient, etc.)
       const lastErr = syncService.getState().lastError;
+      openOutcome = 'open-failed';
       if (isAuthTransientSyncError(lastErr)) {
         backgroundSyncError.value = lastErr ?? 'Token expired';
         backgroundSyncErrorKind.value = 'auth-transient';
@@ -2295,6 +2316,7 @@ export const useSyncStore = defineStore('sync', () => {
         backgroundSyncErrorKind.value = 'network';
       }
     } catch (e) {
+      openOutcome = 'open-failed';
       const msg = e instanceof Error ? e.message : 'Could not refresh data from cloud';
       backgroundSyncError.value = msg;
       const isAuth = isAuthTransientSyncError(msg);
@@ -2308,10 +2330,10 @@ export const useSyncStore = defineStore('sync', () => {
       }
       // Path 1a handed us the open-cycle terminal (see App.vue's loadFamilyData
       // wrapper). This `finally` is the single close point for EVERY outcome —
-      // success, needs-password, network/auth failure, or a throw. No-op when no
-      // window is open, which is how the header Refresh button and the deferred
-      // config-heal reach this code without being counted as app opens.
-      endOpen('open-complete', { providerType: syncService.getProviderType() ?? undefined });
+      // success, needs-password, network/auth failure, or a throw — with the
+      // outcome classified at each terminal rather than reported as success.
+      // Callers with no token (Refresh, config-heal) close nothing.
+      endOpen(openOutcome, openToken);
     }
   }
 

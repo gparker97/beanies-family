@@ -183,7 +183,6 @@ vi.mock('@/services/sync/fileSync', () => ({
   parseBeanpodV4: vi.fn(() => ({})),
   createBeanpodV4: vi.fn(async () => '{"version":"4.0"}'),
   tryUnwrapFamilyKey: vi.fn(async () => null),
-  decryptBeanpodPayload: vi.fn(async () => ({})),
   detectFileVersion: vi.fn(() => '4.0'),
   downloadAsFile: vi.fn(),
 }));
