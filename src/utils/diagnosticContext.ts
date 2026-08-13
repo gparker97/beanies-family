@@ -230,6 +230,20 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'has_card_details',
   'wallet_count',
   'detail_field_count',
+  // Google token lifecycle (surface `google-token-lifecycle`, token-churn fix
+  // #62, 2026-08-13). All PII-FREE closed enums — NEVER a token value: which
+  // grant (drive|calendar), the op (mint|revoke), the outcome (ok|queued|failed),
+  // a short reason enum, and what drove it (reconnect|recovery|signout|disconnect|
+  // enqueue|queue-drain). Lets us measure token-pressure + revoke success-rate
+  // fleet-wide. MIRROR every key here in the Lambda allowlist + its pinned test,
+  // AND in the store data-collection declarations (docs/runbooks/
+  // native-store-submission.md, PrivacyInfo.xcprivacy, Play Data Safety,
+  // web/src/pages/privacy.astro).
+  'token_grant',
+  'token_op',
+  'token_outcome',
+  'token_reason',
+  'token_trigger',
 ]);
 
 export const MAX_STRING_LEN = 200;
