@@ -55,3 +55,22 @@ export function preserveLocalKeyDicts(
     passkeyWrappedKeys: mergeKeyDict(incoming.passkeyWrappedKeys, local.passkeyWrappedKeys) ?? {},
   };
 }
+
+/**
+ * Total number of entries across the three key dicts.
+ *
+ * Used to detect whether `preserveLocalKeyDicts` carried local-only key entries
+ * into a merged envelope — i.e. whether this device holds key material the remote
+ * file does not yet have. That state cannot show up in the Automerge-heads-derived
+ * `dirty` flag (keys live in the envelope, not the document), so it needs its own
+ * signal or a passkey enrolled while offline would never be published. See the
+ * "rides the next successful save" contract in `PasskeySettings.vue`.
+ */
+export function keyDictSize(envelope: BeanpodFileV4 | null | undefined): number {
+  if (!envelope) return 0;
+  return (
+    Object.keys(envelope.wrappedKeys ?? {}).length +
+    Object.keys(envelope.passkeyWrappedKeys ?? {}).length +
+    Object.keys(envelope.inviteKeys ?? {}).length
+  );
+}

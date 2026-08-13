@@ -887,6 +887,7 @@ async function fetchAndMergeRemote(): Promise<void> {
   // the base is the sole source of a peer's edits (change-chunks retired 2026-07-15).
   // This whole-doc read + merge is how every peer's changes reach us — do not gate or
   // skip it on the assumption a delta layer will carry them.
+  bumpOpenCycle('driveRead'); // the poll/save-path whole-file read — also counted
   const text = await currentProvider.read();
   if (!text) return;
 
@@ -979,6 +980,12 @@ async function doSave(): Promise<boolean> {
     // re-introducing a delta mechanism AND re-deriving the convergence argument,
     // or a peer can silently miss another device's edits.
     bumpOpenCycle('driveWrite'); // counted per attempt; no-op outside an open window
+    // Capture BEFORE the awaits below. `currentProvider` is a nullable module var
+    // that `reset()` / `disconnect()` clear with no serialization against an
+    // in-flight save — sign-out explicitly abandons a still-running `doSave`. If the
+    // catch handler dereferenced it after that, the handler itself would throw and
+    // turn a write that actually reached Drive into a reported save failure.
+    const providerTypeForDiag = currentProvider.type;
     await currentProvider.write(fileContent);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
 
@@ -1002,7 +1009,10 @@ async function doSave(): Promise<boolean> {
         surface: 'sync-save',
         message: 'post-write timestamp capture failed — next save will re-fetch',
         error: e,
-        context: { action: 'post-write-timestamp-failed', provider_type: currentProvider.type },
+        // No `provider_type` here: `enrichAndRedact` sets it from the sync store on
+        // every event and would overwrite anything passed. `action` is the field
+        // that actually survives.
+        context: { action: 'post-write-timestamp-failed', detail: providerTypeForDiag },
       });
     }
 
@@ -1060,6 +1070,7 @@ export async function load(): Promise<string | null> {
     }
 
     bumpOpenCycle('driveRead'); // counted per attempt; no-op outside an open window
+    const providerTypeForDiag = currentProvider.type; // see doSave — capture before the awaits
     const text = await currentProvider.read();
 
     if (!text) {
@@ -1086,7 +1097,7 @@ export async function load(): Promise<string | null> {
         surface: 'sync-load',
         message: 'post-read timestamp capture failed — no change-detection baseline',
         error: e,
-        context: { action: 'post-read-timestamp-failed', provider_type: currentProvider.type },
+        context: { action: 'post-read-timestamp-failed', detail: providerTypeForDiag },
       });
     }
 

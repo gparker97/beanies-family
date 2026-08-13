@@ -47,6 +47,7 @@ import {
   type CachePersistFailureDetail,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 
 /** Minimal Worker surface — real `Worker` satisfies it; tests inject a fake. */
 export interface DocWorkerLike {
@@ -820,7 +821,15 @@ export function initDoc(): Promise<{ loaded: true }> {
 /** Init the worker cache + load the cached doc; pushes the full projection. */
 export async function initAndLoadCache(familyId: string): Promise<{ loaded: boolean }> {
   currentFamilyId = familyId;
-  return request('initAndLoadCache', { familyId });
+  const res = await request<{ loaded: boolean }>('initAndLoadCache', { familyId });
+  // Count only a reconstruction that actually HAPPENED. Counting the
+  // `automerge.cacheLoad` perf label instead would over-count, because `time2`
+  // emits from a `finally` — so a cache MISS (which does zero Automerge work) and
+  // a failed load both look like reconstructions, and path1b's miss-then-adopt
+  // would report rec=2 for one real rebuild. Routing through `request` covers the
+  // inline-fallback realm as well as the worker.
+  if (res.loaded) bumpOpenCycle('reconstruction');
+  return res;
 }
 
 /**
@@ -879,12 +888,20 @@ export function fireAndForgetMutate(op: MutationOp): void {
  * worker-side doc-comment — conflating them causes either a lost upload or a
  * pointless ~21-store re-projection.
  */
-export function mergeRemoteEnvelope(
+export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   familyId: string | null,
   opts?: RequestOpts
 ): Promise<{ heads: Heads; dirty: boolean; changed: boolean }> {
-  return request('mergeRemoteEnvelope', { envelope, familyId }, opts);
+  const res = await request<{ heads: Heads; dirty: boolean; changed: boolean }>(
+    'mergeRemoteEnvelope',
+    { envelope, familyId },
+    opts
+  );
+  // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
+  // payload, worker timeout) is NOT a reconstruction and must not be counted.
+  bumpOpenCycle('reconstruction');
+  return res;
 }
 
 /** Serialize + encrypt the current doc; main assembles the envelope + uploads. */

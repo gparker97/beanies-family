@@ -25,7 +25,6 @@ import {
   mergeRemoteEnvelope,
   exportEncryptedPayload,
   flush,
-  dropDoc,
   reset,
   __resetApplyAndProjectForTesting,
   __hasDocForTesting,
@@ -618,20 +617,32 @@ describe('worker/applyAndProject', () => {
       expect(perf.filter((l) => l === 'snapshot.persist').length).toBeGreaterThan(before);
     });
 
-    it('dropDoc clears the snapshot cursor so the next doc is snapshotted fresh', async () => {
+    // NOTE: `dropDoc`'s own `resetDocCursors()` is deliberately NOT tested — it is
+    // unobservable, and a test asserting it would be false assurance. Every path that
+    // re-installs a doc after a drop (`mergeRemoteEnvelope`'s adopt branch, `initDoc`,
+    // `loadSnapshot`, `initAndLoadCache`) resets the cursors itself, so removing
+    // dropDoc's reset changes no reachable behaviour. Verified by mutation: deleting
+    // it leaves every test green. It stays as cheap defence-in-depth, not as a
+    // behaviour this suite can lock. `openCache` below IS observable — that reset is
+    // the only one on its path — and its test fails when the reset is removed.
+    it('openCache clears the snapshot cursor when a different family DB is opened', async () => {
+      // Scope change, not lifecycle: a cursor surviving a DB switch silently
+      // suppresses the new family's snapshot for the whole session, and
+      // `persistSnapshotOnce` swallows failures so nothing surfaces it.
       setKey(key);
       await openCache(FAMILY_ID);
-      initDoc();
-      await flush();
-      // Cursor is warm — a repeat flush writes nothing.
+      const seed = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 's1',
+        entity: { id: 's1', title: 'seed' },
+      }).doc;
+      await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID);
       await flush();
       const warm = perf.filter((l) => l === 'snapshot.persist').length;
 
-      // A different doc is now live; a cursor left over from the previous one would
-      // silently suppress its snapshot (this is the "forgot a reset site" bug class
-      // that `resetDocCursors` exists to close).
-      dropDoc();
-      initDoc();
+      await openCache(FAMILY_ID); // re-open (stands in for a family switch)
+      await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID);
       await flush();
 
       expect(perf.filter((l) => l === 'snapshot.persist').length).toBeGreaterThan(warm);
