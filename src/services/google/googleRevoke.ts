@@ -19,7 +19,8 @@
  * `googleAuth.ts` (`isSessionStillCurrent`, the `commitAcquiredToken` rollback)
  * are a different concern and deliberately do NOT route through here.
  */
-import { logEvent, type LogLevel } from '@/services/telemetry/logEvent';
+import { logEvent } from '@/services/telemetry';
+import type { LogLevel } from '@/services/telemetry/logEvent';
 import { postRevoke, enqueueRevoke } from '@/services/sync/revokeQueue';
 
 export type TokenGrant = 'drive' | 'calendar';
