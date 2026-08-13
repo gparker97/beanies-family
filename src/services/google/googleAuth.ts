@@ -13,6 +13,7 @@
 import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
 import { isPermanentRefreshFailure } from './refreshFailure';
+import { revokeGrant, logTokenLifecycle } from './googleRevoke';
 import { encodeRedirectState, type RedirectMode, type RedirectGrant } from './redirectState';
 import {
   storeGoogleRefreshToken,
@@ -193,6 +194,16 @@ async function commitAcquiredToken(args: {
         context: { action: 'persist-refresh-token' },
       });
     }
+    // A refresh_token in the response means Google just MINTED a new grant (this
+    // Drive chokepoint never handles calendar). Count it so token-pressure is
+    // measurable fleet-wide — the success-side counterpart to the revoke events,
+    // and the basis for a future "reconnect rate climbing" alert (#62).
+    logTokenLifecycle({
+      grant: 'drive',
+      op: 'mint',
+      outcome: 'ok',
+      trigger: interactive ? 'interactive' : 'silent',
+    });
   } else if (interactive) {
     // Consent should have returned a refresh token; if not, offline access wasn't
     // established. Surface instead of silently continuing.
@@ -861,6 +872,19 @@ async function performPopupAuth(
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
   const prompt = options?.forceConsent ? 'consent' : 'select_account';
+
+  // Revoke-before-mint (#62): a forced consent MINTS a brand-new refresh token.
+  // Revoke the one it replaces FIRST so the account's live-token count stays flat
+  // and Google's 100-token FIFO cap never evicts a working token. Fire-and-forget:
+  // `revokeGrant` is idempotent + offline-durable, so it must not block sign-in,
+  // and it runs strictly BEFORE the consent because a whole-grant revoke after the
+  // exchange would kill the token we just minted. Only forced-consent seams mint.
+  if (options?.forceConsent) {
+    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
+    const prior = (await getGoogleRefreshToken(storageKey))?.token;
+    void revokeGrant(prior, { grant: 'drive', trigger: 'reconnect' });
+  }
+
   const authUrl = buildAuthUrl(clientId, codeChallenge, prompt, options?.loginHint);
   const code = await waitForAuthCode(popup, authUrl);
 
@@ -1362,13 +1386,11 @@ export async function revokeToken(): Promise<void> {
   // Per-session revocation latch — see `sawPermanentFailureThisSession`.
   clearPermanentFailureFlag();
 
-  // Revoke access token via Google's endpoint
+  // Revoke the grant via the shared helper (idempotent + offline-durable +
+  // observable) instead of a bare best-effort fetch (#62). Revoking the access
+  // token revokes the whole grant; `await` preserves this function's ordering.
   if (accessToken) {
-    try {
-      await fetch(`${GOOGLE_REVOKE_URL}?token=${accessToken}`, { method: 'POST' });
-    } catch {
-      // Best-effort revocation
-    }
+    await revokeGrant(accessToken, { grant: 'drive', trigger: 'signout' });
   }
 
   // Clear stored refresh token
@@ -1437,9 +1459,11 @@ export async function clearGoogleSessionState(
   //    which calls this WITHOUT preserveRefreshToken (full network revoke) AND
   //    deletes the local cache + resets the trust flag. See ADR-031.
   if (tokenSnapshot && !preserveRefreshToken) {
-    fetch(`${GOOGLE_REVOKE_URL}?token=${tokenSnapshot}`, { method: 'POST' }).catch(() => {
-      // Network errors are expected (offline, slow, etc.) — best-effort.
-    });
+    // Shared helper: idempotent, offline-durable, observable (#62). Fire-and-forget
+    // to keep the synchronous-teardown contract; a transient failure is queued for
+    // retry instead of silently leaking the grant. Revoking the access token
+    // revokes the whole grant.
+    void revokeGrant(tokenSnapshot, { grant: 'drive', trigger: 'signout' });
   }
 
   // 3. Clear persisted refresh tokens. The pending-family slot is ALWAYS
@@ -1870,6 +1894,19 @@ export async function startRedirectAuth(
 
   const grant: RedirectGrant = opts.grant ?? 'drive';
   const scope = opts.scope; // undefined ⇒ buildAuthUrl's Drive default
+
+  // Revoke-before-mint (#62), Drive only. This redirect always forces consent →
+  // it MINTS a new refresh token; revoke the one it replaces first so the token
+  // pool stays flat. Runs before either arm builds its authorize URL (a whole-
+  // grant revoke after the exchange would kill the freshly-minted token). The
+  // calendar grant is NOT revoked here — its reconnect path owns that (so a Drive
+  // reconnect never disturbs a live calendar grant); see calendarSyncStore. Fire-
+  // and-forget: `revokeGrant` is idempotent + offline-durable.
+  if (grant === 'drive') {
+    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
+    const prior = (await getGoogleRefreshToken(storageKey))?.token;
+    void revokeGrant(prior, { grant: 'drive', trigger: 'reconnect' });
+  }
 
   if (isNative()) {
     // NATIVE: opens the system browser and returns via a deep link — the

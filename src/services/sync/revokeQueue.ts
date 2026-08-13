@@ -21,8 +21,11 @@
  * one classification of "done vs. retry".
  */
 import { openDB, type IDBPDatabase } from 'idb';
-import { onTokenAcquired } from '@/services/google/googleAuth';
 import { logTokenLifecycle, type TokenGrant } from '@/services/google/googleRevoke';
+// NOTE: `onTokenAcquired` (from googleAuth) is imported LAZILY inside
+// `startListening` — a static import would close the cycle
+// googleAuth → googleRevoke → revokeQueue → googleAuth and break module init
+// (offlineQueue avoids this only because googleAuth never imports it).
 
 const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
@@ -177,9 +180,18 @@ function handleOnline(): void {
 
 function startListening(): void {
   if (isListening) return;
+  isListening = true;
   window.addEventListener('online', handleOnline);
+  // Lazy import (see the note at the top of this file): resolves the fully-
+  // initialised googleAuth at runtime, so the `token-acquired` trigger is kept
+  // without a static module cycle. Guarded against a stopListening() that races
+  // the dynamic resolve.
   if (!tokenAcquiredUnsub) {
-    tokenAcquiredUnsub = onTokenAcquired(() => tryDrain('token-acquired'));
+    void import('@/services/google/googleAuth').then(({ onTokenAcquired }) => {
+      if (isListening && !tokenAcquiredUnsub) {
+        tokenAcquiredUnsub = onTokenAcquired(() => tryDrain('token-acquired'));
+      }
+    });
   }
   if (!visibilityHandler && typeof document !== 'undefined') {
     visibilityHandler = () => {
@@ -187,7 +199,6 @@ function startListening(): void {
     };
     document.addEventListener('visibilitychange', visibilityHandler);
   }
-  isListening = true;
 }
 
 function stopListening(): void {
