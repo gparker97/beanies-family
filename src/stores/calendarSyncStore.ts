@@ -33,7 +33,8 @@ import {
   type PollWhileVisibleHandle,
 } from '@/composables/usePollWhileVisible';
 import { getAllActivities } from '@/services/automerge/repositories/activityRepository';
-import { getGoogleAccountEmail } from '@/services/google/googleAuth';
+import { getGoogleAccountEmail, hasRefreshToken } from '@/services/google/googleAuth';
+import { revokeGrant, logTokenLifecycle } from '@/services/google/googleRevoke';
 import {
   getCalendarConnectionById,
   createCalendarConnection,
@@ -769,6 +770,22 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     return result;
   }
 
+  /**
+   * Whether a LIVE Drive grant on the same Google account would die with a
+   * revoke of this calendar token. Drive + Calendar share one OAuth client, so
+   * under Google's whole-grant revoke a calendar-token revoke can also kill a
+   * co-located Drive grant ("die together", see refreshFailure.ts). When that
+   * risk exists we skip the calendar revoke — protecting the active Drive
+   * session is worth leaking one soon-to-age-out calendar token. See plan #62
+   * (revoke-breadth); if the empirical validation proves revoke is per-grant,
+   * this guard can be relaxed to always revoke.
+   */
+  function liveDriveGrantSharesAccount(accountEmail: string | undefined): boolean {
+    if (!accountEmail) return false;
+    const driveEmail = getGoogleAccountEmail();
+    return hasRefreshToken() && !!driveEmail && driveEmail === accountEmail;
+  }
+
   /** Re-run consent for an EXISTING connection (e.g. after needs_reconnect): updates
    *  its shared refresh token + scopes in place — never creates a duplicate. On a
    *  redirect surface hands off to the redirect transport (resume completes it). */
@@ -778,6 +795,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     }
     const existing = await getCalendarConnectionById(connectionId);
     const loginHint = existing?.accountEmail;
+    // Revoke-before-mint (#62): the consent below MINTS a new calendar refresh
+    // token; revoke the one it replaces first so the token pool stays flat. Runs
+    // before the consent (a whole-grant revoke after would kill the fresh token).
+    // Usually a no-op — a needs_reconnect token is already dead at Google — but it
+    // catches the live-token case. Fire-and-forget (idempotent + offline-durable).
+    void revokeGrant(existing?.refreshToken, { grant: 'calendar', trigger: 'reconnect' });
     if (shouldUseRedirectAuth()) {
       await startCalendarRedirectAuth(
         buildCalendarReturnPath(connectionId),
@@ -838,6 +861,20 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
     if (allCleared) {
       invalidGrantCounters.delete(connectionId);
+      // Revoke the calendar grant so a disconnect doesn't leak a live token (#62)
+      // — UNLESS a live Drive grant on the same account would die with it (they
+      // share an OAuth client). The skip is observable, never silent.
+      if (liveDriveGrantSharesAccount(connection.accountEmail)) {
+        logTokenLifecycle({
+          grant: 'calendar',
+          op: 'revoke',
+          outcome: 'skipped',
+          reason: 'shared-live-drive-grant',
+          trigger: 'disconnect',
+        });
+      } else {
+        void revokeGrant(connection.refreshToken, { grant: 'calendar', trigger: 'disconnect' });
+      }
       await removeCalendarConnection(connectionId);
     }
     return allCleared;
