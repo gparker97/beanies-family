@@ -25,6 +25,7 @@ import {
   mergeRemoteEnvelope,
   exportEncryptedPayload,
   flush,
+  dropDoc,
   reset,
   __resetApplyAndProjectForTesting,
   __hasDocForTesting,
@@ -520,6 +521,121 @@ describe('worker/applyAndProject', () => {
     expect(reloaded!.recovered).toBe(false);
     expect(reloaded!.doc.accounts.a0).toEqual({ id: 'a0', balance: 0 });
     expect(reloaded!.doc.accounts[`a${OVER}`]).toEqual({ id: `a${OVER}`, balance: OVER });
+  });
+
+  // ─── Open-cycle redundancy guards (2026-08-13) ─────────────────────────────
+  //
+  // These are the DURABLE regression guard for the redundant-work fixes: prod
+  // counters catch what escapes here, but these fail first and fail loudly. If a
+  // future change makes an open reconstruct twice, re-project on a no-op merge, or
+  // re-encrypt an unchanged projection, one of these goes red.
+  describe('open-cycle redundancy guards', () => {
+    it('mergeRemoteEnvelope reports changed:true when adopting into an empty slot', async () => {
+      setKey(key);
+      const remote = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'r1',
+        entity: { id: 'r1', title: 'remote' },
+      }).doc;
+
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+
+      // Nothing to push BACK (we had no local changes), but every consumer's
+      // projection is stale by definition — the two booleans are not the same
+      // question and must not be collapsed.
+      expect(res.dirty).toBe(false);
+      expect(res.changed).toBe(true);
+    });
+
+    it('mergeRemoteEnvelope reports changed:false for a no-op merge of an identical doc', async () => {
+      setKey(key);
+      const doc = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'r1',
+        entity: { id: 'r1', title: 'remote' },
+      }).doc;
+      // Adopt it first, then merge the SAME bytes again — the classic "open the app
+      // twice with nothing having happened" case.
+      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+
+      const res = await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+
+      expect(res.changed).toBe(false);
+      expect(res.dirty).toBe(false);
+    });
+
+    it('mergeRemoteEnvelope reports changed:true when the remote genuinely moves the doc', async () => {
+      setKey(key);
+      const local = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'l1',
+        entity: { id: 'l1', title: 'local' },
+      }).doc;
+      await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID);
+
+      const remote = applyMutation(local, {
+        op: 'set',
+        collection: 'todos',
+        id: 'r2',
+        entity: { id: 'r2', title: 'remote' },
+      }).doc;
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+
+      expect(res.changed).toBe(true);
+    });
+
+    it('snapshot persist is skipped when the projection has not moved', async () => {
+      setKey(key);
+      await openCache(FAMILY_ID);
+      initDoc();
+      await flush();
+      const firstWrites = perf.filter((l) => l === 'snapshot.persist').length;
+      expect(firstWrites).toBeGreaterThan(0);
+
+      // Re-request a snapshot with no intervening mutation. Without the heads
+      // cursor this re-serialized + AES-encrypted the entire projection again —
+      // which is what the `pagehide` backgrounding flush did on EVERY background,
+      // even for a session where the user only read.
+      // `flush()` IS the `pagehide` backgrounding path — test the real thing.
+      await flush();
+
+      expect(perf.filter((l) => l === 'snapshot.persist').length).toBe(firstWrites);
+    });
+
+    it('snapshot persist resumes after a real mutation', async () => {
+      setKey(key);
+      await openCache(FAMILY_ID);
+      initDoc();
+      await flush();
+      const before = perf.filter((l) => l === 'snapshot.persist').length;
+
+      mutate({ op: 'set', collection: 'todos', id: 't9', entity: { id: 't9', title: 'x' } });
+      await flush();
+
+      expect(perf.filter((l) => l === 'snapshot.persist').length).toBeGreaterThan(before);
+    });
+
+    it('dropDoc clears the snapshot cursor so the next doc is snapshotted fresh', async () => {
+      setKey(key);
+      await openCache(FAMILY_ID);
+      initDoc();
+      await flush();
+      // Cursor is warm — a repeat flush writes nothing.
+      await flush();
+      const warm = perf.filter((l) => l === 'snapshot.persist').length;
+
+      // A different doc is now live; a cursor left over from the previous one would
+      // silently suppress its snapshot (this is the "forgot a reset site" bug class
+      // that `resetDocCursors` exists to close).
+      dropDoc();
+      initDoc();
+      await flush();
+
+      expect(perf.filter((l) => l === 'snapshot.persist').length).toBeGreaterThan(warm);
+    });
   });
 });
 

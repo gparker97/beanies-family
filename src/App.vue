@@ -37,6 +37,7 @@ import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
+import { beginOpen, setOpenPath, endOpen } from '@/services/telemetry/openCycle';
 import {
   shouldShowAppLayout,
   isPodlessExpectedRoute,
@@ -405,7 +406,32 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
  */
 
 /* eslint-disable no-console -- debug logging for sync diagnostics */
+
+/**
+ * Open-cycle telemetry window owner.
+ *
+ * `loadFamilyData` is the SOLE open orchestrator, so it is the only correct place
+ * to open the counting window — `backgroundSyncFromFile` is not, because the
+ * header Refresh button and the deferred config-heal also call it and would
+ * otherwise be counted as app opens.
+ *
+ * The window is closed here at every terminal EXCEPT path1a's, which hands the
+ * terminal to `backgroundSyncFromFile` (fire-and-forget, so this `finally` would
+ * otherwise close the window before the background sync had done its work). The
+ * inner function signals that by returning `'handed-off'`.
+ */
 async function loadFamilyData() {
+  beginOpen();
+  let handedOff = false;
+  try {
+    handedOff = (await loadFamilyDataInner()) === 'handed-off';
+  } finally {
+    // `endOpen` is idempotent, so a terminal that already emitted is unaffected.
+    if (!handedOff) endOpen('open-complete');
+  }
+}
+
+async function loadFamilyDataInner(): Promise<'handed-off' | void> {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   const activeFamilyIdStr = getActiveIdInner();
   initBreadcrumbs.push(`loadFamilyData: activeFamily=${activeFamilyIdStr ?? 'null'}`);
@@ -438,6 +464,7 @@ async function loadFamilyData() {
     const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
 
     if (activeFamilyId && cachedKeyB64) {
+      setOpenPath('path1a');
       initBreadcrumbs.push('path1a: trying persistence cache for fast start');
       console.log('[loadFamilyData] path1a: trying cache-first load...');
       try {
@@ -464,9 +491,11 @@ async function loadFamilyData() {
           if (result.processed > 0) {
             await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
           }
-          // Fire-and-forget: fetch fresh data from Drive in background
+          // Fire-and-forget: fetch fresh data from Drive in background.
+          // It owns the open-cycle terminal from here (success, skip, or failure)
+          // — see the wrapper's doc-comment.
           syncStore.backgroundSyncFromFile();
-          return;
+          return 'handed-off';
         }
         initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');
         console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
@@ -476,6 +505,9 @@ async function loadFamilyData() {
     }
 
     // Step 1b: No cache available — fall back to blocking Drive fetch (skeleton shows in UI)
+    // Relabel rather than restart: reaching path1b after a path1a cache miss is
+    // ONE open that did both pieces of work, not two opens.
+    setOpenPath('path1b');
     initBreadcrumbs.push('path1b: loading from sync file (Drive fetch)');
     console.log('[loadFamilyData] path1b: calling loadFromFile...');
     try {
@@ -563,6 +595,7 @@ async function loadFamilyData() {
 
   // Path 2: File configured but needs permission → try Automerge persistence cache
   if (syncStore.isConfigured && syncStore.needsPermission) {
+    setOpenPath('path2');
     initBreadcrumbs.push('path2: file needs permission, trying cache');
     console.log('[loadFamilyData] File needs permission — trying persistence cache');
     const activeFamilyId = familyContextStore.activeFamilyId;
@@ -599,6 +632,7 @@ async function loadFamilyData() {
 
   // Path 3: No file configured → initialize Automerge doc
   // This path is for first-time users or users without a sync file
+  setOpenPath('path3');
   initBreadcrumbs.push('path3: no file configured, initializing empty doc');
   try {
     // Check if a doc is already loaded (e.g. from the signup flow that just
