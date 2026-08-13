@@ -66,6 +66,8 @@ Drive and Calendar are two independent OAuth grants (separate scopes, separate r
 **Belt-and-suspenders even in the narrowest reading:** any orphaned tokens the app can't reference are auto-expired by Google after **6 months of disuse** for a production app, and — more importantly — stopping growth already breaks the live loop. Manual console revocation remains a _fast optional shortcut_, never a hard requirement.
 
 > Design-validation step for the plan: empirically confirm the breadth of a single programmatic revoke against a scratch account holding multiple grants (does it clear siblings, or only the revoked consent's tokens?). The fix does not depend on the broad reading — but if confirmed broad, the stuck-user "reset" is instant rather than settle-over-a-cycle.
+>
+> **RESULT 2026-08-13 — BROAD.** `scripts/revoke-breadth-check.mjs` against the real client: revoking one refresh token returned `invalid_grant` on a _separate_ sibling token. Revoke kills the whole (user, client) grant ("die together"). Consequences (see the plan's Outcome): revoke-before-mint is required, the Drive-safety guards are essential, and the durable revoke queue was **removed** (a deferred retry would kill the current grant) in favour of immediate best-effort revoke.
 
 ## Proposed fixes (for the plan)
 

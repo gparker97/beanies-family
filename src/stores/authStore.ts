@@ -1464,16 +1464,6 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
-    // Wipe the durable revoke queue — it can hold raw refresh-token secrets from
-    // an offline revoke-before-mint/disconnect, which must not survive the
-    // "clear data" privacy wipe on an untrusted device (#62, ADR-031).
-    try {
-      const { clearRevokeQueue } = await import('@/services/sync/revokeQueue');
-      await clearRevokeQueue();
-    } catch (e) {
-      console.warn('[authStore] failed to clear revoke queue on sign-out', e);
-    }
-
     // Clear trust flag and cached family key
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);

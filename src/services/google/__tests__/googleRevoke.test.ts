@@ -1,28 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock the durable queue + telemetry so revokeGrant is tested in isolation.
-const mockPostRevoke = vi.fn(async (_t: string): Promise<'ok' | 'transient'> => 'ok');
-const mockEnqueueRevoke = vi.fn(async (_t: string, _g: string) => {});
-vi.mock('@/services/sync/revokeQueue', () => ({
-  postRevoke: (t: string) => mockPostRevoke(t),
-  enqueueRevoke: (t: string, g: string) => mockEnqueueRevoke(t, g),
-}));
 const mockLogEvent = vi.fn();
 vi.mock('@/services/telemetry', () => ({ logEvent: (...a: unknown[]) => mockLogEvent(...a) }));
 
 import { revokeGrant, logTokenLifecycle } from '../googleRevoke';
 
-describe('googleRevoke.revokeGrant', () => {
+function stubFetch(responder: () => Response | Promise<Response>) {
+  const spy = vi.fn(async (_url: string, _init?: RequestInit) => responder());
+  vi.stubGlobal('fetch', spy);
+  return spy;
+}
+
+describe('googleRevoke.revokeGrant (whole-grant, immediate best-effort, no retry)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('is an idempotent no-op for a null/empty token (no network, no queue)', async () => {
+  it('is an idempotent no-op for a null/empty token (no network)', async () => {
+    const spy = stubFetch(() => new Response(null, { status: 200 }));
     expect(await revokeGrant(null, { grant: 'drive', trigger: 'signout' })).toEqual({
-      ok: true,
-      reason: 'no-token',
-    });
-    expect(await revokeGrant(undefined, { grant: 'drive', trigger: 'signout' })).toEqual({
       ok: true,
       reason: 'no-token',
     });
@@ -30,20 +27,17 @@ describe('googleRevoke.revokeGrant', () => {
       ok: true,
       reason: 'no-token',
     });
-    expect(mockPostRevoke).not.toHaveBeenCalled();
-    expect(mockEnqueueRevoke).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it('reports revoked + logs an ok lifecycle event when the revoke lands', async () => {
-    mockPostRevoke.mockResolvedValueOnce('ok');
+  it('reports revoked + logs ok when Google returns 2xx', async () => {
+    stubFetch(() => new Response(null, { status: 200 }));
     const res = await revokeGrant('rt-live', { grant: 'drive', trigger: 'reconnect' });
     expect(res).toEqual({ ok: true, reason: 'revoked' });
-    expect(mockPostRevoke).toHaveBeenCalledWith('rt-live');
-    expect(mockEnqueueRevoke).not.toHaveBeenCalled();
-    // A google-token-lifecycle revoke/ok event was emitted with the right context.
     expect(mockLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'google-token-lifecycle',
+        level: 'info',
         context: expect.objectContaining({
           token_grant: 'drive',
           token_op: 'revoke',
@@ -54,28 +48,63 @@ describe('googleRevoke.revokeGrant', () => {
     );
   });
 
-  it('enqueues for durable retry (never drops) when the revoke is transient', async () => {
-    mockPostRevoke.mockResolvedValueOnce('transient');
-    const res = await revokeGrant('rt-offline', { grant: 'calendar', trigger: 'disconnect' });
-    expect(res).toEqual({ ok: false, reason: 'queued' });
-    expect(mockEnqueueRevoke).toHaveBeenCalledWith('rt-offline', 'calendar');
+  it('treats 400 (already-invalid) as done (ok)', async () => {
+    stubFetch(() => new Response(null, { status: 400 }));
+    expect(await revokeGrant('rt-dead', { grant: 'drive', trigger: 'signout' })).toEqual({
+      ok: true,
+      reason: 'revoked',
+    });
   });
 
-  it('logTokenLifecycle maps a failed outcome to warn level, ok to info', () => {
+  it('DROPS a transient failure (403/429/5xx/throw) without retrying, logs failed', async () => {
+    for (const status of [403, 429, 503]) {
+      vi.clearAllMocks();
+      const spy = stubFetch(() => new Response(null, { status }));
+      const res = await revokeGrant('rt-x', { grant: 'calendar', trigger: 'disconnect' });
+      expect(res).toEqual({ ok: false, reason: 'failed' });
+      expect(spy).toHaveBeenCalledTimes(1); // no durable retry (whole-grant safety)
+      expect(mockLogEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          context: expect.objectContaining({
+            token_outcome: 'failed',
+            token_reason: 'transient-dropped',
+          }),
+        })
+      );
+    }
+    // Network throw
+    vi.clearAllMocks();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('offline');
+      })
+    );
+    expect(await revokeGrant('rt-y', { grant: 'drive', trigger: 'reconnect' })).toEqual({
+      ok: false,
+      reason: 'failed',
+    });
+  });
+
+  it('sends the token url-encoded with keepalive so it survives a navigation', async () => {
+    const spy = stubFetch(() => new Response(null, { status: 200 }));
+    await revokeGrant('a b/c', { grant: 'drive', trigger: 'reconnect' });
+    const [url, init] = spy.mock.calls[0]!;
+    expect(url).toContain('token=a%20b%2Fc');
+    expect(init).toMatchObject({ method: 'POST', keepalive: true });
+  });
+
+  it('logTokenLifecycle maps failed → warn, ok → info', () => {
     logTokenLifecycle({ grant: 'drive', op: 'mint', outcome: 'ok', trigger: 'interactive' });
     expect(mockLogEvent).toHaveBeenLastCalledWith(expect.objectContaining({ level: 'info' }));
     logTokenLifecycle({
-      grant: 'drive',
+      grant: 'calendar',
       op: 'revoke',
       outcome: 'failed',
-      reason: 'enqueue-failed',
-      trigger: 'enqueue',
+      reason: 'transient-dropped',
+      trigger: 'disconnect',
     });
-    expect(mockLogEvent).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        level: 'warn',
-        context: expect.objectContaining({ token_reason: 'enqueue-failed' }),
-      })
-    );
+    expect(mockLogEvent).toHaveBeenLastCalledWith(expect.objectContaining({ level: 'warn' }));
   });
 });

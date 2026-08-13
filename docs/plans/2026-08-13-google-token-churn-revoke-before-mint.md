@@ -194,7 +194,20 @@ Shipped as branch `google-token-churn-fix` (7 commits), verified green (type-che
 
 **Not deployed.** Landed on `main`; deploy remains a manual, explicit step.
 
-**Still open (greg):** the revoke-breadth validation (does one programmatic revoke clear sibling grants?) — the fix is correct either way; it only decides whether stuck-user recovery is instant vs. settles over a cycle.
+### Update 2026-08-13 (later) — `/code-review max`, revoke-breadth verdict, and the queue removal
+
+**`/code-review max` ran** (14 findings). The reading-independent ones were fixed and pushed (keepalive on the revoke fetch, sign-out revokes the durable refresh token, 403→transient, fail-safe Drive-share guard applied to reconnect + disconnect via a shared helper, mint-telemetry timing + calendar mints, self-recovery `raceTimeout` bound, cold-open IDB gating, plus unit tests). See the fix commit.
+
+**Revoke-breadth validation: RUN — result is BROAD.** `scripts/revoke-breadth-check.mjs` against the real client: revoking one refresh token returned `invalid_grant` on a _separate_ sibling token — revoke kills the **whole (user, client) grant**. Implications, now baked in:
+
+- **Revoke-before-mint is correct and required** (a post-mint revoke would kill the freshly minted token). ✓ as shipped.
+- **The Drive-safety guards are essential** (revoking a calendar token kills a co-located Drive grant). ✓ kept, fail-safe.
+- **The durable revoke QUEUE was removed** (was: `src/services/sync/revokeQueue.ts` + IndexedDB). Under whole-grant revoke a _deferred_ retry is a time-bomb: it would drain after a replacement token exists and kill the current grant (review finding 3, confirmed real). Revoke is now **immediate best-effort, no retry**: a transient failure is dropped and logged (`outcome:'failed', reason:'transient-dropped'`). The orphaned token is bounded — a healthy reconnect's _successful_ revoke resets the entire pool to one, and stragglers FIFO-evict or expire (~6mo). This also resolves finding 5 (no persisted token secrets) and returns sign-out revoke to its established best-effort behaviour.
+- **Healthy reconnects now self-reset the pool** (revoke live token → whole grant dies → mint → pool = 1), so users effectively never accumulate toward the cap going forward. An already-stuck user (dead token, no live token to revoke) heals within ~2 reconnects (1st mints a fresh live token, 2nd revoke-before-mint resets), or immediately via `tryReconnectSilently` adopting a mirrored token — not "instant reset from a single console-free action", but fast. (Review finding 9 characteristic, now understood under BROAD.)
+
+**Remaining review items, by disposition:** finding 1 (cancelling a healthy-account _switch_ loses the session) is **inherent** under whole-grant revoke and recoverable (one reconnect) — accepted, documented in the caveats. Finding 11 (make the account-mismatch toast an actionable switch button) is a UX refinement folded into the deferred commit-5 work.
+
+**Still open (greg):** deploy (manual); commit 5 (unified consent — now _more_ clearly justified, since Drive+Calendar genuinely die together, so a both-connected reconnect must restore both).
 
 ## Prompt Log
 
