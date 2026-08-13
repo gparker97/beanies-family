@@ -3486,6 +3486,9 @@ export const useSyncStore = defineStore('sync', () => {
    */
   // One-at-a-time guard for the silent self-recovery below.
   let selfRecoveryInFlight = false;
+  // Longer than tryReconnectSilently's own retry budget (~22.5s) so a legitimate
+  // recovery is never cut short, but bounded so the latch always releases.
+  const SELF_RECOVERY_TIMEOUT_MS = 30_000;
 
   /**
    * Attempt a SILENT recovery from a permanent Google auth failure before the
@@ -3507,7 +3510,13 @@ export const useSyncStore = defineStore('sync', () => {
     setTimeout(() => {
       void (async () => {
         try {
-          const recovered = await tryReconnectSilently(getGoogleAccountEmail());
+          // Bounded so a hung `tryReconnectSilently` can never wedge the latch (and
+          // thus disable recovery + the fallback banner) for the rest of the
+          // session. `undefined` (timeout) is treated as "not recovered" → banner.
+          const recovered = await raceTimeout(
+            tryReconnectSilently(getGoogleAccountEmail()),
+            SELF_RECOVERY_TIMEOUT_MS
+          );
           logTokenLifecycle({
             grant: 'drive',
             op: 'recovery',
