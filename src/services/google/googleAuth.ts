@@ -19,7 +19,11 @@ import {
   storeGoogleRefreshToken,
   getGoogleRefreshToken,
   clearGoogleRefreshToken,
+  clearProviderConfig,
+  getLastGoogleAccount,
+  setLastGoogleAccount,
   type StoredRefreshToken,
+  type LastGoogleAccount,
 } from '@/services/sync/fileHandleStore';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
@@ -512,7 +516,123 @@ export async function initializeAuth(familyId: string): Promise<void> {
       });
     }
   }
+  // Different-account sign-in reset (#62): if the account authenticating now
+  // differs from the one that last authenticated, revoke + clear the DEPARTED
+  // account's stale token state before this session settles. Runs at the one
+  // transport-agnostic bind point. Cheap on the hot path (no fetch on cold boot;
+  // the heavy revoke is dispatched, not awaited). Never blocks the bind.
+  await reconcileDepartedAccount(familyId);
   installAuthWakeListener();
+}
+
+/**
+ * Detect a different-account sign-in and, if so, dispatch a teardown of the
+ * previously-authenticated (departed) account's token artifacts (#62).
+ *
+ * The teardown targets ONLY the previous family's token slot (`prev.familyId`),
+ * never the family just bound (`familyId`) — the `prev.familyId !== familyId`
+ * guard makes that impossible, so it can never clobber the new session, the
+ * cold-boot re-bind, or the same-family in-app account switch. Detection uses the
+ * OAuth-verified email (no network call on cold boot → no-op) and never throws
+ * out: `initializeAuth` is load-bearing on every cold boot.
+ */
+async function reconcileDepartedAccount(familyId: string): Promise<void> {
+  try {
+    const newEmail = await ensureVerifiedGoogleAccountEmail();
+    if (!newEmail) return; // cold boot / no live session → not an account change
+    const prev = getLastGoogleAccount();
+    if (prev && prev.familyId !== familyId && prev.email.toLowerCase() !== newEmail.toLowerCase()) {
+      logEvent({
+        level: 'info',
+        surface: 'account-switch-reset',
+        message: 'different account signed in — resetting the departed account',
+        context: { action: 'teardown-departed-account' },
+      });
+      // DISPATCHED, not awaited: touches only the departed account and is
+      // offline-durable/idempotent. Awaiting would put an old-account network
+      // revoke on the load-bearing bind path (every cold boot / load awaits it).
+      void teardownDepartedAccount(prev);
+    } else {
+      logEvent({
+        level: 'info',
+        surface: 'account-switch-reset',
+        message: 'same account (or first sign-in) — no teardown',
+        context: { action: 'noop-same-account' },
+      });
+    }
+    setLastGoogleAccount(newEmail, familyId); // refresh the breadcrumb either way
+  } catch (e) {
+    // Detection must NEVER break the bind.
+    logEvent({
+      level: 'warn',
+      surface: 'account-switch-reset',
+      message: 'departed-account reconcile failed (non-blocking)',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { action: 'reconcile-error' },
+    });
+  }
+}
+
+/**
+ * Best-effort teardown of a departed Google account's token artifacts (#62).
+ * Every step is keyed on `prev.familyId` and no-ops if that slot is already
+ * empty (a stale/deleted-family breadcrumb can only cause a no-op, never data
+ * loss). Each step is independently guarded so one failure never skips the rest.
+ * The `.beanpod` mirror is NOT cleared here — the departed family's doc is not
+ * resident on a cross-family switch; that is covered by the full-sign-out clear
+ * (authStore) + the per-account `matchesBoundAccount` recovery guard.
+ */
+async function teardownDepartedAccount(prev: LastGoogleAccount): Promise<void> {
+  // 1. Revoke the old grant (whole-grant: kills old Drive + Calendar together).
+  try {
+    const stored = await getGoogleRefreshToken(prev.familyId);
+    await revokeGrant(stored?.token, { grant: 'drive', trigger: 'account-change' });
+  } catch (e) {
+    reportError({
+      surface: 'account-switch-reset',
+      severity: 'warning',
+      message: 'departed-account grant revoke failed',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { action: 'teardown-revoke', family_id: prev.familyId },
+    });
+  }
+  // 2. Clear the old IndexedDB (+ localStorage mirror) refresh token.
+  try {
+    await clearGoogleRefreshToken(prev.familyId);
+    logEvent({
+      level: 'info',
+      surface: 'account-switch-reset',
+      message: 'departed-account refresh token cleared',
+      context: { action: 'cleared-token', family_id: prev.familyId },
+    });
+  } catch (e) {
+    reportError({
+      surface: 'account-switch-reset',
+      severity: 'warning',
+      message: 'departed-account token clear failed',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { action: 'teardown-token', family_id: prev.familyId },
+    });
+  }
+  // 3. Reset the old provider-config binding so a later return can't resurrect
+  //    the stale bound account.
+  try {
+    await clearProviderConfig(prev.familyId);
+    logEvent({
+      level: 'info',
+      surface: 'account-switch-reset',
+      message: 'departed-account provider config cleared',
+      context: { action: 'cleared-config', family_id: prev.familyId },
+    });
+  } catch (e) {
+    reportError({
+      surface: 'account-switch-reset',
+      severity: 'warning',
+      message: 'departed-account config clear failed',
+      error: e instanceof Error ? e : new Error(String(e)),
+      context: { action: 'teardown-config', family_id: prev.familyId },
+    });
+  }
 }
 
 // Window of time before `expiresAt` that triggers a proactive refresh on
