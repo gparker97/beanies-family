@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.14',
+    date: '2026-08-14',
+    month: '14 august 2026',
+    summary: {
+      en: 'The "wrong Google account" message no longer appears when your family data is loading fine, and beanies now shows the account you\'re actually signed in with.',
+      beanie:
+        'the "wrong google account" message no longer appears when your family data is loading fine, and beanies now shows the account you\'re actually signed in with.',
+    },
+  },
+  {
     version: '2026.08.13',
     date: '2026-08-13',
     month: '13 august 2026',
