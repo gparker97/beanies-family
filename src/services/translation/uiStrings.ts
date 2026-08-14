@@ -5483,6 +5483,42 @@ const STRING_DEFS = {
     beanie: 'no pod files found on google drive',
   },
   'googleDrive.reconnect': { en: 'Reconnect', beanie: 'reconnect' },
+  // Unified Google reconnect prompt (tracker #62, commit 5) — one toast that
+  // names what's disconnected (Drive, Calendar, or both) and reconnects in one
+  // consent where possible.
+  'reconnectPrompt.both.title': {
+    en: 'Google Drive + Calendar disconnected',
+    beanie: 'google drive + calendar disconnected',
+  },
+  'reconnectPrompt.both.body': {
+    en: 'Reconnect once to restore saving and calendar sync.',
+    beanie: 'reconnect once to restore saving and calendar sync.',
+  },
+  'reconnectPrompt.drive.title': {
+    en: 'Google session expired',
+    beanie: 'google session expired',
+  },
+  'reconnectPrompt.drive.body': {
+    en: 'Reconnect to keep saving your family data.',
+    beanie: 'reconnect to keep saving your family data.',
+  },
+  'reconnectPrompt.calendar.title': {
+    en: 'Google Calendar disconnected',
+    beanie: 'google calendar disconnected',
+  },
+  'reconnectPrompt.calendar.body': {
+    en: 'Reconnect to keep your activities in sync.',
+    beanie: 'reconnect to keep your activities in sync.',
+  },
+  'reconnectPrompt.action': { en: 'Reconnect', beanie: 'reconnect' },
+  'reconnectPrompt.error': {
+    en: "Reconnect didn't finish. Please try again.",
+    beanie: "reconnect didn't finish. please try again.",
+  },
+  'reconnectPrompt.reconnected': {
+    en: 'Reconnected to Google.',
+    beanie: 'reconnected to google.',
+  },
   'googleDrive.sessionExpired': {
     en: 'Google session expired. Reconnect to keep saving.',
     beanie: 'google session expired. reconnect to keep saving.',
