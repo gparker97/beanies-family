@@ -1754,6 +1754,16 @@ export const useSyncStore = defineStore('sync', () => {
       // the originating reason + error so the caller can show a focused
       // user-facing message.
       await handleCreateFailure(partialFileId);
+      // Drop any offline-queued save left by the failed write. `provider.write`
+      // enqueues its envelope on a 401 / TokenExpired / 5xx / network error, and
+      // that envelope is encrypted with the family key we are about to discard.
+      // If it survives (the queue persists to sessionStorage and a NON-auth-gated
+      // 'token-acquired'/'online' flush, or a post-reload 'startup', can fire it)
+      // it would later overwrite a subsequently-created good pod with bytes no
+      // cached key can decrypt — bricking the pod. During a create the only queued
+      // content is this doomed create-write, so clearing on failure is safe and
+      // closes the data-loss path for BOTH the auto-retry and the manual re-tap.
+      clearQueue();
       // Mirror to legacy error ref so any old callers still reading it see
       // the latest message; canonical signal is the returned discriminated
       // result.
