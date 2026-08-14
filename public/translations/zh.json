@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-14",
-    "translationCount": 3928
+    "translationCount": 3937
   },
   "translations": {
     "app.name": {
@@ -19645,6 +19645,51 @@
       "translation": "切换到您家人的文件",
       "hash": "81m42w",
       "lastUpdated": "2026-08-10"
+    },
+    "reconnectPrompt.both.title": {
+      "translation": "Google云端硬盘+日历已断开连接",
+      "hash": "wuqd2t",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.both.body": {
+      "translation": "重新连接一次以恢复保存和日历同步。",
+      "hash": "r5yc5b",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.drive.title": {
+      "translation": "Google会话已过期",
+      "hash": "ph61uc",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.drive.body": {
+      "translation": "重新连接以继续保存您的家庭数据。",
+      "hash": "ewkpji",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.calendar.title": {
+      "translation": "Google日历已断开连接",
+      "hash": "lreqly",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.calendar.body": {
+      "translation": "重新连接以保持您的活动同步。",
+      "hash": "n873r1",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.action": {
+      "translation": "重新连接",
+      "hash": "lihjux",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.error": {
+      "translation": "重新连接未完成。请重试。",
+      "hash": "pz9ns9",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.reconnected": {
+      "translation": "已重新连接到Google。",
+      "hash": "a54syi",
+      "lastUpdated": "2026-08-14"
     }
   }
 }

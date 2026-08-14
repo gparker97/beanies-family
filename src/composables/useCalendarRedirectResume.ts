@@ -25,25 +25,7 @@ import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
-
-/** Bounded wait for the Automerge doc to finish loading (a web reload boots in
- *  parallel with this watcher). Resolves true once loaded, false on timeout. */
-async function waitForDocLoaded(timeoutMs = 15_000): Promise<boolean> {
-  const { isLoaded } = await import('@/services/automerge/projection');
-  if (isLoaded()) return true;
-  const start = Date.now();
-  return new Promise((resolve) => {
-    const timer = setInterval(() => {
-      if (isLoaded()) {
-        clearInterval(timer);
-        resolve(true);
-      } else if (Date.now() - start >= timeoutMs) {
-        clearInterval(timer);
-        resolve(false);
-      }
-    }, 100);
-  });
-}
+import { waitForDocLoaded } from '@/composables/waitForDocLoaded';
 
 export function useCalendarRedirectResume(): void {
   const route = useRoute();

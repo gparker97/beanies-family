@@ -14,6 +14,7 @@ import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import { useHelpfulHints } from '@/composables/useHelpfulHints';
 import { useNotifications } from '@/composables/useNotifications';
 import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
+import { useUnifiedRedirectResume } from '@/composables/useUnifiedRedirectResume';
 import { useReminderTapResume } from '@/composables/useReminderTapResume';
 import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -29,8 +30,7 @@ import NotificationsDrawer from '@/components/notifications/NotificationsDrawer.
 import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
 import FeedbackModal from '@/components/feedback/FeedbackModal.vue';
 import { claimInterruption } from '@/composables/useSessionInterruption';
-import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
-import CalendarReconnectToast from '@/components/common/CalendarReconnectToast.vue';
+import UnifiedReconnectToast from '@/components/common/UnifiedReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
 import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
@@ -1393,6 +1393,7 @@ useNotifications();
 // intent. Reactive + SPA-safe; instantiates the calendar store only when a
 // resume is actually pending (zero-cost when the feature is off). See ADR-032.
 useCalendarRedirectResume();
+useUnifiedRedirectResume();
 
 // Reminder-notification tap → open the item. The tap listener (registered by
 // useLocalNotifications above) only stashes the target; this resolves it to a
@@ -1655,13 +1656,11 @@ watch(
     <div
       class="fixed right-4 bottom-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
     >
-      <GoogleReconnectToast
-        v-if="syncStore.showGoogleReconnect && !authStore.needsAuth"
-        @reconnected="handleGoogleReconnected"
-      />
-      <!-- Calendar reconnect toast self-gates on the store's needs_reconnect
-           computed (independent grant from Drive; both may show if both die). -->
-      <CalendarReconnectToast />
+      <!-- Unified reconnect toast (tracker #62, commit 5): ONE prompt for Drive
+           and/or Calendar. Names what's down and reconnects both in one consent
+           when they share an account. Self-gates on the coordinator's
+           activeReconnectPrompt; the !needsAuth gate matches the old Drive toast. -->
+      <UnifiedReconnectToast v-if="!authStore.needsAuth" />
       <InstallPrompt />
     </div>
 

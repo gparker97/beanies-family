@@ -39,7 +39,9 @@ const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
 // Default (Drive) scope set. buildAuthUrl uses this unless a caller passes an
 // explicit scope (the calendar grant passes its own — see startRedirectAuth).
-const DRIVE_SCOPES = `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`;
+// Exported so the unified reconnect coordinator can build the Drive+Calendar
+// scope union for a single consent (tracker #62, commit 5).
+export const DRIVE_SCOPES = `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`;
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
@@ -674,6 +676,10 @@ export async function loadGIS(): Promise<void> {
 export async function requestAccessToken(options?: {
   forceConsent?: boolean;
   loginHint?: string;
+  // Optional OAuth scope string. Defaults to DRIVE_SCOPES (existing callers
+  // unchanged). The unified reconnect (tracker #62, commit 5) passes the
+  // Drive+Calendar union so ONE popup consent restores both grants.
+  scope?: string;
 }): Promise<string> {
   // Fast paths that don't need deduplication
   const clientId = getClientId();
@@ -873,7 +879,7 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
 async function performPopupAuth(
   clientId: string,
   popup: Window,
-  options?: { forceConsent?: boolean; loginHint?: string }
+  options?: { forceConsent?: boolean; loginHint?: string; scope?: string }
 ): Promise<string> {
   const epochAtStart = sessionEpoch;
   const codeVerifier = generateCodeVerifier();
@@ -893,7 +899,14 @@ async function performPopupAuth(
     void revokeGrant(prior, { grant: 'drive', trigger: 'reconnect' });
   }
 
-  const authUrl = buildAuthUrl(clientId, codeChallenge, prompt, options?.loginHint);
+  const authUrl = buildAuthUrl(
+    clientId,
+    codeChallenge,
+    prompt,
+    options?.loginHint,
+    undefined,
+    options?.scope
+  );
   const code = await waitForAuthCode(popup, authUrl);
 
   const tokens = await exchangeCodeForTokens({
@@ -1850,6 +1863,22 @@ export function getGoogleAccountEmail(): string | null {
  */
 export function getVerifiedGoogleAccountEmail(): string | null {
   return cachedEmailToken ? cachedEmail : null;
+}
+
+/**
+ * Resolve the OAuth-verified account email, fetching it if necessary. Right after
+ * an interactive consent commits, the verify (`fetchGoogleUserEmail`) runs
+ * fire-and-forget inside `notifyTokenAcquired`, so `getVerifiedGoogleAccountEmail()`
+ * can briefly still be null. The unified reconnect fan-out (tracker #62, commit 5)
+ * needs the authoritative account to match calendar connections, so this awaits a
+ * fresh verify against the current in-memory access token when the cache is not
+ * yet verified. Returns null only when there is no verified email AND no live
+ * token to verify against. Never throws.
+ */
+export async function ensureVerifiedGoogleAccountEmail(): Promise<string | null> {
+  if (cachedEmailToken && cachedEmail) return cachedEmail;
+  if (accessToken) return fetchGoogleUserEmail(accessToken);
+  return null;
 }
 
 /**
