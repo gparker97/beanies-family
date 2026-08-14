@@ -430,3 +430,17 @@ The fix commit touched only `CHANGELOG.md`. Both `main-ci.yml` and `security.yml
 1. **After resolving a rebase conflict, run the formatter before `git rebase --continue`.** Hooks do not run during a rebase. `npx prettier --check <file>` on anything you hand-edited is the cheap guard.
 2. **If a deploy's final commit touches only markdown, expect no CI run.** Dispatch both gates manually — `gh workflow run main-ci.yml --ref main` and `gh workflow run security.yml --ref main` — before `deploy.yml`. A dispatched run is attributed to the branch HEAD, so the gate's `--commit=$SHA` lookup finds it.
 3. **Don't reach for `skip_gate`.** It exists for config-only changes verified locally; using it to route around a missing CI run deploys code that was never checked.
+
+## 17. Syncing a Notion post to the repo: parse rich-text annotations + hrefs, never `plain_text`
+
+**Date:** 2026-08-14
+**Context:** While regenerating blog #8 ("me, myself, and AI") from its Notion row, the extraction script printed only each rich_text run's `plain_text`. That flattens away everything Notion stores as annotations or link metadata. Two inline links greg had added — one on "beanies.family" (utm-tagged homepage) and a spoke link on "clear the context window" (→ the family-scrapbook post) — were silently dropped, along with seven `_claude-bot_` italics and one `_everything_`. The post shipped and deployed to prod before greg caught the missing homepage link; a second sweep (this time reading annotations) found the rest. It took three follow-up commits + two redeploys to fully repair what one correct parse would have carried through cleanly.
+
+**Pattern:** A Notion paragraph's `rich_text` is an array of runs, each carrying `plain_text` **plus** `annotations` (`bold`/`italic`/`code`/`strikethrough`/`underline`) and `href` (also reachable via `text.link.url`). Reading `plain_text` alone loses all formatting and every hyperlink with **no error** — the text still looks complete, so the loss is invisible until a human notices a link or emphasis is gone. Captions on `image` blocks are `image.caption[]` (same run shape) and are just as easy to miss.
+
+**Rule:**
+
+1. **When converting Notion blocks to markdown, render every run, not its `plain_text`.** For each run: wrap in `**…**` if `annotations.bold`, `_…_` if `annotations.italic`, `` `…` `` if `annotations.code`, and `[…](href)` if `href`/`text.link` is set. Compose them (a run can be both italic and a link).
+2. **After a sync, grep the built HTML for `<a href` and `<em>`/`<strong>` counts and reconcile against the Notion source** before calling it done — a plain-text parse passes the build cleanly, so the build is not the check.
+3. **The Notion MCP write API cannot set annotations** (`API-update-a-block`'s `richTextRequest` has no `annotations` field — it 400s). So a formatting fix that must live in Notion (golden source) has to be done by hand there; the skill can only fix the repo copy and must flag the one-click Notion toggle to keep them in sync.
+4. This is the blog-sync analogue of the beanie-mode/i18n discipline: the failure is a **silent** one, and silent content regressions are the ones that reach readers.
