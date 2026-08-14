@@ -11,14 +11,17 @@
  *      member's own OAuth response; we never infer from indirect signals.
  *   2. **Match** — member's `googleAccountEmail` equals the OAuth email.
  *      No-op.
- *   3. **Mismatch** — surface a manual "switch account" toast (once). We do
- *      NOT auto-force a re-consent: that silently MINTED a fresh refresh token
- *      on every mismatched (often background) acquisition and was a real driver
- *      of Google's per-account token-cap churn (#62). The user re-consents on an
- *      explicit gesture via Settings → Reconnect / "Switch Google account"
- *      (`armAccountSwitch`).
- *
- * A warn-once latch keeps a repeating silent refresh from spamming the toast.
+ *   3. **Mismatch** — record a silent diagnostic event and do NOTHING user-facing
+ *      (2026-08-14). A nominal email mismatch is NOT itself an error: the session
+ *      account may legitimately have shared access to the file. We no longer show
+ *      a "wrong account" toast here (it fired on every hard refresh for a
+ *      multi-account user whose data loaded fine). The genuine can't-access case
+ *      is surfaced by the provider's 404 classifier (reconnect banner), and the
+ *      stale binding self-heals on the next proven Drive access (see
+ *      `healAccountBindingIfNeeded` in syncStore). We also never auto-force a
+ *      re-consent: that silently MINTED a fresh refresh token on every mismatched
+ *      (often background) acquisition and was a real driver of Google's
+ *      per-account token-cap churn (#62).
  *
  * The "switch Google account" flow opts out of assertion via
  * `armAccountSwitch()` — the next acquisition's email is treated as
@@ -28,16 +31,10 @@
 import { onTokenAcquired } from '@/services/google/googleAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { showToast } from '@/composables/useToast';
-import { useTranslationStore } from '@/stores/translationStore';
+import { logEvent } from '@/services/telemetry';
 
 let registered = false;
 let unsubscribe: (() => void) | null = null;
-
-// Warn-once latch — a mismatched session fires the subscriber on every
-// (often silent) acquisition; show the manual-switch toast only once. Reset to
-// false when the next acquisition matches or is consumed by an account switch.
-let mismatchWarned = false;
 
 // One-shot flag set by the "switch Google account" flow. When set, the
 // next *interactive* token acquisition's email is written to the member
@@ -120,7 +117,6 @@ export function registerGoogleAccountAssertion(): void {
     // as a mismatch and trigger a re-consent loop.
     if (interactive && isPendingAccountSwitch()) {
       disarmAccountSwitch();
-      mismatchWarned = false;
       await fam.updateMember(memberId, { googleAccountEmail: email });
       return;
     }
@@ -133,29 +129,24 @@ export function registerGoogleAccountAssertion(): void {
 
     // Match — happy path.
     if (member.googleAccountEmail === email) {
-      mismatchWarned = false;
       return;
     }
 
     // Mismatch — the acquired token is for a DIFFERENT Google account than this
-    // member is bound to. Do NOT auto-force a re-consent here (#62): that silently
-    // MINTED a fresh refresh token on every mismatched background acquisition,
-    // which was a real driver of Google's per-account 100-token-cap churn. Surface
-    // a manual switch instead — the user resolves it via Settings → Reconnect /
-    // "Switch Google account" (armAccountSwitch), which re-consents on an explicit
-    // gesture. Warn once so a repeating silent refresh doesn't spam the toast.
-    if (mismatchWarned) return;
-    mismatchWarned = true;
-    console.warn(
-      `[accountAssertion] Token returned ${email}, expected ${member.googleAccountEmail}. ` +
-        `Surfacing manual switch (no auto re-consent).`
-    );
-    const t = useTranslationStore();
-    showToast(
-      'warning',
-      t.t('auth.accountMismatchTitle'),
-      t.t('auth.accountMismatchBody').replace('{email}', member.googleAccountEmail)
-    );
+    // member is bound to. This is NOT surfaced to the user (2026-08-14): a nominal
+    // mismatch where the session can still access the file is benign, and toasting
+    // it fired on every hard refresh for a multi-account user whose data loaded
+    // fine. Record a silent diagnostic and defer to the access-based path — the
+    // provider's 404 classifier surfaces a genuine can't-access as a reconnect
+    // banner, and the stale binding self-heals on the next proven Drive access
+    // (`healAccountBindingIfNeeded` in syncStore). `logEvent` is client-side
+    // rate-limited (50/surface/min), so a repeating silent refresh cannot spam it.
+    logEvent({
+      level: 'info',
+      surface: 'account-mismatch-benign',
+      message: 'Token account differs from the member binding; deferring to access-based heal',
+      context: { action: 'deferred-to-access-path' },
+    });
   });
 }
 
@@ -167,7 +158,6 @@ export function _resetGoogleAccountAssertionForTests(): void {
   if (unsubscribe) unsubscribe();
   unsubscribe = null;
   registered = false;
-  mismatchWarned = false;
   pendingAccountSwitch = false;
   writePendingSwitchToStorage(false);
 }

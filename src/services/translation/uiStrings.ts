@@ -3311,14 +3311,6 @@ const STRING_DEFS = {
     beanie:
       "use this on shared or public devices - signs out and removes all local data from this device. don't worry - your data is safe with you and we'll find it again when you come back.",
   },
-  'auth.accountMismatchTitle': {
-    en: 'Wrong Google account',
-    beanie: 'wrong google account',
-  },
-  'auth.accountMismatchBody': {
-    en: 'Please sign in with {email} to access your data.',
-    beanie: 'please sign in with {email} to access your data',
-  },
   'settings.familyData.signedInAs': {
     en: 'Signed in with',
     beanie: 'signed in with',
