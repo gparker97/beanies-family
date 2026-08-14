@@ -1096,7 +1096,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <input
             v-model="currencySearch"
             type="text"
-            class="font-outfit w-full rounded-xl border border-gray-200 bg-white py-2 pr-3 pl-9 text-sm text-gray-700 placeholder-gray-400 transition-colors outline-none focus:border-[#F15D22]/40 focus:ring-2 focus:ring-[#F15D22]/10 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-200 dark:placeholder-gray-500"
+            class="font-outfit w-full rounded-xl border border-gray-200 bg-white py-2 pr-3 pl-9 text-base text-gray-700 placeholder-gray-400 transition-colors outline-none focus:border-[#F15D22]/40 focus:ring-2 focus:ring-[#F15D22]/10 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-200 dark:placeholder-gray-500"
             :placeholder="t('settings.searchCurrencies')"
           />
           <svg

@@ -303,7 +303,7 @@ function handleDelete() {
       <input
         v-model="notes"
         type="text"
-        class="w-full border-none bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('assets.notesPlaceholder')"
       />
     </FormFieldGroup>

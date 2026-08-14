@@ -1031,7 +1031,7 @@ function dismissLinkPrompt() {
               <div class="relative">
                 <select
                   :value="String(dayOfMonth)"
-                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-2 pr-6 pl-3 text-sm font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
+                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-2 pr-6 pl-3 text-base font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
                   @change="dayOfMonth = Number(($event.target as HTMLSelectElement).value)"
                 >
                   <option v-for="opt in dayOfMonthOptions" :key="opt.value" :value="opt.value">

@@ -117,7 +117,7 @@ async function toggleComplete(todoId: string) {
             v-model="newTaskTitle"
             type="text"
             :placeholder="t('nook.addTaskPlaceholder')"
-            class="font-outfit min-w-0 flex-1 bg-transparent text-sm font-medium text-[var(--color-text)] outline-none placeholder:opacity-40"
+            class="font-outfit min-w-0 flex-1 bg-transparent text-base font-medium text-[var(--color-text)] outline-none placeholder:opacity-40"
             @keydown="handleKeydown"
           />
           <button
