@@ -50,6 +50,7 @@ import {
   whenRedirectAuthSettled,
   tryGetSilentToken,
   getGoogleAccountEmail,
+  getVerifiedGoogleAccountEmail,
 } from '@/services/google/googleAuth';
 import {
   registerDriveTokenMirror,
@@ -219,6 +220,12 @@ export const useSyncStore = defineStore('sync', () => {
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
   const providerAccountEmail = ref<string | null>(null);
+  // The LIVE, OAuth-verified session account — distinct from the provider's
+  // bound account (`providerAccountEmail`), which can be stale in a multi-account
+  // setup. Settings shows THIS as "Signed in with" so the display is truthful.
+  // Mirrored from the non-reactive `getVerifiedGoogleAccountEmail()` via
+  // `refreshSessionAccountEmail()` at every seam where the verified email changes.
+  const sessionAccountEmail = ref<string | null>(null);
   const isGoogleDriveConnected = computed(() => storageProviderType.value === 'google_drive');
   // Must be a ref, not a computed over `syncService.getProvider()` — that
   // function is a plain singleton read with no reactive deps, so any
@@ -443,6 +450,7 @@ export const useSyncStore = defineStore('sync', () => {
     isSyncing.value = state.isSyncing;
     storageProviderType.value = syncService.getProviderType();
     providerAccountEmail.value = syncService.getProvider()?.getAccountEmail() ?? null;
+    refreshSessionAccountEmail();
     driveFileId.value = syncService.getProvider()?.getFileId() ?? null;
     error.value = state.lastError;
   });
@@ -450,6 +458,10 @@ export const useSyncStore = defineStore('sync', () => {
   // Subscribe to save-complete
   syncService.onSaveComplete((timestamp) => {
     lastSync.value = timestamp;
+    // A save just SUCCEEDED — proven access. Heal a stale account binding if the
+    // live verified session differs from the provider/member binding (#62). The
+    // returned "settled" flag is unused here (no poll to stop). Best-effort.
+    void healAccountBindingIfNeeded('save');
   });
 
   // Subscribe to save failure level changes — see handleSaveFailureChange above.
@@ -3449,21 +3461,117 @@ export const useSyncStore = defineStore('sync', () => {
   let tokenExpiryUnsub: (() => void) | null = null;
   let tokenAcquiredUnsub: (() => void) | null = null;
 
+  /** Mirror the non-reactive verified session email into the reactive ref. */
+  function refreshSessionAccountEmail(): void {
+    sessionAccountEmail.value = getVerifiedGoogleAccountEmail();
+  }
+
+  /**
+   * Reconcile stale provider AND member account bindings after a PROVEN Drive
+   * access (a load/save just succeeded — proof the live session account can reach
+   * the file). The provider binding (per-device IndexedDB) and the member binding
+   * (shared Automerge doc) can be stale independently, so each is reconciled on
+   * its own, both under the same gate: a Drive op succeeded AND a VERIFIED live
+   * email exists. Each write is inequality-guarded, so a steady-state access
+   * performs no IndexedDB or Automerge write.
+   *
+   * This is the ONE safe exception to finding 9's "never rebind A→B" (see
+   * `GoogleDriveProvider.rebindProvenAccount`): success is proof the new account
+   * is a legitimate accessor.
+   *
+   * Returns `true` when SETTLED (bindings already correct, just reconciled, or no
+   * verified identity to act on). Returns `false` ONLY when there is no verified
+   * email yet AND a retry could still converge — the load poll uses this to decide
+   * whether to keep polling (the verified email often arrives late on a cached
+   * resume). Best-effort: never throws.
+   */
+  async function healAccountBindingIfNeeded(trigger: 'load' | 'save'): Promise<boolean> {
+    try {
+      const provider = syncService.getProvider();
+      if (!(provider instanceof GoogleDriveProvider)) return true;
+
+      const verifiedEmail = getVerifiedGoogleAccountEmail();
+      if (!verifiedEmail) {
+        logEvent({
+          level: 'info',
+          surface: 'account-binding-heal',
+          message: 'proven access but no verified session email yet — deferring',
+          context: { action: 'noop-no-verified-email' },
+        });
+        return false; // keep polling on the load path; a later tick may converge
+      }
+
+      let providerChanged = false;
+      let memberChanged = false;
+
+      // Provider binding (per-device IndexedDB provider config).
+      if (
+        verifiedEmail !== provider.getAccountEmail() &&
+        provider.rebindProvenAccount(verifiedEmail)
+      ) {
+        providerAccountEmail.value = verifiedEmail;
+        refreshSessionAccountEmail();
+        const ctx = useFamilyContextStore();
+        if (ctx.activeFamilyId) await provider.persist(ctx.activeFamilyId);
+        providerChanged = true;
+      }
+
+      // Member binding (shared Automerge doc) — reconciled independently: it can
+      // be stale even when the provider binding is already correct.
+      const memberId = useAuthStore().currentUser?.memberId;
+      if (memberId) {
+        const fam = useFamilyStore();
+        const member = fam.members.find((m) => m.id === memberId);
+        if (member && member.googleAccountEmail !== verifiedEmail) {
+          await fam.updateMember(memberId, { googleAccountEmail: verifiedEmail });
+          memberChanged = true;
+        }
+      }
+
+      logEvent({
+        level: 'info',
+        surface: 'account-binding-heal',
+        message:
+          providerChanged || memberChanged
+            ? 'rebound stale account binding after proven access'
+            : 'account binding already correct',
+        context: { action: providerChanged || memberChanged ? 'changed' : 'noop-steady-state' },
+      });
+      return true;
+    } catch (e) {
+      reportError({
+        surface: 'account-binding-heal',
+        severity: 'warning',
+        message: `account-binding heal failed (non-blocking, trigger=${trigger})`,
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
+      return true; // never spin the poll on a persistent failure
+    }
+  }
+
+  /**
+   * Post-load reconciliation poll. Runs after a successful Drive load because the
+   * OAuth-verified session email frequently arrives LATE on a cached-token resume
+   * — a single synchronous check would miss it. Each tick runs the proven-access
+   * heal (learn/rebind the provider AND member bindings); clears once the heal
+   * reports SETTLED or the attempts cap is hit. A re-entrancy guard prevents
+   * overlapping ticks now that a tick can do async persist + updateMember work.
+   */
   function updateProviderEmailAfterLoad(): void {
     let attempts = 0;
-    const interval = setInterval(async () => {
-      attempts++;
-      const provider = syncService.getProvider();
-      if (provider instanceof GoogleDriveProvider && provider.updateAccountEmailIfAvailable()) {
-        providerAccountEmail.value = provider.getAccountEmail();
-        const ctx = useFamilyContextStore();
-        if (ctx.activeFamilyId) {
-          await provider.persist(ctx.activeFamilyId);
+    let ticking = false;
+    const interval = setInterval(() => {
+      if (ticking) return; // don't overlap; the heal does async persist/updateMember
+      ticking = true;
+      void (async () => {
+        try {
+          attempts++;
+          const settled = await healAccountBindingIfNeeded('load');
+          if (settled || attempts >= 10) clearInterval(interval);
+        } finally {
+          ticking = false;
         }
-        clearInterval(interval);
-      } else if (attempts >= 10) {
-        clearInterval(interval);
-      }
+      })();
     }, 500);
   }
 
@@ -3561,6 +3669,9 @@ export const useSyncStore = defineStore('sync', () => {
     }
     if (!tokenAcquiredUnsub) {
       tokenAcquiredUnsub = onTokenAcquired(() => {
+        // A token was just acquired → the verified session email may have changed.
+        // Keep the "Signed in with" display truthful.
+        refreshSessionAccountEmail();
         // Recovery via any path (wake event, popup, redirect) — cancel any
         // in-flight cold-start escalation before the banner ever appears.
         coldStartReconnectDefer.cancel();
@@ -3796,6 +3907,7 @@ export const useSyncStore = defineStore('sync', () => {
     hasPendingEncryptedFile,
     storageProviderType,
     providerAccountEmail,
+    sessionAccountEmail,
     isGoogleDriveConnected,
     driveFileId,
     driveFolderId,

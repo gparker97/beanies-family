@@ -42,6 +42,12 @@ vi.mock('@/services/telemetry', () => ({
 vi.mock('@/utils/errorReporter', () => ({
   reportError: vi.fn(),
 }));
+// Grant revocation — mock so the sign-out revoke can be asserted without a real
+// network call. Covers both exports googleAuth imports from this module.
+vi.mock('../googleRevoke', () => ({
+  revokeGrant: vi.fn(async () => ({ ok: true, reason: 'revoked' })),
+  logTokenLifecycle: vi.fn(),
+}));
 
 // Reset module state between tests
 let googleAuth: typeof import('../googleAuth');
@@ -658,6 +664,59 @@ describe('googleAuth (PKCE)', () => {
       await googleAuth.revokeToken();
       expect(googleAuth.hasRefreshToken()).toBe(false);
 
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe('getVerifiedGoogleAccountEmail', () => {
+    it('returns null for a primed (unverified) guess', () => {
+      googleAuth.setGoogleAccountEmail('primed@example.com');
+      // The plain accessor returns the guess…
+      expect(googleAuth.getGoogleAccountEmail()).toBe('primed@example.com');
+      // …but the verified accessor withholds it (no token confirmed it).
+      expect(googleAuth.getVerifiedGoogleAccountEmail()).toBeNull();
+    });
+
+    it('returns the email once verified against a real token', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'verified@example.com' }),
+      });
+      // fetchGoogleUserEmail(token) is the verifier — it stamps cachedEmailToken.
+      await googleAuth.fetchGoogleUserEmail('a-real-access-token');
+      expect(googleAuth.getVerifiedGoogleAccountEmail()).toBe('verified@example.com');
+    });
+  });
+
+  describe('sign-out revokes the stored refresh token when none is in memory (#62c)', () => {
+    it('reads + revokes the persisted token before clearing it', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      const { revokeGrant } = await import('../googleRevoke');
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+
+      // family reads: 1st (initializeAuth) → null so nothing loads into memory;
+      // 2nd (revokeToken's #62c read) → the persisted token. Non-family reads
+      // (the pending-key rescue) → null.
+      let familyCall = 0;
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockImplementation(
+        async (fid: string) => {
+          if (fid !== 'family-123') return null;
+          familyCall++;
+          return familyCall === 1 ? null : { token: 'stored-rt', issuedAt: null };
+        }
+      );
+
+      await googleAuth.initializeAuth('family-123');
+      // Precondition: nothing in memory to revoke.
+      expect(googleAuth.hasRefreshToken()).toBe(false);
+
+      await googleAuth.revokeToken();
+
+      // The persisted token is revoked (not silently cleared un-revoked).
+      expect(revokeGrant).toHaveBeenCalledWith(
+        'stored-rt',
+        expect.objectContaining({ grant: 'drive', trigger: 'signout' })
+      );
       vi.unstubAllEnvs();
     });
   });

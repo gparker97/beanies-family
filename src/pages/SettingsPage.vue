@@ -1366,7 +1366,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                 <CloudProviderBadge
                   :provider-type="syncStore.storageProviderType"
                   :file-name="syncStore.fileName"
-                  :account-email="syncStore.providerAccountEmail"
+                  :account-email="syncStore.sessionAccountEmail ?? syncStore.providerAccountEmail"
                   size="md"
                 />
                 <p
@@ -1431,7 +1431,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
             <!-- Signed-in Google account + switch -->
             <div
-              v-if="syncStore.isGoogleDriveConnected && syncStore.providerAccountEmail"
+              v-if="
+                syncStore.isGoogleDriveConnected &&
+                (syncStore.sessionAccountEmail ?? syncStore.providerAccountEmail)
+              "
               class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
             >
               <div class="min-w-0 flex-1">
@@ -1439,7 +1442,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   {{ t('settings.familyData.signedInAs') }}
                 </p>
                 <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {{ syncStore.providerAccountEmail }}
+                  {{ syncStore.sessionAccountEmail ?? syncStore.providerAccountEmail }}
                 </p>
               </div>
               <BaseButton
