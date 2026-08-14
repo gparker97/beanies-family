@@ -375,3 +375,50 @@ export async function clearGoogleRefreshToken(familyId: string): Promise<void> {
     console.warn('[fileHandleStore] localStorage refresh-token clear failed', e);
   }
 }
+
+// --- Last authenticated Google account breadcrumb (tracker #62) --------------
+// A NON-authoritative hint: which Google account last authenticated, and the
+// family id its refresh token is stored under. Used at sign-in to detect a
+// different-account login and tear down the departed account's stale token
+// state (see `reconcileDepartedAccount` in googleAuth). Survives sign-out (it is
+// not a token key), holds NO secret (email + family id only), and is best-effort
+// — a lost/corrupt record just means one missed teardown, self-healing on the
+// next write. The token stores remain the source of truth.
+
+const LS_LAST_GOOGLE_ACCOUNT = 'beanies_last_google_account';
+
+export interface LastGoogleAccount {
+  email: string;
+  familyId: string;
+}
+
+export function getLastGoogleAccount(): LastGoogleAccount | null {
+  try {
+    const raw = localStorage.getItem(LS_LAST_GOOGLE_ACCOUNT);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LastGoogleAccount>;
+    if (typeof parsed?.email === 'string' && typeof parsed?.familyId === 'string') {
+      return { email: parsed.email, familyId: parsed.familyId };
+    }
+    return null; // malformed → treat as absent (next write overwrites)
+  } catch (e) {
+    console.warn('[fileHandleStore] last-google-account read failed', e);
+    return null;
+  }
+}
+
+export function setLastGoogleAccount(email: string, familyId: string): void {
+  try {
+    localStorage.setItem(LS_LAST_GOOGLE_ACCOUNT, JSON.stringify({ email, familyId }));
+  } catch (e) {
+    console.warn('[fileHandleStore] last-google-account write failed', e);
+  }
+}
+
+export function clearLastGoogleAccount(): void {
+  try {
+    localStorage.removeItem(LS_LAST_GOOGLE_ACCOUNT);
+  } catch (e) {
+    console.warn('[fileHandleStore] last-google-account clear failed', e);
+  }
+}

@@ -28,6 +28,10 @@ vi.mock('@/services/sync/fileHandleStore', () => ({
   storeGoogleRefreshToken: vi.fn(async () => {}),
   getGoogleRefreshToken: vi.fn(async () => null),
   clearGoogleRefreshToken: vi.fn(async () => {}),
+  clearProviderConfig: vi.fn(async () => {}),
+  getLastGoogleAccount: vi.fn(() => null),
+  setLastGoogleAccount: vi.fn(() => {}),
+  clearLastGoogleAccount: vi.fn(() => {}),
 }));
 
 vi.mock('@/services/indexeddb/database', () => ({
