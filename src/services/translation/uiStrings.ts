@@ -5494,6 +5494,10 @@ const STRING_DEFS = {
     en: 'Reconnect once to restore saving and calendar sync.',
     beanie: 'reconnect once to restore saving and calendar sync.',
   },
+  'reconnectPrompt.both.bodyMulti': {
+    en: 'Reconnect to restore saving and calendar sync.',
+    beanie: 'reconnect to restore saving and calendar sync.',
+  },
   'reconnectPrompt.drive.title': {
     en: 'Google session expired',
     beanie: 'google session expired',
