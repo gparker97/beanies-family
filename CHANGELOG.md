@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Switching Google accounts now starts genuinely clean.** If you signed out and then signed in with a _different_ Google account, beanies could hold on to the previous account's connection behind the scenes — which on a device you'd marked as trusted led to the wrong account being used, "reconnect" prompts, and a session that dropped roughly every hour. A different-account sign-in now fully retires the account you left (its connection is disconnected and its saved sign-in cleared) before the new one takes over, so the new session is clean. Signing back in with the same account is unchanged — it still reconnects silently.
 - **The "wrong Google account" warning no longer appears when your data is actually loading fine.** If the account you signed in with differed from the one a family file was originally linked to — but you could still open the file — beanies showed a "Wrong Google account… reconnect required" message (and named the wrong account) on every refresh, even though everything worked. beanies now treats being able to open the file as the real test: it stays quiet when access is fine, quietly corrects which account it has on record the moment your data loads, and shows the reconnect prompt only when an account genuinely cannot reach the file. Settings now shows the account you are actually signed in with.
 
 ### Security

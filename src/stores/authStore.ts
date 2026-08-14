@@ -17,7 +17,9 @@ import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { saveNow, cancelPendingSave } from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
-import { clearGoogleSessionState } from '@/services/google/googleAuth';
+import { clearGoogleSessionState, getGoogleAccountEmail } from '@/services/google/googleAuth';
+import { clearDriveConnectionForAccount } from '@/services/google/driveTokenRecovery';
+import { clearLastGoogleAccount } from '@/services/sync/fileHandleStore';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -1277,6 +1279,29 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * On a genuine FULL sign-out (untrusted device, or "sign out and clear data")
+   * clear the departed account's `.beanpod` driveConnections mirror + the
+   * last-account breadcrumb (#62 account-switch reset). Only ever called on a
+   * full teardown — the trusted same-account preserve path keeps both so a later
+   * different-account sign-in can still detect the change. Must run with `email`
+   * captured BEFORE `clearGoogleSessionState` nulls it, and BEFORE
+   * `docClient.reset()` (the mirror lives in the still-resident doc). Best-effort;
+   * `clearDriveConnectionForAccount` is `isDocLoaded()`-guarded and never throws.
+   */
+  async function clearDepartedGoogleArtifacts(email: string | null): Promise<void> {
+    if (email) {
+      await clearDriveConnectionForAccount(email);
+      logEvent({
+        level: 'info',
+        surface: 'account-switch-reset',
+        message: 'full sign-out cleared the departed account mirror',
+        context: { action: 'signout-cleared-mirror' },
+      });
+    }
+    clearLastGoogleAccount();
+  }
+
   async function signOut(): Promise<void> {
     // Force a durable save of the latest doc BEFORE the cache is torn down, so
     // the freshest edit (which may live only in the worker cache) reaches Drive.
@@ -1301,6 +1326,9 @@ export const useAuthStore = defineStore('auth', () => {
     // the full teardown.
     const settingsStore = useSettingsStore();
     const trusted = settingsStore.isTrustedDevice;
+    // Capture the departing account BEFORE clearGoogleSessionState nulls the
+    // cached email — only needed on a full (untrusted) teardown (#62).
+    const departedEmail = trusted ? null : getGoogleAccountEmail();
     await clearGoogleSessionStateWithTimeout(3000, { preserveRefreshToken: trusted });
 
     // Reset per-session sync state — banner flags, polling timer, encrypted
@@ -1313,6 +1341,13 @@ export const useAuthStore = defineStore('auth', () => {
       useSyncStore().resetState();
     } catch (e) {
       console.warn('[authStore] syncStore.resetState failed during sign-out', e);
+    }
+
+    // Full (untrusted) teardown only: clear the departed account's .beanpod mirror
+    // + last-account breadcrumb while the doc is still resident (before reset).
+    // A trusted same-account sign-out keeps both (preservation). (#62)
+    if (!trusted) {
+      await clearDepartedGoogleArtifacts(departedEmail);
     }
 
     // Cross-family safety: drop the in-memory worker doc + family key + projection
@@ -1442,6 +1477,10 @@ export const useAuthStore = defineStore('auth', () => {
     // Doubly important here: this path promises the device is clean.
     await cancelRemindersForSignOut();
 
+    // Capture the departing account BEFORE clearGoogleSessionState nulls the
+    // cached email — this path is always a full teardown (#62).
+    const departedEmail = getGoogleAccountEmail();
+
     // Wipe Google session state — same rationale as signOut().
     await clearGoogleSessionStateWithTimeout(3000);
 
@@ -1452,6 +1491,10 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
       console.warn('[authStore] syncStore.resetState failed during sign-out', e);
     }
+
+    // Full teardown: clear the departed account's .beanpod mirror + last-account
+    // breadcrumb while the doc is still resident (before the cache is deleted). (#62)
+    await clearDepartedGoogleArtifacts(departedEmail);
 
     const familyId = currentUser.value?.familyId;
 
