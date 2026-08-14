@@ -518,10 +518,13 @@ export async function initializeAuth(familyId: string): Promise<void> {
   }
   // Different-account sign-in reset (#62): if the account authenticating now
   // differs from the one that last authenticated, revoke + clear the DEPARTED
-  // account's stale token state before this session settles. Runs at the one
-  // transport-agnostic bind point. Cheap on the hot path (no fetch on cold boot;
-  // the heavy revoke is dispatched, not awaited). Never blocks the bind.
-  await reconcileDepartedAccount(familyId);
+  // account's stale token state. DISPATCHED (not awaited): the new session never
+  // depends on it (it targets the OLD account + writes a breadcrumb for the NEXT
+  // sign-in), and dispatching keeps EVERYTHING — including a possible userinfo
+  // fetch on a warm re-init — off the load-bearing bind path (code-review
+  // finding). `reconcileDepartedAccount` wraps its whole body in try/catch, so it
+  // can never reject; the `void` is safe.
+  void reconcileDepartedAccount(familyId);
   installAuthWakeListener();
 }
 
