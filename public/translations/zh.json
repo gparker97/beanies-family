@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-14",
-    "translationCount": 3937
+    "translationCount": 3938
   },
   "translations": {
     "app.name": {
@@ -19689,6 +19689,11 @@
     "reconnectPrompt.reconnected": {
       "translation": "已重新连接到Google。",
       "hash": "a54syi",
+      "lastUpdated": "2026-08-14"
+    },
+    "reconnectPrompt.both.bodyMulti": {
+      "translation": "重新连接以恢复保存和日历同步。",
+      "hash": "qhxmq6",
       "lastUpdated": "2026-08-14"
     }
   }

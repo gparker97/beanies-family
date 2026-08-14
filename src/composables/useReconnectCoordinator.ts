@@ -23,11 +23,13 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { useTranslation } from '@/composables/useTranslation';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { isFlagEnabled } from '@/config/flags';
 import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
 import { startUnifiedReconnect } from '@/services/google/unifiedReconnect';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry';
 
 type DriveDown = { kind: 'drive'; email: string | null };
 type CalendarDown = { kind: 'calendar'; connectionId: string; email: string };
@@ -35,6 +37,12 @@ type DownFeature = DriveDown | CalendarDown;
 interface ReconnectGroup {
   accountEmail: string | null;
   features: DownFeature[];
+}
+
+/** Google account emails are case-insensitive — compare case-folded so a stored
+ *  connection email that differs only in case still matches the live session. */
+function sameAccount(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
 }
 
 export function useReconnectCoordinator() {
@@ -80,10 +88,21 @@ export function useReconnectCoordinator() {
     const hasCalendar = calendarDown.value.length > 0;
     if (!hasDrive && !hasCalendar) return null;
     const variant = hasDrive && hasCalendar ? 'both' : hasDrive ? 'drive' : 'calendar';
+    // The "both" prompt only promises "reconnect ONCE" when Drive and every down
+    // calendar connection share one account (a single unified consent). When they
+    // are on DIFFERENT accounts the plan splits into separate consents, so use the
+    // non-"once" body to avoid over-promising (code-review finding).
+    const oneConsent =
+      variant === 'both' &&
+      calendarDown.value.every((c) => sameAccount(c.email, driveDown.value?.email));
+    const bodyKey: UIStringKey =
+      variant === 'both' && !oneConsent
+        ? 'reconnectPrompt.both.bodyMulti'
+        : (`reconnectPrompt.${variant}.body` as UIStringKey);
     return {
       variant,
-      titleKey: `reconnectPrompt.${variant}.title`,
-      bodyKey: `reconnectPrompt.${variant}.body`,
+      titleKey: `reconnectPrompt.${variant}.title` as UIStringKey,
+      bodyKey,
     } as const;
   });
 
@@ -102,9 +121,10 @@ export function useReconnectCoordinator() {
 
     if (drive) {
       const driveEmail = drive.email;
-      const sameAccount = driveEmail ? cals.filter((c) => c.email === driveEmail) : [];
-      sameAccount.forEach((c) => claimed.add(c.connectionId));
-      groups.push({ accountEmail: driveEmail, features: [drive, ...sameAccount] });
+      // Case-insensitive match — Google emails are case-insensitive (finding).
+      const sameAccountCals = cals.filter((c) => sameAccount(c.email, driveEmail));
+      sameAccountCals.forEach((c) => claimed.add(c.connectionId));
+      groups.push({ accountEmail: driveEmail, features: [drive, ...sameAccountCals] });
     }
     for (const c of cals) {
       if (claimed.has(c.connectionId)) continue;
@@ -118,14 +138,24 @@ export function useReconnectCoordinator() {
     if (isReconnecting.value) return;
     isReconnecting.value = true;
     reconnectError.value = null;
+    const variant = activeReconnectPrompt.value?.variant ?? 'none';
+    // `ranAny` guards the success toast against an empty/self-healed plan: if the
+    // stores self-heal between render and click, the plan is empty and we must NOT
+    // claim "Reconnected" for work that never ran (code-review finding).
+    let ranAny = false;
+    let outcome: 'ok' | 'failed' | 'redirecting' | 'noop' = 'noop';
     try {
       for (const group of buildReconnectPlan()) {
+        ranAny = true;
         if (group.features.length >= 2) {
           // ≥2 features on one account → ONE unified consent for the scope union.
           const drive = group.features.find((f): f is DriveDown => f.kind === 'drive');
-          const outcome = await startUnifiedReconnect(drive?.email ?? undefined);
-          if (outcome === 'redirecting') return; // page is navigating away
-          if (outcome === 'failed') reconnectError.value = t('reconnectPrompt.error');
+          const result = await startUnifiedReconnect(drive?.email ?? undefined);
+          if (result === 'redirecting') {
+            outcome = 'redirecting';
+            return; // page is navigating away
+          }
+          if (result === 'failed') reconnectError.value = t('reconnectPrompt.error');
           continue;
         }
         // Single-feature group → delegate to the existing per-feature primitive.
@@ -135,22 +165,30 @@ export function useReconnectCoordinator() {
           // returns true; stop the loop so we never start a second consent mid-nav.
           const redirecting = shouldUseRedirectAuth();
           const ok = await driveReconnect(feature.email ?? undefined);
-          if (redirecting) return;
+          if (redirecting) {
+            outcome = 'redirecting';
+            return;
+          }
           if (!ok) reconnectError.value = t('reconnectPrompt.error');
         } else {
           const result = await calendarStore.reconnect(feature.connectionId);
-          if (result.status === 'redirecting') return; // navigating away
+          if (result.status === 'redirecting') {
+            outcome = 'redirecting';
+            return; // navigating away
+          }
           if (result.status === 'failed' && result.code !== 'cancelled') {
             reconnectError.value = t('reconnectPrompt.error');
           }
         }
       }
-      // Completed inline (no redirect). Confirm success unless a group failed —
-      // the stores' own self-heal clears the prompt reactively.
-      if (!reconnectError.value) {
+      outcome = reconnectError.value ? 'failed' : ranAny ? 'ok' : 'noop';
+      // Confirm success only when we actually ran a group and none failed — the
+      // stores' own self-heal clears the prompt reactively.
+      if (ranAny && !reconnectError.value) {
         showToast('success', t('reconnectPrompt.reconnected'));
       }
     } catch (error) {
+      outcome = 'failed';
       reconnectError.value = t('reconnectPrompt.error');
       reportError({
         surface: 'unified-reconnect',
@@ -160,6 +198,14 @@ export function useReconnectCoordinator() {
       });
     } finally {
       isReconnecting.value = false;
+      // Success-path signal too (per CLAUDE.md observability rule) so the unified
+      // reconnect's outcome RATE by variant is measurable, not just failures.
+      logEvent({
+        level: outcome === 'failed' ? 'warn' : 'info',
+        surface: 'unified-reconnect',
+        message: 'reconnect action complete',
+        context: { action: `reconnect-all:${variant}:${outcome}` },
+      });
     }
   }
 

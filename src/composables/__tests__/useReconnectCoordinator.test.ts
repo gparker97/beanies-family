@@ -141,4 +141,35 @@ describe('useReconnectCoordinator', () => {
     expect(plan).toHaveLength(1);
     expect(plan[0]!.features).toHaveLength(3); // drive + 2 calendar
   });
+
+  it('folds a same-account calendar connection even when the email case differs', () => {
+    setDrive(true, 'Greg@Example.com');
+    setCalendar([{ id: 'c1', accountEmail: 'greg@example.com' }]);
+    const c = useReconnectCoordinator();
+    const plan = c.buildReconnectPlan();
+    expect(plan).toHaveLength(1); // one unified group, not two
+    expect(plan[0]!.features).toHaveLength(2);
+  });
+
+  it("uses the 'once' body for a same-account both-down, and the multi body for different accounts", () => {
+    setDrive(true, 'a@example.com');
+    setCalendar([{ id: 'c1', accountEmail: 'a@example.com' }]);
+    expect(useReconnectCoordinator().activeReconnectPrompt.value?.bodyKey).toBe(
+      'reconnectPrompt.both.body'
+    );
+
+    setCalendar([{ id: 'c2', accountEmail: 'b@example.com' }]);
+    expect(useReconnectCoordinator().activeReconnectPrompt.value?.bodyKey).toBe(
+      'reconnectPrompt.both.bodyMulti'
+    );
+  });
+
+  it('does NOT toast success when the plan is empty (stores self-healed before the click)', async () => {
+    setDrive(false);
+    setCalendar([]);
+    const c = useReconnectCoordinator();
+    await c.reconnectAll();
+    expect(h.showToast).not.toHaveBeenCalled();
+    expect(h.startUnified).not.toHaveBeenCalled();
+  });
 });

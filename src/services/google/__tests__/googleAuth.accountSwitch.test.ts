@@ -87,14 +87,16 @@ describe('account-switch reset (#62)', () => {
     await primeVerifiedEmail('me@example.com');
 
     await googleAuth.initializeAuth('family-NEW');
-    await new Promise((r) => setTimeout(r, 5));
+    // reconcile is dispatched (not awaited) — wait for its breadcrumb write.
+    await vi.waitFor(() =>
+      expect(fhs.setLastGoogleAccount).toHaveBeenCalledWith('me@example.com', 'family-NEW')
+    );
 
     expect(revokeGrant).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ trigger: 'account-change' })
     );
     expect(fhs.clearProviderConfig).not.toHaveBeenCalled();
-    expect(fhs.setLastGoogleAccount).toHaveBeenCalledWith('me@example.com', 'family-NEW');
   });
 
   it('does NOT tear down when the new sign-in is the SAME family (guard)', async () => {

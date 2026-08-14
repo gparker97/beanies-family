@@ -786,8 +786,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     email: string;
   }): Promise<{ matched: number; restored: number; failed: number }> {
     if (!isFlagEnabled(FLAG) || !input.email) return { matched: 0, restored: 0, failed: 0 };
+    // Case-insensitive account match — Google emails are case-insensitive, so a
+    // connection whose stored accountEmail differs only in case is the SAME account
+    // and must be restored (code-review finding).
+    const wantedEmail = input.email.toLowerCase();
     const targets = connections.value.filter(
-      (c) => c.status === 'needs_reconnect' && c.accountEmail === input.email
+      (c) => c.status === 'needs_reconnect' && c.accountEmail?.toLowerCase() === wantedEmail
     );
     let restored = 0;
     let failed = 0;
