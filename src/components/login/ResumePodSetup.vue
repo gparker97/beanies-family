@@ -528,18 +528,24 @@ async function finalizePod(): Promise<boolean> {
       heardVia.value
     );
   let result = await createPod();
+  let retriedWrite = false;
 
   // Transient Drive failure on the FIRST write right after the full-page OAuth
   // redirect: the freshly-returned access token can momentarily fail the write
-  // (or its read-back verify) because WebKit bounce-tracking clears the refresh
-  // cookie across the cross-origin redirect — even though the `.beanpod` stub was
-  // already created on Drive. Re-acquire a token silently and retry the write ONCE
-  // before surfacing a critical error and dumping the user back to the storage
-  // picker (the false "we couldn't save your pod" the user saw on iPhone, where
-  // the file had in fact been created). Safe to retry: on a write/verify failure
-  // createNewFile persists/registers nothing and leaves the connected provider +
-  // stub intact, so re-running it simply re-writes into them.
-  if (!result.ok && (result.reason === 'write' || result.reason === 'verify')) {
+  // because WebKit bounce-tracking clears the refresh cookie across the
+  // cross-origin redirect — even though the `.beanpod` stub was already created on
+  // Drive. Re-acquire a token silently and retry the write ONCE before surfacing a
+  // critical error and dumping the user back to the storage picker (the false "we
+  // couldn't save your pod" the user saw on iPhone, where the file had in fact
+  // been created). Safe to retry ONLY on the 'write' reason: the write threw
+  // before `partialFileId` was captured, so createNewFile persisted/registered
+  // nothing, ran no cleanup, and left the connected provider + stub intact — a
+  // re-run simply re-writes into them. We deliberately do NOT retry 'verify'
+  // (there `partialFileId` is set, so cleanup renames the stub to
+  // `<name>.corrupt-<ts>` and a retry would write a valid pod under that bad name)
+  // — and createNewFile now clears the offline queue on any create failure, so the
+  // discarded first-attempt envelope can never flush over the retried pod.
+  if (!result.ok && result.reason === 'write') {
     let recovered = false;
     try {
       recovered = await tryReconnectSilently(user.email);
@@ -552,18 +558,18 @@ async function finalizePod(): Promise<boolean> {
         context: { provider_type: syncStore.storageProviderType ?? null },
       });
     }
+    const canRetry = recovered && isTokenValid();
     logEvent({
       level: 'info',
       surface: 'resumeSetup',
       message: 'pod write failed on redirect return — attempting silent retry',
       context: {
-        action: `create-write-retry:${result.reason}:${
-          recovered && isTokenValid() ? 'reconnected' : 'no-token'
-        }`,
+        action: `create-write-retry:${canRetry ? 'reconnected' : 'no-token'}`,
         provider_type: syncStore.storageProviderType ?? null,
       },
     });
-    if (recovered && isTokenValid()) {
+    if (canRetry) {
+      retriedWrite = true;
       result = await createPod();
     }
   }
@@ -621,7 +627,10 @@ async function finalizePod(): Promise<boolean> {
     surface: 'resumeSetup',
     message: 'pod created',
     context: {
-      action: 'create-ok',
+      // Distinguish a clean first-try create from one that only succeeded after
+      // the silent write-retry, so the recovery's success RATE is measurable in
+      // CloudWatch (not collapsed into a generic success).
+      action: retriedWrite ? 'create-ok:after-write-retry' : 'create-ok',
       provider_type: syncStore.storageProviderType ?? null,
     },
   });
