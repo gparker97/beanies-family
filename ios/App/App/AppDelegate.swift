@@ -28,26 +28,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-
-        // The full-page Google OAuth redirect navigates the SHARED WKWebView out to
-        // accounts.google.com — whose sub-16px inputs make iOS zoom the webview's
-        // scrollView — and back. WKWebView retains that accumulated zoomScale across
-        // the return, and re-asserting the viewport meta from JS does NOT reset it, so
-        // the app came back stuck-zoomed with pinch unable to recover it (only a
-        // force-quit fixed it). Reset the zoom to 1 whenever the app becomes active.
-        // We deliberately do NOT add user-scalable=no / maximum-scale to the viewport
-        // meta: that would disable pinch-zoom entirely (a WCAG 1.4.4 regression) and is
-        // itself the classic "can't pinch back out" trap. A second delayed pass catches
-        // the case where the webview re-settles its zoom just after becoming active.
-        resetWebViewZoom()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.resetWebViewZoom()
-        }
     }
 
-    /// Reset the Capacitor bridge WKWebView's zoom back to 1 (see
-    /// `applicationDidBecomeActive`). No-op when the webview isn't zoomed, so it never
-    /// fights legitimate state; never disables pinch-zoom.
+    /// Reset the Capacitor bridge WKWebView's zoom back to 1 after an OAuth/deep-link
+    /// return (see `scheduleWebViewZoomReset`). No-op when the webview isn't zoomed, so
+    /// it never fights legitimate state; never disables pinch-zoom.
     private func resetWebViewZoom() {
         guard let webView = findBridgeWebView() else { return }
         let scrollView = webView.scrollView
@@ -71,6 +56,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return bridge(from: window?.rootViewController)?.webView
     }
 
+    /// The full-page Google OAuth redirect navigates the SHARED WKWebView out to
+    /// accounts.google.com — whose sub-16px inputs make iOS zoom the webview's
+    /// scrollView — and returns to the app via a deep link (custom scheme / Universal
+    /// Link). WKWebView retains that accumulated zoomScale across the return, and
+    /// re-asserting the viewport meta from JS does NOT reset it, so the app came back
+    /// stuck-zoomed with pinch unable to recover it (only a force-quit fixed it). We
+    /// reset zoom ONLY on these deep-link returns — not on every foreground, which
+    /// would silently discard a user's intentional pinch-zoom. An immediate pass plus
+    /// one delayed pass catch the case where the webview re-settles just after the
+    /// return. We deliberately do NOT add user-scalable=no / maximum-scale to the
+    /// viewport meta: that would disable pinch-zoom entirely (a WCAG 1.4.4 regression)
+    /// and is itself the classic "can't pinch back out" trap.
+    private func scheduleWebViewZoomReset() {
+        resetWebViewZoom()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.resetWebViewZoom()
+        }
+    }
+
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
@@ -78,14 +82,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        let handled = ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        // OAuth/Drive redirect returns via this deep link — reset any zoom Google's
+        // sign-in page left on the shared webview (see scheduleWebViewZoomReset).
+        scheduleWebViewZoomReset()
+        return handled
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
         // Called when the app was launched with an activity, including Universal Links.
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+        let handled = ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+        // OAuth/Drive redirect can return via a Universal Link — reset any zoom
+        // Google's sign-in page left on the shared webview (see scheduleWebViewZoomReset).
+        scheduleWebViewZoomReset()
+        return handled
     }
 
 }
