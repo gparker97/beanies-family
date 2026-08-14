@@ -1402,6 +1402,16 @@ export async function revokeToken(): Promise<void> {
   const revokeTarget = currentRefreshToken?.token ?? accessToken;
   if (revokeTarget) {
     await revokeGrant(revokeTarget, { grant: 'drive', trigger: 'signout' });
+  } else if (currentFamilyId) {
+    // Nothing in memory to revoke (e.g. after a token death cleared
+    // `currentRefreshToken`). The persisted refresh token below would otherwise
+    // be CLEARED un-revoked, leaking a live grant toward Google's per-account
+    // cap (#62c). Read it and revoke it first. Best-effort: `revokeGrant` is
+    // idempotent + offline-durable and self-logs via `logTokenLifecycle`.
+    const stored = await getGoogleRefreshToken(currentFamilyId);
+    if (stored?.token) {
+      await revokeGrant(stored.token, { grant: 'drive', trigger: 'signout' });
+    }
   }
 
   // Clear stored refresh token
@@ -1480,6 +1490,17 @@ export async function clearGoogleSessionState(
     // Fire-and-forget to keep the synchronous-teardown contract; a transient
     // failure is queued, not silently dropped.
     void revokeGrant(refreshSnapshot ?? tokenSnapshot, { grant: 'drive', trigger: 'signout' });
+  } else if (!preserveRefreshToken && familyIdSnapshot) {
+    // (#62c) Nothing in memory to revoke, but a persisted refresh token may still
+    // exist and would be cleared un-revoked in step 3 below — leaking a live grant
+    // toward Google's per-account cap. Read + revoke it first. Awaited (unlike the
+    // fire-and-forget path above) because it only runs on the uncommon both-null
+    // teardown, so it does not slow the common case. Skipped when preserving (the
+    // grant is deliberately kept alive for a trusted-device silent reconnect).
+    const stored = await getGoogleRefreshToken(familyIdSnapshot);
+    if (stored?.token) {
+      await revokeGrant(stored.token, { grant: 'drive', trigger: 'signout' });
+    }
   }
 
   // 3. Clear persisted refresh tokens. The pending-family slot is ALWAYS
@@ -1818,6 +1839,17 @@ export async function fetchGoogleUserEmail(token: string): Promise<string | null
  */
 export function getGoogleAccountEmail(): string | null {
   return cachedEmail;
+}
+
+/**
+ * Get the cached Google account email ONLY when it has been verified against a
+ * real access token by `fetchGoogleUserEmail` (i.e. `cachedEmailToken` is set).
+ * Returns null for a primed/unverified guess (`setGoogleAccountEmail` nulls the
+ * token) or when nothing is cached. Used by the account-binding heal, which must
+ * never rebind to an unverified guess (see the proven-access heal in syncStore).
+ */
+export function getVerifiedGoogleAccountEmail(): string | null {
+  return cachedEmailToken ? cachedEmail : null;
 }
 
 /**

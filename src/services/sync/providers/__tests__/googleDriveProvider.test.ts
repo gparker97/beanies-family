@@ -313,20 +313,59 @@ describe('GoogleDriveProvider', () => {
     }, 20_000);
   });
 
-  describe('bound-account guard (account drift — 2026-06-19 finding 9)', () => {
-    it('read() throws TokenExpiredError when the session drifted to another account', async () => {
-      const { getGoogleAccountEmail, TokenExpiredError } =
-        await import('@/services/google/googleAuth');
-      // Provider bound to account A; live session is account B.
+  describe('account-mismatch classifier (finding 9 — reworked to access-based, 2026-08-14)', () => {
+    it('read() SUCCEEDS despite a nominal account mismatch (no pre-emptive gate)', async () => {
+      const { getGoogleAccountEmail } = await import('@/services/google/googleAuth');
+      // Provider bound to account A; live session is account B — but B CAN reach it.
       const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
       (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('b@example.com');
+      mockReadFile.mockResolvedValueOnce('{"version":"4.0"}');
 
-      await expect(bound.read()).rejects.toBeInstanceOf(TokenExpiredError);
-      // Never read with the wrong account's token.
-      expect(mockReadFile).not.toHaveBeenCalled();
+      // The op must proceed — nominal mismatch is no longer a pre-emptive error.
+      await expect(bound.read()).resolves.toBe('{"version":"4.0"}');
+      expect(mockReadFile).toHaveBeenCalled();
     });
 
-    it('allows read() when the bound account is not yet known (null → learn)', async () => {
+    it('read() 404 WITH an account mismatch → reconnect TokenExpiredError (not missing-file)', async () => {
+      const { getGoogleAccountEmail, TokenExpiredError } =
+        await import('@/services/google/googleAuth');
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
+      (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('b@example.com');
+      mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
+
+      await expect(bound.read()).rejects.toBeInstanceOf(TokenExpiredError);
+    });
+
+    it('read() 404 WITHOUT a mismatch → re-throws the raw 404 (missing-file recovery)', async () => {
+      const { getGoogleAccountEmail } = await import('@/services/google/googleAuth');
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
+      (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('a@example.com'); // matches
+      mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
+
+      await expect(bound.read()).rejects.toBeInstanceOf(MockDriveApiError);
+    });
+
+    it('write() 404 WITH an account mismatch → reconnect TokenExpiredError', async () => {
+      const { getGoogleAccountEmail, TokenExpiredError } =
+        await import('@/services/google/googleAuth');
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
+      (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('b@example.com');
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
+
+      await expect(bound.write('{"data":"x"}')).rejects.toBeInstanceOf(TokenExpiredError);
+    });
+
+    it('rebindProvenAccount changes the binding (true) and is a no-op when equal (false)', () => {
+      const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
+      expect(bound.rebindProvenAccount('a@example.com')).toBe(false);
+      expect(bound.rebindProvenAccount('b@example.com')).toBe(true);
+      expect(bound.getAccountEmail()).toBe('b@example.com');
+    });
+
+    it('allows read() when the bound account is not yet known (null bound email)', async () => {
       const { getGoogleAccountEmail } = await import('@/services/google/googleAuth');
       const unbound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', null);
       (getGoogleAccountEmail as ReturnType<typeof vi.fn>).mockReturnValue('b@example.com');

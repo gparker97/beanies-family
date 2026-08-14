@@ -129,30 +129,62 @@ export class GoogleDriveProvider implements StorageProvider {
    * On network error: queue for offline flush.
    */
   /**
-   * Guard against account drift (2026-06-19, finding 9). This provider is bound
-   * to ONE Drive account (`this.accountEmail`) that owns `this.fileId`. If the
-   * live session has silently drifted to a different account, using that
-   * account's token to operate on this file yields spurious 404/403s and a
-   * reconnect loop. Throw `TokenExpiredError` so the reconnect banner appears
-   * for the bound account instead of operating with the wrong identity.
+   * Account-drift predicate (2026-06-19, finding 9). This provider is bound to
+   * ONE Drive account (`this.accountEmail`) that owns `this.fileId`. Returns true
+   * only when BOTH the bound email and the live session email are known and
+   * differ. A null bound email means "not yet learned" (the provider learns it
+   * via `updateAccountEmailIfAvailable` / `rebindProvenAccount`); a null session
+   * email means we can't tell — both cases return false (no mismatch asserted).
    *
-   * Only enforced when BOTH are known: a null bound email means "not yet
-   * learned" (allow — the provider learns it via `updateAccountEmailIfAvailable`);
-   * a null session email means we can't tell (allow — the token path handles it).
+   * NOTE: unlike the pre-2026-08-14 `ensureBoundAccount`, this is NO LONGER a
+   * pre-emptive gate. A nominal mismatch is not itself an error — the session
+   * account may legitimately have shared access to the file. The mismatch only
+   * matters when a real Drive op FAILS with a 404 (see `reconnectIfAccountMismatch`).
    */
-  private ensureBoundAccount(): void {
-    if (!this.accountEmail) return;
+  private accountMismatch(): boolean {
+    if (!this.accountEmail) return false;
     const active = getGoogleAccountEmail();
-    if (active && active !== this.accountEmail) {
-      throw new TokenExpiredError(
-        `Drive session account (${active}) does not match this file's bound account (${this.accountEmail}) — reconnect required`
-      );
-    }
+    return !!active && active !== this.accountEmail;
+  }
+
+  /**
+   * Shared 404 classifier (finding 9) — the SINGLE home for the reconnect message
+   * string and the `drive-account-mismatch-blocked` event. Call from a caught
+   * Drive 404. If the live session account is known to differ from this file's
+   * bound account, that 404 means "this account can't reach the file" — log it
+   * and throw the reconnect `TokenExpiredError` so the reconnect banner appears
+   * for the bound account (NOT the missing-file recovery path). Otherwise return;
+   * the caller re-throws the raw 404 for missing-file recovery (today's behavior).
+   */
+  private reconnectIfAccountMismatch(): void {
+    if (!this.accountMismatch()) return;
+    logEvent({
+      level: 'warn',
+      surface: 'drive-account-mismatch-blocked',
+      message: 'Drive 404 with an account mismatch — surfacing reconnect for the bound account',
+      context: { http_status: 404, action: 'reconnect-required' },
+    });
+    throw new TokenExpiredError(
+      `Drive session account (${getGoogleAccountEmail()}) does not match this file's bound account (${this.accountEmail}) — reconnect required`
+    );
+  }
+
+  /**
+   * Rebind this provider to a DIFFERENT account after that account has PROVEN it
+   * can access `this.fileId` (a read/write succeeded). This is the ONE safe
+   * exception to finding 9's "never rebind A→B" (see `updateAccountEmailIfAvailable`):
+   * a successful Drive op is proof the new account is a legitimate accessor.
+   * Returns true if the binding changed. Callers MUST only invoke this after a
+   * successful Drive operation.
+   */
+  rebindProvenAccount(verifiedEmail: string): boolean {
+    if (this.accountEmail === verifiedEmail) return false;
+    this.accountEmail = verifiedEmail;
+    return true;
   }
 
   async write(content: string): Promise<void> {
     try {
-      this.ensureBoundAccount();
       const token = await getValidTokenSilent();
       await withRetry(() => updateFile(token, this.fileId, content));
     } catch (e) {
@@ -180,8 +212,11 @@ export class GoogleDriveProvider implements StorageProvider {
         throw e;
       }
 
-      // 404 — file gone (deleted/moved), let caller handle
+      // 404 — file gone (deleted/moved) OR the live session account can't reach
+      // it. Classify (finding 9): an account mismatch → reconnect banner for the
+      // bound account; otherwise let the caller run missing-file recovery.
       if (e instanceof DriveApiError && e.status === 404) {
+        this.reconnectIfAccountMismatch();
         throw e;
       }
 
@@ -224,7 +259,6 @@ export class GoogleDriveProvider implements StorageProvider {
   async read(): Promise<string | null> {
     try {
       /* eslint-disable no-console -- init diagnostics */
-      this.ensureBoundAccount();
       console.log('[GoogleDrive.read] getting token...');
       const token = await getValidTokenSilent();
       console.log('[GoogleDrive.read] token obtained, reading file...');
@@ -248,6 +282,13 @@ export class GoogleDriveProvider implements StorageProvider {
           return await withRetry(() => readFile(silentToken, this.fileId));
         }
         throw new TokenExpiredError('Drive read failed: token rejected and silent refresh failed');
+      }
+      // 404 — file gone OR the live session account can't reach it. Classify
+      // (finding 9), mirroring write(): account mismatch → reconnect banner;
+      // otherwise re-throw the raw 404 for missing-file recovery (today's path).
+      if (e instanceof DriveApiError && e.status === 404) {
+        this.reconnectIfAccountMismatch();
+        throw e;
       }
       throw e;
     }
@@ -372,7 +413,6 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   async listAux(): Promise<string[]> {
-    this.ensureBoundAccount();
     const token = await getValidTokenSilent();
     const folderId = await this.resolveAuxFolder(token);
     const files = await withRetry(() => listFilesInFolder(token, folderId, '.beanchanges'));
@@ -381,7 +421,6 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   async readAux(name: string): Promise<string | null> {
-    this.ensureBoundAccount();
     const token = await getValidTokenSilent();
     let id = this.auxIdByName.get(name);
     if (!id) {
@@ -393,7 +432,6 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   async writeAux(name: string, content: string): Promise<void> {
-    this.ensureBoundAccount();
     const token = await getValidTokenSilent();
     const folderId = await this.resolveAuxFolder(token);
     const { fileId } = await withRetry(() => createFile(token, folderId, name, content));
@@ -401,7 +439,6 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   async deleteAux(name: string): Promise<void> {
-    this.ensureBoundAccount();
     const token = await getValidTokenSilent();
     let id = this.auxIdByName.get(name);
     if (!id) {
@@ -411,24 +448,6 @@ export class GoogleDriveProvider implements StorageProvider {
     if (!id) return; // already gone — delete is idempotent
     await withRetry(() => deleteFile(token, id));
     this.auxIdByName.delete(name);
-  }
-
-  /**
-   * Check if Google account email has become available (e.g. after token acquisition)
-   * and update the in-memory state. Returns true if email changed.
-   */
-  updateAccountEmailIfAvailable(): boolean {
-    const email = getGoogleAccountEmail();
-    // Only LEARN an account when we don't have one yet (null → learn). Do NOT
-    // rebind A→B: a provider bound to account A must never silently adopt a
-    // drifted session account B (2026-06-19, finding 9) — that is exactly the
-    // account-drift `ensureBoundAccount()` guards against on read/write. A
-    // genuine account switch installs a fresh provider, it doesn't rebind here.
-    if (email && !this.accountEmail) {
-      this.accountEmail = email;
-      return true;
-    }
-    return false;
   }
 
   /**

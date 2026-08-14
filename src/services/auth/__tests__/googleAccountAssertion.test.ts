@@ -40,19 +40,20 @@ vi.mock('@/stores/authStore', () => ({
   }),
 }));
 
-const mockShowToast = vi.fn();
-vi.mock('@/composables/useToast', () => ({
-  showToast: (...args: unknown[]) => mockShowToast(...args),
+// As of 2026-08-14 a nominal mismatch no longer toasts — it records a silent
+// diagnostic via logEvent and defers to the access-based heal in syncStore.
+const mockLogEvent = vi.fn();
+vi.mock('@/services/telemetry', () => ({
+  logEvent: (...args: unknown[]) => mockLogEvent(...args),
 }));
 
-vi.mock('@/stores/translationStore', () => ({
-  useTranslationStore: () => ({
-    // Return a string that contains the {email} placeholder so the
-    // production .replace('{email}', ...) call has something to swap.
-    // Mirrors how the real translation entry looks.
-    t: (key: string) => (key === 'auth.accountMismatchBody' ? `${key}: {email}` : key),
-  }),
-}));
+/** Assert the benign-mismatch diagnostic fired (and NO user-facing toast, since
+ *  there is no toast dependency in the module anymore). */
+function expectBenignMismatchLogged() {
+  expect(mockLogEvent).toHaveBeenCalledWith(
+    expect.objectContaining({ surface: 'account-mismatch-benign' })
+  );
+}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ describe('googleAccountAssertion', () => {
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
 
-  it('surfaces a manual-switch toast on mismatch — never auto-forces consent (#62)', async () => {
+  it('logs a benign-mismatch diagnostic and shows NO toast on mismatch — never auto-forces consent (#62/2026-08-14)', async () => {
     familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
     assertionModule.registerGoogleAccountAssertion();
 
@@ -124,17 +125,13 @@ describe('googleAccountAssertion', () => {
     // The whole point of #62: no silent mint on a mismatched acquisition.
     expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
-    // Member record NOT overwritten on mismatch.
+    // Member record NOT overwritten on mismatch (the heal owns that, on proven access).
     expect(mockUpdateMember).not.toHaveBeenCalled();
-    // A manual-switch toast surfaces with the expected (bound) email.
-    expect(mockShowToast).toHaveBeenCalledWith(
-      'warning',
-      'auth.accountMismatchTitle',
-      expect.stringContaining('a@example.com')
-    );
+    // A silent diagnostic fires; the mismatch is deferred to the access-based heal.
+    expectBenignMismatchLogged();
   });
 
-  it('warns once on repeated mismatches — no toast spam, no re-consent (#62)', async () => {
+  it('logs a benign event on EACH mismatch (no re-consent, no toast) — rate-limiting lives in logEvent', async () => {
     familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
     assertionModule.registerGoogleAccountAssertion();
 
@@ -143,19 +140,25 @@ describe('googleAccountAssertion', () => {
 
     expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
-    // Toast fires exactly once despite two mismatched acquisitions.
-    expect(mockShowToast).toHaveBeenCalledTimes(1);
+    // Both mismatched acquisitions record a benign event (the warn-once toast
+    // latch was removed; client-side rate-limiting in logEvent prevents spam).
+    const benign = mockLogEvent.mock.calls.filter(
+      ([arg]) => (arg as { surface?: string })?.surface === 'account-mismatch-benign'
+    );
+    expect(benign).toHaveLength(2);
   });
 
-  it('resets the warn-once latch on a match, so a later mismatch warns again (#62)', async () => {
+  it('a matching acquisition logs no benign event; a later mismatch does (#62/2026-08-14)', async () => {
     familyMembers.push({ id: 'member-A', googleAccountEmail: 'a@example.com' });
     assertionModule.registerGoogleAccountAssertion();
 
-    await fireToken('b@example.com'); // mismatch → 1st toast
-    await fireToken('a@example.com'); // match → resets the latch
-    await fireToken('c@example.com'); // mismatch again → 2nd toast
+    await fireToken('a@example.com'); // match → no benign event
+    expect(mockLogEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'account-mismatch-benign' })
+    );
 
-    expect(mockShowToast).toHaveBeenCalledTimes(2);
+    await fireToken('c@example.com'); // mismatch → benign event
+    expectBenignMismatchLogged();
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
 
@@ -166,13 +169,16 @@ describe('googleAccountAssertion', () => {
     assertionModule.armAccountSwitch();
     await fireToken('c@example.com'); // user picked a different account at the chooser
 
-    // Record updated with the new email — no assertion mismatch toast.
+    // Record updated with the new email — a deliberate switch, not a mismatch.
     expect(mockUpdateMember).toHaveBeenCalledWith('member-A', {
       googleAccountEmail: 'c@example.com',
     });
     expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
-    expect(mockShowToast).not.toHaveBeenCalled();
+    // No benign-mismatch diagnostic — the switch branch consumed the acquisition.
+    expect(mockLogEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'account-mismatch-benign' })
+    );
   });
 
   it('armAccountSwitch is one-shot — subsequent acquisitions assert normally', async () => {
@@ -186,14 +192,10 @@ describe('googleAccountAssertion', () => {
     familyMembers[0]!.googleAccountEmail = 'c@example.com';
 
     // Next acquisition with a different email should be treated as a
-    // mismatch (assertion path), NOT as another switch → manual-switch toast,
+    // mismatch (assertion path), NOT as another switch → benign diagnostic,
     // never an auto re-consent.
     await fireToken('d@example.com');
-    expect(mockShowToast).toHaveBeenCalledWith(
-      'warning',
-      'auth.accountMismatchTitle',
-      expect.stringContaining('c@example.com')
-    );
+    expectBenignMismatchLogged();
     expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });
@@ -228,15 +230,11 @@ describe('googleAccountAssertion', () => {
 
     // A different email now — should be treated as a mismatch (assert,
     // not a switch) because the flag was disarmed before consumption →
-    // manual-switch toast, never an auto re-consent.
+    // benign diagnostic, never an auto re-consent.
     await fireToken('b@example.com');
 
     expect(mockUpdateMember).not.toHaveBeenCalled();
-    expect(mockShowToast).toHaveBeenCalledWith(
-      'warning',
-      'auth.accountMismatchTitle',
-      expect.stringContaining('a@example.com')
-    );
+    expectBenignMismatchLogged();
     expect(mockClearGoogleSessionState).not.toHaveBeenCalled();
     expect(mockRequestAccessToken).not.toHaveBeenCalled();
   });

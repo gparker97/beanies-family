@@ -79,6 +79,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   isSilentRefreshPending: vi.fn(() => false),
   isTokenValid: vi.fn(() => false),
   getLastSilentRefreshDiagnostics: vi.fn(() => null),
+  getVerifiedGoogleAccountEmail: vi.fn(() => null),
 }));
 vi.mock('@/services/sync/capabilities', () => ({
   getSyncCapabilities: () => ({ googleDrive: true, manualSync: true }),

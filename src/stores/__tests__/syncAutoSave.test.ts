@@ -238,6 +238,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   revokeToken: vi.fn(async () => {}),
   isTokenValid: vi.fn(() => false),
   fetchGoogleUserEmail: vi.fn(async () => null),
+  getVerifiedGoogleAccountEmail: vi.fn(() => null),
 }));
 vi.mock('@/services/google/driveService', () => ({
   getOrCreateAppFolder: vi.fn(async () => 'folder-id'),
