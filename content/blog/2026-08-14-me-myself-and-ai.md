@@ -67,6 +67,8 @@ You know what? I feel like I’m thinking about this too much, so if you don’t
 
 ![greg and a smiling robot sitting arm-in-arm at a desk in pixel-art style, coding together at a computer, with the Singapore skyline out the window and a "build together, ship together" poster on the wall](/blog/me-myself-and-ai-robot-friends.webp)
 
+_another good thing about claude-bot is that he never complains about me always wearing a dodgers hoodie and cargo shorts_
+
 Speak soon, my beans (hopefully for real). By the way, we’re still waiting on Apple’s blessing for the iPhone app.
 
 \- greg
