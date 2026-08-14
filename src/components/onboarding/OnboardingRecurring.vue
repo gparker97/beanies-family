@@ -327,7 +327,9 @@ function formatFrequency(freq: RecurringFrequency): string {
   border-color: rgb(44 62 80 / 8%);
   box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
   font-family: Outfit, sans-serif;
-  font-size: 0.75rem;
+
+  /* >= 1rem: focusable <select>, kept above iOS's 16px stuck-zoom-on-focus threshold. */
+  font-size: 1rem;
   font-weight: 600;
 }
 
