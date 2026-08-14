@@ -227,7 +227,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <textarea
         v-model="ingredientsText"
         rows="6"
-        class="focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        class="focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
         :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
       />
     </FormFieldGroup>
@@ -236,7 +236,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <textarea
         v-model="stepsText"
         rows="6"
-        class="focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-sm leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        class="focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
         :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
       />
     </FormFieldGroup>

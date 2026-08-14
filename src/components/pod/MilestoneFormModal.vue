@@ -379,7 +379,7 @@ async function handleDelete(): Promise<void> {
       <textarea
         v-model="description"
         rows="3"
-        class="focus:border-primary-500 focus:ring-primary-500 font-outfit w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-sm leading-snug text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        class="focus:border-primary-500 focus:ring-primary-500 font-outfit w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-snug text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
         :placeholder="t('milestone.placeholder.description')"
       />
     </FormFieldGroup>

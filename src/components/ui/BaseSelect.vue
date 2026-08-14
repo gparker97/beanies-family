@@ -42,8 +42,11 @@ const selectId = computed(() => props.id || `select-${Math.random().toString(36)
 const isGrouped = computed(() => props.groupedOptions && props.groupedOptions.length > 0);
 
 const selectClasses = computed(() => {
+  // `text-base` (1rem) is REQUIRED, not cosmetic — see BaseInput: a focusable
+  // <select> that computes < 16px triggers iOS's stuck-zoom-on-focus. rem-based so
+  // Large reading mode still scales it.
   const base =
-    'block w-full rounded-xl border pl-3 pr-8 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 transition-colors appearance-none cursor-pointer';
+    'block w-full rounded-xl border pl-3 pr-8 py-2 text-base text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 transition-colors appearance-none cursor-pointer';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'

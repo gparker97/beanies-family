@@ -252,6 +252,32 @@ export async function reconcileDriveTokenWithDoc(
 }
 
 /**
+ * Prepare for a ONE-SHOT Drive write retry after a transient post-redirect token
+ * failure (a freshly-returned access token momentarily rejected because WebKit
+ * bounce-tracking cleared the refresh cookie across the cross-origin redirect).
+ * Silently re-acquires a token and returns true iff a valid one is now in hand —
+ * the caller should then retry its write exactly once. Never throws.
+ *
+ * Shared by the two setup writes that hit this same failure class: the initial
+ * pod write (`ResumePodSetup.finalizePod`) and the end-of-wizard member-sync save
+ * (`SetupProgressModal`), so both recover identically (DRY).
+ */
+export async function reconnectForWriteRetry(email?: string | null): Promise<boolean> {
+  let recovered = false;
+  try {
+    recovered = await tryReconnectSilently(email);
+  } catch (e) {
+    reportError({
+      surface: 'driveTokenRecovery.writeRetry',
+      severity: 'warning',
+      message: `silent reconnect before a write retry threw: ${e instanceof Error ? e.message : String(e)}`,
+      error: e instanceof Error ? e : new Error(String(e)),
+    });
+  }
+  return recovered && isTokenValid();
+}
+
+/**
  * B5 — try to restore the Drive connection silently BEFORE a caller falls back to
  * a forced-consent screen. Returns true only if the connection is now live.
  *

@@ -423,7 +423,7 @@ function clearSelection() {
       v-model="customText"
       type="text"
       data-testid="combobox-custom-input"
-      class="focus:border-primary-500 font-outfit block w-full rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 text-sm font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+      class="focus:border-primary-500 font-outfit block w-full rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
       :placeholder="otherPlaceholder"
       @blur="handleCustomBlur"
       @keydown="handleCustomKeydown"
@@ -451,7 +451,7 @@ function clearSelection() {
             v-model="searchQuery"
             type="text"
             data-testid="combobox-search"
-            class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100"
+            class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-base text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100"
             :placeholder="searchPlaceholder"
             @keydown.stop
           />
