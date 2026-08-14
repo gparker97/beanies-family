@@ -178,7 +178,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
               ref="customInputRef"
               v-model="customValue"
               type="time"
-              class="font-outfit border-primary-500 flex-1 rounded-lg border-2 bg-white px-2 py-1 text-xs outline-none dark:bg-slate-700 dark:text-gray-200"
+              class="font-outfit border-primary-500 flex-1 rounded-lg border-2 bg-white px-2 py-1 text-base outline-none dark:bg-slate-700 dark:text-gray-200"
               @keydown.enter="applyCustom"
             />
             <button

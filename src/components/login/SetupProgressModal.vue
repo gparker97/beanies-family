@@ -8,6 +8,9 @@ import { useTranslation } from '@/composables/useTranslation';
 import { playFanfare } from '@/composables/useSounds';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
+import { useAuthStore } from '@/stores/authStore';
+import { reconnectForWriteRetry } from '@/services/google/driveTokenRecovery';
+import { logEvent } from '@/services/telemetry';
 import { delay } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -18,6 +21,7 @@ const emit = defineEmits<{ complete: []; back: [] }>();
 const { t } = useTranslation();
 const syncStore = useSyncStore();
 const familyContextStore = useFamilyContextStore();
+const authStore = useAuthStore();
 
 const familyName = computed(() => familyContextStore.activeFamilyName || 'Family');
 
@@ -168,7 +172,24 @@ async function runFromStep(startIdx: number) {
           try {
             let saved = await syncStore.syncNow(true);
             if (!saved) {
-              saved = await syncStore.syncNow(true); // retry once
+              // Transient iOS token failure right after setup (same class as the
+              // initial pod write): silently re-acquire a token and retry the save
+              // ONCE. The old "call syncNow twice" retried nothing for a token
+              // expiry — nothing re-acquired the token between the two attempts, so
+              // both failed and the user was dropped to the error screen even though
+              // tapping Continue (which only SKIPS the save) then let autosync flush
+              // it later. Now we actually recover the save inline.
+              const canRetry = await reconnectForWriteRetry(authStore.currentUser?.email);
+              logEvent({
+                level: 'info',
+                surface: 'setupProgress',
+                message: 'member-sync save failed on setup finish — attempting silent retry',
+                context: {
+                  action: `member-sync-retry:${canRetry ? 'reconnected' : 'no-token'}`,
+                  provider_type: syncStore.storageProviderType ?? null,
+                },
+              });
+              if (canRetry) saved = await syncStore.syncNow(true);
             }
             if (!saved) {
               enterErrorPhase(i, syncStore.lastSaveError || syncStore.error || '');

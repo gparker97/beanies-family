@@ -78,7 +78,7 @@ import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
 import { getProvider } from '@/services/sync/syncService';
-import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
+import { tryReconnectSilently, reconnectForWriteRetry } from '@/services/google/driveTokenRecovery';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
@@ -546,19 +546,7 @@ async function finalizePod(): Promise<boolean> {
   // — and createNewFile now clears the offline queue on any create failure, so the
   // discarded first-attempt envelope can never flush over the retried pod.
   if (!result.ok && result.reason === 'write') {
-    let recovered = false;
-    try {
-      recovered = await tryReconnectSilently(user.email);
-    } catch (e) {
-      reportError({
-        surface: 'resumeSetup.writeRetryReconnect',
-        message: `silent reconnect before pod-write retry threw: ${e instanceof Error ? e.message : String(e)}`,
-        error: e,
-        severity: 'warning',
-        context: { provider_type: syncStore.storageProviderType ?? null },
-      });
-    }
-    const canRetry = recovered && isTokenValid();
+    const canRetry = await reconnectForWriteRetry(user.email);
     logEvent({
       level: 'info',
       surface: 'resumeSetup',

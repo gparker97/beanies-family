@@ -1728,7 +1728,7 @@ function addQuickIdea() {
               v-model="quickIdeaText"
               type="text"
               :placeholder="t('travel.quickAddIdea')"
-              class="flex-1 rounded-xl border-[1.5px] border-[var(--tint-slate-5)] bg-white px-3.5 py-2.5 text-sm text-gray-900 transition-all outline-none focus:border-[#00B4D8] focus:shadow-[0_0_0_3px_rgba(0,180,216,0.08)] dark:bg-slate-800 dark:text-gray-100"
+              class="flex-1 rounded-xl border-[1.5px] border-[var(--tint-slate-5)] bg-white px-3.5 py-2.5 text-base text-gray-900 transition-all outline-none focus:border-[#00B4D8] focus:shadow-[0_0_0_3px_rgba(0,180,216,0.08)] dark:bg-slate-800 dark:text-gray-100"
               @keydown.enter="addQuickIdea"
             />
             <button

@@ -906,7 +906,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
             v-model="searchQuery"
             type="text"
             :placeholder="t('transactions.searchPlaceholder')"
-            class="w-full border-none bg-transparent text-xs text-[var(--color-text)] outline-none placeholder:text-[var(--color-text)] placeholder:opacity-25 dark:text-gray-100"
+            class="w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text)] placeholder:opacity-25 dark:text-gray-100"
           />
         </div>
 

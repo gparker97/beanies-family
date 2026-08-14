@@ -41,6 +41,24 @@
   html[data-text-size='large'] {
     font-size: calc(1rem * var(--text-scale-large));
   }
+
+  /* iOS auto-zooms the WKWebView when a focused text-entry control computes to
+     < 16px and does not reliably zoom back (a stuck zoom that only a force-quit
+     clears). Native controls are font-size:100% (inherit), so any control under a
+     `text-sm`/`text-xs` ancestor would drop below 16px. Floor every focusable
+     text-entry control at 1rem. `max(1rem, 1em)` only ever RAISES — a control that
+     inherits a smaller size is lifted to 1rem, while one explicitly sized larger
+     keeps its size (a later-layer `text-lg`/`text-xl` utility still wins). Lives in
+     @layer base so per-control utilities can still override the *floor* upward;
+     the paired source fixes (text-base on the base components + bumping the few
+     explicit `text-sm` controls) keep controls from being sized below it. Never
+     use maximum-scale / user-scalable=no — that kills pinch-zoom + regresses
+     WCAG 1.4.4; Large reading mode still scales via the root. */
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  select,
+  textarea {
+    font-size: max(1rem, 1em);
+  }
 }
 
 /* ─── CSS custom properties (used in non-Tailwind contexts) ─────────────── */

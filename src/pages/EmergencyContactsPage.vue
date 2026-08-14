@@ -151,7 +151,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
         <input
           v-model="search"
           type="search"
-          class="font-inter w-full border-none bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] dark:text-gray-100"
+          class="font-inter w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] dark:text-gray-100"
           :placeholder="t('contacts.searchPlaceholder')"
         />
       </label>

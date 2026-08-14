@@ -37,8 +37,13 @@ const emit = defineEmits<{
 const inputId = computed(() => props.id || `input-${Math.random().toString(36).slice(2, 9)}`);
 
 const inputClasses = computed(() => {
+  // `text-base` (1rem) is REQUIRED, not cosmetic: native inputs are font-size:100%
+  // (inherit), so under any `text-sm` ancestor the field would compute < 16px and
+  // iOS would auto-zoom the webview on focus and not zoom back (a stuck zoom only a
+  // force-quit clears). Pinning 1rem keeps every BaseInput above that threshold;
+  // it's rem-based so Large reading mode still scales it.
   const base =
-    'block w-full rounded-xl border px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-colors';
+    'block w-full rounded-xl border px-3 py-2 text-base text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-colors';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'

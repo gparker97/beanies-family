@@ -174,7 +174,7 @@ onMounted(() => {
       type="text"
       :placeholder="t('createSurvey.otherPlaceholder')"
       data-testid="survey-other-input"
-      class="mt-2.5 w-full rounded-xl border-[1.5px] border-[var(--silk)] p-3 text-sm text-gray-900 normal-case focus:ring-2 focus:ring-[var(--silk)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+      class="mt-2.5 w-full rounded-xl border-[1.5px] border-[var(--silk)] p-3 text-base text-gray-900 normal-case focus:ring-2 focus:ring-[var(--silk)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
     />
 
     <!-- Finish + skip (both complete the flow; the survey never blocks) -->
