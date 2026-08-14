@@ -83,6 +83,7 @@ import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry';
 import { confirm } from '@/composables/useConfirm';
 import { consumeResumeReason } from '@/components/login/resumePaths';
 
@@ -517,14 +518,56 @@ async function finalizePod(): Promise<boolean> {
     return false;
   }
   const podFileName = `${familyContextStore.activeFamilyName || 'my-family'}.beanpod`;
-  const result = await syncStore.createNewFile(
-    podFileName,
-    password.value,
-    user.memberId,
-    familyContextStore.activeFamilyId ?? user.familyId ?? '',
-    familyContextStore.activeFamilyName ?? 'My Family',
-    heardVia.value
-  );
+  const createPod = () =>
+    syncStore.createNewFile(
+      podFileName,
+      password.value,
+      user.memberId,
+      familyContextStore.activeFamilyId ?? user.familyId ?? '',
+      familyContextStore.activeFamilyName ?? 'My Family',
+      heardVia.value
+    );
+  let result = await createPod();
+
+  // Transient Drive failure on the FIRST write right after the full-page OAuth
+  // redirect: the freshly-returned access token can momentarily fail the write
+  // (or its read-back verify) because WebKit bounce-tracking clears the refresh
+  // cookie across the cross-origin redirect — even though the `.beanpod` stub was
+  // already created on Drive. Re-acquire a token silently and retry the write ONCE
+  // before surfacing a critical error and dumping the user back to the storage
+  // picker (the false "we couldn't save your pod" the user saw on iPhone, where
+  // the file had in fact been created). Safe to retry: on a write/verify failure
+  // createNewFile persists/registers nothing and leaves the connected provider +
+  // stub intact, so re-running it simply re-writes into them.
+  if (!result.ok && (result.reason === 'write' || result.reason === 'verify')) {
+    let recovered = false;
+    try {
+      recovered = await tryReconnectSilently(user.email);
+    } catch (e) {
+      reportError({
+        surface: 'resumeSetup.writeRetryReconnect',
+        message: `silent reconnect before pod-write retry threw: ${e instanceof Error ? e.message : String(e)}`,
+        error: e,
+        severity: 'warning',
+        context: { provider_type: syncStore.storageProviderType ?? null },
+      });
+    }
+    logEvent({
+      level: 'info',
+      surface: 'resumeSetup',
+      message: 'pod write failed on redirect return — attempting silent retry',
+      context: {
+        action: `create-write-retry:${result.reason}:${
+          recovered && isTokenValid() ? 'reconnected' : 'no-token'
+        }`,
+        provider_type: syncStore.storageProviderType ?? null,
+      },
+    });
+    if (recovered && isTokenValid()) {
+      result = await createPod();
+    }
+  }
+
   if (!result.ok) {
     if (result.reason === 'existing-pod') {
       // The registry has a real pod after all — the create guard refused to
@@ -573,6 +616,15 @@ async function finalizePod(): Promise<boolean> {
   // emitted later, after SetupProgressModal completes (handleSetupComplete).
   // Flag the members step so the router's ALREADY_AUTH guard does not bounce
   // /welcome?resume=setup → /nook now that podCreated is true (iOS skip guard).
+  logEvent({
+    level: 'info',
+    surface: 'resumeSetup',
+    message: 'pod created',
+    context: {
+      action: 'create-ok',
+      provider_type: syncStore.storageProviderType ?? null,
+    },
+  });
   syncStore.membersStepActive = true;
   phase.value = 'members';
   return true;
