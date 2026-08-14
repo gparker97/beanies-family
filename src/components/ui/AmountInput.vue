@@ -23,6 +23,14 @@ const displayValue = computed(() => {
   return String(props.modelValue);
 });
 
+// iOS auto-zooms the WKWebView when a focused text field computes to < 16px and
+// does not reliably zoom back (a stuck zoom that only a force-quit clears). Floor
+// the applied size at 1rem (16px in default mode) so focusing the amount field
+// never triggers it, WITHOUT capping intentionally-larger callers (default 1.4rem
+// stays 1.4rem). rem-based, so Large reading mode still scales via the root; never
+// uses maximum-scale/user-scalable=no (would kill pinch-zoom + regress WCAG 1.4.4).
+const clampedFontSize = computed(() => `max(1rem, ${props.fontSize})`);
+
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement;
   const val = target.value;
@@ -50,7 +58,7 @@ function handleInput(event: Event) {
     >
       <span
         class="font-outfit flex-shrink-0 font-bold text-[var(--color-text)] opacity-25 dark:text-gray-400"
-        :style="{ fontSize }"
+        :style="{ fontSize: clampedFontSize }"
       >
         {{ currencySymbol }}
       </span>
@@ -59,7 +67,7 @@ function handleInput(event: Event) {
         step="0.01"
         min="0"
         class="font-outfit w-full border-none bg-transparent font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
-        :style="{ fontSize }"
+        :style="{ fontSize: clampedFontSize }"
         :value="displayValue"
         placeholder="0.00"
         @input="handleInput"

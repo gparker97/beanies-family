@@ -326,7 +326,10 @@
   border-radius: 12px;
   color: var(--deep-slate, #2c3e50);
   font-family: Outfit, sans-serif;
-  font-size: 0.85rem;
+
+  /* >= 1rem (16px default) so focusing this field never triggers iOS's
+     stuck-zoom-on-focus (< 16px). rem-based, so Large mode still scales it. */
+  font-size: 1rem;
   font-weight: 700;
   outline: none;
   padding: 8px 12px;
@@ -402,7 +405,9 @@
   color: var(--deep-slate, #2c3e50);
   cursor: pointer;
   font-family: Outfit, sans-serif;
-  font-size: 0.68rem;
+
+  /* >= 1rem: focusable <select>, so keep it above iOS's 16px zoom threshold. */
+  font-size: 1rem;
   font-weight: 600;
   padding: 6px 28px 6px 10px;
   width: 100%;

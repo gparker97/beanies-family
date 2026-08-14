@@ -371,7 +371,9 @@ async function handleStart() {
   color: var(--deep-slate, #2c3e50);
   cursor: pointer;
   font-family: Outfit, sans-serif;
-  font-size: 0.85rem;
+
+  /* >= 1rem: focusable <select>, kept above iOS's 16px stuck-zoom-on-focus threshold. */
+  font-size: 1rem;
   font-weight: 700;
   min-width: 200px;
   padding: 10px 36px 10px 16px;
