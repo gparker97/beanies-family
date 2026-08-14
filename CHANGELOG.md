@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-14
 
+### Changed
+
+- **Reconnecting Google is now one prompt and one sign-in, not two.** If both your family data file (Drive) and your calendar lose their Google connection at the same time — which normally happens together — beanies used to show two separate "reconnect" messages and make you sign in to Google twice. It now shows a single prompt that names what's disconnected and reconnects everything in one sign-in when they share the same Google account. Drive-only families are unaffected (they're never asked for calendar access), and if your Drive and a calendar are on different Google accounts each is still handled on its own.
+
 ### Fixed
 
 - **The "wrong Google account" warning no longer appears when your data is actually loading fine.** If the account you signed in with differed from the one a family file was originally linked to — but you could still open the file — beanies showed a "Wrong Google account… reconnect required" message (and named the wrong account) on every refresh, even though everything worked. beanies now treats being able to open the file as the real test: it stays quiet when access is fine, quietly corrects which account it has on record the moment your data loads, and shows the reconnect prompt only when an account genuinely cannot reach the file. Settings now shows the account you are actually signed in with.

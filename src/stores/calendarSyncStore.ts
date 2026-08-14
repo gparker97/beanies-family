@@ -716,17 +716,23 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
    */
   async function finalizeConnected(
     result: CalendarConnectSuccess,
-    connectionId?: string
+    connectionId?: string,
+    // `countMint: false` for the unified reconnect fan-out (#62 commit 5): there
+    // the calendar token is the SAME grant Drive just minted (counted once on the
+    // Drive seam), so logging a calendar mint here would double-count one grant.
+    opts?: { countMint?: boolean }
   ): Promise<void> {
     // A calendar consent just MINTED a new refresh token — count it so calendar
     // token-pressure is measurable alongside the calendar revokes (#62). Covers
     // both connect + reconnect, popup + redirect (all converge here).
-    logTokenLifecycle({
-      grant: 'calendar',
-      op: 'mint',
-      outcome: 'ok',
-      trigger: connectionId ? 'reconnect' : 'connect',
-    });
+    if (opts?.countMint !== false) {
+      logTokenLifecycle({
+        grant: 'calendar',
+        op: 'mint',
+        outcome: 'ok',
+        trigger: connectionId ? 'reconnect' : 'connect',
+      });
+    }
     if (connectionId) {
       const existing = await getCalendarConnectionById(connectionId);
       if (existing) {
@@ -759,6 +765,56 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     invalidGrantCounters.delete(connection.id);
     // Kick a full verify reconcile for the new connection (don't block the UI).
     void reconcileConnection(connection.id, { verifyExisting: true, force: true });
+  }
+
+  /**
+   * Fan-out for the unified Drive+Calendar reconnect (tracker #62, commit 5).
+   * After ONE unified consent restores the shared Google grant, apply the newly
+   * minted refresh token to EVERY `needs_reconnect` connection whose `accountEmail`
+   * POSITIVELY matches the consent account. Connections on a different (or
+   * `'unknown'`) account are never touched here — they heal via their own
+   * per-feature reconnect group, so one account's token can never leak into
+   * another's. Reuses `finalizeConnected` (the single write+verify path, with the
+   * mint-count suppressed — the mint was already counted on the Drive seam).
+   * Per-connection failures are collected + reported (never swallowed). Returns the
+   * outcome so the coordinator can log rates + keep the prompt honest on partial
+   * failure. Never throws.
+   */
+  async function applyUnifiedRefreshToken(input: {
+    refreshToken: string;
+    grantedScopes: string[];
+    email: string;
+  }): Promise<{ matched: number; restored: number; failed: number }> {
+    if (!isFlagEnabled(FLAG) || !input.email) return { matched: 0, restored: 0, failed: 0 };
+    const targets = connections.value.filter(
+      (c) => c.status === 'needs_reconnect' && c.accountEmail === input.email
+    );
+    let restored = 0;
+    let failed = 0;
+    for (const conn of targets) {
+      try {
+        await finalizeConnected(
+          {
+            status: 'connected',
+            email: input.email,
+            refreshToken: input.refreshToken,
+            grantedScopes: input.grantedScopes,
+          },
+          conn.id,
+          { countMint: false }
+        );
+        restored++;
+      } catch (error) {
+        failed++;
+        reportError({
+          surface: 'unified-reconnect',
+          severity: 'warning',
+          message: 'unified reconnect: applying the shared token to a calendar connection failed',
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
+    }
+    return { matched: targets.length, restored, failed };
   }
 
   /** Run the consent flow + create a family-wide connection. Returns the auth result.
@@ -1053,6 +1109,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     showCalendarReconnect,
     connect,
     reconnect,
+    applyUnifiedRefreshToken,
     resumeRedirectConnect,
     disconnect,
     setDestinationCalendar,
