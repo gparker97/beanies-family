@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-10",
-    "translationCount": 3930
+    "lastUpdated": "2026-08-14",
+    "translationCount": 3928
   },
   "translations": {
     "app.name": {
@@ -11975,16 +11975,6 @@
       "translation": "清楚",
       "hash": "12tbn1",
       "lastUpdated": "2026-04-24"
-    },
-    "auth.accountMismatchTitle": {
-      "translation": "错误的Google帐户",
-      "hash": "hlre7b",
-      "lastUpdated": "2026-04-26"
-    },
-    "auth.accountMismatchBody": {
-      "translation": "请使用{email}登录以访问您的数据。",
-      "hash": "a3ss76",
-      "lastUpdated": "2026-04-26"
     },
     "settings.familyData.signedInAs": {
       "translation": "已登录",
