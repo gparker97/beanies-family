@@ -3,7 +3,11 @@ import { useActivityStore } from '@/stores/activityStore';
 import { chooseScope } from '@/composables/useRecurringEditScope';
 import { confirm } from '@/composables/useConfirm';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
-import type { FamilyActivity, UpdateFamilyActivityInput } from '@/types/models';
+import { reportSessionActionFailed } from '@/utils/actionFailure';
+import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
+import { logEvent } from '@/services/telemetry';
+import type { FamilyActivity, ISODateString, UpdateFamilyActivityInput } from '@/types/models';
 
 /**
  * Shared composable for scope-aware activity view/edit/delete.
@@ -15,6 +19,7 @@ import type { FamilyActivity, UpdateFamilyActivityInput } from '@/types/models';
  */
 export function useActivityScopeEdit() {
   const activityStore = useActivityStore();
+  const { t } = useTranslationStore();
 
   const viewingActivity = ref<FamilyActivity | null>(null);
   const viewingOccurrenceDate = ref<string | undefined>();
@@ -55,28 +60,115 @@ export function useActivityScopeEdit() {
     const scope = await chooseScope();
     if (!scope) return false;
 
+    const template = activityStore.activities.find((a) => a.id === templateId);
+    // `changes` is a minimal diff, so `date` is present ONLY if the user
+    // actually edited the date field.
+    const movedTo = changes.date && changes.date !== occurrenceDate ? changes.date : null;
+
+    // A date edit at a SERIES scope means "shift the schedule by this much" —
+    // which is only expressible when the series has a single weekday. On a
+    // multi-weekday series (Mon+Wed) "move this Wednesday to Thursday, for all"
+    // is ambiguous, and the form's `daysOfWeek` watcher deliberately leaves the
+    // chips alone in that case. Shifting the start date anyway would discard the
+    // move AND push the first occurrence before the new start, dropping it from
+    // the calendar. Refuse with guidance instead of corrupting the series.
+    if (movedTo && scope !== 'this-only' && (template?.daysOfWeek?.length ?? 0) > 1) {
+      showToast(
+        'error',
+        t('planner.multiDayMoveBlocked.title'),
+        t('planner.multiDayMoveBlocked.message'),
+        {
+          surface: 'activity-scope-edit',
+          context: { action: 'multi-weekday-move-refused', recur_scope: scope },
+        }
+      );
+      return false;
+    }
+
+    /** The moved occurrence's day-shift, applied to a series anchor date. */
+    function shiftAnchor(anchor: ISODateString): ISODateString {
+      const deltaDays = Math.round(
+        (parseLocalDate(movedTo!).getTime() - parseLocalDate(occurrenceDate).getTime()) / 86_400_000
+      );
+      return toDateInputValue(addDays(parseLocalDate(anchor), deltaDays));
+    }
+
     if (scope === 'all') {
-      await activityStore.updateActivity(templateId, changes);
+      // Apply the DELTA to the template's start rather than assigning the
+      // occurrence date to it (which would drag the series start forward to
+      // this one occurrence). Single-weekday only, per the guard above, so the
+      // shifted start keeps the same weekday as the moved occurrence and stays
+      // consistent with the form's watcher-updated `daysOfWeek`.
+      const patch = { ...changes };
+      if (movedTo && template) patch.date = shiftAnchor(template.date);
+      if (!(await activityStore.updateActivity(templateId, patch))) {
+        reportSessionActionFailed();
+        return false;
+      }
     } else if (scope === 'this-only') {
-      await activityStore.materializeOverride(templateId, occurrenceDate, changes);
+      // An untouched date is simply ABSENT from the diff, so `materializeOverride`
+      // resolves it to `occurrenceDate` — the occurrence stays where the user
+      // clicked. A present date is a deliberate reschedule.
+      if (!(await activityStore.materializeOverride(templateId, occurrenceDate, changes))) {
+        reportSessionActionFailed();
+        return false;
+      }
     } else if (scope === 'this-and-future') {
       const newTemplate = await activityStore.splitActivity(templateId, occurrenceDate);
-      if (newTemplate) {
-        // Remove date and recurrenceEndDate from changes — splitActivity already set
-        // the correct start date (occurrenceDate) and preserved the original end date.
-        // Letting the form's date through would reset the start to the original,
-        // causing overlapping occurrences with the end-dated original template.
-        const {
-          date: _d,
-          recurrenceEndDate: _re,
-          ...safeChanges
-        } = changes as Record<string, unknown>;
-        await activityStore.updateActivity(
+      if (!newTemplate) {
+        reportSessionActionFailed();
+        return false;
+      }
+      // `splitActivity` anchors the new template at `occurrenceDate`, so the
+      // form's raw `date` must not overwrite it (Recurring Invariant 3) — but a
+      // deliberate MOVE must still apply, shifted the same way scope 'all'
+      // shifts the template. Dropping `date` outright discarded the move
+      // silently, and for a same-weekday move or any non-weekly recurrence the
+      // remaining patch was empty, so the reschedule vanished without a trace.
+      //
+      // `recurrenceEndDate` is likewise no longer blanket-stripped: the diff
+      // only carries it when the user deliberately edited the "ends on" field.
+      const { date: _d, ...rest } = changes as Record<string, unknown>;
+      void _d;
+      const safeChanges = {
+        ...rest,
+        ...(movedTo ? { date: shiftAnchor(newTemplate.date) } : {}),
+      } as UpdateFamilyActivityInput;
+      if (
+        Object.keys(safeChanges).length > 0 &&
+        !(await activityStore.updateActivity(newTemplate.id, safeChanges))
+      ) {
+        reportSessionActionFailed();
+        return false;
+      }
+      // Truncating a series via an "ends on" edit strands the children past the
+      // cut exactly as the delete path does (Recurring Invariant 7).
+      if (typeof safeChanges.recurrenceEndDate === 'string') {
+        await activityStore.deleteChildrenFrom(
           newTemplate.id,
-          safeChanges as UpdateFamilyActivityInput
+          toDateInputValue(addDays(parseLocalDate(safeChanges.recurrenceEndDate), 1))
         );
       }
     }
+    // An "ends on" edit at 'all' scope truncates the series in place — same
+    // orphan risk, same reap.
+    if (scope === 'all' && typeof changes.recurrenceEndDate === 'string') {
+      await activityStore.deleteChildrenFrom(
+        templateId,
+        toDateInputValue(addDays(parseLocalDate(changes.recurrenceEndDate), 1))
+      );
+    }
+    logEvent({
+      surface: 'activity-scope-edit',
+      level: 'info',
+      message: 'Applied a scoped edit to a recurring activity',
+      context: {
+        action: 'scoped-save',
+        recur_scope: scope,
+        recur_occurrence_ymd: occurrenceDate,
+        recur_rescheduled: 'date' in changes,
+      },
+    });
     return true;
   }
 
@@ -95,6 +187,7 @@ export function useActivityScopeEdit() {
           viewingOccurrenceDate.value,
           { isActive: false }
         );
+        if (!override) reportSessionActionFailed();
         return !!override;
       }
 
@@ -105,7 +198,15 @@ export function useActivityScopeEdit() {
         const updated = await activityStore.updateActivity(activity.id, {
           recurrenceEndDate: dayBefore,
         });
-        return !!updated;
+        if (!updated) {
+          reportSessionActionFailed();
+          return false;
+        }
+        // End-dating the master does NOT touch its override children — they are
+        // `recurrence:'none'` one-offs no end date applies to. Reap the ones on/
+        // after the cut so they don't survive as ghosts (Recurring Invariant 7).
+        await activityStore.deleteChildrenFrom(activity.id, viewingOccurrenceDate.value);
+        return true;
       }
 
       // 'all' — fall through to standard delete with confirm
