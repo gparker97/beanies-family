@@ -8,6 +8,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-15
+
+### Fixed
+
+- **Editing one session of a repeating activity no longer moves or hides it.** Changing anything on a single occurrence of a repeating activity — the pickup person, the category, who's going — and choosing "just this item" could move that session to the date the series started, where it overlapped an earlier session, or make it disappear from the calendar altogether. The edit form was quietly holding the series' start date instead of the date you actually tapped. It now shows and keeps the session you're editing, and only the fields you actually change are saved.
+- **A moved session no longer vanishes when the series has an end date.** Rescheduling one session of a repeating activity that ends on a set date could push the moved session past that end date and hide it from every day at once. Repeating rules no longer apply to a single moved session, so sessions hidden this way in the past reappear on their own — nothing to restore by hand.
+- **Editing or cancelling one session of a paid activity no longer breaks its recurring payment.** Changing a single session of an activity with a linked fee could rewrite the family's monthly payment into a one-off charge on that date, silently stopping the rest of the payments. Single sessions are never treated as the fee owner now, and any payment link left on one from before is cleaned up automatically.
+- **Moving an already-moved session now moves it instead of duplicating it.** Rescheduling a session that had already been edited or moved once left the original day's session behind, so it showed up twice.
+- **Deleting or shortening a repeating activity now clears its edited sessions.** Sessions you had previously edited or moved used to survive a "delete all" or "delete this and all future", lingering on the calendar and never syncing to Google Calendar again.
+- **Splitting a repeating activity with "this & all future" keeps its edited sessions on the right series** — they used to be left behind on the old series and show up twice.
+- **"Delete this and all future" on a recurring bill now actually stops it.** The end date was being written to a field that doesn't exist on recurring payments, so the bill regenerated every deleted instalment and came back. Editing a recurring bill with "this & all future" also no longer resets the new series back to the original start date.
+- **A Google Calendar session whose event was removed at Google's end now recovers on its own** instead of retrying the same failing update on every sync forever.
+- **Recurring actions that quietly did nothing now tell you.** Several save, reschedule and delete paths for repeating activities and bills failed without any message when the underlying record couldn't be found. They now surface a clear error instead of appearing to work.
+- **Splitting a paid repeating activity keeps a single fee.** "This & all future" on an activity with a linked payment now hands the existing payment to the new series rather than leaving two running side by side.
+- **A duty you already ticked stays ticked when the session is edited.** Marking a drop-off or pick-up done and then editing that same session no longer re-lists it as outstanding or re-sends its reminder — and if the session is moved, the completed duty moves with it.
+- **Moving a session for a whole series is now blocked when it can't be applied cleanly.** For an activity that repeats on more than one day each week, changing one session's date and choosing "all occurrences" used to silently drop the change and hide the first session. beanies now explains why and points you at the right option.
+- **Editing a repeating activity's "ends on" date clears the sessions past the new end**, instead of leaving them stranded on the calendar.
+- **Changing a repeating bill's end date while splitting it now applies**, rather than being silently discarded.
+- **Adding or removing a payment on one session no longer moves the whole series** to that session's date.
+- **A photo-scanned update to an existing activity saves again.** Reviewing an extracted update without changing anything by hand no longer discards it.
+- **Multi-day all-day activities keep their start date** when opened from any day in their range.
+
 ## 2026-08-14
 
 ### Changed

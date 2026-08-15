@@ -80,6 +80,7 @@ import {
 } from '@/utils/calendar/reconcilePlan';
 import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
+import { logEvent } from '@/services/telemetry';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
 
 const FLAG = 'googleCalendarSync';
@@ -367,10 +368,18 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // Invariant guard: an override child is always `recurrence:'none'`. A recurring
     // "child" is malformed data — never stamp an RRULE onto a single instance.
     if (e.child.recurrence !== 'none') {
-      console.warn(
-        `[calendarSync] skipping exception for ${e.child.id}: override child has recurrence ` +
-          `'${e.child.recurrence}' (expected 'none') — refusing to write an RRULE onto an instance`
-      );
+      logEvent({
+        surface: 'calendar-sync',
+        level: 'warn',
+        message:
+          'Skipped an exception: override child has a recurrence rule (expected none) — ' +
+          'refusing to write an RRULE onto a single instance',
+        context: {
+          action: 'exception-malformed-child',
+          recur_occurrence_ymd: e.occurrenceYmd,
+          recur_outcome: 'skipped-malformed',
+        },
+      });
       return false;
     }
 
@@ -392,33 +401,85 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       } catch (err) {
         // Master not on Google yet → converge on the next reconcile (not an error).
         if (err instanceof CalendarApiError && err.kind === 'not_found') {
-          console.debug(
-            `[calendarSync] exception deferred: master ${e.master.id} not yet on Google`
-          );
+          // `debug`, not `warn`: the master simply has not been pushed yet and
+          // the next reconcile converges. Recording it at `warn` every poll
+          // would burn the 50/surface/min client rate cap on an expected,
+          // self-resolving state and crowd out real calendar-sync signal.
+          logEvent({
+            surface: 'calendar-sync',
+            level: 'debug',
+            message: 'Exception deferred: master not yet on Google',
+            context: {
+              action: 'exception-deferred',
+              recur_occurrence_ymd: e.occurrenceYmd,
+              recur_outcome: 'master-missing',
+            },
+          });
           return false;
         }
         throw err;
       }
       const inst = matchInstanceForDate(instances, e.occurrenceYmd);
       if (!inst) {
-        console.debug(
-          `[calendarSync] exception deferred: no Google instance for ${e.occurrenceYmd} ` +
-            `of master ${e.master.id}`
-        );
+        // NOTE: this defers on EVERY poll and never converges if the occurrence
+        // ymd is not a real slot of the series. Logged at `warn` (not debug) so
+        // a permanently-stuck exception is visible in CloudWatch.
+        logEvent({
+          surface: 'calendar-sync',
+          level: 'warn',
+          message: 'Exception deferred: no Google instance matches this occurrence date',
+          context: {
+            action: 'exception-deferred',
+            recur_occurrence_ymd: e.occurrenceYmd,
+            recur_outcome: 'no-instance',
+          },
+        });
         return false;
       }
       instanceId = inst.id;
     }
 
-    if (e.mode === 'cancel') {
-      await client.patchEventFields(connectionId, calendarId, instanceId, { status: 'cancelled' });
-    } else {
-      await client.patchEvent(
-        connectionId,
-        calendarId,
-        instanceId,
-        activityToGoogleEvent(e.child, ctx)
-      );
+    try {
+      if (e.mode === 'cancel') {
+        await client.patchEventFields(connectionId, calendarId, instanceId, {
+          status: 'cancelled',
+        });
+      } else {
+        await client.patchEvent(
+          connectionId,
+          calendarId,
+          instanceId,
+          activityToGoogleEvent(e.child, ctx)
+        );
+      }
+    } catch (err) {
+      // A stored instance id dies whenever the master's RRULE changes (or the
+      // user deletes the instance in Google). Without this recovery the patch
+      // threw on every poll forever — the hash is never stored, so the same
+      // task is re-planned each time, pinning the connection to `error` and
+      // eventually paging Slack via the sustained-error counter.
+      //
+      // Recovery is "drop the dead link and defer", NOT "re-discover inline":
+      // the discover-once invariant above exists because a moved instance falls
+      // outside an original-date re-window, so an inline re-discovery could
+      // match a DIFFERENT instance now occupying that window and patch the
+      // wrong event. Clearing the link costs one poll cycle and lets the
+      // existing, already-tested discovery block run from the top.
+      if (err instanceof CalendarApiError && err.kind === 'not_found') {
+        await removeCalendarEventLinkById(connectionId, e.child.id);
+        logEvent({
+          surface: 'calendar-sync',
+          level: 'warn',
+          message: 'Exception instance was gone — dropped the stale link and deferred',
+          context: {
+            action: 'exception-instance-not-found',
+            recur_occurrence_ymd: e.occurrenceYmd,
+            recur_outcome: 'recovered',
+          },
+        });
+        return false;
+      }
+      throw err;
     }
     await recordLink(connectionId, e.child.id, instanceId, e.hash, {
       exceptionOf: e.master.id,

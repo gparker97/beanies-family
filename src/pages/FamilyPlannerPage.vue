@@ -17,6 +17,7 @@ import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
+import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -478,12 +479,23 @@ async function handleViewOpenEdit(activity: FamilyActivity) {
 async function handleSave(
   data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }
 ) {
-  // Track payment changes (adding or removing linked recurring payment)
+  // Track payment changes (adding or removing linked recurring payment).
+  //
+  // `data.data` is a MINIMAL DIFF, so an untouched `payFromAccountId` is ABSENT
+  // — not falsy. Both checks must therefore gate on the key being PRESENT
+  // (Recurring Invariant 6: absent means "untouched", never "cleared").
+  // Without this, every occurrence edit of a paid activity would read as a
+  // "remove", deleting its generated transactions AND routing the save around
+  // the scope modal into a template-wide update.
+  //
+  // One named predicate, deliberately — two independently-written `in`
+  // expressions is exactly how FamilyNookPage drifted out of step here.
   const isUpdate = 'id' in data && 'data' in data;
+  const touchedPayment = isUpdate && 'payFromAccountId' in data.data;
   const isAddingPayment =
-    isUpdate && data.data.payFromAccountId && !editingActivity.value?.linkedRecurringItemId;
+    touchedPayment && !!data.data.payFromAccountId && !editingActivity.value?.linkedRecurringItemId;
   const isRemovingPayment =
-    isUpdate && !data.data.payFromAccountId && !!editingActivity.value?.linkedRecurringItemId;
+    touchedPayment && !data.data.payFromAccountId && !!editingActivity.value?.linkedRecurringItemId;
   const isPaymentChange = isAddingPayment || isRemovingPayment;
 
   if (isUpdate) {
@@ -504,8 +516,24 @@ async function handleSave(
       const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
       if (!saved) return; // cancelled — keep modal open
     } else {
-      // Direct update: non-recurring, adding/removing payment (always applies to template)
-      await activityStore.updateActivity(data.id, data.data);
+      // Direct update: non-recurring, or adding/removing a payment (a payment is
+      // a SERIES-level concern, so it always applies to the template).
+      //
+      // The payment bypass skips the scope modal, so a date edit made in the
+      // same save would land on the template — and since the form now seeds
+      // `date` from the clicked OCCURRENCE, that would silently jump the whole
+      // series to this one session's date (and re-anchor the new fee item to
+      // it). Drop the schedule fields on this path: the user's intent here is
+      // the payment, and a date move has its own scoped path.
+      const patch = { ...data.data };
+      if (isPaymentChange && editingActivity.value?.recurrence !== 'none') {
+        delete patch.date;
+        delete patch.daysOfWeek;
+      }
+      if (!(await activityStore.updateActivity(data.id, patch))) {
+        reportSessionActionFailed();
+        return;
+      }
     }
   } else {
     const created = await activityStore.createActivity(data as CreateFamilyActivityInput);

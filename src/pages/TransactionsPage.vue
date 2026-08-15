@@ -32,6 +32,9 @@ import {
   getDueDatesInRange,
   processRecurringItems,
 } from '@/services/recurring/recurringProcessor';
+import { recurringToTransactionFields, recurringTemplateFields } from '@/utils/recurringItemFields';
+import { reportRecurringItemActionFailed } from '@/utils/actionFailure';
+import { logEvent } from '@/services/telemetry';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -596,26 +599,6 @@ async function deleteTransaction(id: string) {
 
 /** After updating a recurring template, propagate field changes to linked
  *  non-reconciled materialized transactions so the UI reflects the edit. */
-/** Extract transaction-level fields from a recurring item input.
- *  Used by syncLinkedTransactions and scope handlers to avoid
- *  repeating the same field list (and forgetting goal fields). */
-function recurringToTransactionFields(data: CreateRecurringItemInput): UpdateTransactionInput {
-  return {
-    accountId: data.accountId,
-    type: data.type,
-    amount: data.amount,
-    currency: data.currency,
-    category: data.category,
-    description: data.description,
-    goalId: data.goalId,
-    goalAllocMode: data.goalId ? data.goalAllocMode : undefined,
-    goalAllocValue: data.goalId ? data.goalAllocValue : undefined,
-    // Clear computed allocation so updateTransaction's reversal + reapply
-    // cycle starts fresh (applyGoalAllocation will recompute it).
-    goalAllocApplied: undefined,
-  };
-}
-
 async function syncLinkedTransactions(recurringItemId: string, data: CreateRecurringItemInput) {
   const linked = transactionsStore.transactions.filter(
     (tx) => tx.recurringItemId === recurringItemId && !tx.isReconciled
@@ -649,32 +632,68 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
       const projectedDate = pendingProjectedTx.value.date;
 
       if (scope === 'all') {
-        if (!(await recurringStore.updateRecurringItem(itemId, data))) return;
+        if (!(await recurringStore.updateRecurringItem(itemId, data))) {
+          reportRecurringItemActionFailed();
+          return;
+        }
         await syncLinkedTransactions(itemId, data);
       } else if (scope === 'this-only') {
         const existingTx = pendingProjectedTx.value.isProjected
           ? null
           : transactionsStore.transactions.find((t) => t.id === pendingProjectedTx.value!.id);
 
+        // Both writes are bound — leaving them unbound let a failed write fall
+        // straight through to `closeEditModal()`, losing the edit with no toast
+        // and no telemetry, which is the exact failure the sibling branches of
+        // this same function already guard.
         if (existingTx) {
           // Materialized transaction — update the existing record in place
-          await transactionsStore.updateTransaction(
-            existingTx.id,
-            recurringToTransactionFields(data)
-          );
+          if (
+            !(await transactionsStore.updateTransaction(
+              existingTx.id,
+              recurringToTransactionFields(data)
+            ))
+          ) {
+            reportRecurringItemActionFailed();
+            return;
+          }
         } else {
           // Projected transaction — materialize a one-off transaction
-          await transactionsStore.createTransaction({
-            ...recurringToTransactionFields(data),
-            date: projectedDate,
-            isReconciled: false,
-            recurringItemId: pendingProjectedTx.value.recurringItemId,
-          } as CreateTransactionInput);
+          if (
+            !(await transactionsStore.createTransaction({
+              ...recurringToTransactionFields(data),
+              date: projectedDate,
+              isReconciled: false,
+              recurringItemId: pendingProjectedTx.value.recurringItemId,
+            } as CreateTransactionInput))
+          ) {
+            reportRecurringItemActionFailed();
+            return;
+          }
         }
       } else if (scope === 'this-and-future') {
         const newItem = await recurringStore.splitRecurringItem(itemId, projectedDate);
-        if (!newItem) return;
-        if (!(await recurringStore.updateRecurringItem(newItem.id, data))) return;
+        if (!newItem) {
+          reportRecurringItemActionFailed();
+          return;
+        }
+        // The SPLIT owns the schedule (Recurring Invariant 3). Passing the raw
+        // form payload here overwrote `splitRecurringItem`'s correct
+        // `startDate` with the template-seeded one from the modal — so the new
+        // segment started at the ORIGINAL series start and overlapped the
+        // just-end-dated original — and carried `lastProcessedDate`, which
+        // suppressed materialisation of the new segment.
+        // Pass what the split inherited so an untouched "ends on" is dropped
+        // while a deliberate edit made in this same save still applies.
+        if (
+          !(await recurringStore.updateRecurringItem(
+            newItem.id,
+            recurringTemplateFields(data, newItem.endDate ?? '')
+          ))
+        ) {
+          reportRecurringItemActionFailed();
+          return;
+        }
         await syncLinkedTransactions(newItem.id, data);
       }
 
@@ -683,7 +702,10 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
     }
 
     // Non-projected recurring item edit — update directly
-    if (!(await recurringStore.updateRecurringItem(itemId, data))) return;
+    if (!(await recurringStore.updateRecurringItem(itemId, data))) {
+      reportRecurringItemActionFailed();
+      return;
+    }
     await syncLinkedTransactions(itemId, data);
     closeEditModal();
   } else if (editingTransaction.value) {
@@ -788,15 +810,26 @@ async function handleScopedRecurringDelete(recurringItemId: string, tx: DisplayT
     }
     // Projected transactions don't exist in DB — nothing to delete for "this only"
   } else if (scope === 'this-and-future') {
-    // Set the recurring item's end date to the day before this occurrence
+    // End-date the series at the day before this occurrence.
+    //
+    // This previously wrote `recurrenceEndDate` — a field that does NOT exist on
+    // RecurringItem (it belongs to FamilyActivity); an `as any` cast hid the
+    // mistake from the type checker. `recurringProcessor` only ever reads
+    // `endDate`, so the series was never end-dated and simply regenerated every
+    // transaction the loop below deleted: the user cancelled a bill and watched
+    // it come back. The `...item` spread also wrote back `id`/`createdAt`/
+    // `updatedAt`, and the lookup was redundant — `updateRecurringItem` already
+    // returns falsy for an unknown id.
     const endDate = new Date(tx.date + 'T00:00:00');
     endDate.setDate(endDate.getDate() - 1);
-    const item = recurringStore.recurringItems.find((r) => r.id === recurringItemId);
-    if (item) {
-      await recurringStore.updateRecurringItem(recurringItemId, {
-        ...item,
-        recurrenceEndDate: toDateInputValue(endDate),
-      } as any);
+    const updated = await recurringStore.updateRecurringItem(recurringItemId, {
+      endDate: toDateInputValue(endDate),
+    });
+    if (!updated) {
+      // Do NOT fall through to the deletion loop — deleting materialised rows
+      // for a series that will regenerate them is strictly worse than a no-op.
+      reportRecurringItemActionFailed();
+      return;
     }
     // Delete materialized transactions on or after this date
     const futureTxs = transactionsStore.transactions.filter(
@@ -805,6 +838,18 @@ async function handleScopedRecurringDelete(recurringItemId: string, tx: DisplayT
     for (const ftx of futureTxs) {
       await transactionsStore.deleteTransaction(ftx.id);
     }
+    logEvent({
+      surface: 'recurring-item-scope',
+      level: 'info',
+      message: 'End-dated a recurring item and removed its future occurrences',
+      context: {
+        action: 'delete-this-and-future',
+        recur_scope: 'this-and-future',
+        recur_occurrence_ymd: tx.date,
+        recur_outcome: 'end-dated',
+        recur_children_removed: futureTxs.length,
+      },
+    });
     playWhoosh();
   }
 }

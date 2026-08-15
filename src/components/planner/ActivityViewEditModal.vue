@@ -29,7 +29,8 @@ import {
   formatTime12,
 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { showToast } from '@/composables/useToast';
+import { reportSessionActionFailed } from '@/utils/actionFailure';
+import { diffPayload } from '@/utils/diffPayload';
 import { BaseButton } from '@/components/ui';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
@@ -48,7 +49,7 @@ import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import { openExternal } from '@/utils/openExternal';
 import { ensureHttpUrl } from '@/utils/url';
 import { MARKETING_URL } from '@/utils/marketing';
-import type { FamilyActivity, DutyCompletion } from '@/types/models';
+import type { FamilyActivity, DutyCompletion, UpdateFamilyActivityInput } from '@/types/models';
 
 type EditableField =
   | 'title'
@@ -412,7 +413,10 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           if (!scope) return; // cancelled — discard edit
 
           if (scope === 'all') {
-            await activityStore.updateActivity(editing.id, update);
+            if (!(await activityStore.updateActivity(editing.id, update))) {
+              reportSessionActionFailed();
+              return;
+            }
             scopeResolved.value = true;
           } else if (scope === 'this-only') {
             const override = await activityStore.materializeOverride(
@@ -420,24 +424,46 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
               props.occurrenceDate,
               update
             );
-            if (override) {
-              effectiveTargetId.value = override.id;
-              emit('activity-swapped', override.id);
+            if (!override) {
+              reportSessionActionFailed();
+              return;
             }
+            effectiveTargetId.value = override.id;
+            emit('activity-swapped', override.id);
             // Override has recurrence:'none' so future edits skip scope naturally
           } else if (scope === 'this-and-future') {
             const newTemplate = await activityStore.splitActivity(editing.id, props.occurrenceDate);
-            if (newTemplate) {
-              await activityStore.updateActivity(newTemplate.id, update);
-              effectiveTargetId.value = newTemplate.id;
-              emit('activity-swapped', newTemplate.id);
+            if (!newTemplate) {
+              reportSessionActionFailed();
+              return;
             }
+            // `splitActivity` anchors the new template at the clicked occurrence
+            // (Recurring Invariant 3) — letting an inline `date` edit through
+            // here would overwrite that start, the same defect the scoped-save
+            // path guards against.
+            const { date: _d, ...safeUpdate } = update as Record<string, unknown>;
+            void _d;
+            if (
+              Object.keys(safeUpdate).length > 0 &&
+              !(await activityStore.updateActivity(
+                newTemplate.id,
+                safeUpdate as UpdateFamilyActivityInput
+              ))
+            ) {
+              reportSessionActionFailed();
+              return;
+            }
+            effectiveTargetId.value = newTemplate.id;
+            emit('activity-swapped', newTemplate.id);
             scopeResolved.value = true;
           }
         } else {
           // Non-recurring, or scope already resolved — direct update
           const targetId = effectiveTargetId.value ?? editing.id;
-          await activityStore.updateActivity(targetId, update);
+          if (!(await activityStore.updateActivity(targetId, update))) {
+            reportSessionActionFailed();
+            return;
+          }
         }
       }
     },
@@ -622,17 +648,6 @@ function handleOpenEdit() {
   }
 }
 
-function reportSessionActionFailed() {
-  // Surface a non-throw store failure (record-not-found → null; vacation-linked →
-  // deleteActivity false) — never fail silently. Grouped for telemetry.
-  showToast(
-    'error',
-    t('planner.sessionActionFailed.title'),
-    t('planner.sessionActionFailed.message'),
-    { surface: 'activity-session-action' }
-  );
-}
-
 async function handleDelete() {
   if (!activity.value) return;
   const act = activity.value;
@@ -644,9 +659,16 @@ async function handleDelete() {
     if (!scope) return;
 
     if (scope === 'this-only') {
-      await activityStore.materializeOverride(act.id, props.occurrenceDate, {
-        isActive: false,
-      });
+      // Bind the result — an unbound call let the drawer whoosh shut on a
+      // failed cancel while the session stayed on the calendar.
+      if (
+        !(await activityStore.materializeOverride(act.id, props.occurrenceDate, {
+          isActive: false,
+        }))
+      ) {
+        reportSessionActionFailed();
+        return;
+      }
       playWhoosh();
       emit('deleted', act.id);
       emit('close');
@@ -655,9 +677,14 @@ async function handleDelete() {
 
     if (scope === 'this-and-future') {
       const dayBefore = toDateInputValue(addDays(parseLocalDate(props.occurrenceDate), -1));
-      await activityStore.updateActivity(act.id, {
-        recurrenceEndDate: dayBefore,
-      });
+      if (!(await activityStore.updateActivity(act.id, { recurrenceEndDate: dayBefore }))) {
+        reportSessionActionFailed();
+        return;
+      }
+      // End-dating the master does NOT touch its override children (they are
+      // `recurrence:'none'` one-offs). Reap the ones on/after the cut so they
+      // don't survive as ghosts — Recurring Invariant 7.
+      await activityStore.deleteChildrenFrom(act.id, props.occurrenceDate);
       playWhoosh();
       emit('deleted', act.id);
       emit('close');
@@ -776,41 +803,63 @@ function handleRescheduleEndTime(value: string) {
 async function confirmReschedule() {
   if (!activity.value || !rescheduleDate.value) return;
 
-  if (isRecurring.value && props.occurrenceDate) {
-    // Recurring: materialize an override for this occurrence
-    const overrides: Record<string, string | null> = { date: rescheduleDate.value };
-    if (viewIsAllDay.value) {
-      overrides.endDate = rescheduleEndDate.value || null;
-    } else {
-      if (rescheduleStartTime.value !== (activity.value.startTime ?? ''))
-        overrides.startTime = rescheduleStartTime.value || null;
-      if (rescheduleEndTime.value !== (activity.value.endTime ?? ''))
-        overrides.endTime = rescheduleEndTime.value || null;
-    }
+  // These four fields map 1:1 onto the entity, so a payload-vs-entity diff is
+  // safe here. Using `diffPayload` also normalises cleared fields to `undefined`
+  // — the hand-rolled deltas this replaces wrote `null`, which Automerge
+  // persists as a literal null rather than deleting the key.
+  // The base date is the OCCURRENCE being rescheduled, not the entity's `date`
+  // (which for a recurring master is the series START). Using the entity's date
+  // meant that moving an occurrence ONTO the series start produced an equal
+  // value, so `date` dropped out of the delta, the move silently did nothing,
+  // and the UI still reported success. Same template-vs-occurrence confusion
+  // this change fixed in `ActivityModal.onEdit`.
+  const base = {
+    date: props.occurrenceDate ?? activity.value.date,
+    endDate: activity.value.endDate,
+    startTime: activity.value.startTime,
+    endTime: activity.value.endTime,
+  };
+  const next: Record<string, string | undefined> = { date: rescheduleDate.value };
+  if (viewIsAllDay.value) {
+    next.endDate = rescheduleEndDate.value || undefined;
+  } else {
+    next.startTime = rescheduleStartTime.value || undefined;
+    next.endTime = rescheduleEndTime.value || undefined;
+  }
+  const delta = diffPayload(base, next);
 
+  if (isRecurring.value && props.occurrenceDate) {
+    // Recurring MASTER: materialize an override for this occurrence.
     const override = await activityStore.materializeOverride(
       activity.value.id,
       props.occurrenceDate,
-      overrides
+      delta
     );
     if (override) {
       showReschedule.value = false;
       emit('activity-swapped', override.id);
       emit('close');
+    } else {
+      reportSessionActionFailed();
     }
   } else {
-    // One-time: directly update the activity
-    const update: Record<string, string | null> = { date: rescheduleDate.value };
-    if (viewIsAllDay.value) {
-      update.endDate = rescheduleEndDate.value || null;
-    } else {
-      if (rescheduleStartTime.value !== (activity.value.startTime ?? ''))
-        update.startTime = rescheduleStartTime.value || null;
-      if (rescheduleEndTime.value !== (activity.value.endTime ?? ''))
-        update.endTime = rescheduleEndTime.value || null;
+    // One-time activity, OR an override CHILD being moved again.
+    //
+    // A child is always `recurrence:'none'`, so it lands here. Its occurrence
+    // key (`originalOccurrenceDate ?? date`) must NOT drift with the new date:
+    // if it did, the master's original slot would stop being suppressed and the
+    // session would DUPLICATE instead of moving — and the Google exception link
+    // would end up anchored to the wrong day. Carry the key explicitly
+    // (Recurring Invariant 4).
+    const update: Record<string, string | undefined> = { ...delta };
+    if (activity.value.parentActivityId) {
+      update.originalOccurrenceDate = activity.value.originalOccurrenceDate ?? activity.value.date;
     }
 
-    await activityStore.updateActivity(activity.value.id, update);
+    if (!(await activityStore.updateActivity(activity.value.id, update))) {
+      reportSessionActionFailed();
+      return;
+    }
     showReschedule.value = false;
     emit('close');
   }

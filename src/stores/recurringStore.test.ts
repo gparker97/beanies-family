@@ -2,6 +2,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useRecurringStore } from './recurringStore';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
+import { recurringTemplateFields } from '@/utils/recurringItemFields';
 import type { RecurringItem } from '@/types/models';
 
 // Mock the recurring item repository
@@ -545,6 +546,103 @@ describe('recurringStore - Monthly Summary Calculations', () => {
       const store = useRecurringStore();
       const result = await store.splitRecurringItem('non-existent', '2026-03-15');
       expect(result).toBeNull();
+    });
+
+    // The split was only ever tested in ISOLATION. The bug lived in the
+    // SEQUENCE: TransactionsPage split, then immediately called
+    // updateRecurringItem with the raw form payload, whose `startDate` was
+    // seeded from the original template — resetting the new segment's start to
+    // the original series start and overlapping the just-end-dated original.
+    describe('split-then-update sequence (the "this and future" shape)', () => {
+      it('REGRESSION: the post-split update must not carry the schedule fields', async () => {
+        const store = useRecurringStore();
+        const original = createMockRecurringItem({
+          id: 'r-original',
+          startDate: '2026-01-01',
+          endDate: '2026-12-01',
+          lastProcessedDate: '2026-02-01',
+          amount: 100,
+        });
+        store.recurringItems = [original];
+
+        vi.mocked(recurringRepo.updateRecurringItem).mockImplementation(
+          async (id, patch) =>
+            ({ ...store.recurringItems.find((r) => r.id === id)!, ...patch }) as RecurringItem
+        );
+        vi.mocked(recurringRepo.createRecurringItem).mockImplementation(
+          async (input) => ({ ...input, id: 'r-new' }) as RecurringItem
+        );
+
+        const newItem = await store.splitRecurringItem('r-original', '2026-03-15');
+        expect(newItem?.startDate).toBe('2026-03-15');
+
+        // Call the REAL helper TransactionsPage uses. Hand-rolling the same
+        // destructure here would assert against this test's own arithmetic, so
+        // it would still pass if `recurringTemplateFields` started keeping
+        // `startDate` — the "right and wrong answers must be different values"
+        // trap in docs/lessons.md rule 4.
+        //
+        // The form payload is seeded from the ORIGINAL template, which is what
+        // made this dangerous: `startDate` here is the series start, not the
+        // split date.
+        const formPayload = {
+          accountId: original.accountId,
+          type: original.type,
+          amount: 150,
+          currency: original.currency,
+          category: original.category,
+          description: original.description,
+          frequency: original.frequency,
+          dayOfMonth: original.dayOfMonth,
+          startDate: original.startDate,
+          endDate: original.endDate,
+          lastProcessedDate: original.lastProcessedDate,
+          isActive: true,
+        } as unknown as Parameters<typeof recurringTemplateFields>[0];
+
+        await store.updateRecurringItem(
+          newItem!.id,
+          recurringTemplateFields(formPayload, newItem!.endDate ?? '')
+        );
+
+        const [, patch] = vi.mocked(recurringRepo.updateRecurringItem).mock.calls.at(-1)!;
+        expect(patch).not.toHaveProperty('startDate');
+        expect(patch).not.toHaveProperty('lastProcessedDate');
+        expect(patch).toHaveProperty('amount', 150);
+        // The split's own start survives the update it is followed by.
+        expect(store.recurringItems.find((r) => r.id === newItem!.id)?.startDate).toBe(
+          '2026-03-15'
+        );
+      });
+
+      it('APPLIES an "ends on" edit made in the same save as the split', async () => {
+        const store = useRecurringStore();
+        const original = createMockRecurringItem({
+          id: 'r-original',
+          startDate: '2026-01-01',
+          endDate: '2026-12-01',
+          amount: 100,
+        });
+        store.recurringItems = [original];
+        vi.mocked(recurringRepo.updateRecurringItem).mockImplementation(
+          async (id, patch) =>
+            ({ ...store.recurringItems.find((r) => r.id === id)!, ...patch }) as RecurringItem
+        );
+        vi.mocked(recurringRepo.createRecurringItem).mockImplementation(
+          async (input) => ({ ...input, id: 'r-new' }) as RecurringItem
+        );
+
+        const newItem = await store.splitRecurringItem('r-original', '2026-03-15');
+        // User shortened the series to August in the same save.
+        const patch = recurringTemplateFields(
+          { ...original, endDate: '2026-08-01' } as unknown as Parameters<
+            typeof recurringTemplateFields
+          >[0],
+          newItem!.endDate ?? ''
+        );
+
+        expect(patch).toHaveProperty('endDate', '2026-08-01');
+      });
     });
   });
 

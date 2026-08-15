@@ -4,6 +4,42 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A create-payload reused as an update-payload writes fields the user never touched — and a test that can't distinguish two values proves nothing
+
+**Date:** 2026-08-15
+**Context:** Editing one occurrence of a recurring activity (changing only the pickup person) moved the session to the series' start date — overlapping an earlier instance — or hid it entirely. It shipped in `529d2547` (2026-03-09) and ran for five months.
+
+The proximate cause was one line: `ActivityModal.onEdit` seeded the form's `date` from `activity.date` (the **series start**) while the banner directly above it displayed `props.occurrenceDate` (the day the user clicked). The modal showed two different dates and the user only ever saw one. But the line was only reachable as a bug because `buildPayload()` — a **create** payload — was reused verbatim as the **update/override** payload, so `date` was written on every save whether or not it was touched.
+
+That single structural choice produced eight distinct failure modes, two of them proven data loss and one financial corruption:
+
+- A leaked `recurrenceEndDate` landed on the one-off child, and `expandRecurring` applied the end-date cut **before** the `switch (recurrence)` — so a moved session vanished from both its old and new dates.
+- A cloned `linkedRecurringItemId` made the child look like a payment owner; since the child is `recurrence:'none'`, the fee sync rewrote the family's **monthly** payment into a one-off and stopped it.
+- `splitActivity` and "delete this and all future" both abandoned their override children, leaving ghosts that render in-app but can never sync to Google.
+
+Three further traps surfaced while fixing it:
+
+- **The proximate fix would have shipped a new bug.** Correcting the form's date un-masked a second defect (`confirmReschedule` never preserving `originalOccurrenceDate` on an override child), converting "the session moves" into "the session duplicates". The two had to land in the same commit.
+- **The E2E test covering this path could not fail.** `planner.spec.ts` created a series starting **tomorrow** and clicked `.first()`, so the template's start date and the clicked occurrence were the same value. Its sibling asserted `expect(newTemplate.date).toBeTruthy()` — true for any date at all.
+- **The unit tests tested a contract the caller never satisfied.** `activityStore.test.ts` asserted `materializeOverride`'s behaviour when passed `{ startTime }` with **no `date` key** — correct, and precisely the case the form never produced.
+
+**Rules:**
+
+1. **Never reuse a create payload as an update payload.** An update must carry only what changed. Use `src/utils/diffPayload.ts` (forms) or an explicit field helper (`src/utils/recurringItemFields.ts`), and remember `automergeRepository.update` keys its delete list off `Object.keys` — a cleared field must be _assigned_ `undefined`, never omitted.
+2. **A store action must be safe regardless of caller.** `materializeOverride` re-forces `OVERRIDE_INVALID_KEYS` **after** the caller's overrides for exactly this reason. If correctness depends on every caller behaving, it is not a guarantee — it is a convention waiting to be broken.
+3. **When two fields can disagree on screen, one of them is a bug.** A banner showing `occurrenceDate` above a form field holding `activity.date` is a defect the moment it is written, whether or not anything reads it yet.
+4. **Write the test so the right and wrong answers are different values.** A fixture where the expected and buggy values coincide (series starts tomorrow, click the first occurrence) is not a test. Pick the _second_ occurrence, and assert the exact date — never `toBeTruthy()`.
+5. **Fixing a masked bug un-masks the one beneath it.** Before shipping a fix, ask what the broken behaviour was accidentally compensating for. Here the spurious `originalOccurrenceDate` was hiding a second defect entirely.
+6. **When one defect is found in a shared pattern, sweep every other user of that pattern.** The identical shape was live in recurring transactions, including a `recurrenceEndDate` write to a field that does not exist on `RecurringItem` — hidden by an `as any` cast — which made "delete this and all future" on a bill a silent no-op that regenerated forever.
+
+**Postscript — the fix introduced eight regressions of its own, two financial.** A `/code-review max` pass caught them before anything shipped. The worst: adding `linkedRecurringItemId` to the "never inherit" list stripped the id but kept `payFromAccountId`/`feeAmount`, so a split minted a SECOND recurring fee item while the original's kept running — the family billed twice, forever. Three further rules earned the hard way:
+
+7. **"Strip the dangerous field" is not automatically safe — check what the field GATES.** An id is often the difference between _update this record_ and _create a new one_. Removing it while leaving the fields that trigger the write flips an update into a create. Ask "what does the code do when this is absent?", not just "should this be here?".
+8. **A blanket strip is the same anti-pattern as a blanket write.** Both ignore user intent. The first pass removed a blanket `recurrenceEndDate` strip on the activity side for exactly this reason, then reintroduced it verbatim in a new transactions helper in the same change. If a field is dropped because it is _usually_ unchanged, pass the original and compare — do not assume.
+9. **Mocking the collaborator hides the regression the collaborator would have caught.** The store regression suite mocked `linkedRecurringItem` wholesale, so the double-billing was invisible to it; the E2E assertion passed only because that fixture had no fee. When a test mocks the thing a change is most likely to break, it is not covering that change.
+
+---
+
 ## Verify the platform actually ACCEPTS a setting before spending a build on it — and beware green-looking local gates
 
 **Date:** 2026-08-07

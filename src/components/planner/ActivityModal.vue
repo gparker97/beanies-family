@@ -19,6 +19,7 @@ import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import TripShortcutCard from '@/components/planner/TripShortcutCard.vue';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { calculateMonthlyFee } from '@/utils/finance';
+import { diffPayload } from '@/utils/diffPayload';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useActivityStore } from '@/stores/activityStore';
@@ -261,7 +262,20 @@ const { isEditing, isSubmitting } = useFormModal(
       icon.value = activity.icon ?? '';
       title.value = activity.title;
       description.value = activity.description ?? '';
-      date.value = activity.date;
+      // Seed from the OCCURRENCE being edited, not the series start. The banner
+      // above the form already shows `occurrenceDate`; seeding `activity.date`
+      // here made the form display two different dates, and — because
+      // `buildPayload` emits `date` unconditionally — silently moved the
+      // occurrence to the series start on a "just this item" save. See
+      // docs/plans/2026-08-15-recurring-occurrence-edit-data-loss.md.
+      //
+      // RECURRING ONLY. `occurrenceDate` is also supplied for a NON-recurring
+      // multi-day all-day activity (every day of its range is a clickable
+      // occurrence), where `date` is the range START. Seeding the clicked day
+      // there would show the wrong start date and let a one-day nudge truncate
+      // the trip — there is no scope modal on a one-off to catch it.
+      date.value =
+        activity.recurrence !== 'none' ? (props.occurrenceDate ?? activity.date) : activity.date;
       endDate.value = activity.endDate ?? '';
       isAllDay.value = activity.isAllDay ?? false;
       startTime.value = activity.startTime ?? '';
@@ -357,6 +371,9 @@ watch(category, (newCategory) => {
 // single weekday. A multi-day pick, or a single day the user switched to a
 // different weekday, counts as customized and is preserved across date edits.
 watch(date, (newDate, oldDate) => {
+  // Suppressed during edit population: re-seeding `date` from `occurrenceDate`
+  // would otherwise fire this and rewrite the SERIES' weekday set.
+  if (suppressDaysOfWeekSync) return;
   if (!newDate || !isRecurring.value) return;
   const newWeekday = new Date(newDate + 'T00:00:00').getDay();
   const oldWeekday = oldDate ? new Date(oldDate + 'T00:00:00').getDay() : null;
@@ -370,15 +387,49 @@ watch(date, (newDate, oldDate) => {
 
 // Sync endTime when startTime changes (skip during edit population)
 let suppressEndTimeSync = false;
+let suppressDaysOfWeekSync = false;
+/**
+ * Baseline snapshot of the form payload, taken once per open in edit mode.
+ *
+ * `handleSave` diffs against this so the emitted update contains ONLY what the
+ * user actually changed. Diffing against `props.activity` instead would couple
+ * correctness to `buildPayload`'s derivations (`payFromAccountId: ''`,
+ * `feeSchedule: 'none'`, the legacy `assigneeId` mirror) staying in lockstep
+ * with the stored shape forever — and, since `date` is now seeded from
+ * `occurrenceDate`, would emit `date` on every recurring occurrence edit.
+ *
+ * `null` when there is nothing to diff against (a create, including the
+ * eager-create path where the entity exists but `onEdit` never ran). The rule
+ * is one line: no baseline → no diff → emit the full payload.
+ *
+ * ALSO null for the AI "update existing activity" flow. There, the page passes
+ * an in-memory object merged from the extraction that was NEVER PERSISTED, so
+ * the extracted fields are already in the baseline — the user reviews, changes
+ * nothing, saves, the diff comes back empty and every extracted field is
+ * silently discarded. `props.sourcePhoto` is the flow's marker (set by
+ * `applyUpdateExisting`), and a full payload is what that flow wants anyway.
+ */
+const editBaseline = ref<CreateFamilyActivityInput | null>(null);
 watch(
   () => props.open,
   (open) => {
     if (open && props.activity) {
-      // Suppress the startTime watcher during edit population
+      // Suppress the startTime + daysOfWeek watchers during edit population.
+      // Vue's default 'pre' watchers are queued, not synchronous: onEdit's field
+      // assignments queue those callbacks, and this watcher — registered later
+      // on the same `props.open` source — sets the flags before the queue flushes.
       suppressEndTimeSync = true;
+      suppressDaysOfWeekSync = true;
       nextTick(() => {
         suppressEndTimeSync = false;
+        suppressDaysOfWeekSync = false;
+        // Taken AFTER the flags release so watcher-settled values are part of
+        // the baseline rather than surfacing as phantom user changes.
+        // Skipped for the AI update-existing flow — see the ref's docblock.
+        editBaseline.value = props.sourcePhoto ? null : buildPayload();
       });
+    } else {
+      editBaseline.value = null;
     }
   }
 );
@@ -688,8 +739,27 @@ function handleSave() {
     // runs normally. This skips the "Activity Created" confirmation
     // even on the eager-created path; the user already has visible
     // feedback (the photo tile they attached) so the modal is fine.
-    const { createdBy: _omit, ...updateData } = payload;
+    //
+    // Diff against the baseline so untouched fields never reach the update —
+    // an untouched `date` must be ABSENT, otherwise a "just this item" save
+    // reschedules the occurrence the user never moved. No baseline (the
+    // eager-create path) → emit the full payload, exactly as before.
+    //
+    // Known, accepted imprecision: `photoIds` arrive asynchronously from the
+    // binding composable, so a photo landing after the baseline shows up in the
+    // diff at its correct current value — a harmless same-value write. Do not
+    // add machinery to chase it.
+    const data = editBaseline.value ? diffPayload(editBaseline.value, payload) : payload;
+    // `createdBy` is destructured off the DIFF, not the payload — otherwise it
+    // rides along into an update whenever the current member changed mid-session.
+    const { createdBy: _omit, ...updateData } = data;
     void _omit;
+    // Nothing changed — close without a pointless write (and without the
+    // recurring scope modal, which would ask the user to scope a no-op).
+    if (editBaseline.value && Object.keys(updateData).length === 0) {
+      emit('close');
+      return;
+    }
     emit('save', { id: existingId, data: updateData as UpdateFamilyActivityInput });
   } else {
     emit('save', payload);

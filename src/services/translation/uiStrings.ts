@@ -5825,6 +5825,15 @@ const STRING_DEFS = {
     en: 'Something went wrong — please try again.',
     beanie: 'something went wrong — please try again.',
   },
+  'planner.multiDayMoveBlocked.title': {
+    en: 'Pick a different option to move this',
+    beanie: 'pick a different option to move this',
+  },
+  'planner.multiDayMoveBlocked.message': {
+    en: 'This activity repeats on more than one day each week, so moving one session can’t be applied to the whole series. Choose “This occurrence only” to move just this one, or edit the days it repeats on.',
+    beanie:
+      'this bean sprouts on more than one day each week, so moving one session can’t change the whole series. choose “this occurrence only” to move just this one, or change the days it repeats on.',
+  },
   'planner.addAnotherActivity': {
     en: '+ add another activity',
     beanie: '+ add another activity',

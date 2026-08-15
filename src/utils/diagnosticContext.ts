@@ -244,6 +244,25 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'token_outcome',
   'token_reason',
   'token_trigger',
+  // Recurring-series occurrence handling (surfaces `activity-override`,
+  // `activity-scope-edit`, `activity-series-delete`, `activity-fee-sync`,
+  // `recurring-item-scope`, `calendar-sync`; occurrence-edit data-loss fix,
+  // 2026-08-15). All PII-FREE: two `YYYY-MM-DD` occurrence dates (never a
+  // title, member name, or amount), closed enums, counts, and a joined list of
+  // model FIELD NAMES that were stripped. Lets one CloudWatch filter prove the
+  // fix holds — `recur_occurrence_ymd !== recur_resolved_ymd` with
+  // `recur_rescheduled:false` is the exact signature of the bug class. MIRROR
+  // every key here in the Lambda allowlist + its pinned test, AND in the store
+  // data-collection declarations (docs/runbooks/native-store-submission.md,
+  // PrivacyInfo.xcprivacy, Play Data Safety, web/src/pages/privacy.astro).
+  'recur_occurrence_ymd',
+  'recur_resolved_ymd',
+  'recur_rescheduled',
+  'recur_scope',
+  'recur_stripped_fields',
+  'recur_outcome',
+  'recur_children_removed',
+  'recur_children_expected',
 ]);
 
 export const MAX_STRING_LEN = 200;
