@@ -16,6 +16,11 @@
       used solely to keep the app working. The firehose itself is PII-free
       (correlated by a random family_id); the critical-error path additionally
       carries the owner email, so these types are marked Linked.
+      Includes (2026-08) recurring-series occurrence dates: the calendar date of
+      a repeating session being edited, the date it resolved to, the chosen edit
+      scope, and counts — dates and closed enums only, never a title, member
+      name or amount. Declared here under Other Diagnostic Data; no new
+      NSPrivacyCollectedDataType is required.
     - User ID (family_id): a random per-family UUID used to correlate diagnostics.
     - Product Interaction (last-login date + approx .beanpod size): a low-frequency
       usage heartbeat sent to the family registry, used for analytics (gauge active

@@ -172,6 +172,17 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'token_outcome',
   'token_reason',
   'token_trigger',
+  // Recurring-series occurrence handling (occurrence-edit data-loss fix,
+  // 2026-08-15). PII-free: occurrence dates, closed enums, counts, and a joined
+  // list of stripped model field names. Mirror of src/utils/diagnosticContext.ts.
+  'recur_occurrence_ymd',
+  'recur_resolved_ymd',
+  'recur_rescheduled',
+  'recur_scope',
+  'recur_stripped_fields',
+  'recur_outcome',
+  'recur_children_removed',
+  'recur_children_expected',
 ]);
 
 function getHeaders(event) {

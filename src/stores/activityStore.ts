@@ -22,10 +22,12 @@ import { selectActivitiesToBackfill } from '@/utils/activityReminderBackfill';
 import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
+import { reportSessionActionFailed } from '@/utils/actionFailure';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
+  DutyCompletion,
   ISODateString,
   CurrencyCode,
 } from '@/types/models';
@@ -36,6 +38,114 @@ export const CATEGORY_COLORS = ACTIVITY_COLORS;
 /** Returns the activity's custom color or falls back to category default. */
 export function getActivityColor(activity: FamilyActivity): string {
   return activity.color ?? getActivityCategoryColor(activity.category);
+}
+
+/**
+ * Fields a SPLIT template must never inherit from the series it replaces.
+ *
+ * `vacationId` is here because inheriting it mints an activity `deleteActivity`
+ * then refuses to delete; `originalOccurrenceDate`/`parentActivityId` because a
+ * split produces a master, never a child.
+ *
+ * `linkedRecurringItemId` is deliberately NOT here. A split TRANSFERS fee
+ * ownership to the new template — `splitActivity` carries the id across so the
+ * existing item is updated in place, then clears it from the end-dated
+ * original. Stripping it instead makes the new template look fee-enabled with
+ * no item, so the sync MINTS A SECOND one while the original's keeps running:
+ * the family is billed twice, forever.
+ *
+ * The completion arrays are also not here — they are FILTERED rather than
+ * dropped (see `completionsForDerived`), because wholesale removal erases a
+ * duty the family already ticked.
+ */
+export const SPLIT_INVALID_KEYS = [
+  'id',
+  'createdAt',
+  'updatedAt',
+  'recurrenceEndDate',
+  'vacationId',
+  'originalOccurrenceDate',
+  'parentActivityId',
+] as const satisfies readonly (keyof FamilyActivity)[];
+
+/**
+ * An override child is a LEAF: everything a split strips, plus the series rule
+ * AND the fee link. Unlike a split, a child is never a fee owner — it is one
+ * session, not a series (Recurring Invariant 2).
+ */
+export const OVERRIDE_INVALID_KEYS = [
+  ...SPLIT_INVALID_KEYS,
+  'recurrence',
+  'daysOfWeek',
+  'linkedRecurringItemId',
+] as const satisfies readonly (keyof FamilyActivity)[];
+
+/**
+ * The completion entries a derived activity should inherit.
+ *
+ * Dropping the arrays entirely erases work the family already did: if a parent
+ * ticks "picked up" for an occurrence and someone then edits that same session,
+ * the override suppresses the master for that date — so every reader
+ * (`findCompletion`, `useCriticalItems`, `useScheduledReminders`) sees the
+ * child, finds nothing, re-lists the duty as outstanding and re-fires the
+ * reminder. Carrying the whole history is equally wrong: a split template would
+ * inherit ticks for dates before it existed.
+ *
+ * `retarget` re-dates the kept entries when the occurrence moves, so a
+ * completed duty follows its session.
+ */
+function completionsForDerived(
+  entries: DutyCompletion[] | undefined,
+  keep: (ymd: string) => boolean,
+  retarget?: ISODateString
+): DutyCompletion[] | undefined {
+  if (!entries?.length) return undefined;
+  const kept = entries
+    .filter((c) => keep(c.date))
+    .map((c) => (retarget ? { ...c, date: retarget } : c));
+  return kept.length ? kept : undefined;
+}
+
+/**
+ * Plain deep-clone of `template` minus `strip`, plus the names actually removed.
+ *
+ * The clone strips Automerge/Vue proxy wrappers (nested arrays like
+ * `daysOfWeek` would otherwise carry a proxy into the new record). The returned
+ * `strippedKeys` drives the `recur_stripped_fields` telemetry, so the list of
+ * what was removed has exactly one source of truth.
+ */
+function deriveFromTemplate(
+  template: FamilyActivity,
+  strip: readonly (keyof FamilyActivity)[]
+): { payload: CreateFamilyActivityInput; strippedKeys: string[] } {
+  const clone = JSON.parse(JSON.stringify(template)) as Record<string, unknown>;
+  const strippedKeys: string[] = [];
+  for (const key of strip) {
+    if (clone[key] !== undefined) strippedKeys.push(key);
+    delete clone[key];
+  }
+  return { payload: clone as unknown as CreateFamilyActivityInput, strippedKeys };
+}
+
+/**
+ * Remove every occurrence-invalid key from a caller-supplied override patch.
+ *
+ * This is the guard that makes `materializeOverride` safe REGARDLESS of caller:
+ * a form that hands us the whole series payload cannot leak `recurrenceEndDate`
+ * (which would hide the child entirely once the series end date passes) or
+ * `linkedRecurringItemId` (which would hijack the series' fee item).
+ */
+function sanitizeOverridePatch(overrides?: UpdateFamilyActivityInput): {
+  patch: UpdateFamilyActivityInput;
+  strippedKeys: string[];
+} {
+  const patch = { ...(overrides ?? {}) } as Record<string, unknown>;
+  const strippedKeys: string[] = [];
+  for (const key of OVERRIDE_INVALID_KEYS) {
+    if (patch[key] !== undefined) strippedKeys.push(key);
+    delete patch[key];
+  }
+  return { patch: patch as UpdateFamilyActivityInput, strippedKeys };
 }
 
 export const useActivityStore = defineStore('activities', () => {
@@ -51,17 +161,29 @@ export const useActivityStore = defineStore('activities', () => {
   // Filtered getters (by global member filter)
   const filteredActivities = createMemberFiltered(activeActivities, (a) => normalizeAssignees(a));
 
-  /** Map of parentActivityId → Set of override dates, for skipping in expansion. */
+  /**
+   * Map of parentActivityId → (occurrenceYmd → override child).
+   *
+   * Serves three readers from one scan: expansion suppression (`.has`), the
+   * idempotency lookup in `materializeOverride` (`.get`), and the delete
+   * cascade / re-parent loops (`.values()`).
+   *
+   * When two children collide on one occurrence key (concurrent materialize on
+   * two devices, merged by the CRDT) the map keeps the last. That is a real
+   * multi-device edge case, surfaced by the `activity-override` telemetry
+   * rather than silently merged — see the plan's "idempotency is best-effort
+   * and local" note.
+   */
   const overridesByParent = computed(() => {
-    const map = new Map<string, Set<string>>();
+    const map = new Map<string, Map<string, FamilyActivity>>();
     for (const a of activities.value) {
       if (a.parentActivityId) {
-        let dates = map.get(a.parentActivityId);
-        if (!dates) {
-          dates = new Set();
-          map.set(a.parentActivityId, dates);
+        let byYmd = map.get(a.parentActivityId);
+        if (!byYmd) {
+          byYmd = new Map();
+          map.set(a.parentActivityId, byYmd);
         }
-        dates.add(overrideOccurrenceYmd(a));
+        byYmd.set(overrideOccurrenceYmd(a), a);
       }
     }
     return map;
@@ -147,7 +269,15 @@ export const useActivityStore = defineStore('activities', () => {
       return [];
     }
 
-    const endDate = activity.recurrenceEndDate ? parseLocalDate(activity.recurrenceEndDate) : null;
+    // `recurrenceEndDate` is a SERIES rule — it must never gate a one-off. An
+    // override child that inherited one (possible in `.beanpod` files written
+    // before the 2026-08-15 fix) would otherwise be pruned by the early return
+    // below and vanish from the calendar entirely. Ignoring it on
+    // `recurrence:'none'` un-hides that legacy data with no migration.
+    const endDate =
+      activity.recurrence !== 'none' && activity.recurrenceEndDate
+        ? parseLocalDate(activity.recurrenceEndDate)
+        : null;
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
 
@@ -207,6 +337,8 @@ export const useActivityStore = defineStore('activities', () => {
     // parentActivityId). Same path for every recurrence kind.
     const overrides = overridesByParent.value.get(activity.id);
     return overrides ? results.filter((r) => !overrides.has(r.date)) : results;
+    // NOTE: `.has` on the ymd→child map — same computed the idempotency
+    // lookup and the delete cascade read. See `overridesByParent`.
   }
 
   /** Single one-off activity (no recurrence). Multi-day all-day expands into
@@ -505,7 +637,39 @@ export const useActivityStore = defineStore('activities', () => {
   });
 
   // ── Linked recurring payment sync ──────────────────────────────────────────
+  /**
+   * Keep an activity's linked recurring PAYMENT item in step with its fee fields.
+   *
+   * The guard on the first line is load-bearing (Recurring Invariant 2). Both
+   * `createActivity` and `updateActivity` call this unconditionally, so without
+   * it an override child — which clones the parent's `linkedRecurringItemId`
+   * and is always `recurrence:'none'` — would be treated as a ONE-TIME payment
+   * and rewrite the SERIES' monthly fee item in place, re-dated to that single
+   * occurrence and repointed at the child. Editing or cancelling one session of
+   * a paid class would silently stop the family's recurring fee.
+   */
   async function syncLinkedRecurringPayment(activity: FamilyActivity) {
+    if (activity.parentActivityId) {
+      // An override child is never the fee owner. If it carries a leaked id
+      // from a `.beanpod` written before the 2026-08-15 fix, clear it on the
+      // way out — a leaked id is NOT inert: `TransactionsPage` resolves a
+      // recurring item's owning activity by scanning this field, and a child
+      // can win that scan. Repo write + in-memory patch directly (not the
+      // `updateActivity` action) so this never re-enters the store.
+      if (activity.linkedRecurringItemId) {
+        await activityRepo.updateActivity(activity.id, { linkedRecurringItemId: undefined });
+        activities.value = activities.value.map((a) =>
+          a.id === activity.id ? { ...a, linkedRecurringItemId: undefined } : a
+        );
+        logEvent({
+          surface: 'activity-fee-sync',
+          level: 'warn',
+          message: 'Cleared leaked linkedRecurringItemId from an override child',
+          context: { action: 'cleared-leaked-link-on-child' },
+        });
+      }
+      return;
+    }
     const enabled = !!(activity.payFromAccountId && activity.feeAmount);
     const settingsStore = useSettingsStore();
     const isAllSchedule = activity.feeSchedule === 'all';
@@ -618,6 +782,27 @@ export const useActivityStore = defineStore('activities', () => {
     );
   }
 
+  /**
+   * `syncLinkedRecurringPayment` is awaited OUTSIDE `wrapAsync` in both callers,
+   * so an unguarded throw here would reject the caller's save AFTER the activity
+   * was already written — a partial failure with no attributed toast. The
+   * activity write itself succeeded and must not be reported as a failure, so
+   * the fee-sync failure is reported on its own surface and swallowed.
+   */
+  async function safeSyncLinkedRecurringPayment(activity: FamilyActivity): Promise<void> {
+    try {
+      await syncLinkedRecurringPayment(activity);
+    } catch (err) {
+      reportError({
+        surface: 'activity-fee-sync',
+        message: 'Failed to sync the linked recurring payment for an activity',
+        severity: 'error',
+        error: err,
+        context: { action: 'sync-linked-recurring-payment' },
+      });
+    }
+  }
+
   async function createActivity(input: CreateFamilyActivityInput): Promise<FamilyActivity | null> {
     const result = await wrapAsync(
       isLoading,
@@ -630,7 +815,7 @@ export const useActivityStore = defineStore('activities', () => {
       },
       { action: 'activityStore:createActivity' }
     );
-    if (result) await syncLinkedRecurringPayment(result);
+    if (result) await safeSyncLinkedRecurringPayment(result);
     return result ?? null;
   }
 
@@ -651,35 +836,165 @@ export const useActivityStore = defineStore('activities', () => {
       },
       { action: 'activityStore:updateActivity' }
     );
-    if (result) await syncLinkedRecurringPayment(result);
+    if (result) await safeSyncLinkedRecurringPayment(result);
     return result ?? null;
   }
 
+  /**
+   * The shared delete LEAF: repo delete + in-memory removal + Beanie List
+   * unlink. Deliberately not an action — `deleteActivity` and
+   * `deleteChildrenFrom` both wrap it in a SINGLE `wrapAsync`, so the loading
+   * state does not flicker once per child and there is no recursion.
+   */
+  async function deleteOne(id: string): Promise<boolean> {
+    const success = await activityRepo.deleteActivity(id);
+    if (success) {
+      activities.value = activities.value.filter((a) => a.id !== id);
+      // Clear any Beanie List link to this activity (no orphan reference).
+      const { useListStore } = await import('@/stores/listStore');
+      await useListStore().clearLinksFor('activity', id);
+    }
+    return success;
+  }
+
+  /**
+   * Delete an activity and — when it is a recurring master — its override
+   * children (Recurring Invariant 7).
+   *
+   * Without the cascade, deleting a series leaves every edited/moved session
+   * behind as a `recurrence:'none'` ghost: still rendered in-app, but excluded
+   * from the Google master push path AND skipped by the exception path (its
+   * parent is gone), so it can never sync again.
+   *
+   * ORDER MATTERS — master first, children second. If the master delete fails
+   * we abort having lost nothing. Children-first would mean a failed master
+   * delete has already destroyed the user's edited occurrences.
+   */
   async function deleteActivity(id: string): Promise<boolean> {
     // Prevent standalone deletion of vacation-linked activities
     const activity = activities.value.find((a) => a.id === id);
     if (activity?.vacationId) {
-      console.warn(
-        'Cannot delete a vacation-linked activity directly. Use vacationStore.deleteVacation() instead.'
-      );
+      reportSessionActionFailed();
+      logEvent({
+        surface: 'activity-series-delete',
+        level: 'warn',
+        message: 'Refused to delete a vacation-linked activity directly',
+        context: { action: 'vacation-linked-delete-refused' },
+      });
       return false;
     }
+    // Snapshot before the master delete — `overridesByParent` recomputes the
+    // moment `activities` changes.
+    const children = [...(overridesByParent.value.get(id)?.values() ?? [])];
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        const success = await activityRepo.deleteActivity(id);
-        if (success) {
-          activities.value = activities.value.filter((a) => a.id !== id);
-          // Clear any Beanie List link to this activity (no orphan reference).
-          const { useListStore } = await import('@/stores/listStore');
-          await useListStore().clearLinksFor('activity', id);
+        const success = await deleteOne(id);
+        if (!success) return false;
+        let reaped = 0;
+        for (const child of children) {
+          // A child delete failing after the master is gone leaves today's
+          // status quo (an orphan), not a new failure — report and continue.
+          //
+          // The try/catch is load-bearing: a THROW here (the dynamic import,
+          // `clearLinksFor`, or the worker RPC) would escape to `wrapAsync`,
+          // which returns undefined — so `deleteActivity` would report FALSE
+          // even though the master is already gone from the calendar, and the
+          // caller would show "couldn't delete" over a series that no longer
+          // exists. Only the boolean path is a tolerable partial failure.
+          try {
+            if (await deleteOne(child.id)) reaped += 1;
+          } catch (err) {
+            reportError({
+              surface: 'activity-series-delete',
+              message: 'Failed to delete an override child during the series cascade',
+              severity: 'error',
+              error: err,
+              context: { action: 'series-delete-child-failed' },
+            });
+          }
         }
-        return success;
+        if (children.length > 0) {
+          logEvent({
+            surface: 'activity-series-delete',
+            level: reaped === children.length ? 'info' : 'warn',
+            message: 'Deleted a recurring series and its override children',
+            context: {
+              action: 'series-delete-cascade',
+              recur_outcome: reaped === children.length ? 'complete' : 'partial',
+              recur_children_removed: reaped,
+              recur_children_expected: children.length,
+            },
+          });
+        }
+        return true;
       },
       { action: 'activityStore:deleteActivity' }
     );
     return result ?? false;
+  }
+
+  /**
+   * Reap override children on/after `fromYmd` when a series is TRUNCATED.
+   *
+   * "Delete this and all future" end-dates the master, which does nothing to
+   * its children — they are `recurrence:'none'` one-offs and no end date
+   * applies to them (Recurring Invariant 7). Without this they survive the cut
+   * as ghosts on dates the series no longer covers.
+   *
+   * `ymd >= fromYmd` is a safe lexicographic compare on `YYYY-MM-DD`.
+   */
+  async function deleteChildrenFrom(masterId: string, fromYmd: ISODateString): Promise<number> {
+    // Select by the date the child actually RENDERS on (`child.date`), not its
+    // occurrence key. The user picked a cut based on what they can see: a
+    // session moved to BEFORE the cut must survive it (selecting by key would
+    // hard-delete a session sitting a week earlier than the day they chose to
+    // keep), and a session moved to AFTER it must go (selecting by key would
+    // spare a ghost rendering a month past the series end).
+    const doomed = [...(overridesByParent.value.get(masterId)?.values() ?? [])].filter(
+      (child) => child.date.slice(0, 10) >= fromYmd
+    );
+    if (doomed.length === 0) return 0;
+
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        let reaped = 0;
+        for (const child of doomed) {
+          // Per-child try/catch for the same reason as the delete cascade: a
+          // throw would abandon the remaining children AND lose the count.
+          try {
+            if (await deleteOne(child.id)) reaped += 1;
+          } catch (err) {
+            reportError({
+              surface: 'activity-series-delete',
+              message: 'Failed to reap an override child while truncating a series',
+              severity: 'error',
+              error: err,
+              context: { action: 'series-truncate-child-failed' },
+            });
+          }
+        }
+        return reaped;
+      },
+      { action: 'activityStore:deleteChildrenFrom' }
+    );
+    const reaped = result ?? 0;
+    logEvent({
+      surface: 'activity-series-delete',
+      level: reaped === doomed.length ? 'info' : 'warn',
+      message: 'Reaped override children from a truncated recurring series',
+      context: {
+        action: 'series-truncate-cascade',
+        recur_occurrence_ymd: fromYmd,
+        recur_outcome: reaped === doomed.length ? 'complete' : 'partial',
+        recur_children_removed: reaped,
+        recur_children_expected: doomed.length,
+      },
+    });
+    return reaped;
   }
 
   /**
@@ -699,6 +1014,13 @@ export const useActivityStore = defineStore('activities', () => {
   /**
    * Split a recurring activity at a given date.
    * End-dates the original at the day before, creates a new template from the split date.
+   *
+   * Override children on/after the split date are RE-PARENTED onto the new
+   * template (Recurring Invariant 7). Without that step the child keeps
+   * suppressing an occurrence the old template no longer emits, while the new
+   * template emits an unsuppressed one — the split-date session duplicates.
+   * Mirrors `recurringStore.splitRecurringItem`, which already re-links its
+   * materialised transactions.
    */
   async function splitActivity(
     activityId: string,
@@ -707,26 +1029,105 @@ export const useActivityStore = defineStore('activities', () => {
     const original = activities.value.find((a) => a.id === activityId);
     if (!original) return null;
 
-    const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
-    await updateActivity(activityId, { recurrenceEndDate: dayBefore });
+    // Snapshot before any write — `overridesByParent` recomputes on mutation.
+    //
+    // Re-parenting selects by OCCURRENCE KEY, not render date: the key is the
+    // master slot a child suppresses, and slots on/after `fromDate` now belong
+    // to the new template. (Contrast `deleteChildrenFrom`, which selects by
+    // render date because there the question is what the user can SEE.)
+    const childrenToMove = [...(overridesByParent.value.get(activityId)?.entries() ?? [])]
+      .filter(([ymd]) => ymd >= fromDate)
+      .map(([, child]) => child);
 
-    // Deep-clone to strip Automerge/Vue proxy wrappers (nested arrays like daysOfWeek)
-    const {
-      id: _id,
-      createdAt: _ca,
-      updatedAt: _ua,
-      recurrenceEndDate: _re,
-      ...rest
-    } = JSON.parse(JSON.stringify(original));
-    return createActivity({
-      ...rest,
+    // CREATE FIRST, end-date LAST. The reverse order (which this used to use)
+    // has two unrecoverable failure modes: if the create fails after the
+    // original is truncated, the series silently loses every occurrence from
+    // the split date on with no replacement; and if the end-date write fails
+    // but the create succeeds, BOTH templates expand from `fromDate` and every
+    // session renders twice, forever. Mirrors the master-first ordering
+    // `deleteActivity` documents.
+    const { payload, strippedKeys } = deriveFromTemplate(original, SPLIT_INVALID_KEYS);
+    const newTemplate = await createActivity({
+      ...payload,
       date: fromDate,
       recurrenceEndDate: original.recurrenceEndDate,
+      // Fee ownership TRANSFERS to the new template: carrying the id means the
+      // existing item is updated in place rather than a second one minted.
+      ...(original.linkedRecurringItemId
+        ? { linkedRecurringItemId: original.linkedRecurringItemId }
+        : {}),
+      dropoffCompletions: completionsForDerived(original.dropoffCompletions, (d) => d >= fromDate),
+      pickupCompletions: completionsForDerived(original.pickupCompletions, (d) => d >= fromDate),
     });
+    if (!newTemplate) return null;
+
+    const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
+    if (!(await updateActivity(activityId, { recurrenceEndDate: dayBefore }))) {
+      // The replacement exists but the original was never truncated — both
+      // would expand from `fromDate`. Roll the replacement back so the user is
+      // left with the un-split series rather than a permanent duplicate.
+      await deleteOne(newTemplate.id);
+      reportError({
+        surface: 'activity-split',
+        message: 'Could not end-date the original series; rolled back the split',
+        severity: 'error',
+        context: { action: 'split-rollback', recur_occurrence_ymd: fromDate },
+      });
+      return null;
+    }
+
+    // The end-dated original no longer owns the fee item (the new template
+    // does). Clear its pointer directly so two activities never claim one item.
+    if (original.linkedRecurringItemId) {
+      await activityRepo.updateActivity(activityId, { linkedRecurringItemId: undefined });
+      activities.value = activities.value.map((a) =>
+        a.id === activityId ? { ...a, linkedRecurringItemId: undefined } : a
+      );
+    }
+
+    // Success counter — emitted on the SUCCESS path so the split failure RATE is
+    // measurable, not just its absolute count (CLAUDE.md observability rule 6).
+    // `recur_stripped_fields` names what the derivation actually removed, which
+    // is the regression signature `SPLIT_INVALID_KEYS` exists to guard.
+    logEvent({
+      surface: 'activity-series-split',
+      level: 'info',
+      message: 'Split a recurring series at an occurrence',
+      context: {
+        action: 'series-split',
+        recur_occurrence_ymd: fromDate,
+        recur_outcome: 'split',
+        recur_stripped_fields: strippedKeys.join(','),
+        recur_children_expected: childrenToMove.length,
+      },
+    });
+
+    for (const child of childrenToMove) {
+      if (!(await updateActivity(child.id, { parentActivityId: newTemplate.id }))) {
+        logEvent({
+          surface: 'activity-series-split',
+          level: 'warn',
+          message: 'Could not re-parent an override child onto the split template',
+          context: { action: 'split-reparent-failed', recur_occurrence_ymd: fromDate },
+        });
+      }
+    }
+    return newTemplate;
   }
 
   /**
    * Materialize a one-off override for a single occurrence of a recurring activity.
+   *
+   * SAFE REGARDLESS OF CALLER (Recurring Invariant 1): every occurrence-invalid
+   * key is stripped from `overrides` AFTER it is applied, so a caller handing us
+   * a whole-series form payload cannot leak `recurrenceEndDate` (which would
+   * hide the child once the series end date passes) or `linkedRecurringItemId`
+   * (which would hijack the series' fee item).
+   *
+   * IDEMPOTENT per `(parentId, occurrenceDate)`: a second call updates the
+   * existing child rather than creating a duplicate. The update branch patches
+   * with the sanitized overrides ONLY — re-deriving from the parent would
+   * silently revert whatever the first override changed.
    */
   async function materializeOverride(
     parentId: string,
@@ -736,27 +1137,117 @@ export const useActivityStore = defineStore('activities', () => {
     const parent = activities.value.find((a) => a.id === parentId);
     if (!parent) return null;
 
-    // Deep-clone to strip Automerge/Vue proxy wrappers (nested arrays like daysOfWeek)
-    const {
-      id: _id,
-      createdAt: _ca,
-      updatedAt: _ua,
-      recurrence: _rec,
-      daysOfWeek: _dow,
-      recurrenceEndDate: _re,
-      ...rest
-    } = JSON.parse(JSON.stringify(parent));
-    const finalDate = overrides?.date ?? occurrenceDate;
+    const { patch, strippedKeys } = sanitizeOverridePatch(overrides);
+    if (strippedKeys.length > 0) {
+      logEvent({
+        surface: 'activity-override',
+        level: 'warn',
+        message: 'Stripped series-level fields from an override patch',
+        context: {
+          action: 'override-sanitized',
+          recur_occurrence_ymd: occurrenceDate,
+          recur_stripped_fields: strippedKeys.join(','),
+        },
+      });
+    }
+
+    // Everything the caller asked to change was series-level, so sanitizing
+    // emptied the patch. Creating a child here would silently discard the edit
+    // AND permanently detach the occurrence from its series behind a junk
+    // duplicate. Refuse instead — the caller reports it as a failed save.
+    if (overrides && Object.keys(overrides).length > 0 && Object.keys(patch).length === 0) {
+      reportError({
+        surface: 'activity-override',
+        message: 'Refused an override whose every field was series-level',
+        severity: 'warning',
+        context: {
+          action: 'override-empty-after-sanitize',
+          recur_occurrence_ymd: occurrenceDate,
+          recur_stripped_fields: strippedKeys.join(','),
+        },
+      });
+      return null;
+    }
+
+    const existing = overridesByParent.value.get(parentId)?.get(occurrenceDate);
+    if (existing) {
+      // Write `date` ONLY when the caller explicitly passed one. Re-deriving it
+      // from `occurrenceDate` would snap a previously-rescheduled child back to
+      // its original slot on the next unrelated edit.
+      // Guard on a TRUTHY date: `diffPayload` can legitimately emit
+      // `date: undefined`, and deleting a child's date breaks
+      // `overrideOccurrenceYmd` for every calendar computed.
+      if (overrides && overrides.date) {
+        patch.date = overrides.date;
+        // First move of a not-yet-moved child pins the occurrence key so it can
+        // never drift afterwards (Recurring Invariant 4).
+        if (!existing.originalOccurrenceDate && overrides.date !== occurrenceDate) {
+          patch.originalOccurrenceDate = occurrenceDate;
+        }
+      }
+      const updated = await updateActivity(existing.id, patch);
+      logEvent({
+        surface: 'activity-override',
+        level: 'info',
+        message: 'Reused an existing override for this occurrence',
+        context: {
+          action: 'override-updated',
+          recur_occurrence_ymd: occurrenceDate,
+          recur_resolved_ymd: updated?.date ?? existing.date,
+          recur_rescheduled: !!(updated?.originalOccurrenceDate ?? existing.originalOccurrenceDate),
+          recur_outcome: 'reused',
+        },
+      });
+      return updated;
+    }
+
+    const { payload, strippedKeys: derivedStrippedKeys } = deriveFromTemplate(
+      parent,
+      OVERRIDE_INVALID_KEYS
+    );
+    // `patch.date` may be present-but-undefined (a legal `diffPayload` clear).
+    // Falling back to `occurrenceDate` keeps a child from ever being created
+    // without a date — `overrideOccurrenceYmd` slices it and would throw inside
+    // a computed every calendar view reads.
+    const finalDate = patch.date || occurrenceDate;
     const isRescheduled = finalDate !== occurrenceDate;
 
-    return createActivity({
-      ...rest,
-      ...overrides,
+    const created = await createActivity({
+      ...payload,
+      ...patch,
       date: finalDate,
       recurrence: 'none',
       parentActivityId: parentId,
+      // Carry only THIS occurrence's completions, re-dated if the session moved,
+      // so a duty the family already ticked is not silently un-ticked.
+      dropoffCompletions: completionsForDerived(
+        parent.dropoffCompletions,
+        (d) => d === occurrenceDate,
+        isRescheduled ? finalDate : undefined
+      ),
+      pickupCompletions: completionsForDerived(
+        parent.pickupCompletions,
+        (d) => d === occurrenceDate,
+        isRescheduled ? finalDate : undefined
+      ),
       ...(isRescheduled ? { originalOccurrenceDate: occurrenceDate } : {}),
     });
+    logEvent({
+      surface: 'activity-override',
+      level: 'info',
+      message: 'Materialized a one-off override for a recurring occurrence',
+      context: {
+        action: 'override-created',
+        recur_occurrence_ymd: occurrenceDate,
+        recur_resolved_ymd: finalDate,
+        recur_rescheduled: isRescheduled,
+        recur_outcome: created ? 'created' : 'failed',
+        // What the PARENT derivation stripped, alongside the caller-patch strip
+        // logged above — both lists reach CloudWatch, not just one.
+        recur_stripped_fields: derivedStrippedKeys.join(','),
+      },
+    });
+    return created;
   }
 
   /** Remove an activity from the in-memory array (used when another store deletes from the repo directly). */
@@ -806,6 +1297,7 @@ export const useActivityStore = defineStore('activities', () => {
     createActivity,
     updateActivity,
     deleteActivity,
+    deleteChildrenFrom,
     splitActivity,
     materializeOverride,
     resetOccurrenceToSeries,
