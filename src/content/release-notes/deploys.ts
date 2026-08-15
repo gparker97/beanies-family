@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.15',
+    date: '2026-08-15',
+    month: '15 august 2026',
+    summary: {
+      en: 'Editing one session of a repeating activity no longer moves it to another date or makes it disappear, and repeating payments and bills stay intact.',
+      beanie:
+        'editing one session of a repeating activity no longer moves it to another date or makes it disappear, and repeating payments and bills stay intact.',
+    },
+  },
+  {
     version: '2026.08.14',
     date: '2026-08-14',
     month: '14 august 2026',
