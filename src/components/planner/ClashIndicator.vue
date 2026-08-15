@@ -5,29 +5,40 @@
 // the `v-for` grid surfaces — resolve the clash exactly ONCE. It does NOT read any
 // store (coupling lives only in `useClash`).
 //
-// Two states, one mark (the active dismiss lives in the activity drawer, not here):
-//   • active  — unacknowledged: prominent. `variant="chip"` (week/day/agenda) shows
-//               a labelled pill naming the calendar; `variant="mark"` (month, tight)
-//               shows the solid mark (the chip's orange ring is applied by the host).
-//   • quiet   — acknowledged: a small faded mark, on every surface.
+// ONE MARK, EVERY SURFACE (2026-08-15). This used to have a second `chip` variant
+// that also rendered the clashing calendar's NAME in a tinted pill. On a narrow
+// mobile week column that pill took most of the title row — "Softball batting cage"
+// rendered as "Softball ba…" — because the pill is `flex-shrink-0` and the title
+// is not, so the title absorbed all the compression. The label was answering a
+// question the user hasn't asked yet: on a grid they are scanning "what's on?",
+// which is the title. "Which calendar?" is a drill-down, and the drawer already
+// answers it in full WITH the actions attached ("Overlaps your <x> calendar" /
+// "This is OK" / "Reschedule…"). So: the grid signals, the drawer explains.
+//
+// Deliberately NOT a shrinkable label — a name compressed to "greg…" costs nearly
+// the same title space and communicates nothing.
+//
+// Two states, told apart by opacity alone now that both are the same shape:
+//   • active (unacknowledged) — solid.
+//   • quiet  (acknowledged)   — 40%. NOT higher: the previous 70% was legible only
+//     because the active state was a differently-SHAPED pill; against a solid mark
+//     it reads as the same thing.
+//
+// Discoverability without the label rests on three legs, all preserved below:
+// the mark is a distinctive motif reused in the drawer callout (learnable, not a
+// generic warning glyph); `role="img"` + `aria-label` keep the full sentence for
+// screen readers and the desktop tooltip; and tapping opens the drawer.
+//
 // Heritage Orange throughout, never Alert Red — a clash is information, not a failure.
+// Trailing, never leading: a leading mark would shift each title's start position
+// depending on whether it clashes, breaking the vertical scan down a column.
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import OverlapMark from './OverlapMark.vue';
 import type { ResolvedClash } from '@/composables/useClash';
 
-const props = withDefaults(defineProps<{ clash?: ResolvedClash; variant?: 'mark' | 'chip' }>(), {
-  variant: 'mark',
-});
+const props = defineProps<{ clash?: ResolvedClash }>();
 const { t } = useTranslation();
-
-const state = computed<'quiet' | 'active-mark' | 'active-chip'>(() => {
-  if (!props.clash || props.clash.acknowledged) return 'quiet';
-  return props.variant === 'chip' ? 'active-chip' : 'active-mark';
-});
-
-/** Mark height by surface — standard Tailwind sizes (no arbitrary px). */
-const markSize = computed(() => (props.variant === 'chip' ? 'h-3.5' : 'h-3'));
 
 const tooltip = computed(() =>
   props.clash ? `${t('calendarSync.clash.tooltipPrefix')} ${props.clash.calendarLabel}` : ''
@@ -42,16 +53,9 @@ const tooltip = computed(() =>
     :aria-label="tooltip"
     :title="tooltip"
   >
-    <span
-      v-if="state === 'active-chip'"
-      class="bg-primary-500/15 text-primary-600 dark:text-primary-400 font-outfit inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-semibold"
-    >
-      <OverlapMark :class="[markSize, 'text-primary-500 w-auto']" />
-      <span class="max-w-24 truncate">{{ clash.calendarLabel }}</span>
-    </span>
     <OverlapMark
-      v-else
-      :class="[markSize, 'text-primary-500 w-auto', { 'opacity-70': state === 'quiet' }]"
+      class="text-primary-500 h-3 w-auto"
+      :class="{ 'opacity-40': clash.acknowledged }"
     />
   </span>
 </template>

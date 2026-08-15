@@ -129,7 +129,7 @@ function onClick(event: MouseEvent) {
 
     <span class="min-w-0 flex-1 truncate font-medium">{{ title }}</span>
 
-    <ClashIndicator :clash="clash" variant="mark" class="flex-shrink-0" />
+    <ClashIndicator :clash="clash" class="flex-shrink-0" />
 
     <!-- Right-edge avatar stack — mobile-only (`md:hidden`) and only for
          multi-person events (the left bar already says whose for solo). -->

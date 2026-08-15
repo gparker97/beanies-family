@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-15
 
+### Changed
+
+- **Clashing events no longer hide their own title.** When an activity overlapped something on one of your other calendars, beanies showed a badge naming that calendar right next to the title — which on a phone took most of the row and cut "Softball batting cage" down to "Softball ba…". The calendar name now appears only when you open the activity, where it already sat alongside "This is OK" and "Reschedule…". The calendar itself keeps a small orange overlap mark, fainter once you've marked a clash as fine.
+
 ### Fixed
 
 - **Editing one session of a repeating activity no longer moves or hides it.** Changing anything on a single occurrence of a repeating activity — the pickup person, the category, who's going — and choosing "just this item" could move that session to the date the series started, where it overlapped an earlier session, or make it disappear from the calendar altogether. The edit form was quietly holding the series' start date instead of the date you actually tapped. It now shows and keeps the session you're editing, and only the fields you actually change are saved.

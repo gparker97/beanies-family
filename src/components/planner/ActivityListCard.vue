@@ -61,7 +61,7 @@ function formatDisplayDate(dateStr: string): string {
         >
           <span class="truncate">{{ activity.title }}</span>
           <PhotoIndicator :photo-ids="activity.photoIds" />
-          <ClashIndicator :clash="clash" variant="chip" class="ml-1.5" />
+          <ClashIndicator :clash="clash" class="ml-1.5" />
         </h4>
         <span
           v-if="showDate"

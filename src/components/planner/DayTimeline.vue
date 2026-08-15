@@ -362,7 +362,6 @@ function handleSlotClick(hour: number): void {
                 <PhotoIndicator :photo-ids="ev.occurrence.activity.photoIds" />
                 <ClashIndicator
                   :clash="clashFor(ev.occurrence.activity.id, ev.occurrence.date)"
-                  variant="chip"
                   class="ml-1"
                 />
               </div>

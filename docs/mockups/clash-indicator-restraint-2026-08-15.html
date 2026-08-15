@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clash indicator — restraint pass</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --slate: #2c3e50;
+        --cloud: #f8f9fa;
+        --silk: #aed6f1;
+        --terracotta: #e67e22;
+        --ink: #2c3e50;
+        --muted: #7b8794;
+        --line: #e6e9ec;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--cloud);
+        color: var(--ink);
+        font-family: Inter, system-ui, sans-serif;
+        padding: 2.5rem 1.5rem 5rem;
+      }
+      .wrap {
+        max-width: 68rem;
+        margin: 0 auto;
+      }
+      h1 {
+        font-family: Outfit, sans-serif;
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.35rem;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.9375rem;
+        margin: 0 0 2.5rem;
+        max-width: 46rem;
+        line-height: 1.55;
+      }
+      h2 {
+        font-family: Outfit, sans-serif;
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        margin: 2.75rem 0 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      h2::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--line);
+      }
+      .row {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .cap {
+        font-family: Outfit, sans-serif;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .cap b {
+        color: var(--orange);
+      }
+      .cap.bad b {
+        color: #b4232a;
+      }
+      .device {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 0.5rem;
+        box-shadow: 0 1px 2px rgba(44, 62, 80, 0.05);
+      }
+      .w-week {
+        width: 7.5rem;
+      }
+      .w-day {
+        width: 20rem;
+      }
+      .w-desk {
+        width: 26rem;
+      }
+
+      /* ---- the event chip, matching the app's grid chip ---- */
+      .ev {
+        border-radius: 10px;
+        background: #f4f8fb;
+        border-left: 3px solid var(--silk);
+        padding: 0.375rem 0.5rem;
+        margin-bottom: 0.375rem;
+      }
+      .ev + .ev {
+        margin-bottom: 0;
+      }
+      .ev-title {
+        font-family: Outfit, sans-serif;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        min-width: 0;
+      }
+      .ev-title > .t {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ev-meta {
+        font-size: 0.6875rem;
+        color: var(--orange);
+        opacity: 0.7;
+        margin-top: 0.125rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---- CURRENT: labelled pill ---- */
+      .clash-pill {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-left: 0.25rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 999px;
+        background: rgba(241, 93, 34, 0.15);
+        color: #d94f18;
+        font-family: Outfit, sans-serif;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .clash-pill .lbl {
+        max-width: 6rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---- PROPOSED: mark only ---- */
+      .clash-mark {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        margin-left: 0.25rem;
+        color: var(--orange);
+      }
+      .clash-mark.quiet {
+        opacity: 0.4;
+      }
+      .clash-mark.was-quiet {
+        opacity: 0.7;
+      }
+      svg {
+        display: block;
+      }
+
+      .note {
+        font-size: 0.8125rem;
+        line-height: 1.6;
+        color: var(--muted);
+        max-width: 34rem;
+        margin: 0.75rem 0 0;
+      }
+      .note b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .legend {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        margin-top: 0.75rem;
+        padding: 0.875rem 1rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+      .legend div {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8125rem;
+      }
+      .measure {
+        font-family: Outfit, sans-serif;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: var(--muted);
+        margin-top: 0.25rem;
+      }
+      .measure .hit {
+        color: #b4232a;
+      }
+      .measure .ok {
+        color: #1e7a4c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Clash indicator — restraint pass</h1>
+      <p class="sub">
+        The clash chip currently carries two jobs — <em>“these overlap”</em> and <em>“with which
+        calendar”</em> — in the tightest space in the product. The proposal keeps the signal on the
+        grid and moves the detail to the drawer, where the user has already committed to one event.
+      </p>
+
+      <h2>Mobile week column · 7.5rem — the reported case</h2>
+      <div class="row">
+        <div class="col">
+          <span class="cap bad">Now — <b>title unreadable</b></span>
+          <div class="device w-week">
+            <div class="ev">
+              <div class="ev-title">
+                <span class="t">Softball batting cage</span>
+                <span class="clash-pill">
+                  <svg width="15" height="9" viewBox="0 0 26 16" fill="none">
+                    <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+                  </svg>
+                  <span class="lbl">gregsophia@g…</span>
+                </span>
+              </div>
+              <div class="ev-meta">11am–1pm · The cages</div>
+            </div>
+            <div class="ev" style="border-left-color: #b7e4c7; background: #f2faf5">
+              <div class="ev-title">
+                <span class="t">Joey Lewis Gymnastics</span>
+                <span class="clash-pill">
+                  <svg width="15" height="9" viewBox="0 0 26 16" fill="none">
+                    <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+                  </svg>
+                  <span class="lbl">gregsophia@g…</span>
+                </span>
+              </div>
+              <div class="ev-meta">2pm–3pm · Bubbles gym</div>
+            </div>
+          </div>
+          <div class="measure">title gets <span class="hit">~18%</span> of the row</div>
+        </div>
+
+        <div class="col">
+          <span class="cap">Proposed — <b>title readable</b></span>
+          <div class="device w-week">
+            <div class="ev">
+              <div class="ev-title">
+                <span class="t">Softball batting cage</span>
+                <span class="clash-mark">
+                  <svg width="15" height="9" viewBox="0 0 26 16" fill="none">
+                    <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+                  </svg>
+                </span>
+              </div>
+              <div class="ev-meta">11am–1pm · The cages</div>
+            </div>
+            <div class="ev" style="border-left-color: #b7e4c7; background: #f2faf5">
+              <div class="ev-title">
+                <span class="t">Joey Lewis Gymnastics</span>
+                <span class="clash-mark">
+                  <svg width="15" height="9" viewBox="0 0 26 16" fill="none">
+                    <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+                  </svg>
+                </span>
+              </div>
+              <div class="ev-meta">2pm–3pm · Bubbles gym</div>
+            </div>
+          </div>
+          <div class="measure">title gets <span class="ok">~88%</span> of the row</div>
+        </div>
+      </div>
+
+      <h2>Day view · 20rem</h2>
+      <div class="row">
+        <div class="col">
+          <span class="cap bad">Now</span>
+          <div class="device w-day">
+            <div class="ev">
+              <div class="ev-title">
+                <span class="t">Neil piano theory</span>
+                <span class="clash-pill">
+                  <svg width="15" height="9" viewBox="0 0 26 16" fill="none">
+                    <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+                  </svg>
+                  <span class="lbl">gregsophia@g…</span>
+                </span>
+              </div>
+              <div class="ev-meta">2pm–2:45pm · The Hungarian Touch Roxy Square</div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <span class="cap">Proposed</span>
+          <div class="device w-day">
+            <div class="ev">
+              <div class="ev-title">
+                <span class="t">Neil piano theory</span>
+                <span class="clash-mark">
+                  <svg width="15" height="9" viewBox="0 0 26 16" fill="none">
+                    <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+                    <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+                  </svg>
+                </span>
+              </div>
+              <div class="ev-meta">2pm–2:45pm · The Hungarian Touch Roxy Square</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2>Two states — the distinction has to survive losing the pill</h2>
+      <div class="legend">
+        <div>
+          <span class="clash-mark" style="margin: 0">
+            <svg width="17" height="10" viewBox="0 0 26 16" fill="none">
+              <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+              <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+              <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+            </svg>
+          </span>
+          <span><b>Active</b> — solid, full opacity</span>
+        </div>
+        <div>
+          <span class="clash-mark quiet" style="margin: 0">
+            <svg width="17" height="10" viewBox="0 0 26 16" fill="none">
+              <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+              <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+              <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+            </svg>
+          </span>
+          <span><b>Acknowledged</b> — 40% (was 70%)</span>
+        </div>
+        <div>
+          <span class="clash-mark was-quiet" style="margin: 0">
+            <svg width="17" height="10" viewBox="0 0 26 16" fill="none">
+              <circle cx="9" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+              <circle cx="17" cy="8" r="6.2" stroke="currentColor" stroke-width="1.7" opacity=".85"/>
+              <path d="M13 3.1A6.2 6.2 0 0 1 13 12.9 6.2 6.2 0 0 1 13 3.1Z" fill="currentColor" opacity=".9"/>
+            </svg>
+          </span>
+          <span style="color: var(--muted)">old 70% — too close to active</span>
+        </div>
+      </div>
+      <p class="note">
+        Today the states are told apart by <b>shape</b> (pill vs mark). Once both are marks, opacity
+        carries it alone — and 70% sits too close to solid to read at a glance. Dropping
+        acknowledged to 40% keeps “I’ve handled this” legible without adding weight back.
+      </p>
+
+      <h2>Where the calendar name goes</h2>
+      <p class="note">
+        Nowhere new — the drawer already says it in full, with the actions attached:
+        <b>“Overlaps your gregsophia@gmail.com calendar”</b> · <b>This is OK</b> ·
+        <b>Reschedule…</b>. The grid signals; the drawer explains. On desktop the mark also keeps
+        its native tooltip, and <code>role="img"</code> + <code>aria-label="May clash with …"</code>
+        are unchanged, so screen readers still get the full sentence.
+      </p>
+    </div>
+  </body>
+</html>

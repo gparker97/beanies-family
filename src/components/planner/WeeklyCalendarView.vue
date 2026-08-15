@@ -850,11 +850,7 @@ function onStripDayClick(dateStr: string) {
                 >
                   <span class="truncate">{{ activity.title }}</span>
                   <PhotoIndicator :photo-ids="activity.photoIds" />
-                  <ClashIndicator
-                    :clash="clashFor(activity.id, day.dateStr)"
-                    variant="chip"
-                    class="ml-1"
-                  />
+                  <ClashIndicator :clash="clashFor(activity.id, day.dateStr)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
                   <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">
