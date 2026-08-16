@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-14",
-    "translationCount": 3938
+    "lastUpdated": "2026-08-16",
+    "translationCount": 3940
   },
   "translations": {
     "app.name": {
@@ -19695,6 +19695,16 @@
       "translation": "重新连接以恢复保存和日历同步。",
       "hash": "qhxmq6",
       "lastUpdated": "2026-08-14"
+    },
+    "planner.multiDayMoveBlocked.title": {
+      "translation": "选择其他选项以移动此项",
+      "hash": "ifrh2m",
+      "lastUpdated": "2026-08-16"
+    },
+    "planner.multiDayMoveBlocked.message": {
+      "translation": "此活动每周重复一天以上，因此移动一个会话不能应用于整个系列。选择“仅此事件”以仅移动此事件，或编辑其重复的日期。",
+      "hash": "m56ia0",
+      "lastUpdated": "2026-08-16"
     }
   }
 }
