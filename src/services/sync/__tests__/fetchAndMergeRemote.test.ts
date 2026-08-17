@@ -42,6 +42,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
+  noteRemoteBaseline: vi.fn(),
 }));
 
 vi.mock('@/services/indexeddb/database', () => ({
@@ -220,5 +221,97 @@ describe('syncService.save → fetchAndMergeRemote — local-wins merge', () => 
     const writtenEnv = JSON.parse(written) as BeanpodFileV4;
     expect(writtenEnv.inviteKeys.tok1.wrapped).toBe('NEW');
     expect(writtenEnv.passkeyWrappedKeys.cred1.wrapped).toBe('NEW');
+  });
+});
+
+// ─── #61 open-guard I/O shell (remoteChanged / shouldSkipOpenRead) ────────────
+
+function markerProvider(opts: {
+  marker?: { revision: string | null; modifiedTime: string | null };
+  markerThrows?: unknown;
+  lastModified?: string | null;
+  hasGetRemoteMarker?: boolean;
+}) {
+  const getLastModified = vi.fn(async () => opts.lastModified ?? null);
+  const base = {
+    type: 'google_drive' as const,
+    read: vi.fn(async () => null),
+    write: vi.fn(async () => undefined),
+    getLastModified,
+    getDisplayName: () => 'pod.beanpod',
+    getFileId: () => 'mock-file-id',
+    getAccountEmail: () => null,
+    supportsLocalPolling: () => false,
+  };
+  if (opts.hasGetRemoteMarker === false) return { provider: base, getLastModified };
+  const getRemoteMarker = vi.fn(async () => {
+    if (opts.markerThrows) throw opts.markerThrows;
+    return opts.marker ?? { revision: null, modifiedTime: null };
+  });
+  return { provider: { ...base, getRemoteMarker }, getLastModified, getRemoteMarker };
+}
+
+describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+  });
+
+  it('falls back to getLastModified ONCE when the provider has no getRemoteMarker', async () => {
+    const { provider, getLastModified } = markerProvider({
+      hasGetRemoteMarker: false,
+      lastModified: '2026-08-13T00:00:00Z',
+    });
+    syncService.setProvider(provider as never);
+    const r = await syncService.remoteChanged();
+    expect(getLastModified).toHaveBeenCalledTimes(1);
+    expect(r.basis).toBe('mtime');
+  });
+
+  it('skips when the revision matches the seeded baseline and is within the trust window', async () => {
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    const { skip } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(true);
+  });
+
+  it('reads (no skip) when the revision advanced', async () => {
+    const { provider } = markerProvider({ marker: { revision: 'ver:6', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('changed');
+  });
+
+  it('reads (no skip) when the baseline is older than the trust window', async () => {
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: twoHoursAgo });
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('trust-expired');
+  });
+
+  it('reads (no skip) on a probe throw, classifying it as unknown/auth and NOT rethrowing', async () => {
+    const authErr = Object.assign(new Error('token'), { name: 'TokenExpiredError' });
+    const { provider } = markerProvider({ markerThrows: authErr });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    const r = await syncService.remoteChanged();
+    expect(r.status).toBe('unknown');
+    const { skip } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+  });
+
+  it('never skips on an mtime basis (provider with no revision)', async () => {
+    const { provider } = markerProvider({ marker: { revision: null, modifiedTime: 'T1' } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('no-revision');
   });
 });
