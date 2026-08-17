@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-17
 
+### Performance
+
+- **Opening beanies is faster and uses less data** (app `0.9.10R9`). When your family's data hasn't changed since you last looked, the app now shows what you already have instead of re-downloading the whole file and rebuilding it a second time. On an unchanged open this skips the full download plus a multi-second reconstruction; on a real 2.5MB file the redundant work drops away entirely, self-healing within an hour if anything is ever uncertain (#61 open-cycle redundancy).
+
 ### Changed
 
 - **Homepage links now go where you'd expect.** The "beanies" mentions in the story now open the create-your-beanpod screen directly, the "reach me" line and footer both point to the beanies.family Discord (in a new tab), and technical terms (CRDTs, encryption, local-first) link into the matching guides and glossary entries. Added a plain-English PBKDF2 entry to the glossary, and tidied the family library so guides and blog posts reliably link back to each other.
