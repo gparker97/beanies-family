@@ -24,6 +24,7 @@ import {
   mutate,
   mergeRemoteEnvelope,
   exportEncryptedPayload,
+  noteRemoteBaseline,
   flush,
   reset,
   __resetApplyAndProjectForTesting,
@@ -174,6 +175,40 @@ describe('worker/applyAndProject', () => {
     expect(reloaded!.doc.accounts.a1).toEqual({ id: 'a1', balance: 7 });
     // First persist of a fresh doc writes a whole-doc base (B1); timing relayed.
     expect(perf).toContain('automerge.saveBase');
+  });
+
+  describe('remote-baseline commit (#61)', () => {
+    it('commits the pending baseline alongside a doc-changing persist', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
+      noteRemoteBaseline('ver:5');
+      await flush();
+      expect((await cache.readRemoteBaseline())?.revision).toBe('ver:5');
+    });
+
+    it('commits on a no-change persist too (C10a — read-only merge terminus)', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      await flush(); // doc now fully persisted; lastPersistedHeads === heads
+      // No further doc change — the changes.length===0 path must still commit.
+      noteRemoteBaseline('ver:8');
+      await flush();
+      expect((await cache.readRemoteBaseline())?.revision).toBe('ver:8');
+    });
+
+    it('never persists an mtime — a null revision is never committed', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      await flush();
+      // noteRemoteBaseline is never called → no baseline row exists.
+      expect(await cache.readRemoteBaseline()).toBeNull();
+    });
   });
 
   it('#50: a cache-persist WRITE failure signals cachePersistFailed(true, {kind, errorName}) and recovers', async () => {

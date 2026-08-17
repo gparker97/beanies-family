@@ -32,6 +32,9 @@ import {
   persistProjectionSnapshot,
   loadProjectionSnapshot,
   SNAPSHOT_VERSION,
+  readRemoteBaseline,
+  writeRemoteBaseline,
+  clearRemoteBaseline,
 } from '../cache';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
@@ -83,6 +86,41 @@ describe('worker/cache', () => {
 
   it('returns null when the cache has no doc row', async () => {
     expect(await loadCachedDoc(key, FAMILY_ID)).toBeNull();
+  });
+
+  describe('remote-baseline row (#61)', () => {
+    it('round-trips the namespaced revision + checkedAt (plaintext, no key needed)', async () => {
+      await writeRemoteBaseline('ver:7');
+      const row = await readRemoteBaseline();
+      expect(row?.revision).toBe('ver:7');
+      expect(typeof row?.checkedAt).toBe('string');
+      expect(Number.isNaN(Date.parse(row!.checkedAt))).toBe(false);
+    });
+
+    it('is untouched by persistDocBinary base + increment sweep, and unread by loadCachedDoc', async () => {
+      const doc = setAccount(base(), 'a1', 42);
+      await persistDocBinary(key, saveDoc(doc));
+      await writeRemoteBaseline('ver:9');
+      // A later base write clears all increments — the baseline row must survive.
+      const doc2 = setAccount(doc, 'a2', 7);
+      await seedIncrement(key, doc, doc2);
+      await persistDocBinary(key, saveDoc(doc2)); // base write → increment sweep
+
+      expect((await readRemoteBaseline())?.revision).toBe('ver:9');
+      // loadCachedDoc reconstructs the doc and never reads/consumes the baseline row.
+      const loaded = await loadCachedDoc(key, FAMILY_ID);
+      expect(loaded).not.toBeNull();
+      expect(materializeCollection(loaded!.doc, 'accounts').length).toBe(2);
+      expect((await readRemoteBaseline())?.revision).toBe('ver:9');
+    });
+
+    it('clearRemoteBaseline removes the row (no-op if already absent)', async () => {
+      await writeRemoteBaseline('ver:3');
+      await clearRemoteBaseline();
+      expect(await readRemoteBaseline()).toBeNull();
+      await clearRemoteBaseline(); // idempotent
+      expect(await readRemoteBaseline()).toBeNull();
+    });
   });
 
   it('detects a materialize-corrupt cache as CorruptPayloadError (not a silent later throw)', async () => {
