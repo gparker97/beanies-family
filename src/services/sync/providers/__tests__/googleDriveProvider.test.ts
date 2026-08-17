@@ -69,6 +69,9 @@ describe('GoogleDriveProvider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // updateFile now returns the write ack { version } (#61 C14b); a successful
+    // write must resolve to a parseable ack, not undefined.
+    mockUpdateFile.mockResolvedValue({ version: '1' });
     provider = new GoogleDriveProvider('file-123', 'family.beanpod');
   });
 
@@ -80,6 +83,36 @@ describe('GoogleDriveProvider', () => {
     it('calls updateFile with valid token', async () => {
       await provider.write('{"data":"test"}');
       expect(mockUpdateFile).toHaveBeenCalledWith('mock-token', 'file-123', '{"data":"test"}');
+    });
+
+    it('returns the write ack with a namespaced revision (#61 C14b)', async () => {
+      mockUpdateFile.mockResolvedValueOnce({ version: '42' });
+      const ack = await provider.write('{"data":"test"}');
+      expect(ack).toEqual({ revision: 'ver:42' });
+    });
+
+    it('returns { revision: null } when the write ack has no version (malformed body)', async () => {
+      mockUpdateFile.mockResolvedValueOnce({ version: null });
+      const ack = await provider.write('{"data":"test"}');
+      expect(ack).toEqual({ revision: null });
+    });
+  });
+
+  describe('getRemoteMarker (#61 C14a)', () => {
+    it('returns the namespaced revision + mtime in one probe', async () => {
+      mockGetFileMetadata.mockResolvedValueOnce({
+        modifiedTime: '2026-08-13T00:00:00Z',
+        version: '7',
+        headRevisionId: 'abc',
+      });
+      const marker = await provider.getRemoteMarker();
+      expect(marker).toEqual({ revision: 'ver:7', modifiedTime: '2026-08-13T00:00:00Z' });
+    });
+
+    it('returns null revision + mtime when the probe fails transiently', async () => {
+      mockGetFileMetadata.mockRejectedValueOnce(new Error('transient network'));
+      const marker = await provider.getRemoteMarker();
+      expect(marker).toEqual({ revision: null, modifiedTime: null });
     });
   });
 
@@ -289,8 +322,9 @@ describe('GoogleDriveProvider', () => {
       // a persistent mockRejectedValue that would otherwise leak into this one).
       mockUpdateFile.mockReset();
 
-      // First attempt fails with a TypeError; second attempt succeeds.
+      // First attempt fails with a TypeError; second attempt succeeds with an ack.
       // No banner, no offline queue — purely silent retry.
+      mockUpdateFile.mockResolvedValue({ version: '1' });
       mockUpdateFile.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
       await provider.write('{"data":"transient"}');

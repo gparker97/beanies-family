@@ -188,12 +188,34 @@ export async function updateFile(
   fileId: string,
   content: string,
   contentMimeType: string = 'application/octet-stream'
-): Promise<void> {
-  await driveRequest(token, `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=media`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': contentMimeType },
-    body: content,
-  });
+): Promise<{ version: string | null }> {
+  // Ask for the resulting revision counter IN the write response (#61 C14b),
+  // so there is no separate post-write metadata read for a peer's write to race.
+  const res = await driveRequest(
+    token,
+    `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=media&fields=version,headRevisionId`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': contentMimeType },
+      body: content,
+    }
+  );
+  // The write has already SUCCEEDED (driveRequest resolved). Parsing the ack
+  // body is best-effort ONLY: a malformed/empty response must never turn a
+  // successful 2-3MB save into a failure — and because googleDriveProvider wraps
+  // this call in withRetry, a throw here would re-upload the whole file. Any
+  // parse failure degrades to { version: null } => the next open re-reads
+  // (safe direction), never a lost or duplicated save.
+  try {
+    const data = (await res.json()) as { version?: string | null };
+    return { version: data.version ?? null };
+  } catch (err) {
+    console.warn(
+      '[driveService.updateFile] write succeeded but ack body was unparseable; baseline not advanced (next open re-reads, no data at risk)',
+      err
+    );
+    return { version: null };
+  }
 }
 
 /**

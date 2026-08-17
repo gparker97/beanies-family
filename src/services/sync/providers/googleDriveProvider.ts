@@ -6,6 +6,8 @@
  * On 401, attempts token refresh and retries once.
  */
 import type { StorageProvider } from '../storageProvider';
+import { toStoredRevision } from '../remoteBaseline';
+import type { WriteAck, RemoteMarker } from '../remoteBaseline';
 import {
   storeProviderConfig,
   clearProviderConfig,
@@ -183,10 +185,11 @@ export class GoogleDriveProvider implements StorageProvider {
     return true;
   }
 
-  async write(content: string): Promise<void> {
+  async write(content: string): Promise<WriteAck | void> {
     try {
       const token = await getValidTokenSilent();
-      await withRetry(() => updateFile(token, this.fileId, content));
+      const ack = await withRetry(() => updateFile(token, this.fileId, content));
+      return { revision: toStoredRevision(ack.version) };
     } catch (e) {
       // 401 — server says the in-memory token is invalid. Try one silent
       // refresh in case it raced with token expiry; on failure, queue the
@@ -195,8 +198,11 @@ export class GoogleDriveProvider implements StorageProvider {
       if (e instanceof DriveApiError && e.status === 401) {
         const silentToken = await attemptSilentRefresh();
         if (silentToken) {
-          await withRetry(() => updateFile(silentToken, this.fileId, content));
-          return;
+          // C14b: the silent-refresh retry MUST propagate the ack too — a bare
+          // `return` here silently disabled the open-guard optimisation for
+          // every token-refresh save.
+          const ack = await withRetry(() => updateFile(silentToken, this.fileId, content));
+          return { revision: toStoredRevision(ack.version) };
         }
         enqueueOfflineSave(content);
         throw new TokenExpiredError(
@@ -299,20 +305,48 @@ export class GoogleDriveProvider implements StorageProvider {
    * Re-throws 401 errors so callers can detect auth failures.
    * Swallows network/5xx errors (transient failures are expected).
    */
-  async getLastModified(): Promise<string | null> {
+  /**
+   * The SINGLE correct classifier for a Drive metadata failure, shared by
+   * `getLastModified` and `getRemoteMarker` (#61 C14a — do not copy-paste it).
+   * Auth failures (TokenExpiredError / 401 / 404) rethrow so the caller can
+   * surface the reconnect / missing-file path; transient failures (network,
+   * 5xx) return `null` — a metadata check is non-critical.
+   */
+  private async metadataProbe<T>(fn: (token: string) => Promise<T>): Promise<T | null> {
     try {
       const token = await getValidTokenSilent();
-      return await getFileModifiedTime(token, this.fileId);
+      return await fn(token);
     } catch (e) {
-      // TokenExpiredError or 401 — auth failure, let caller surface reconnect banner.
-      // 404 — file gone (deleted/moved), let caller handle (e.g., file-not-found banner).
       if (e instanceof TokenExpiredError) throw e;
-      if (e instanceof DriveApiError && (e.status === 401 || e.status === 404)) {
-        throw e;
-      }
+      if (e instanceof DriveApiError && (e.status === 401 || e.status === 404)) throw e;
       // Network errors, 5xx, and other failures — non-critical for a metadata check
       return null;
     }
+  }
+
+  async getLastModified(): Promise<string | null> {
+    return this.metadataProbe((token) => getFileModifiedTime(token, this.fileId));
+  }
+
+  /**
+   * Cheap revision+mtime probe in ONE round-trip (#61 C14a). `version` is
+   * Drive's monotonic, server-assigned counter — present on every file, advances
+   * on any server-side change, and strictly more conservative than
+   * `headRevisionId` (it can only ever trigger an EXTRA read, never miss one),
+   * so it is the guard's field. `headRevisionId` is requested as audit-only
+   * evidence. The returned revision is namespaced via `toStoredRevision`; a null
+   * probe (transient failure) yields `{ revision: null, modifiedTime: null }` so
+   * the guard reads.
+   */
+  async getRemoteMarker(): Promise<RemoteMarker> {
+    const meta = await this.metadataProbe((token) =>
+      getFileMetadata(token, this.fileId, 'modifiedTime,version,headRevisionId')
+    );
+    if (meta === null) return { revision: null, modifiedTime: null };
+    return {
+      revision: toStoredRevision((meta.version as string | undefined) ?? null),
+      modifiedTime: (meta.modifiedTime as string | undefined) ?? null,
+    };
   }
 
   /**
