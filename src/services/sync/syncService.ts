@@ -497,6 +497,16 @@ export function getProviderFamilyId(): string | null {
 export function setProvider(provider: StorageProvider): void {
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
+  // #61: a new provider means a DIFFERENT file (migrate to Drive, rebind pod
+  // file, local→Drive) whose `version` sequence is independent of the old one.
+  // The in-memory baseline described the OLD file, so it must not survive: a
+  // stale/absent baseline against the new file's first-sight revision would
+  // classify it 'changed' and (a) false-block `installProvider`'s non-force
+  // `syncNow()` with "File has newer data", reliably failing every Drive-targeted
+  // migration, and (b) risk a coincidental revision match granting a wrong skip.
+  // The durable per-file row is re-established by the next successful load/write
+  // terminus; nulling the in-memory basis forces that read.
+  remoteBaseline = null;
   // This is the single write-intent install seam, so it OWNS offline-queue
   // flush registration (2026-06-19, finding 11). Provider builds (createNew /
   // fromExisting) no longer self-register, so read-only resume/recovery paths
@@ -641,14 +651,31 @@ export async function remoteChanged(): Promise<ChangeResult> {
     const probe = await probeRemoteMarker();
     return compareMarkers(remoteBaseline, probe);
   } catch (e) {
+    // Distinguish a MISSING file (404) from an AUTH failure (401 / expired token):
+    // the poll path surfaces the former as the "file missing" banner + stops
+    // polling, but must NOT do that for a transient auth blip.
+    const isNotFound = e instanceof DriveApiError && e.status === 404;
     const isAuth =
-      e instanceof TokenExpiredError ||
-      (e instanceof DriveApiError && (e.status === 401 || e.status === 404));
-    const reason = isAuth ? 'auth' : `provider-error:${e instanceof Error ? e.name : 'unknown'}`;
+      e instanceof TokenExpiredError || (e instanceof DriveApiError && e.status === 401);
+    const reason = isNotFound
+      ? 'file-not-found'
+      : isAuth
+        ? 'auth'
+        : `provider-error:${e instanceof Error ? e.name : 'unknown'}`;
     console.warn(
-      `[syncService.remoteChanged] marker probe failed (${reason}); treating remote as unknown — the caller reads and provider.read() re-raises any real auth error:`,
+      `[syncService.remoteChanged] marker probe failed (${reason}); treating remote as unknown — a reading caller re-raises any real error from provider.read():`,
       e
     );
+    // Observability (MANDATORY): the poll callers early-return on 'unknown', so a
+    // persistent probe failure would otherwise degrade change detection to unknown
+    // with ZERO firehose trace. Emit it so the degradation is triageable + alertable.
+    logEvent({
+      level: 'warn',
+      surface: 'sync-change-detect',
+      message: `remote change-probe failed — change detection degraded to unknown (${reason})`,
+      error: e instanceof Error ? e : undefined,
+      context: { action: 'remote-changed-unknown', error_code: reason },
+    });
     return { status: 'unknown', basis: 'none', revision: null, modifiedTime: null, reason };
   }
 }
@@ -661,13 +688,21 @@ export async function remoteChanged(): Promise<ChangeResult> {
  * the guard can emit it as `open-fail-open` telemetry.
  */
 export async function shouldSkipOpenRead(): Promise<{ skip: boolean; reason: string }> {
+  // Cheap LOCAL checks FIRST — never spend a metadata probe on an open we already
+  // know will read. This is the common daily-user case: the 1h trust window is
+  // always expired between once-a-day opens, so probing here and then re-probing
+  // in load() would be a pure +1 round-trip for zero skip benefit.
+  if (!remoteBaseline || remoteBaseline.revision === null) {
+    return { skip: false, reason: 'no-baseline' };
+  }
+  if (!withinTrustWindow(remoteBaseline.checkedAt, Date.now())) {
+    return { skip: false, reason: 'trust-expired' };
+  }
+  // In-window with a revision baseline — now the probe can actually save a read.
   const result = await remoteChanged();
   if (result.status === 'unknown') return { skip: false, reason: result.reason ?? 'unknown' };
   if (result.basis !== 'revision') return { skip: false, reason: 'no-revision' };
   if (result.status !== 'unchanged') return { skip: false, reason: result.reason ?? 'changed' };
-  if (!withinTrustWindow(remoteBaseline?.checkedAt ?? null, Date.now())) {
-    return { skip: false, reason: 'trust-expired' };
-  }
   return { skip: true, reason: 'unchanged-revision-in-window' };
 }
 
@@ -986,6 +1021,10 @@ async function fetchAndMergeRemote(): Promise<void> {
   const change = await remoteChanged();
   if (change.status !== 'changed') return; // unchanged OR unknown → skip the full read
 
+  // C1: capture the provider we read THROUGH, to guard the baseline commit below
+  // against a family-switch landing during the multi-second read+merge.
+  const providerAtRead = currentProvider;
+
   // Remote has newer data — fetch, decrypt, and merge. INVARIANT (ADR-032 addendum):
   // the base is the sole source of a peer's edits (change-chunks retired 2026-07-15).
   // This whole-doc read + merge is how every peer's changes reach us — do not gate or
@@ -1011,8 +1050,9 @@ async function fetchAndMergeRemote(): Promise<void> {
   // be pushed. `setEnvelope` also RPCs the worker to re-persist the envelope
   // cache (keeps cold-start unlock working after a peer key-add/rotation).
   setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
-  // Terminus 2 (C10): the worker's doc now provably contains this remote state.
-  commitRemoteBaseline();
+  // Terminus 2 (C10): the worker's doc now provably contains this remote state —
+  // but only commit if no family switch landed mid read+merge (C1).
+  if (currentProvider === providerAtRead) commitRemoteBaseline();
 
   // The poll path's ONLY re-upload trigger: re-push a converged doc that still
   // carries local unsynced changes (heads-derived dirty), without ping-ponging
@@ -1093,33 +1133,60 @@ async function doSave(): Promise<boolean> {
     // in-flight save — sign-out explicitly abandons a still-running `doSave`. If the
     // catch handler dereferenced it after that, the handler itself would throw and
     // turn a write that actually reached Drive into a reported save failure.
-    const providerTypeForDiag = currentProvider.type;
+    // C1: capture the provider we write THROUGH. A sign-out / family-switch can
+    // null or swap `currentProvider` during this multi-second write; committing our
+    // baseline into the NEW family's state afterwards would poison it (the module
+    // baseline is family-untagged). Learn/commit ONLY while the active provider is
+    // still the one we wrote through.
+    const providerAtWrite: StorageProvider = currentProvider;
+    const providerTypeForDiag = providerAtWrite.type;
     // C14b: the write returns its own resulting revision IN the response. Narrow
     // the `WriteAck | void` union explicitly at this ONE site.
-    const ack = await currentProvider.write(fileContent);
+    const ack = await providerAtWrite.write(fileContent);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
     const ackRevision = ack ? ack.revision : null;
 
-    if (ackRevision !== null) {
+    if (currentProvider !== providerAtWrite) {
+      // A family switch landed mid-write — do not touch the baseline (C1).
+    } else if (ackRevision !== null) {
       // Terminus 3 (C10): the file IS what we just wrote. Learn our own write's
       // revision and commit — for Drive this REPLACES the old post-write metadata
       // read, removing one network round-trip per save.
       learnRemoteMarker({ revision: ackRevision, modifiedTime: null });
       commitRemoteBaseline();
-    } else {
-      // No revision (non-Drive provider, or a parse failure): fall back to a
-      // post-write getLastModified to refresh the in-memory MTIME basis ONLY
-      // (this is what stops a local-file poll re-reading its own write). It never
-      // becomes a persisted baseline (commitRemoteBaseline no-ops on a null rev).
+    } else if (providerAtWrite.getRemoteMarker) {
+      // Drive write whose ack body was unparseable: RE-PROBE the real revision
+      // rather than nulling the basis. Nulling would re-download our own 2-3MB
+      // write on the next poll AND false-block a non-force syncNow with "File has
+      // newer data". One extra metadata call, only on a rare malformed 2xx.
       try {
-        const postWriteTimestamp = await currentProvider.getLastModified();
-        if (postWriteTimestamp) {
+        const marker = await providerAtWrite.getRemoteMarker();
+        if (currentProvider === providerAtWrite) {
+          learnRemoteMarker(marker);
+          commitRemoteBaseline();
+        }
+      } catch (e) {
+        console.warn(
+          '[syncService] doSave: post-write marker re-probe failed — baseline not advanced (next open re-reads):',
+          e
+        );
+        logEvent({
+          level: 'warn',
+          surface: 'sync-save',
+          message: 'post-write marker re-probe failed — baseline not advanced',
+          error: e instanceof Error ? e : undefined,
+          context: { action: 'post-write-probe-failed', detail: providerTypeForDiag },
+        });
+      }
+    } else {
+      // Non-Drive provider (no revision): refresh the in-memory MTIME basis ONLY —
+      // stops a local-file poll re-reading its own write. Never a persisted baseline.
+      try {
+        const postWriteTimestamp = await providerAtWrite.getLastModified();
+        if (postWriteTimestamp && currentProvider === providerAtWrite) {
           learnRemoteMarker({ revision: null, modifiedTime: postWriteTimestamp });
         }
       } catch (e) {
-        // Not fatal — the next save re-fetches. But NOT "non-critical": a missed
-        // capture leaves the mtime basis behind the file we just wrote, so the
-        // next poll re-downloads our own write. Never swallow it silently.
         console.warn(
           '[syncService] doSave: post-write getLastModified fallback failed — next save may re-fetch our own write; check token/network:',
           e
@@ -1129,8 +1196,6 @@ async function doSave(): Promise<boolean> {
           surface: 'sync-save',
           message: 'post-write mtime fallback failed — next save may re-fetch',
           error: e,
-          // No `provider_type` here: `enrichAndRedact` sets it from the sync store
-          // on every event and would overwrite anything passed. `action` survives.
           context: { action: 'post-write-timestamp-failed', detail: providerTypeForDiag },
         });
       }

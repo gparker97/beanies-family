@@ -615,7 +615,13 @@ export const useSyncStore = defineStore('sync', () => {
 
     isReloading = true;
     try {
-      const ok = await syncNow();
+      // FORCE: this is a deliberate write to a destination we just created/selected
+      // (createNewFile / migrateStorage), so there is no peer data to conflict with.
+      // A non-force syncNow would run the #61 change-check against the fresh file's
+      // first-sight revision (no matching baseline yet) and false-block with "File
+      // has newer data", reliably failing every migration (and it depended on a
+      // clock quirk even pre-#61). We own this file; write our data to it.
+      const ok = await syncNow(true);
       if (!ok) {
         throw new Error(error.value || 'Could not write to the new storage location');
       }
@@ -2329,7 +2335,10 @@ export const useSyncStore = defineStore('sync', () => {
         if (familyKey.value && pendingEncryptedFile.value) {
           try {
             await hydrateFromEnvelope(pendingEncryptedFile.value.envelope);
-            setupAutoSync();
+            // A pod WAS decrypted+loaded on this branch, but it did NOT go through
+            // loadFromFile's success terminus — so run the SAME housekeeping (incl.
+            // markPodCreated + token-expiry wiring), not a bare setupAutoSync.
+            await runPostLoadDriveHousekeeping();
             return;
           } catch {
             // Family key doesn't work — try cached key
@@ -2338,7 +2347,7 @@ export const useSyncStore = defineStore('sync', () => {
 
         const success = await tryDecryptWithCachedKey();
         if (success) {
-          setupAutoSync();
+          await runPostLoadDriveHousekeeping();
           return;
         }
 
@@ -2405,6 +2414,17 @@ export const useSyncStore = defineStore('sync', () => {
       // provider error) does NOT reload — a persistent error must not turn this
       // 10s poll into a read storm (matches today's null-timestamp → no reload).
       const change = await syncService.remoteChanged();
+      // A genuine 404 (file deleted/moved) is classified `file-not-found`.
+      // `remoteChanged` catches it, so it no longer reaches the catch below — surface
+      // the "file missing" banner + stop polling HERE, mirroring the pre-#61 path
+      // (only when the token is genuinely valid; an auth-masked 404 is the reconnect
+      // path's job, and `remoteChanged` classifies that as `auth`, not this).
+      if (change.status === 'unknown' && change.reason === 'file-not-found' && isTokenValid()) {
+        driveFileNotFound.value = true;
+        showSaveFailureBanner.value = true;
+        stopFilePolling();
+        return false;
+      }
       if (change.status !== 'changed') return false;
 
       syncService.cancelPendingSave();
