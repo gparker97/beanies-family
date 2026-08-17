@@ -8,6 +8,7 @@ lastUpdated: 2026-04-24
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
+  - activity-finance-linking
 tags:
   - family-finance
   - budgeting

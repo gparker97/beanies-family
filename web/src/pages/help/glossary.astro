@@ -105,6 +105,13 @@ const terms: Term[] = [
     long: "When you invite a new family member, beanies.family wraps the family master key with a key derived from that family member's passphrase. They unwrap it on their device. The master key itself is never exposed in plaintext across the network.",
   },
   {
+    id: 'pbkdf2',
+    term: 'PBKDF2',
+    short:
+      "Password-Based Key Derivation Function 2. The algorithm beanies.family uses to stretch each family member's passphrase into a strong cryptographic key, without ever storing the passphrase itself.",
+    long: "PBKDF2 deliberately runs the passphrase through many thousands of hashing rounds, so brute-forcing a stolen key wrapper is slow and expensive. The derived key never leaves your device: it unwraps (via AES-KW) your personal copy of the shared family key that decrypts the <code>.beanpod</code> file. Implemented with the native Web Crypto API, like the rest of beanies.family's cryptography.",
+  },
+  {
     id: 'web-crypto-api',
     term: 'Web Crypto API',
     short:

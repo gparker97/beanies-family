@@ -9,6 +9,7 @@ relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
   - made-a-wish-to-become-a-real-boy
+  - have-your-cake-and-eat-it-too
 tags:
   - local-first
   - privacy
