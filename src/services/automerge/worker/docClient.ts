@@ -47,6 +47,7 @@ import {
   type CachePersistFailureDetail,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 
 /** Minimal Worker surface — real `Worker` satisfies it; tests inject a fake. */
@@ -818,10 +819,17 @@ export function initDoc(): Promise<{ loaded: true }> {
   return request('initDoc');
 }
 
-/** Init the worker cache + load the cached doc; pushes the full projection. */
-export async function initAndLoadCache(familyId: string): Promise<{ loaded: boolean }> {
+/** Init the worker cache + load the cached doc; pushes the full projection. Also
+ * returns the open-guard baseline row (#61) read in the SAME round-trip, so the
+ * cache and the baseline that describes it can never be read out of step (C5). */
+export async function initAndLoadCache(
+  familyId: string
+): Promise<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }> {
   currentFamilyId = familyId;
-  const res = await request<{ loaded: boolean }>('initAndLoadCache', { familyId });
+  const res = await request<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }>(
+    'initAndLoadCache',
+    { familyId }
+  );
   // Count only a reconstruction that actually HAPPENED. Counting the
   // `automerge.cacheLoad` perf label instead would over-count, because `time2`
   // emits from a `finally` — so a cache MISS (which does zero Automerge work) and
@@ -870,15 +878,55 @@ export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): P
  * `reportError`s it — critical because in INLINE mode a failed `mutate` never
  * routes through `surface()` (no toast), so this is the ONLY signal there. In
  * worker mode `surface()` has already toasted; the errorReporter bucket dedups. */
-export function fireAndForgetMutate(op: MutationOp): void {
-  void mutate(op).catch((e) => {
-    reportError({
-      surface: 'doc-mutate-fire-forget',
-      message: `fire-and-forget mutate '${op.op}' failed`,
-      error: e,
-      severity: 'error',
-    });
+/**
+ * The house detached-call idiom (#61 C5a): run a promise the caller doesn't
+ * await, attach a `.catch` so a rejection can't become an unhandled promise
+ * rejection, and `reportError` it — critical because in INLINE mode a failed RPC
+ * never routes through `surface()` (no toast), so this is the ONLY signal there.
+ * ONE place to fix so there is never a second naked `void call().catch(...)`.
+ */
+function fireAndForget(
+  run: () => Promise<unknown>,
+  surface: string,
+  message: string,
+  severity: 'warning' | 'error'
+): void {
+  void run().catch((e) => {
+    reportError({ surface, message, error: e, severity });
   });
+}
+
+/** Fire-and-forget a mutation whose result the caller doesn't await. */
+export function fireAndForgetMutate(op: MutationOp): void {
+  fireAndForget(
+    () => mutate(op),
+    'doc-mutate-fire-forget',
+    `fire-and-forget mutate '${op.op}' failed`,
+    'error'
+  );
+}
+
+/**
+ * Learn a remote baseline in the worker (#61). Fire-and-forget: a lost baseline
+ * costs one extra Drive read next open (the safe direction), so `severity:
+ * 'warning'`.
+ *
+ * NOT added to RETRYABLE_METHODS / ENVELOPE_METHODS / HEAVY_METHODS /
+ * USER_ACTION_METHODS, deliberately (C17):
+ *  - not retryable: a respawned worker has no `currentDoc` and rebuilds from a
+ *    cache that may be BEHIND this revision; re-issuing would seed a baseline
+ *    against a doc not yet containing it (the C10 stale-forever bug, via auto-heal).
+ *  - not envelope: it carries a bare revision string, no envelope.
+ *  - not heavy: a variable set, not a megabyte payload.
+ *  - not user-action: no user edit is in doubt; a failure is firehose-only.
+ */
+export function noteRemoteBaseline(revision: string): void {
+  fireAndForget(
+    () => request('noteRemoteBaseline', { revision }),
+    'doc-baseline-fire-forget',
+    'fire-and-forget noteRemoteBaseline failed',
+    'warning'
+  );
 }
 
 /**

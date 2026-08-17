@@ -66,7 +66,17 @@ export const cancelPendingSave = vi.fn();
 export const flushPendingSave = vi.fn(async () => {});
 
 // Load operations
-export const getFileTimestamp = vi.fn(async () => null);
+// #61 open-guard surface: default to "changed / read" so existing tests keep
+// today's always-read behaviour unless a test opts into a skip.
+export const remoteChanged = vi.fn(async () => ({
+  status: 'changed' as const,
+  basis: 'revision' as const,
+  revision: null as string | null,
+  modifiedTime: null as string | null,
+}));
+export const shouldSkipOpenRead = vi.fn(async () => ({ skip: false, reason: 'changed' }));
+export const commitRemoteBaseline = vi.fn();
+export const seedRemoteBaseline = vi.fn();
 export const load = vi.fn(async () => null);
 export const loadAndImport = vi.fn(async () => ({ success: true }));
 export const loadAndParseV4 = vi.fn(async () => ({ success: false }));

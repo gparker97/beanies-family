@@ -71,7 +71,7 @@ vi.mock('@/services/familyContext', () => ({
 vi.mock('@/services/automerge/worker/docClient', () => ({
   setFamilyKey: vi.fn(async () => {}),
   persistEnvelope: vi.fn(async () => {}),
-  initAndLoadCache: vi.fn(async () => ({ loaded: false })),
+  initAndLoadCache: vi.fn(async () => ({ loaded: false, remoteBaseline: null })),
   mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
   verifyEnvelope: vi.fn(async () => {}),
   exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64==' })),
@@ -418,7 +418,10 @@ describe('syncStore.completeAutoLoad', () => {
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
-    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: false }); // B never cached here
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({
+      loaded: false,
+      remoteBaseline: null,
+    }); // B never cached here
     // `changed: true` — the cache miss drops the doc, so the merge takes the
     // fresh-adopt branch, which always installs a brand-new projection.
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
@@ -444,7 +447,10 @@ describe('syncStore.completeAutoLoad', () => {
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
-    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true }); // this family's cache present
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({
+      loaded: true,
+      remoteBaseline: null,
+    }); // this family's cache present
     // `changed: false` — cache and remote already agree, so this is a no-op merge.
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
       heads: [],
@@ -498,7 +504,10 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
-    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({
+      loaded: true,
+      remoteBaseline: null,
+    });
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
       heads: [],
       dirty: false,
@@ -579,7 +588,10 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
-    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({ loaded: true });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({
+      loaded: true,
+      remoteBaseline: null,
+    });
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
       heads: [],
       dirty: false,

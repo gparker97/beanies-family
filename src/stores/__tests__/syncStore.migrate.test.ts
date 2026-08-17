@@ -14,7 +14,7 @@ import type { Settings, GlobalSettings } from '@/types/models';
 
 const {
   mockSave,
-  mockGetFileTimestamp,
+  mockRemoteChanged,
   mockSetProvider,
   mockGetProvider,
   mockCreateNew,
@@ -23,7 +23,14 @@ const {
   mockRegisterFamily,
 } = vi.hoisted(() => ({
   mockSave: vi.fn(async () => true),
-  mockGetFileTimestamp: vi.fn(async () => null as string | null),
+  mockRemoteChanged: vi.fn<
+    () => Promise<{
+      status: string;
+      basis: string;
+      revision: string | null;
+      modifiedTime: string | null;
+    }>
+  >(async () => ({ status: 'unchanged', basis: 'revision', revision: null, modifiedTime: null })),
   mockSetProvider: vi.fn(),
   mockGetProvider: vi.fn(() => null as unknown),
   mockCreateNew: vi.fn(),
@@ -106,8 +113,7 @@ vi.mock('@/services/sync/syncService', async () => {
   return {
     ...defaults,
     save: (...a: unknown[]) => (mockSave as (...x: unknown[]) => unknown)(...a),
-    getFileTimestamp: (...a: unknown[]) =>
-      (mockGetFileTimestamp as (...x: unknown[]) => unknown)(...a),
+    remoteChanged: (...a: unknown[]) => (mockRemoteChanged as (...x: unknown[]) => unknown)(...a),
     setProvider: (...a: unknown[]) => mockSetProvider(...a),
     getProvider: () => mockGetProvider(),
     onStateChange: vi.fn(() => () => {}),
@@ -262,7 +268,12 @@ describe('syncStore.migrateStorage', () => {
     setActivePinia(pinia);
     vi.clearAllMocks();
     mockSave.mockResolvedValue(true);
-    mockGetFileTimestamp.mockResolvedValue(null);
+    mockRemoteChanged.mockResolvedValue({
+      status: 'unchanged',
+      basis: 'revision',
+      revision: null,
+      modifiedTime: null,
+    });
     mockCreateNew.mockReset();
     mockFromSavePicker.mockReset();
     mockGetProvider.mockReturnValue(null);
@@ -436,7 +447,12 @@ describe('syncStore — registry country sync', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     mockSave.mockResolvedValue(true);
-    mockGetFileTimestamp.mockResolvedValue(null);
+    mockRemoteChanged.mockResolvedValue({
+      status: 'unchanged',
+      basis: 'revision',
+      revision: null,
+      modifiedTime: null,
+    });
     mockGetProvider.mockReturnValue(null);
   });
 
@@ -510,7 +526,12 @@ describe('syncStore — registry usage signals (login flag + size)', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     mockSave.mockResolvedValue(true);
-    mockGetFileTimestamp.mockResolvedValue(null);
+    mockRemoteChanged.mockResolvedValue({
+      status: 'unchanged',
+      basis: 'revision',
+      revision: null,
+      modifiedTime: null,
+    });
     mockGetProvider.mockReturnValue(makeProvider('local', 'my-family.beanpod'));
   });
 
