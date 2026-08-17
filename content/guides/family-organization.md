@@ -10,6 +10,7 @@ relatedPosts:
   - accidentally-built-greatest-family-app
   - buy-fruit
   - best-cozi-maple-alternatives-in-2026
+  - travel-plans-intro
   - japan-trip-with-my-son
   - getting-your-beans-in-a-row
   - my-life-could-use-some-helpful-hints
