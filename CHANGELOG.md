@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-17
+
+### Changed
+
+- **Homepage links now go where you'd expect.** The "beanies" mentions in the story now open the create-your-beanpod screen directly, the "reach me" line and footer both point to the beanies.family Discord (in a new tab), and technical terms (CRDTs, encryption, local-first) link into the matching guides and glossary entries. Added a plain-English PBKDF2 entry to the glossary, and tidied the family library so guides and blog posts reliably link back to each other.
+
 ## 2026-08-15
 
 ### Changed
