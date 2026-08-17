@@ -9,6 +9,9 @@
 > **IMPORTANT — Launch & Marketing Content:**
 > NEVER save launch plans, marketing strategy, post drafts, subreddit content, Reddit/social media strategy, or any launch-related material to the repo. All launch and marketing content lives ONLY in Notion. The repo is for code, product docs, and architecture only. This includes `docs/launch/`, `docs/plans/` (for launch items), or any other directory. If asked to create launch content, write it to Notion, not the filesystem.
 >
+> **IMPORTANT — Non-repo file artifacts (Google Drive):**
+> Rendered file artifacts that must NOT be committed to the repo but are worth keeping (marketing collateral, pamphlets, flyers, Pinterest pins, exported images/PDFs, one-off design outputs) go to Google Drive, which is rclone-mounted in WSL at `~/gdrive-gparker97/Projects/beanies.family/<subfolder>` (persists across machines; accessible to both greg and Claude). Do NOT leave them in `~/Downloads`, `~/beanies-pins`, or the ephemeral scratchpad. Pinterest pins → `Pinterest/`. This is the file store only — launch **strategy/plans/copy** still live ONLY in Notion (rule above); the strategy rule is unchanged.
+>
 > **Key project documents in `docs/`:**
 >
 > - `docs/STATUS.md` — Current project status and progress
