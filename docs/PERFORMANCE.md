@@ -414,7 +414,12 @@ Representative raw record: `open-complete: path=path1a rec=2 reads=1 writes=0 re
 
 **Note:** the audit predicted `writes=1`, but production reads `writes=0` on read-only opens — PR 1's Phase-B `dirty` gate already eliminated the ungated upload, so PR 2's win is purely the redundant remoteLoad + the download (the ~2.6s p50 `remoteLoad` from §9's table) on unchanged opens, plus dropping a store re-projection. The 1-hour trust bound caps the guard at one refresh read per device per hour even in total silent failure.
 
-**After-measurement pending greg's post-PR-2-deploy capture** — the same five-surface cold-open, expecting `open-skip rec=1 reads=0 reloads=1` on the second open of an unchanged file, and **no `error_code=no-revision`** (whose absence confirms Drive's `version` field is populated + advancing). This table's "after" column is filled from that capture before #61 closes.
+**After-measurement — CONFIRMED locally (dev, real 2.5MB Drive `.beanpod`, 2026-08-17).** Two consecutive hard-refreshes of an unchanged file:
+
+- 1st open: `open-complete rec=2 reads=1 writes=0 reloads=2` (`automerge.cacheLoad` 3907ms + a 2.5MB Drive download + `automerge.remoteLoad` 3137ms).
+- 2nd open (unchanged): **`open-skip rec=1 reads=0 writes=0 reloads=2 reason=unchanged-revision-in-window`** — the Drive download AND the `automerge.remoteLoad` (~3.1s) are both gone.
+
+So **rec 2→1 and reads 1→0** are delivered. `reads=0` on the 2nd open eliminates the whole-file download + the second CRDT reconstruction. `reason=unchanged-revision-in-window` also **confirms Drive's `version` field is populated + compared** (a missing field would surface `open-fail-open reason=no-revision`). Two honest caveats: (a) `reloads` stayed at 2 — those are the fast-paint snapshot's reloads (§9), not the remote path, so PR 2 doesn't touch them; (b) `automerge.cacheLoad` is still multi-second — that is the LOCAL rebuild replaying increments (history-bound), the separate history-compaction lever the #61 audit deferred, hidden behind the ~83ms snapshot paint. The prod five-surface after-capture rides the deploy for the record, but the mechanism is verified.
 
 Full design + review: `docs/plans/2026-08-13-open-cycle-redundant-loads.md`. Audit: `docs/investigations/2026-08-13-open-cycle-load-audit.md`.
 
