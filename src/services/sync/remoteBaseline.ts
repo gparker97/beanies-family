@@ -27,12 +27,11 @@
  */
 export const BASELINE_MAX_TRUST_MS = 60 * 60 * 1000; // 1 hour
 
-/** A cheap metadata probe: a monotonic revision counter (null when the backend
- *  has none) plus mtime, from ONE round-trip. */
-export interface RemoteMarker {
-  revision: string | null;
-  modifiedTime: string | null;
-}
+// `RemoteMarker` and `WriteAck` are part of the StorageProvider contract, so they
+// are defined THERE (the abstraction) and re-exported here for the guard's use —
+// keeping the dependency arrow provider→feature, not the inversion (#61 review).
+import type { RemoteMarker, WriteAck } from './storageProvider';
+export type { RemoteMarker, WriteAck };
 
 /**
  * The durable baseline: the revision our cached doc provably contains, plus the
@@ -46,11 +45,6 @@ export interface RemoteBaseline {
   revision: string | null;
   modifiedTime: string | null;
   checkedAt: string | null; // ISO; the row's updatedAt. NaN/future => expired.
-}
-
-/** The ack our own write returns: the revision the file is at after our write. */
-export interface WriteAck {
-  revision: string | null;
 }
 
 /**
