@@ -4,7 +4,20 @@
  * Both local filesystem (File System Access API) and Google Drive
  * implement this interface, making the sync engine backend-agnostic.
  */
-import type { WriteAck, RemoteMarker } from './remoteBaseline';
+/**
+ * Cheap metadata probe result (#61): a monotonic revision counter (null when the
+ * backend has none) plus mtime, from ONE round-trip. Part of the provider
+ * contract, so it lives HERE (the abstraction), not in the guard feature module.
+ */
+export interface RemoteMarker {
+  revision: string | null;
+  modifiedTime: string | null;
+}
+
+/** The ack a `write()` returns (#61): the revision the file is at after our write. */
+export interface WriteAck {
+  revision: string | null;
+}
 
 export interface StorageProvider {
   /** Provider type identifier */

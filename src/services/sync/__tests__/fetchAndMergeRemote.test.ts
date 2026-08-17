@@ -80,7 +80,14 @@ vi.mock('@/services/sync/capabilities', () => ({
 }));
 
 vi.mock('@/services/google/driveService', () => ({
-  DriveApiError: class extends Error {},
+  DriveApiError: class extends Error {
+    status: number;
+    constructor(message: string, status = 500) {
+      super(message);
+      this.name = 'DriveApiError';
+      this.status = status;
+    }
+  },
 }));
 
 vi.mock('@/stores/translationStore', () => ({
@@ -313,5 +320,41 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     const { skip, reason } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(false);
     expect(reason).toBe('no-revision');
+  });
+
+  it('does NOT probe when the baseline is already trust-expired (daily-user perf)', async () => {
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:5', modifiedTime: null },
+    });
+    syncService.setProvider(provider as never);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: twoHoursAgo });
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('trust-expired');
+    expect(getRemoteMarker).not.toHaveBeenCalled(); // no wasted metadata round-trip
+  });
+
+  it('does NOT probe when there is no baseline yet (first sight reads without a probe)', async () => {
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:5', modifiedTime: null },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline(null);
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('no-baseline');
+    expect(getRemoteMarker).not.toHaveBeenCalled();
+  });
+
+  it('classifies a Drive 404 as file-not-found (poll path surfaces the missing-file banner)', async () => {
+    const { DriveApiError } = await import('@/services/google/driveService');
+    const notFound = new DriveApiError('gone', 404);
+    const { provider } = markerProvider({ markerThrows: notFound });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    const r = await syncService.remoteChanged();
+    expect(r.status).toBe('unknown');
+    expect(r.reason).toBe('file-not-found');
   });
 });
