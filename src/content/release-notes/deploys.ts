@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.17',
+    date: '2026-08-17',
+    month: '17 august 2026',
+    summary: {
+      en: "Opening beanies is faster and uses less data. When your family's data hasn't changed since you last looked, the app shows what you already have instead of downloading it all again.",
+      beanie:
+        "opening beanies is faster and uses less data. when your family's data hasn't changed since you last looked, the app shows what you already have instead of downloading it all again.",
+    },
+  },
+  {
     version: '2026.08.15',
     date: '2026-08-15',
     month: '15 august 2026',
