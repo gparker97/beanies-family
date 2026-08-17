@@ -18,7 +18,7 @@ Trust me, I sympathize. I didn't want to do it either. That's exactly why I buil
 
 (If you don't care about why, and for whatever reason you just trust me implicitly — _bad_ idea — then you can ignore the rest of this post and just [create a bean pod](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=privacy-explainer). But I suggest you read on.)
 
-I wrote a guide about [local-first tools, privacy, and security](https://beanies.family/guides/local-first-family-finance-planning-tools), which is a ~20-min read about how you can keep your data private with certain software. But if you're busy with a thousand things (like most of us), here's the official (for those of you who are 'experienced' enough to remember our best friend from high school) "Cliff Notes" version.
+I wrote a guide about [local-first tools, privacy, and security](/guides/local-first-family-finance-planning-tools), which is a ~20-min read about how you can keep your data private with certain software. But if you're busy with a thousand things (like most of us), here's the official (for those of you who are 'experienced' enough to remember our best friend from high school) "Cliff Notes" version.
 
 **Where hath my credit gone?**
 
