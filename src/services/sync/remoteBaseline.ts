@@ -53,6 +53,17 @@ export interface WriteAck {
   revision: string | null;
 }
 
+/**
+ * The persisted baseline row as read back from the worker cache: the namespaced
+ * revision our cached doc provably contains, plus the ISO `checkedAt` (the row's
+ * `updatedAt`, reused as the trust clock). Read alongside the cached doc in the
+ * one `initAndLoadCache` round-trip so the two can never be read out of step.
+ */
+export interface RemoteBaselineRow {
+  revision: string;
+  checkedAt: string;
+}
+
 export type ChangeStatus = 'changed' | 'unchanged' | 'unknown';
 export type ChangeBasis = 'revision' | 'mtime' | 'none';
 

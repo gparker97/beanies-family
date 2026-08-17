@@ -22,10 +22,18 @@ import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { getAuxStore } from './storageProvider';
+import {
+  compareMarkers,
+  withinTrustWindow,
+  type RemoteBaseline,
+  type RemoteMarker,
+  type ChangeResult,
+} from './remoteBaseline';
 import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
 import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
+import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { preserveLocalKeyDicts } from './envelopeMerge';
 import { setFlushProvider } from './offlineQueue';
@@ -73,8 +81,13 @@ let currentFamilyKey: CryptoKey | null = null;
 let currentEnvelope: BeanpodFileV4 | null = null;
 let noKeyWarnedOnce = false;
 
-// Drive-reported modifiedTime of the last file we read or wrote
-let lastKnownFileTimestamp: string | null = null;
+// Open-guard baseline (#61): the in-memory marker for the current file. Collapses
+// the old `lastKnownFileTimestamp` into ONE object (C9): `revision` (namespaced,
+// the authoritative change basis), `modifiedTime` (the fallback basis for
+// providers with no revision), and `checkedAt` (the trust clock — seeded from the
+// persisted row on open, so the 1-hour bound survives a reload). `reset()` nulls
+// it. Only `revision` + `checkedAt` are ever persisted (via the worker).
+let remoteBaseline: RemoteBaseline | null = null;
 // UTF-8 byte length of the last .beanpod string we persisted or loaded. Used as
 // a coarse (KB-rounded, client-side) usage signal in the family registry. Not
 // content — the string is an encrypted envelope. Populated by recordPersistedBytes().
@@ -564,14 +577,6 @@ export function setEnvelope(envelope: BeanpodFileV4 | null): void {
 }
 
 /**
- * Set the last known file timestamp (called by syncStore after loading).
- * Prevents the next doSave() from re-fetching what was just loaded.
- */
-export function setLastKnownFileTimestamp(timestamp: string | null): void {
-  lastKnownFileTimestamp = timestamp;
-}
-
-/**
  * Get the current session file handle (for reading encrypted blob during passkey registration).
  */
 export function getSessionFileHandle(): FileSystemFileHandle | null {
@@ -592,7 +597,7 @@ export function reset(): void {
   currentFamilyKey = null;
   currentEnvelope = null;
   noKeyWarnedOnce = false;
-  lastKnownFileTimestamp = null;
+  remoteBaseline = null;
   lastPersistedBytes = null;
   resetSaveFailures();
   // Clear the durability banner on teardown, but SILENTLY — a logout / family-switch
@@ -605,6 +610,107 @@ export function reset(): void {
     isSyncing: false,
     lastError: null,
   });
+}
+
+// ─── Open-guard change detection (#61) ───────────────────────────────────────
+
+/**
+ * Probe the current provider's marker in ONE round-trip. Uses `getRemoteMarker`
+ * when the provider implements it (Drive), else falls back to `getLastModified`
+ * in this ONE place. May throw an auth error — `remoteChanged` catches it.
+ */
+async function probeRemoteMarker(): Promise<RemoteMarker> {
+  if (!currentProvider) return { revision: null, modifiedTime: null };
+  if (currentProvider.getRemoteMarker) {
+    return currentProvider.getRemoteMarker();
+  }
+  const modifiedTime = await currentProvider.getLastModified();
+  return { revision: null, modifiedTime };
+}
+
+/**
+ * Has the remote file changed relative to our in-memory baseline? The I/O shell
+ * over the pure `compareMarkers` (#61 C14). Owns the probe + every failure
+ * classification: any throw (auth/transient) degrades to `unknown` and is NEVER
+ * rethrown. The caller decides whether unknown means read; a real auth error
+ * re-surfaces from the subsequent `provider.read()` into the existing
+ * classification, so nothing is swallowed.
+ */
+export async function remoteChanged(): Promise<ChangeResult> {
+  try {
+    const probe = await probeRemoteMarker();
+    return compareMarkers(remoteBaseline, probe);
+  } catch (e) {
+    const isAuth =
+      e instanceof TokenExpiredError ||
+      (e instanceof DriveApiError && (e.status === 401 || e.status === 404));
+    const reason = isAuth ? 'auth' : `provider-error:${e instanceof Error ? e.name : 'unknown'}`;
+    console.warn(
+      `[syncService.remoteChanged] marker probe failed (${reason}); treating remote as unknown — the caller reads and provider.read() re-raises any real auth error:`,
+      e
+    );
+    return { status: 'unknown', basis: 'none', revision: null, modifiedTime: null, reason };
+  }
+}
+
+/**
+ * The ONLY place that decides an open-path Drive read may be SKIPPED (#61 C14).
+ * Composes `remoteChanged()` with the trust window. `unknown` READS here (a
+ * one-shot per open; a spurious read costs one download) — unlike the polls,
+ * which never read on unknown. Returns a classified reason on every non-skip so
+ * the guard can emit it as `open-fail-open` telemetry.
+ */
+export async function shouldSkipOpenRead(): Promise<{ skip: boolean; reason: string }> {
+  const result = await remoteChanged();
+  if (result.status === 'unknown') return { skip: false, reason: result.reason ?? 'unknown' };
+  if (result.basis !== 'revision') return { skip: false, reason: 'no-revision' };
+  if (result.status !== 'unchanged') return { skip: false, reason: result.reason ?? 'changed' };
+  if (!withinTrustWindow(remoteBaseline?.checkedAt ?? null, Date.now())) {
+    return { skip: false, reason: 'trust-expired' };
+  }
+  return { skip: true, reason: 'unchanged-revision-in-window' };
+}
+
+/**
+ * Learn a marker in memory (#61 C10) — a READ-TIME fact: the probe sampled
+ * strictly before a download, or our own write's ack. Does NOT persist;
+ * committing to the durable baseline happens at the three termini via
+ * `commitRemoteBaseline`, where the worker's doc provably contains that state.
+ */
+function learnRemoteMarker(marker: RemoteMarker): void {
+  remoteBaseline = {
+    revision: marker.revision,
+    modifiedTime: marker.modifiedTime,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Seed the in-memory baseline from the persisted row on open (#61 C-5), WITHOUT
+ * re-committing it — routing this through `commitRemoteBaseline` would re-write
+ * the row and refresh `checkedAt`, silently defeating the 1-hour trust bound.
+ * This is the easiest mistake to make in the design; keep it a plain setter.
+ */
+export function seedRemoteBaseline(row: { revision: string; checkedAt: string } | null): void {
+  remoteBaseline = row
+    ? { revision: row.revision, modifiedTime: null, checkedAt: row.checkedAt }
+    : null;
+}
+
+/**
+ * Commit the current in-memory baseline durably (#61 C10). Called from EXACTLY
+ * three termini where the worker's `currentDoc` provably contains the remote
+ * state: after `loadFromFile`'s merge succeeds (via syncStore), after
+ * `fetchAndMergeRemote`'s merge resolves, and after `doSave`'s write resolves. A
+ * no-op when there is no revision (never persist an mtime). Fire-and-forget
+ * through the worker; the FIFO orders it after the already-resolved merge. It is
+ * an unconditional last-write-wins set (C10b) — correctness is from WHERE it is
+ * called, never from comparing revisions.
+ */
+export function commitRemoteBaseline(): void {
+  const revision = remoteBaseline?.revision ?? null;
+  if (revision === null) return;
+  docClient.noteRemoteBaseline(revision);
 }
 
 /**
@@ -873,15 +979,12 @@ async function fetchAndMergeRemote(): Promise<void> {
   // old `changes/` residue rides this once-per-session first-read seam (detached).
   void cleanupChunkResidueOnce();
 
-  // Fast path: check if remote has changed since we last read/wrote
-  const remoteTimestamp = await currentProvider.getLastModified();
-  if (
-    !remoteTimestamp ||
-    (lastKnownFileTimestamp &&
-      new Date(remoteTimestamp).getTime() <= new Date(lastKnownFileTimestamp).getTime())
-  ) {
-    return; // No change — skip the full read
-  }
+  // Fast path: read iff the remote actually changed (revision basis on Drive,
+  // mtime fallback elsewhere) — one comparator for the whole app (#61 C14). On a
+  // poll/save path `unknown` deliberately does NOT read: a persistent provider
+  // error must not turn the 10s poll into a read storm (C14 caller table).
+  const change = await remoteChanged();
+  if (change.status !== 'changed') return; // unchanged OR unknown → skip the full read
 
   // Remote has newer data — fetch, decrypt, and merge. INVARIANT (ADR-032 addendum):
   // the base is the sole source of a peer's edits (change-chunks retired 2026-07-15).
@@ -892,6 +995,10 @@ async function fetchAndMergeRemote(): Promise<void> {
   if (!text) return;
 
   const remoteEnvelope = parseBeanpodV4(text);
+  // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
+  // gap between the probe and the read, this records the OLDER revision → the next
+  // open re-reads (the safe direction), never a stale skip.
+  learnRemoteMarker({ revision: change.revision, modifiedTime: change.modifiedTime });
 
   // The worker decrypts + CRDT-merges the remote into its doc and returns
   // heads-derived `dirty` (did local carry unsynced changes the converged doc
@@ -904,7 +1011,8 @@ async function fetchAndMergeRemote(): Promise<void> {
   // be pushed. `setEnvelope` also RPCs the worker to re-persist the envelope
   // cache (keeps cold-start unlock working after a peer key-add/rotation).
   setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
-  lastKnownFileTimestamp = remoteTimestamp;
+  // Terminus 2 (C10): the worker's doc now provably contains this remote state.
+  commitRemoteBaseline();
 
   // The poll path's ONLY re-upload trigger: re-push a converged doc that still
   // carries local unsynced changes (heads-derived dirty), without ping-ponging
@@ -986,34 +1094,46 @@ async function doSave(): Promise<boolean> {
     // catch handler dereferenced it after that, the handler itself would throw and
     // turn a write that actually reached Drive into a reported save failure.
     const providerTypeForDiag = currentProvider.type;
-    await currentProvider.write(fileContent);
+    // C14b: the write returns its own resulting revision IN the response. Narrow
+    // the `WriteAck | void` union explicitly at this ONE site.
+    const ack = await currentProvider.write(fileContent);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
+    const ackRevision = ack ? ack.revision : null;
 
-    // Update timestamp after successful write
-    try {
-      const postWriteTimestamp = await currentProvider.getLastModified();
-      if (postWriteTimestamp) {
-        lastKnownFileTimestamp = postWriteTimestamp;
+    if (ackRevision !== null) {
+      // Terminus 3 (C10): the file IS what we just wrote. Learn our own write's
+      // revision and commit — for Drive this REPLACES the old post-write metadata
+      // read, removing one network round-trip per save.
+      learnRemoteMarker({ revision: ackRevision, modifiedTime: null });
+      commitRemoteBaseline();
+    } else {
+      // No revision (non-Drive provider, or a parse failure): fall back to a
+      // post-write getLastModified to refresh the in-memory MTIME basis ONLY
+      // (this is what stops a local-file poll re-reading its own write). It never
+      // becomes a persisted baseline (commitRemoteBaseline no-ops on a null rev).
+      try {
+        const postWriteTimestamp = await currentProvider.getLastModified();
+        if (postWriteTimestamp) {
+          learnRemoteMarker({ revision: null, modifiedTime: postWriteTimestamp });
+        }
+      } catch (e) {
+        // Not fatal — the next save re-fetches. But NOT "non-critical": a missed
+        // capture leaves the mtime basis behind the file we just wrote, so the
+        // next poll re-downloads our own write. Never swallow it silently.
+        console.warn(
+          '[syncService] doSave: post-write getLastModified fallback failed — next save may re-fetch our own write; check token/network:',
+          e
+        );
+        logEvent({
+          level: 'warn',
+          surface: 'sync-save',
+          message: 'post-write mtime fallback failed — next save may re-fetch',
+          error: e,
+          // No `provider_type` here: `enrichAndRedact` sets it from the sync store
+          // on every event and would overwrite anything passed. `action` survives.
+          context: { action: 'post-write-timestamp-failed', detail: providerTypeForDiag },
+        });
       }
-    } catch (e) {
-      // Not fatal — the next save re-fetches. But this is NOT "non-critical":
-      // a missed capture leaves `lastKnownFileTimestamp` behind the file we just
-      // wrote, so the next `fetchAndMergeRemote` re-downloads our own write.
-      // Never swallow it silently (it fed a 2026-08 investigation blind).
-      console.warn(
-        '[syncService] doSave: post-write getLastModified failed — next save will re-fetch our own write; check Drive token/network:',
-        e
-      );
-      logEvent({
-        level: 'warn',
-        surface: 'sync-save',
-        message: 'post-write timestamp capture failed — next save will re-fetch',
-        error: e,
-        // No `provider_type` here: `enrichAndRedact` sets it from the sync store on
-        // every event and would overwrite anything passed. `action` is the field
-        // that actually survives.
-        context: { action: 'post-write-timestamp-failed', detail: providerTypeForDiag },
-      });
     }
 
     updateState({ isSyncing: false, lastError: null });
@@ -1032,16 +1152,6 @@ async function doSave(): Promise<boolean> {
     recordSaveFailure(errorMsg);
     return false;
   }
-}
-
-/**
- * Get the timestamp from the sync file (lightweight check for polling)
- */
-export async function getFileTimestamp(): Promise<string | null> {
-  if (!currentProvider) {
-    return null;
-  }
-  return currentProvider.getLastModified();
 }
 
 /**
@@ -1069,8 +1179,32 @@ export async function load(): Promise<string | null> {
       }
     }
 
-    bumpOpenCycle('driveRead'); // counted per attempt; no-op outside an open window
     const providerTypeForDiag = currentProvider.type; // see doSave — capture before the awaits
+    // C13: sample the marker STRICTLY BEFORE the download, inside this same try so
+    // the NotFoundError/404 classification below still governs. A committed baseline
+    // can then only ever describe content we actually merged — a peer write landing
+    // AFTER this probe advances the counter, so the NEXT open reads (safe). This
+    // ordering is LOAD-BEARING: it looks like a harmless reorder and it is not.
+    // Non-throwing: a probe failure nulls the baseline (=> read next open) and must
+    // NOT fail the load; the read proceeds and re-raises any real auth error.
+    remoteBaseline = null;
+    try {
+      learnRemoteMarker(await probeRemoteMarker());
+    } catch (e) {
+      console.warn(
+        '[syncService] load: pre-read marker probe failed — no change-detection baseline, callers do a full read; check Drive token/network:',
+        e
+      );
+      logEvent({
+        level: 'warn',
+        surface: 'sync-load',
+        message: 'pre-read marker probe failed — no change-detection baseline',
+        error: e,
+        context: { action: 'pre-read-probe-failed', detail: providerTypeForDiag },
+      });
+    }
+
+    bumpOpenCycle('driveRead'); // counted per attempt; no-op outside an open window
     const text = await currentProvider.read();
 
     if (!text) {
@@ -1078,28 +1212,6 @@ export async function load(): Promise<string | null> {
       return null;
     }
     recordPersistedBytes(text); // capture size for the registry usage signal
-
-    // Track the file's timestamp so doSave() can detect remote changes
-    try {
-      const fileTs = await currentProvider.getLastModified();
-      if (fileTs) lastKnownFileTimestamp = fileTs;
-    } catch (e) {
-      // Not fatal — the comparison simply has no baseline and every caller then
-      // does a full read (the safe direction). But never swallow it: a silent
-      // failure here presents as "the app re-downloads the file every time" with
-      // no evidence anywhere.
-      console.warn(
-        '[syncService] load: getLastModified failed — no change-detection baseline, callers will do a full read; check Drive token/network:',
-        e
-      );
-      logEvent({
-        level: 'warn',
-        surface: 'sync-load',
-        message: 'post-read timestamp capture failed — no change-detection baseline',
-        error: e,
-        context: { action: 'post-read-timestamp-failed', detail: providerTypeForDiag },
-      });
-    }
 
     updateState({ isSyncing: false, lastError: null });
     return text;

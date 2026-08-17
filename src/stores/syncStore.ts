@@ -645,29 +645,6 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  /**
-   * Check if the sync file has newer data than our last sync
-   */
-  async function checkForConflicts(): Promise<{
-    hasConflict: boolean;
-    fileTimestamp: string | null;
-    localTimestamp: string | null;
-  }> {
-    const fileTimestamp = await syncService.getFileTimestamp();
-    const localTimestamp = lastSync.value;
-
-    if (!fileTimestamp) {
-      return { hasConflict: false, fileTimestamp: null, localTimestamp };
-    }
-
-    if (!localTimestamp) {
-      return { hasConflict: true, fileTimestamp, localTimestamp: null };
-    }
-
-    const hasConflict = new Date(fileTimestamp).getTime() > new Date(localTimestamp).getTime();
-    return { hasConflict, fileTimestamp, localTimestamp };
-  }
-
   /** Bounded post-auth save: `syncNow(true)` raced against a timeout so a slow/offline
    * Drive push can't wedge a login/rotation spinner. Returns true if it synced within
    * the bound; false (deferred) on timeout — the push rides the next auto-sync. The
@@ -742,8 +719,12 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function syncNow(force = false): Promise<boolean> {
     if (!force) {
-      const { hasConflict } = await checkForConflicts();
-      if (hasConflict) {
+      // One change-comparator for the whole app (#61 C14): the file has newer data
+      // only when it actually CHANGED relative to our baseline. `unknown` (a
+      // transient provider error) does NOT block the save — matches today's
+      // wall-clock check returning hasConflict:false on a null timestamp.
+      const change = await syncService.remoteChanged();
+      if (change.status === 'changed') {
         error.value = 'File has newer data. Load from file first or force sync.';
         return false;
       }
@@ -823,6 +804,25 @@ export const useSyncStore = defineStore('sync', () => {
     const dupsRemoved = await deduplicateRecurringTransactions();
     if (dupsRemoved > 0) await reloadAllStores();
     if (dirty) syncService.triggerDebouncedSave();
+  }
+
+  /**
+   * The Drive-side housekeeping run at EVERY successful open terminus — the
+   * authoritative load path AND the #61 open-guard SKIP path — so the two can
+   * never drift (Requirement 12). The `google_drive` gate lives INSIDE, not at
+   * the call sites, so a new line here cannot be forgotten on one path.
+   * `markPodCreated` is included per its own contract (authStore): call it at
+   * every terminus that reads a pod, or the user is stranded on the
+   * create-recovery screen and `app.onboardingZombieState` false-fires.
+   */
+  async function runPostLoadDriveHousekeeping(): Promise<void> {
+    if (syncService.getProviderType() === 'google_drive') {
+      setupTokenExpiryHandler();
+      updateProviderEmailAfterLoad();
+      await reconcileDriveTokenForMember();
+    }
+    setupAutoSync();
+    useAuthStore().markPodCreated();
   }
 
   /**
@@ -951,10 +951,11 @@ export const useSyncStore = defineStore('sync', () => {
           const merged = replaceEnvelope(remoteEnvelope);
           syncService.setFamilyKey(familyKey.value!, merged);
 
-          // NOTE: no `getFileTimestamp()` call here. `syncService.load()` already
-          // captured the file's timestamp from the same source moments ago (see its
-          // post-read capture); re-reading it was a second network round-trip that
-          // set the same variable to the same value.
+          // Terminus 1 (#61 C10): the worker's doc now provably contains the remote
+          // state `syncService.load()` sampled BEFORE the download, so commit that
+          // revision as the durable open-guard baseline. Zero-network (a worker RPC).
+          // This replaces the old getFileTimestamp round-trip that used to sit here.
+          syncService.commitRemoteBaseline();
 
           // `dirty` is derived purely from Automerge doc heads, so it can NEVER be
           // true for an envelope-only change. But a save publishes the envelope key
@@ -999,16 +1000,7 @@ export const useSyncStore = defineStore('sync', () => {
             }
           }
 
-          if (syncService.getProviderType() === 'google_drive') {
-            setupTokenExpiryHandler();
-            updateProviderEmailAfterLoad();
-            await reconcileDriveTokenForMember();
-          }
-
-          setupAutoSync();
-          // A real pod was decrypted and loaded — establish the podCreated
-          // invariant (see markPodCreated's contract doc-comment in authStore).
-          useAuthStore().markPodCreated();
+          await runPostLoadDriveHousekeeping();
           return { success: true };
         } catch (e) {
           console.warn('[syncStore] Failed to decrypt with current FK, may need re-auth:', e);
@@ -1331,7 +1323,9 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       // AUTHORITATIVE rebuild result — the existing state-setup flow, unchanged.
-      const { loaded } = await loadedPromise;
+      // Also carries the open-guard baseline row (#61 C-5), read in the SAME
+      // round-trip as the cache so the two can never be out of step.
+      const { loaded, remoteBaseline: baselineRow } = await loadedPromise;
       const { envelope: cachedEnvelope } = await docClient.readEnvelope();
       if (!cachedEnvelope || !loaded) {
         if (paintedFromSnapshot) isBackgroundSyncing.value = false;
@@ -1344,6 +1338,10 @@ export const useSyncStore = defineStore('sync', () => {
       familyKey.value = fk;
       const cachedMerged = replaceEnvelope(cachedEnvelope);
       syncService.setFamilyKey(fk, cachedMerged);
+      // Seed (NOT commit) the in-memory baseline from the row (#61 C-5): the
+      // subsequent open-guard read decides skip vs read from this. Committing it
+      // would re-write the row and refresh `checkedAt`, defeating the 1h bound.
+      syncService.seedRemoteBaseline(baselineRow);
       if (!options?.preservePermissionState) {
         isConfigured.value = true; // Data is loaded — show configured UI
         needsPermission.value = true; // Still need file permission for future saves
@@ -2290,16 +2288,39 @@ export const useSyncStore = defineStore('sync', () => {
     }
     // Classified at each terminal below; `finally` emits it once.
     let openOutcome: OpenOutcome = 'open-complete';
+    // #61: the guard's classified reason, ridden to CloudWatch as `error_code`.
+    let openFailReason: string | undefined;
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
     backgroundSyncErrorKind.value = null;
 
     try {
+      // #61 OPEN GUARD: if the file's revision has not advanced past the state we
+      // durably cached (within the 1h trust window), the whole open-path download +
+      // remoteLoad + merge + reloads + ungated upload is waste — skip it. The
+      // envelope on this path came from `loadFromPersistenceCache`'s `setFamilyKey`
+      // (cachedMerged) and stays correct because an envelope-only change (peer key
+      // rotation / member add) rewrites the file and advances `version`, so the
+      // guard reads (C21). Every uncertainty falls through to a normal read.
+      const { skip, reason } = await syncService.shouldSkipOpenRead();
+      openFailReason = reason;
+      if (skip) {
+        openOutcome = 'open-skip';
+        await runPostLoadDriveHousekeeping(); // same terminus as the load path (Req 12)
+        return; // the `finally` starts polling + emits `open-skip`
+      }
+      // The guard fell open on UNCERTAINTY (not a clean `changed`/`no-baseline`) —
+      // record it as `open-fail-open` on a successful read (C7), so a rising
+      // fail-open rate is visible without a repro.
+      const CLEAN_READ_REASONS = new Set(['changed', 'no-baseline']);
+      const fellOpen = !CLEAN_READ_REASONS.has(reason);
+
       const loadResult = await loadFromFile({ merge: true });
 
       if (loadResult.success) {
         setupAutoSync();
+        if (fellOpen) openOutcome = 'open-fail-open';
         return;
       }
 
@@ -2357,8 +2378,9 @@ export const useSyncStore = defineStore('sync', () => {
       // wrapper). This `finally` is the single close point for EVERY outcome —
       // success, needs-password, network/auth failure, or a throw — with the
       // outcome classified at each terminal rather than reported as success.
-      // Callers with no token (Refresh, config-heal) close nothing.
-      endOpen(openOutcome, openToken);
+      // Callers with no token (Refresh, config-heal) close nothing. The #61 guard
+      // reason rides along as `error_code` (skip / fail-open / why it read).
+      endOpen(openOutcome, openToken, { failOpenReason: openFailReason });
     }
   }
 
@@ -2379,8 +2401,11 @@ export const useSyncStore = defineStore('sync', () => {
 
     isCheckingFile = true;
     try {
-      const { hasConflict } = await checkForConflicts();
-      if (!hasConflict) return false;
+      // #61 C14: reload only when the file actually CHANGED. `unknown` (transient
+      // provider error) does NOT reload — a persistent error must not turn this
+      // 10s poll into a read storm (matches today's null-timestamp → no reload).
+      const change = await syncService.remoteChanged();
+      if (change.status !== 'changed') return false;
 
       syncService.cancelPendingSave();
 
@@ -3952,7 +3977,6 @@ export const useSyncStore = defineStore('sync', () => {
     canDurablySaveNow,
     DURABLE_ROTATION_SAVE_TIMEOUT_MS,
     forceSyncNow,
-    checkForConflicts,
     loadFromFile,
     loadFromNewFile,
     loadFromDroppedFile,
