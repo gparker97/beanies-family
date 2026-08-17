@@ -4,12 +4,22 @@
  * Both local filesystem (File System Access API) and Google Drive
  * implement this interface, making the sync engine backend-agnostic.
  */
+import type { WriteAck, RemoteMarker } from './remoteBaseline';
+
 export interface StorageProvider {
   /** Provider type identifier */
   readonly type: 'local' | 'google_drive';
 
-  /** Write content to the storage backend */
-  write(content: string): Promise<void>;
+  /**
+   * Write content to the storage backend.
+   *
+   * Returns a {@link WriteAck} carrying the file's resulting revision when the
+   * backend can report one (Drive); a `void`-returning implementation still
+   * satisfies this, so the three non-Drive providers and every test double need
+   * no change (#61 C14b). `doSave` is the ONLY reader and narrows the union
+   * explicitly (`ack ? ack.revision : null`) — nothing else touches it.
+   */
+  write(content: string): Promise<WriteAck | void>;
 
   /** Read content from the storage backend. Returns null if file is empty or missing. */
   read(): Promise<string | null>;
@@ -53,6 +63,16 @@ export interface StorageProvider {
    * `fetchAndMergeRemote` instead). Optional method; treat absent as false.
    */
   supportsLocalPolling?(): boolean;
+
+  /**
+   * Cheap metadata probe: a monotonic revision counter (null when the backend
+   * has none) plus mtime, in ONE round-trip (#61 C14a). When absent, the sync
+   * layer falls back to `getLastModified()` in one place, so providers without
+   * a revision (local / capacitor / memory) are untouched. Only Google Drive
+   * implements it (Drive's `version` field). The returned revision is already
+   * namespaced (`ver:` prefix) — an opaque string compared with `!==` only.
+   */
+  getRemoteMarker?(): Promise<RemoteMarker>;
 
   // ─── Plan B (ADR-032) incremental change-log — optional multi-object API ─────
   //
