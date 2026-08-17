@@ -395,6 +395,31 @@ Full design + review: `docs/plans/2026-08-12-app-open-instant-projection-snapsho
 
 ---
 
+### 10. Open-Cycle Redundancy Elimination — revision-gated Drive read (#61)
+
+**Problem.** Even with the fast-paint snapshot, an app open still did the full Drive-side round-trip on **every** open, whether or not the file had changed: download + `automerge.remoteLoad` + CRDT merge + store re-projections. That is a second full reconstruction (`rec=2`) and a whole-file read for zero new information on an unchanged file.
+
+**Before-baseline (measured, prod PR 1 build `10d88180` / 0.9.10R8, `open-cycle` surface, 2026-08-17).** Five read-only cold opens of a real ~2–3 MB `.beanpod` on one family (`…fa046620`) across **iOS, web (Windows/Chrome), and Android (Pixel)** were dead-consistent:
+
+| metric                                | before (PR 1)                                                 | after (PR 2, unchanged file, target) |
+| ------------------------------------- | ------------------------------------------------------------- | ------------------------------------ |
+| `rec` (full CRDT reconstructions)     | **2** (cacheLoad + remoteLoad)                                | **1** (cacheLoad only)               |
+| `reads` (whole-file Drive downloads)  | **1**                                                         | **0** (guard skips)                  |
+| `writes`                              | **0** (PR 1's `dirty` gate already holds — no ungated upload) | 0                                    |
+| `reloads` (full store re-projections) | **2–3**                                                       | **1**                                |
+| `snap`                                | hit                                                           | hit                                  |
+| `action`                              | `open-complete`                                               | `open-skip`                          |
+
+Representative raw record: `open-complete: path=path1a rec=2 reads=1 writes=0 reloads=2 snap=hit`.
+
+**Note:** the audit predicted `writes=1`, but production reads `writes=0` on read-only opens — PR 1's Phase-B `dirty` gate already eliminated the ungated upload, so PR 2's win is purely the redundant remoteLoad + the download (the ~2.6s p50 `remoteLoad` from §9's table) on unchanged opens, plus dropping a store re-projection. The 1-hour trust bound caps the guard at one refresh read per device per hour even in total silent failure.
+
+**After-measurement pending greg's post-PR-2-deploy capture** — the same five-surface cold-open, expecting `open-skip rec=1 reads=0 reloads=1` on the second open of an unchanged file, and **no `error_code=no-revision`** (whose absence confirms Drive's `version` field is populated + advancing). This table's "after" column is filled from that capture before #61 closes.
+
+Full design + review: `docs/plans/2026-08-13-open-cycle-redundant-loads.md`. Audit: `docs/investigations/2026-08-13-open-cycle-load-audit.md`.
+
+---
+
 ## Monitoring and Profiling
 
 ### Quick Performance Checks

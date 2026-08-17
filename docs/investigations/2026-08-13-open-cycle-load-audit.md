@@ -119,10 +119,17 @@ yet** — that is PR 2.
 
 ## Still to measure (requires a real device — greg)
 
-- [ ] **A4 — before-baseline** on a real 2-3MB `.beanpod`: open the app, capture the
-      `open-cycle` record. Expected today: `rec=2 reads=1 writes=1`.
-- [ ] Observed `version` / `headRevisionId` values for the `.beanpod` (confirms the PR 2 guard
-      has a usable revision field; `version` is the primary, `headRevisionId` evidence only).
-- [ ] Confirm every open path emits at least once — path 3 is easiest (sign out, fresh start).
+- [x] **A4 — before-baseline CAPTURED 2026-08-17** on a real ~2-3MB `.beanpod` (family `…fa046620`),
+      prod PR 1 build `10d88180` (0.9.10R8), 5 read-only cold opens across iOS + web + Android:
+      **consistently `rec=2 reads=1 writes=0 reloads=2-3 snap=hit` (`open-complete`, path1a)**.
+      (`writes=0`, not the predicted `writes=1` — PR 1's `dirty` gate already holds on read-only
+      opens.) Recorded in `docs/PERFORMANCE.md` §10.
+- [ ] Observed `version` / `headRevisionId` values for the `.beanpod` — deferred to the PR 2
+      after-capture: the guard's `open-skip` record (and the ABSENCE of `error_code=no-revision`)
+      confirms `version` is populated + advancing, which is the safe confirmation path per C12
+      (a missing field just fails open to today's always-read behaviour).
+- [ ] Confirm every open path emits at least once — path1a confirmed above (all 3 surfaces);
+      path 3 easiest via sign-out/fresh-start.
 
-Record results here, then in `docs/PERFORMANCE.md` alongside the after-numbers once PR 2 lands.
+Before-baseline recorded in `docs/PERFORMANCE.md` §10; the after-numbers + version confirmation
+land there together from the post-PR-2-deploy capture, at which point #61 closes.
