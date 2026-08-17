@@ -38,6 +38,7 @@ import {
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
+import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type { MutationOp, ProjectionDelta, Heads, CachePersistFailureDetail } from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -112,23 +113,36 @@ let snapshotInFlight: Promise<void> = Promise.resolve();
  * advance would let one transient IDB error silently disable snapshots for the whole
  * session, since this function swallows its failures by design. */
 let lastSnapshotHeads: Heads | null = null;
+/**
+ * The open-guard remote baseline (#61) waiting to be committed durably: the
+ * namespaced revision our doc now provably contains, set by `noteRemoteBaseline`
+ * AFTER main has merged that remote state (plan C10). It is a value learned at a
+ * remote-merge/write terminus and committed only inside `persistOnce`, where the
+ * cache provably holds the doc it describes (C4a/C4c/C10b/C11). Cleared on every
+ * doc-lifecycle reset (below) AND explicitly at the two DB-open entry points
+ * (C18 — a leftover value must not be committed into a different family's cache).
+ */
+let pendingRemoteBaseline: string | null = null;
 
 /**
  * Null every in-memory, doc-derived cursor in one place.
  *
  * These cursors describe "what has already been written for the doc currently in
  * memory". The moment that doc is replaced, dropped or reset they are lies, and a
- * stale cursor is silent data loss (a skipped persist) or silent staleness (a
- * skipped snapshot). There are five reset sites and now several cursors, so the
- * "forgot one" bug is a matter of time — every site calls this instead.
+ * stale cursor is silent data loss (a skipped persist), silent staleness (a
+ * skipped snapshot), or a baseline committed against the wrong doc. There are
+ * five reset sites and now several cursors, so the "forgot one" bug is a matter
+ * of time — every site calls this instead.
  *
- * NOT for scope changes (opening a different family's DB): those clear the pending
- * baseline explicitly at the DB-open entry points, because that is a different
- * concern with a different correctness argument.
+ * `pendingRemoteBaseline` is cleared here for the doc-LIFECYCLE cases (drop/reset/
+ * replace). The two DB-open entry points (`initAndLoadCache`/`openCache`) ALSO
+ * clear it explicitly, for the distinct SCOPE concern (C18) — a leftover value
+ * surviving a DB re-point without a preceding reset.
  */
 function resetDocCursors(): void {
   lastPersistedHeads = null;
   lastSnapshotHeads = null;
+  pendingRemoteBaseline = null;
 }
 
 /** Wire the sink once (worker startup / inline adapter init). Also registers the
@@ -254,6 +268,34 @@ function markPersistOk(): void {
   }
 }
 
+/**
+ * Commit the open-guard baseline (#61) captured at the start of a persist, once
+ * the doc write it accompanies has succeeded. Called immediately before each
+ * `markPersistOk()` (C4c: doc write → baseline → markPersistOk).
+ *
+ * - `pending === null` → nothing to commit (never persist an mtime / absent rev).
+ * - `currentDoc !== doc` → the doc was replaced/reset mid-write; committing now
+ *   would write this revision into a DIFFERENT family's cache (C11). Skip.
+ * - Its OWN try/catch (C4b): a failed baseline write is advisory — at most one
+ *   extra Drive read next open — and must NEVER raise the local-durability
+ *   banner. Console-only (the worker's only local channel).
+ * - Clears the module var ONLY if it still `=== pending` (C4a): a newer
+ *   `noteRemoteBaseline` landing during the write must survive to its own commit.
+ */
+async function commitPendingBaseline(pending: string | null, doc: Doc): Promise<void> {
+  if (pending === null) return;
+  if (currentDoc !== doc) return;
+  try {
+    await cache.writeRemoteBaseline(pending);
+    if (pendingRemoteBaseline === pending) pendingRemoteBaseline = null;
+  } catch (e) {
+    console.error(
+      '[applyAndProject] remote-baseline write failed — baseline not advanced (next open will re-read, no data at risk)',
+      e
+    );
+  }
+}
+
 /** Write a fresh whole-doc BASE (clears increments, resets seq) and advance the
  * cursor. Used for the first persist of a doc, after adopt/replace, on recovery,
  * and for re-compaction. `doc` is the entry snapshot — stable across the await even
@@ -287,6 +329,10 @@ async function persistOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
   const doc = currentDoc;
   const key = familyKey;
+  // C4a: capture the pending baseline in the SAME pre-`await` snapshot as `doc`,
+  // so a newer value arriving DURING this write is not committed against this
+  // (older) doc state. Committed only via `commitPendingBaseline` below.
+  const pending = pendingRemoteBaseline;
   // Track which write is in flight so the failure signal can carry `kind` — MUST be
   // explicit, not inferred from lastPersistedHeads (the re-compaction writeBase below
   // runs with a non-null lastPersistedHeads and would be mislabeled 'increment').
@@ -299,6 +345,11 @@ async function persistOnce(): Promise<void> {
       const captureHeads = headsOf(doc);
       const changes = changesSince(doc, lastPersistedHeads);
       if (changes.length === 0) {
+        // No new doc changes to persist, but the cache already holds `doc` (which
+        // contains the merged remote state that set `pending`), so this is a valid
+        // commit terminus (C10a: `noteRemoteBaseline` schedules a persist precisely
+        // to reach here on a read-only merge).
+        await commitPendingBaseline(pending, doc);
         markPersistOk();
         return;
       }
@@ -315,6 +366,8 @@ async function persistOnce(): Promise<void> {
         await writeBase(key, doc); // re-compaction: fresh base drops the increments
       }
     }
+    // C4c: the doc write above has succeeded and the cache now holds `doc`.
+    await commitPendingBaseline(pending, doc);
     markPersistOk();
   } catch (e) {
     // A durable-cache write failure is the "local durability broken" signal —
@@ -415,13 +468,25 @@ export async function openCache(id: string): Promise<{ loaded: false }> {
   // Scope change: a different family's DB is now open, so cursors describing the
   // previous doc must not survive. `persistSnapshotOnce` swallows its failures, so
   // a stale cursor here would silently suppress this family's snapshot for the
-  // whole session — invisible, and it costs the fast first paint.
+  // whole session — invisible, and it costs the fast first paint. resetDocCursors
+  // also clears `pendingRemoteBaseline` (C18 scope clear).
   resetDocCursors();
   await cache.initPersistenceDB(id);
+  // C16: this is the deliberate don't-load path (createNewFile). A baseline row
+  // left by a prior/interrupted create describes a doc we are about to discard —
+  // a baseline row may exist ONLY alongside a cache that was actually loaded.
+  await cache.clearRemoteBaseline().catch(() => {});
   return { loaded: false };
 }
 
-export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }> {
+export async function initAndLoadCache(
+  id: string
+): Promise<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }> {
+  // C18: clear any leftover pending baseline for the PREVIOUS family's doc as the
+  // first statement, BEFORE the DB re-point — else the next persist for THIS
+  // family's doc would commit it (the currentDoc===doc guard passes; it is this
+  // family's own doc, so C11 cannot catch it).
+  pendingRemoteBaseline = null;
   await cache.initPersistenceDB(id);
   const key = requireKey('initAndLoadCache');
   let loaded: { doc: Doc; recovered: boolean } | null;
@@ -436,13 +501,13 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
     // claiming those rows exist is now a lie, and only one of this function's three
     // callers recovers with `dropDoc()`; the other two just log.
     resetDocCursors();
-    throw e;
+    throw e; // whole DB cleared → baseline row gone with it (C16 self-healing)
   }
   if (!loaded) {
     // Reached AFTER `initPersistenceDB(id)` re-pointed the DB, so the cursors still
     // describe the previous family's doc. Reset before returning.
     resetDocCursors();
-    return { loaded: false };
+    return { loaded: false, remoteBaseline: null };
   }
   // Capture the reconstructed heads BEFORE migrate (which consumes the handle). A
   // migrate delta, if any, then persists as an increment on the next tick; the
@@ -457,6 +522,10 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
     // corrupt tail rows (base-write clears all increments). Immediate: dropping
     // corrupt rows ASAP matters here.
     lastPersistedHeads = null;
+    // C-5/C16: the baseline row describes a doc state this recovered cache no
+    // longer holds. DELETE it — returning null alone would leave it on disk to
+    // mislead the next open into skipping a read it must do.
+    await cache.clearRemoteBaseline().catch(() => {});
     void enqueuePersist();
   } else if (cache.incrementCount() > INCREMENT_COMPACTION_THRESHOLD) {
     // Over-threshold on a clean load — e.g. a device that accumulated many
@@ -478,7 +547,13 @@ export async function initAndLoadCache(id: string): Promise<{ loaded: boolean }>
     perf_entity_count: countEntities(doc),
   });
   scheduleSnapshotPersist(); // refresh the fast-paint snapshot from the authoritative load
-  return { loaded: true };
+  // C-5: read the baseline row on the LOADED paths (clean + over-threshold
+  // compaction, which is still a complete, verified load — only the persist
+  // cursor was reset). The recovered path deleted it above → null. The row and
+  // the cached doc are read in this one round-trip so they can never be read out
+  // of step.
+  const remoteBaseline = loaded.recovered ? null : await cache.readRemoteBaseline();
+  return { loaded: true, remoteBaseline };
 }
 
 /** Compare two Automerge heads (deterministic sorted change-hash arrays). */
@@ -506,6 +581,21 @@ export function mutate(op: MutationOp): {
     scheduleSnapshotPersist(); // coarse-coalesced; won't fire per-mutate
   }
   return { result, delta, changed };
+}
+
+/**
+ * Learn a remote baseline to commit durably (#61 C10a). Main calls this from a
+ * post-merge / post-write terminus where `currentDoc` provably contains the
+ * remote state `revision` names. The FIFO orders this strictly after the
+ * already-resolved merge, so any persist entering afterwards holds a doc ⊇ that
+ * state. Sets the pending value AND schedules a persist, so it is committed even
+ * on a read-only session (where no mutation would otherwise schedule one). It is
+ * a plain last-write-wins set — correctness comes from WHERE it is called, never
+ * from comparing revisions (C10b).
+ */
+export function noteRemoteBaseline(revision: string): void {
+  pendingRemoteBaseline = revision;
+  schedulePersist();
 }
 
 /**
@@ -736,6 +826,9 @@ export async function dispatch(
       return { result: await loadProjectionSnapshot(a.familyId as string) };
     case 'openCache':
       return { result: await openCache(a.familyId as string) };
+    case 'noteRemoteBaseline':
+      noteRemoteBaseline(a.revision as string);
+      return {};
     case 'mutate': {
       const { result, delta, changed } = mutate(args as MutationOp);
       return { result, delta, changed };

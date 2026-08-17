@@ -22,6 +22,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
+import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import { loadAndVerify, applyChanges, unframeChanges } from './docOps';
 import * as Automerge from '@automerge/automerge';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
@@ -42,6 +43,19 @@ const ENVELOPE_KEY = 'envelope';
  * source of truth. Dropped with everything else by `clearCache`'s whole-DB delete.
  */
 const SNAPSHOT_KEY = 'projection-snapshot';
+/**
+ * The open-guard baseline row (#61): the remote `version` counter our cached
+ * doc provably contains, stored as an opaque namespaced string in `payload`,
+ * with `updatedAt` reused AS the trust clock (`checkedAt`). This row is
+ * PLAINTEXT where every other payload is ciphertext — deliberately, because an
+ * opaque counter plus a local clock reading carries no family data. It sorts
+ * outside every read/clear key range here (`'r' > 'i'`, and the base/legacy/
+ * envelope/snapshot reads are exact-key `get`s), so `persistDocBinary`'s
+ * increment sweep and `loadCachedDoc` never touch it. `writeRemoteBaseline` is
+ * the row's ONLY writer — nothing else may refresh `updatedAt`, or it would
+ * silently extend trust. Dropped with everything else by `clearCache`.
+ */
+const REMOTE_BASELINE_KEY = 'remote-baseline';
 /** Increment rows key on `inc:<zero-padded seq>` so IDB's lexical key order == seq order. */
 const INC_PREFIX = 'inc:';
 /** The char after ':' — upper bound (exclusive) for the `inc:*` key range. */
@@ -211,6 +225,38 @@ export async function loadProjectionSnapshot(
   if (!entry) return null;
   const bytes = await decryptPayload(familyKey, new Uint8Array(base64ToBuffer(entry.payload)));
   return JSON.parse(new TextDecoder().decode(bytes)) as ProjectionSnapshot;
+}
+
+/**
+ * Read the open-guard baseline row (#61): the namespaced revision string our
+ * cached doc provably contains, plus its `checkedAt` (the row's `updatedAt`,
+ * reused as the trust clock). Returns null when absent. Plaintext — no decrypt.
+ */
+export async function readRemoteBaseline(): Promise<RemoteBaselineRow | null> {
+  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const entry = (await withIdbRetry('loadRemoteBaseline', () =>
+    cacheDb!.get(STORE_NAME, REMOTE_BASELINE_KEY)
+  )) as { payload: string; updatedAt: string } | undefined;
+  if (!entry || !entry.payload) return null;
+  return { revision: entry.payload, checkedAt: entry.updatedAt };
+}
+
+/**
+ * Write the open-guard baseline row (#61). This is the row's ONLY writer,
+ * because `updatedAt` doubles as the trust clock — nothing else may refresh it.
+ * `revision` is the already-namespaced (`ver:`) opaque string.
+ */
+export async function writeRemoteBaseline(revision: string): Promise<void> {
+  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  await withIdbRetry('writeRemoteBaseline', () =>
+    cacheDb!.put(STORE_NAME, { id: REMOTE_BASELINE_KEY, payload: revision, updatedAt: nowIso() })
+  );
+}
+
+/** Delete the open-guard baseline row (#61). No-op if the DB is closed/absent. */
+export async function clearRemoteBaseline(): Promise<void> {
+  if (!cacheDb) return;
+  await withIdbRetry('clearRemoteBaseline', () => cacheDb!.delete(STORE_NAME, REMOTE_BASELINE_KEY));
 }
 
 /**
