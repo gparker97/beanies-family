@@ -69,6 +69,11 @@ export default [
       '*.config.js',
       '*.config.ts',
       'scripts/**',
+      // Skill build/tooling scripts (pinterest-post, beanies-blog, …) are developer
+      // tooling that legitimately does fs ops on computed paths — same category as
+      // `scripts/**`, NOT shipped app code. Scanning them fails the app-security gate
+      // on `security/detect-non-literal-fs-filename` for no real risk.
+      '.claude/**',
       'playwright-report/**',
       'test-results/**',
       '.github/**',
