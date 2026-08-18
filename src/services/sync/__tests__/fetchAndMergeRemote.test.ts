@@ -38,11 +38,16 @@ vi.mock('@/services/sync/fileSync', () => ({
 vi.mock('@/services/automerge/worker/docClient', () => ({
   setFamilyKey: vi.fn(),
   persistEnvelope: vi.fn(async () => {}),
-  exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64-payload==' })),
-  mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
+  exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64-payload==', heads: ['h-export'] })),
+  mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false, remoteHeads: ['h-remote'] })),
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
   noteRemoteBaseline: vi.fn(),
+  // #65: the open-guard probes doc heads before the metadata probe. Default to
+  // MATCHING the seeded baseline fingerprint so the pre-existing guard cases keep
+  // exercising the path they were written for; cases about unpushed changes
+  // override this explicitly.
+  getHeads: vi.fn(async () => ({ heads: ['h-remote'] })),
 }));
 
 vi.mock('@/services/indexeddb/database', () => ({
@@ -105,6 +110,8 @@ vi.mock('@/utils/beanpodFilename', () => ({
 }));
 
 import * as syncService from '../syncService';
+import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
+import * as docClient from '@/services/automerge/worker/docClient';
 
 function buildEnvelope(over: Partial<BeanpodFileV4> = {}): BeanpodFileV4 {
   return {
@@ -278,7 +285,10 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
   it('skips when the revision matches the seeded baseline and is within the trust window', async () => {
     const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
     syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: new Date().toISOString(),
+    });
     const { skip } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(true);
   });
@@ -286,7 +296,10 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
   it('reads (no skip) when the revision advanced', async () => {
     const { provider } = markerProvider({ marker: { revision: 'ver:6', modifiedTime: null } });
     syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: new Date().toISOString(),
+    });
     const { skip, reason } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(false);
     expect(reason).toBe('changed');
@@ -296,7 +309,10 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
     syncService.setProvider(provider as never);
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: twoHoursAgo });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: twoHoursAgo,
+    });
     const { skip, reason } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(false);
     expect(reason).toBe('trust-expired');
@@ -306,7 +322,10 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     const authErr = Object.assign(new Error('token'), { name: 'TokenExpiredError' });
     const { provider } = markerProvider({ markerThrows: authErr });
     syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: new Date().toISOString(),
+    });
     const r = await syncService.remoteChanged();
     expect(r.status).toBe('unknown');
     const { skip } = await syncService.shouldSkipOpenRead();
@@ -316,7 +335,10 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
   it('never skips on an mtime basis (provider with no revision)', async () => {
     const { provider } = markerProvider({ marker: { revision: null, modifiedTime: 'T1' } });
     syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: new Date().toISOString(),
+    });
     const { skip, reason } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(false);
     expect(reason).toBe('no-revision');
@@ -328,7 +350,10 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     });
     syncService.setProvider(provider as never);
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: twoHoursAgo });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: twoHoursAgo,
+    });
     const { skip, reason } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(false);
     expect(reason).toBe('trust-expired');
@@ -352,9 +377,175 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     const notFound = new DriveApiError('gone', 404);
     const { provider } = markerProvider({ markerThrows: notFound });
     syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({ revision: 'ver:5', checkedAt: new Date().toISOString() });
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: new Date().toISOString(),
+    });
     const r = await syncService.remoteChanged();
     expect(r.status).toBe('unknown');
     expect(r.reason).toBe('file-not-found');
+  });
+});
+
+// ─── #65: the unpushed-local-changes pre-check ───────────────────────────────
+
+describe('syncService.shouldSkipOpenRead — unpushed local changes (#65)', () => {
+  const seedFp = (heads: string[]) =>
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(heads)),
+      checkedAt: new Date().toISOString(),
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+    vi.mocked(docClient.getHeads).mockResolvedValue({ heads: ['h-remote'] });
+  });
+
+  it('DECLINES the skip when the doc holds heads Drive never received', async () => {
+    // The crash-window case: an edit reached the local cache, the debounced Drive
+    // save never flushed, so our doc has moved past the recorded Drive heads.
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:5', modifiedTime: null },
+    });
+    syncService.setProvider(provider as never);
+    seedFp(['h-remote']);
+    vi.mocked(docClient.getHeads).mockResolvedValue({ heads: ['h-remote', 'h-local-edit'] });
+
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('unpushed-local-changes');
+    // Ordering: the local check runs BEFORE the network probe, so an open that is
+    // going to read anyway never pays a metadata round-trip.
+    expect(getRemoteMarker).not.toHaveBeenCalled();
+  });
+
+  it('still SKIPS when the doc heads match Drive (the #61 win is preserved)', async () => {
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    seedFp(['h-remote']);
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(true);
+    expect(reason).toBe('unchanged-revision-in-window');
+  });
+
+  it('declines with baseline-heads-unknown on a LEGACY pre-#65 row', async () => {
+    // Distinct from unpushed-local-changes: we do not know what Drive holds, which
+    // is genuine uncertainty and must stay classified as a fail-open.
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:5', modifiedTime: null },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ payload: 'ver:5', checkedAt: new Date().toISOString() });
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('baseline-heads-unknown');
+    expect(getRemoteMarker).not.toHaveBeenCalled();
+  });
+
+  it('declines with heads-probe-failed when the worker RPC rejects — and never throws', async () => {
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    seedFp(['h-remote']);
+    vi.mocked(docClient.getHeads).mockRejectedValue(new Error('worker gone'));
+
+    const { skip, reason } = await syncService.shouldSkipOpenRead();
+    expect(skip).toBe(false);
+    expect(reason).toBe('heads-probe-failed');
+  });
+
+  it('probes with { quiet: true, probe: true } — one report, and never tears down a live worker', async () => {
+    // quiet: docClient.surface() would otherwise ALSO fire a doc-worker report on
+    // top of this function's own classification.
+    // probe: without it the call inherits the 45s budget AND the recovery path —
+    // a wedged-but-live worker would be torn down, every sibling RPC drained
+    // (including a user mutate), and a doc-worker-recovery report fired that quiet
+    // does NOT suppress. All to answer a question whose worst answer is "read".
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    seedFp(['h-remote']);
+    await syncService.shouldSkipOpenRead();
+    expect(docClient.getHeads).toHaveBeenCalledWith({ quiet: true, probe: true });
+  });
+
+  it('does NOT spend the worker round-trip when the fingerprint is unknown', async () => {
+    // The answer is already decided (cannot prove the doc is on Drive), so probing
+    // would compute and discard. This is every device's first open post-upgrade.
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({ payload: 'ver:5', checkedAt: new Date().toISOString() });
+    const { reason } = await syncService.shouldSkipOpenRead();
+    expect(reason).toBe('baseline-heads-unknown');
+    expect(docClient.getHeads).not.toHaveBeenCalled();
+  });
+
+  it('does NOT probe doc heads when the trust window has already expired', async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
+      checkedAt: twoHoursAgo,
+    });
+    const { reason } = await syncService.shouldSkipOpenRead();
+    expect(reason).toBe('trust-expired');
+    expect(docClient.getHeads).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+  });
+
+  it('encodes the passed Drive heads into the baseline payload', () => {
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', null),
+      checkedAt: new Date().toISOString(),
+    });
+    syncService.commitRemoteBaseline(['h-drive']);
+    expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+      encodeBaselinePayload('ver:5', headsFingerprint(['h-drive']))
+    );
+  });
+
+  it('records NO fingerprint when the terminus cannot prove Drive content (null)', () => {
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['stale'])),
+      checkedAt: new Date().toISOString(),
+    });
+    syncService.commitRemoteBaseline(null);
+    expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(encodeBaselinePayload('ver:5', null));
+  });
+
+  it('writes the fingerprint back in memory so a SECOND open in the same process still skips', async () => {
+    // backgroundSyncFromFile re-enters per process (header Refresh, config-heal).
+    // Without the write-back every post-save open would report baseline-heads-unknown.
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', null),
+      checkedAt: new Date().toISOString(),
+    });
+    vi.mocked(docClient.getHeads).mockResolvedValue({ heads: ['h-drive'] });
+
+    // Before the commit: unknown => declines.
+    expect((await syncService.shouldSkipOpenRead()).reason).toBe('baseline-heads-unknown');
+    syncService.commitRemoteBaseline(['h-drive']);
+    // After: in-memory baseline knows what Drive holds => skips.
+    expect((await syncService.shouldSkipOpenRead()).skip).toBe(true);
+  });
+
+  it('does not move checkedAt (never silently extends the trust window)', async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', null),
+      checkedAt: twoHoursAgo,
+    });
+    syncService.commitRemoteBaseline(['h-drive']);
+    expect((await syncService.shouldSkipOpenRead()).reason).toBe('trust-expired');
   });
 });

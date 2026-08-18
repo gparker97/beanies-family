@@ -28,6 +28,10 @@ import {
   type RemoteBaseline,
   type RemoteMarker,
   type ChangeResult,
+  decodeBaselinePayload,
+  encodeBaselinePayload,
+  hasUnpushedChanges,
+  headsFingerprint,
 } from './remoteBaseline';
 import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
@@ -687,6 +691,71 @@ export async function remoteChanged(): Promise<ChangeResult> {
  * which never read on unknown. Returns a classified reason on every non-skip so
  * the guard can emit it as `open-fail-open` telemetry.
  */
+/**
+ * Does our doc hold changes Drive has never received (#65)? Returns the
+ * classified decline, or `null` when nothing blocks a skip.
+ *
+ * Extracted so `shouldSkipOpenRead` stays a flat ladder of guard clauses rather
+ * than growing a try-block in its middle: this owns the one piece of I/O in the
+ * local-check phase and its failure classification, the ladder owns the decision.
+ *
+ * WHY PROBE HERE, and not reuse heads read earlier in the open: the obvious
+ * optimization is to have `initAndLoadCache` return the loaded doc's heads
+ * alongside the baseline row, saving this round-trip. It is UNSAFE. Those heads
+ * are captured at cache-load time, and `reloadAllStores()` calls
+ * `cancelPendingSave()` between then and here — a documented state in which a
+ * local mutation exists with no armed save. A stale value in that window
+ * compares EQUAL to the baseline and yields a false skip: the unsafe direction,
+ * and the exact bug class #65 exists to close. Ask at the moment the answer is
+ * used.
+ */
+async function unpushedLocalChangesCheck(
+  baselineFp: string | null
+): Promise<{ skip: false; reason: string } | null> {
+  // Cheapest first, same discipline as the ladder that calls this: with no recorded
+  // fingerprint the answer is already decided (we cannot prove the doc is on Drive),
+  // so the worker round-trip would be computed and thrown away. This is the common
+  // path on every device's first open after the #65 upgrade.
+  if (baselineFp === null) return { skip: false, reason: 'baseline-heads-unknown' };
+  let currentFp: string;
+  try {
+    // `quiet` — this function classifies the failure itself; without it
+    // `docClient.surface()` would ALSO fire a `doc-worker` reportError, giving
+    // two events for one benign degradation.
+    //
+    // `probe` — and this is the load-bearing one. Without it the call inherits the
+    // 45s default budget AND the full recovery path: on a wedged-but-live worker it
+    // would tear the worker down, drain every sibling RPC (including a user `mutate`),
+    // fire a `doc-worker-recovery` report that `quiet` does NOT suppress, and retry
+    // itself. All to answer a question whose worst honest answer is "read anyway".
+    // `probe` makes it throw and get out of the way; whatever op reads next owns the
+    // real recovery, with its own method name on the report.
+    const { heads } = await docClient.getHeads({ quiet: true, probe: true });
+    currentFp = headsFingerprint(heads);
+  } catch (e) {
+    console.warn(
+      '[syncService.shouldSkipOpenRead] doc-heads probe failed — open-guard fell back to a full read; ' +
+        'check the worker RPC log. No data at risk (an extra download, not a lost edit):',
+      e
+    );
+    // Observability (MANDATORY): `quiet`+`probe` deliberately suppress docClient's
+    // own report, so without this the error's name/message/stack never leave the
+    // device. The endOpen reason alone is not coverage — it is a bare string, and
+    // it is dropped entirely on the tokenless re-entries (header Refresh, deferred
+    // config-heal). Same shape as `remoteChanged`'s degradation event below.
+    logEvent({
+      level: 'warn',
+      surface: 'sync-change-detect',
+      message: 'doc-heads probe failed — open-guard fell back to a full read',
+      error: e instanceof Error ? e : undefined,
+      context: { action: 'heads-probe-failed', error_code: 'heads-probe-failed' },
+    });
+    return { skip: false, reason: 'heads-probe-failed' };
+  }
+  if (!hasUnpushedChanges(baselineFp, currentFp)) return null;
+  return { skip: false, reason: 'unpushed-local-changes' };
+}
+
 export async function shouldSkipOpenRead(): Promise<{ skip: boolean; reason: string }> {
   // Cheap LOCAL checks FIRST — never spend a metadata probe on an open we already
   // know will read. This is the common daily-user case: the 1h trust window is
@@ -698,6 +767,11 @@ export async function shouldSkipOpenRead(): Promise<{ skip: boolean; reason: str
   if (!withinTrustWindow(remoteBaseline.checkedAt, Date.now())) {
     return { skip: false, reason: 'trust-expired' };
   }
+  // #65: one cheap worker round-trip, still BEFORE the network probe — an open
+  // carrying unsynced local changes must read+merge+re-push, so paying a metadata
+  // probe first would be pure waste.
+  const blocked = await unpushedLocalChangesCheck(remoteBaseline.headsFp);
+  if (blocked) return blocked;
   // In-window with a revision baseline — now the probe can actually save a read.
   const result = await remoteChanged();
   if (result.status === 'unknown') return { skip: false, reason: result.reason ?? 'unknown' };
@@ -717,6 +791,13 @@ function learnRemoteMarker(marker: RemoteMarker): void {
     revision: marker.revision,
     modifiedTime: marker.modifiedTime,
     checkedAt: new Date().toISOString(),
+    // #65: a marker probe knows the REVISION, never the heads behind it. Null is
+    // the safe direction — unknown => never skip. A terminus that follows fills it
+    // in, but NOT every caller is a terminus: `load()`'s pre-read probe opens a
+    // fresh trust window here, and `loadFromFile` can then exit without any commit
+    // (unsupported version, needsPassword, decrypt failure). Those opens correctly
+    // decline for the rest of the window rather than skipping on an unknown.
+    headsFp: null,
   };
 }
 
@@ -726,9 +807,21 @@ function learnRemoteMarker(marker: RemoteMarker): void {
  * the row and refresh `checkedAt`, silently defeating the 1-hour trust bound.
  * This is the easiest mistake to make in the design; keep it a plain setter.
  */
-export function seedRemoteBaseline(row: { revision: string; checkedAt: string } | null): void {
-  remoteBaseline = row
-    ? { revision: row.revision, modifiedTime: null, checkedAt: row.checkedAt }
+export function seedRemoteBaseline(row: { payload: string; checkedAt: string } | null): void {
+  if (!row) {
+    remoteBaseline = null;
+    return;
+  }
+  // #65: the row's payload is opaque to the worker; this module owns the format.
+  // An undecodable payload degrades to "no baseline" => the guard reads.
+  const decoded = decodeBaselinePayload(row.payload);
+  remoteBaseline = decoded
+    ? {
+        revision: decoded.revision,
+        modifiedTime: null,
+        checkedAt: row.checkedAt,
+        headsFp: decoded.headsFp,
+      }
     : null;
 }
 
@@ -742,10 +835,25 @@ export function seedRemoteBaseline(row: { revision: string; checkedAt: string } 
  * an unconditional last-write-wins set (C10b) — correctness is from WHERE it is
  * called, never from comparing revisions.
  */
-export function commitRemoteBaseline(): void {
+export function commitRemoteBaseline(driveHeads: readonly string[] | null): void {
   const revision = remoteBaseline?.revision ?? null;
   if (revision === null) return;
-  docClient.noteRemoteBaseline(revision);
+  // #65: `driveHeads` MUST be the heads of the content DRIVE HOLDS at `revision`
+  // — the unmigrated decrypted remote doc at a merge terminus, or the serialized
+  // bytes at the write terminus. NEVER `currentDoc`'s heads, which can be ahead
+  // of Drive and would produce a false skip. It is a REQUIRED parameter so that
+  // any future terminus is forced by the compiler to answer the question rather
+  // than over-claiming by omission; `null` means "cannot prove" => never skip.
+  const headsFp = driveHeads === null ? null : headsFingerprint(driveHeads);
+  // Keep the in-memory baseline in step with the durable row. `backgroundSyncFromFile`
+  // (and so the guard) runs MORE THAN ONCE per process — header Refresh and the
+  // deferred config-heal both re-enter it — so without this write-back every
+  // post-save open would see `headsFp === null` and report `baseline-heads-unknown`
+  // forever, polluting the metric. Only `headsFp` is touched: refreshing `checkedAt`
+  // here would silently extend the trust window, which is the design's easiest
+  // mistake (see `seedRemoteBaseline`).
+  if (remoteBaseline) remoteBaseline.headsFp = headsFp;
+  docClient.noteRemoteBaseline(encodeBaselinePayload(revision, headsFp));
 }
 
 /**
@@ -1043,7 +1151,10 @@ async function fetchAndMergeRemote(): Promise<void> {
   // heads-derived `dirty` (did local carry unsynced changes the converged doc
   // must push back?). No suppressAutoSave bracket is needed — the worker doesn't
   // fire a main persist callback; main decides when to save via `dirty`.
-  const { dirty } = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
+  const { dirty, remoteHeads } = await docClient.mergeRemoteEnvelope(
+    remoteEnvelope,
+    remoteEnvelope.familyId
+  );
 
   // Local-wins merge of the three key dicts (wrappedKeys / inviteKeys /
   // passkeyWrappedKeys) — the local side is the just-mutated state about to
@@ -1052,7 +1163,10 @@ async function fetchAndMergeRemote(): Promise<void> {
   setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
   // Terminus 2 (C10): the worker's doc now provably contains this remote state —
   // but only commit if no family switch landed mid read+merge (C1).
-  if (currentProvider === providerAtRead) commitRemoteBaseline();
+  // #65: `remoteHeads` is the heads of the bytes Drive holds (captured pre-migrate,
+  // pre-merge). `?? null` mirrors this file's fail-safe-default discipline — a
+  // partial test double degrades to "unknown => read", never to a false skip.
+  if (currentProvider === providerAtRead) commitRemoteBaseline(remoteHeads ?? null);
 
   // The poll path's ONLY re-upload trigger: re-push a converged doc that still
   // carries local unsynced changes (heads-derived dirty), without ping-ponging
@@ -1118,7 +1232,9 @@ async function doSave(): Promise<boolean> {
     }
     // The worker serializes + encrypts the doc → base64 payload; main assembles
     // the envelope (keys never leave main for the upload path).
-    const { payload } = await docClient.exportEncryptedPayload();
+    // #65: `exportedHeads` are the heads of EXACTLY these serialized bytes — the
+    // only sound Drive-baseline value on the write path.
+    const { payload, heads: exportedHeads } = await docClient.exportEncryptedPayload();
     const fileContent = reEncryptEnvelope(currentEnvelope, payload);
 
     // INVARIANT (ADR-032 addendum, 2026-07-15): every save writes the FULL compacted
@@ -1153,7 +1269,12 @@ async function doSave(): Promise<boolean> {
       // revision and commit — for Drive this REPLACES the old post-write metadata
       // read, removing one network round-trip per save.
       learnRemoteMarker({ revision: ackRevision, modifiedTime: null });
-      commitRemoteBaseline();
+      // `?? null` is the same fail-safe every other call site applies: an older or
+      // partial worker double omits `heads`, and `headsFingerprint(undefined)`
+      // would throw HERE — after the upload already landed — converting a
+      // successful save into a reported failure that advances the save-failure
+      // escalation ladder.
+      commitRemoteBaseline(exportedHeads ?? null);
     } else if (providerAtWrite.getRemoteMarker) {
       // Drive write whose ack body was unparseable: RE-PROBE the real revision
       // rather than nulling the basis. Nulling would re-download our own 2-3MB
@@ -1163,7 +1284,12 @@ async function doSave(): Promise<boolean> {
         const marker = await providerAtWrite.getRemoteMarker();
         if (currentProvider === providerAtWrite) {
           learnRemoteMarker(marker);
-          commitRemoteBaseline();
+          // NOT `exportedHeads`. This revision was probed AFTER our write, so a peer
+          // may have written in the gap — pairing their revision with our heads would
+          // certify a (revision, heads) pair that never existed on Drive, and the next
+          // in-window open would skip past their edits. `null` costs one extra read,
+          // which is what every other uncertain branch of this design costs.
+          commitRemoteBaseline(null);
         }
       } catch (e) {
         console.warn(
@@ -1585,6 +1711,11 @@ export async function disconnect(): Promise<void> {
   currentProviderFamilyId = null;
   currentFamilyKey = null;
   currentEnvelope = null;
+  // Same reason `reset()` and `setProvider()` do it: a baseline describing the OLD
+  // file must not survive an unbind, or a coincidental revision match could grant a
+  // skip against a file this service is no longer bound to. #65 widens the leak —
+  // the surviving object also carries `headsFp` and a live `checkedAt`.
+  remoteBaseline = null;
   updateState({
     isConfigured: false,
     fileName: null,

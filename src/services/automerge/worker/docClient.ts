@@ -916,13 +916,13 @@ export function fireAndForgetMutate(op: MutationOp): void {
  *  - not retryable: a respawned worker has no `currentDoc` and rebuilds from a
  *    cache that may be BEHIND this revision; re-issuing would seed a baseline
  *    against a doc not yet containing it (the C10 stale-forever bug, via auto-heal).
- *  - not envelope: it carries a bare revision string, no envelope.
+ *  - not envelope: it carries a bare opaque baseline string, no envelope.
  *  - not heavy: a variable set, not a megabyte payload.
  *  - not user-action: no user edit is in doubt; a failure is firehose-only.
  */
-export function noteRemoteBaseline(revision: string): void {
+export function noteRemoteBaseline(payload: string): void {
   fireAndForget(
-    () => request('noteRemoteBaseline', { revision }),
+    () => request('noteRemoteBaseline', { payload }),
     'doc-baseline-fire-forget',
     'fire-and-forget noteRemoteBaseline failed',
     'warning'
@@ -940,20 +940,23 @@ export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   familyId: string | null,
   opts?: RequestOpts
-): Promise<{ heads: Heads; dirty: boolean; changed: boolean }> {
-  const res = await request<{ heads: Heads; dirty: boolean; changed: boolean }>(
-    'mergeRemoteEnvelope',
-    { envelope, familyId },
-    opts
-  );
+): Promise<{ heads: Heads; dirty: boolean; changed: boolean; remoteHeads: Heads }> {
+  const res = await request<{
+    heads: Heads;
+    dirty: boolean;
+    changed: boolean;
+    remoteHeads: Heads;
+  }>('mergeRemoteEnvelope', { envelope, familyId }, opts);
   // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');
   return res;
 }
 
-/** Serialize + encrypt the current doc; main assembles the envelope + uploads. */
-export function exportEncryptedPayload(): Promise<{ payload: string }> {
+/** Serialize + encrypt the current doc; main assembles the envelope + uploads.
+ * `heads` are the heads of exactly the serialized doc (#65) — commit them as the
+ * Drive baseline once the write is acked. */
+export function exportEncryptedPayload(): Promise<{ payload: string; heads: Heads }> {
   return request('exportEncryptedPayload');
 }
 
@@ -972,11 +975,16 @@ export function exportSnapshot(): Promise<{ binary: Uint8Array }> {
   return request('exportSnapshot');
 }
 
-/** Kept as the canonical read-RPC probe the worker-death/recovery test-suite drives
- * (`docClient.test.ts`); no production caller after the change-chunk transport was
- * retired 2026-07-15. */
-export function getHeads(): Promise<{ heads: Heads }> {
-  return request('getHeads');
+/** Current doc heads. Also the canonical read-RPC probe the worker-death/recovery
+ * test-suite drives (`docClient.test.ts`).
+ *
+ * Production caller since #65: `syncService`'s open-guard, which asks whether our
+ * doc holds changes Drive never received. That caller MUST pass `{quiet: true}` —
+ * it classifies the failure itself (`heads-probe-failed`) and a second
+ * `doc-worker` report for one benign, self-healing degradation would be noise on
+ * a paging-adjacent surface. */
+export function getHeads(opts?: RequestOpts): Promise<{ heads: Heads }> {
+  return request('getHeads', undefined, opts);
 }
 
 /** Gather every photoId referenced across registered collections (for `gcOrphans`).

@@ -593,8 +593,8 @@ export function mutate(op: MutationOp): {
  * a plain last-write-wins set — correctness comes from WHERE it is called, never
  * from comparing revisions (C10b).
  */
-export function noteRemoteBaseline(revision: string): void {
-  pendingRemoteBaseline = revision;
+export function noteRemoteBaseline(payload: string): void {
+  pendingRemoteBaseline = payload;
   schedulePersist();
 }
 
@@ -617,11 +617,21 @@ export function noteRemoteBaseline(revision: string): void {
 export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   id: string | null
-): Promise<{ heads: Heads; dirty: boolean; changed: boolean }> {
+): Promise<{ heads: Heads; dirty: boolean; changed: boolean; remoteHeads: Heads }> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
     perf_doc_bytes: envelope.encryptedPayload.length,
   });
+  // #65: the heads of EXACTLY the bytes on Drive. Captured here, from the
+  // UNMIGRATED decrypted doc (`decryptToDoc` does not migrate — see its doc
+  // comment), before `migrateDoc`/`mergeDocs` can move anything. This is the
+  // ONLY value the caller may record as the Drive baseline.
+  //
+  // Do NOT substitute `dirty === false` as the proof: the adopt branch below
+  // hardcodes `dirty: false` while `migrateDoc` may have emitted a real change,
+  // so the returned `heads` can be strictly AHEAD of Drive. That over-claim is
+  // the false-skip #65 exists to prevent.
+  const remoteHeads = headsOf(remote);
 
   void id; // familyId is tracked inside `cache`; kept in the signature for the wire contract
 
@@ -644,9 +654,18 @@ export async function mergeRemoteEnvelope(
       perf_entity_count: countEntities(doc),
     });
     // `changed: true` — we adopted a document into an empty slot, so every
-    // consumer's projection is stale by definition, even though there is nothing
-    // to push back to the file (`dirty: false`).
-    return { heads, dirty: false, changed: true };
+    // consumer's projection is stale by definition.
+    //
+    // `dirty` is DERIVED, not hardcoded false (#65 review): `migrateDoc` above is
+    // not a no-op — when the remote predates a collection it emits a real
+    // `Automerge.change`, so the adopted doc can hold a migration delta Drive has
+    // never seen. Claiming `dirty: false` there means the delta is never pushed;
+    // it then sits unsynced forever, and #65's guard correctly reports unpushed
+    // changes on EVERY open without anything ever repairing it. Comparing against
+    // the unmigrated remote's heads answers the real question: did adopting move
+    // us past the file? When migrate is a no-op these are equal and the behaviour
+    // is exactly as before.
+    return { heads, dirty: !headsEqual(remoteHeads, heads), changed: true, remoteHeads };
   }
 
   const local = currentDoc;
@@ -670,6 +689,7 @@ export async function mergeRemoteEnvelope(
     heads: merged.heads,
     dirty: merged.dirty,
     changed: !headsEqual(localHeads, merged.heads),
+    remoteHeads,
   };
 }
 
@@ -683,12 +703,21 @@ export async function verifyEnvelope(envelope: BeanpodFileV4): Promise<{ ok: tru
 }
 
 /** Serialize + encrypt the current doc → base64 payload (main assembles the
- * envelope + uploads; key material never leaves main for the upload path). */
-export async function exportEncryptedPayload(): Promise<{ payload: string }> {
+ * envelope + uploads; key material never leaves main for the upload path).
+ *
+ * Also returns `heads` — the heads of EXACTLY the serialized doc (#65). Captured
+ * synchronously from the same `doc` const, BEFORE the `await`: `getHeads`
+ * returns a value snapshot, so it survives a later handle-consuming `mutate`,
+ * whereas re-reading `currentDoc` after the await could report heads AHEAD of
+ * the bytes we uploaded — an over-claim, and precisely the false-skip #65
+ * exists to prevent. The caller commits these as the Drive baseline once the
+ * write is acked. */
+export async function exportEncryptedPayload(): Promise<{ payload: string; heads: Heads }> {
   const doc = requireDoc('exportEncryptedPayload');
   const key = requireKey('exportEncryptedPayload');
+  const heads = headsOf(doc);
   const payload = await time2('automerge.save', () => encryptDocPayload(doc, key));
-  return { payload };
+  return { payload, heads };
 }
 
 // ─── Change-aware transport (Plan B — incremental delta sync) ────────────────
@@ -827,7 +856,7 @@ export async function dispatch(
     case 'openCache':
       return { result: await openCache(a.familyId as string) };
     case 'noteRemoteBaseline':
-      noteRemoteBaseline(a.revision as string);
+      noteRemoteBaseline(a.payload as string);
       return {};
     case 'mutate': {
       const { result, delta, changed } = mutate(args as MutationOp);
