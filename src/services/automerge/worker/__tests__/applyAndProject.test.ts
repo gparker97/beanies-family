@@ -185,7 +185,7 @@ describe('worker/applyAndProject', () => {
       mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
       noteRemoteBaseline('ver:5');
       await flush();
-      expect((await cache.readRemoteBaseline())?.revision).toBe('ver:5');
+      expect((await cache.readRemoteBaseline())?.payload).toBe('ver:5');
     });
 
     it('commits on a no-change persist too (C10a — read-only merge terminus)', async () => {
@@ -197,7 +197,7 @@ describe('worker/applyAndProject', () => {
       // No further doc change — the changes.length===0 path must still commit.
       noteRemoteBaseline('ver:8');
       await flush();
-      expect((await cache.readRemoteBaseline())?.revision).toBe('ver:8');
+      expect((await cache.readRemoteBaseline())?.payload).toBe('ver:8');
     });
 
     it('never persists an mtime — a null revision is never committed', async () => {
@@ -619,6 +619,113 @@ describe('worker/applyAndProject', () => {
       const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
 
       expect(res.changed).toBe(true);
+    });
+
+    // #65: `remoteHeads` is the ONLY value main may record as the Drive baseline.
+    // It must describe the bytes on Drive, never our doc after migrate/merge —
+    // an over-claim here is a false skip, i.e. the bug #65 exists to close.
+    it('adopt branch: remoteHeads is the UNMIGRATED remote, even when migrate moves the doc', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID); // no local doc => adopt branch
+      // A RAW init doc, deliberately NOT migrated: `migrateDoc` inside the adopt
+      // branch must add every COLLECTION_NAMES entry, so the installed doc's heads
+      // genuinely move past Drive's. This is the ONLY shape that discriminates —
+      // with a `base()` remote, migrate is a no-op and the assertion would hold
+      // against the over-claiming implementation too (docs/lessons.md rule 4).
+      const remote = Automerge.init<FamilyDocument>();
+      const rawHeads = getHeads(remote);
+
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+
+      expect(res.remoteHeads).toEqual(rawHeads);
+      expect(res.heads).not.toEqual(rawHeads); // migrate genuinely moved the doc
+      // ...and because it moved, the migration delta is something Drive has never
+      // seen, so it MUST be pushed. A hardcoded `dirty: false` here would strand it
+      // unsynced forever while #65 reported unpushed changes on every open.
+      expect(res.dirty).toBe(true);
+    });
+
+    it('adopt branch reports dirty:false when migrate is a no-op (behaviour unchanged)', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      // `base()` is already migrated, so adopting it moves nothing.
+      const remote = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'r1',
+        entity: { id: 'r1', title: 'remote' },
+      }).doc;
+
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+
+      expect(res.dirty).toBe(false);
+      expect(res.remoteHeads).toEqual(res.heads);
+    });
+
+    it('mergeRemoteEnvelope returns remoteHeads matching the REMOTE doc on the merge branch', async () => {
+      setKey(key);
+      const local = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'l1',
+        entity: { id: 'l1', title: 'local' },
+      }).doc;
+      await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID);
+
+      const remote = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'r2',
+        entity: { id: 'r2', title: 'remote' },
+      }).doc;
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+
+      // Our merged doc holds BOTH edits, so its heads are strictly ahead of Drive.
+      // remoteHeads must still describe Drive alone.
+      expect(res.remoteHeads).toEqual(getHeads(remote));
+      expect(res.remoteHeads).not.toEqual(res.heads);
+      expect(res.dirty).toBe(true); // local edit still needs pushing back
+    });
+
+    it('exportEncryptedPayload returns the heads of exactly the serialized doc', async () => {
+      setKey(key);
+      const doc = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'e1',
+        entity: { id: 'e1', title: 'exported' },
+      }).doc;
+      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+
+      const res = await exportEncryptedPayload();
+      expect(res.heads).toEqual(getHeads(doc));
+      expect(typeof res.payload).toBe('string');
+    });
+
+    it('exportEncryptedPayload heads describe the SERIALIZED doc even if the doc moves mid-encrypt', async () => {
+      setKey(key);
+      const doc = applyMutation(base(), {
+        op: 'set',
+        collection: 'todos',
+        id: 'e1',
+        entity: { id: 'e1', title: 'exported' },
+      }).doc;
+      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+      const headsAtExport = getHeads(doc);
+
+      // Land a mutation while the encrypt is in flight. Heads captured BEFORE the
+      // await must survive it — reading `currentDoc` afterwards would report heads
+      // ahead of the bytes uploaded, which is an over-claim and a false skip.
+      const inFlight = exportEncryptedPayload();
+      await mutate({
+        op: 'set',
+        collection: 'todos',
+        id: 'e2',
+        entity: { id: 'e2', title: 'landed mid-encrypt' },
+      });
+      const res = await inFlight;
+
+      expect(res.heads).toEqual(headsAtExport);
     });
 
     it('snapshot persist is skipped when the projection has not moved', async () => {

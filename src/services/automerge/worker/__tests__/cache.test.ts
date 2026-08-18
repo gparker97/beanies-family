@@ -89,10 +89,10 @@ describe('worker/cache', () => {
   });
 
   describe('remote-baseline row (#61)', () => {
-    it('round-trips the namespaced revision + checkedAt (plaintext, no key needed)', async () => {
+    it('round-trips the opaque payload + checkedAt (plaintext, no key needed)', async () => {
       await writeRemoteBaseline('ver:7');
       const row = await readRemoteBaseline();
-      expect(row?.revision).toBe('ver:7');
+      expect(row?.payload).toBe('ver:7');
       expect(typeof row?.checkedAt).toBe('string');
       expect(Number.isNaN(Date.parse(row!.checkedAt))).toBe(false);
     });
@@ -106,12 +106,12 @@ describe('worker/cache', () => {
       await seedIncrement(key, doc, doc2);
       await persistDocBinary(key, saveDoc(doc2)); // base write → increment sweep
 
-      expect((await readRemoteBaseline())?.revision).toBe('ver:9');
+      expect((await readRemoteBaseline())?.payload).toBe('ver:9');
       // loadCachedDoc reconstructs the doc and never reads/consumes the baseline row.
       const loaded = await loadCachedDoc(key, FAMILY_ID);
       expect(loaded).not.toBeNull();
       expect(materializeCollection(loaded!.doc, 'accounts').length).toBe(2);
-      expect((await readRemoteBaseline())?.revision).toBe('ver:9');
+      expect((await readRemoteBaseline())?.payload).toBe('ver:9');
     });
 
     it('clearRemoteBaseline removes the row (no-op if already absent)', async () => {
