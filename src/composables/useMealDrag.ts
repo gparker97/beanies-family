@@ -15,8 +15,15 @@ export type MealDragPayload =
 const dragged = ref<MealDragPayload | null>(null);
 
 export function useMealDrag() {
-  function startDrag(payload: MealDragPayload): void {
+  function startDrag(payload: MealDragPayload, event?: DragEvent): void {
     dragged.value = payload;
+    // Firefox CANCELS a drag whose `dragstart` sets no dataTransfer data — so a
+    // module-ref-only payload silently kills the whole drag flow there. Setting
+    // any data (the value is unused; we read the ref) makes the drag start.
+    if (event?.dataTransfer) {
+      event.dataTransfer.setData('text/plain', 'beanies-meal');
+      event.dataTransfer.effectAllowed = 'move';
+    }
   }
   function endDrag(): void {
     dragged.value = null;

@@ -11,6 +11,7 @@ import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { mealDisplayName } from '@/utils/mealDisplayName';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 const emit = defineEmits<{ openMeal: [meal: MealPlanEntry] }>();
@@ -33,9 +34,7 @@ function recipeFor(m: MealPlanEntry) {
   return m.recipeId ? recipesStore.recipes.find((r) => r.id === m.recipeId) : undefined;
 }
 function nameFor(m: MealPlanEntry): string {
-  if (m.kind === 'recipe') return recipeFor(m)?.name ?? t('mealPlanner.card.recipeRemoved');
-  const label = t(`mealPlanner.kind.${m.kind}` as 'mealPlanner.kind.other');
-  return m.label ? `${label} · ${m.label}` : label;
+  return mealDisplayName(m, recipesStore.recipes, t);
 }
 function cookFor(m: MealPlanEntry) {
   return m.cookMemberId ? familyStore.members.find((x) => x.id === m.cookMemberId) : undefined;

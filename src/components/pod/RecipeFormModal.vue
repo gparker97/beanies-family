@@ -29,10 +29,15 @@ import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { usePhotoStore } from '@/stores/photoStore';
 import type { Recipe, UUID } from '@/types/models';
 
-const props = defineProps<{
-  open: boolean;
-  recipe?: Recipe | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    recipe?: Recipe | null;
+    /** Stack above another open drawer/modal (e.g. opened from the meal editor). */
+    layer?: 'base' | 'overlay';
+  }>(),
+  { recipe: null, layer: 'base' }
+);
 
 const emit = defineEmits<{
   close: [];
@@ -204,6 +209,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
 <template>
   <BeanieFormModal
     variant="drawer"
+    :layer="layer"
     :open="open"
     :title="modalTitle"
     icon="🍝"

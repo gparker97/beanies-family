@@ -31,7 +31,9 @@ const SLOT_META: Record<MealSlot, { emoji: string; chip: string }> = {
   snack: { emoji: '🍎', chip: 'bg-[rgba(39,174,96,0.12)] text-[#1e7a45]' },
 };
 
-const WEEKDAY_FMT = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+// Fixed en-US to match the app's English-only date labels (utils/date.ts) — an
+// undefined locale would follow the OS and mismatch the mobile/share labels.
+const WEEKDAY_FMT = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
 function mealsFor(date: string, slot: MealSlot): MealPlanEntry[] {
   return mealPlanStore.mealsForDate(date).filter((m) => m.slot === slot);

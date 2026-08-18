@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-18",
-    "translationCount": 4023
+    "translationCount": 4025
   },
   "translations": {
     "app.name": {
@@ -20119,6 +20119,16 @@
     "mealPlanner.clear.confirmLabel": {
       "translation": "清楚",
       "hash": "12tbn1",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.editRecipe": {
+      "translation": "编辑食谱",
+      "hash": "bsoekc",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.viewCookLog": {
+      "translation": "查看烹饪日志",
+      "hash": "137q1l",
       "lastUpdated": "2026-08-18"
     }
   }

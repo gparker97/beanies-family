@@ -12,6 +12,7 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
+import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -108,11 +109,23 @@ async function remove(): Promise<void> {
   emit('close');
 }
 
-// ── Mark cooked (recipe meals) ──────────────────────────────────────────────
+// Edit the underlying recipe from the planner — opens the cookbook's existing
+// RecipeFormModal as an overlay (drawer-over-drawer); the meal card/name update
+// reactively on save. Keeps recipe editing in one place (not duplicated here).
+const recipeEditOpen = ref(false);
+
+// ── Cook log (recipe meals) — mark cooked, then view / edit / delete ─────────
 const cookLogOpen = ref(false);
 let preCookLogIds = new Set<string>();
 
-function openMarkCooked(): void {
+/** The saved cook-log entry for a cooked meal (edit mode); null → new-log mode. */
+const cookLog = computed(() =>
+  props.meal?.cookLogId
+    ? (recipesStore.cookLogs.find((c) => c.id === props.meal!.cookLogId) ?? null)
+    : null
+);
+
+function openCookLog(): void {
   if (!props.meal?.recipeId) return;
   preCookLogIds = new Set(
     recipesStore.cookLogsByRecipe(props.meal.recipeId).value.map((c) => c.id)
@@ -124,20 +137,24 @@ async function onCookLogClosed(): Promise<void> {
   cookLogOpen.value = false;
   const m = props.meal;
   if (!m?.recipeId) return;
-  // Detect a newly-created cook log; only THEN flip the meal to cooked (guards a
-  // failed/cancelled save from marking it cooked with no cookLogId).
-  const created = recipesStore
-    .cookLogsByRecipe(m.recipeId)
-    .value.find((c) => !preCookLogIds.has(c.id));
-  if (created) {
-    await mealPlanStore.updateMeal(m.id, { cooked: true, cookLogId: created.id });
-    logEvent({
-      level: 'info',
-      surface: 'meal-planner',
-      message: 'meal marked cooked',
-      context: { action: 'marked-cooked', slot: m.slot },
-    });
-    emit('close');
+  const logs = recipesStore.cookLogsByRecipe(m.recipeId).value;
+  if (!m.cooked) {
+    // Was marking new — flip to cooked only if a log actually got created (guards a
+    // cancelled/failed save from marking cooked with no cookLogId).
+    const created = logs.find((c) => !preCookLogIds.has(c.id));
+    if (created) {
+      await mealPlanStore.updateMeal(m.id, { cooked: true, cookLogId: created.id });
+      logEvent({
+        level: 'info',
+        surface: 'meal-planner',
+        message: 'meal marked cooked',
+        context: { action: 'marked-cooked', slot: m.slot },
+      });
+      emit('close');
+    }
+  } else if (m.cookLogId && !logs.some((c) => c.id === m.cookLogId)) {
+    // Was viewing/editing and the user DELETED the log — un-mark the meal as cooked.
+    await mealPlanStore.updateMeal(m.id, { cooked: false, cookLogId: undefined });
   }
 }
 </script>
@@ -161,7 +178,17 @@ async function onCookLogClosed(): Promise<void> {
         <div
           class="flex items-center gap-2 rounded-xl border border-[rgba(44,62,80,0.12)] bg-white px-3 py-2.5 text-sm dark:bg-slate-800"
         >
-          {{ recipe?.name ?? t('mealPlanner.card.recipeRemoved') }}
+          <span class="min-w-0 flex-1 truncate">
+            {{ recipe?.name ?? t('mealPlanner.card.recipeRemoved') }}
+          </span>
+          <button
+            v-if="recipe"
+            type="button"
+            class="font-outfit flex-none text-xs font-semibold text-[#F15D22]"
+            @click="recipeEditOpen = true"
+          >
+            {{ t('mealPlanner.editor.editRecipe') }}
+          </button>
         </div>
       </div>
       <div v-else>
@@ -241,14 +268,22 @@ async function onCookLogClosed(): Promise<void> {
         </div>
       </div>
 
-      <!-- Mark cooked (recipe meals, not yet cooked) -->
+      <!-- Cook log: mark cooked when open, view/edit/delete once cooked -->
       <button
-        v-if="isRecipe && meal && !meal.cooked && meal.recipeId"
+        v-if="isRecipe && meal?.recipeId && !meal.cooked"
         type="button"
         class="font-outfit w-full rounded-xl border border-[rgba(241,93,34,0.35)] bg-[var(--tint-orange-8)] py-2.5 text-sm font-semibold text-[#F15D22]"
-        @click="openMarkCooked"
+        @click="openCookLog"
       >
         ✓ {{ t('mealPlanner.editor.markCooked') }}
+      </button>
+      <button
+        v-else-if="isRecipe && meal?.recipeId && meal.cooked"
+        type="button"
+        class="font-outfit w-full rounded-xl border border-[rgba(39,174,96,0.35)] bg-[rgba(39,174,96,0.1)] py-2.5 text-sm font-semibold text-[#1e7a45]"
+        @click="openCookLog"
+      >
+        📖 {{ t('mealPlanner.editor.viewCookLog') }}
       </button>
     </div>
 
@@ -256,7 +291,18 @@ async function onCookLogClosed(): Promise<void> {
       v-if="meal?.recipeId"
       :open="cookLogOpen"
       :recipe-id="meal.recipeId"
+      :entry="meal.cooked ? cookLog : null"
+      :preset-cooked-on="meal.date"
+      :preset-cooked-by="meal.cookMemberId"
       @close="onCookLogClosed"
+    />
+
+    <RecipeFormModal
+      v-if="recipe"
+      :open="recipeEditOpen"
+      :recipe="recipe"
+      layer="overlay"
+      @close="recipeEditOpen = false"
     />
   </BeanieFormModal>
 </template>
