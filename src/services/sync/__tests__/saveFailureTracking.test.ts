@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as docClient from '@/services/automerge/worker/docClient';
+import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
 
 // Must reset modules between tests to clear module-level state
 let syncService: typeof import('../syncService');
@@ -34,6 +36,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
+  noteRemoteBaseline: vi.fn(),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
@@ -114,6 +117,81 @@ describe('syncService — save failure tracking', () => {
       syncService.resetSaveFailures();
       expect(syncService.getSaveFailureLevel()).toBe('none');
       expect(syncService.getLastSaveError()).toBeNull();
+    });
+  });
+
+  // #65 write terminus. Every other test in this file rejects `write`, so the
+  // terminus is never reached — which is exactly why a defect there survived a
+  // fully green suite. These drive a SUCCESSFUL save.
+  describe('successful save — the #65 Drive-heads terminus', () => {
+    const okProvider = (ack: unknown) => ({
+      type: 'google_drive' as const,
+      write: vi.fn().mockResolvedValue(ack),
+      read: vi.fn(),
+      getLastModified: vi.fn(),
+      isReady: vi.fn().mockResolvedValue(true),
+      requestAccess: vi.fn(),
+      persist: vi.fn(),
+      clearPersisted: vi.fn(),
+      disconnect: vi.fn(),
+      getDisplayName: vi.fn(() => 'test.beanpod'),
+      getFileId: vi.fn(() => 'file-123'),
+      getAccountEmail: vi.fn(() => null),
+    });
+
+    it('commits the heads of the bytes it uploaded, and reports success', async () => {
+      vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
+        payload: 'base64-payload==',
+        heads: ['h-uploaded'],
+      });
+      syncService.setProvider(okProvider({ revision: 'ver:9' }));
+
+      const result = await syncService.save();
+
+      expect(result).toBe(true);
+      expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+        encodeBaselinePayload('ver:9', headsFingerprint(['h-uploaded']))
+      );
+    });
+
+    it('does NOT pair a re-probed revision with our heads (it may be a peer write)', async () => {
+      // Malformed 2xx => the ack carries no revision => syncService re-probes. A peer
+      // may have written in that gap, so the revision is not necessarily ours.
+      // Recording our heads against it would certify a (revision, heads) pair that
+      // never existed on Drive, and the next open would skip past the peer's edits.
+      vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
+        payload: 'base64-payload==',
+        heads: ['h-uploaded'],
+      });
+      const provider = {
+        ...okProvider(undefined),
+        getRemoteMarker: vi.fn().mockResolvedValue({ revision: 'ver:peer', modifiedTime: null }),
+      };
+      syncService.setProvider(provider as never);
+
+      await syncService.save();
+
+      expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+        encodeBaselinePayload('ver:peer', null)
+      );
+    });
+
+    it('a worker double that omits `heads` does not turn a LANDED write into a failure', async () => {
+      // The fail-safe that matters most: the throw would happen AFTER the upload
+      // succeeded, so a TypeError here reports a save that actually reached Drive
+      // as failed — advancing the save-failure escalation ladder toward the
+      // critical "data isn't saving" banner.
+      vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
+        payload: 'base64-payload==',
+      } as unknown as { payload: string; heads: string[] });
+      syncService.setProvider(okProvider({ revision: 'ver:9' }));
+
+      const result = await syncService.save();
+
+      expect(result).toBe(true);
+      expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+        encodeBaselinePayload('ver:9', null)
+      );
     });
   });
 

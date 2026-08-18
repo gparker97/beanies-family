@@ -16,6 +16,28 @@
  * unparseable trust window) degrades to "baseline not advanced" => an extra
  * read, never a missed one. There is no code path here that can turn a genuine
  * change into `unchanged`.
+ *
+ * #65 adds the local->remote half of the same guarantee: the row also carries a
+ * fingerprint of the heads DRIVE HOLDS, so an open can tell that our doc has
+ * changes Drive never received (a force-kill between the cache persist and the
+ * debounced save) and decline to skip. The invariant's mirror image:
+ *
+ *   Record heads H as the baseline only if H is provably the content of the
+ *   file on Drive — never merely our doc's heads at the time.
+ *
+ * DEPENDENCY CONSTRAINT: keep this module free of RUNTIME imports. It is
+ * type-imported by worker code (`worker/cache.ts`, `worker/docClient.ts`), and
+ * those imports are erased precisely because nothing here is a value they need.
+ * Adding a runtime import risks pulling main-thread modules into the worker
+ * bundle. This is also why `headsFingerprint` takes `readonly string[]` instead
+ * of importing `Heads` from `worker/protocol`.
+ *
+ * PRIVACY (the row is deliberately PLAINTEXT where every other cache payload is
+ * ciphertext): the existing justification is that an opaque counter plus a local
+ * clock reading carries no family data. The #65 fingerprint does not change
+ * that. Automerge change hashes are SHA-256 digests of change bytes — no content
+ * is recoverable from them. The row now additionally reveals "the doc has
+ * moved", which the revision counter already implied.
  */
 
 /**
@@ -38,24 +60,113 @@ export type { RemoteMarker, WriteAck };
  * ISO wall-clock at which we committed it. `checkedAt` is the cache row's
  * existing `updatedAt` string, reused as the trust clock (plan Assumption 2) —
  * so there is no invented field. `modifiedTime` is an in-memory-only fallback
- * basis for providers without a revision; only `revision` + `checkedAt` are
- * persisted.
+ * basis for providers without a revision; only `revision` + `headsFp` are
+ * persisted (in the row payload), with `checkedAt` riding the row's `updatedAt`.
+ *
+ * `headsFp` (#65) is the fingerprint of the heads of the content DRIVE HOLDS at
+ * `revision` — NEVER of our own doc. See {@link headsFingerprint}.
  */
 export interface RemoteBaseline {
   revision: string | null;
   modifiedTime: string | null;
   checkedAt: string | null; // ISO; the row's updatedAt. NaN/future => expired.
+  headsFp: string | null; // null => unknown => never skip (#65).
 }
 
 /**
- * The persisted baseline row as read back from the worker cache: the namespaced
- * revision our cached doc provably contains, plus the ISO `checkedAt` (the row's
- * `updatedAt`, reused as the trust clock). Read alongside the cached doc in the
- * one `initAndLoadCache` round-trip so the two can never be read out of step.
+ * The persisted baseline row as read back from the worker cache. The worker
+ * treats `payload` as an OPAQUE string and never parses it — this module owns
+ * the format (see {@link encodeBaselinePayload}/{@link decodeBaselinePayload}),
+ * which is what keeps every branch of the codec pure and table-testable. Read
+ * alongside the cached doc in the one `initAndLoadCache` round-trip so the two
+ * can never be read out of step.
  */
 export interface RemoteBaselineRow {
-  revision: string;
+  payload: string;
   checkedAt: string;
+}
+
+/** A decoded baseline payload. `headsFp: null` => unknown => never skip. */
+export interface DecodedBaseline {
+  revision: string;
+  headsFp: string | null;
+}
+
+/**
+ * Canonical fingerprint of a set of Automerge heads (#65). We only ever ask
+ * "same or not", so a joined string beats an array plus a comparator: no
+ * ordering question at the call site, plain `===`, and a compact row payload.
+ *
+ * Exactly as order-sensitive as the worker-private `headsEqual`
+ * (`applyAndProject.ts`), which already compares by index on the documented
+ * "deterministic sorted change-hash arrays" — so this adds NO new assumption.
+ * Takes `readonly string[]` rather than importing the worker's `Heads` so this
+ * module keeps its single type-only import (see the header note).
+ */
+export function headsFingerprint(heads: readonly string[]): string {
+  return heads.join(' ');
+}
+
+/**
+ * Does our doc hold changes Drive has never seen (#65)? PURE.
+ *
+ * An ABSENT baseline fingerprint counts as unpushed: we cannot prove the doc is
+ * on Drive, so we must not skip. Same failure direction as the rest of this
+ * module — uncertainty costs an extra read, never a missed one.
+ */
+export function hasUnpushedChanges(baselineFp: string | null, currentFp: string): boolean {
+  return baselineFp === null || baselineFp !== currentFp;
+}
+
+/** Encode the baseline row payload (#65). The ONE place that knows the format. */
+export function encodeBaselinePayload(revision: string, headsFp: string | null): string {
+  return JSON.stringify({ r: revision, h: headsFp });
+}
+
+/**
+ * Decode the baseline row payload (#65). PURE, and NEVER throws.
+ *
+ * Three cases, all degrading toward a read:
+ *  - JSON object with a string `r` — the current format.
+ *  - Not JSON at all, but a non-empty string — a LEGACY pre-#65 row, whose
+ *    payload was the bare namespaced revision. Usable revision, unknown heads:
+ *    the guard declines once, then the next terminus rewrites it in the new
+ *    format. No migration needed.
+ *  - Anything else (valid JSON of the wrong shape, empty) — `null`, i.e. no
+ *    baseline at all, which the guard already handles by reading.
+ */
+export function decodeBaselinePayload(payload: string): DecodedBaseline | null {
+  if (!payload) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    // A LEGACY pre-#65 row's payload WAS the namespaced revision string — and a
+    // namespaced revision is never valid JSON. Recognise it by the prefix rather
+    // than by "JSON.parse threw": a truncated new-format row (e.g. a partially
+    // written `{"r":"ver:9","h":"ab`) also throws, and treating that as a revision
+    // would turn corruption into a silently-wrong baseline with no diagnostic.
+    if (payload.startsWith(REVISION_PREFIX)) return { revision: payload, headsFp: null };
+    console.error(
+      `[remoteBaseline] baseline row payload is neither valid JSON nor a '${REVISION_PREFIX}' revision ` +
+        `— treating as no baseline (an extra read, no data at risk). ` +
+        `To clear it manually: delete the 'remote-baseline' row from the beanies-automerge-* IndexedDB, or clear the cache.`
+    );
+    return null;
+  }
+  if (typeof parsed === 'object' && parsed !== null) {
+    const { r, h } = parsed as { r?: unknown; h?: unknown };
+    if (typeof r === 'string' && r !== '') {
+      return { revision: r, headsFp: typeof h === 'string' ? h : null };
+    }
+  }
+  // Parsed, but not a shape we recognise. Do not guess — no baseline => read.
+  console.error(
+    `[remoteBaseline] unrecognised baseline row payload; treating as no baseline (an extra read, no data at risk). ` +
+      `To clear it manually: delete the 'remote-baseline' row from the beanies-automerge-* IndexedDB, or clear the cache. ` +
+      `The next open re-reads Drive and re-seeds the row.`
+  );
+  return null;
 }
 
 export type ChangeStatus = 'changed' | 'unchanged' | 'unknown';

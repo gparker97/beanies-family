@@ -44,9 +44,11 @@ const ENVELOPE_KEY = 'envelope';
  */
 const SNAPSHOT_KEY = 'projection-snapshot';
 /**
- * The open-guard baseline row (#61): the remote `version` counter our cached
- * doc provably contains, stored as an opaque namespaced string in `payload`,
- * with `updatedAt` reused AS the trust clock (`checkedAt`). This row is
+ * The open-guard baseline row (#61/#65): the remote `version` counter our cached
+ * doc provably contains — plus, since #65, a fingerprint of the heads DRIVE
+ * HOLDS at that revision — stored as ONE opaque string in `payload` whose format
+ * is owned by `@/services/sync/remoteBaseline` (never parsed in this file), with
+ * `updatedAt` reused AS the trust clock (`checkedAt`). This row is
  * PLAINTEXT where every other payload is ciphertext — deliberately, because an
  * opaque counter plus a local clock reading carries no family data. It sorts
  * outside every read/clear key range here (`'r' > 'i'`, and the base/legacy/
@@ -228,9 +230,15 @@ export async function loadProjectionSnapshot(
 }
 
 /**
- * Read the open-guard baseline row (#61): the namespaced revision string our
- * cached doc provably contains, plus its `checkedAt` (the row's `updatedAt`,
- * reused as the trust clock). Returns null when absent. Plaintext — no decrypt.
+ * Read the open-guard baseline row (#61/#65) VERBATIM, plus its `checkedAt`
+ * (the row's `updatedAt`, reused as the trust clock). Returns null when absent.
+ * Plaintext — no decrypt.
+ *
+ * `payload` is OPAQUE here by design: the format (revision + the #65 Drive-heads
+ * fingerprint) is owned entirely by `@/services/sync/remoteBaseline`, which
+ * decodes it main-side. Do NOT parse it here — a second owner of the format
+ * would move the branchy compatibility logic out of that module's pure,
+ * zero-mock test coverage.
  */
 export async function readRemoteBaseline(): Promise<RemoteBaselineRow | null> {
   if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
@@ -238,18 +246,19 @@ export async function readRemoteBaseline(): Promise<RemoteBaselineRow | null> {
     cacheDb!.get(STORE_NAME, REMOTE_BASELINE_KEY)
   )) as { payload: string; updatedAt: string } | undefined;
   if (!entry || !entry.payload) return null;
-  return { revision: entry.payload, checkedAt: entry.updatedAt };
+  return { payload: entry.payload, checkedAt: entry.updatedAt };
 }
 
 /**
- * Write the open-guard baseline row (#61). This is the row's ONLY writer,
+ * Write the open-guard baseline row (#61/#65). This is the row's ONLY writer,
  * because `updatedAt` doubles as the trust clock — nothing else may refresh it.
- * `revision` is the already-namespaced (`ver:`) opaque string.
+ * `payload` is the already-encoded opaque string from `remoteBaseline`'s
+ * `encodeBaselinePayload`; this function never inspects it.
  */
-export async function writeRemoteBaseline(revision: string): Promise<void> {
+export async function writeRemoteBaseline(payload: string): Promise<void> {
   if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
   await withIdbRetry('writeRemoteBaseline', () =>
-    cacheDb!.put(STORE_NAME, { id: REMOTE_BASELINE_KEY, payload: revision, updatedAt: nowIso() })
+    cacheDb!.put(STORE_NAME, { id: REMOTE_BASELINE_KEY, payload, updatedAt: nowIso() })
   );
 }
 

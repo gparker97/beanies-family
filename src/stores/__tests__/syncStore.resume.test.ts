@@ -428,6 +428,7 @@ describe('syncStore.completeAutoLoad', () => {
       heads: [],
       dirty: false,
       changed: true,
+      remoteHeads: [],
     });
 
     const syncStore = useSyncStore();
@@ -456,6 +457,7 @@ describe('syncStore.completeAutoLoad', () => {
       heads: [],
       dirty: false,
       changed: false,
+      remoteHeads: [],
     });
 
     const syncStore = useSyncStore();
@@ -512,6 +514,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       heads: [],
       dirty: false,
       changed: false,
+      remoteHeads: [],
     });
     syncStore.pendingEncryptedFile = {
       envelope: JSON.parse(envelopeJsonFor('fam-resume-1', 'LaFleur')),
@@ -533,7 +536,11 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     // branch and the assertions below would pass vacuously.
     vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
     vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
-    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({ heads: [], ...outcome });
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+      remoteHeads: [],
+      ...outcome,
+    });
 
     await syncStore.backgroundSyncFromFile();
     // Now meaningful: exactly the merge this call made, not the setup's.
@@ -596,6 +603,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       heads: [],
       dirty: false,
       changed: false,
+      remoteHeads: [],
     });
     syncStore.pendingEncryptedFile = {
       envelope: JSON.parse(envelopeJsonFor('fam-resume-1', 'LaFleur')),
@@ -613,7 +621,12 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     // must resolve to the safe direction (upload), never to silently dropping it.
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
       heads: [],
-    } as unknown as { heads: never[]; dirty: boolean; changed: boolean });
+    } as unknown as {
+      heads: never[];
+      dirty: boolean;
+      changed: boolean;
+      remoteHeads: never[];
+    });
 
     await syncStore.backgroundSyncFromFile();
     expect(docClient.mergeRemoteEnvelope).toHaveBeenCalled();

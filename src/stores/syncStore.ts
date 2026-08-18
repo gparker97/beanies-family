@@ -926,6 +926,13 @@ export const useSyncStore = defineStore('sync', () => {
           // allowed to narrow them to `false`.
           let changed = true;
           let dirty = true;
+          // #65: the heads of the bytes DRIVE HOLDS, for the open-guard baseline.
+          // Same fail-safe default as above but inverted in form: `null` means "we
+          // cannot prove what Drive holds", which makes the next open decline to
+          // skip. The replace branch leaves it null — `replaceDocWithCacheRecovery`
+          // deliberately re-applies unsynced cache changes, so our doc is knowably
+          // AHEAD of Drive there and no fingerprint may be claimed.
+          let driveHeads: readonly string[] | null = null;
           if (merging) {
             // CRDT merge remote into the worker's doc.
             const mergeResult = await docClient.mergeRemoteEnvelope(
@@ -939,6 +946,12 @@ export const useSyncStore = defineStore('sync', () => {
             // doubles honest instead of silently disabling the reload.)
             changed = mergeResult.changed ?? true;
             dirty = mergeResult.dirty ?? true;
+            // NOT `dirty ? null : mergeResult.heads`: `mergeRemoteEnvelope`'s adopt
+            // branch hardcodes `dirty: false` while `migrateDoc` may have moved the
+            // doc, so `heads` can be strictly ahead of Drive. `remoteHeads` is
+            // captured from the unmigrated decrypted remote and is sound on both
+            // branches.
+            driveHeads = mergeResult.remoteHeads ?? null;
           } else {
             // Replace: adopt remote (+ recover any unsynced cache) to prevent loss.
             const famId = useFamilyContextStore().activeFamilyId;
@@ -946,7 +959,15 @@ export const useSyncStore = defineStore('sync', () => {
               await replaceDocWithCacheRecovery(remoteEnvelope, famId);
             } else {
               await docClient.dropDoc(); // no cache to recover — adopt remote fresh
-              await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
+              // This branch adopts Drive's document verbatim (nothing local survived
+              // the drop), so `remoteHeads` is exactly as sound here as on the merging
+              // branch. Discarding it would forfeit the next skip and log a WARN-level
+              // fail-open on an open that converged perfectly.
+              const adopted = await docClient.mergeRemoteEnvelope(
+                remoteEnvelope,
+                remoteEnvelope.familyId
+              );
+              driveHeads = adopted.remoteHeads ?? null;
             }
           }
 
@@ -961,7 +982,7 @@ export const useSyncStore = defineStore('sync', () => {
           // state `syncService.load()` sampled BEFORE the download, so commit that
           // revision as the durable open-guard baseline. Zero-network (a worker RPC).
           // This replaces the old getFileTimestamp round-trip that used to sit here.
-          syncService.commitRemoteBaseline();
+          syncService.commitRemoteBaseline(driveHeads);
 
           // `dirty` is derived purely from Automerge doc heads, so it can NEVER be
           // true for an envelope-only change. But a save publishes the envelope key
@@ -2319,7 +2340,24 @@ export const useSyncStore = defineStore('sync', () => {
       // The guard fell open on UNCERTAINTY (not a clean `changed`/`no-baseline`) —
       // record it as `open-fail-open` on a successful read (C7), so a rising
       // fail-open rate is visible without a repro.
-      const CLEAN_READ_REASONS = new Set(['changed', 'no-baseline']);
+      // `unpushed-local-changes` (#65) joins these: it is the guard working exactly
+      // as designed on a path that then completes successfully, NOT a fail-open on
+      // uncertainty. Counting it as one would inflate the very fail-open rate #61
+      // added to alert on, and emit a warn per crash-window recovery. Its sibling
+      // reasons `baseline-heads-unknown` and `heads-probe-failed` stay OUT — those
+      // are genuine uncertainty. All three still reach CloudWatch as `error_code`.
+      const CLEAN_READ_REASONS = new Set([
+        'changed',
+        'no-baseline',
+        'unpushed-local-changes',
+        // The upgrade cohort: every device shipped before #65 decodes a legacy
+        // bare-`ver:` row to an unknown fingerprint on its FIRST open after this
+        // release. Benign, one-shot, and self-clearing at the next terminus — but
+        // it fires simultaneously fleet-wide, and counting it as uncertainty would
+        // desensitise the fail-open alert exactly when it is most needed. Still
+        // reaches CloudWatch as `error_code`, so it stays countable.
+        'baseline-heads-unknown',
+      ]);
       const fellOpen = !CLEAN_READ_REASONS.has(reason);
 
       const loadResult = await loadFromFile({ merge: true });

@@ -5,6 +5,7 @@
 import { isFlagEnabled } from '@/config/flags';
 import * as docClient from './docClient';
 import { inlineExecutor } from './inlineBridge';
+import { seedRemoteBaseline } from '@/services/sync/syncService';
 
 let bootstrapped = false;
 
@@ -18,7 +19,21 @@ export function bootstrapDocClient(): void {
 
   // Worker-death re-hydration: reload the doc from the encrypted cache after a
   // respawn (docClient re-posts the retained key first).
-  docClient.setRehydrator((familyId) => docClient.initAndLoadCache(familyId).then(() => undefined));
+  //
+  // Forward the baseline row it returns — including `null`. On a `recovered` load
+  // the worker DELETES the durable row on purpose (the rebuilt doc may have lost
+  // the post-last-save tail), and dropping the result here would leave main's
+  // in-memory baseline intact and misleading. Since #65 that object also carries
+  // the Drive-heads fingerprint, so a truncated doc can match its own recorded
+  // fingerprint and skip the read it most needs.
+  docClient.setRehydrator((familyId) =>
+    docClient
+      .initAndLoadCache(familyId)
+      .then((res) => {
+        seedRemoteBaseline(res.remoteBaseline);
+      })
+      .then(() => undefined)
+  );
 
   // docWorker kill-switch — off (prod default) forces the inline path; on
   // (dev default) spawns the real worker lazily on first use.

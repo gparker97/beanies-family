@@ -10,6 +10,10 @@ import { describe, it, expect } from 'vitest';
 import {
   BASELINE_MAX_TRUST_MS,
   compareMarkers,
+  decodeBaselinePayload,
+  encodeBaselinePayload,
+  hasUnpushedChanges,
+  headsFingerprint,
   toStoredRevision,
   withinTrustWindow,
   type RemoteBaseline,
@@ -20,6 +24,7 @@ const baseline = (over: Partial<RemoteBaseline> = {}): RemoteBaseline => ({
   revision: 'ver:10',
   modifiedTime: '2026-08-13T00:00:00.000Z',
   checkedAt: '2026-08-13T00:00:00.000Z',
+  headsFp: null,
   ...over,
 });
 
@@ -127,5 +132,81 @@ describe('withinTrustWindow', () => {
   it('future timestamp => false (a skewed-ahead clock never grants trust)', () => {
     const future = new Date(now + 60_000).toISOString();
     expect(withinTrustWindow(future, now)).toBe(false);
+  });
+});
+
+// ─── #65: the Drive-heads fingerprint + row codec ────────────────────────────
+// Everything branchy about the #65 change lives here, pure: no fake IDB, no
+// worker harness. If these pass, the compatibility ladder is proved.
+
+describe('headsFingerprint / hasUnpushedChanges (#65)', () => {
+  it('same heads => not unpushed (the skip is allowed to proceed)', () => {
+    const fp = headsFingerprint(['aaa', 'bbb']);
+    expect(hasUnpushedChanges(fp, headsFingerprint(['aaa', 'bbb']))).toBe(false);
+  });
+
+  it('different heads => unpushed (decline the skip)', () => {
+    const baselineFp = headsFingerprint(['aaa']);
+    expect(hasUnpushedChanges(baselineFp, headsFingerprint(['aaa', 'bbb']))).toBe(true);
+  });
+
+  it('ABSENT baseline fingerprint => unpushed (we cannot prove it is on Drive)', () => {
+    expect(hasUnpushedChanges(null, headsFingerprint(['aaa']))).toBe(true);
+  });
+
+  it('empty heads is a real, distinguishable value — not conflated with unknown', () => {
+    expect(hasUnpushedChanges(headsFingerprint([]), headsFingerprint([]))).toBe(false);
+    expect(hasUnpushedChanges(headsFingerprint([]), headsFingerprint(['aaa']))).toBe(true);
+  });
+
+  it('is stable across calls (a fingerprint is a pure function of its input)', () => {
+    expect(headsFingerprint(['a', 'b'])).toBe(headsFingerprint(['a', 'b']));
+  });
+});
+
+describe('encodeBaselinePayload / decodeBaselinePayload (#65)', () => {
+  it('round-trips a revision WITH a fingerprint', () => {
+    const fp = headsFingerprint(['h1', 'h2']);
+    expect(decodeBaselinePayload(encodeBaselinePayload('ver:12', fp))).toEqual({
+      revision: 'ver:12',
+      headsFp: fp,
+    });
+  });
+
+  it('round-trips a revision with NO fingerprint (terminus could not prove Drive content)', () => {
+    expect(decodeBaselinePayload(encodeBaselinePayload('ver:12', null))).toEqual({
+      revision: 'ver:12',
+      headsFp: null,
+    });
+  });
+
+  it('reads a LEGACY pre-#65 row (bare namespaced revision) as revision-only', () => {
+    // The upgrade path: usable revision, unknown heads => declines once, then the
+    // next terminus rewrites the row in the new format. No migration.
+    expect(decodeBaselinePayload('ver:7')).toEqual({ revision: 'ver:7', headsFp: null });
+  });
+
+  it('returns null for an empty payload (=> no baseline => read)', () => {
+    expect(decodeBaselinePayload('')).toBeNull();
+  });
+
+  it('returns null for valid JSON of the wrong shape, without throwing', () => {
+    expect(decodeBaselinePayload('{"nope":1}')).toBeNull();
+    expect(decodeBaselinePayload('[1,2,3]')).toBeNull();
+    expect(decodeBaselinePayload('null')).toBeNull();
+    expect(decodeBaselinePayload('42')).toBeNull();
+  });
+
+  it('ignores a non-string fingerprint rather than trusting it', () => {
+    expect(decodeBaselinePayload('{"r":"ver:3","h":99}')).toEqual({
+      revision: 'ver:3',
+      headsFp: null,
+    });
+  });
+
+  it('never throws on arbitrary garbage', () => {
+    for (const junk of ['{', '\u0000', 'ver:', '{"r":""}', '{"r":null}']) {
+      expect(() => decodeBaselinePayload(junk)).not.toThrow();
+    }
   });
 });
