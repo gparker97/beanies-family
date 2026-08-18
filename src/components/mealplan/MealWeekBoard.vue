@@ -2,7 +2,8 @@
 /**
  * Desktop/tablet week board — days across the top, meal slots down the side.
  * Purely presentational: it lays out MealSlotCells (the shared seam) and bubbles
- * their intents up. Meals come from the store per cell.
+ * their intents up. Meals come from the store per cell. Each slot row carries a
+ * colour-coded label chip + a top divider so the rows read distinctly.
  */
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -14,25 +15,38 @@ defineProps<{ weekDays: WeekDay[] }>();
 const emit = defineEmits<{
   openMeal: [meal: MealPlanEntry];
   addMeal: [date: string, slot: MealSlot];
+  clearDay: [date: string];
 }>();
 
 const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/** Per-slot emoji + tinted chip classes, so each row is instantly distinguishable. */
+const SLOT_META: Record<MealSlot, { emoji: string; chip: string }> = {
+  breakfast: { emoji: '🍳', chip: 'bg-[rgba(230,166,74,0.16)] text-[#9a6a1a]' },
+  lunch: { emoji: '🥪', chip: 'bg-[var(--tint-silk-20)] text-secondary-500' },
+  dinner: { emoji: '🍽️', chip: 'bg-[var(--tint-orange-8)] text-[#D14D1A]' },
+  snack: { emoji: '🍎', chip: 'bg-[rgba(39,174,96,0.12)] text-[#1e7a45]' },
+};
+
 const WEEKDAY_FMT = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
 
 function mealsFor(date: string, slot: MealSlot): MealPlanEntry[] {
   return mealPlanStore.mealsForDate(date).filter((m) => m.slot === slot);
 }
+function hasMeals(date: string): boolean {
+  return mealPlanStore.mealsForDate(date).length > 0;
+}
 </script>
 
 <template>
   <div class="overflow-x-auto p-3">
-    <div class="grid min-w-[46rem] grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] gap-1">
+    <div class="grid min-w-[56rem] grid-cols-[6rem_repeat(7,minmax(7rem,1fr))] gap-x-1">
       <!-- Header row: empty corner + 7 days -->
       <div></div>
-      <div v-for="day in weekDays" :key="day.dateStr" class="pb-2 text-center">
+      <div v-for="day in weekDays" :key="day.dateStr" class="group relative pb-2 text-center">
         <div
           class="font-outfit text-sm font-bold"
           :class="day.isToday ? 'text-[#F15D22]' : 'text-secondary-500 dark:text-slate-100'"
@@ -48,20 +62,36 @@ function mealsFor(date: string, slot: MealSlot): MealPlanEntry[] {
         >
           {{ t('mealPlanner.thisWeek') }}
         </div>
+        <!-- Clear-day: appears on hover when the day has meals -->
+        <button
+          v-if="hasMeals(day.dateStr)"
+          type="button"
+          class="font-outfit absolute top-0 right-1 rounded-full px-1.5 text-[0.62rem] font-semibold text-[rgba(44,62,80,0.35)] opacity-0 transition group-hover:opacity-100 hover:text-[#F15D22]"
+          :aria-label="t('mealPlanner.clearDay')"
+          @click="emit('clearDay', day.dateStr)"
+        >
+          {{ t('mealPlanner.clearDay') }}
+        </button>
       </div>
 
       <!-- Slot rows -->
       <template v-for="slot in SLOTS" :key="slot">
         <div
-          class="font-outfit flex items-center justify-end pr-2 text-[0.62rem] font-semibold tracking-[0.06em] text-[rgba(44,62,80,0.4)] uppercase"
+          class="flex items-start border-t border-[rgba(44,62,80,0.07)] py-2 pr-1 dark:border-slate-700"
         >
-          {{ t(`mealPlanner.slot.${slot}`) }}
+          <span
+            class="font-outfit inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.6rem] font-bold tracking-[0.04em] uppercase"
+            :class="SLOT_META[slot].chip"
+          >
+            <span aria-hidden="true">{{ SLOT_META[slot].emoji }}</span>
+            {{ t(`mealPlanner.slot.${slot}`) }}
+          </span>
         </div>
         <div
           v-for="day in weekDays"
           :key="`${slot}-${day.dateStr}`"
-          class="min-h-[3.5rem]"
-          :class="day.isToday ? 'rounded-[13px] bg-[rgba(241,93,34,0.035)]' : ''"
+          class="min-h-[4rem] border-t border-[rgba(44,62,80,0.07)] py-2 dark:border-slate-700"
+          :class="day.isToday ? 'bg-[rgba(241,93,34,0.035)]' : ''"
         >
           <MealSlotCell
             :meal-slot="slot"

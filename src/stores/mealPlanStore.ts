@@ -163,6 +163,32 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     return result ?? false;
   }
 
+  /**
+   * Remove every meal on the given dates in one atomic batch (reuses replaceWeek
+   * with no new entries). Used by "clear day" (one date) and "clear week" (seven).
+   * Cook logs are untouched — they live in their own collection.
+   */
+  async function clearDates(dates: string[]): Promise<boolean> {
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        await mealRepo.replaceWeek(dates, []);
+        const set = new Set(dates);
+        meals.value = meals.value.filter((m) => !set.has(m.date));
+        logEvent({
+          level: 'info',
+          surface: 'meal-planner',
+          message: 'meals cleared',
+          context: { action: dates.length > 1 ? 'week-cleared' : 'day-cleared' },
+        });
+        return true;
+      },
+      { action: 'mealPlanStore:clearDates' }
+    );
+    return result ?? false;
+  }
+
   /** Whether the target week already holds meals — drives the copy overwrite warning. */
   function weekHasMeals(weekDates: string[]): boolean {
     const set = new Set(weekDates);
@@ -200,6 +226,7 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     updateMeal,
     deleteMeal,
     copyWeek,
+    clearDates,
     nullifyRecipe,
     resetState,
   };

@@ -22,15 +22,11 @@ const { startDrag, endDrag } = useMealDrag();
 const query = ref('');
 const { results } = useRecipeSearch(recipes, query);
 
-const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; cls: string }[] = [
-  { kind: 'eat_out', emoji: '🍜', cls: 'bg-[var(--tint-silk-20)] text-secondary-500' },
-  { kind: 'leftovers', emoji: '♻️', cls: 'bg-[var(--tint-slate-5)] text-secondary-500' },
-  {
-    kind: 'skip',
-    emoji: '—',
-    cls: 'border border-[rgba(44,62,80,0.14)] text-[rgba(44,62,80,0.6)]',
-  },
-  { kind: 'other', emoji: '✎', cls: 'bg-[var(--tint-orange-8)] text-[#D14D1A]' },
+const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: string }[] = [
+  { kind: 'eat_out', emoji: '🍜', tile: 'bg-[var(--tint-silk-20)]' },
+  { kind: 'leftovers', emoji: '♻️', tile: 'bg-[var(--tint-slate-5)]' },
+  { kind: 'skip', emoji: '⊘', tile: 'bg-[var(--tint-slate-5)]' },
+  { kind: 'other', emoji: '✎', tile: 'bg-[var(--tint-orange-8)]' },
 ];
 </script>
 
@@ -76,18 +72,25 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; cls: string
     >
       {{ t('mealPlanner.picker.alternatives') }}
     </div>
-    <div class="mt-2 flex flex-wrap gap-1.5">
-      <span
+    <div class="mt-2 grid grid-cols-2 gap-2">
+      <div
         v-for="alt in ALT_TYPES"
         :key="alt.kind"
         draggable="true"
-        class="font-outfit inline-flex cursor-grab items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold"
-        :class="alt.cls"
+        class="flex cursor-grab items-center gap-2 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-1.5 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
         @dragstart="startDrag({ source: 'type', kind: alt.kind })"
         @dragend="endDrag"
       >
-        {{ alt.emoji }} {{ t(`mealPlanner.kind.${alt.kind}`) }}
-      </span>
+        <span
+          class="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] text-base"
+          :class="alt.tile"
+          aria-hidden="true"
+          >{{ alt.emoji }}</span
+        >
+        <span class="font-outfit text-secondary-500 text-xs font-semibold dark:text-slate-100">
+          {{ t(`mealPlanner.kind.${alt.kind}`) }}
+        </span>
+      </div>
     </div>
   </aside>
 </template>

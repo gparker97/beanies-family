@@ -107,6 +107,26 @@ function copyViewedToCurrent() {
   void doCopy(weekDates.value, currentWeekDates());
 }
 
+// ── Clear ─────────────────────────────────────────────────────────────────────
+async function clearWeek() {
+  const ok = await confirm({
+    title: 'mealPlanner.clear.weekTitle',
+    message: 'mealPlanner.clear.weekMessage',
+    variant: 'danger',
+    confirmLabel: 'mealPlanner.clear.confirmLabel',
+  });
+  if (ok) await mealPlanStore.clearDates(weekDates.value);
+}
+async function clearDay(date: string) {
+  const ok = await confirm({
+    title: 'mealPlanner.clear.dayTitle',
+    message: 'mealPlanner.clear.dayMessage',
+    variant: 'danger',
+    confirmLabel: 'mealPlanner.clear.confirmLabel',
+  });
+  if (ok) await mealPlanStore.clearDates([date]);
+}
+
 // ── Share ───────────────────────────────────────────────────────────────────
 const shareOpen = ref(false);
 const shareScope = ref<'day' | 'week'>('week');
@@ -156,7 +176,7 @@ async function doShare() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-3 py-5 sm:px-5">
+  <div class="px-3 py-5 sm:px-6">
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -211,6 +231,15 @@ async function doShare() {
       >
         {{ t('mealPlanner.thisWeek') }}
       </button>
+      <span class="flex-1"></span>
+      <button
+        v-if="mealPlanStore.weekHasMeals(weekDates)"
+        type="button"
+        class="font-outfit text-sm font-semibold text-[rgba(44,62,80,0.5)] hover:text-[#F15D22] dark:text-slate-400"
+        @click="clearWeek"
+      >
+        {{ t('mealPlanner.clearWeek') }}
+      </button>
     </div>
 
     <!-- Day nav (mobile) -->
@@ -231,7 +260,12 @@ async function doShare() {
       class="mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:grid-cols-[15rem_1fr] dark:bg-slate-800"
     >
       <RecipeRail />
-      <MealWeekBoard :week-days="weekDays" @open-meal="openMeal" @add-meal="openPicker" />
+      <MealWeekBoard
+        :week-days="weekDays"
+        @open-meal="openMeal"
+        @add-meal="openPicker"
+        @clear-day="clearDay"
+      />
     </div>
 
     <!-- Day stack (mobile) -->
