@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-18",
-    "translationCount": 4016
+    "translationCount": 4023
   },
   "translations": {
     "app.name": {
@@ -20084,6 +20084,41 @@
     "mealPlanner.nook.empty": {
       "translation": "今天没有计划的餐点。",
       "hash": "u2fwq9",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clearDay": {
+      "translation": "晴天",
+      "hash": "c3it61",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clearWeek": {
+      "translation": "清除周",
+      "hash": "jvz1mv",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clear.dayTitle": {
+      "translation": "清除这一天？",
+      "hash": "ydebbi",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clear.dayMessage": {
+      "translation": "这将删除当天计划的所有餐点。您已保存的烹饪日志将被保留。",
+      "hash": "ngwmmz",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clear.weekTitle": {
+      "translation": "本周清空？",
+      "hash": "7vc7w",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clear.weekMessage": {
+      "translation": "这会删除本周计划的所有餐点。您已保存的烹饪日志将被保留。",
+      "hash": "p7ia82",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.clear.confirmLabel": {
+      "translation": "清楚",
+      "hash": "12tbn1",
       "lastUpdated": "2026-08-18"
     }
   }
