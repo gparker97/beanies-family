@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-16",
-    "translationCount": 3940
+    "lastUpdated": "2026-08-18",
+    "translationCount": 4016
   },
   "translations": {
     "app.name": {
@@ -19705,6 +19705,386 @@
       "translation": "此活动每周重复一天以上，因此移动一个会话不能应用于整个系列。选择“仅此事件”以仅移动此事件，或编辑其重复的日期。",
       "hash": "m56ia0",
       "lastUpdated": "2026-08-16"
+    },
+    "common.previous": {
+      "translation": "曾任职务",
+      "hash": "jzvvmx",
+      "lastUpdated": "2026-08-18"
+    },
+    "common.next": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-08-18"
+    },
+    "common.remove": {
+      "translation": "移除",
+      "hash": "ulvuxo",
+      "lastUpdated": "2026-08-18"
+    },
+    "nav.mealPlanner": {
+      "translation": "膳食计划员",
+      "hash": "ubnqt1",
+      "lastUpdated": "2026-08-18"
+    },
+    "mobileNav.hint.mealPlanner": {
+      "translation": "规划一周的餐点",
+      "hash": "j0wsie",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.title": {
+      "translation": "膳食计划员",
+      "hash": "ubnqt1",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.welcome": {
+      "translation": "这周有什么好吃的？ 🌱",
+      "hash": "efz8cq",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.thisWeek": {
+      "translation": "这个星期",
+      "hash": "mwvrbq",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.pastWeeks": {
+      "translation": "过去几周",
+      "hash": "rxun4h",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copyLastWeek": {
+      "translation": "复制上周",
+      "hash": "ip6ann",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copyHere": {
+      "translation": "复制到本周",
+      "hash": "gw3y4c",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.shareAction": {
+      "translation": "共享",
+      "hash": "1bjem7",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.cookbook": {
+      "translation": "食谱",
+      "hash": "7z8jvz",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.railHint": {
+      "translation": "将食谱拖到某天 🍝",
+      "hash": "tkl6pp",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.search": {
+      "translation": "搜索食谱",
+      "hash": "f1xy0p",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.newRecipe": {
+      "translation": "添加食谱",
+      "hash": "rpv2ky",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.addMeal": {
+      "translation": "新增餐点",
+      "hash": "f3d6xr",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.emptyWeek": {
+      "translation": "本周还没有安排餐点—请将食谱放置在一天开始。",
+      "hash": "h5ptjx",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.slot.breakfast": {
+      "translation": "早餐",
+      "hash": "1rfliz",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.slot.lunch": {
+      "translation": "午餐",
+      "hash": "17xekq",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.slot.dinner": {
+      "translation": "晚餐",
+      "hash": "xut9qq",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.slot.snack": {
+      "translation": "零食小吃",
+      "hash": "u0406z",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.kind.eat_out": {
+      "translation": "外出就餐",
+      "hash": "4ziye2",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.kind.leftovers": {
+      "translation": "剩飯",
+      "hash": "8u1pk8",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.kind.skip": {
+      "translation": "跳过",
+      "hash": "1j9un",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.kind.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.card.toCook": {
+      "translation": "做饭",
+      "hash": "k2de0j",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.card.cooked": {
+      "translation": "烹饪",
+      "hash": "mel5p5",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.card.anyone": {
+      "translation": "任何人 任何人 [ren4 he2 ren2]",
+      "hash": "nd1q12",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.card.recipeRemoved": {
+      "translation": "食谱被删除",
+      "hash": "7dm48e",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.card.guests": {
+      "translation": "+{count} guests",
+      "hash": "uvxa7x",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.addTitle": {
+      "translation": "新增餐点",
+      "hash": "f3d6xr",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.editTitle": {
+      "translation": "编辑餐点",
+      "hash": "1bd5h5",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.plan": {
+      "translation": "你下一步打算是什么？",
+      "hash": "6jw2fd",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.recipe": {
+      "translation": "配方",
+      "hash": "um2dea",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.choose": {
+      "translation": "选择食谱",
+      "hash": "torg22",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.change": {
+      "translation": "变动",
+      "hash": "xczjyo",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.cook": {
+      "translation": "谁在做饭？",
+      "hash": "cxanet",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.cookHint": {
+      "translation": "显示在卡片上",
+      "hash": "u4f9jj",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.anyone": {
+      "translation": "任何人",
+      "hash": "wimfbu",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.eaters": {
+      "translation": "谁在吃东西？",
+      "hash": "6cggf3",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.addGuest": {
+      "translation": "[客人]",
+      "hash": "t8ey7u",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.guestName": {
+      "translation": "房客姓名",
+      "hash": "301iib",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.note": {
+      "translation": "备注",
+      "hash": "1g64y",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.notePlaceholder": {
+      "translation": "例如，剩菜的双批次",
+      "hash": "4z7l6k",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.serveTime": {
+      "translation": "上菜时间",
+      "hash": "1j8ace",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.label": {
+      "translation": "标号",
+      "hash": "17kdzo",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.labelPlaceholder": {
+      "translation": "例如：奶奶的",
+      "hash": "x3p9r8",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.markCooked": {
+      "translation": "标记为已煮熟",
+      "hash": "663pmi",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.save": {
+      "translation": "节省订餐费用",
+      "hash": "z7z23q",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.deleteConfirmTitle": {
+      "translation": "删除此项",
+      "hash": "ac9j9y",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.editor.deleteConfirmMessage": {
+      "translation": "这会将餐点从计划中移除。您已保存的任何烹饪日志都将保留。",
+      "hash": "59omvd",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.picker.title": {
+      "translation": "选择餐点",
+      "hash": "hwx2jj",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.picker.quickAddHint": {
+      "translation": "不在烹饪书中？只需命名 🍝",
+      "hash": "8pproa",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.picker.quickAddPlaceholder": {
+      "translation": "食谱名称",
+      "hash": "g1wi4j",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.picker.alternatives": {
+      "translation": "或替代方案",
+      "hash": "vgkbnt",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copy.confirmTitle": {
+      "translation": "本周复制？",
+      "hash": "9k8p2u",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copy.confirmMessage": {
+      "translation": "本周已安排好餐点。复制将替换它们。您已经烹饪过的餐点将保留其历史记录。",
+      "hash": "puxx4m",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copy.confirmLabel": {
+      "translation": "替换和复制",
+      "hash": "rd8l6j",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copy.empty": {
+      "translation": "没有要复制的内容",
+      "hash": "6kxsop",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copy.emptyHelp": {
+      "translation": "那一周没有计划的膳食。",
+      "hash": "tj10qo",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.copy.done": {
+      "translation": "已复制周",
+      "hash": "djvmts",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.recipeDelete.title": {
+      "translation": "是否删除此配方？",
+      "hash": "9wzqvw",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.recipeDelete.message": {
+      "translation": "此食谱用于{count}个膳食计划。删除它会删除食谱，并将这些餐点标记为“已删除食谱”。保留烹饪日志。",
+      "hash": "nl1arv",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.day": {
+      "translation": "这一天。",
+      "hash": "lczhh6",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.week": {
+      "translation": "这个星期",
+      "hash": "mwvrbq",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.header": {
+      "translation": "🍲 beanies膳食计划",
+      "hash": "vjqfr1",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.title": {
+      "translation": "饮食计划",
+      "hash": "oy6jba",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.copied": {
+      "translation": "复制到剪贴板",
+      "hash": "nhirm2",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.copyFailed": {
+      "translation": "无法复制计划",
+      "hash": "o1ypp",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.share.copyFailedHelp": {
+      "translation": "此处没有副本—请尝试手动选择文本。",
+      "hash": "4ezvxf",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.briefing.owner": {
+      "translation": "您正在烹饪： {meal}",
+      "hash": "1g0012",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.briefing.forChild": {
+      "translation": "{name}正在烹饪： {meal}",
+      "hash": "1iwb0y",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.briefing.unassigned": {
+      "translation": "需要烹饪： {meal}",
+      "hash": "b3fftb",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.nook.title": {
+      "translation": "今日餐点",
+      "hash": "g3t6wt",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.nook.empty": {
+      "translation": "今天没有计划的餐点。",
+      "hash": "u2fwq9",
+      "lastUpdated": "2026-08-18"
     }
   }
 }
