@@ -93,7 +93,7 @@ For each approved pin:
 2. Render to a 1000×1500 @2x PNG, writing the final file into the Drive Pinterest folder:
    ```bash
    node .claude/skills/pinterest-post/scripts/render-pin.mjs <filled.html> \
-     ~/gdrive-gparker97/Projects/beanies.family/Pinterest/<pin-NN>.png
+     ~/gdrive-gparker97/Projects/beanies.family/Marketing/Pinterest/<pin-NN>.png
    ```
    (Playwright headless Chromium; needs network for the webfonts. If Chromium is missing:
    `npx playwright install chromium`.)
@@ -103,14 +103,19 @@ For each approved pin:
 
 **Where files go — important.** Pins are launch/marketing content, which per the project
 rules must **NOT be committed to the repo**. Render the final PNG into the Google Drive
-Pinterest folder — `~/gdrive-gparker97/Projects/beanies.family/Pinterest/` (mounted via
-rclone, so it persists across machines and greg can grab it from Drive directly). Use the
+Pinterest folder — `~/gdrive-gparker97/Projects/beanies.family/Marketing/Pinterest/` (mounted
+via rclone, so it persists across machines and greg can grab it from Drive directly). Use the
 scratchpad only for intermediate/throwaway renders. Then hand greg the PNG path and log the
 row to Notion. The reusable *template + script* live in this skill (they're tooling, fine to
 commit); the *rendered pins and their copy* live only in Drive + Notion.
 
-> Legacy note: the first batch was rendered to `~/beanies-pins/` (local-only). That path is
-> retired — always render to the Drive Pinterest folder going forward.
+**Check the mount before rendering.** If rclone isn't running, that path is an ordinary empty
+local directory and the render will *appear* to succeed while landing on local disk. Confirm
+with `findmnt /home/greg/gdrive-gparker97` first — not `ls`, which can't tell the difference.
+
+> Legacy note: two paths are retired — `~/beanies-pins/` (local-only, the first batch) and
+> `…/beanies.family/Pinterest/` (pre-2026-08-18, before the Drive tree gained a `Marketing/`
+> layer). Always render to `Marketing/Pinterest/` going forward.
 
 ### 6. Log to the Pin Tracker (on approval)
 Write one row per pin to the **Pin Tracker** Notion DB
@@ -169,7 +174,7 @@ Inline DB "Pin Tracker" on the Pinterest Strategy page, section 6.
 | `Title` | title | the pin's short headline / name |
 | `Description` | rich_text | the Pinterest description copy (lowercase) |
 | `Link` | url | the full **tagged** destination URL (with UTMs) |
-| `Pin image` | rich_text | the Drive path to the rendered PNG (e.g. `~/gdrive-gparker97/Projects/beanies.family/Pinterest/pin-NN.png`) — a text field, since the API can't upload image files; greg attaches the actual image when posting on Pinterest |
+| `Pin image` | rich_text | the Drive path to the rendered PNG (e.g. `~/gdrive-gparker97/Projects/beanies.family/Marketing/Pinterest/pin-NN.png`) — a text field, since the API can't upload image files; greg attaches the actual image when posting on Pinterest |
 | `Board (s)` | multi_select | the target board(s) |
 | `Status` | select | Draft / Approved / Live / Paused / Archived |
 | `Pin code` | rich_text | the `utm_content` value ("which pin") |
