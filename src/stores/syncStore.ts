@@ -19,6 +19,7 @@ import { useAllergiesStore } from './allergiesStore';
 import { useMedicationsStore } from './medicationsStore';
 import { useMilestonesStore } from './milestonesStore';
 import { useRecipesStore } from './recipesStore';
+import { useMealPlanStore } from './mealPlanStore';
 import { useEmergencyContactsStore } from './emergencyContactsStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
@@ -2134,6 +2135,7 @@ export const useSyncStore = defineStore('sync', () => {
       const medicationsStoreInst = useMedicationsStore();
       const milestonesStoreInst = useMilestonesStore();
       const recipesStoreInst = useRecipesStore();
+      const mealPlanStoreInst = useMealPlanStore();
       const emergencyContactsStoreInst = useEmergencyContactsStore();
 
       // Snapshot permission state before reload for diagnostics
@@ -2165,6 +2167,7 @@ export const useSyncStore = defineStore('sync', () => {
           medicationsStoreInst.loadMedications(),
           milestonesStoreInst.loadMilestones(),
           recipesStoreInst.loadRecipes(),
+          mealPlanStoreInst.loadMealPlans(),
           emergencyContactsStoreInst.loadEmergencyContacts(),
         ])
       );

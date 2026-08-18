@@ -12,4 +12,5 @@ export { useMemberNotesStore } from './memberNotesStore';
 export { useAllergiesStore } from './allergiesStore';
 export { useMedicationsStore } from './medicationsStore';
 export { useRecipesStore } from './recipesStore';
+export { useMealPlanStore } from './mealPlanStore';
 export { useEmergencyContactsStore } from './emergencyContactsStore';

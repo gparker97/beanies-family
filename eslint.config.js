@@ -144,6 +144,10 @@ export default [
             // triggers a lint error → add it here intentionally (keeps the set
             // reviewed). Wrap purely-decorative glyphs in aria-hidden where they
             // sit next to real (translated) text.
+            '‹', // meal-planner nav prev arrow (aria-labelled button)
+            '⧉', // meal-planner copy-week action glyph
+            '🍲', // meal planner
+            '👥', // "who's eating" guests glyph
             '⏰',
             '⏳',
             '⚠',

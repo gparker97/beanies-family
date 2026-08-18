@@ -3,6 +3,8 @@ import type { Recipe, CookLogEntry } from '@/types/models';
 import { list } from '../projection';
 import { mutate } from '../worker/docClient';
 import type { MutationOp } from '../worker/protocol';
+import { mealIdsForRecipe } from './mealPlanRepository';
+import { toISODateString } from '@/utils/date';
 
 const recipeRepo = createAutomergeRepository<'recipes', Recipe>('recipes');
 const cookLogRepo = createAutomergeRepository<'cookLogs', CookLogEntry>('cookLogs');
@@ -34,8 +36,22 @@ export async function deleteRecipeCascade(recipeId: string): Promise<void> {
   const childIds = list('cookLogs')
     .filter((c) => c.recipeId === recipeId)
     .map((c) => c.id);
+  // Meal-plan entries referencing this recipe are dereferenced (recipeId cleared →
+  // "recipe removed") in the SAME atomic batch, so the deletion + deref land
+  // together. Already-recorded cook logs are their own deletes above.
+  const mealIds = mealIdsForRecipe(recipeId);
+  const now = toISODateString(new Date());
   const ops: MutationOp[] = [
     ...childIds.map((id): MutationOp => ({ op: 'delete', collection: 'cookLogs', id })),
+    ...mealIds.map((id): MutationOp => ({
+      op: 'patch',
+      collection: 'mealPlans',
+      id,
+      patch: {},
+      deleteKeys: ['recipeId'],
+      updatedAt: now,
+      onMissing: 'skip',
+    })),
     { op: 'delete', collection: 'recipes', id: recipeId },
   ];
   await mutate({ op: 'batch', ops });

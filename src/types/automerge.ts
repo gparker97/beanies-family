@@ -20,6 +20,7 @@ import type {
   Milestone,
   Recipe,
   CookLogEntry,
+  MealPlanEntry,
   EmergencyContact,
   CalendarConnection,
   CalendarEventLink,
@@ -56,6 +57,7 @@ export interface FamilyDocument {
   milestones: Record<string, Milestone>;
   recipes: Record<string, Recipe>;
   cookLogs: Record<string, CookLogEntry>;
+  mealPlans: Record<string, MealPlanEntry>;
   emergencyContacts: Record<string, EmergencyContact>;
   /**
    * Per-member in-app notification read-state: memberId → (notificationId →
@@ -117,6 +119,7 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   milestones: 0,
   recipes: 0,
   cookLogs: 0,
+  mealPlans: 0,
   emergencyContacts: 0,
   notificationReads: 0,
   calendarConnections: 0,
