@@ -44,9 +44,9 @@ function hasMeals(date: string): boolean {
 </script>
 
 <template>
-  <div class="flex h-full flex-col overflow-x-auto p-3">
+  <div class="flex h-full flex-col overflow-auto p-3">
     <div
-      class="grid min-h-0 min-w-[56rem] flex-1 grid-cols-[6rem_repeat(7,minmax(7rem,1fr))] grid-rows-[auto_repeat(4,minmax(4.5rem,1fr))] gap-x-1"
+      class="grid min-h-0 min-w-[56rem] flex-1 grid-cols-[6rem_repeat(7,minmax(7rem,1fr))] grid-rows-[auto_repeat(4,minmax(min-content,1fr))] gap-x-1"
     >
       <!-- Header row: empty corner + 7 days -->
       <div></div>
