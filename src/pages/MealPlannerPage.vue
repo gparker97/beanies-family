@@ -254,9 +254,13 @@ async function doShare() {
          space (md:flex-1) but caps its height so tall monitors don't stretch the
          four slot rows into cartoonish bands — the remainder stays as margin. The
          cap is generous enough for a full four-slot week; a busier week scrolls
-         inside the board (MealWeekBoard is overflow-auto) rather than clipping. -->
+         inside the board (MealWeekBoard is overflow-auto) rather than clipping.
+         grid-rows-[minmax(0,1fr)] is load-bearing: a grid's implicit row is
+         content-sized, which would let the rail/week-grid grow past the board's
+         box (clipping the rail's alternatives). Constraining the single row to
+         the board height forces both columns to fit and scroll internally. -->
     <div
-      class="mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:max-h-[52rem] md:min-h-0 md:flex-1 md:grid-cols-[15rem_1fr] dark:bg-slate-800"
+      class="mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:max-h-[52rem] md:min-h-0 md:flex-1 md:grid-cols-[15rem_1fr] md:grid-rows-[minmax(0,1fr)] dark:bg-slate-800"
     >
       <RecipeRail />
       <MealWeekBoard
