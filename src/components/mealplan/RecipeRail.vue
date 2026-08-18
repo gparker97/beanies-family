@@ -121,32 +121,36 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
       </div>
     </div>
 
-    <div
-      class="font-outfit mt-4 text-[0.62rem] font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
-    >
-      {{ t('mealPlanner.picker.alternatives') }}
-    </div>
-    <!-- Full-width rows (one per line) — matches the recipe cards above so they
-         read as the same draggable object, and the labels never truncate. -->
-    <div class="mt-2 grid gap-2">
+    <!-- Alternatives are flex-none so they always reserve their full height —
+         the scrollable recipe list above (flex-1) is what yields when the rail
+         runs short, never these. Full-width rows (one per line) match the recipe
+         cards, so they read as the same draggable object and never truncate. -->
+    <div class="flex-none">
       <div
-        v-for="alt in ALT_TYPES"
-        :key="alt.kind"
-        draggable="true"
-        class="flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
-        @dragstart="startDrag({ source: 'type', kind: alt.kind }, $event)"
-        @dragend="endDrag"
+        class="font-outfit mt-4 text-[0.62rem] font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
       >
-        <span class="mp-grip" aria-hidden="true"></span>
-        <span
-          class="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] text-base"
-          :class="alt.tile"
-          aria-hidden="true"
-          >{{ alt.emoji }}</span
+        {{ t('mealPlanner.picker.alternatives') }}
+      </div>
+      <div class="mt-2 grid gap-2">
+        <div
+          v-for="alt in ALT_TYPES"
+          :key="alt.kind"
+          draggable="true"
+          class="flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
+          @dragstart="startDrag({ source: 'type', kind: alt.kind }, $event)"
+          @dragend="endDrag"
         >
-        <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-slate-100">
-          {{ t(`mealPlanner.kind.${alt.kind}`) }}
-        </span>
+          <span class="mp-grip" aria-hidden="true"></span>
+          <span
+            class="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] text-base"
+            :class="alt.tile"
+            aria-hidden="true"
+            >{{ alt.emoji }}</span
+          >
+          <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-slate-100">
+            {{ t(`mealPlanner.kind.${alt.kind}`) }}
+          </span>
+        </div>
       </div>
     </div>
 
