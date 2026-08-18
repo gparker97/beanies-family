@@ -401,14 +401,14 @@ Full design + review: `docs/plans/2026-08-12-app-open-instant-projection-snapsho
 
 **Before-baseline (measured, prod PR 1 build `10d88180` / 0.9.10R8, `open-cycle` surface, 2026-08-17).** Five read-only cold opens of a real ~2–3 MB `.beanpod` on one family (`…fa046620`) across **iOS, web (Windows/Chrome), and Android (Pixel)** were dead-consistent:
 
-| metric                                | before (PR 1)                                                 | after (PR 2, unchanged file, target) |
-| ------------------------------------- | ------------------------------------------------------------- | ------------------------------------ |
-| `rec` (full CRDT reconstructions)     | **2** (cacheLoad + remoteLoad)                                | **1** (cacheLoad only)               |
-| `reads` (whole-file Drive downloads)  | **1**                                                         | **0** (guard skips)                  |
-| `writes`                              | **0** (PR 1's `dirty` gate already holds — no ungated upload) | 0                                    |
-| `reloads` (full store re-projections) | **2–3**                                                       | **1**                                |
-| `snap`                                | hit                                                           | hit                                  |
-| `action`                              | `open-complete`                                               | `open-skip`                          |
+| metric                                | before (PR 1)                                                 | after (PR 2, unchanged file — confirmed prod R9 2026-08-18) |
+| ------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| `rec` (full CRDT reconstructions)     | **2** (cacheLoad + remoteLoad)                                | **1** (cacheLoad only)                                      |
+| `reads` (whole-file Drive downloads)  | **1**                                                         | **0** (guard skips)                                         |
+| `writes`                              | **0** (PR 1's `dirty` gate already holds — no ungated upload) | 0                                                           |
+| `reloads` (full store re-projections) | **2–3**                                                       | **1**                                                       |
+| `snap`                                | hit                                                           | hit                                                         |
+| `action`                              | `open-complete`                                               | `open-skip`                                                 |
 
 Representative raw record: `open-complete: path=path1a rec=2 reads=1 writes=0 reloads=2 snap=hit`.
 
@@ -419,7 +419,16 @@ Representative raw record: `open-complete: path=path1a rec=2 reads=1 writes=0 re
 - 1st open: `open-complete rec=2 reads=1 writes=0 reloads=2` (`automerge.cacheLoad` 3907ms + a 2.5MB Drive download + `automerge.remoteLoad` 3137ms).
 - 2nd open (unchanged): **`open-skip rec=1 reads=0 writes=0 reloads=2 reason=unchanged-revision-in-window`** — the Drive download AND the `automerge.remoteLoad` (~3.1s) are both gone.
 
-So **rec 2→1 and reads 1→0** are delivered. `reads=0` on the 2nd open eliminates the whole-file download + the second CRDT reconstruction. `reason=unchanged-revision-in-window` also **confirms Drive's `version` field is populated + compared** (a missing field would surface `open-fail-open reason=no-revision`). Two honest caveats: (a) `reloads` stayed at 2 — those are the fast-paint snapshot's reloads (§9), not the remote path, so PR 2 doesn't touch them; (b) `automerge.cacheLoad` is still multi-second — that is the LOCAL rebuild replaying increments (history-bound), the separate history-compaction lever the #61 audit deferred, hidden behind the ~83ms snapshot paint. The prod five-surface after-capture rides the deploy for the record, but the mechanism is verified.
+So **rec 2→1 and reads 1→0** are delivered. `reads=0` on the 2nd open eliminates the whole-file download + the second CRDT reconstruction. `reason=unchanged-revision-in-window` also **confirms Drive's `version` field is populated + compared** (a missing field would surface `open-fail-open reason=no-revision`). Two honest caveats: (a) `reloads` stayed at 2 — those are the fast-paint snapshot's reloads (§9), not the remote path, so PR 2 doesn't touch them; (b) `automerge.cacheLoad` is still multi-second — that is the LOCAL rebuild replaying increments (history-bound), the separate history-compaction lever the #61 audit deferred, hidden behind the ~83ms snapshot paint.
+
+**After-measurement — CONFIRMED IN PROD (build `46108bbb` / 0.9.10R9, `open-cycle` surface, CloudWatch, 2026-08-18).** A single-client browser clean-reopen of a real `.beanpod` on family `…fa046620` (no edits between opens, within the 1-hour trust window) emitted two consecutive skips:
+
+```
+open-skip  unchanged-revision-in-window  rec=1 reads=0 writes=0 snap=hit  (02:59:33Z)
+open-skip  unchanged-revision-in-window  rec=1 reads=0 writes=0 snap=hit  (03:00:08Z)
+```
+
+This is the target column met on a live build: **`rec=1 reads=0 writes=0`, `action=open-skip`** against the PR-1 prod baseline of `rec=2 reads=1`. The `unchanged-revision-in-window` reason re-confirms Drive's `version` counter is populated and compared in prod (no `no-revision` fallback). **Caveat on the prod population:** in the 60h since the R9 deploy, no _organic_ skip was observed — the family carrying nearly all R9 opens (`…fa046620`) is a change-heavy dual-client testing setup that structurally never hits "unchanged," and the one other R9 user had opened only once (recording its baseline, `no-baseline`). The skip is therefore verified by a deliberate clean-reopen rather than by ambient traffic; §10 is considered closed on the mechanism. This R9 skip figure is the like-for-like baseline for validating #65 (R10), which layers a second skip barrier on top of this path.
 
 Full design + review: `docs/plans/2026-08-13-open-cycle-redundant-loads.md`. Audit: `docs/investigations/2026-08-13-open-cycle-load-audit.md`.
 
