@@ -1201,6 +1201,19 @@ const STRING_DEFS = {
   'mealPlanner.pastWeeks': { en: 'Past weeks', beanie: 'past weeks' },
   'mealPlanner.copyLastWeek': { en: 'Copy last week', beanie: 'copy last week' },
   'mealPlanner.copyHere': { en: 'Copy to this week', beanie: 'copy to this week' },
+  'mealPlanner.clearDay': { en: 'Clear day', beanie: 'clear day' },
+  'mealPlanner.clearWeek': { en: 'Clear week', beanie: 'clear week' },
+  'mealPlanner.clear.dayTitle': { en: 'Clear this day?', beanie: 'clear this day?' },
+  'mealPlanner.clear.dayMessage': {
+    en: 'This removes every meal planned for this day. Cook logs you already saved are kept.',
+    beanie: 'this removes every meal planned for this day. cook logs you already saved are kept.',
+  },
+  'mealPlanner.clear.weekTitle': { en: 'Clear this week?', beanie: 'clear this week?' },
+  'mealPlanner.clear.weekMessage': {
+    en: 'This removes every meal planned this week. Cook logs you already saved are kept.',
+    beanie: 'this removes every meal planned this week. cook logs you already saved are kept.',
+  },
+  'mealPlanner.clear.confirmLabel': { en: 'Clear', beanie: 'clear' },
   'mealPlanner.shareAction': { en: 'Share', beanie: 'share' },
   'mealPlanner.cookbook': { en: 'Cookbook', beanie: 'cookbook' },
   'mealPlanner.railHint': {
