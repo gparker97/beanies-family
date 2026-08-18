@@ -1222,6 +1222,8 @@ const STRING_DEFS = {
   },
   'mealPlanner.search': { en: 'Search recipes…', beanie: 'search recipes…' },
   'mealPlanner.newRecipe': { en: 'New recipe', beanie: 'new recipe' },
+  'mealPlanner.removeHint': { en: 'Drop here to remove', beanie: 'drop here to remove' },
+  'mealPlanner.removed': { en: 'Removed from the plan', beanie: 'removed from the plan' },
   'mealPlanner.addMeal': { en: 'Add a meal', beanie: 'add a meal' },
   'mealPlanner.emptyWeek': {
     en: 'No meals planned this week yet — drop a recipe onto a day to start.',

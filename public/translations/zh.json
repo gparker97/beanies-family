@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-18",
-    "translationCount": 4025
+    "translationCount": 4027
   },
   "translations": {
     "app.name": {
@@ -20129,6 +20129,16 @@
     "mealPlanner.editor.viewCookLog": {
       "translation": "查看烹饪日志",
       "hash": "137q1l",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.removeHint": {
+      "translation": "拖放到此即可移除。",
+      "hash": "h8r1ze",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.removed": {
+      "translation": "已从计划中删除",
+      "hash": "wzmcaa",
       "lastUpdated": "2026-08-18"
     }
   }
