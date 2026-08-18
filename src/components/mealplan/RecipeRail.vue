@@ -126,12 +126,14 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
     >
       {{ t('mealPlanner.picker.alternatives') }}
     </div>
-    <div class="mt-2 grid grid-cols-2 gap-2">
+    <!-- Full-width rows (one per line) — matches the recipe cards above so they
+         read as the same draggable object, and the labels never truncate. -->
+    <div class="mt-2 grid gap-2">
       <div
         v-for="alt in ALT_TYPES"
         :key="alt.kind"
         draggable="true"
-        class="flex cursor-grab items-center gap-1.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
+        class="flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
         @dragstart="startDrag({ source: 'type', kind: alt.kind }, $event)"
         @dragend="endDrag"
       >
@@ -142,9 +144,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
           aria-hidden="true"
           >{{ alt.emoji }}</span
         >
-        <span
-          class="font-outfit text-secondary-500 truncate text-xs font-semibold dark:text-slate-100"
-        >
+        <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-slate-100">
           {{ t(`mealPlanner.kind.${alt.kind}`) }}
         </span>
       </div>
