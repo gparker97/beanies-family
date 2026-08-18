@@ -12,6 +12,10 @@ const todayRef = { value: '2026-08-20' };
 vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: todayRef }) }));
 vi.mock('@/services/automerge/docService', () => ({ isDocLoaded: () => true }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
+vi.mock('@/stores/translationStore', () => ({
+  useTranslationStore: () => ({ t: (k: string) => k }),
+}));
 
 const repoState = { all: [] as MealPlanEntry[] };
 const createMealPlan = vi.fn(async (input: Record<string, unknown>) => ({
@@ -156,6 +160,44 @@ describe('mealPlanStore', () => {
     store.nullifyRecipe('r1');
     expect(store.meals.find((m) => m.id === 'm1')?.recipeId).toBeUndefined();
     expect(store.meals.find((m) => m.id === 'm2')?.recipeId).toBe('r2');
+  });
+
+  it('blocks a duplicate recipe/fixed-type in a cell, but allows other + different cells', async () => {
+    repoState.all = [
+      seed({ id: 'a', date: '2026-08-20', slot: 'dinner', kind: 'recipe', recipeId: 'r1' }),
+    ];
+    await store.loadMealPlans();
+
+    // same recipe, same cell -> blocked
+    expect(
+      await store.createMeal({
+        date: '2026-08-20',
+        slot: 'dinner',
+        kind: 'recipe',
+        recipeId: 'r1',
+        cooked: false,
+      })
+    ).toBeNull();
+    // same recipe, different slot -> allowed
+    expect(
+      await store.createMeal({
+        date: '2026-08-20',
+        slot: 'lunch',
+        kind: 'recipe',
+        recipeId: 'r1',
+        cooked: false,
+      })
+    ).not.toBeNull();
+    // duplicate eat_out in the same cell -> blocked
+    await store.createMeal({ date: '2026-08-21', slot: 'dinner', kind: 'eat_out', cooked: false });
+    expect(
+      await store.createMeal({ date: '2026-08-21', slot: 'dinner', kind: 'eat_out', cooked: false })
+    ).toBeNull();
+    // two 'other' in the same cell -> allowed (freeform, distinct labels)
+    await store.createMeal({ date: '2026-08-22', slot: 'dinner', kind: 'other', cooked: false });
+    expect(
+      await store.createMeal({ date: '2026-08-22', slot: 'dinner', kind: 'other', cooked: false })
+    ).not.toBeNull();
   });
 
   it('todaysCookAssignments surfaces only uncooked recipe meals with a cook', async () => {
