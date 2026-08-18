@@ -31,6 +31,7 @@ const emit = defineEmits<{
   'open-activity': [id: string, date: string];
   'open-medication': [id: string];
   'open-list': [id: string];
+  'open-meal': [id: string];
   'complete-duty': [id: string, dutyType: string, occurrenceDate: string];
   'complete-todo': [id: string];
 }>();
@@ -110,6 +111,7 @@ function handleItemClick(item: CriticalItem) {
   if (item.type === 'todo') emit('open-todo', item.id);
   else if (item.type === 'medication') emit('open-medication', item.id);
   else if (item.type === 'list') emit('open-list', item.id);
+  else if (item.type === 'meal') emit('open-meal', item.id);
   else if (item.type === 'holiday')
     return; // informational only — no target view
   else emit('open-activity', item.id, item.occurrenceDate ?? '');

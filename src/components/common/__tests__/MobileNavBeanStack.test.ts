@@ -122,9 +122,9 @@ describe('MobileNavBeanStack', () => {
     expect(wrapper.findAll('[role=menuitem]')).toHaveLength(0);
   });
 
-  it('renders 3 beans for Planning (Activities, Travel, To-do)', () => {
+  it('renders 4 beans for Planning (Activities, Travel, To-do, Meal Planner)', () => {
     const wrapper = mountStack({ category: planning });
-    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(3);
+    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(4);
   });
 
   it('renders 6 beans for Money', () => {
@@ -141,10 +141,11 @@ describe('MobileNavBeanStack', () => {
     const wrapper = mountStack({ category: planning });
     const beans = wrapper.findAll('[role=menuitem]');
     // Items render in REVERSED order — first DOM item is the last category item.
-    // For Planning, items are [/activities, /travel, /todo]; reversed first = /todo.
+    // For Planning, items are [/activities, /travel, /todo, /meal-planner];
+    // reversed first = /meal-planner.
     await beans[0]!.trigger('click');
     expect(wrapper.emitted('navigate')).toBeTruthy();
-    expect(wrapper.emitted('navigate')![0]).toEqual(['/todo']);
+    expect(wrapper.emitted('navigate')![0]).toEqual(['/meal-planner']);
   });
 
   it('emits close on scrim tap', async () => {
@@ -229,9 +230,9 @@ describe('MobileNavBeanStack', () => {
     const wrapper = mountStack({ category: planning, attach: true });
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
-    // Bottom bean (DOM order index 0 since reversed) is /todo for Planning
+    // Bottom bean (DOM order index 0 since reversed) is /meal-planner for Planning
     const focused = document.activeElement;
-    expect(focused?.textContent).toContain('nav.todo');
+    expect(focused?.textContent).toContain('nav.mealPlanner');
     wrapper.unmount();
   });
 
@@ -248,8 +249,8 @@ describe('MobileNavBeanStack', () => {
   it('exposes hint text inside the same button so screen readers read both', () => {
     const wrapper = mountStack({ category: planning });
     const beans = wrapper.findAll('[role=menuitem]');
-    // Reversed order: /todo first
-    expect(beans[0]!.text()).toContain('nav.todo');
-    expect(beans[0]!.text()).toContain('mobileNav.hint.todo');
+    // Reversed order: /meal-planner first
+    expect(beans[0]!.text()).toContain('nav.mealPlanner');
+    expect(beans[0]!.text()).toContain('mobileNav.hint.mealPlanner');
   });
 });

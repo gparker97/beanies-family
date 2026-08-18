@@ -67,6 +67,16 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'from_path',
   'action',
   'error_code',
+  // Meal Planner (#27, surface 'meal-planner'). All PII-free fixed enums/bools —
+  // no recipe names, notes, guest names, or member names ever ship: `kind`
+  // (recipe|eat_out|leftovers|skip|other), `slot` (breakfast|lunch|dinner|snack),
+  // `quick_add` (bool), `share_scope` (day|week), `overwrote` (bool). Same
+  // Diagnostics category already declared to the stores.
+  'kind',
+  'slot',
+  'quick_add',
+  'share_scope',
+  'overwrote',
   'http_status',
   'provider_type',
   'file_id_tail',

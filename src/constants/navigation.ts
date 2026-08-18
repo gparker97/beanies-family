@@ -137,6 +137,13 @@ export const NAV_ITEMS: NavItemDef[] = [
     mobileCategory: 'planning',
   },
   {
+    labelKey: 'nav.mealPlanner',
+    path: '/meal-planner',
+    emoji: '\u{1F372}',
+    section: 'treehouse',
+    mobileCategory: 'planning',
+  },
+  {
     labelKey: 'nav.pod',
     path: '/pod',
     emoji: '\u{1F331}',
@@ -378,6 +385,7 @@ const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
   '/activities': 'mobileNav.hint.activities',
   '/todo': 'mobileNav.hint.todo',
   '/lists': 'mobileNav.hint.lists',
+  '/meal-planner': 'mobileNav.hint.mealPlanner',
   '/travel': 'mobileNav.hint.travel',
   '/dashboard': 'mobileNav.hint.overview',
   '/accounts': 'mobileNav.hint.accounts',

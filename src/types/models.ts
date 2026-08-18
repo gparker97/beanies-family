@@ -1425,6 +1425,61 @@ export interface CookLogEntry {
   updatedAt: ISODateString;
 }
 
+/** Meal-plan slots (#27). Breakfast/Lunch/Dinner are fixed; any number of `snack` per day. */
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+/**
+ * What a planned meal IS. A `recipe` meal links a cookbook `Recipe` via
+ * `recipeId`; the other kinds are lightweight non-recipe entries (no recipe,
+ * no cook-log). There is deliberately NO free-form ad-hoc meal — `other`
+ * covers "something else" with an optional `label`.
+ */
+export type MealKind = 'recipe' | 'eat_out' | 'leftovers' | 'skip' | 'other';
+
+/**
+ * One planned meal on the meal-planner board (#27). Family-wide, keyed by
+ * `date` + `slot` + `position`. A `recipe` meal points at a cookbook `Recipe`
+ * (`recipeId`) and can be marked cooked → a separate `cookLogs` entry (the
+ * recipe's history is NOT nested here). `serveTime` is a display-only clock
+ * time — deliberately named to avoid colliding with `Recipe.prepTime` (a prep
+ * duration). Cook assignment (`cookMemberId`, single owner) surfaces in the
+ * daily briefing like a list. `guestNames` are non-member eaters.
+ */
+export interface MealPlanEntry {
+  id: UUID;
+  date: ISODateString;
+  slot: MealSlot;
+  /** Order within a day+slot; `(max in day+slot) + 1` on insert, gaps are fine. */
+  position: number;
+  kind: MealKind;
+  /** Present only when `kind === 'recipe'`; cleared to "recipe removed" if the recipe is deleted. */
+  recipeId?: UUID;
+  /** Display label for `other`, or the note beside a type meal ("Grandma's", "from Mon dinner"). */
+  label?: string;
+  /** Single cook (owner); absent = "anyone"/unassigned. Type meals like eat_out/skip need none. */
+  cookMemberId?: UUID;
+  /** Who's eating — family members; absent = everyone. */
+  eaterMemberIds?: UUID[];
+  /** Non-member guests eating (plain names, no member record). */
+  guestNames?: string[];
+  note?: string;
+  /** Clock time the meal is served (e.g. "16:30"); display only — no OS reminder. */
+  serveTime?: string;
+  cooked: boolean;
+  /** The `cookLogs` entry created when this recipe meal was marked cooked. */
+  cookLogId?: UUID;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/** Create input — `position` is assigned by the store, so callers omit it. */
+export type CreateMealPlanInput = Omit<
+  MealPlanEntry,
+  'id' | 'position' | 'createdAt' | 'updatedAt'
+>;
+export type UpdateMealPlanInput = Partial<Omit<MealPlanEntry, 'id' | 'createdAt' | 'updatedAt'>>;
+
 export type EmergencyContactCategory =
   'doctor' | 'dentist' | 'nurse' | 'teacher' | 'school' | 'other';
 

@@ -22,6 +22,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { confirm } from '@/composables/useConfirm';
+import { countMealsForRecipe } from '@/services/automerge/repositories/mealPlanRepository';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -163,18 +165,26 @@ async function handleSave(): Promise<void> {
 async function handleDelete(): Promise<void> {
   if (!props.recipe) return;
   const logCount = recipesStore.cookLogsByRecipe(props.recipe.id).value.length;
-  // confirm() takes a `detail` string (plain, untranslated) in addition
-  // to title + message. We use `detail` for the "this will also remove
-  // N cook-log entries" warning so the count surfaces in the dialog.
-  const detail =
-    logCount > 0
-      ? t('recipes.deleteConfirm.body')
-          .replace('{count}', String(logCount))
-          .replace(
-            '{label}',
-            logCount === 1 ? t('recipes.cookLogs.entry') : t('recipes.cookLogs.entries')
-          )
-      : undefined;
+  const mealCount = countMealsForRecipe(props.recipe.id);
+  // confirm() takes a `detail` string (plain, untranslated) in addition to
+  // title + message. We surface both counts there: the cook-log removal and,
+  // when the recipe is used in meal plans, the "marks those meals as recipe
+  // removed" warning (the meals themselves are kept; cook logs are kept).
+  const detailParts: string[] = [];
+  if (logCount > 0) {
+    detailParts.push(
+      t('recipes.deleteConfirm.body')
+        .replace('{count}', String(logCount))
+        .replace(
+          '{label}',
+          logCount === 1 ? t('recipes.cookLogs.entry') : t('recipes.cookLogs.entries')
+        )
+    );
+  }
+  if (mealCount > 0) {
+    detailParts.push(fillTemplate(t('mealPlanner.recipeDelete.message'), { count: mealCount }));
+  }
+  const detail = detailParts.length ? detailParts.join(' ') : undefined;
   const ok = await confirm({
     title: 'recipes.deleteConfirm.title',
     message: logCount > 0 ? 'recipes.deleteConfirm.body' : 'recipes.deleteConfirm.bodyNoLogs',
