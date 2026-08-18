@@ -10,7 +10,13 @@
 > NEVER save launch plans, marketing strategy, post drafts, subreddit content, Reddit/social media strategy, or any launch-related material to the repo. All launch and marketing content lives ONLY in Notion. The repo is for code, product docs, and architecture only. This includes `docs/launch/`, `docs/plans/` (for launch items), or any other directory. If asked to create launch content, write it to Notion, not the filesystem.
 >
 > **IMPORTANT — Non-repo file artifacts (Google Drive):**
-> Rendered file artifacts that must NOT be committed to the repo but are worth keeping (marketing collateral, pamphlets, flyers, Pinterest pins, exported images/PDFs, one-off design outputs) go to Google Drive, which is rclone-mounted in WSL at `~/gdrive-gparker97/Projects/beanies.family/<subfolder>` (persists across machines; accessible to both greg and Claude). Do NOT leave them in `~/Downloads`, `~/beanies-pins`, or the ephemeral scratchpad. Pinterest pins → `Pinterest/`. This is the file store only — launch **strategy/plans/copy** still live ONLY in Notion (rule above); the strategy rule is unchanged.
+> Rendered file artifacts that must NOT be committed to the repo but are worth keeping (marketing collateral, pamphlets, flyers, Pinterest pins, exported images/PDFs, one-off design outputs) go to Google Drive, which is rclone-mounted in WSL at `~/gdrive-gparker97/Projects/beanies.family/<subfolder>` (persists across machines; accessible to both greg and Claude). Do NOT leave them in `~/Downloads`, a local `~/beanies-*` directory, or the ephemeral scratchpad.
+>
+> **Marketing artifacts live under `Marketing/`** — create an appropriately-named subfolder there for any new category rather than adding one at the `beanies.family/` root. Current subfolders: `Marketing/Pinterest/` (pins), `Marketing/Handouts/` (event flyers), `Marketing/Blog/`, `Marketing/Fair Play/`, `Marketing/beanies CIG/`. The non-marketing siblings are `AI/`, `Legals/`, `Media/`, `Tech/`, `temp/`.
+>
+> **Verify the mount before writing.** If rclone isn't running, `~/gdrive-gparker97/...` is an ordinary empty local directory — the write appears to succeed and never reaches Drive. Check with `findmnt /home/greg/gdrive-gparker97` (or `systemctl is-active rclone-gdrive`), not with `ls` or a plain existence test.
+>
+> This is the file store only — launch **strategy/plans/copy** still live ONLY in Notion (rule above); the strategy rule is unchanged.
 >
 > **Key project documents in `docs/`:**
 >
