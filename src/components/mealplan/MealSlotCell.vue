@@ -53,7 +53,7 @@ async function onDrop(): Promise<void> {
       cooked: false,
     });
   } else if (payload.source === 'meal') {
-    await mealPlanStore.updateMeal(payload.mealId, { date: props.date, slot: props.mealSlot });
+    await mealPlanStore.moveMeal(payload.mealId, props.date, props.mealSlot);
   }
 }
 </script>

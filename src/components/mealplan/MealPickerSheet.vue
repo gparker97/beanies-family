@@ -61,14 +61,19 @@ async function quickAdd(): Promise<void> {
   busy.value = true;
   const recipe = await recipesStore.createRecipe({ name, ingredients: [], steps: [] });
   if (recipe) {
-    await mealPlanStore.createMeal({
-      date: props.date,
-      slot: props.mealSlot,
-      kind: 'recipe',
-      recipeId: recipe.id,
-      cooked: false,
-    });
-    emit('close');
+    const meal = await mealPlanStore.createMeal(
+      {
+        date: props.date,
+        slot: props.mealSlot,
+        kind: 'recipe',
+        recipeId: recipe.id,
+        cooked: false,
+      },
+      { quickAdd: true }
+    );
+    // Only close on a real success — otherwise the sheet stays open so the user
+    // can retry rather than leaving the just-created recipe orphaned with no meal.
+    if (meal) emit('close');
   }
   busy.value = false;
 }
@@ -130,6 +135,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
             type="button"
             class="from-primary-500 to-terracotta-400 font-outfit flex-none rounded-xl bg-gradient-to-r px-4 text-sm font-bold text-white disabled:opacity-50"
             :disabled="!canQuickAdd || busy"
+            :aria-label="t('mealPlanner.addMeal')"
             @click="quickAdd"
           >
             ＋

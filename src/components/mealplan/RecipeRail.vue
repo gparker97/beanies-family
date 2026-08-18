@@ -52,7 +52,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
         :key="recipe.id"
         draggable="true"
         class="flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
-        @dragstart="startDrag({ source: 'recipe', recipeId: recipe.id })"
+        @dragstart="startDrag({ source: 'recipe', recipeId: recipe.id }, $event)"
         @dragend="endDrag"
       >
         <MealThumb :photo-ids="recipe.photoIds" fallback-emoji="🍽️" :size-rem="2.125" />
@@ -78,7 +78,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
         :key="alt.kind"
         draggable="true"
         class="flex cursor-grab items-center gap-2 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-1.5 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
-        @dragstart="startDrag({ source: 'type', kind: alt.kind })"
+        @dragstart="startDrag({ source: 'type', kind: alt.kind }, $event)"
         @dragend="endDrag"
       >
         <span
