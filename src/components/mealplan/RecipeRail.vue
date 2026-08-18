@@ -8,6 +8,7 @@
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import MealThumb from './MealThumb.vue';
+import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useRecipeSearch } from '@/composables/useRecipeSearch';
 import { useMealDrag } from '@/composables/useMealDrag';
@@ -22,6 +23,12 @@ const { startDrag, endDrag } = useMealDrag();
 const query = ref('');
 const { results } = useRecipeSearch(recipes, query);
 
+// Add a full cookbook recipe (photo/ingredients/steps) without leaving the
+// planner — reuses the existing RecipeFormModal in create mode. The new recipe
+// appears in the rail reactively (recipesStore), ready to drag. This is the
+// richer sibling of MealPickerSheet's name-only slot quick-add.
+const addOpen = ref(false);
+
 const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: string }[] = [
   { kind: 'eat_out', emoji: '🍜', tile: 'bg-[var(--tint-silk-20)]' },
   { kind: 'leftovers', emoji: '♻️', tile: 'bg-[var(--tint-slate-5)]' },
@@ -32,7 +39,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
 
 <template>
   <aside
-    class="border-b border-[rgba(44,62,80,0.06)] p-4 md:border-r md:border-b-0 dark:border-slate-700"
+    class="flex h-full flex-col border-b border-[rgba(44,62,80,0.06)] p-4 md:border-r md:border-b-0 dark:border-slate-700"
   >
     <div class="font-outfit text-secondary-500 text-sm font-bold dark:text-slate-100">
       📖 {{ t('mealPlanner.cookbook') }}
@@ -46,7 +53,15 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
       class="font-inter text-secondary-500 mt-3 w-full rounded-xl border border-[rgba(44,62,80,0.14)] bg-white px-3 py-2 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1] dark:bg-slate-900 dark:text-slate-100"
     />
 
-    <div class="mt-3 grid max-h-80 gap-2 overflow-y-auto">
+    <button
+      type="button"
+      class="font-outfit mt-2.5 w-full rounded-[14px] border-[1.5px] border-dashed border-[rgba(241,93,34,0.5)] bg-[var(--tint-orange-8)] py-2.5 text-sm font-bold text-[#F15D22]"
+      @click="addOpen = true"
+    >
+      ＋ {{ t('mealPlanner.newRecipe') }}
+    </button>
+
+    <div class="mt-3 grid min-h-0 flex-1 gap-2 overflow-y-auto">
       <div
         v-for="recipe in results"
         :key="recipe.id"
@@ -92,6 +107,8 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
         </span>
       </div>
     </div>
+
+    <RecipeFormModal :open="addOpen" @close="addOpen = false" />
   </aside>
 </template>
 
