@@ -1224,6 +1224,11 @@ const STRING_DEFS = {
   'mealPlanner.newRecipe': { en: 'New recipe', beanie: 'new recipe' },
   'mealPlanner.removeHint': { en: 'Drop here to remove', beanie: 'drop here to remove' },
   'mealPlanner.removed': { en: 'Removed from the plan', beanie: 'removed from the plan' },
+  'mealPlanner.duplicate': { en: 'Already on the menu', beanie: 'already on the menu' },
+  'mealPlanner.duplicateHelp': {
+    en: 'That one is already in this meal.',
+    beanie: 'that one is already in this meal.',
+  },
   'mealPlanner.addMeal': { en: 'Add a meal', beanie: 'add a meal' },
   'mealPlanner.emptyWeek': {
     en: 'No meals planned this week yet — drop a recipe onto a day to start.',
