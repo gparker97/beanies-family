@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-18",
-    "translationCount": 4027
+    "translationCount": 4029
   },
   "translations": {
     "app.name": {
@@ -20139,6 +20139,16 @@
     "mealPlanner.removed": {
       "translation": "已从计划中删除",
       "hash": "wzmcaa",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.duplicate": {
+      "translation": "已在菜单上",
+      "hash": "nvl3on",
+      "lastUpdated": "2026-08-18"
+    },
+    "mealPlanner.duplicateHelp": {
+      "translation": "那个已经在这顿饭里了。",
+      "hash": "7m68ih",
       "lastUpdated": "2026-08-18"
     }
   }

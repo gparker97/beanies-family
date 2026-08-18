@@ -100,7 +100,10 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
       ＋ {{ t('mealPlanner.newRecipe') }}
     </button>
 
-    <div class="mt-3 grid min-h-0 flex-1 gap-2 overflow-y-auto">
+    <!-- content-start: a grid's default align-content is stretch, which would
+         balloon a lone search result to fill the tall list. Pack rows at the top
+         so every card keeps its natural height whether 1 or 20 match. -->
+    <div class="mt-3 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto">
       <div
         v-for="recipe in results"
         :key="recipe.id"

@@ -7,6 +7,8 @@ import * as mealRepo from '@/services/automerge/repositories/mealPlanRepository'
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
 import type {
   MealPlanEntry,
   CreateMealPlanInput,
@@ -86,10 +88,42 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     return existing.length ? Math.max(...existing.map((m) => m.position)) + 1 : 0;
   }
 
+  /**
+   * Is this exact card already in the target cell? A recipe matches on recipeId;
+   * the fixed types (eat out / leftovers / skip) match on kind — there's no sense
+   * in the same dish or the same "eat out" twice in one meal. 'other' is exempt:
+   * it's a freeform placeholder that can legitimately hold two distinct custom
+   * meals (distinguished by their labels), so it is never treated as a duplicate.
+   */
+  function isDuplicateInCell(input: CreateMealPlanInput): boolean {
+    if (input.kind === 'other') return false;
+    return meals.value.some(
+      (m) =>
+        m.date === input.date &&
+        m.slot === input.slot &&
+        (input.kind === 'recipe'
+          ? m.kind === 'recipe' && m.recipeId === input.recipeId
+          : m.kind === input.kind)
+    );
+  }
+
   async function createMeal(
     input: CreateMealPlanInput,
     opts?: { quickAdd?: boolean }
   ): Promise<MealPlanEntry | null> {
+    // Block adding the same card to a cell twice (drag or tap) — a no-op with a
+    // clear info toast, not an error. quick-add can't collide (fresh recipe id).
+    if (isDuplicateInCell(input)) {
+      const { t } = useTranslationStore();
+      showToast('info', t('mealPlanner.duplicate'), t('mealPlanner.duplicateHelp'));
+      logEvent({
+        level: 'info',
+        surface: 'meal-planner',
+        message: 'duplicate meal blocked',
+        context: { action: 'duplicate-blocked', kind: input.kind, slot: input.slot },
+      });
+      return null;
+    }
     const result = await wrapAsync(
       isLoading,
       error,
