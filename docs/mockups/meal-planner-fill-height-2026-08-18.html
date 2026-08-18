@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meal Planner — fill height + rail add</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --orange: #f15d22;
+        --orange-dark: #d14d1a;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+        --sq: 24px;
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--cloud);
+        color: var(--slate);
+        font-family: Inter, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 15rem 1fr;
+        min-height: 100vh;
+      }
+      /* --- faux sidebar, just to set context/scale --- */
+      .side {
+        background: var(--slate);
+        color: #ecf0f1;
+        padding: 1.25rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .brand {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1.05rem;
+        margin-bottom: 1.25rem;
+      }
+      .brand .tld {
+        color: var(--orange);
+      }
+      .nav {
+        font-family: Outfit, sans-serif;
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: rgba(236, 240, 241, 0.62);
+        padding: 0.55rem 0.7rem;
+        border-radius: 0.9rem;
+      }
+      .nav.on {
+        background: linear-gradient(90deg, rgba(241, 93, 34, 0.22), transparent);
+        color: #fff;
+        border-left: 3px solid var(--orange);
+      }
+      /* --- content --- */
+      .main {
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      .head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      h1 {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1.5rem;
+      }
+      .welcome {
+        font-family: Caveat, cursive;
+        font-weight: 700;
+        font-size: 1.05rem;
+        color: var(--orange);
+        margin-top: 0.1rem;
+      }
+      .head-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border: none;
+        border-radius: 1rem;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+      }
+      .btn-ghost {
+        background: var(--tint-slate-5);
+        color: var(--slate);
+      }
+      .btn-share {
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        color: #fff;
+        font-weight: 700;
+      }
+      .weeknav {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+      .arrow {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.75rem;
+        border: 1.5px solid rgba(44, 62, 80, 0.12);
+        background: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 1rem;
+        cursor: pointer;
+        color: var(--slate);
+      }
+      .weeklabel {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .spacer {
+        flex: 1;
+      }
+      .clearweek {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: rgba(44, 62, 80, 0.5);
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+
+      /* THE BOARD — the change: a flex column that claims remaining height,
+         but capped so a tall monitor doesn't stretch the rows grotesquely. */
+      .board {
+        margin-top: 1rem;
+        flex: 1; /* fill the leftover vertical space... */
+        max-height: 44rem; /* ...up to a sensible cap — remainder stays as margin */
+        display: grid;
+        grid-template-columns: 15rem 1fr;
+        background: #fff;
+        border-radius: var(--sq);
+        box-shadow: var(--soft-shadow);
+        overflow: hidden;
+        min-height: 0;
+      }
+
+      /* --- rail --- */
+      .rail {
+        border-right: 1px solid rgba(44, 62, 80, 0.06);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .rail-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.9rem;
+      }
+      .rail-hint {
+        font-family: Caveat, cursive;
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--orange);
+        margin-top: 0.1rem;
+      }
+      .search {
+        margin-top: 0.75rem;
+        width: 100%;
+        border: 1px solid rgba(44, 62, 80, 0.14);
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        font-family: Inter, sans-serif;
+        color: var(--slate);
+      }
+      .search::placeholder {
+        color: rgba(44, 62, 80, 0.4);
+      }
+      /* rail list flexes to fill (no fixed max-height) */
+      .rail-list {
+        margin-top: 0.75rem;
+        display: grid;
+        gap: 0.5rem;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        align-content: start;
+      }
+      .recipe {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        border: 1px solid rgba(44, 62, 80, 0.08);
+        border-radius: 14px;
+        background: #fff;
+        padding: 0.5rem;
+        box-shadow: var(--card-shadow);
+        cursor: grab;
+      }
+      .thumb {
+        width: 2.125rem;
+        height: 2.125rem;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        font-size: 1.1rem;
+        flex: none;
+        background: var(--tint-orange-8);
+      }
+      .recipe .rname {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      .recipe .rsub {
+        font-size: 0.72rem;
+        color: rgba(44, 62, 80, 0.45);
+      }
+      /* the NEW add-recipe button — pinned under the search / above alternatives */
+      .add-recipe {
+        margin-top: 0.75rem;
+        width: 100%;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.85rem;
+        border: 1.5px dashed rgba(241, 93, 34, 0.5);
+        background: var(--tint-orange-8);
+        color: var(--orange);
+        border-radius: 14px;
+        padding: 0.6rem;
+        cursor: pointer;
+      }
+      .alt-label {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.62rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: rgba(44, 62, 80, 0.4);
+        margin-top: 1rem;
+      }
+      .alts {
+        margin-top: 0.5rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+      .alt {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1px solid rgba(44, 62, 80, 0.08);
+        border-radius: 14px;
+        background: #fff;
+        padding: 0.4rem;
+        box-shadow: var(--card-shadow);
+        cursor: grab;
+      }
+      .alt .aemoji {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        font-size: 1rem;
+        flex: none;
+        background: var(--tint-slate-5);
+      }
+      .alt .aname {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.75rem;
+      }
+
+      /* --- week grid: the 4 slot rows now share leftover height equally --- */
+      .grid {
+        padding: 0.75rem;
+        display: grid;
+        grid-template-columns: 6rem repeat(7, minmax(7rem, 1fr));
+        grid-template-rows: auto repeat(4, 1fr); /* <- the fill: 4 equal slot rows */
+        column-gap: 0.25rem;
+        min-height: 0;
+      }
+      .dayhead {
+        text-align: center;
+        padding-bottom: 0.5rem;
+      }
+      .dayhead .dh-name {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.85rem;
+      }
+      .dayhead.today .dh-name {
+        color: var(--orange);
+      }
+      .dayhead .dh-num {
+        font-size: 0.72rem;
+        color: rgba(44, 62, 80, 0.45);
+      }
+      .dayhead .dh-badge {
+        margin-top: 0.15rem;
+        display: inline-block;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.58rem;
+        color: var(--orange);
+        background: var(--tint-orange-15);
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+      }
+      .slotlabelcell {
+        display: flex;
+        align-items: flex-start;
+        border-top: 1px solid rgba(44, 62, 80, 0.07);
+        padding: 0.5rem 0.25rem 0 0;
+      }
+      .slotchip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 999px;
+        padding: 0.25rem 0.5rem;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.6rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .chip-b {
+        background: rgba(230, 166, 74, 0.16);
+        color: #9a6a1a;
+      }
+      .chip-l {
+        background: var(--tint-silk-20);
+        color: var(--slate);
+      }
+      .chip-d {
+        background: var(--tint-orange-8);
+        color: var(--orange-dark);
+      }
+      .chip-s {
+        background: rgba(39, 174, 96, 0.12);
+        color: #1e7a45;
+      }
+      .cell {
+        border-top: 1px solid rgba(44, 62, 80, 0.07);
+        padding: 0.5rem 0.35rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-height: 0;
+      }
+      .cell.today {
+        background: rgba(241, 93, 34, 0.035);
+      }
+      /* drag-over state: the WHOLE cell is the drop target — even when a card
+         already occupies part of it. This is the full-cell-droppable fix. */
+      .cell.dropping {
+        background: var(--tint-orange-15);
+        box-shadow: inset 0 0 0 2px var(--orange);
+        border-radius: 13px;
+      }
+      .drop-hint {
+        margin-top: auto;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.66rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--orange);
+        text-align: center;
+        padding: 0.35rem;
+        border: 1.5px dashed rgba(241, 93, 34, 0.5);
+        border-radius: 10px;
+      }
+      /* meal card */
+      .meal {
+        border: 1px solid rgba(44, 62, 80, 0.08);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--card-shadow);
+        padding: 0.45rem 0.5rem;
+        display: flex;
+        gap: 0.45rem;
+        align-items: flex-start;
+      }
+      .meal .mthumb {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 0.95rem;
+        flex: none;
+        background: var(--tint-orange-8);
+      }
+      .meal .mname {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.78rem;
+        line-height: 1.15;
+      }
+      .meal .mcook {
+        font-size: 0.68rem;
+        color: rgba(44, 62, 80, 0.5);
+        margin-top: 0.1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .avatar {
+        width: 1.1rem;
+        height: 1.1rem;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.6rem;
+        color: #fff;
+      }
+      .meal.cooked .mname::after {
+        content: ' ✓';
+        color: var(--success);
+      }
+      .type-meal {
+        border-style: dashed;
+        background: var(--tint-slate-5);
+        box-shadow: none;
+        align-items: center;
+      }
+      /* empty slot = generous drop target; grows with the row now */
+      .empty {
+        flex: 1;
+        min-height: 2rem;
+        border: 1.5px dashed rgba(44, 62, 80, 0.1);
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        color: rgba(44, 62, 80, 0.28);
+        font-size: 1.1rem;
+        cursor: pointer;
+      }
+      .empty:hover {
+        border-color: rgba(241, 93, 34, 0.4);
+        color: var(--orange);
+        background: var(--tint-orange-8);
+      }
+      .note {
+        max-width: 1100px;
+        margin: 1.25rem auto 0;
+        padding: 0 1.5rem;
+      }
+      .note h2 {
+        font-family: Outfit, sans-serif;
+        font-size: 0.95rem;
+        margin-bottom: 0.35rem;
+      }
+      .note p {
+        font-size: 0.85rem;
+        color: rgba(44, 62, 80, 0.7);
+        line-height: 1.5;
+        margin-bottom: 0.6rem;
+      }
+      .tag {
+        display: inline-block;
+        background: var(--tint-orange-15);
+        color: var(--orange-dark);
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.62rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+        margin-right: 0.35rem;
+      }
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .side {
+          display: none;
+        }
+        .board {
+          grid-template-columns: 1fr;
+        }
+        .rail {
+          border-right: none;
+          border-bottom: 1px solid rgba(44, 62, 80, 0.06);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- faux sidebar for scale/context only -->
+      <aside class="side">
+        <div class="brand">beanies<span class="tld">.family</span></div>
+        <div class="nav">🐷 piggy bank</div>
+        <div class="nav on">🍲 meal planner</div>
+        <div class="nav">🌳 treehouse</div>
+        <div class="nav">📅 planner</div>
+        <div class="nav">✅ to-dos</div>
+      </aside>
+
+      <main class="main">
+        <div class="head">
+          <div>
+            <h1>🍲 Meal Planner</h1>
+            <div class="welcome">what's cooking this week? 🍳</div>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost">⧉ Copy last week</button>
+            <button class="btn btn-share">↗ Share the plan</button>
+          </div>
+        </div>
+
+        <div class="weeknav">
+          <button class="arrow">‹</button>
+          <button class="arrow">›</button>
+          <span class="weeklabel">Aug 18 – 24</span>
+          <span class="spacer"></span>
+          <button class="clearweek">Clear week</button>
+        </div>
+
+        <!-- BOARD fills remaining height -->
+        <section class="board">
+          <!-- RAIL -->
+          <aside class="rail">
+            <div class="rail-title">📖 Cookbook</div>
+            <div class="rail-hint">drag one onto a day 🍝</div>
+            <input class="search" placeholder="Search recipes" />
+
+            <!-- NEW: add a real recipe straight from the rail -->
+            <button class="add-recipe">＋ Add a recipe</button>
+
+            <div class="rail-list">
+              <div class="recipe">
+                <div class="thumb">🍝</div>
+                <div>
+                  <div class="rname">Spaghetti bolognese</div>
+                  <div class="rsub">family favourite</div>
+                </div>
+              </div>
+              <div class="recipe">
+                <div class="thumb">🍛</div>
+                <div>
+                  <div class="rname">Chicken curry</div>
+                  <div class="rsub">mild, kid-friendly</div>
+                </div>
+              </div>
+              <div class="recipe">
+                <div class="thumb">🥗</div>
+                <div>
+                  <div class="rname">Big garden salad</div>
+                  <div class="rsub">10 min</div>
+                </div>
+              </div>
+              <div class="recipe">
+                <div class="thumb">🌮</div>
+                <div>
+                  <div class="rname">Taco night</div>
+                  <div class="rsub">build your own</div>
+                </div>
+              </div>
+              <div class="recipe">
+                <div class="thumb">🥞</div>
+                <div>
+                  <div class="rname">Weekend pancakes</div>
+                  <div class="rsub">grandma's notes</div>
+                </div>
+              </div>
+              <div class="recipe">
+                <div class="thumb">🍲</div>
+                <div>
+                  <div class="rname">Veggie stew</div>
+                  <div class="rsub">slow cooker</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="alt-label">Alternatives</div>
+            <div class="alts">
+              <div class="alt">
+                <div class="aemoji" style="background: var(--tint-silk-20)">🍜</div>
+                <div class="aname">Eat out</div>
+              </div>
+              <div class="alt">
+                <div class="aemoji">♻️</div>
+                <div class="aname">Leftovers</div>
+              </div>
+              <div class="alt">
+                <div class="aemoji">⊘</div>
+                <div class="aname">Skip</div>
+              </div>
+              <div class="alt">
+                <div class="aemoji" style="background: var(--tint-orange-8)">✎</div>
+                <div class="aname">Other</div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- WEEK GRID -->
+          <div class="grid">
+            <!-- header row -->
+            <div></div>
+            <div class="dayhead">
+              <div class="dh-name">Mon</div>
+              <div class="dh-num">18</div>
+            </div>
+            <div class="dayhead today">
+              <div class="dh-name">Tue</div>
+              <div class="dh-num">19</div>
+              <div class="dh-badge">Today</div>
+            </div>
+            <div class="dayhead">
+              <div class="dh-name">Wed</div>
+              <div class="dh-num">20</div>
+            </div>
+            <div class="dayhead">
+              <div class="dh-name">Thu</div>
+              <div class="dh-num">21</div>
+            </div>
+            <div class="dayhead">
+              <div class="dh-name">Fri</div>
+              <div class="dh-num">22</div>
+            </div>
+            <div class="dayhead">
+              <div class="dh-name">Sat</div>
+              <div class="dh-num">23</div>
+            </div>
+            <div class="dayhead">
+              <div class="dh-name">Sun</div>
+              <div class="dh-num">24</div>
+            </div>
+
+            <!-- BREAKFAST -->
+            <div class="slotlabelcell">
+              <span class="slotchip chip-b"><span>🍳</span> Breakfast</span>
+            </div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🥞</div>
+                <div>
+                  <div class="mname">Weekend pancakes</div>
+                  <div class="mcook"><span class="avatar" style="background: #e67e22">G</span> greg</div>
+                </div>
+              </div>
+            </div>
+            <div class="cell today"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🥞</div>
+                <div><div class="mname">Weekend pancakes</div></div>
+              </div>
+            </div>
+            <div class="cell"><div class="empty">＋</div></div>
+
+            <!-- LUNCH -->
+            <div class="slotlabelcell">
+              <span class="slotchip chip-l"><span>🥪</span> Lunch</span>
+            </div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell today">
+              <div class="meal type-meal">
+                <div class="mthumb" style="background: var(--tint-silk-20)">🍜</div>
+                <div><div class="mname">Eat out</div></div>
+              </div>
+            </div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🥗</div>
+                <div><div class="mname">Big garden salad</div></div>
+              </div>
+            </div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+
+            <!-- DINNER -->
+            <div class="slotlabelcell">
+              <span class="slotchip chip-d"><span>🍽️</span> Dinner</span>
+            </div>
+            <div class="cell">
+              <div class="meal cooked">
+                <div class="mthumb">🍝</div>
+                <div>
+                  <div class="mname">Spaghetti bolognese</div>
+                  <div class="mcook"><span class="avatar" style="background: #9b59b6">S</span> sofia</div>
+                </div>
+              </div>
+            </div>
+            <div class="cell today dropping">
+              <div class="meal">
+                <div class="mthumb">🍛</div>
+                <div>
+                  <div class="mname">Chicken curry</div>
+                  <div class="mcook"><span class="avatar" style="background: #e67e22">G</span> greg</div>
+                </div>
+              </div>
+              <div class="drop-hint">Drop to add ＋</div>
+            </div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🌮</div>
+                <div>
+                  <div class="mname">Taco night</div>
+                  <div class="mcook"><span class="avatar" style="background: #9b59b6">S</span> sofia</div>
+                </div>
+              </div>
+            </div>
+            <div class="cell">
+              <div class="meal type-meal">
+                <div class="mthumb" style="background: var(--tint-slate-5)">♻️</div>
+                <div><div class="mname">Leftovers</div></div>
+              </div>
+            </div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🍲</div>
+                <div>
+                  <div class="mname">Veggie stew</div>
+                  <div class="mcook"><span class="avatar" style="background: #e67e22">G</span> greg</div>
+                </div>
+              </div>
+            </div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🍝</div>
+                <div><div class="mname">Taco night</div></div>
+              </div>
+            </div>
+            <div class="cell">
+              <div class="meal type-meal">
+                <div class="mthumb" style="background: var(--tint-silk-20)">🍜</div>
+                <div><div class="mname">Eat out</div></div>
+              </div>
+            </div>
+
+            <!-- SNACK -->
+            <div class="slotlabelcell">
+              <span class="slotchip chip-s"><span>🍎</span> Snack</span>
+            </div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell today"><div class="empty">＋</div></div>
+            <div class="cell">
+              <div class="meal">
+                <div class="mthumb">🍎</div>
+                <div><div class="mname">Fruit & yoghurt</div></div>
+              </div>
+            </div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+            <div class="cell"><div class="empty">＋</div></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="note">
+      <h2>What changed</h2>
+      <p>
+        <span class="tag">Rail add</span> A full-width <strong>＋ Add a recipe</strong> button sits
+        under the cookbook search — it opens the existing recipe form (photo, ingredients, steps), so
+        you can build the cookbook without leaving the planner. The new recipe lands in the rail,
+        ready to drag. This is the richer sibling of the tap-a-slot quick-add (which stays name-only).
+      </p>
+      <p>
+        <span class="tag">Fill height</span> The board now claims the leftover vertical space and the
+        four slot rows share it equally, so each slot is a roomy, comfortable drop zone instead of a
+        thin strip floating in whitespace. Empty slots read as generous "drop here" targets, and the
+        rail's recipe list flexes to match — more recipes visible, less scrolling. No filler content,
+        just breathing room where the space already was.
+      </p>
+      <p>
+        <span class="tag">Capped rows</span> The board grows to fill the space but stops at a sensible
+        height, so a tall monitor never stretches the four rows into cartoonish bands — the small
+        remainder just stays as bottom margin. On a laptop it fills fully and compresses gracefully
+        back toward today's size.
+      </p>
+      <p>
+        <span class="tag">Drop anywhere</span> The full day + slot area is the drop target now — not
+        just the card. See Tuesday dinner: it already holds a card, yet the whole cell lights up and
+        accepts the drop (the "Drop to add ＋" zone). Today you can only drop on top of the existing
+        card, which gets harder as cells grow — this makes the entire cell catch the drop.
+      </p>
+    </div>
+  </body>
+</html>
