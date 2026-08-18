@@ -10,15 +10,19 @@ import { storeToRefs } from 'pinia';
 import MealThumb from './MealThumb.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import { useRecipesStore } from '@/stores/recipesStore';
+import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipeSearch } from '@/composables/useRecipeSearch';
 import { useMealDrag } from '@/composables/useMealDrag';
 import { useTranslation } from '@/composables/useTranslation';
+import { showToast } from '@/composables/useToast';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type { MealKind } from '@/types/models';
 
 const { t } = useTranslation();
 const recipesStore = useRecipesStore();
+const mealPlanStore = useMealPlanStore();
 const { recipes } = storeToRefs(recipesStore);
-const { startDrag, endDrag } = useMealDrag();
+const { dragged, startDrag, endDrag } = useMealDrag();
 
 const query = ref('');
 const { results } = useRecipeSearch(recipes, query);
@@ -28,6 +32,37 @@ const { results } = useRecipeSearch(recipes, query);
 // appears in the rail reactively (recipesStore), ready to drag. This is the
 // richer sibling of MealPickerSheet's name-only slot quick-add.
 const addOpen = ref(false);
+
+// Drag a planned meal back onto the rail to remove it from its day. The rail is
+// a drop target ONLY while a meal (not a recipe/type) is being dragged, so a
+// recipe drag never accidentally "removes" anything. Mirror the board's drop:
+// read the singleton payload, act, endDrag. deleteMeal wraps its own error
+// toast (wrapAsync); we add a success toast + telemetry so removals are visible.
+const removeOver = ref(false);
+const isRemovable = () => dragged.value?.source === 'meal';
+
+function onRemoveDragOver(e: DragEvent): void {
+  if (!isRemovable()) return;
+  e.preventDefault();
+  removeOver.value = true;
+}
+
+async function onRemoveDrop(): Promise<void> {
+  removeOver.value = false;
+  const payload = dragged.value;
+  endDrag();
+  if (payload?.source !== 'meal') return;
+  const ok = await mealPlanStore.deleteMeal(payload.mealId);
+  if (ok) {
+    showToast('success', t('mealPlanner.removed'));
+    logEvent({
+      level: 'info',
+      surface: 'meal-planner',
+      message: 'meal removed via rail drag',
+      context: { action: 'removed-drag' },
+    });
+  }
+}
 
 const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: string }[] = [
   { kind: 'eat_out', emoji: '🍜', tile: 'bg-[var(--tint-silk-20)]' },
@@ -39,7 +74,11 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
 
 <template>
   <aside
-    class="flex h-full flex-col border-b border-[rgba(44,62,80,0.06)] p-4 md:border-r md:border-b-0 dark:border-slate-700"
+    class="relative flex h-full flex-col border-b border-[rgba(44,62,80,0.06)] p-4 transition-colors md:border-r md:border-b-0 dark:border-slate-700"
+    @dragover="onRemoveDragOver"
+    @dragenter="onRemoveDragOver"
+    @dragleave="removeOver = false"
+    @drop="onRemoveDrop"
   >
     <div class="font-outfit text-secondary-500 text-sm font-bold dark:text-slate-100">
       📖 {{ t('mealPlanner.cookbook') }}
@@ -92,20 +131,42 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
         v-for="alt in ALT_TYPES"
         :key="alt.kind"
         draggable="true"
-        class="flex cursor-grab items-center gap-2 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-1.5 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
+        class="flex cursor-grab items-center gap-1.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
         @dragstart="startDrag({ source: 'type', kind: alt.kind }, $event)"
         @dragend="endDrag"
       >
+        <span class="mp-grip" aria-hidden="true"></span>
         <span
           class="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] text-base"
           :class="alt.tile"
           aria-hidden="true"
           >{{ alt.emoji }}</span
         >
-        <span class="font-outfit text-secondary-500 text-xs font-semibold dark:text-slate-100">
+        <span
+          class="font-outfit text-secondary-500 truncate text-xs font-semibold dark:text-slate-100"
+        >
           {{ t(`mealPlanner.kind.${alt.kind}`) }}
         </span>
       </div>
+    </div>
+
+    <!-- Remove drop-zone: the rail becomes a "drop here to remove" target the
+         moment a planned meal is picked up (never for a recipe/type drag). The
+         overlay is pointer-events-none so drag events fall through to the aside's
+         handlers; it just signals where to drop to delete. -->
+    <div
+      v-if="dragged?.source === 'meal'"
+      class="pointer-events-none absolute inset-2 z-10 flex flex-col items-center justify-center gap-1.5 rounded-[var(--sq)] border-2 border-dashed transition-colors"
+      :class="
+        removeOver
+          ? 'border-[#F15D22] bg-[rgba(241,93,34,0.14)]'
+          : 'border-[rgba(241,93,34,0.4)] bg-[rgba(248,249,250,0.88)] dark:bg-[rgba(30,41,59,0.88)]'
+      "
+    >
+      <span class="text-2xl" aria-hidden="true">🗑️</span>
+      <span class="font-outfit text-sm font-bold text-[#F15D22]">
+        {{ t('mealPlanner.removeHint') }}
+      </span>
     </div>
 
     <RecipeFormModal :open="addOpen" @close="addOpen = false" />
@@ -118,5 +179,15 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
   font-size: 1rem;
   font-weight: 700;
   line-height: 1.2;
+}
+
+/* Drag-handle grip — a 2×3 dot pad that reads as "grab me" on the alternative
+   cards, so they feel draggable rather than pill-like. Pure CSS, no glyph. */
+.mp-grip {
+  background-image: radial-gradient(circle, rgb(44 62 80 / 30%) 1.1px, transparent 1.2px);
+  background-size: 0.28rem 0.3rem;
+  flex: none;
+  height: 0.85rem;
+  width: 0.5rem;
 }
 </style>
