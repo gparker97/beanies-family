@@ -145,6 +145,7 @@ async function onCookLogClosed(): Promise<void> {
 <template>
   <BeanieFormModal
     :open="open"
+    variant="drawer"
     :title="t('mealPlanner.editor.editTitle')"
     icon="🍽️"
     :save-label="t('mealPlanner.editor.save')"
