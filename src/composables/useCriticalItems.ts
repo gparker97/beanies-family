@@ -2,6 +2,8 @@ import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
+import { useMealPlanStore } from '@/stores/mealPlanStore';
+import { useRecipesStore } from '@/stores/recipesStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
@@ -21,7 +23,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list';
+  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -91,10 +93,18 @@ const LIST_UNASSIGNED_KEYS = {
   noDue: 'lists.briefing.unassigned.noDue',
 } satisfies Record<DateState, UIStringKey>;
 
+// Meal planner (#27) — a cook assignment for today's meal. Briefing-only (like
+// medication/lists); no due-state, so one key per audience kind.
+const MEAL_OWNER_KEY = 'mealPlanner.briefing.owner' satisfies UIStringKey;
+const MEAL_FORCHILD_KEY = 'mealPlanner.briefing.forChild' satisfies UIStringKey;
+const MEAL_UNASSIGNED_KEY = 'mealPlanner.briefing.unassigned' satisfies UIStringKey;
+
 export function useCriticalItems() {
   const familyStore = useFamilyStore();
   const todoStore = useTodoStore();
   const listStore = useListStore();
+  const mealPlanStore = useMealPlanStore();
+  const recipesStore = useRecipesStore();
   const activityStore = useActivityStore();
   const medicationsStore = useMedicationsStore();
   const holidayStore = useHolidayStore();
@@ -350,6 +360,34 @@ export function useCriticalItems() {
           completable: false,
         });
       }
+    }
+
+    // ── Today's cook assignments (meal planner) ──────────────────────
+    // Recipe meals for today with a cook that aren't cooked yet. Briefing-only,
+    // non-completable (marking cooked needs the rating form, not a checkbox).
+    for (const meal of mealPlanStore.todaysCookAssignments) {
+      const audience = classifyOwnerAudience(meal.cookMemberId!, currentMember, getMemberById);
+      if (audience.kind === 'hidden') continue;
+      const recipeName = recipesStore.recipes.find((r) => r.id === meal.recipeId)?.name ?? '';
+      let message: string;
+      if (audience.kind === 'forChild') {
+        message = buildMessage(MEAL_FORCHILD_KEY, {
+          name: formatNameList(audience.childNames),
+          meal: recipeName,
+        });
+      } else if (audience.kind === 'unassigned') {
+        message = buildMessage(MEAL_UNASSIGNED_KEY, { meal: recipeName });
+      } else {
+        message = buildMessage(MEAL_OWNER_KEY, { meal: recipeName });
+      }
+      items.push({
+        id: meal.id,
+        type: 'meal',
+        message,
+        icon: '🍲',
+        time: meal.serveTime ?? '',
+        completable: false,
+      });
     }
 
     // Sort: timed items first (ascending), untimed last

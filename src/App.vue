@@ -81,6 +81,7 @@ import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useRecipesStore } from '@/stores/recipesStore';
+import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -126,6 +127,7 @@ const memberNotesStore = useMemberNotesStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
 const recipesStore = useRecipesStore();
+const mealPlanStore = useMealPlanStore();
 const emergencyContactsStore = useEmergencyContactsStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
@@ -688,6 +690,7 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         allergiesStore.loadAllergies(),
         medicationsStore.loadMedications(),
         recipesStore.loadRecipes(),
+        mealPlanStore.loadMealPlans(),
         emergencyContactsStore.loadEmergencyContacts(),
       ]);
 

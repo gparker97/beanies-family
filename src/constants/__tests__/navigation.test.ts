@@ -41,21 +41,22 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
     }
   });
 
-  it('total stack items = 16 (Planning: Activities, Travel, To-do, Beanie Lists = 4; Money 6; Pod 6)', () => {
+  it('total stack items = 17 (Planning: Activities, Travel, To-do, Beanie Lists, Meal Planner = 5; Money 6; Pod 6)', () => {
     // MOBILE_NAV_CATEGORIES is built at module load without flag awareness, so
     // the flag-gated Beanie Lists item is always present in the data (the bean
     // stack filters it at render via isItemFlagEnabled).
     const total = MOBILE_NAV_CATEGORIES.reduce((sum, c) => sum + (c.items?.length ?? 0), 0);
-    expect(total).toBe(16);
+    expect(total).toBe(17);
   });
 
-  it('Planning has Activities (first), Travel, To-do, Beanie Lists', () => {
+  it('Planning has Activities (first), Travel, To-do, Beanie Lists, Meal Planner', () => {
     const planning = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'planning')!;
     expect(planning.items!.map((i) => i.path)).toEqual([
       '/activities',
       '/travel',
       '/todo',
       '/lists',
+      '/meal-planner',
     ]);
   });
 

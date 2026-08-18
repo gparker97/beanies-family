@@ -12,6 +12,8 @@ import NookVacationCard from '@/components/nook/NookVacationCard.vue';
 import MilestonesCard from '@/components/nook/MilestonesCard.vue';
 import PiggyBankCard from '@/components/nook/PiggyBankCard.vue';
 import RecentActivityCard from '@/components/nook/RecentActivityCard.vue';
+import NookMealsCard from '@/components/nook/NookMealsCard.vue';
+import MealEditModal from '@/components/mealplan/MealEditModal.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
@@ -28,12 +30,14 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { confirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import type {
   FamilyActivity,
   DutyCompletion,
+  MealPlanEntry,
   Transaction,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
@@ -50,7 +54,21 @@ const activityStore = useActivityStore();
 const transactionsStore = useTransactionsStore();
 const vacationStore = useVacationStore();
 const medicationsStore = useMedicationsStore();
+const mealPlanStore = useMealPlanStore();
 const { playWhoosh } = useSounds();
+
+// ── Meal editor — opened from the "Today's meals" card and from a cook-
+// assignment tap in the daily briefing (single editor host).
+const mealEditTarget = ref<MealPlanEntry | null>(null);
+const mealEditOpen = ref(false);
+function openMeal(meal: MealPlanEntry): void {
+  mealEditTarget.value = meal;
+  mealEditOpen.value = true;
+}
+function openMealById(id: string): void {
+  const meal = mealPlanStore.meals.find((m) => m.id === id);
+  if (meal) openMeal(meal);
+}
 
 // ── Todo modal (for ScheduleCards / RecentActivityCard clicks) ───────────────
 const selectedTodoId = ref<string | null>(null);
@@ -227,6 +245,7 @@ async function handleTransactionDelete(id: string) {
       @open-activity="(id: string, date: string) => openActivity(id, date)"
       @open-medication="viewingMedicationId = $event"
       @open-list="(id: string) => router.push({ path: '/lists', query: { view: id } })"
+      @open-meal="openMealById"
       @complete-duty="handleDutyComplete"
       @complete-todo="handleTodoComplete"
     />
@@ -251,6 +270,9 @@ async function handleTransactionDelete(id: string) {
       @open-activity="(id: string, date: string) => openActivity(id, date)"
     />
 
+    <!-- Today's meals -->
+    <NookMealsCard @open-meal="openMeal" />
+
     <!-- Upcoming vacation -->
     <NookVacationCard v-if="vacationStore.upcomingVacations.length > 0" />
 
@@ -268,6 +290,8 @@ async function handleTransactionDelete(id: string) {
 
     <!-- Modals -->
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
+
+    <MealEditModal :open="mealEditOpen" :meal="mealEditTarget" @close="mealEditOpen = false" />
 
     <ActivityViewEditModal
       :activity="viewingActivity"

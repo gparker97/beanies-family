@@ -73,6 +73,70 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: 'planning-your-familys-meals',
+    category: 'features',
+    title: "Planning your family's meals",
+    excerpt:
+      "Plan the week from your cookbook — who's cooking what, when — and share it so nobody has to ask what's for dinner.",
+    icon: '\u{1F372}',
+    readTime: 3,
+    updatedDate: '2026-08-18',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          "The <strong>Meal Planner</strong> (under 🌳 the Treehouse) lays your week out as a board — days across the top, meals down the side. Plan breakfast, lunch, dinner and as many snacks as you like, say who's cooking, and share the whole thing with the family.",
+      },
+      {
+        type: 'heading',
+        content: 'Add a meal',
+        level: 2,
+        id: 'add-a-meal',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On a computer, drag a recipe from your cookbook straight onto a day. On a phone, tap a slot and pick one. If the recipe is not in your cookbook yet, just type its name — beanies adds it as a quick recipe you can fill in later.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          "<strong>Who's cooking</strong> — assign a cook; it shows on the meal and in that person's daily briefing (no phone reminder in this version).",
+          "<strong>Who's eating</strong> — pick family members, and add guests by name for the night someone's over.",
+          '<strong>Eating out, leftovers or skipping?</strong> — drop one of those in instead of a recipe. No recipe needed.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Mark a meal cooked',
+        level: 2,
+        id: 'mark-cooked',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "Open a planned meal and tap <strong>Mark cooked</strong>. beanies opens the cook-log so you can give it a quick rating — that entry is saved to the recipe's history, so your cookbook remembers how it went.",
+      },
+      {
+        type: 'heading',
+        content: 'Copy a week & share',
+        level: 2,
+        id: 'copy-and-share',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Had a good week? Tap <strong>Copy last week</strong> to reuse it — meals and cooks come across, ready to tweak. You can also open any past week from the arrows and copy it forward. Tap <strong>Share</strong> to send the day or the whole week to the family over WhatsApp, Messages or wherever you chat.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          "Copying a week <strong>replaces</strong> whatever was already planned in the target week — beanies warns you first. Anything you'd already marked cooked keeps its history. A shared plan only shows what each person is allowed to see.",
+      },
+    ],
+  },
+  {
     slug: 'notifications',
     category: 'features',
     title: 'Notifications & reminders — staying on top of what needs you',

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
+import { useMealPlanStore } from '@/stores/mealPlanStore';
 import * as repo from '@/services/automerge/repositories/recipeRepository';
 import type { Recipe, CookLogEntry } from '@/types/models';
 
@@ -68,6 +69,10 @@ export const useRecipesStore = defineStore('recipes', () => {
       await repo.deleteRecipeCascade(id);
       recipes.value = recipes.value.filter((r) => r.id !== id);
       cookLogs.value = cookLogs.value.filter((c) => c.recipeId !== id);
+      // Reconcile the meal planner's reactive state — the repo batch already
+      // nullified `recipeId` on any referencing meal-plan entries, so patch them
+      // in place ("recipe removed") rather than leaving stale refs until reload.
+      useMealPlanStore().nullifyRecipe(id);
     });
   }
 
