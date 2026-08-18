@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meal Plan Share — At-a-Glance Grid</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --orange: #f15d22;
+        --orange-dark: #d14d1a;
+        --silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+        --purple: #9b59b6;
+        --sq: 22px;
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.22);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--slate);
+        font-family: 'Inter', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        background:
+          radial-gradient(1100px 500px at 50% -10%, rgba(44, 62, 80, 0.1), transparent 60%), #e9edf1;
+      }
+      .wrap {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 36px 18px 70px;
+      }
+      .intro {
+        text-align: center;
+        margin-bottom: 22px;
+      }
+      .intro .eyebrow {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      .intro h1 {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 1.7rem;
+        margin: 6px 0 0;
+      }
+      .intro p {
+        max-width: 640px;
+        margin: 8px auto 0;
+        font-size: 0.82rem;
+        color: rgba(44, 62, 80, 0.62);
+        line-height: 1.55;
+      }
+
+      /* ===== brand bits ===== */
+      .pod {
+        display: inline-flex;
+        gap: 4px;
+        align-items: flex-end;
+      }
+      .bean {
+        width: 13px;
+        height: 17px;
+        border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+        position: relative;
+      }
+      .bean::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 8px;
+        height: 4px;
+        border-radius: 40% 40% 0 0;
+        background: rgba(255, 255, 255, 0.55);
+      }
+      .b-slate {
+        background: var(--slate);
+      }
+      .b-terra {
+        background: var(--terracotta);
+      }
+      .b-orange {
+        background: var(--orange);
+      }
+      .b-silk {
+        background: var(--silk);
+      }
+      /* the hugging pair — parent + child bean, the beanies family mark (a stand-in
+         for the real logo asset in the shipped export). Distinct from the 4-bean
+         Pod so the two brand devices don't repeat. */
+      .hug {
+        display: inline-flex;
+        align-items: flex-end;
+      }
+      .hug .parent {
+        width: 17px;
+        height: 21px;
+      }
+      .hug .child {
+        width: 13px;
+        height: 16px;
+        margin-left: -4px;
+      }
+      .cook {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        color: #fff;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 0.5rem;
+        flex: none;
+      }
+      .cook.g {
+        background: var(--slate);
+      }
+      .cook.s {
+        background: var(--purple);
+      }
+      .cook.m {
+        background: var(--terracotta);
+      }
+
+      /* ===== the sheet (landscape A4) ===== */
+      .sheet {
+        width: 100%;
+        aspect-ratio: 1.414 / 1;
+        background: var(--cloud);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 24px 60px rgba(44, 62, 80, 0.22);
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* soft header, single compact row (the original C layout): light Heritage
+         Orange → Terracotta wash, dark text — warm, not shouty, and low so the
+         grid gets the room. A hairline seats it on the paper. */
+      .head {
+        background: linear-gradient(135deg, var(--tint-orange-8), rgba(230, 126, 34, 0.12));
+        color: var(--slate);
+        padding: 20px 26px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        border-bottom: 1px solid rgba(241, 93, 34, 0.14);
+      }
+      .head h2 {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 1.3rem;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .head .accent {
+        font-family: 'Caveat';
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: var(--orange);
+      }
+      .head .spacer {
+        flex: 1;
+      }
+      /* the date is the anchor — it must be unmistakable which week this is */
+      .head .dates {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        line-height: 1.08;
+      }
+      .head .dates .lbl {
+        font-family: 'Outfit';
+        font-weight: 600;
+        font-size: 0.56rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--orange-dark);
+      }
+      .head .dates .rng {
+        font-family: 'Outfit';
+        font-weight: 800;
+        font-size: 1.25rem;
+        color: var(--slate);
+        letter-spacing: -0.01em;
+      }
+
+      /* ===== grid ===== */
+      .grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 3.4rem repeat(7, 1fr);
+        grid-template-rows: auto repeat(4, 1fr);
+        gap: 4px;
+        padding: 12px 14px 6px;
+      }
+      .dh {
+        text-align: center;
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 0.72rem;
+        padding-bottom: 2px;
+        align-self: end;
+      }
+      .dh .n {
+        display: block;
+        font-size: 0.6rem;
+        color: rgba(44, 62, 80, 0.45);
+        font-weight: 500;
+      }
+      /* slot label rail */
+      .sl {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        border-radius: 10px;
+        background: var(--tint-slate-5);
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 0.5rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: rgba(44, 62, 80, 0.55);
+      }
+      .sl .ic {
+        font-size: 0.85rem;
+      }
+
+      .cell {
+        background: #fff;
+        border: 1px solid rgba(44, 62, 80, 0.08);
+        border-radius: 10px;
+        padding: 5px 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .cell.empty {
+        align-items: center;
+        justify-content: center;
+        border-style: dashed;
+        border-color: rgba(44, 62, 80, 0.12);
+      }
+      .cell.empty::before {
+        content: '·';
+        color: rgba(44, 62, 80, 0.25);
+        font-size: 1rem;
+      }
+
+      /* a dish entry inside a cell (a cell may hold more than one) */
+      .dish + .dish {
+        border-top: 1px dashed rgba(44, 62, 80, 0.14);
+        padding-top: 4px;
+      }
+      .dish .nm {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 0.62rem;
+        line-height: 1.15;
+        color: var(--slate);
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .dish .who {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        margin-top: 2px;
+        font-size: 0.54rem;
+        color: rgba(44, 62, 80, 0.6);
+      }
+      .dish .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 2px;
+        font-size: 0.5rem;
+        color: rgba(44, 62, 80, 0.5);
+        font-family: 'Outfit';
+        font-weight: 600;
+      }
+      /* non-recipe "type" entry — tinted pill feel */
+      .dish.type .nm {
+        font-weight: 600;
+        color: rgba(44, 62, 80, 0.62);
+        font-style: italic;
+      }
+
+      /* footer */
+      .foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 26px 12px;
+        gap: 14px;
+        border-top: 1px solid rgba(44, 62, 80, 0.08);
+      }
+      .foot .legend {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.58rem;
+        color: rgba(44, 62, 80, 0.55);
+      }
+      .foot .legend .lg {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .wordmark {
+        font-family: 'Outfit';
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: var(--slate);
+      }
+      .wordmark .fam {
+        color: var(--orange);
+      }
+      .brand-r {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tagline {
+        font-family: 'Outfit';
+        font-style: italic;
+        font-size: 0.62rem;
+        letter-spacing: 0.04em;
+        color: rgba(44, 62, 80, 0.4);
+      }
+
+      .foot-note {
+        text-align: center;
+        margin-top: 26px;
+        font-size: 0.76rem;
+        color: rgba(44, 62, 80, 0.55);
+        line-height: 1.7;
+      }
+      .foot-note b {
+        color: var(--slate);
+        font-family: 'Outfit';
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <div class="eyebrow">beanies.family · meal plan · share sheet</div>
+        <h1>The at-a-glance grid — polished</h1>
+        <p>
+          Option C, taken to a finished one-page export: a soft Heritage&nbsp;Orange → Terracotta
+          header (warm, not shouty) with the week's dates as the clear anchor, and every cell carries
+          the meal name, who's cooking, and the key extras (serve time, guests). Tuesday and Thursday
+          dinners show how a cell holds more than one dish. Nothing live is shown — no "today", no
+          cooked ticks — because it's a whole-week printout, not a screen. Landscape A4 — prints or
+          shares as a single image for the fridge.
+        </p>
+      </div>
+
+      <div class="sheet">
+        <!-- striking gradient header (borrowed warmth from option A) -->
+        <div class="head">
+          <span class="hug"
+            ><span class="bean b-slate parent"></span><span class="bean b-orange child"></span
+          ></span>
+          <h2>This week's meals</h2>
+          <span class="accent">what's cooking? 🌱</span>
+          <span class="spacer"></span>
+          <span class="dates">
+            <span class="lbl">week of</span>
+            <span class="rng">18 – 24 Aug 2026</span>
+          </span>
+        </div>
+
+        <div class="grid">
+          <!-- header row -->
+          <div></div>
+          <div class="dh">Mon<span class="n">18</span></div>
+          <div class="dh">Tue<span class="n">19</span></div>
+          <div class="dh">Wed<span class="n">20</span></div>
+          <div class="dh">Thu<span class="n">21</span></div>
+          <div class="dh">Fri<span class="n">22</span></div>
+          <div class="dh">Sat<span class="n">23</span></div>
+          <div class="dh">Sun<span class="n">24</span></div>
+
+          <!-- BREAKFAST -->
+          <div class="sl"><span class="ic">🍳</span>Bkfst</div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Overnight oats</div>
+              <div class="who"><span class="cook s">S</span> sofia</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Toast &amp; eggs</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Banana pancakes</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+            </div>
+          </div>
+          <div class="cell empty"></div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Cereal</div>
+              <div class="who"><span class="cook s">S</span> sofia</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Weekend waffles</div>
+              <div class="who"><span class="cook m">M</span> mary</div>
+            </div>
+          </div>
+          <div class="cell empty"></div>
+
+          <!-- LUNCH -->
+          <div class="sl"><span class="ic">🥪</span>Lunch</div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Pasta bake</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+              <div class="meta">🍲 leftovers</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Bento boxes</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+              <div class="meta">⏰ 12:00</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish type"><div class="nm">Eat out</div></div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Tomato soup</div>
+              <div class="who"><span class="cook m">M</span> mary</div>
+            </div>
+          </div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+
+          <!-- DINNER (two multi-dish cells: Tue + Thu) -->
+          <div class="sl"><span class="ic">🍽️</span>Dinner</div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Chicken congee</div>
+              <div class="who"><span class="cook m">M</span> mary</div>
+              <div class="meta">⏰ 19:00</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Sheet-pan salmon</div>
+              <div class="who"><span class="cook s">S</span> sofia</div>
+              <div class="meta">⏰ 19:00 · 👥 +2</div>
+            </div>
+            <div class="dish">
+              <div class="nm">Garden salad</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Gran's beef stew</div>
+              <div class="who"><span class="cook s">S</span> sofia</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Veggie stir-fry</div>
+              <div class="who"><span class="cook m">M</span> mary</div>
+            </div>
+            <div class="dish">
+              <div class="nm">Spring rolls</div>
+              <div class="who"><span class="cook m">M</span> mary</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Pizza night 🍕</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+            </div>
+          </div>
+          <div class="cell">
+            <div class="dish type"><div class="nm">Eat out · Grandma's</div></div>
+          </div>
+          <div class="cell">
+            <div class="dish">
+              <div class="nm">Sunday roast</div>
+              <div class="who"><span class="cook g">G</span> greg</div>
+              <div class="meta">⏰ 18:00 · 👥 +3</div>
+            </div>
+          </div>
+
+          <!-- SNACK -->
+          <div class="sl"><span class="ic">🍎</span>Snack</div>
+          <div class="cell">
+            <div class="dish"><div class="nm">Fruit &amp; yoghurt</div></div>
+          </div>
+          <div class="cell empty"></div>
+          <div class="cell">
+            <div class="dish"><div class="nm">Apple slices</div></div>
+          </div>
+          <div class="cell empty"></div>
+          <div class="cell">
+            <div class="dish"><div class="nm">Popcorn</div></div>
+          </div>
+          <div class="cell empty"></div>
+          <div class="cell empty"></div>
+        </div>
+
+        <div class="foot">
+          <div class="legend">
+            <span class="lg"><b style="color: var(--slate)">Cooks</b></span>
+            <span class="lg"><span class="cook g">G</span> greg</span>
+            <span class="lg"><span class="cook m">M</span> mary</span>
+            <span class="lg"><span class="cook s">S</span> sofia</span>
+            <span class="lg" style="color: rgba(44, 62, 80, 0.4)">⏰ serve time · 👥 guests</span>
+          </div>
+          <div class="brand-r">
+            <span class="pod"
+              ><span class="bean b-slate"></span><span class="bean b-terra"></span
+              ><span class="bean b-orange"></span><span class="bean b-silk"></span></span
+            >
+            <span class="wordmark">beanies<span class="fam">.family</span></span>
+            <span class="tagline">every bean counts</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot-note">
+        <b>Same header/body/footer shell</b> as the future weekly agenda — swap the body from meals
+        to meals + activities + to-dos + meds + key info and the lockup carries straight over.<br />
+        Heritage&nbsp;Orange → Terracotta header · Cloud&nbsp;White paper · Outfit / Inter / Caveat ·
+        squircle corners · one-page landscape, print- and image-ready.
+      </div>
+    </div>
+  </body>
+</html>
