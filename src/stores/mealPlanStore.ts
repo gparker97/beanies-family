@@ -20,6 +20,13 @@ const SLOT_ORDER: Record<MealSlot, number> = { breakfast: 0, lunch: 1, dinner: 2
 const bySlotThenPosition = (a: MealPlanEntry, b: MealPlanEntry) =>
   SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] || a.position - b.position;
 
+// Week/multi-day ordering MUST lead with the date, else a share (which prints a
+// day heading only when the date changes) repeats headings and scrambles output.
+const byDateSlotPosition = (a: MealPlanEntry, b: MealPlanEntry) =>
+  a.date.localeCompare(b.date) ||
+  SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] ||
+  a.position - b.position;
+
 /**
  * Meal-planner store (#27) — mirrors `listStore`/`recipesStore`: the same state
  * triple, the same `wrapAsync` error discipline (toast + `reportError`, returns
@@ -41,10 +48,10 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     return meals.value.filter((m) => m.date === dateISO).sort(bySlotThenPosition);
   }
 
-  /** Meals across a set of week dates, sorted. */
+  /** Meals across a set of week dates, sorted by date → slot → position. */
   function mealsForWeek(weekDates: string[]): MealPlanEntry[] {
     const set = new Set(weekDates);
-    return meals.value.filter((m) => set.has(m.date)).sort(bySlotThenPosition);
+    return meals.value.filter((m) => set.has(m.date)).sort(byDateSlotPosition);
   }
 
   /** Today's meals — drives the nook "today's meals" card. */
@@ -52,7 +59,9 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
 
   /** Today's uncooked recipe meals with a cook — the daily-briefing source (see useCriticalItems). */
   const todaysCookAssignments = computed(() =>
-    todaysMeals.value.filter((m) => m.kind === 'recipe' && !!m.cookMemberId && !m.cooked)
+    todaysMeals.value.filter(
+      (m) => m.kind === 'recipe' && !!m.recipeId && !!m.cookMemberId && !m.cooked
+    )
   );
 
   // ========== ACTIONS ==========
@@ -77,7 +86,10 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     return existing.length ? Math.max(...existing.map((m) => m.position)) + 1 : 0;
   }
 
-  async function createMeal(input: CreateMealPlanInput): Promise<MealPlanEntry | null> {
+  async function createMeal(
+    input: CreateMealPlanInput,
+    opts?: { quickAdd?: boolean }
+  ): Promise<MealPlanEntry | null> {
     const result = await wrapAsync(
       isLoading,
       error,
@@ -91,13 +103,27 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
           level: 'info',
           surface: 'meal-planner',
           message: 'meal created',
-          context: { action: 'meal-created', kind: entry.kind, slot: entry.slot },
+          context: {
+            action: 'meal-created',
+            kind: entry.kind,
+            slot: entry.slot,
+            quick_add: opts?.quickAdd ?? false,
+          },
         });
         return entry;
       },
       { action: 'mealPlanStore:createMeal' }
     );
     return result ?? null;
+  }
+
+  /**
+   * Move a placed meal to a new day+slot, recomputing its `position` for the
+   * target cell (so it lands after any meals already there, never colliding on
+   * position 0). Used by drag-to-move on the board.
+   */
+  async function moveMeal(id: string, date: string, slot: MealSlot): Promise<MealPlanEntry | null> {
+    return updateMeal(id, { date, slot, position: nextPosition(date, slot) });
   }
 
   async function updateMeal(id: string, input: UpdateMealPlanInput): Promise<MealPlanEntry | null> {
@@ -137,6 +163,18 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
    * cook logs are untouched (they live in the `cookLogs` collection).
    */
   async function copyWeek(fromDates: string[], toDates: string[]): Promise<boolean> {
+    // Guard the index-alignment contract — a misaligned pair would persist a
+    // dateless orphan meal (toDates[i] === undefined). Callers pass aligned
+    // 7-day arrays; this fails loud rather than corrupting the doc.
+    if (fromDates.length !== toDates.length) {
+      logEvent({
+        level: 'warn',
+        surface: 'meal-planner',
+        message: 'copyWeek called with misaligned date arrays',
+        context: { action: 'copy-misaligned' },
+      });
+      return false;
+    }
     const result = await wrapAsync(
       isLoading,
       error,
@@ -225,6 +263,7 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     createMeal,
     updateMeal,
     deleteMeal,
+    moveMeal,
     copyWeek,
     clearDates,
     nullifyRecipe,

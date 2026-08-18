@@ -29,6 +29,9 @@ const props = defineProps<{
   open: boolean;
   recipeId: UUID;
   entry?: CookLogEntry | null;
+  /** New-entry defaults (e.g. the meal planner logs the meal's date + assigned cook). */
+  presetCookedOn?: string;
+  presetCookedBy?: string;
 }>();
 
 const emit = defineEmits<{
@@ -69,8 +72,8 @@ const { isEditing, isSubmitting } = useFormModal(
       entryId.value = c.id;
     },
     onNew: () => {
-      cookedOn.value = toDateInputValue(new Date());
-      cookedBy.value = familyStore.currentMember?.id ?? '';
+      cookedOn.value = props.presetCookedOn ?? toDateInputValue(new Date());
+      cookedBy.value = props.presetCookedBy ?? familyStore.currentMember?.id ?? '';
       rating.value = 5;
       servings.value = '';
       wentWell.value = '';

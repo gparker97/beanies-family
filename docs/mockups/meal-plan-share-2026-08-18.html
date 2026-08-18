@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meal Plan Share Sheet — beanies.family (#27)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --slate: #2C3E50; --slate-2: #34495E; --orange: #F15D22; --orange-dark: #D14D1A;
+    --silk: #AED6F1; --terracotta: #E67E22; --cloud: #F8F9FA; --success: #27AE60; --purple: #9B59B6; --white: #fff;
+    --tint-orange-8: rgba(241,93,34,.08); --tint-orange-15: rgba(241,93,34,.15);
+    --tint-silk-20: rgba(174,214,241,.22); --tint-slate-5: rgba(44,62,80,.05);
+    --sq: 24px;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    margin: 0; color: var(--slate); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(1100px 500px at 50% -10%, rgba(44,62,80,.10), transparent 60%),
+      #e9edf1;
+  }
+  .board { max-width: 860px; margin: 0 auto; padding: 40px 18px 80px; }
+  .board-head { text-align: center; margin-bottom: 6px; }
+  .eyebrow { font-family: 'Outfit'; font-weight: 600; font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+  .board-title { font-family: 'Outfit'; font-weight: 800; font-size: 2.1rem; margin: 6px 0 2px; letter-spacing: -.01em; }
+  .board-note { max-width: 620px; margin: 12px auto 0; font-size: .82rem; color: rgba(44,62,80,.62); line-height: 1.55; }
+
+  .opt-label { display: flex; align-items: baseline; gap: 10px; margin: 50px 0 14px; }
+  .opt-label .tag { font-family: 'Outfit'; font-weight: 700; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--white); background: var(--slate); padding: 4px 10px; border-radius: 8px; }
+  .opt-label h2 { font-family: 'Outfit'; font-weight: 700; font-size: 1.15rem; margin: 0; }
+  .opt-label .rec { font-family: 'Outfit'; font-weight: 700; font-size: .62rem; color: var(--orange); background: var(--tint-orange-15); padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .06em; }
+  .opt-sub { font-size: .8rem; color: rgba(44,62,80,.55); margin: -6px 0 14px; }
+
+  /* A4 portrait "paper" */
+  .sheet {
+    width: 100%; max-width: 640px; margin: 0 auto; aspect-ratio: 1 / 1.414;
+    background: var(--cloud); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(44,62,80,.22); position: relative;
+    display: flex; flex-direction: column;
+  }
+
+  /* ===== shared brand bits ===== */
+  .pod { display: inline-flex; gap: 4px; align-items: flex-end; }
+  .bean { width: 15px; height: 19px; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; position: relative; }
+  .bean.sm { width: 12px; height: 15px; }
+  .bean::after { content: ''; position: absolute; top: 3px; left: 50%; transform: translateX(-50%); width: 9px; height: 5px; border-radius: 40% 40% 0 0; background: rgba(255,255,255,.55); }
+  .b-slate { background: var(--slate); } .b-terra { background: var(--terracotta); } .b-orange { background: var(--orange); } .b-silk { background: var(--silk); }
+
+  .cook { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 999px; color: #fff; font-family: 'Outfit'; font-weight: 700; font-size: .5rem; flex: none; }
+  .cook.g { background: var(--slate); } .cook.s { background: var(--purple); } .cook.m { background: var(--terracotta); }
+
+  .brand-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding: 12px 26px; border-top: 1px solid rgba(44,62,80,.08); }
+  .wordmark { font-family: 'Outfit'; font-weight: 700; font-size: .82rem; color: var(--slate); }
+  .wordmark .fam { color: var(--orange); }
+  .tagline { font-family: 'Outfit'; font-style: italic; font-size: .64rem; letter-spacing: .04em; color: rgba(44,62,80,.4); }
+
+  /* ============ OPTION A — the weekly menu ============ */
+  .a-head { padding: 22px 26px 16px; background: linear-gradient(135deg, var(--tint-orange-8), rgba(230,126,34,.10)); }
+  .a-top { display: flex; align-items: center; gap: 10px; }
+  .a-eyebrow { font-family: 'Outfit'; font-weight: 600; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--orange-dark); }
+  .a-title { font-family: 'Outfit'; font-weight: 800; font-size: 1.5rem; margin: 2px 0 0; }
+  .a-accent { font-family: 'Caveat'; font-weight: 700; font-size: 1.25rem; color: var(--orange); margin: 1px 0 0; }
+  .a-meta { margin-left: auto; text-align: right; }
+  .a-range { font-family: 'Outfit'; font-weight: 700; font-size: .9rem; }
+  .a-fam { font-size: .68rem; color: rgba(44,62,80,.5); }
+
+  .a-days { padding: 8px 18px 4px; display: grid; gap: 7px; }
+  .a-day { display: flex; gap: 12px; align-items: stretch; background: var(--white); border: 1px solid rgba(44,62,80,.06); border-radius: 14px; padding: 8px 12px 8px 8px; box-shadow: 0 3px 12px rgba(44,62,80,.04); }
+  .a-day.today { box-shadow: 0 0 0 2px var(--orange), 0 3px 12px rgba(241,93,34,.12); }
+  .a-tab { flex: none; width: 46px; border-radius: 11px; background: var(--tint-slate-5); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .a-day.today .a-tab { background: var(--tint-orange-15); }
+  .a-dow { font-family: 'Outfit'; font-weight: 800; font-size: .66rem; letter-spacing: .04em; text-transform: uppercase; color: var(--slate); }
+  .a-day.today .a-dow { color: var(--orange); }
+  .a-dnum { font-family: 'Outfit'; font-weight: 700; font-size: 1.05rem; line-height: 1; }
+  .a-meals { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; align-content: center; }
+  .a-meal { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .a-slot { font-size: .74rem; flex: none; width: 15px; text-align: center; }
+  .a-name { font-family: 'Outfit'; font-weight: 600; font-size: .72rem; color: var(--slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .a-eat { color: rgba(44,62,80,.5); font-style: italic; font-weight: 500; }
+
+  /* ============ OPTION B — the menu board ============ */
+  .b-head { background: var(--slate); color: #fff; padding: 20px 26px 18px; text-align: center; }
+  .b-head .pod { margin-bottom: 8px; }
+  .b-eyebrow { font-family: 'Outfit'; font-weight: 600; font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--silk); }
+  .b-title { font-family: 'Outfit'; font-weight: 800; font-size: 1.7rem; margin: 2px 0 0; }
+  .b-accent { font-family: 'Caveat'; font-weight: 700; font-size: 1.2rem; color: #F6A57F; }
+  .b-body { flex: 1; padding: 16px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; }
+  .b-day { border-bottom: 1px dashed rgba(44,62,80,.14); padding: 5px 0; }
+  .b-dh { display: flex; align-items: baseline; gap: 6px; }
+  .b-dow { font-family: 'Outfit'; font-weight: 700; font-size: .82rem; }
+  .b-dnum { font-size: .66rem; color: rgba(44,62,80,.45); }
+  .b-line { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .b-cap { font-family: 'Outfit'; font-weight: 600; font-size: .56rem; letter-spacing: .05em; text-transform: uppercase; color: rgba(44,62,80,.4); width: 26px; flex: none; }
+  .b-nm { font-family: 'Inter'; font-size: .72rem; color: var(--slate); }
+
+  /* ============ OPTION C — the at-a-glance grid ============ */
+  .c-head { padding: 16px 22px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--tint-orange-15); }
+  .c-title { font-family: 'Outfit'; font-weight: 800; font-size: 1.15rem; }
+  .c-accent { font-family: 'Caveat'; font-weight: 700; color: var(--orange); font-size: 1.05rem; }
+  .c-range { margin-left: auto; font-family: 'Outfit'; font-weight: 700; font-size: .8rem; }
+  .c-grid { flex: 1; padding: 10px 14px; display: grid; grid-template-rows: auto repeat(4, 1fr); grid-template-columns: 2.4rem repeat(7, 1fr); gap: 3px; }
+  .c-dh { text-align: center; font-family: 'Outfit'; font-weight: 700; font-size: .64rem; padding-bottom: 3px; }
+  .c-dh .n { display: block; font-size: .56rem; color: rgba(44,62,80,.45); font-weight: 500; }
+  .c-dh.today { color: var(--orange); }
+  .c-sl { display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; font-family: 'Outfit'; font-weight: 700; font-size: .5rem; letter-spacing: .04em; text-transform: uppercase; color: rgba(44,62,80,.42); }
+  .c-cell { background: var(--white); border: 1px solid rgba(44,62,80,.07); border-radius: 8px; padding: 4px 5px; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 0; }
+  .c-cell.today { background: rgba(241,93,34,.04); border-color: rgba(241,93,34,.2); }
+  .c-mn { font-family: 'Outfit'; font-weight: 600; font-size: .56rem; line-height: 1.1; color: var(--slate); overflow: hidden; }
+  .c-empty { color: rgba(44,62,80,.2); text-align: center; font-size: .7rem; }
+  .c-cook { font-size: .5rem; color: rgba(44,62,80,.45); }
+
+  .foot-legend { text-align: center; margin-top: 50px; font-size: .76rem; color: rgba(44,62,80,.55); line-height: 1.7; }
+  .foot-legend b { color: var(--slate); font-family: 'Outfit'; }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <div class="board-head">
+    <div class="eyebrow">beanies.family · issue #27 · share sheet</div>
+    <h1 class="board-title">The week's meal plan, ready to share</h1>
+    <p class="board-note">
+      One page, print- or image-friendly, for the fridge door or the family chat. Built as a
+      <b>header · body · footer</b> shell so the future weekly agenda reuses the same lockup and
+      just swaps the body. CIG-true — Cloud White paper (not the usual cream), Heritage Orange,
+      Outfit / Inter / Caveat, and the Pod beans. Three directions below; A is my pick.
+    </p>
+  </div>
+
+  <!-- ============ OPTION A ============ -->
+  <div class="opt-label">
+    <span class="tag">A</span>
+    <h2>The Weekly Menu</h2>
+    <span class="rec">recommended</span>
+  </div>
+  <p class="opt-sub">Fridge-menu warmth: a day card per row, meals two-up, cook chips. Reads top-to-bottom like a family's week. Portrait A4 / phone image.</p>
+
+  <div class="sheet">
+    <div class="a-head">
+      <div class="a-top">
+        <div>
+          <div class="a-top" style="gap:8px">
+            <span class="pod"><span class="bean b-slate"></span><span class="bean b-terra"></span><span class="bean b-orange"></span><span class="bean b-silk"></span></span>
+            <span class="a-eyebrow">on the menu this week</span>
+          </div>
+          <div class="a-title">The Parker kitchen</div>
+          <div class="a-accent">what's cooking this week? 🌱</div>
+        </div>
+        <div class="a-meta">
+          <div class="a-range">Aug 18 – 24</div>
+          <div class="a-fam">4 beans · 3 cooks</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="a-days">
+      <!-- MON -->
+      <div class="a-day">
+        <div class="a-tab"><span class="a-dow">Mon</span><span class="a-dnum">18</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🍳</span><span class="a-name">Overnight oats</span><span class="cook s">S</span></div>
+          <div class="a-meal"><span class="a-slot">🥪</span><span class="a-name">Leftover pasta bake</span><span class="cook g">G</span></div>
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name">Chicken congee</span><span class="cook m">M</span></div>
+          <div class="a-meal"><span class="a-slot">🍎</span><span class="a-name">Fruit &amp; yoghurt</span></div>
+        </div>
+      </div>
+      <!-- TUE (today) -->
+      <div class="a-day today">
+        <div class="a-tab"><span class="a-dow">Tue</span><span class="a-dnum">19</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🍳</span><span class="a-name">Toast &amp; eggs</span><span class="cook g">G</span></div>
+          <div class="a-meal"><span class="a-slot">🥪</span><span class="a-name">Bento boxes</span><span class="cook g">G</span></div>
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name">Sheet-pan salmon</span><span class="cook s">S</span></div>
+          <div class="a-meal"><span class="a-slot">🍜</span><span class="a-name a-eat">Leftovers</span></div>
+        </div>
+      </div>
+      <!-- WED -->
+      <div class="a-day">
+        <div class="a-tab"><span class="a-dow">Wed</span><span class="a-dnum">20</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🍳</span><span class="a-name">Banana pancakes</span><span class="cook g">G</span></div>
+          <div class="a-meal"><span class="a-slot">🥪</span><span class="a-name">Tomato soup</span><span class="cook m">M</span></div>
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name">Gran's beef stew</span><span class="cook s">S</span></div>
+          <div class="a-meal"><span class="a-slot">🍎</span><span class="a-name">Apple slices</span></div>
+        </div>
+      </div>
+      <!-- THU -->
+      <div class="a-day">
+        <div class="a-tab"><span class="a-dow">Thu</span><span class="a-dnum">21</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🥪</span><span class="a-name">School lunch</span><span class="cook g">G</span></div>
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name">Veggie stir-fry</span><span class="cook m">M</span></div>
+        </div>
+      </div>
+      <!-- FRI -->
+      <div class="a-day">
+        <div class="a-tab"><span class="a-dow">Fri</span><span class="a-dnum">22</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🍳</span><span class="a-name">Cereal</span><span class="cook s">S</span></div>
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name">Pizza night 🍕</span><span class="cook g">G</span></div>
+        </div>
+      </div>
+      <!-- SAT -->
+      <div class="a-day">
+        <div class="a-tab"><span class="a-dow">Sat</span><span class="a-dnum">23</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🍳</span><span class="a-name">Weekend waffles</span><span class="cook m">M</span></div>
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name a-eat">Eat out · Grandma's</span></div>
+        </div>
+      </div>
+      <!-- SUN -->
+      <div class="a-day">
+        <div class="a-tab"><span class="a-dow">Sun</span><span class="a-dnum">24</span></div>
+        <div class="a-meals">
+          <div class="a-meal"><span class="a-slot">🍽️</span><span class="a-name">Sunday roast</span><span class="cook g">G</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-foot">
+      <span class="wordmark">beanies<span class="fam">.family</span></span>
+      <span class="tagline">every bean counts</span>
+    </div>
+  </div>
+
+  <!-- ============ OPTION B ============ -->
+  <div class="opt-label">
+    <span class="tag">B</span>
+    <h2>The Menu Board</h2>
+  </div>
+  <p class="opt-sub">A café-menu feel: Deep-Slate header panel, two columns of days listed like a chalkboard. More "restaurant menu", a touch more formal.</p>
+
+  <div class="sheet">
+    <div class="b-head">
+      <span class="pod"><span class="bean sm b-silk"></span><span class="bean sm b-orange"></span><span class="bean sm b-terra"></span><span class="bean sm b-slate" style="background:#5a6b7d"></span></span>
+      <div class="b-eyebrow">the parker family</div>
+      <div class="b-title">This week's menu</div>
+      <div class="b-accent">every bean counts 🌱</div>
+    </div>
+    <div class="b-body">
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Monday</span><span class="b-dnum">18 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Chicken congee <span class="cook m" style="width:12px;height:12px">M</span></span></div></div>
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Tuesday</span><span class="b-dnum">19 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Sheet-pan salmon <span class="cook s" style="width:12px;height:12px">S</span></span></div></div>
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Wednesday</span><span class="b-dnum">20 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Gran's beef stew <span class="cook s" style="width:12px;height:12px">S</span></span></div></div>
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Thursday</span><span class="b-dnum">21 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Veggie stir-fry <span class="cook m" style="width:12px;height:12px">M</span></span></div></div>
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Friday</span><span class="b-dnum">22 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Pizza night 🍕 <span class="cook g" style="width:12px;height:12px">G</span></span></div></div>
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Saturday</span><span class="b-dnum">23 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Eat out · Grandma's</span></div></div>
+      <div class="b-day"><div class="b-dh"><span class="b-dow">Sunday</span><span class="b-dnum">24 Aug</span></div>
+        <div class="b-line"><span class="b-cap">Dinner</span><span class="b-nm">Sunday roast <span class="cook g" style="width:12px;height:12px">G</span></span></div></div>
+    </div>
+    <div class="brand-foot">
+      <span class="wordmark">beanies<span class="fam">.family</span></span>
+      <span class="tagline">planned with love</span>
+    </div>
+  </div>
+
+  <!-- ============ OPTION C ============ -->
+  <div class="opt-label">
+    <span class="tag">C</span>
+    <h2>The At-a-Glance Grid</h2>
+  </div>
+  <p class="opt-sub">The whole week in one grid — days across, meals down. Most utilitarian; best when you just want to scan the whole week fast. (Prints best landscape.)</p>
+
+  <div class="sheet" style="aspect-ratio: 1.414 / 1; max-width:640px;">
+    <div class="c-head">
+      <span class="pod"><span class="bean sm b-slate"></span><span class="bean sm b-terra"></span><span class="bean sm b-orange"></span><span class="bean sm b-silk"></span></span>
+      <span class="c-title">This week's meals</span>
+      <span class="c-accent">what's cooking? 🌱</span>
+      <span class="c-range">Aug 18 – 24</span>
+    </div>
+    <div class="c-grid">
+      <div></div>
+      <div class="c-dh">Mon<span class="n">18</span></div>
+      <div class="c-dh today">Tue<span class="n">19</span></div>
+      <div class="c-dh">Wed<span class="n">20</span></div>
+      <div class="c-dh">Thu<span class="n">21</span></div>
+      <div class="c-dh">Fri<span class="n">22</span></div>
+      <div class="c-dh">Sat<span class="n">23</span></div>
+      <div class="c-dh">Sun<span class="n">24</span></div>
+
+      <div class="c-sl">Bkfst</div>
+      <div class="c-cell"><span class="c-mn">Overnight oats</span></div>
+      <div class="c-cell today"><span class="c-mn">Toast &amp; eggs</span></div>
+      <div class="c-cell"><span class="c-mn">Banana pancakes</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-mn">Cereal</span></div>
+      <div class="c-cell"><span class="c-mn">Waffles</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+
+      <div class="c-sl">Lunch</div>
+      <div class="c-cell"><span class="c-mn">Pasta bake</span></div>
+      <div class="c-cell today"><span class="c-mn">Bento boxes</span></div>
+      <div class="c-cell"><span class="c-mn">Tomato soup</span></div>
+      <div class="c-cell"><span class="c-mn">School lunch</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+
+      <div class="c-sl">Dinner</div>
+      <div class="c-cell"><span class="c-mn">Chicken congee</span><span class="c-cook">mary</span></div>
+      <div class="c-cell today"><span class="c-mn">Sheet-pan salmon</span><span class="c-cook">sofia</span></div>
+      <div class="c-cell"><span class="c-mn">Gran's beef stew</span><span class="c-cook">sofia</span></div>
+      <div class="c-cell"><span class="c-mn">Veggie stir-fry</span><span class="c-cook">mary</span></div>
+      <div class="c-cell"><span class="c-mn">Pizza night</span><span class="c-cook">greg</span></div>
+      <div class="c-cell"><span class="c-mn">Eat out</span></div>
+      <div class="c-cell"><span class="c-mn">Sunday roast</span><span class="c-cook">greg</span></div>
+
+      <div class="c-sl">Snack</div>
+      <div class="c-cell"><span class="c-mn">Fruit</span></div>
+      <div class="c-cell today"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-mn">Apple</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+      <div class="c-cell"><span class="c-empty">–</span></div>
+    </div>
+    <div class="brand-foot" style="padding:8px 20px">
+      <span class="wordmark">beanies<span class="fam">.family</span></span>
+      <span class="tagline">every bean counts</span>
+    </div>
+  </div>
+
+  <div class="foot-legend">
+    <b>Cooks</b> — <span class="cook g" style="display:inline-flex;vertical-align:middle">G</span> greg ·
+    <span class="cook m" style="display:inline-flex;vertical-align:middle">M</span> mary ·
+    <span class="cook s" style="display:inline-flex;vertical-align:middle">S</span> sofia. &nbsp;·&nbsp;
+    <b>Shell</b> — Pod-beans header · meal body · <b>every bean counts</b> footer — reused by the weekly agenda (body swaps to meals + activities + to-dos + meds + key info).<br />
+    Heritage Orange, Cloud White paper, Outfit / Inter / Caveat · squircle corners · print-ready one page.
+  </div>
+
+</div>
+</body>
+</html>

@@ -1246,6 +1246,7 @@ const STRING_DEFS = {
   'mealPlanner.editor.recipe': { en: 'Recipe', beanie: 'recipe' },
   'mealPlanner.editor.choose': { en: 'Choose a recipe', beanie: 'choose a recipe' },
   'mealPlanner.editor.change': { en: 'Change', beanie: 'change' },
+  'mealPlanner.editor.editRecipe': { en: 'Edit recipe', beanie: 'edit recipe' },
   'mealPlanner.editor.cook': { en: "Who's cooking?", beanie: "who's cooking?" },
   'mealPlanner.editor.cookHint': { en: 'shown on the card', beanie: 'shown on the card' },
   'mealPlanner.editor.anyone': { en: 'Anyone', beanie: 'anyone' },
@@ -1261,6 +1262,7 @@ const STRING_DEFS = {
   'mealPlanner.editor.label': { en: 'Label', beanie: 'label' },
   'mealPlanner.editor.labelPlaceholder': { en: "e.g. Grandma's", beanie: "e.g. grandma's" },
   'mealPlanner.editor.markCooked': { en: 'Mark cooked', beanie: 'mark cooked' },
+  'mealPlanner.editor.viewCookLog': { en: 'View cook log', beanie: 'view cook log' },
   'mealPlanner.editor.save': { en: 'Save meal', beanie: 'save meal' },
   'mealPlanner.editor.deleteConfirmTitle': { en: 'Remove this meal?', beanie: 'remove this meal?' },
   'mealPlanner.editor.deleteConfirmMessage': {

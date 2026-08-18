@@ -132,7 +132,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          "Copying a week <strong>replaces</strong> whatever was already planned in the target week — beanies warns you first. Anything you'd already marked cooked keeps its history. A shared plan only shows what each person is allowed to see.",
+          "Copying a week <strong>replaces</strong> whatever was already planned in the target week — beanies warns you first. Anything you'd already marked cooked keeps its history. Sharing sends the whole family's plan for that day or week, so everyone sees the same list.",
       },
     ],
   },

@@ -13,6 +13,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMealDrag } from '@/composables/useMealDrag';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { mealDisplayName } from '@/utils/mealDisplayName';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 const props = defineProps<{ meal: MealPlanEntry }>();
@@ -36,13 +37,7 @@ const recipe = computed(() =>
 
 const isType = computed(() => props.meal.kind !== 'recipe');
 
-const name = computed(() => {
-  if (props.meal.kind === 'recipe') {
-    return recipe.value?.name ?? t('mealPlanner.card.recipeRemoved');
-  }
-  const label = t(`mealPlanner.kind.${props.meal.kind}` as 'mealPlanner.kind.other');
-  return props.meal.label ? `${label} · ${props.meal.label}` : label;
-});
+const name = computed(() => mealDisplayName(props.meal, recipesStore.recipes, t));
 
 const cook = computed(() =>
   props.meal.cookMemberId
@@ -66,8 +61,8 @@ const typeClass = computed(() => {
   }
 });
 
-function onDragStart(): void {
-  startDrag({ source: 'meal', mealId: props.meal.id });
+function onDragStart(e: DragEvent): void {
+  startDrag({ source: 'meal', mealId: props.meal.id }, e);
 }
 </script>
 

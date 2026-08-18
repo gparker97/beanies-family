@@ -18,18 +18,17 @@ import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
-import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
 import { useShareText } from '@/composables/useShareText';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { formatMealPlanShare } from '@/utils/formatMealPlanShare';
+import { mealDisplayName } from '@/utils/mealDisplayName';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { addDays, toDateInputValue, formatDayLong } from '@/utils/date';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 const { t } = useTranslation();
-const { today } = useToday();
 const mealPlanStore = useMealPlanStore();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
@@ -78,7 +77,10 @@ async function doCopy(fromDates: string[], toDates: string[]) {
     showToast('info', t('mealPlanner.copy.empty'), t('mealPlanner.copy.emptyHelp'));
     return;
   }
-  if (mealPlanStore.weekHasMeals(toDates)) {
+  // Capture BEFORE the copy — afterwards the target always holds meals, so the
+  // overwrote metric would be permanently true.
+  const overwrote = mealPlanStore.weekHasMeals(toDates);
+  if (overwrote) {
     const ok = await confirm({
       title: 'mealPlanner.copy.confirmTitle',
       message: 'mealPlanner.copy.confirmMessage',
@@ -94,7 +96,7 @@ async function doCopy(fromDates: string[], toDates: string[]) {
       level: 'info',
       surface: 'meal-planner',
       message: 'week copied',
-      context: { action: 'week-copied', overwrote: mealPlanStore.weekHasMeals(toDates) },
+      context: { action: 'week-copied', overwrote },
     });
   }
 }
@@ -135,36 +137,29 @@ const shareOptions = computed(() => [
   { value: 'week', label: t('mealPlanner.share.week') },
 ]);
 
-function mealName(m: MealPlanEntry): string {
-  if (m.kind === 'recipe') {
-    return (
-      recipesStore.recipes.find((r) => r.id === m.recipeId)?.name ??
-      t('mealPlanner.card.recipeRemoved')
-    );
-  }
-  const label = t(`mealPlanner.kind.${m.kind}` as 'mealPlanner.kind.other');
-  return m.label ? `${label} · ${m.label}` : label;
-}
 function cookName(id?: string): string | undefined {
   return id ? familyStore.members.find((m) => m.id === id)?.name : undefined;
 }
 
 const sharePreview = computed(() => {
+  // 'day' shares the day the user is actually looking at (the mobile day-stack /
+  // its ref, which defaults to today) — not always today.
   const meals =
     shareScope.value === 'week'
       ? mealPlanStore.mealsForWeek(weekDates.value)
-      : mealPlanStore.mealsForDate(today.value);
+      : mealPlanStore.mealsForDate(mobileDate.value);
   return formatMealPlanShare(meals, {
     header: `${t('mealPlanner.share.header')} · ${weekLabel.value}`,
     dayLabel: (d) => formatDayLong(d),
     slotLabel: (s: MealSlot) => t(`mealPlanner.slot.${s}`),
-    mealName,
+    mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
     cookName,
   });
 });
 
 async function doShare() {
-  await share(t('mealPlanner.share.title'), sharePreview.value);
+  const ok = await share(t('mealPlanner.share.title'), sharePreview.value);
+  if (!ok) return; // cancelled sheet / failed copy — don't record a success or close
   logEvent({
     level: 'info',
     surface: 'meal-planner',

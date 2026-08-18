@@ -120,6 +120,29 @@ describe('mealPlanStore', () => {
     expect(store.mealsForWeek(WEEK_B).map((m) => m.date)).toEqual(['2026-08-25']);
   });
 
+  it('mealsForWeek orders by date then slot (never slot-grouped — guards the share)', async () => {
+    repoState.all = [
+      seed({ id: 'mon-b', date: '2026-08-18', slot: 'breakfast' }),
+      seed({ id: 'tue-b', date: '2026-08-19', slot: 'breakfast' }),
+      seed({ id: 'mon-d', date: '2026-08-18', slot: 'dinner' }),
+    ];
+    await store.loadMealPlans();
+    // Correct: all of Monday (breakfast, dinner) before Tuesday — NOT all breakfasts then dinners.
+    expect(store.mealsForWeek(WEEK_A).map((m) => m.id)).toEqual(['mon-b', 'mon-d', 'tue-b']);
+  });
+
+  it('moveMeal recomputes position for the target cell', async () => {
+    repoState.all = [
+      seed({ id: 'src', date: '2026-08-18', slot: 'dinner', position: 0 }),
+      seed({ id: 'tgt', date: '2026-08-19', slot: 'dinner', position: 0 }),
+    ];
+    await store.loadMealPlans();
+    await store.moveMeal('src', '2026-08-19', 'dinner');
+    const moved = store.meals.find((m) => m.id === 'src')!;
+    expect(moved.date).toBe('2026-08-19');
+    expect(moved.position).toBe(1); // after the existing tgt (position 0), not colliding
+  });
+
   it('weekHasMeals reflects the target week', async () => {
     repoState.all = [seed({ date: '2026-08-26' })];
     await store.loadMealPlans();
