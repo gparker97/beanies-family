@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meal Planner — beanies.family mockup (#27)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --slate:#2C3E50; --slate-2:#34495E; --orange:#F15D22; --orange-dark:#D14D1A;
+    --silk:#AED6F1; --terracotta:#E67E22; --cloud:#F8F9FA; --success:#27AE60; --purple:#9B59B6; --white:#fff;
+    --tint-orange-8:rgba(241,93,34,.08); --tint-orange-15:rgba(241,93,34,.15);
+    --tint-silk-20:rgba(174,214,241,.2); --tint-silk-35:rgba(174,214,241,.38);
+    --tint-slate-5:rgba(44,62,80,.05); --tint-slate-10:rgba(44,62,80,.1);
+    --tint-success-10:rgba(39,174,96,.1);
+    --card-shadow:0 4px 20px rgba(44,62,80,.05); --card-hover-shadow:0 8px 32px rgba(44,62,80,.1);
+    --soft-shadow:0 8px 40px rgba(44,62,80,.08); --sq:24px;
+  }
+  * { box-sizing:border-box; }
+  html { font-size:16px; }
+  body {
+    margin:0; color:var(--slate); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+    background:radial-gradient(1200px 500px at 50% -10%, rgba(174,214,241,.18), transparent 60%), var(--cloud);
+  }
+  .board { max-width:1220px; margin:0 auto; padding:40px 20px 80px; }
+
+  .board-head { text-align:center; margin-bottom:8px; }
+  .board-eyebrow { font-family:'Outfit'; font-weight:600; font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; color:var(--orange); }
+  .board-title { font-family:'Outfit'; font-weight:800; font-size:2.25rem; margin:6px 0 2px; letter-spacing:-.01em; }
+  .board-sub { font-size:.9rem; color:rgba(44,62,80,.6); }
+  .board-note { max-width:660px; margin:14px auto 0; font-size:.82rem; color:rgba(44,62,80,.62); line-height:1.5; }
+
+  .caption { display:flex; align-items:center; gap:10px; margin:54px 0 16px; }
+  .caption .n { font-family:'Outfit'; font-weight:700; font-size:.72rem; color:var(--white); background:var(--slate); width:26px; height:26px; border-radius:9px; display:grid; place-items:center; flex:none; }
+  .caption h2 { font-family:'Outfit'; font-weight:700; font-size:1.05rem; margin:0; }
+  .caption p { margin:0; font-size:.8rem; color:rgba(44,62,80,.55); }
+
+  .frame { background:var(--white); border-radius:var(--sq); box-shadow:var(--soft-shadow); overflow:hidden; border:1px solid rgba(44,62,80,.05); }
+
+  /* header */
+  .page { padding:24px 26px 22px; background:radial-gradient(600px 200px at 88% -40%, rgba(230,126,34,.10), transparent 60%), var(--white); }
+  .page-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .page-h1 { font-family:'Outfit'; font-weight:700; font-size:1.55rem; margin:0; display:flex; align-items:center; gap:10px; }
+  .page-welcome { font-family:'Caveat'; font-weight:700; color:var(--orange); font-size:1.3rem; margin:2px 0 0; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn { font-family:'Outfit'; font-weight:600; font-size:.82rem; border:none; cursor:pointer; border-radius:16px; padding:11px 16px; display:inline-flex; align-items:center; gap:8px; transition:transform .15s, box-shadow .2s, background .2s; }
+  .btn:hover { transform:translateY(-1px); }
+  .btn-primary { background:linear-gradient(135deg,var(--orange),var(--terracotta)); color:var(--white); box-shadow:0 6px 18px rgba(241,93,34,.25); }
+  .btn-ghost { background:var(--tint-slate-5); color:var(--slate); }
+  .btn-ghost:hover { background:var(--tint-slate-10); }
+  .btn-outline { background:var(--white); color:var(--slate); border:1.5px solid rgba(44,62,80,.12); }
+
+  .weeknav { display:flex; align-items:center; gap:12px; margin-top:18px; flex-wrap:wrap; }
+  .arrows { display:flex; gap:6px; }
+  .arrow { width:36px; height:36px; border-radius:12px; border:1.5px solid rgba(44,62,80,.12); background:var(--white); color:var(--slate); cursor:pointer; font-size:1rem; display:grid; place-items:center; }
+  .arrow:hover { background:var(--tint-slate-5); }
+  .week-range { font-family:'Outfit'; font-weight:700; font-size:1.05rem; }
+  .chip-today { font-family:'Outfit'; font-weight:600; font-size:.7rem; color:var(--orange); background:var(--tint-orange-15); padding:5px 11px; border-radius:999px; }
+  .week-spacer { flex:1; }
+  .history-link { font-family:'Outfit'; font-weight:600; font-size:.78rem; color:var(--slate); opacity:.6; background:none; border:none; cursor:pointer; display:inline-flex; gap:6px; align-items:center; }
+  .history-link:hover { opacity:1; }
+
+  /* ===== the board: rail + week grid ===== */
+  .layout { display:grid; grid-template-columns:236px 1fr; gap:0; border-top:1px solid rgba(44,62,80,.06); }
+
+  /* recipe rail */
+  .rail { border-right:1px solid rgba(44,62,80,.06); padding:16px 14px; background:linear-gradient(180deg, rgba(174,214,241,.06), transparent 120px); }
+  .rail-title { font-family:'Outfit'; font-weight:700; font-size:.9rem; display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+  .rail-hint { font-family:'Caveat'; font-weight:700; color:var(--orange); font-size:1rem; margin:0 0 12px; }
+  .search { width:100%; border:1.5px solid rgba(44,62,80,.14); border-radius:12px; padding:9px 12px 9px 32px; font-family:'Inter'; font-size:.82rem; color:var(--slate); outline:none;
+    background:var(--white) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%232C3E50' stroke-opacity='0.4' stroke-width='2'><circle cx='7' cy='7' r='5'/><line x1='11' y1='11' x2='15' y2='15'/></svg>") no-repeat 10px center; }
+  .search:focus { border-color:var(--silk); box-shadow:0 0 0 3px rgba(174,214,241,.5); }
+  .rail-list { display:grid; gap:8px; margin-top:12px; }
+  .rcard { display:flex; align-items:center; gap:10px; background:var(--white); border:1px solid rgba(44,62,80,.08); border-radius:14px; padding:9px 11px; box-shadow:var(--card-shadow); cursor:grab; transition:transform .12s, box-shadow .2s; }
+  .rcard:hover { transform:translateY(-2px); box-shadow:var(--card-hover-shadow); }
+  .rcard .rimg { width:34px; height:34px; border-radius:10px; background:var(--tint-orange-8); display:grid; place-items:center; font-size:1.05rem; flex:none; }
+  .rcard .rt { font-family:'Outfit'; font-weight:600; font-size:.8rem; line-height:1.15; }
+  .rcard .rs { font-size:.68rem; color:rgba(44,62,80,.45); margin-top:1px; }
+  .rcard .grip { margin-left:auto; color:rgba(44,62,80,.25); font-size:.9rem; letter-spacing:-2px; }
+
+  .rail-divider { font-family:'Outfit'; font-weight:600; font-size:.62rem; letter-spacing:.09em; text-transform:uppercase; color:rgba(44,62,80,.4); margin:18px 2px 8px; }
+  .alt-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .alt { font-family:'Outfit'; font-weight:600; font-size:.72rem; padding:7px 11px; border-radius:999px; cursor:grab; display:inline-flex; align-items:center; gap:5px; border:1px solid transparent; }
+  .alt.eat { background:var(--tint-silk-35); color:var(--slate); }
+  .alt.left { background:var(--tint-slate-5); color:var(--slate); }
+  .alt.skip { background:var(--white); border-color:rgba(44,62,80,.14); color:rgba(44,62,80,.6); }
+  .alt.other { background:var(--tint-orange-8); color:var(--orange-dark); }
+  .newrecipe { margin-top:14px; width:100%; justify-content:center; }
+
+  /* week grid */
+  .weekgrid { padding:12px 14px 18px; overflow-x:auto; }
+  .wg { width:100%; min-width:720px; border-collapse:separate; border-spacing:0; }
+  .wg thead th { padding:6px 5px 12px; text-align:center; }
+  .wg thead th.slotcol { width:78px; }
+  .dcol { font-family:'Outfit'; font-weight:700; font-size:.82rem; }
+  .dcol .dd { font-size:.68rem; color:rgba(44,62,80,.45); font-weight:500; margin-top:1px; }
+  .dcol.today .dn { color:var(--orange); }
+  .dcol.today .badge { display:inline-block; margin-top:4px; font-size:.58rem; font-family:'Outfit'; font-weight:700; color:var(--orange); background:var(--tint-orange-15); padding:2px 7px; border-radius:999px; }
+
+  .wg td { padding:4px; vertical-align:top; }
+  .slothdr { font-family:'Outfit'; font-weight:600; font-size:.6rem; letter-spacing:.06em; text-transform:uppercase; color:rgba(44,62,80,.4); text-align:right; padding-right:8px !important; white-space:nowrap; vertical-align:middle; }
+  td.today-col { background:rgba(241,93,34,.035); }
+
+  /* meal card in a cell */
+  .m { background:var(--white); border:1px solid rgba(44,62,80,.09); border-radius:13px; padding:7px 8px 6px; box-shadow:var(--card-shadow); cursor:pointer; min-height:58px; transition:transform .12s, box-shadow .2s; }
+  .m:hover { transform:translateY(-1px); box-shadow:var(--card-hover-shadow); }
+  /* leading recipe photo, with a graceful emoji-tile fallback */
+  .mtop { display:flex; gap:7px; align-items:flex-start; }
+  .thumb { width:28px; height:28px; border-radius:9px; flex:none; background-size:cover; background-position:center; box-shadow:inset 0 0 0 1px rgba(44,62,80,.08); }
+  .thumb.fb { display:grid; place-items:center; font-size:.9rem; background:var(--tint-orange-8); box-shadow:none; }
+  .mtext { flex:1; min-width:0; }
+  .m .nm { font-family:'Outfit'; font-weight:700; font-size:.8rem; line-height:1.18; color:var(--slate); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  /* COOK — clearly legible, but secondary to the meal name */
+  .cookline { display:flex; align-items:center; gap:5px; margin-top:6px; }
+  .cook { width:16px; height:16px; border-radius:999px; display:grid; place-items:center; font-family:'Outfit'; font-weight:700; font-size:.52rem; color:var(--white); flex:none; box-shadow:0 0 0 2px var(--white); }
+  .cookname { font-family:'Outfit'; font-weight:600; font-size:.63rem; color:rgba(44,62,80,.6); }
+  .state { margin-left:auto; width:8px; height:8px; border-radius:999px; flex:none; }
+  .state.todo { background:var(--orange); }
+  .state.done { background:var(--success); }
+  .m .meta { display:flex; align-items:center; gap:5px; margin-top:5px; color:rgba(44,62,80,.5); font-size:.6rem; }
+  .m .meta .pill { display:inline-flex; align-items:center; gap:3px; }
+  .m.eat { background:var(--tint-silk-35); border-color:transparent; }
+  .m.left { background:var(--tint-slate-5); border-color:transparent; box-shadow:none; }
+  .m.skip { background:repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(44,62,80,.03) 6px, rgba(44,62,80,.03) 12px); border:1px dashed rgba(44,62,80,.14); box-shadow:none; }
+  .m.skip .nm { color:rgba(44,62,80,.5); }
+  .m.type .cookline { margin-top:5px; }
+  .m .typelabel { font-family:'Outfit'; font-weight:600; font-size:.62rem; color:rgba(44,62,80,.5); }
+
+  .drop { border:1.5px dashed rgba(44,62,80,.16); border-radius:13px; min-height:58px; display:grid; place-items:center; color:rgba(44,62,80,.32); font-size:1.1rem; transition:.15s; }
+  .drop:hover { border-color:var(--orange); color:var(--orange); background:var(--tint-orange-8); }
+  .drop.active { border:2px solid var(--orange); background:var(--tint-orange-15); color:var(--orange); box-shadow:0 0 0 4px rgba(241,93,34,.12); }
+
+  /* dragging ghost */
+  .ghost { position:absolute; top:-14px; left:44%; transform:rotate(-4deg); z-index:5; width:150px; pointer-events:none;
+    background:var(--white); border:1px solid rgba(241,93,34,.4); border-radius:14px; padding:9px 11px; box-shadow:0 16px 34px rgba(44,62,80,.22); }
+  .ghost .rt { font-family:'Outfit'; font-weight:600; font-size:.8rem; display:flex; align-items:center; gap:8px; }
+  .ghost .rt .rimg { width:30px; height:30px; border-radius:9px; background:var(--tint-orange-8); display:grid; place-items:center; font-size:1rem; }
+  .drag-wrap { position:relative; }
+  .drag-note { position:absolute; top:20px; left:calc(44% + 158px); font-family:'Caveat'; font-weight:700; color:var(--orange); font-size:1.05rem; transform:rotate(-3deg); }
+
+  /* ===== vignettes ===== */
+  .vignettes { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:22px; align-items:start; }
+
+  /* add-meal sheet */
+  .modal { background:var(--white); border-radius:var(--sq); box-shadow:var(--soft-shadow); overflow:hidden; border:1px solid rgba(44,62,80,.05); }
+  .modal-head { display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid rgba(44,62,80,.08); }
+  .iconbox { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; font-size:1.2rem; flex:none; background:var(--tint-orange-8); }
+  .modal-title { font-family:'Outfit'; font-weight:700; font-size:1.02rem; margin:0; }
+  .modal-title small { display:block; font-family:'Inter'; font-weight:400; font-size:.72rem; color:rgba(44,62,80,.5); margin-top:1px; }
+  .modal-body { padding:16px 18px; background:var(--cloud); }
+  .fld { margin-bottom:13px; }
+  .flab { font-family:'Outfit'; font-weight:600; font-size:.64rem; letter-spacing:.07em; text-transform:uppercase; color:rgba(44,62,80,.42); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .flab .req { color:var(--orange); }
+  .segpick { display:flex; gap:5px; background:var(--tint-slate-5); border-radius:11px; padding:4px; }
+  .segpick button { flex:1; font-family:'Outfit'; font-weight:600; font-size:.68rem; border:none; background:none; cursor:pointer; padding:7px 4px; border-radius:8px; color:rgba(44,62,80,.55); }
+  .segpick button.on { background:var(--white); color:var(--slate); box-shadow:var(--card-shadow); }
+  .selrow { display:flex; align-items:center; gap:9px; background:var(--white); border:1.5px solid rgba(44,62,80,.12); border-radius:12px; padding:10px 12px; font-size:.84rem; }
+  .selrow .rimg { width:26px; height:26px; border-radius:8px; background:var(--tint-orange-8); display:grid; place-items:center; font-size:.9rem; }
+  .selrow .cta { margin-left:auto; font-family:'Outfit'; font-weight:600; font-size:.72rem; color:var(--orange); }
+  .input { width:100%; border:1.5px solid rgba(44,62,80,.14); border-radius:12px; padding:9px 12px; font-family:'Inter'; font-size:.84rem; color:var(--slate); outline:none; }
+  .input:focus { border-color:var(--silk); box-shadow:0 0 0 3px rgba(174,214,241,.5); }
+  .cookpick { display:flex; gap:8px; }
+  .cookopt { display:grid; justify-items:center; gap:4px; cursor:pointer; }
+  .cookopt .av { width:38px; height:38px; border-radius:999px; display:grid; place-items:center; font-family:'Outfit'; font-weight:700; font-size:.8rem; color:var(--white); border:2.5px solid transparent; }
+  .cookopt.sel .av { border-color:var(--orange); box-shadow:0 0 0 3px var(--tint-orange-15); }
+  .cookopt span { font-family:'Outfit'; font-weight:600; font-size:.64rem; color:rgba(44,62,80,.6); }
+  .eaters { display:flex; align-items:center; gap:-6px; }
+  .eaters .av { width:30px; height:30px; border-radius:999px; display:grid; place-items:center; font-family:'Outfit'; font-weight:700; font-size:.66rem; color:var(--white); box-shadow:0 0 0 2px var(--cloud); margin-right:-6px; }
+  .eaters .guest { width:auto; padding:0 10px; border-radius:999px; background:var(--tint-silk-35); color:var(--slate); font-size:.66rem; height:30px; box-shadow:0 0 0 2px var(--cloud); }
+  .eaters .addg { width:30px; height:30px; border-radius:999px; border:1.5px dashed rgba(44,62,80,.28); color:rgba(44,62,80,.45); display:grid; place-items:center; font-size:.9rem; margin-left:2px; cursor:pointer; }
+  .tworow { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .modal-foot { padding:13px 18px; }
+  .save-btn { width:100%; font-family:'Outfit'; font-weight:700; font-size:.85rem; color:var(--white); background:linear-gradient(135deg,var(--orange),var(--terracotta)); border:none; border-radius:16px; padding:13px; cursor:pointer; }
+
+  /* mobile frame */
+  .phone { width:300px; margin:0 auto; background:var(--slate); border-radius:34px; padding:10px; box-shadow:var(--soft-shadow); }
+  .phone-screen { background:var(--cloud); border-radius:26px; overflow:hidden; }
+  .ph-head { background:var(--white); padding:14px 16px 12px; }
+  .ph-head .t { font-family:'Outfit'; font-weight:700; font-size:1rem; display:flex; align-items:center; gap:7px; }
+  .ph-daynav { display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .ph-daynav .d { font-family:'Outfit'; font-weight:700; font-size:.82rem; }
+  .ph-daynav .arrow { width:28px; height:28px; border-radius:9px; }
+  .ph-body { padding:12px 14px 16px; }
+  .ph-slot { font-family:'Outfit'; font-weight:600; font-size:.6rem; letter-spacing:.06em; text-transform:uppercase; color:rgba(44,62,80,.4); margin:12px 2px 6px; }
+  .ph-m { background:var(--white); border:1px solid rgba(44,62,80,.08); border-radius:14px; padding:10px 11px; box-shadow:var(--card-shadow); }
+  .ph-m .nm { font-family:'Outfit'; font-weight:600; font-size:.85rem; }
+  .ph-m .thumb { width:42px; height:42px; border-radius:12px; }
+  .ph-m .mtop { gap:10px; align-items:center; }
+  .ph-tap { border:1.5px dashed rgba(44,62,80,.2); border-radius:14px; padding:12px; text-align:center; color:rgba(44,62,80,.4); font-family:'Outfit'; font-weight:600; font-size:.78rem; }
+
+  /* nook / warn / share (compact) */
+  .mini { background:var(--white); border-radius:var(--sq); box-shadow:var(--card-shadow); border:1px solid rgba(44,62,80,.05); overflow:hidden; }
+  .mini-pad { padding:16px 18px; }
+  .mini-h { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .mini-h .e { font-size:1.1rem; } .mini-h h3 { font-family:'Outfit'; font-weight:700; font-size:.98rem; margin:0; } .mini-h .when { margin-left:auto; font-size:.68rem; color:rgba(44,62,80,.45); font-family:'Outfit'; font-weight:600; }
+  .nrow { display:flex; align-items:center; gap:10px; padding:8px 0; }
+  .nrow + .nrow { border-top:1px solid rgba(44,62,80,.06); }
+  .nslot { font-family:'Outfit'; font-weight:600; font-size:.58rem; letter-spacing:.05em; text-transform:uppercase; color:rgba(44,62,80,.45); width:56px; flex:none; }
+  .nrow .nm { font-family:'Outfit'; font-weight:600; font-size:.82rem; }
+  .nthumb { width:26px; height:26px; border-radius:8px; flex:none; background-size:cover; background-position:center; box-shadow:inset 0 0 0 1px rgba(44,62,80,.08); }
+  .nthumb.fb { display:grid; place-items:center; font-size:.82rem; background:var(--tint-orange-8); box-shadow:none; }
+  .nrow .who { margin-left:auto; display:flex; align-items:center; gap:5px; }
+  .warn-body { padding:20px 18px 6px; text-align:center; }
+  .warn-icon { width:52px; height:52px; border-radius:16px; background:var(--tint-orange-15); display:grid; place-items:center; font-size:1.4rem; margin:0 auto 12px; }
+  .warn-body h3 { font-family:'Outfit'; font-weight:700; font-size:1rem; margin:0 0 8px; }
+  .warn-body p { font-size:.82rem; color:rgba(44,62,80,.66); line-height:1.5; margin:0 6px; }
+  .warn-foot { padding:14px 18px 18px; display:flex; gap:9px; } .warn-foot .btn { flex:1; justify-content:center; padding:11px; font-size:.78rem; }
+  .seg2 { display:flex; gap:5px; background:var(--tint-slate-5); border-radius:11px; padding:4px; margin:0 0 12px; }
+  .seg2 button { flex:1; font-family:'Outfit'; font-weight:600; font-size:.74rem; border:none; background:none; padding:7px; border-radius:8px; color:rgba(44,62,80,.55); cursor:pointer; }
+  .seg2 button.on { background:var(--white); color:var(--slate); box-shadow:var(--card-shadow); }
+  .channels { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+  .chan { display:grid; gap:5px; justify-items:center; font-size:.62rem; color:rgba(44,62,80,.6); }
+  .chan .ci { width:42px; height:42px; border-radius:14px; display:grid; place-items:center; font-size:1.2rem; background:var(--tint-slate-5); }
+  .preview { background:var(--cloud); border-radius:12px; padding:11px 13px; font-size:.72rem; color:rgba(44,62,80,.72); line-height:1.5; white-space:pre-line; margin-top:10px; }
+
+  .foot-legend { text-align:center; margin-top:56px; font-size:.76rem; color:rgba(44,62,80,.5); line-height:1.8; }
+  .foot-legend b { color:var(--slate); font-family:'Outfit'; }
+
+  @media (max-width:820px){ .layout{ grid-template-columns:1fr; } .rail{ border-right:none; border-bottom:1px solid rgba(44,62,80,.06); } }
+  @media (max-width:560px){ .board-title{ font-size:1.7rem; } }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <div class="board-head">
+    <div class="board-eyebrow">beanies.family · issue #27 · mockup v2</div>
+    <h1 class="board-title">Meal Planner</h1>
+    <div class="board-sub">The Treehouse 🌳 · Planning · the family meal board</div>
+    <p class="board-note">
+      A week-first meal board: days across the top, your cookbook down the side. Drag a recipe onto any
+      day + slot — or drop an "eat out / leftovers / skip". The meal leads each card, with <b>who's cooking</b> clear beneath.
+      Mark a meal cooked and it logs to the recipe. Clamped to the beanies CIG — Heritage Orange for
+      prompts, squircle corners, Outfit / Inter / Caveat. A direction for review, not final UI.
+    </p>
+  </div>
+
+  <!-- 1 · THE BOARD -->
+  <div class="caption">
+    <span class="n">1</span>
+    <div><h2>The meal board — drag from the cookbook</h2><p>Days across the top (like the calendar), meal slots down the left. Drag a recipe from the rail onto a cell; the target glows. The meal name is the focus, the cook clearly beneath.</p></div>
+  </div>
+
+  <div class="frame drag-wrap">
+    <div class="page">
+      <div class="page-topbar">
+        <div>
+          <h1 class="page-h1">🍲 Meal Planner</h1>
+          <p class="page-welcome">what's cooking this week? 🌱</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost">⧉ Copy last week</button>
+          <button class="btn btn-primary">↗ Share</button>
+        </div>
+      </div>
+      <div class="weeknav">
+        <div class="arrows"><button class="arrow">‹</button><button class="arrow">›</button></div>
+        <span class="week-range">Aug 18 – 24</span>
+        <span class="chip-today">This week</span>
+        <span class="week-spacer"></span>
+        <button class="history-link">🕘 Past weeks</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- rail -->
+      <aside class="rail">
+        <div class="rail-title">📖 Cookbook</div>
+        <p class="rail-hint">drag a recipe onto a day 🍝</p>
+        <input class="search" placeholder="Search recipes…" />
+        <div class="rail-list">
+          <div class="rcard"><div class="rimg" style="background-image:linear-gradient(135deg,#c8781f,#e6a54d)"></div><div><div class="rt">Butter chicken curry</div><div class="rs">cooked 4× · 45 min</div></div><span class="grip">⋮⋮</span></div>
+          <div class="rcard"><div class="rimg" style="background-image:linear-gradient(135deg,#8a4a24,#c9873f)"></div><div><div class="rt">Gran's beef stew</div><div class="rs">cooked 9× · 2 hr</div></div><span class="grip">⋮⋮</span></div>
+          <div class="rcard"><div class="rimg" style="background-image:linear-gradient(135deg,#e0805a,#f2b199)"></div><div><div class="rt">Sheet-pan salmon</div><div class="rs">cooked 3× · 25 min</div></div><span class="grip">⋮⋮</span></div>
+          <div class="rcard"><div class="rimg">🥞</div><div><div class="rt">Banana pancakes</div><div class="rs">cooked 6× · 20 min</div></div><span class="grip">⋮⋮</span></div>
+        </div>
+        <div class="rail-divider">Or an alternative</div>
+        <div class="alt-chips">
+          <span class="alt eat">🍜 Eat out</span>
+          <span class="alt left">♻️ Leftovers</span>
+          <span class="alt skip">— Skip</span>
+          <span class="alt other">✎ Other</span>
+        </div>
+        <button class="btn btn-ghost newrecipe">＋ New recipe</button>
+      </aside>
+
+      <!-- week grid -->
+      <div class="weekgrid">
+        <table class="wg">
+          <thead>
+            <tr>
+              <th class="slotcol"></th>
+              <th><div class="dcol"><div class="dn">Mon</div><div class="dd">18</div></div></th>
+              <th><div class="dcol"><div class="dn">Tue</div><div class="dd">19</div></div></th>
+              <th><div class="dcol today"><div class="dn">Wed</div><div class="dd">20</div><div class="badge">today</div></div></th>
+              <th><div class="dcol"><div class="dn">Thu</div><div class="dd">21</div></div></th>
+              <th><div class="dcol"><div class="dn">Fri</div><div class="dd">22</div></div></th>
+              <th><div class="dcol"><div class="dn">Sat</div><div class="dd">23</div></div></th>
+              <th><div class="dcol"><div class="dn">Sun</div><div class="dd">24</div></div></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- BREAKFAST -->
+            <tr>
+              <td class="slothdr">Breakfast</td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🥣</span><div class="mtext"><div class="nm">Overnight oats</div><div class="cookline"><span class="cook" style="background:#9B59B6">S</span><span class="cookname">sofia</span><span class="state done"></span></div></div></div></div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🍳</span><div class="mtext"><div class="nm">Toast + eggs</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state done"></span></div></div></div></div></td>
+              <td class="today-col"><div class="m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#e0a94a,#f4d98f)"></span><div class="mtext"><div class="nm">Banana pancakes</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state todo"></span></div></div></div><div class="meta"><span class="pill">📝 note</span></div></div></td>
+              <td><div class="drop">＋</div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🥣</span><div class="mtext"><div class="nm">Cereal</div><div class="cookline"><span class="cook" style="background:#9B59B6">S</span><span class="cookname">sofia</span><span class="state todo"></span></div></div></div></div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#d99a3f,#f2cf82)"></span><div class="mtext"><div class="nm">Weekend waffles</div><div class="cookline"><span class="cook" style="background:#E67E22">M</span><span class="cookname">mary</span><span class="state todo"></span></div></div></div></div></td>
+              <td><div class="drop">＋</div></td>
+            </tr>
+            <!-- LUNCH -->
+            <tr>
+              <td class="slothdr">Lunch</td>
+              <td><div class="m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#c65a2a,#e59a5c)"></span><div class="mtext"><div class="nm">Leftover pasta bake</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state done"></span></div></div></div></div></td>
+              <td><div class="m left type"><div class="typelabel">♻️ Leftovers</div><div class="cookline"><span class="cookname" style="color:rgba(44,62,80,.55);font-weight:600">from Mon dinner</span></div></div></td>
+              <td class="today-col"><div class="m"><div class="mtop"><span class="thumb fb">🥪</span><div class="mtext"><div class="nm">Tomato soup + grilled cheese</div><div class="cookline"><span class="cook" style="background:#E67E22">M</span><span class="cookname">mary</span><span class="state todo"></span></div></div></div><div class="meta"><span class="pill">👥 +2 guests</span></div></div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🍱</span><div class="mtext"><div class="nm">Bento boxes</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state todo"></span></div></div></div></div></td>
+              <td><div class="drop">＋</div></td>
+              <td><div class="drop">＋</div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#8a4a24,#c9873f)"></span><div class="mtext"><div class="nm">Sunday roast</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state todo"></span></div></div></div></div></td>
+            </tr>
+            <!-- DINNER -->
+            <tr>
+              <td class="slothdr">Dinner</td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🍚</span><div class="mtext"><div class="nm">Chicken congee</div><div class="cookline"><span class="cook" style="background:#E67E22">M</span><span class="cookname">mary</span><span class="state done"></span></div></div></div></div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#e0805a,#f2b199)"></span><div class="mtext"><div class="nm">Sheet-pan salmon</div><div class="cookline"><span class="cook" style="background:#9B59B6">S</span><span class="cookname">sofia</span><span class="state todo"></span></div></div></div></div></td>
+              <td class="today-col">
+                <!-- drop target mid-drag -->
+                <div class="drop active">drop here</div>
+              </td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🥦</span><div class="mtext"><div class="nm">Veggie stir-fry</div><div class="cookline"><span class="cook" style="background:#E67E22">M</span><span class="cookname">mary</span><span class="state todo"></span></div></div></div></div></td>
+              <td><div class="m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#c0392b,#e69a3c)"></span><div class="mtext"><div class="nm">Friday pizza night</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state todo"></span></div></div></div></div></td>
+              <td><div class="m eat type"><div class="typelabel">🍜 Eat out</div><div class="cookline"><span class="cookname" style="color:var(--slate);font-weight:600">Grandma's 🏡</span></div></div></td>
+              <td><div class="drop">＋</div></td>
+            </tr>
+            <!-- SNACKS -->
+            <tr>
+              <td class="slothdr">Snacks</td>
+              <td><div class="m"><div class="mtop"><span class="thumb fb">🍓</span><div class="mtext"><div class="nm">Fruit + yoghurt</div><div class="cookline"><span class="cookname" style="color:rgba(44,62,80,.5);font-weight:600">anyone</span><span class="state done"></span></div></div></div></div></td>
+              <td><div class="drop">＋</div></td>
+              <td class="today-col"><div class="m"><div class="mtop"><span class="thumb fb">🍎</span><div class="mtext"><div class="nm">Apple slices</div><div class="cookline"><span class="cookname" style="color:rgba(44,62,80,.5);font-weight:600">anyone</span><span class="state done"></span></div></div></div></div></td>
+              <td><div class="drop">＋</div></td>
+              <td><div class="drop">＋</div></td>
+              <td><div class="drop">＋</div></td>
+              <td><div class="m skip type"><div class="typelabel">— Skip</div></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- drag ghost + hint -->
+    <div class="ghost"><div class="rt"><span class="rimg" style="background-image:linear-gradient(135deg,#8a4a24,#c9873f);background-size:cover"></span> Gran's beef stew</div></div>
+    <span class="drag-note">↖ dragging onto<br>Wed · dinner</span>
+  </div>
+
+  <!-- 2 · ADD / EDIT A MEAL -->
+  <div class="caption">
+    <span class="n">2</span>
+    <div><h2>One meal — everything it can hold</h2><p>Recipe or an alternative · the cook (lead field) · who's eating, including outside guests · a one-off note · an optional prep time. Name-only quick-add when the recipe is new.</p></div>
+  </div>
+
+  <div class="vignettes">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="iconbox">🍽️</div>
+        <div><h3 class="modal-title">Dinner<small>Wednesday · Aug 20</small></h3></div>
+      </div>
+      <div class="modal-body">
+        <div class="fld">
+          <div class="flab">What's the plan? <span class="req">*</span></div>
+          <div class="segpick"><button class="on">Recipe</button><button>Eat out</button><button>Leftovers</button><button>Skip</button></div>
+        </div>
+        <div class="fld">
+          <div class="flab">Recipe</div>
+          <div class="selrow"><span class="rimg" style="background-image:linear-gradient(135deg,#8a4a24,#c9873f)"></span> Gran's beef stew <span class="cta">change</span></div>
+        </div>
+        <div class="fld">
+          <div class="flab">Who's cooking? <span style="font-weight:500;text-transform:none;letter-spacing:0;color:rgba(44,62,80,.4)">· shown on the card</span></div>
+          <div class="cookpick">
+            <div class="cookopt sel"><div class="av" style="background:#9B59B6">S</div><span>sofia</span></div>
+            <div class="cookopt"><div class="av" style="background:#2C3E50">G</div><span>greg</span></div>
+            <div class="cookopt"><div class="av" style="background:#E67E22">M</div><span>mary</span></div>
+            <div class="cookopt"><div class="av" style="background:rgba(44,62,80,.25)">?</div><span>anyone</span></div>
+          </div>
+        </div>
+        <div class="fld">
+          <div class="flab">Who's eating?</div>
+          <div class="eaters">
+            <span class="av" style="background:#2C3E50">G</span>
+            <span class="av" style="background:#E67E22">M</span>
+            <span class="av" style="background:#9B59B6">S</span>
+            <span class="av guest">+ Auntie Jo</span>
+            <span class="addg">＋</span>
+          </div>
+        </div>
+        <div class="tworow">
+          <div class="fld" style="margin-bottom:0">
+            <div class="flab">Note</div>
+            <input class="input" value="Double batch — leftovers Tue" />
+          </div>
+          <div class="fld" style="margin-bottom:0">
+            <div class="flab">Start prepping</div>
+            <input class="input" value="4:30 pm" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="save-btn">Add to Wednesday</button></div>
+    </div>
+
+    <!-- mobile -->
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="ph-head">
+          <div class="t">🍲 Meal Planner</div>
+          <div class="ph-daynav"><button class="arrow">‹</button><span class="d">Wed · Aug 20</span><button class="arrow">›</button><span class="chip-today" style="margin-left:auto">today</span></div>
+        </div>
+        <div class="ph-body">
+          <div class="ph-slot">Breakfast</div>
+          <div class="ph-m"><div class="mtop"><span class="thumb" style="background-image:linear-gradient(135deg,#e0a94a,#f4d98f)"></span><div class="mtext"><div class="nm">Banana pancakes</div><div class="cookline"><span class="cook" style="background:#2C3E50">G</span><span class="cookname">greg</span><span class="state todo"></span></div></div></div></div>
+          <div class="ph-slot">Lunch</div>
+          <div class="ph-m"><div class="mtop"><span class="thumb fb">🥪</span><div class="mtext"><div class="nm">Tomato soup + grilled cheese</div><div class="cookline"><span class="cook" style="background:#E67E22">M</span><span class="cookname">mary</span><span class="state todo"></span></div></div></div></div>
+          <div class="ph-slot">Dinner</div>
+          <div class="ph-tap">＋ tap to add dinner</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- add-meal sheet on mobile (picker) -->
+    <div class="modal">
+      <div class="modal-head">
+        <div class="iconbox">🔎</div>
+        <div><h3 class="modal-title">Pick for dinner<small>tap a recipe, or an alternative</small></h3></div>
+      </div>
+      <div class="modal-body">
+        <input class="search" placeholder="Search recipes…" style="background-color:var(--white)" value="butter" />
+        <div class="rail-list" style="margin-top:10px">
+          <div class="rcard" style="cursor:pointer"><div class="rimg">🍛</div><div><div class="rt">Butter chicken curry</div><div class="rs">cooked 4×</div></div></div>
+        </div>
+        <div class="qa" style="margin-top:12px;background:var(--white);border:1.5px solid rgba(241,93,34,.3);border-radius:14px;padding:12px">
+          <p style="font-family:'Caveat';font-weight:700;color:var(--orange);font-size:1.02rem;margin:0 0 8px">not in the cookbook? just name it 🍝</p>
+          <input class="input" value="Butter chicken (Auntie's)" />
+        </div>
+        <div class="alt-chips" style="margin-top:14px"><span class="alt eat">🍜 Eat out</span><span class="alt left">♻️ Leftovers</span><span class="alt skip">— Skip</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 · SUPPORTING -->
+  <div class="caption">
+    <span class="n">3</span>
+    <div><h2>Around the board</h2><p>Today's meals on the nook, the copy-week overwrite warning (Heritage Orange, never red), and the day/week share.</p></div>
+  </div>
+
+  <div class="vignettes">
+    <div class="mini"><div class="mini-pad">
+      <div class="mini-h"><span class="e">🍲</span><h3>Today's meals</h3><span class="when">Wed · Aug 20</span></div>
+      <div class="nrow"><span class="nslot">Bkfst</span><span class="nthumb" style="background-image:linear-gradient(135deg,#e0a94a,#f4d98f)"></span><span class="nm">Banana pancakes</span><span class="who"><span class="cook" style="background:#2C3E50">G</span></span></div>
+      <div class="nrow"><span class="nslot">Lunch</span><span class="nthumb fb">🥪</span><span class="nm">Tomato soup + grilled cheese</span><span class="who"><span class="cook" style="background:#E67E22">M</span></span></div>
+      <div class="nrow"><span class="nslot">Dinner</span><span class="nthumb" style="background-image:linear-gradient(135deg,#8a4a24,#c9873f)"></span><span class="nm">Gran's beef stew</span><span class="who"><span class="cook" style="background:#9B59B6">S</span></span></div>
+      <div class="nrow"><span class="nslot">Snack</span><span class="nthumb fb">🍎</span><span class="nm">Apple slices</span><span class="who"><span style="color:var(--success);font-family:'Outfit';font-weight:600;font-size:.66rem">✓ done</span></span></div>
+    </div></div>
+
+    <div class="mini">
+      <div class="warn-body">
+        <div class="warn-icon">⧉</div>
+        <h3>Copy over next week?</h3>
+        <p>Aug 25 – 31 already has <b>6 meals planned</b>. Copying this week over it will replace them. Meals you've already cooked keep their history.</p>
+      </div>
+      <div class="warn-foot">
+        <button class="btn btn-outline">Keep what's there</button>
+        <button class="btn btn-primary" style="box-shadow:none">Replace &amp; copy</button>
+      </div>
+    </div>
+
+    <div class="mini"><div class="mini-pad">
+      <div class="mini-h"><span class="e">↗</span><h3>Share the plan</h3></div>
+      <div class="seg2"><button>This day</button><button class="on">This week</button></div>
+      <div class="channels">
+        <div class="chan"><span class="ci" style="background:rgba(37,211,102,.14)">🟢</span>WhatsApp</div>
+        <div class="chan"><span class="ci">💬</span>Message</div>
+        <div class="chan"><span class="ci" style="background:var(--tint-silk-20)">✈️</span>Telegram</div>
+        <div class="chan"><span class="ci">📋</span>Copy</div>
+      </div>
+      <div class="preview">🍲 beanies meal plan · Aug 18–24
+
+Wed — dinner: Gran's beef stew (sofia)
+Fri — dinner: Pizza night (greg)
+Sat — dinner: Eat out · Grandma's
+…</div>
+    </div></div>
+  </div>
+
+  <div class="foot-legend">
+    <b>The meal</b> is the focus; the <b>cook</b> is shown clearly beneath — greg (slate) · mary (terracotta) · sofia (purple) · "anyone" for open snacks. &nbsp;·&nbsp;
+    <b>State dot</b> <span style="color:var(--orange)">●</span> to cook (shows in that cook's briefing) · <span style="color:var(--success)">●</span> cooked (logs to the recipe). &nbsp;·&nbsp;
+    <b>Alternatives</b> — 🍜 eat out · ♻️ leftovers · — skip · ✎ other, no recipe needed. &nbsp;·&nbsp;
+    <b>Photos</b> — a card shows the recipe's photo when it has one, and falls back to an emoji tile otherwise.<br />
+    Heritage Orange for prompts, never Alert Red · squircle corners · Outfit / Inter / Caveat · rem-based type.
+  </div>
+
+</div>
+</body>
+</html>
