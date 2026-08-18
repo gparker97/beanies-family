@@ -60,7 +60,7 @@ async function onDrop(): Promise<void> {
 
 <template>
   <div
-    class="grid gap-1.5 rounded-[13px] transition-colors"
+    class="flex h-full min-h-[3.5rem] flex-col gap-1.5 rounded-[13px] transition-colors"
     :class="isOver ? 'bg-[var(--tint-orange-15)] ring-2 ring-[#F15D22]' : ''"
     @dragover="onDragOver"
     @dragenter="onDragOver"
@@ -68,14 +68,19 @@ async function onDrop(): Promise<void> {
     @drop="onDrop"
   >
     <MealCard v-for="meal in meals" :key="meal.id" :meal="meal" @open="emit('openMeal', meal)" />
+    <!-- Add/drop affordance: the trailing element grows to fill the cell, so the
+         WHOLE day+slot area is a drop target — not just the card. When the slot
+         is full (a filled non-snack), a transparent grow-filler keeps the empty
+         space droppable (it inherits the root's drag handlers). -->
     <button
       v-if="showAdd"
       type="button"
-      class="font-outfit flex min-h-[2.75rem] items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.42)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] dark:border-slate-600 dark:text-slate-500"
+      class="font-outfit flex min-h-[2.75rem] flex-1 items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.42)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] dark:border-slate-600 dark:text-slate-500"
       :aria-label="t('mealPlanner.addMeal')"
       @click="emit('addMeal', date, mealSlot)"
     >
       ＋
     </button>
+    <div v-else class="min-h-[0.75rem] flex-1" aria-hidden="true"></div>
   </div>
 </template>

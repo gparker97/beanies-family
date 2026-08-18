@@ -171,7 +171,7 @@ async function doShare() {
 </script>
 
 <template>
-  <div class="px-3 py-5 sm:px-6">
+  <div class="flex flex-col px-3 py-5 sm:px-6 md:h-full">
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -250,9 +250,11 @@ async function doShare() {
       }}</span>
     </div>
 
-    <!-- Board (desktop/tablet): rail + week grid -->
+    <!-- Board (desktop/tablet): rail + week grid. Fills the leftover vertical
+         space (md:flex-1) but caps its height so tall monitors don't stretch the
+         four slot rows into cartoonish bands — the remainder stays as margin. -->
     <div
-      class="mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:grid-cols-[15rem_1fr] dark:bg-slate-800"
+      class="mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:max-h-[44rem] md:min-h-0 md:flex-1 md:grid-cols-[15rem_1fr] dark:bg-slate-800"
     >
       <RecipeRail />
       <MealWeekBoard
