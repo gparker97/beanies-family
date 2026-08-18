@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-18
+
+### Fixed
+
+- **An edit made just before the app closes now reaches your family straight away.** If beanies was force-closed or crashed in the second or two after an edit — before that change had finished saving to your family's file — the next time you opened the app it could decide nothing had changed and skip the check, leaving the edit sitting on that device. Nothing was ever lost, and it caught up on its own within the hour or as soon as you made another change, but until then your partner's phone showed the older version. beanies now notices that the device is holding something the file hasn't got yet, and sends it on the spot. Opening the app when there's nothing waiting is still just as fast as before.
+
 ## 2026-08-17
 
 ### Performance
