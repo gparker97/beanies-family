@@ -119,6 +119,13 @@ const SUMMARY_ICONS: Record<string, BeanieIconDef> = {
   'arrow-down': {
     paths: ['M17 13l-5 5m0 0l-5-5m5 5V6'],
   },
+  // Standard "download to device" glyph — arrow dropping into a tray.
+  download: {
+    paths: [
+      'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5',
+      'M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3',
+    ],
+  },
   wallet: {
     paths: [
       'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
