@@ -10,6 +10,7 @@ describe('shareOrDownloadFile', () => {
   const origRevoke = URL.revokeObjectURL;
 
   beforeEach(() => {
+    vi.useFakeTimers(); // the object-URL revoke is deferred via setTimeout
     URL.createObjectURL = vi.fn(() => 'blob:mock');
     URL.revokeObjectURL = vi.fn();
   });
@@ -22,6 +23,7 @@ describe('shareOrDownloadFile', () => {
     else delete (navigator as { share?: unknown }).share;
     URL.createObjectURL = origCreate;
     URL.revokeObjectURL = origRevoke;
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -50,6 +52,9 @@ describe('shareOrDownloadFile', () => {
     expect(result.outcome).toBe('downloaded');
     expect(clickSpy).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    // Revoke is deferred so WebKit/Firefox can read the blob first.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.runAllTimers();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock');
   });
 
@@ -88,6 +93,7 @@ describe('shareOrDownloadFile', () => {
     expect(result.outcome).toBe('downloaded');
     expect(share).not.toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalledTimes(1);
+    vi.runAllTimers();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock');
   });
 });

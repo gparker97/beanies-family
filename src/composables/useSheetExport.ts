@@ -14,6 +14,7 @@
  * failure. `ExportStage` + `ExportError` are the single taxonomy the View and
  * the delivery helper import (no drifting string literals).
  */
+import { blobToDataUrl } from '@/utils/blobToDataUrl';
 
 export type ExportStage = 'render' | 'rasterize' | 'pdf' | 'deliver';
 
@@ -33,14 +34,39 @@ export class ExportError extends Error {
 // ── Memoised lazy deps (code-split, mirroring loadPdfjs) ─────────────────────
 let htmlToImagePromise: Promise<typeof import('html-to-image')> | null = null;
 function loadHtmlToImage(): Promise<typeof import('html-to-image')> {
-  if (!htmlToImagePromise) htmlToImagePromise = import('html-to-image');
+  // Null the memo on rejection so a failed first import (offline / a 404'd
+  // chunk right after a deploy) doesn't cache the rejection and permanently
+  // break every later export — the next call re-imports.
+  if (!htmlToImagePromise) {
+    htmlToImagePromise = import('html-to-image').catch((err) => {
+      htmlToImagePromise = null;
+      throw err;
+    });
+  }
   return htmlToImagePromise;
 }
 
 let jspdfPromise: Promise<typeof import('jspdf')> | null = null;
 function loadJsPdf(): Promise<typeof import('jspdf')> {
-  if (!jspdfPromise) jspdfPromise = import('jspdf');
+  if (!jspdfPromise) {
+    jspdfPromise = import('jspdf').catch((err) => {
+      jspdfPromise = null;
+      throw err;
+    });
+  }
   return jspdfPromise;
+}
+
+/**
+ * Warm the lazy export deps in the background so a later Share/Export tap
+ * doesn't have to await a code-split chunk fetch — important on iOS WebKit,
+ * where `navigator.share({files})` loses its transient user activation if too
+ * much awaiting happens between the tap and the call. Fire-and-forget; failures
+ * are ignored (the real export path reports them).
+ */
+export function prewarmSheetExport(): void {
+  void loadHtmlToImage().catch(() => {});
+  void loadJsPdf().catch(() => {});
 }
 
 export interface PngExportOptions {
@@ -67,18 +93,22 @@ export async function exportElementToPng(
 ): Promise<Blob> {
   try {
     if (opts.fonts?.length && typeof document !== 'undefined' && document.fonts) {
-      // Force each family/weight into flight first, then let ALL loading settle.
-      await Promise.all(opts.fonts.map((f) => document.fonts.load(f)));
+      // Force each family/weight into flight, then let loading settle.
+      // `allSettled`: a single failed font fetch (offline / flaky) is a cosmetic
+      // fallback, NOT a reason to fail the whole export.
+      await Promise.allSettled(opts.fonts.map((f) => document.fonts.load(f)));
     }
     if (typeof document !== 'undefined' && document.fonts) {
       await document.fonts.ready;
     }
 
     const { toBlob } = await loadHtmlToImage();
+    // No `cacheBust`: the only images are same-origin brand PNGs (no CORS), and
+    // cache-busting appends a unique query that misses the SW precache and can
+    // bake in blank marks on a cold/offline first capture.
     const blob = await toBlob(el, {
       pixelRatio: opts.pixelRatio ?? 2,
       backgroundColor: opts.backgroundColor,
-      cacheBust: true,
     });
     if (!blob) throw new Error('html-to-image returned a null blob');
     return blob;
@@ -118,15 +148,6 @@ export async function pngBlobToPdf(pngBlob: Blob, opts: PdfExportOptions = {}): 
     if (err instanceof ExportError) throw err;
     throw new ExportError('pdf', err);
   }
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'));
-    reader.readAsDataURL(blob);
-  });
 }
 
 function imageSize(dataUrl: string): Promise<{ width: number; height: number }> {

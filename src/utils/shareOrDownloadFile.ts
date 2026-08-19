@@ -28,21 +28,25 @@ function isAbortError(err: unknown): boolean {
  * share sheet. Returns `downloaded` or `failed` (with the error).
  */
 export function downloadFile(blob: Blob, filename: string): ShareOrDownloadResult {
+  let url: string | undefined;
   try {
-    const url = URL.createObjectURL(blob);
-    try {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
     return { outcome: 'downloaded' };
   } catch (err) {
     return { outcome: 'failed', error: err };
+  } finally {
+    // Defer the revoke: WebKit/Firefox read the blob on a task queued AFTER the
+    // click returns, so revoking in the same tick aborts the download entirely.
+    if (url) {
+      const u = url;
+      setTimeout(() => URL.revokeObjectURL(u), 10_000);
+    }
   }
 }
 

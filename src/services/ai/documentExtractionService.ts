@@ -17,6 +17,7 @@ import {
   type CompressOptions,
 } from '@/services/photos/photoCompression';
 import { assertNever } from '@/utils/assertNever';
+import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
 import { createByokProvider, type ByokConfig } from './providers/byokProvider';
 import { managedProvider } from './providers/managedProvider';
@@ -74,13 +75,9 @@ function selectProvider(opts: ExtractOptions): ExtractionProvider {
 }
 
 /** Read a Blob as a base64 `data:` URL for the self-contained image payload. */
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () =>
-      reject(new CompressionError('Could not read compressed image', reader.error));
-    reader.readAsDataURL(blob);
+function readImageDataUrl(blob: Blob): Promise<string> {
+  return blobToDataUrl(blob).catch((err) => {
+    throw new CompressionError('Could not read compressed image', err);
   });
 }
 
@@ -127,7 +124,7 @@ async function prepareImageDataUrls(
   for (const src of sourceFiles) {
     const compressed = await compress(src, compression);
     compressedBlob ??= compressed.blob; // page 1 → source thumbnail
-    imageDataUrls.push(await blobToDataUrl(compressed.blob));
+    imageDataUrls.push(await readImageDataUrl(compressed.blob));
   }
   // compressedBlob is defined: the length guard above guarantees ≥1 iteration.
   return { imageDataUrls, compressedBlob: compressedBlob as Blob, truncated };

@@ -5,7 +5,7 @@
  * the single MealEditModal + MealPickerSheet, copy-week (overwrite-warned), and
  * day/week share. All CRDT work goes through mealPlanStore (MVO).
  */
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import RecipeRail from '@/components/mealplan/RecipeRail.vue';
 import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
 import MealDayStack from '@/components/mealplan/MealDayStack.vue';
@@ -18,6 +18,8 @@ import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
+import { useTranslationStore } from '@/stores/translationStore';
+import { isIosOrIpadOs } from '@/services/sync/capabilities';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { mealDisplayName } from '@/utils/mealDisplayName';
@@ -27,6 +29,7 @@ import MealExportLegend from '@/components/export/MealExportLegend.vue';
 import {
   exportElementToPng,
   pngBlobToPdf,
+  prewarmSheetExport,
   ExportError,
   type ExportStage,
 } from '@/composables/useSheetExport';
@@ -39,28 +42,47 @@ import {
 import { record as recordPerf } from '@/utils/perfTiming';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { addDays, toDateInputValue, formatDayLong } from '@/utils/date';
-import type { MealPlanEntry, MealSlot } from '@/types/models';
+import type { MealPlanEntry, MealSlot, LanguageCode } from '@/types/models';
 
-/** Faces the export sheet renders — forced into flight before capture (no FOUT). */
+/** Every Outfit/Inter/Caveat face the export sheet renders — each forced into
+ *  flight before capture so the fonts-ready gate actually covers them (no FOUT).
+ *  Weights/styles must match what ExportSheet + MealPlanExportBody + the legend
+ *  actually use. */
 const EXPORT_FONTS = [
-  '600 15px Outfit',
-  '700 16px Outfit',
-  '800 24px Outfit',
-  '400 14px Inter',
-  '700 22px Caveat',
+  '500 15px Outfit', // .day-num
+  '600 15px Outfit', // labels, meta
+  '700 16px Outfit', // headings, names, chips
+  '800 24px Outfit', // heading, date range
+  'italic 400 14px Outfit', // .export-tagline
+  'italic 600 14px Outfit', // .dish.type name
+  '400 14px Inter', // body
+  '700 22px Caveat', // header accent
 ];
 
-/** Short weekday for the grid header (mirrors MealWeekBoard's en-US short format). */
-const WEEKDAY_SHORT = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
-function dayHeading(dateISO: string): { weekday: string; dayNum: string } {
-  const d = new Date(`${dateISO}T00:00:00`);
-  return { weekday: WEEKDAY_SHORT.format(d), dayNum: String(d.getDate()) };
-}
+/** UI language → BCP-47 locale for the exported weekday headers. */
+const WEEKDAY_LOCALE: Record<LanguageCode, string> = { en: 'en-US', zh: 'zh-CN' };
 
 const { t } = useTranslation();
+const translationStore = useTranslationStore();
 const mealPlanStore = useMealPlanStore();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
+
+/** Short weekday + day-of-month for the grid header, localized to the UI
+ *  language so a shared picture isn't half-translated (day number is locale-
+ *  neutral). */
+function dayHeading(dateISO: string): { weekday: string; dayNum: string } {
+  const locale = WEEKDAY_LOCALE[translationStore.currentLanguage] ?? 'en-US';
+  const d = new Date(`${dateISO}T00:00:00`);
+  return {
+    weekday: new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d),
+    dayNum: String(d.getDate()),
+  };
+}
+
+// Warm the code-split export deps so a later Share tap doesn't lose its iOS
+// user-activation window awaiting the chunk fetch.
+onMounted(() => prewarmSheetExport());
 
 // ── Week navigation (desktop) + day navigation (mobile) ─────────────────────
 const referenceDate = ref(new Date());
@@ -164,10 +186,8 @@ function cook(id?: string): { name: string; color?: string } | undefined {
 }
 
 // Resolver object handed to `buildMealExportRows` so a meal is named/attributed
-// identically everywhere. `dayLabel` (long form) is retained on the shared shape
-// for `formatMealPlanShare`; the grid uses `dayHeading`.
+// identically across the exported grid.
 const mealResolvers = computed<MealResolvers>(() => ({
-  dayLabel: (d) => formatDayLong(d),
   dayHeading,
   slotLabel: (s: MealSlot) => t(`mealPlanner.slot.${s}`),
   mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
@@ -175,28 +195,35 @@ const mealResolvers = computed<MealResolvers>(() => ({
 }));
 
 // ── Export the week as an image / PDF ────────────────────────────────────────
-// One layout source (the off-screen ExportSheet) → PNG (share sheet) or PDF
-// (download). The sheet always renders the whole viewed WEEK; the day/week
-// toggle above governs only the text share.
+// One layout source (the off-screen ExportSheet) → PNG (Share → OS share sheet)
+// or PDF (download on desktop/Android; share sheet on iOS, where <a download>
+// can't save). The sheet always renders the whole viewed WEEK.
 type ExportFormat = 'image' | 'pdf';
 
 const exportMounting = ref(false); // gates the declarative off-screen host
 const exportRows = ref<MealExportRows | null>(null);
-const exporting = ref(false); // busy flag — disables the chooser buttons
+// Which format is currently exporting (null = idle). Drives a per-button busy
+// state so triggering one button doesn't flip the other to "Preparing…".
+const exportingFormat = ref<ExportFormat | null>(null);
+const exporting = computed(() => exportingFormat.value !== null);
 const sheetComp = ref<{ $el: HTMLElement } | null>(null);
 
 async function runExport(format: ExportFormat): Promise<void> {
-  if (exporting.value) return;
-  exporting.value = true;
-  const started = performance.now();
-  logEvent({
-    level: 'info',
-    surface: 'plan-export',
-    message: 'export started',
-    context: { action: 'export-start', format },
-  });
+  if (exportingFormat.value) return;
+  exportingFormat.value = format;
+  // `stage` is declared before the try so the catch can read it. Everything
+  // else (incl. the start log) lives INSIDE the try so any throw still hits the
+  // finally that clears the busy flag.
   let stage: ExportStage = 'render';
   try {
+    const started = performance.now();
+    logEvent({
+      level: 'info',
+      surface: 'plan-export',
+      message: 'export started',
+      context: { action: 'export-start', format },
+    });
+
     // 1. Build the row view-model + mount the sheet off-screen.
     exportRows.value = buildMealExportRows(
       mealPlanStore.mealsForWeek(weekDates.value),
@@ -224,12 +251,14 @@ async function runExport(format: ExportFormat): Promise<void> {
       mime = 'application/pdf';
     }
 
-    // 4. Deliver: "Share" hands the image to the OS share sheet; "Export as PDF"
-    //    downloads straight to the device (the conventional download action).
+    // 4. Deliver. Image → always the OS share sheet. PDF → a straight download
+    //    where the browser honours it (desktop/Android), but the share sheet on
+    //    iOS/iPadOS, where `<a download>` saves nothing — its "Save to Files"
+    //    is the only way to land the file.
     stage = 'deliver';
     const filename = `beanies-meal-plan-${weekDates.value[0]}.${ext}`;
     const result =
-      format === 'pdf'
+      format === 'pdf' && !isIosOrIpadOs()
         ? downloadFile(blob, filename)
         : await shareOrDownloadFile(blob, filename, mime, t('mealPlanner.share.title'));
     if (result.outcome === 'failed') throw new ExportError('deliver', result.error);
@@ -263,7 +292,7 @@ async function runExport(format: ExportFormat): Promise<void> {
   } finally {
     // Unmounting the host in `finally` means a thrown error can never leak it.
     exportMounting.value = false;
-    exporting.value = false;
+    exportingFormat.value = null;
   }
 }
 </script>
@@ -303,8 +332,12 @@ async function runExport(format: ExportFormat): Promise<void> {
           :disabled="exporting"
           @click="runExport('image')"
         >
-          <BeanieIcon v-if="!exporting" name="share" size="sm" />
-          {{ exporting ? t('mealPlanner.export.building') : t('mealPlanner.export.share') }}
+          <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
+          {{
+            exportingFormat === 'image'
+              ? t('mealPlanner.export.building')
+              : t('mealPlanner.export.share')
+          }}
         </button>
         <button
           type="button"
@@ -312,8 +345,12 @@ async function runExport(format: ExportFormat): Promise<void> {
           :disabled="exporting"
           @click="runExport('pdf')"
         >
-          <BeanieIcon v-if="!exporting" name="download" size="sm" />
-          {{ exporting ? t('mealPlanner.export.building') : t('mealPlanner.export.exportPdf') }}
+          <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
+          {{
+            exportingFormat === 'pdf'
+              ? t('mealPlanner.export.building')
+              : t('mealPlanner.export.exportPdf')
+          }}
         </button>
       </div>
     </div>
