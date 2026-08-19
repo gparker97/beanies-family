@@ -21,7 +21,8 @@ const cooks: Record<string, { name: string; color?: string }> = {
   u2: { name: 'ben', color: undefined },
 };
 const resolvers: MealResolvers = {
-  dayLabel: (d) => `day:${d}`,
+  dayLabel: (d) => `long:${d}`,
+  dayHeading: (d) => ({ weekday: `wd:${d.slice(-2)}`, dayNum: d.slice(-2) }),
   slotLabel: (s) => `slot:${s}`,
   mealName: (m) => m.label ?? m.id,
   cook: (id) => (id ? cooks[id] : undefined),
@@ -30,15 +31,15 @@ const resolvers: MealResolvers = {
 const WEEK = ['2026-08-17', '2026-08-18'];
 
 describe('buildMealExportRows', () => {
-  it('builds one column per day and four slot rows in fixed order', () => {
+  it('builds one column per day (weekday + dayNum) and four slot rows in order', () => {
     const rows = buildMealExportRows([], WEEK, resolvers);
     expect(rows.dayColumns).toEqual([
-      { dateISO: '2026-08-17', label: 'day:2026-08-17' },
-      { dateISO: '2026-08-18', label: 'day:2026-08-18' },
+      { dateISO: '2026-08-17', weekday: 'wd:17', dayNum: '17' },
+      { dateISO: '2026-08-18', weekday: 'wd:18', dayNum: '18' },
     ]);
     expect(rows.rows.map((r) => r.slot)).toEqual(['breakfast', 'lunch', 'dinner', 'snack']);
     expect(rows.rows[0].slotLabel).toBe('slot:breakfast');
-    // Every cell is an empty array when there are no meals.
+    expect(rows.cooks).toEqual([]);
     for (const row of rows.rows) {
       expect(row.cells).toHaveLength(WEEK.length);
       expect(row.cells.every((c) => c.length === 0)).toBe(true);
@@ -52,13 +53,12 @@ describe('buildMealExportRows', () => {
       resolvers
     );
     const dinner = rows.rows.find((r) => r.slot === 'dinner')!;
-    // day index 1 = 2026-08-18
     expect(dinner.cells[0]).toHaveLength(0);
     expect(dinner.cells[1]).toHaveLength(1);
-    const cell = dinner.cells[1][0];
-    expect(cell).toMatchObject({
+    expect(dinner.cells[1][0]).toMatchObject({
       id: 'm1',
       name: 'Tacos',
+      isType: false,
       cook: { name: 'Alice', initial: 'A', color: '#F15D22' },
     });
   });
@@ -76,14 +76,15 @@ describe('buildMealExportRows', () => {
     expect(lunch.cells[0].map((c) => c.name)).toEqual(['Soup', 'Salad']);
   });
 
-  it('derives the cook initial and passes serve time + non-empty guests through', () => {
+  it('flags non-recipe meals as type, and passes serve time + guest COUNT through', () => {
     const rows = buildMealExportRows(
       [
         meal({
           id: 'm',
           date: '2026-08-17',
           slot: 'dinner',
-          label: 'Roast',
+          kind: 'eat_out',
+          label: 'Sushi bar',
           cookMemberId: 'u2',
           serveTime: '18:30',
           guestNames: ['Sam', 'Kim'],
@@ -93,19 +94,37 @@ describe('buildMealExportRows', () => {
       resolvers
     );
     const cell = rows.rows.find((r) => r.slot === 'dinner')!.cells[0][0];
+    expect(cell.isType).toBe(true);
     expect(cell.cook).toEqual({ name: 'ben', initial: 'B', color: undefined });
     expect(cell.serveTime).toBe('18:30');
-    expect(cell.guests).toEqual(['Sam', 'Kim']);
+    expect(cell.guestCount).toBe(2);
   });
 
-  it('omits cook when unassigned and guests when the array is empty', () => {
+  it('omits cook when unassigned and reports guestCount 0 for no guests', () => {
     const rows = buildMealExportRows(
-      [meal({ id: 'm', date: '2026-08-17', slot: 'breakfast', label: 'Cereal', guestNames: [] })],
+      [meal({ id: 'm', date: '2026-08-17', slot: 'breakfast', label: 'Cereal' })],
       WEEK,
       resolvers
     );
     const cell = rows.rows.find((r) => r.slot === 'breakfast')!.cells[0][0];
     expect(cell.cook).toBeUndefined();
-    expect(cell.guests).toBeUndefined();
+    expect(cell.guestCount).toBe(0);
+  });
+
+  it('collects distinct cooks across the week in first-appearance order', () => {
+    const rows = buildMealExportRows(
+      [
+        meal({ id: '1', date: '2026-08-17', slot: 'breakfast', cookMemberId: 'u2' }),
+        meal({ id: '2', date: '2026-08-17', slot: 'lunch', cookMemberId: 'u1' }),
+        meal({ id: '3', date: '2026-08-18', slot: 'dinner', cookMemberId: 'u2' }), // dup
+        meal({ id: '4', date: '2026-08-18', slot: 'snack' }), // no cook
+      ],
+      WEEK,
+      resolvers
+    );
+    expect(rows.cooks).toEqual([
+      { initial: 'B', name: 'ben', color: undefined },
+      { initial: 'A', name: 'Alice', color: '#F15D22' },
+    ]);
   });
 });
