@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-19
 
+### Added
+
+- **The family meal board.** Plan the week's meals on a days-across board, with a cookbook rail you can drag from (or tap, if you'd rather). Add a meal by name alone, or pick a recipe with its photo; note who's cooking, who's eating (guests included), the serve time and anything else worth remembering. Nights out, leftovers and skipped meals have their own card types. Mark a meal cooked, copy a whole week forward, clear a day or a week, and share a day or week as text. Today's meals also appear on the family nook.
+
 ### Fixed
 
 - **The savings goal you set during setup is now actually saved.** The setup wizard asked for a savings goal, showed it back on the "you're all set" summary, and then threw it away — so the app had no budget and you had to enter the same number again on the Budget page. The goal you pick is now written as your family's budget when setup finishes. An existing budget is never overwritten, so re-running setup or a second family member finishing their own can't disturb it.
