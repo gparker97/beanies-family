@@ -148,6 +148,33 @@ function parseApiResponse(baseCurrency: CurrencyCode, data: unknown): ExchangeRa
 /**
  * Update rates if they are stale
  */
+/** What a rate-bootstrap caller should do, decided from a few flags. */
+export type RateRefreshAction = 'force' | 'stale' | 'skip';
+
+/**
+ * Pure decision for the app-init / family-arrival rate bootstrap.
+ *
+ * - `docLoaded` false → `skip`. The worker holds no document, so any resulting
+ *   write would throw `docWorker: no document loaded for 'mutate'`. On a hard
+ *   refresh the `activeFamilyId` watcher fires during `familyContextStore.
+ *   initialize()`, BEFORE `loadFamilyData()` loads the doc — this guard stops
+ *   that write racing the load; the post-load init call covers the family once
+ *   the doc is in.
+ * - No rates yet → `force` (fetch on the current basis; e.g. a freshly created
+ *   family, or after a base-currency switch that cleared the old basis).
+ * - Has rates → `stale` only when auto-update is on (let `updateRatesIfStale`
+ *   short-circuit on freshness); otherwise `skip`.
+ */
+export function pickRateRefreshAction(opts: {
+  docLoaded: boolean;
+  hasRates: boolean;
+  autoUpdate: boolean;
+}): RateRefreshAction {
+  if (!opts.docLoaded) return 'skip';
+  if (!opts.hasRates) return 'force';
+  return opts.autoUpdate ? 'stale' : 'skip';
+}
+
 export async function updateRatesIfStale(): Promise<UpdateResult> {
   const stale = await areRatesStale();
 

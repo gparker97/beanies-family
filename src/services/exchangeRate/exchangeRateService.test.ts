@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import { resetDoc } from '@/services/automerge/docService';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
+import { pickRateRefreshAction } from './exchangeRateService';
 import type { ExchangeRate, Settings } from '@/types/models';
 
 // Mock the global settings repo (IDB-dependent)
@@ -161,5 +162,45 @@ describe('exchangeRateService: Automerge persistence', () => {
 
     expect(result.exchangeRates).toHaveLength(1);
     expect(result.exchangeRates[0]!.to).toBe('GBP');
+  });
+});
+
+describe('pickRateRefreshAction — startup rate-bootstrap guard', () => {
+  // Regression: before the docLoaded guard, the app-init `activeFamilyId` watcher
+  // could fire a rate write during `initialize()` — BEFORE the worker document
+  // was loaded — throwing `docWorker: no document loaded for 'mutate'` and the
+  // spurious critical "couldn't update your beans" toast on every hard refresh.
+  it('SKIPS entirely when the worker document is not loaded yet', () => {
+    // Pre-fix this returned "force" (empty rates → fetch+write) regardless of
+    // doc state — exactly the write that raced the load.
+    expect(pickRateRefreshAction({ docLoaded: false, hasRates: false, autoUpdate: true })).toBe(
+      'skip'
+    );
+    expect(pickRateRefreshAction({ docLoaded: false, hasRates: true, autoUpdate: true })).toBe(
+      'skip'
+    );
+    expect(pickRateRefreshAction({ docLoaded: false, hasRates: false, autoUpdate: false })).toBe(
+      'skip'
+    );
+  });
+
+  it('forces a fetch for a loaded family that has no rates yet', () => {
+    expect(pickRateRefreshAction({ docLoaded: true, hasRates: false, autoUpdate: true })).toBe(
+      'force'
+    );
+    // No rates always fetches, even with auto-update off — an empty family must
+    // bootstrap once.
+    expect(pickRateRefreshAction({ docLoaded: true, hasRates: false, autoUpdate: false })).toBe(
+      'force'
+    );
+  });
+
+  it('refreshes stale rates only when auto-update is on', () => {
+    expect(pickRateRefreshAction({ docLoaded: true, hasRates: true, autoUpdate: true })).toBe(
+      'stale'
+    );
+    expect(pickRateRefreshAction({ docLoaded: true, hasRates: true, autoUpdate: false })).toBe(
+      'skip'
+    );
   });
 });
