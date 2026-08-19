@@ -423,6 +423,55 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
  * otherwise close the window before the background sync had done its work). The
  * inner function signals that by returning `'handed-off'`.
  */
+/**
+ * Fetch exchange rates when the family has none, or refresh them when they are
+ * stale and auto-update is on. Fire-and-forget; every failure is logged.
+ *
+ * Extracted from the init path so it can ALSO run when a family arrives after
+ * mount. `loadFamilyData()` is called exactly once, from init — so a pod CREATED
+ * or JOINED during this session (the whole onboarding flow) never reached the
+ * init-time fetch, and its rates stayed empty until a full page reload or a
+ * manual Settings → update. Reported by greg after setting up a new family:
+ * accounts added in several currencies all rendered in the base currency,
+ * because `getRate` returns `undefined` with no rates and both converters then
+ * hand back the raw amount for the UI to label with the base currency.
+ *
+ * Safe to call repeatedly: with rates present and fresh, `updateRatesIfStale`
+ * short-circuits on `areRatesStale()` without touching the network.
+ */
+function refreshExchangeRatesIfNeeded() {
+  const hasNoRates = !settingsStore.exchangeRates || settingsStore.exchangeRates.length === 0;
+  const run = hasNoRates
+    ? forceUpdateRates()
+    : settingsStore.exchangeRateAutoUpdate
+      ? updateRatesIfStale()
+      : null;
+  if (!run) return;
+  run
+    .then((r) => {
+      if (r.ratesUpdated > 0) {
+        settingsStore.loadSettings();
+        settingsStore.loadGlobalSettings();
+      }
+    })
+    .catch(console.error);
+}
+
+/**
+ * A family arriving AFTER mount (pod created or joined this session) gets the
+ * same rate bootstrap the init path gives a family that was already there.
+ * `flush: 'post'` so the family's settings have landed before we read them, and
+ * no `immediate` — init already covers the first family.
+ */
+watch(
+  () => familyContextStore.activeFamilyId,
+  (familyId, previous) => {
+    if (!familyId || familyId === previous) return;
+    refreshExchangeRatesIfNeeded();
+  },
+  { flush: 'post' }
+);
+
 async function loadFamilyData() {
   const openToken = beginOpen();
   let handedOff = false;
@@ -1183,26 +1232,7 @@ onMounted(async () => {
       .backfillReminderMinutes({ canEdit: canEditActivities.value })
       .catch((e) => console.warn('[App] activity reminder back-fill failed', e));
 
-    const hasNoRates = !settingsStore.exchangeRates || settingsStore.exchangeRates.length === 0;
-    if (hasNoRates) {
-      forceUpdateRates()
-        .then((r) => {
-          if (r.ratesUpdated > 0) {
-            settingsStore.loadSettings();
-            settingsStore.loadGlobalSettings();
-          }
-        })
-        .catch(console.error);
-    } else if (settingsStore.exchangeRateAutoUpdate) {
-      updateRatesIfStale()
-        .then((r) => {
-          if (r.ratesUpdated > 0) {
-            settingsStore.loadSettings();
-            settingsStore.loadGlobalSettings();
-          }
-        })
-        .catch(console.error);
-    }
+    refreshExchangeRatesIfNeeded();
   } catch (err) {
     // Stale-chunk symptom — a dynamic `await import()` during init either
     // rejected with one of the standard chunk-load shapes OR resolved to

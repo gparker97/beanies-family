@@ -6,6 +6,7 @@ import { STORAGE_KEYS } from '@/constants/storageKeys';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { isDocLoaded } from '@/services/automerge/docService';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { toISODateString } from '@/utils/date';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type {
@@ -273,6 +274,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function setBaseCurrency(currency: CurrencyCode): Promise<void> {
     isLoading.value = true;
     error.value = null;
+    const previous = settings.value.baseCurrency;
     try {
       settings.value = await settingsRepo.setBaseCurrency(currency);
       // Keep display currency in sync with base currency
@@ -283,10 +285,81 @@ export const useSettingsStore = defineStore('settings', () => {
       settings.value = await settingsRepo.setPreferredCurrencies(
         [currency, ...withoutBase].slice(0, 4)
       );
+      // Every stored rate is `from: <previous base>`. Leaving them is not merely
+      // stale — it is the WRONG BASIS, and `getRate` fails silently: it returns
+      // `undefined`, and both `convertToBaseCurrency` and `convertAmount` then
+      // hand back the RAW amount, which the UI labels with the new base currency.
+      // A €100 account renders as "$100". `getRate`'s USD/EUR/GBP path-finding
+      // masks this whenever the OLD base happened to be one of those three, which
+      // is why it survived: the default base is USD, so the bug only bites a
+      // family whose first base currency was something else (reported by greg
+      // during onboarding — accounts in several currencies all showed the base).
+      //
+      // Awaited, not fire-and-forget: callers switch currency and immediately
+      // render converted amounts, so returning before the rates land would show
+      // the wrong numbers for a frame. Failure is non-fatal by design (see below).
+      if (previous !== currency) await refetchRatesForNewBase(previous, currency);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update base currency';
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /**
+   * Re-fetch exchange rates against a newly-chosen base currency.
+   *
+   * NON-FATAL: offline, or an API outage, must not block the currency change
+   * itself — the user's choice is already persisted above. The rates simply stay
+   * on the old basis until the next successful refresh (app init, a stale-tab
+   * refresh, or Settings → update rates), which is the same degraded state that
+   * shipped before this call existed. It is logged, never silent.
+   */
+  async function refetchRatesForNewBase(
+    previous: CurrencyCode | undefined,
+    next: CurrencyCode
+  ): Promise<void> {
+    try {
+      const { forceUpdateRates } = await import('@/services/exchangeRate');
+      const result = await forceUpdateRates();
+      if (result.success) {
+        // Rates are written through the repo, so the store's reactive copies must
+        // be re-read or every consumer keeps computing off the old basis.
+        await Promise.all([loadSettings(), loadGlobalSettings()]);
+        logEvent({
+          level: 'info',
+          surface: 'exchange-rate-rebase',
+          message: 'refetched exchange rates for a new base currency',
+          // `count` is deliberately NOT sent: it is not in ALLOWED_CONTEXT_KEYS, and
+          // adding a key obliges a store-privacy declaration update (CLAUDE.md) that a
+          // rate tally does not justify. The success/failure split plus the pair is
+          // what a rate alert needs.
+          context: { action: 'rebase-ok', detail: `${previous ?? 'unknown'}->${next}` },
+        });
+        return;
+      }
+      logEvent({
+        level: 'warn',
+        surface: 'exchange-rate-rebase',
+        message: 'rate refetch failed after a base-currency change — rates remain on the old basis',
+        context: {
+          action: 'rebase-failed',
+          detail: `${previous ?? 'unknown'}->${next}`,
+          error_code: 'fetch-unsuccessful',
+        },
+      });
+    } catch (e) {
+      logEvent({
+        level: 'warn',
+        surface: 'exchange-rate-rebase',
+        message: 'rate refetch threw after a base-currency change — rates remain on the old basis',
+        error: e instanceof Error ? e : undefined,
+        context: {
+          action: 'rebase-threw',
+          detail: `${previous ?? 'unknown'}->${next}`,
+          error_code: 'fetch-threw',
+        },
+      });
     }
   }
 
