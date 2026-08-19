@@ -1545,9 +1545,21 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐⭐ #65 — SHIPPED TO `main`, UNVALIDATED IN PROD. Validate before anything else. ⭐⭐
+### ⭐⭐ #65 — DEPLOYED (R10) AND VALIDATED: IT REGRESSED #61. Fix this before anything else. ⭐⭐
 
-**State:** implemented + code-reviewed on `main` (`46f1c79a`), **NOT deployed**. `docs/plans/2026-08-18-skip-path-unflushed-local-edit.md`.
+**State (corrected 2026-08-19):** #65 is **LIVE in prod**. The 08-18 deploy ran on `70f03983`, which has `46f1c79a` as an ancestor (`git merge-base --is-ancestor` confirms) — the old "NOT deployed / step 1: deploy" text below was wrong. `PERFORMANCE.md` §10's after-column was likewise already filled (`025e0c67`), so steps 1-2 of the plan below are DONE.
+
+**VALIDATION RESULT — the BAD case fired.** CloudWatch `open-cycle`, 2026-08-17 00:00Z → 2026-08-19, n=24 across R8/R9/R10: **zero** `unchanged-revision-in-window` on R10 (R9 had 3, at `rec=1 reads=0 writes=0`), and `baseline-heads-unknown` on the same client 19.4h apart (03:23:17, 03:23:19, 22:46:55) instead of decaying within the hour. Full table + evidence in `docs/PERFORMANCE.md` §10.
+
+**ROOT CAUSE (found, NOT fixed).** Every cold-open/sign-in call site calls `loadFromFile()` with no options, so `merging` is false (`syncStore.ts:845`) and the open takes the **replace** branch, which leaves `driveHeads = null` (`syncStore.ts:936`). Terminus 1 then calls `commitRemoteBaseline(null)` unconditionally (`syncStore.ts:986`), persisting `headsFp: null` and — because the commit is last-write-wins (C10b) — **clobbering** any good fingerprint `doSave`'s terminus 3 had recorded. The next open therefore trips `baseline-heads-unknown` (`syncService.ts:719`) forever. #61's skip is inert in prod.
+
+**FIX — IMPLEMENTED on `main` (2026-08-19), NOT yet deployed.** `replaceDocWithCacheRecovery` already calls `mergeRemoteEnvelope` and discards `remoteHeads` (`syncStore.ts:790`). Return it and feed terminus 1. The branch's justifying comment — "our doc is knowably AHEAD of Drive, so no fingerprint may be claimed" — is the bug: the fingerprint records what **Drive** holds, and being ahead is what #65's own `unpushedLocalChangesCheck` already reports as `unpushed-local-changes`. Done: `replaceDocWithCacheRecovery` now returns `remoteHeads` and terminus 1 commits it on both branches. Regression test `src/stores/__tests__/syncStore.openBaselineTerminus.test.ts` (4 cases) — confirmed RED against the old code with exactly the diagnosed value (`null` for the drive heads) and green after. Full suite 4456 green, type-check + lint 0 errors.
+
+**STILL TO DO — deploy, then re-run the validation.** The fix is unproven in prod: re-run the `open-cycle` query 24h after the next deploy and confirm organic `unchanged-revision-in-window` at `rec=1 reads=0` reappears, and that `baseline-heads-unknown` decays within the hour instead of persisting.
+
+**Note on the R10 `unpushed-local-changes` event** (Android, family `…cda0c344`, 10:59Z): it reports `writes=0`, which deserves an explanation given #65 exists to re-push on exactly that path. May simply be that the write lands after the terminus emits. Unverified.
+
+**Historical plan below — steps 1-2 are complete; steps 3-4 are superseded by the fix above.** `docs/plans/2026-08-18-skip-path-unflushed-local-edit.md`.
 
 **The risk this validation exists to catch.** #65 adds a second barrier in front of #61's skip. If the Drive-heads fingerprint is not being recorded correctly at the four termini, EVERY open declines to skip and the #61 win (`rec=2 reads=1` → `rec=1 reads=0`, shipped yesterday as `0.9.10R9`) silently evaporates. That failure is **invisible to tests and produces no error** — it looks like slower opens and more Drive reads. It is only detectable in telemetry.
 

@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-19
+
+### Performance
+
+- **Opening beanies is fast again.** A change shipped on 18 August accidentally switched off the "nothing has changed, so don't re-download it" shortcut introduced the day before — so every open went back to fetching and rebuilding the whole family file even when nothing had moved. Opens are back to reusing what the device already has, and the shortcut now survives an ordinary sign-in instead of being cleared by it. Nothing was ever lost or shown incorrectly; opens were simply slower and used more data than intended.
+
 ## 2026-08-18
 
 ### Added
