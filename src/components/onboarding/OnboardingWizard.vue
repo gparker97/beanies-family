@@ -15,6 +15,8 @@ import OnboardingSavings from './OnboardingSavings.vue';
 import OnboardingActivity from './OnboardingActivity.vue';
 import OnboardingComplete from './OnboardingComplete.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useBudgetStore } from '@/stores/budgetStore';
+import { useRecurringStore } from '@/stores/recurringStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { claimInterruption } from '@/composables/useSessionInterruption';
@@ -22,6 +24,7 @@ import { reportError } from '@/utils/errorReporter';
 import { ErrorSurfaces } from './errorSurfaces';
 
 const settingsStore = useSettingsStore();
+const budgetStore = useBudgetStore();
 const syncStore = useSyncStore();
 const { t } = useTranslation();
 
@@ -54,6 +57,14 @@ const skipLabelKey = computed(() => currentDef.value.skipKey ?? 'onboarding.skip
 // Owned here, threaded into Savings via v-model and Complete via prop. Today's
 // hardcoded `20` is the same default; the slider now actually reaches Complete.
 const savingsPercent = ref(20);
+
+// Same source the Savings step previews "$X / mo" from, reused so the stored
+// budget amount matches what the user was shown.
+const monthlyIncome = computed(() =>
+  useRecurringStore()
+    .recurringItems.filter((r) => r.type === 'income' && r.isActive)
+    .reduce((sum, r) => sum + r.amount, 0)
+);
 
 function dismiss() {
   visible.value = false;
@@ -118,7 +129,55 @@ function handleSkip() {
   dismiss();
 }
 
-function handleFinish() {
+/**
+ * Persist the savings goal the wizard collected as the family's active budget.
+ *
+ * Until 2026-08-19 nothing did this: `savingsPercent` was threaded into the
+ * Savings step and displayed on the Complete summary ("20%"), but never written
+ * anywhere — so a user who set a goal during setup found no budget in the app
+ * and had to enter it a second time (reported by greg). Moving the slider or
+ * leaving it on its default made no difference; the value was discarded either
+ * way.
+ *
+ * Percentage mode, matching what the wizard actually asks for and what
+ * `BudgetSettingsModal` writes: `percentage` is the SAVINGS goal, and the
+ * spending budget is the remainder, recomputed from live income by
+ * `budgetStore.effectiveBudgetAmount`. `totalAmount` is stored for parity with
+ * the modal but is not read back in percentage mode.
+ */
+async function persistSavingsBudget() {
+  // Never clobber an existing budget: re-running setup, or a second member
+  // completing their own onboarding against a family that already has one, must
+  // leave the family's real budget alone.
+  await budgetStore.loadBudgets();
+  if (budgetStore.activeBudget) return;
+
+  const spendingPercent = 100 - savingsPercent.value;
+  await budgetStore.createBudget({
+    mode: 'percentage',
+    percentage: savingsPercent.value,
+    totalAmount: Math.round((monthlyIncome.value * spendingPercent) / 100),
+    currency: settingsStore.baseCurrency,
+    categories: [],
+    isActive: true,
+  });
+}
+
+async function handleFinish() {
+  // Awaited BEFORE the sync so the budget rides the same upload rather than
+  // waiting for the next incidental save. A failure must not trap the user in
+  // the wizard — the rest of setup is already persisted and the budget is
+  // re-creatable from the Budget page — so it is reported, not thrown.
+  try {
+    await persistSavingsBudget();
+  } catch (e) {
+    reportError({
+      surface: ErrorSurfaces.onboardingFinishBudget,
+      message:
+        'Failed to persist the onboarding savings budget — user can set one on the Budget page.',
+      error: e,
+    });
+  }
   settingsStore.setOnboardingCompleted(true);
   syncInBackground(ErrorSurfaces.onboardingFinishSync);
   dismiss();

@@ -11,6 +11,7 @@ export const ErrorSurfaces = {
   onboardingAddRecurring: 'onboarding-add-recurring',
   onboardingAddActivity: 'onboarding-add-activity',
   onboardingFinishSync: 'onboarding-finish-sync',
+  onboardingFinishBudget: 'onboarding-finish-budget',
   onboardingSkipSync: 'onboarding-skip-sync',
 } as const;
 

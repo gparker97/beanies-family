@@ -76,6 +76,20 @@ vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({ activities: [] }),
 }));
 
+const mockLoadBudgets = vi.fn().mockResolvedValue(undefined);
+const mockCreateBudget = vi.fn().mockResolvedValue({ id: 'budget-1' });
+// Mutable so a test can present a family that ALREADY has a budget.
+const budgetState: { activeBudget: unknown } = { activeBudget: null };
+vi.mock('@/stores/budgetStore', () => ({
+  useBudgetStore: () => ({
+    get activeBudget() {
+      return budgetState.activeBudget;
+    },
+    loadBudgets: mockLoadBudgets,
+    createBudget: mockCreateBudget,
+  }),
+}));
+
 const mockSyncNow = vi.fn().mockResolvedValue(true);
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
@@ -108,6 +122,7 @@ describe('OnboardingWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.removeItem('e2e_auto_auth');
+    budgetState.activeBudget = null;
   });
 
   // ── Step structure (data-driven STEPS table, 6 steps) ────────────────────
@@ -240,6 +255,75 @@ describe('OnboardingWizard', () => {
 
     expect(mockSetOnboardingCompleted).toHaveBeenCalledWith(true);
     expect(mockCelebrate).not.toHaveBeenCalled();
+  });
+
+  // ── Savings goal → budget (regression, 2026-08-19) ───────────────────────
+  //
+  // The wizard collected `savingsPercent`, threaded it into the Savings step and
+  // DISPLAYED it on the Complete summary, but never wrote it anywhere — so the
+  // user set a goal during setup and found no budget in the app. Asserting
+  // "createBudget was called" is not enough: the value it is called WITH is the
+  // whole bug, and the default (20) must not be confusable with a stale one.
+
+  async function walkToFinish(wrapper: ReturnType<typeof mount>) {
+    await wrapper.find('[data-testid="onboarding-start"]').trigger('click');
+    for (let i = 0; i < 4; i++) {
+      await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
+    }
+    await wrapper.find('[data-testid="onboarding-finish"]').trigger('click');
+    await nextTick();
+  }
+
+  it('writes the savings goal as an active percentage budget on finish', async () => {
+    const wrapper = mount(OnboardingWizard, { global: { stubs: { Teleport: true } } });
+    await walkToFinish(wrapper);
+
+    expect(mockCreateBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'percentage',
+        percentage: 20,
+        currency: 'USD',
+        isActive: true,
+      })
+    );
+  });
+
+  it('persists the slider value the user actually chose, not the default', async () => {
+    const wrapper = mount(OnboardingWizard, { global: { stubs: { Teleport: true } } });
+    // start -> step 2, then two Nexts -> step 4 (Savings).
+    await wrapper.find('[data-testid="onboarding-start"]').trigger('click');
+    await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
+    await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
+    // 35 is deliberately not the 20 default, so a regression that persists the
+    // default instead of the chosen value fails here (docs/lessons.md rule 4).
+    await wrapper.find('[data-testid="onboarding-savings-slider"]').setValue(35);
+    await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
+    await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
+    await wrapper.find('[data-testid="onboarding-finish"]').trigger('click');
+    await nextTick();
+
+    expect(mockCreateBudget).toHaveBeenCalledWith(expect.objectContaining({ percentage: 35 }));
+  });
+
+  it('never clobbers a family budget that already exists', async () => {
+    budgetState.activeBudget = { id: 'existing', mode: 'fixed', isActive: true };
+    const wrapper = mount(OnboardingWizard, { global: { stubs: { Teleport: true } } });
+    await walkToFinish(wrapper);
+
+    expect(mockCreateBudget).not.toHaveBeenCalled();
+    expect(mockSetOnboardingCompleted).toHaveBeenCalledWith(true);
+  });
+
+  it('still completes onboarding when the budget write fails', async () => {
+    mockLoadBudgets.mockRejectedValueOnce(new Error('doc worker down'));
+    const wrapper = mount(OnboardingWizard, { global: { stubs: { Teleport: true } } });
+    await walkToFinish(wrapper);
+
+    // The user must never be trapped in the wizard by a budget failure.
+    expect(mockSetOnboardingCompleted).toHaveBeenCalledWith(true);
+    expect(mockReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'onboarding-finish-budget' })
+    );
   });
 
   it('back button goes to previous step', async () => {
