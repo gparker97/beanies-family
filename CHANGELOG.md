@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-19
 
+### Fixed
+
+- **The savings goal you set during setup is now actually saved.** The setup wizard asked for a savings goal, showed it back on the "you're all set" summary, and then threw it away — so the app had no budget and you had to enter the same number again on the Budget page. The goal you pick is now written as your family's budget when setup finishes. An existing budget is never overwritten, so re-running setup or a second family member finishing their own can't disturb it.
+- **Accounts in other currencies now convert straight away after setup.** Picking your family's currency during setup left the app holding exchange rates measured against the _previous_ currency, which it couldn't use — so accounts in other currencies displayed their raw amount labelled with your currency (a €100 account showing as "$100"). Rates are now refreshed whenever the family currency changes, and a family created or joined part-way through a session fetches them too instead of waiting for the next app restart. Previously the only way out was Settings → update rates by hand.
+
 ### Performance
 
 - **Opening beanies is fast again.** A change shipped on 18 August accidentally switched off the "nothing has changed, so don't re-download it" shortcut introduced the day before — so every open went back to fetching and rebuilding the whole family file even when nothing had moved. Opens are back to reusing what the device already has, and the shortcut now survives an ordinary sign-in instead of being cleared by it. Nothing was ever lost or shown incorrectly; opens were simply slower and used more data than intended.
