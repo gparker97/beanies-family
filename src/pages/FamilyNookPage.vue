@@ -23,6 +23,7 @@ import MedicationViewModal from '@/components/pod/MedicationViewModal.vue';
 import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard.vue';
 import { usePermissions } from '@/composables/usePermissions';
+import { isFlagEnabled } from '@/config/flags';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -46,6 +47,9 @@ import type {
 } from '@/types/models';
 
 const router = useRouter();
+// Meal Planner is dev-flag-gated; hide its nook card in prod when the flag is
+// off (evaluated once — the flag only changes across a reload).
+const mealPlannerEnabled = isFlagEnabled('mealPlanner');
 const settingsStore = useSettingsStore();
 const familyStore = useFamilyStore();
 const { canViewFinances } = usePermissions();
@@ -270,8 +274,8 @@ async function handleTransactionDelete(id: string) {
       @open-activity="(id: string, date: string) => openActivity(id, date)"
     />
 
-    <!-- Today's meals -->
-    <NookMealsCard @open-meal="openMeal" />
+    <!-- Today's meals (dev-flag-gated) -->
+    <NookMealsCard v-if="mealPlannerEnabled" @open-meal="openMeal" />
 
     <!-- Upcoming vacation -->
     <NookVacationCard v-if="vacationStore.upcomingVacations.length > 0" />

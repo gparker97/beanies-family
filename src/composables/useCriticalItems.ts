@@ -365,29 +365,32 @@ export function useCriticalItems() {
     // ── Today's cook assignments (meal planner) ──────────────────────
     // Recipe meals for today with a cook that aren't cooked yet. Briefing-only,
     // non-completable (marking cooked needs the rating form, not a checkbox).
-    for (const meal of mealPlanStore.todaysCookAssignments) {
-      const audience = classifyOwnerAudience(meal.cookMemberId!, currentMember, getMemberById);
-      if (audience.kind === 'hidden') continue;
-      const recipeName = recipesStore.recipes.find((r) => r.id === meal.recipeId)?.name ?? '';
-      let message: string;
-      if (audience.kind === 'forChild') {
-        message = buildMessage(MEAL_FORCHILD_KEY, {
-          name: formatNameList(audience.childNames),
-          meal: recipeName,
+    // Gated behind `mealPlanner`; flag off → no meal briefing items at all.
+    if (isFlagEnabled('mealPlanner')) {
+      for (const meal of mealPlanStore.todaysCookAssignments) {
+        const audience = classifyOwnerAudience(meal.cookMemberId!, currentMember, getMemberById);
+        if (audience.kind === 'hidden') continue;
+        const recipeName = recipesStore.recipes.find((r) => r.id === meal.recipeId)?.name ?? '';
+        let message: string;
+        if (audience.kind === 'forChild') {
+          message = buildMessage(MEAL_FORCHILD_KEY, {
+            name: formatNameList(audience.childNames),
+            meal: recipeName,
+          });
+        } else if (audience.kind === 'unassigned') {
+          message = buildMessage(MEAL_UNASSIGNED_KEY, { meal: recipeName });
+        } else {
+          message = buildMessage(MEAL_OWNER_KEY, { meal: recipeName });
+        }
+        items.push({
+          id: meal.id,
+          type: 'meal',
+          message,
+          icon: '🍲',
+          time: meal.serveTime ?? '',
+          completable: false,
         });
-      } else if (audience.kind === 'unassigned') {
-        message = buildMessage(MEAL_UNASSIGNED_KEY, { meal: recipeName });
-      } else {
-        message = buildMessage(MEAL_OWNER_KEY, { meal: recipeName });
       }
-      items.push({
-        id: meal.id,
-        type: 'meal',
-        message,
-        icon: '🍲',
-        time: meal.serveTime ?? '',
-        completable: false,
-      });
     }
 
     // Sort: timed items first (ascending), untimed last

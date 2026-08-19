@@ -5,11 +5,13 @@ import { MOBILE_NAV_CATEGORIES } from '@/constants/navigation';
 
 const mockRoute = { path: '/nook' };
 
-// Beanie Lists is a flag-gated Planning bean; mock the flag OFF so these tests
-// keep their original 3-bean Planning intent (they predate + don't concern it).
+// Planning has two flag-gated beans: Beanie Lists (`familyLists`) and the Meal
+// Planner (`mealPlanner`). These tests assert the 4-bean Planning stack
+// (Activities, Travel, To-do, Meal Planner), so keep `mealPlanner` ON and only
+// `familyLists` OFF (its 5th bean is out of scope here).
 vi.mock('@/config/flags', async (orig) => ({
   ...(await orig<typeof import('@/config/flags')>()),
-  isFlagEnabled: () => false,
+  isFlagEnabled: (flag: string) => flag !== 'familyLists',
 }));
 
 vi.mock('vue-router', () => ({
