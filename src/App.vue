@@ -59,7 +59,12 @@ import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
 import { canOfferBiometric } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
-import { updateRatesIfStale, forceUpdateRates } from '@/services/exchangeRate';
+import {
+  updateRatesIfStale,
+  forceUpdateRates,
+  pickRateRefreshAction,
+} from '@/services/exchangeRate';
+import { isLoaded as isDocLoaded } from '@/services/automerge/projection';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -440,12 +445,20 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
  * short-circuits on `areRatesStale()` without touching the network.
  */
 function refreshExchangeRatesIfNeeded() {
-  const hasNoRates = !settingsStore.exchangeRates || settingsStore.exchangeRates.length === 0;
-  const run = hasNoRates
-    ? forceUpdateRates()
-    : settingsStore.exchangeRateAutoUpdate
-      ? updateRatesIfStale()
-      : null;
+  // `docLoaded` guards the race that produced the "couldn't update your beans"
+  // toast: on a hard refresh the `activeFamilyId` watcher below fires during
+  // `familyContextStore.initialize()`, BEFORE `loadFamilyData()` loads the
+  // document into the worker — a rate write then throws `docWorker: no document
+  // loaded for 'mutate'`. The post-load init call covers the first family once
+  // its doc is in; a family arriving mid-session already has its doc loaded.
+  const hasRates = !!settingsStore.exchangeRates && settingsStore.exchangeRates.length > 0;
+  const action = pickRateRefreshAction({
+    docLoaded: isDocLoaded(),
+    hasRates,
+    autoUpdate: settingsStore.exchangeRateAutoUpdate,
+  });
+  const run =
+    action === 'force' ? forceUpdateRates() : action === 'stale' ? updateRatesIfStale() : null;
   if (!run) return;
   run
     .then((r) => {
