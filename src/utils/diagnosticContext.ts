@@ -77,6 +77,11 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'quick_add',
   'share_scope',
   'overwrote',
+  // Plan export (#67, surface 'plan-export', reused by #66). Both PII-free fixed
+  // enums — no plan content ever ships: `format` (image|pdf), `stage`
+  // (render|rasterize|pdf|deliver). Same Diagnostics category already declared.
+  'format',
+  'stage',
   'http_status',
   'provider_type',
   'file_id_tail',

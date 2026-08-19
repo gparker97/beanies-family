@@ -80,7 +80,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "Plan the week from your cookbook — who's cooking what, when — and share it so nobody has to ask what's for dinner.",
     icon: '\u{1F372}',
     readTime: 3,
-    updatedDate: '2026-08-18',
+    updatedDate: '2026-08-19',
     sections: [
       {
         type: 'paragraph',
@@ -127,12 +127,21 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Had a good week? Tap <strong>Copy last week</strong> to reuse it — meals and cooks come across, ready to tweak. You can also open any past week from the arrows and copy it forward. Tap <strong>Share</strong> to send the day or the whole week to the family over WhatsApp, Messages or wherever you chat.',
+          'Had a good week? Tap <strong>Copy last week</strong> to reuse it — meals and cooks come across, ready to tweak. You can also open any past week from the arrows and copy it forward. Tap <strong>Share</strong> to send the plan to the family over WhatsApp, Messages or wherever you chat.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Copy as text</strong> — a tidy plain-text list of the day or the week, ready to paste anywhere.',
+          "<strong>Send to a chat</strong> — turns the whole week into a friendly one-page picture and hands it to your phone's share sheet, so you can drop it straight into WhatsApp, Messages or email.",
+          '<strong>Export as PDF</strong> — the same one-page week as a PDF, perfect for printing and sticking on the fridge.',
+        ],
       },
       {
         type: 'infoBox',
         content:
-          "Copying a week <strong>replaces</strong> whatever was already planned in the target week — beanies warns you first. Anything you'd already marked cooked keeps its history. Sharing sends the whole family's plan for that day or week, so everyone sees the same list.",
+          "Copying a week <strong>replaces</strong> whatever was already planned in the target week — beanies warns you first. Anything you'd already marked cooked keeps its history. The picture and PDF are made <strong>on your device</strong> — nothing about your plan is uploaded to make them, and they always show the whole week (not a single day).",
       },
     ],
   },

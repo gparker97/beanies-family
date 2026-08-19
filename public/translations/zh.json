@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-19",
-    "translationCount": 4035
+    "translationCount": 4043
   },
   "translations": {
     "app.name": {
@@ -20179,6 +20179,46 @@
     "careSafety.add.contact": {
       "translation": "添加联系人",
       "hash": "ifjbmn",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.copyText": {
+      "translation": "复制为文本",
+      "hash": "nhr6k0",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.sectionTitle": {
+      "translation": "分享本周内容",
+      "hash": "zf3xyc",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.sendToChat": {
+      "translation": "发送到聊天",
+      "hash": "ceocws",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.exportPdf": {
+      "translation": "导出为 PDF",
+      "hash": "nrwtrk",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.building": {
+      "translation": "正在准备…",
+      "hash": "bncl36",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.sheetTitle": {
+      "translation": "膳食计划",
+      "hash": "oxm3qe",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.failed": {
+      "translation": "无法创建文件",
+      "hash": "utcu21",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.failedHelp": {
+      "translation": "准备您的膳食计划时出错了。请重试。",
+      "hash": "e9vzgp",
       "lastUpdated": "2026-08-19"
     }
   }

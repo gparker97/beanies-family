@@ -73,6 +73,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'from_path',
   'action',
   'error_code',
+  // Plan export (#67, surface 'plan-export'). PII-free fixed enums: `format`
+  // (image|pdf), `stage` (render|rasterize|pdf|deliver).
+  'format',
+  'stage',
   'http_status',
   'provider_type',
   'file_id_tail',
