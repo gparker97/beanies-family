@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-19",
-    "translationCount": 4046
+    "translationCount": 4041
   },
   "translations": {
     "app.name": {
@@ -19756,11 +19756,6 @@
       "hash": "gw3y4c",
       "lastUpdated": "2026-08-18"
     },
-    "mealPlanner.shareAction": {
-      "translation": "共享",
-      "hash": "1bjem7",
-      "lastUpdated": "2026-08-18"
-    },
     "mealPlanner.cookbook": {
       "translation": "食谱",
       "hash": "7z8jvz",
@@ -20021,21 +20016,6 @@
       "hash": "nl1arv",
       "lastUpdated": "2026-08-18"
     },
-    "mealPlanner.share.day": {
-      "translation": "这一天。",
-      "hash": "lczhh6",
-      "lastUpdated": "2026-08-18"
-    },
-    "mealPlanner.share.week": {
-      "translation": "这个星期",
-      "hash": "mwvrbq",
-      "lastUpdated": "2026-08-18"
-    },
-    "mealPlanner.share.header": {
-      "translation": "🍲 beanies膳食计划",
-      "hash": "vjqfr1",
-      "lastUpdated": "2026-08-18"
-    },
     "mealPlanner.share.title": {
       "translation": "饮食计划",
       "hash": "oy6jba",
@@ -20179,11 +20159,6 @@
     "careSafety.add.contact": {
       "translation": "添加联系人",
       "hash": "ifjbmn",
-      "lastUpdated": "2026-08-19"
-    },
-    "mealPlanner.export.copyText": {
-      "translation": "复制为文本",
-      "hash": "nhr6k0",
       "lastUpdated": "2026-08-19"
     },
     "mealPlanner.export.exportPdf": {
