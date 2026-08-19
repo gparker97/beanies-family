@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import OnboardingStepHeader from './OnboardingStepHeader.vue';
 import OnboardingStepShell from './OnboardingStepShell.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
@@ -50,6 +50,23 @@ const savingsModeOptions = computed(() => [
 ]);
 
 const sliderLabels = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+
+// `savingsPercent` is the SINGLE value that reaches the wizard, the Complete
+// screen's summary, and the budget written on finish. In fixed mode the user
+// types an amount instead, so derive the equivalent percentage and write it back
+// — otherwise choosing "fixed" would silently persist whatever the slider last
+// showed (20% by default), i.e. a budget the user never asked for while the
+// summary screen confidently displayed that number.
+//
+// Needs income to convert. With no income captured in step 3 there is nothing to
+// take a percentage OF, so the slider default stands — the same value the
+// Complete screen shows, so the two never disagree.
+watch([savingsMode, fixedSavingsAmount, totalIncome], () => {
+  if (savingsMode.value !== 'fixed') return;
+  const amount = fixedSavingsAmount.value;
+  if (!amount || amount <= 0 || totalIncome.value <= 0) return;
+  savingsPercent.value = Math.min(100, Math.max(1, Math.round((amount / totalIncome.value) * 100)));
+});
 </script>
 
 <template>
