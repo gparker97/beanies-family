@@ -1,22 +1,16 @@
-import type { MealPlanEntry, MealSlot } from '@/types/models';
+import type { MealPlanEntry } from '@/types/models';
+import type { MealResolvers } from '@/utils/mealExportModel';
 
 /**
- * Resolvers + labels the share formatter needs, injected so this stays a pure,
- * testable function (no store imports). The caller (the share surface) provides
- * i18n-resolved labels and name lookups.
+ * The text share needs the shared meal resolvers (`dayLabel` / `slotLabel` /
+ * `mealName` / `cook`) plus a header line. Reusing `MealResolvers` (rather than a
+ * parallel shape) means the caller builds ONE resolver object and both the text
+ * share and the grid export name/attribute every meal identically.
  */
-export interface MealShareContext {
+export type MealShareContext = MealResolvers & {
   /** Header line, e.g. "🍲 beanies meal plan · Aug 18–24". */
   header: string;
-  /** Localized day heading for a date, e.g. "Mon — Aug 18". */
-  dayLabel: (dateISO: string) => string;
-  /** Localized slot label, e.g. "Dinner". */
-  slotLabel: (slot: MealSlot) => string;
-  /** Display name for a meal — recipe name, or the type label (Eat out / Leftovers / …). */
-  mealName: (meal: MealPlanEntry) => string;
-  /** Cook's display name, or undefined when unassigned. */
-  cookName: (memberId?: string) => string | undefined;
-}
+};
 
 /**
  * Build a readable, markdown-free plain-text meal plan for sharing (WhatsApp,
@@ -31,7 +25,7 @@ export function formatMealPlanShare(meals: MealPlanEntry[], ctx: MealShareContex
       lines.push('', ctx.dayLabel(m.date));
       lastDate = m.date;
     }
-    const cook = ctx.cookName(m.cookMemberId);
+    const cook = ctx.cook(m.cookMemberId)?.name;
     lines.push(`  ${ctx.slotLabel(m.slot)}: ${ctx.mealName(m)}${cook ? ` (${cook})` : ''}`);
   }
   return lines.join('\n');

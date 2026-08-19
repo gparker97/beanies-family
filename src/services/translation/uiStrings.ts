@@ -1315,6 +1315,20 @@ const STRING_DEFS = {
   'mealPlanner.share.week': { en: 'This week', beanie: 'this week' },
   'mealPlanner.share.header': { en: '🍲 beanies meal plan', beanie: '🍲 beanies meal plan' },
   'mealPlanner.share.title': { en: 'Meal plan', beanie: 'meal plan' },
+  'mealPlanner.export.copyText': { en: 'Copy as Text', beanie: 'copy as text' },
+  'mealPlanner.export.sectionTitle': { en: 'Share the Week', beanie: 'share the week' },
+  'mealPlanner.export.sendToChat': { en: 'Send to a Chat', beanie: 'send to a chat' },
+  'mealPlanner.export.exportPdf': { en: 'Export as PDF', beanie: 'export as pdf' },
+  'mealPlanner.export.building': { en: 'Preparing…', beanie: 'preparing…' },
+  'mealPlanner.export.sheetTitle': { en: 'Meal Plan', beanie: 'meal plan' },
+  'mealPlanner.export.failed': {
+    en: "Couldn't create the file",
+    beanie: "couldn't create the file",
+  },
+  'mealPlanner.export.failedHelp': {
+    en: 'Something went wrong preparing your meal plan. Please try again.',
+    beanie: 'something went wrong preparing your meal plan. please try again.',
+  },
   'mealPlanner.share.copied': {
     en: 'Plan copied to clipboard',
     beanie: 'plan copied to clipboard',

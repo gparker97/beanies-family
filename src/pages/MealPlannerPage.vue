@@ -5,7 +5,7 @@
  * the single MealEditModal + MealPickerSheet, copy-week (overwrite-warned), and
  * day/week share. All CRDT work goes through mealPlanStore (MVO).
  */
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import RecipeRail from '@/components/mealplan/RecipeRail.vue';
 import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
 import MealDayStack from '@/components/mealplan/MealDayStack.vue';
@@ -24,9 +24,27 @@ import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { formatMealPlanShare } from '@/utils/formatMealPlanShare';
 import { mealDisplayName } from '@/utils/mealDisplayName';
+import ExportSheet from '@/components/export/ExportSheet.vue';
+import MealPlanExportBody from '@/components/export/MealPlanExportBody.vue';
+import {
+  exportElementToPng,
+  pngBlobToPdf,
+  ExportError,
+  type ExportStage,
+} from '@/composables/useSheetExport';
+import { shareOrDownloadFile } from '@/utils/shareOrDownloadFile';
+import {
+  buildMealExportRows,
+  type MealResolvers,
+  type MealExportRows,
+} from '@/utils/mealExportModel';
+import { record as recordPerf } from '@/utils/perfTiming';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { addDays, toDateInputValue, formatDayLong } from '@/utils/date';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
+
+/** Faces the export sheet renders — forced into flight before capture (no FOUT). */
+const EXPORT_FONTS = ['600 15px Outfit', '700 16px Outfit', '800 40px Outfit', '400 14px Inter'];
 
 const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
@@ -137,9 +155,19 @@ const shareOptions = computed(() => [
   { value: 'week', label: t('mealPlanner.share.week') },
 ]);
 
-function cookName(id?: string): string | undefined {
-  return id ? familyStore.members.find((m) => m.id === id)?.name : undefined;
+function cook(id?: string): { name: string; color?: string } | undefined {
+  const m = id ? familyStore.members.find((mm) => mm.id === id) : undefined;
+  return m ? { name: m.name, color: m.color } : undefined;
 }
+
+// One resolver object feeds BOTH the text share and the grid export, so a meal
+// is named/attributed identically on every surface (DRY — no drift).
+const mealResolvers = computed<MealResolvers>(() => ({
+  dayLabel: (d) => formatDayLong(d),
+  slotLabel: (s: MealSlot) => t(`mealPlanner.slot.${s}`),
+  mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
+  cook,
+}));
 
 const sharePreview = computed(() => {
   // 'day' shares the day the user is actually looking at (the mobile day-stack /
@@ -149,11 +177,8 @@ const sharePreview = computed(() => {
       ? mealPlanStore.mealsForWeek(weekDates.value)
       : mealPlanStore.mealsForDate(mobileDate.value);
   return formatMealPlanShare(meals, {
+    ...mealResolvers.value,
     header: `${t('mealPlanner.share.header')} · ${weekLabel.value}`,
-    dayLabel: (d) => formatDayLong(d),
-    slotLabel: (s: MealSlot) => t(`mealPlanner.slot.${s}`),
-    mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
-    cookName,
   });
 });
 
@@ -167,6 +192,96 @@ async function doShare() {
     context: { action: 'plan-shared', share_scope: shareScope.value },
   });
   shareOpen.value = false;
+}
+
+// ── Export the week as an image / PDF ────────────────────────────────────────
+// One layout source (the off-screen ExportSheet) → PNG (share sheet) or PDF
+// (download). The sheet always renders the whole viewed WEEK; the day/week
+// toggle above governs only the text share.
+type ExportFormat = 'image' | 'pdf';
+
+const exportMounting = ref(false); // gates the declarative off-screen host
+const exportRows = ref<MealExportRows | null>(null);
+const exporting = ref(false); // busy flag — disables the chooser buttons
+const sheetComp = ref<{ $el: HTMLElement } | null>(null);
+
+async function runExport(format: ExportFormat): Promise<void> {
+  if (exporting.value) return;
+  exporting.value = true;
+  const started = performance.now();
+  logEvent({
+    level: 'info',
+    surface: 'plan-export',
+    message: 'export started',
+    context: { action: 'export-start', format },
+  });
+  let stage: ExportStage = 'render';
+  try {
+    // 1. Build the row view-model + mount the sheet off-screen.
+    exportRows.value = buildMealExportRows(
+      mealPlanStore.mealsForWeek(weekDates.value),
+      weekDates.value,
+      mealResolvers.value
+    );
+    exportMounting.value = true;
+    await nextTick();
+    const el = sheetComp.value?.$el;
+    if (!el) throw new ExportError('render', new Error('export sheet did not mount'));
+
+    // 2. Rasterize (fonts-ready gated inside the engine).
+    stage = 'rasterize';
+    const png = await exportElementToPng(el, { fonts: EXPORT_FONTS, backgroundColor: '#F8F9FA' });
+    recordPerf('plan-export', performance.now() - started);
+
+    // 3. Pick the delivered blob per format (PDF wraps the same PNG).
+    let blob = png;
+    let ext = 'png';
+    let mime = 'image/png';
+    if (format === 'pdf') {
+      stage = 'pdf';
+      blob = await pngBlobToPdf(png);
+      ext = 'pdf';
+      mime = 'application/pdf';
+    }
+
+    // 4. Deliver via the share sheet (image) / download (pdf).
+    stage = 'deliver';
+    const filename = `beanies-meal-plan-${weekDates.value[0]}.${ext}`;
+    const result = await shareOrDownloadFile(blob, filename, mime, t('mealPlanner.share.title'));
+    if (result.outcome === 'failed') throw new ExportError('deliver', result.error);
+    if (result.outcome === 'cancelled') {
+      logEvent({
+        level: 'info',
+        surface: 'plan-export',
+        message: 'export cancelled',
+        context: { action: 'export-cancelled', format },
+      });
+      return;
+    }
+    logEvent({
+      level: 'info',
+      surface: 'plan-export',
+      message: 'export delivered',
+      context: {
+        action: result.outcome === 'shared' ? 'export-shared' : 'export-downloaded',
+        format,
+      },
+    });
+    shareOpen.value = false;
+  } catch (err) {
+    const failStage = err instanceof ExportError ? err.stage : stage;
+    // ONE call: showToast('error') auto-invokes reportError with this
+    // surface/error/context, so a separate reportError would double-report.
+    showToast('error', t('mealPlanner.export.failed'), t('mealPlanner.export.failedHelp'), {
+      surface: 'plan-export',
+      error: err,
+      context: { format, stage: failStage },
+    });
+  } finally {
+    // Unmounting the host in `finally` means a thrown error can never leak it.
+    exportMounting.value = false;
+    exporting.value = false;
+  }
 }
 </script>
 
@@ -300,13 +415,61 @@ async function doShare() {
           >{{ sharePreview }}</pre>
         <button
           type="button"
-          class="from-primary-500 to-terracotta-400 font-outfit w-full rounded-2xl bg-gradient-to-r py-3 text-sm font-bold text-white"
+          class="font-outfit w-full rounded-2xl border border-[rgba(44,62,80,0.15)] py-3 text-sm font-semibold text-[var(--color-secondary-500)] dark:border-slate-600 dark:text-slate-200"
           @click="doShare"
         >
-          ↗ {{ t('mealPlanner.shareAction') }}
+          📋 {{ t('mealPlanner.export.copyText') }}
         </button>
+
+        <div class="border-t border-[rgba(44,62,80,0.1)] pt-3 dark:border-slate-700">
+          <p
+            class="font-outfit mb-2 text-xs font-semibold tracking-[0.04em] text-[rgba(44,62,80,0.5)] uppercase dark:text-slate-400"
+          >
+            {{ t('mealPlanner.export.sectionTitle') }}
+          </p>
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r py-3 text-sm font-bold text-white disabled:opacity-60"
+              :disabled="exporting"
+              @click="runExport('image')"
+            >
+              {{
+                exporting
+                  ? t('mealPlanner.export.building')
+                  : `🖼️ ${t('mealPlanner.export.sendToChat')}`
+              }}
+            </button>
+            <button
+              type="button"
+              class="font-outfit bg-secondary-500 rounded-2xl py-3 text-sm font-bold text-white disabled:opacity-60"
+              :disabled="exporting"
+              @click="runExport('pdf')"
+            >
+              {{
+                exporting
+                  ? t('mealPlanner.export.building')
+                  : `📄 ${t('mealPlanner.export.exportPdf')}`
+              }}
+            </button>
+          </div>
+        </div>
       </div>
     </BaseModal>
+
+    <!-- Off-screen export sheet: rendered declaratively so it inherits Pinia /
+         i18n / theme; unmounted by flipping `exportMounting` in the handler's
+         `finally`, so a thrown error can never leak it. -->
+    <div v-if="exportMounting" class="export-host" aria-hidden="true">
+      <ExportSheet
+        ref="sheetComp"
+        :title="`🍲 ${t('mealPlanner.export.sheetTitle')}`"
+        :date-range="weekLabel"
+        :tagline="t('app.tagline')"
+      >
+        <MealPlanExportBody v-if="exportRows" :rows="exportRows" />
+      </ExportSheet>
+    </div>
   </div>
 </template>
 
@@ -325,5 +488,16 @@ async function doShare() {
 
 .dark .mp-arrow {
   background: var(--color-slate-800, #1e293b);
+}
+
+/* Off-screen host for the export sheet: kept in the layout (so fonts/images
+   load and it has real dimensions to rasterise) but pushed far off-screen and
+   out of the a11y tree. Mirrors the existing off-screen pattern in
+   useFilePicker.ts. */
+.export-host {
+  left: -99999px;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
 }
 </style>
