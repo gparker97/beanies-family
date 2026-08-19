@@ -41,6 +41,11 @@ vi.mock('@/router', () => ({
   },
 }));
 
+// Silence the telemetry firehose + error reporter in tests; assert the
+// error reporter fires on the unknown-action guard.
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+
 const mockRoute = hoisted.mockRoute;
 const push = hoisted.push;
 const replace = hoisted.replace;
@@ -52,9 +57,11 @@ import {
   closeQuickAdd,
   toggleQuickAdd,
   triggerQuickAddAction,
+  startQuickAddItem,
   commitPickerSelection,
   cancelPicker,
 } from '../useQuickAdd';
+import { reportError } from '@/utils/errorReporter';
 import type { QuickAddItem } from '@/constants/quickAddItems';
 
 function item(overrides: Partial<QuickAddItem> = {}): QuickAddItem {
@@ -282,6 +289,73 @@ describe('triggerQuickAddAction — main ↔ picker branching', () => {
     );
     expect(push).toHaveBeenCalledTimes(1);
     expect(replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('startQuickAddItem — in-page "Add" affordances', () => {
+  beforeEach(() => {
+    mockedHasOpenOverlays.mockReturnValue(false);
+    push.mockClear();
+    replace.mockClear();
+    vi.mocked(reportError).mockClear();
+    mockRoute.path = '/pod/safety';
+    mockRoute.params = {};
+    window.history.replaceState(null, '');
+    closeQuickAdd();
+    window.history.replaceState(null, '');
+  });
+
+  it('context-required action on a route with no matching param opens the picker directly', () => {
+    // `add-medication` needs a memberId; /pod/safety supplies none, so the
+    // sheet should open straight into the parent picker (same as the FAB).
+    const { isOpen, stage } = useQuickAdd();
+    startQuickAddItem('add-medication');
+
+    expect(isOpen.value).toBe(true);
+    expect(stage.value.mode).toBe('picker');
+    if (stage.value.mode === 'picker') {
+      expect(stage.value.pending.action).toBe('add-medication');
+    }
+    // No navigation until the user picks a member.
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('committing the picker forwards to /pod/safety with the resolved member', () => {
+    startQuickAddItem('add-medication');
+    commitPickerSelection('bean-carol');
+
+    // add-medication routes to /pod/safety; same route → replace. The page's
+    // own intent handler then forwards to the member's medications tab.
+    expect(replace).toHaveBeenCalledWith({
+      path: '/pod/safety',
+      query: { action: 'add-medication', memberId: 'bean-carol' },
+    });
+  });
+
+  it('no-context action navigates straight to the form without opening the sheet', () => {
+    // `add-emergency` (key contacts) has no contextKey → no picker needed.
+    const { isOpen } = useQuickAdd();
+    startQuickAddItem('add-emergency');
+
+    expect(isOpen.value).toBe(false);
+    // No sheet was opened → no history marker → cross-route push.
+    expect(push).toHaveBeenCalledWith({
+      path: '/pod/contacts',
+      query: { action: 'add-emergency' },
+    });
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('unknown action reports an error and does not navigate or open the sheet', () => {
+    const { isOpen } = useQuickAdd();
+    // @ts-expect-error — deliberately passing an action outside the union.
+    startQuickAddItem('add-nonsense');
+
+    expect(isOpen.value).toBe(false);
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledTimes(1);
   });
 });
 

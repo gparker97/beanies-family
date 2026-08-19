@@ -10,8 +10,10 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
+import SectionAddButton from '@/components/pod/shared/SectionAddButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { useQuickAdd } from '@/composables/useQuickAdd';
 import { usePermissions } from '@/composables/usePermissions';
 import { useGiveDose } from '@/composables/useGiveDose';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -24,6 +26,7 @@ import type { Allergy, AllergySeverity, FamilyMember, Medication } from '@/types
 const router = useRouter();
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
+const { startItem } = useQuickAdd();
 const familyStore = useFamilyStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
@@ -149,9 +152,16 @@ function openMedication(m: Medication): void {
     <section
       class="mb-6 rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
     >
-      <h2 class="font-outfit text-secondary-500 mb-3 text-lg font-bold dark:text-gray-100">
-        ⚠️ {{ t('careSafety.section.allergies') }}
-      </h2>
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+          ⚠️ {{ t('careSafety.section.allergies') }}
+        </h2>
+        <SectionAddButton
+          v-if="canEditActivities"
+          :label="t('careSafety.add.allergy')"
+          @click="startItem('add-allergy')"
+        />
+      </div>
       <ul v-if="allergies.length" class="grid gap-2 md:grid-cols-2">
         <li
           v-for="a in allergies"
@@ -192,9 +202,16 @@ function openMedication(m: Medication): void {
     <section
       class="mb-6 rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
     >
-      <h2 class="font-outfit text-secondary-500 mb-3 text-lg font-bold dark:text-gray-100">
-        💊 {{ t('careSafety.section.medications') }}
-      </h2>
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+          💊 {{ t('careSafety.section.medications') }}
+        </h2>
+        <SectionAddButton
+          v-if="canEditActivities"
+          :label="t('careSafety.add.medication')"
+          @click="startItem('add-medication')"
+        />
+      </div>
       <ul v-if="activeMeds.length" class="grid gap-2 md:grid-cols-2">
         <li
           v-for="m in activeMeds"
@@ -221,13 +238,20 @@ function openMedication(m: Medication): void {
         <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
           🆘 {{ t('careSafety.section.keyContacts') }}
         </h2>
-        <button
-          type="button"
-          class="font-outfit text-primary-500 text-xs font-semibold hover:underline"
-          @click="router.push('/pod/contacts')"
-        >
-          {{ t('careSafety.keyContacts.cta') }}
-        </button>
+        <div class="flex flex-shrink-0 items-center gap-3">
+          <button
+            type="button"
+            class="font-outfit text-primary-500 text-xs font-semibold hover:underline"
+            @click="router.push('/pod/contacts')"
+          >
+            {{ t('careSafety.keyContacts.cta') }}
+          </button>
+          <SectionAddButton
+            v-if="canEditActivities"
+            :label="t('careSafety.add.contact')"
+            @click="startItem('add-emergency')"
+          />
+        </div>
       </div>
       <ul v-if="previewContacts.length" class="grid gap-2 md:grid-cols-3">
         <li

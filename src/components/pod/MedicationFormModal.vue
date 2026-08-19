@@ -12,7 +12,8 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
+import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import FrequencyChips, { type ChipOption } from '@/components/ui/FrequencyChips.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -93,6 +94,26 @@ watch(ongoing, (val) => {
   if (val) endDate.value = '';
 });
 
+// The medication schedule is a single explicit choice, surfaced as a
+// two-option segmented control instead of a bare "ongoing" toggle:
+//   'ongoing' — no end date (stays on the active list until removed)
+//   'ends'    — has an end date (reveals a required end-date picker)
+// It's a presentation view over the existing `ongoing` boolean, so the
+// data model and `buildPayload` are unchanged. Placing the choice ABOVE
+// the end-date field (and revealing that field only when relevant) fixes
+// the old "disabled end date with the reason hidden below it" confusion.
+const schedule = computed<string>({
+  get: () => (ongoing.value ? 'ongoing' : 'ends'),
+  set: (v) => {
+    ongoing.value = v === 'ongoing';
+  },
+});
+
+const scheduleOptions = computed(() => [
+  { value: 'ongoing', label: t('medications.schedule.ongoing') },
+  { value: 'ends', label: t('medications.schedule.hasEndDate') },
+]);
+
 const { isEditing, isSubmitting } = useFormModal(
   () => props.medication,
   () => props.open,
@@ -141,7 +162,12 @@ const canSave = computed(
   () =>
     name.value.trim().length > 0 &&
     dose.value.trim().length > 0 &&
-    frequency.value.trim().length > 0
+    frequency.value.trim().length > 0 &&
+    // Safety: a medication with an end date must actually carry one.
+    // If the user chose "has an end date", block save until it's set —
+    // an end-dated med with no date is a contradiction that shouldn't
+    // persist onto a care-and-safety record.
+    (ongoing.value || endDate.value.length > 0)
 );
 
 const title = computed(() =>
@@ -288,23 +314,32 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       </FormFieldGroup>
     </Transition>
 
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <FormFieldGroup :label="t('medications.field.startDate')" optional>
-        <BeanieDatePicker v-model="startDate" />
-      </FormFieldGroup>
-      <FormFieldGroup :label="t('medications.field.endDate')" optional>
+    <FormFieldGroup :label="t('medications.field.startDate')" optional>
+      <BeanieDatePicker v-model="startDate" />
+    </FormFieldGroup>
+
+    <FormFieldGroup :label="t('medications.field.schedule')">
+      <TogglePillGroup v-model="schedule" :options="scheduleOptions" />
+      <p
+        v-if="ongoing"
+        class="font-outfit mt-2 text-xs text-[var(--color-text-muted)] dark:text-gray-400"
+      >
+        {{ t('medications.schedule.ongoingHint') }}
+      </p>
+    </FormFieldGroup>
+
+    <!-- End date only appears once the user chooses "has an end date",
+         so there's no disabled, unexplained field. Required in this
+         branch — enforced by canSave. -->
+    <ConditionalSection :show="!ongoing">
+      <FormFieldGroup :label="t('medications.field.endDate')" required>
+        <!-- `:disabled="ongoing"` keeps the picker out of the tab order while
+             the section is collapsed — ConditionalSection hides via max-height,
+             not display:none, so without this a keyboard/SR user would still
+             land on the invisible field. -->
         <BeanieDatePicker v-model="endDate" :disabled="ongoing" />
       </FormFieldGroup>
-    </div>
-
-    <div
-      class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
-    >
-      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200">
-        {{ t('medications.field.ongoing') }}
-      </span>
-      <ToggleSwitch v-model="ongoing" size="sm" />
-    </div>
+    </ConditionalSection>
 
     <FormFieldGroup :label="t('medications.field.notes')" optional>
       <BaseInput v-model="notes" :placeholder="t('medications.placeholder.notes')" />
