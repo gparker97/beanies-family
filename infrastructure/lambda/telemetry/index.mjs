@@ -73,6 +73,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'from_path',
   'action',
   'error_code',
+  // Meal planner (#27, surface 'meal-planner'). PII-free fixed enums/bools:
+  // `kind` (recipe|eat_out|leftovers|skip|other), `slot` (breakfast|lunch|
+  // dinner|snack), `quick_add`, `share_scope` (day|week), `overwrote`.
+  'kind',
+  'slot',
+  'quick_add',
+  'share_scope',
+  'overwrote',
   // Plan export (#67, surface 'plan-export'). PII-free fixed enums: `format`
   // (image|pdf), `stage` (render|rasterize|pdf|deliver).
   'format',

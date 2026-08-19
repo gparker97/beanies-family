@@ -2,32 +2,35 @@
 /**
  * ExportSheet — the reusable one-page "paper" shell for a shareable export.
  *
- * A fixed landscape-A4 Cloud-White sheet with a soft Heritage-Orange→Terracotta
- * header (kicker + prominent date range + hugging beanies mark) and a brand
- * footer (the Pod + wordmark + tagline). The body is a `<slot>`, so #66's weekly
- * agenda reuses this shell unchanged — only the slotted body differs.
+ * A landscape Cloud-White sheet with a soft Heritage-Orange→Terracotta header
+ * (hugging-beanies mark + heading + Caveat accent on the left, "week of" + the
+ * date range anchored on the right) and a brand footer (a slotted legend on the
+ * left, the Pod + wordmark + tagline on the right). The body is a `<slot>`, so
+ * #66's weekly agenda reuses this shell unchanged.
  *
  * All strings arrive already-resolved via `t()` from the caller, so this stays
  * i18n-agnostic and pure. It is rendered OFF-SCREEN and rasterised by
- * `useSheetExport`; it is never part of the normal interactive page tree.
+ * `useSheetExport`; never part of the normal interactive tree.
  *
- * Fixed-size print artifact: dimensions and type are px-pinned on purpose so the
- * exported image/PDF is identical regardless of the app's text-size mode and
- * never overflows the A4 box. This is the documented "fixed-size decorative"
- * opt-out from the rem-based text-scale rule.
+ * Height is content-driven (fixed WIDTH only, no fixed height / overflow clip)
+ * so a packed week can never clip a cell; the PDF path scales-to-fit one page.
+ * Fixed-size print artifact — type is px-pinned on purpose so the export never
+ * rescales with the app's text-size mode (documented decorative opt-out).
  */
 withDefaults(
   defineProps<{
-    /** Small kicker above the date range, e.g. "🍲 Meal plan". Already t()-resolved. */
-    title: string;
-    /** The hero line — the week the sheet covers, e.g. "Aug 18 – 24". */
+    /** Left heading, e.g. "This week's meals". Already t()-resolved. */
+    heading: string;
+    /** Optional Caveat accent beside the heading, e.g. "what's cooking? 🌱". */
+    accent?: string;
+    /** Small kicker above the range, e.g. "week of". */
+    dateLabel: string;
+    /** The anchor line — the week the sheet covers, e.g. "17 – 23 Aug 2026". */
     dateRange: string;
-    /** Optional line under the date range. */
-    subtitle?: string;
     /** Wordmark tagline (t('app.tagline')). */
     tagline?: string;
   }>(),
-  { subtitle: '', tagline: '' }
+  { accent: '', tagline: '' }
 );
 
 /** The Pod — four beans, always Slate → Terracotta → Orange → Sky Silk. */
@@ -37,16 +40,18 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 <template>
   <div class="export-sheet">
     <header class="export-header">
-      <div class="export-header-text">
-        <p class="export-kicker">{{ title }}</p>
-        <p class="export-dates">{{ dateRange }}</p>
-        <p v-if="subtitle" class="export-subtitle">{{ subtitle }}</p>
-      </div>
       <img
         class="export-mark"
         src="/brand/beanies_logo_transparent_192x192.png"
         alt="beanies.family"
       />
+      <h2 class="export-heading">{{ heading }}</h2>
+      <span v-if="accent" class="export-accent">{{ accent }}</span>
+      <span class="export-spacer" />
+      <span class="export-dates">
+        <span class="export-dates-label">{{ dateLabel }}</span>
+        <span class="export-dates-range">{{ dateRange }}</span>
+      </span>
     </header>
 
     <main class="export-body">
@@ -54,11 +59,15 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
     </main>
 
     <footer class="export-footer">
-      <div class="export-pod" aria-hidden="true">
-        <span v-for="(c, i) in POD" :key="i" class="export-bean" :style="{ background: c }" />
+      <div class="export-legend"><slot name="legend" /></div>
+      <span class="export-spacer" />
+      <div class="export-brand">
+        <span class="export-pod" aria-hidden="true">
+          <span v-for="(c, i) in POD" :key="i" class="export-bean" :style="{ background: c }" />
+        </span>
+        <span class="export-wordmark">beanies<span class="export-tld">.family</span></span>
+        <span v-if="tagline" class="export-tagline">{{ tagline }}</span>
       </div>
-      <p class="export-wordmark"><span>beanies</span><span class="export-tld">.family</span></p>
-      <p v-if="tagline" class="export-tagline">{{ tagline }}</p>
     </footer>
   </div>
 </template>
@@ -66,7 +75,7 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 <style scoped>
 /* stylelint-disable declaration-property-value-disallowed-list -- fixed-size print
    artifact: px is intentional so the export never rescales with the app text-size
-   mode and always fits the A4 box (documented decorative opt-out). */
+   mode (documented decorative opt-out). */
 .export-sheet {
   background: #f8f9fa;
   box-sizing: border-box;
@@ -74,67 +83,96 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
   display: flex;
   flex-direction: column;
   font-family: Inter, system-ui, sans-serif;
-  gap: 20px;
-  height: 794px;
-  padding: 34px 38px 26px;
   width: 1123px;
 }
 
 .export-header {
   align-items: center;
-  background: linear-gradient(135deg, rgb(241 93 34 / 14%) 0%, rgb(230 126 34 / 12%) 100%);
-  border-radius: 24px;
+  background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(230 126 34 / 12%));
+  border-bottom: 1px solid rgb(241 93 34 / 14%);
   display: flex;
-  gap: 20px;
-  justify-content: space-between;
+  gap: 14px;
   padding: 22px 30px;
-}
-
-.export-header-text {
-  min-width: 0;
-}
-
-.export-kicker {
-  color: rgb(44 62 80 / 65%);
-  font-family: Outfit, sans-serif;
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.export-dates {
-  color: #2c3e50;
-  font-family: Outfit, sans-serif;
-  font-size: 40px;
-  font-weight: 800;
-  line-height: 1.1;
-  margin: 2px 0 0;
-}
-
-.export-subtitle {
-  color: rgb(44 62 80 / 60%);
-  font-size: 16px;
-  margin: 4px 0 0;
 }
 
 .export-mark {
   flex-shrink: 0;
-  height: 76px;
+  height: 46px;
   object-fit: contain;
-  width: 76px;
+  width: 46px;
+}
+
+.export-heading {
+  color: #2c3e50;
+  font-family: Outfit, sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.export-accent {
+  color: #f15d22;
+  font-family: Caveat, cursive;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.export-spacer {
+  flex: 1;
+}
+
+.export-dates {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.export-dates-label {
+  color: #d14d1a;
+  font-family: Outfit, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.export-dates-range {
+  color: #2c3e50;
+  font-family: Outfit, sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .export-body {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  min-height: 0;
+  padding: 16px 20px 8px;
 }
 
 .export-footer {
   align-items: center;
+  border-top: 1px solid rgb(44 62 80 / 8%);
   display: flex;
-  gap: 10px;
+  gap: 16px;
+  padding: 12px 30px 16px;
+}
+
+.export-legend {
+  align-items: center;
+  color: rgb(44 62 80 / 55%);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 14px;
+}
+
+.export-brand {
+  align-items: center;
+  display: flex;
+  gap: 9px;
 }
 
 .export-pod {
@@ -143,8 +181,8 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 }
 
 .export-bean {
-  border-radius: 999px;
-  height: 12px;
+  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+  height: 15px;
   width: 12px;
 }
 
@@ -153,7 +191,6 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
   font-family: Outfit, sans-serif;
   font-size: 16px;
   font-weight: 700;
-  margin: 0;
 }
 
 .export-tld {
@@ -161,11 +198,10 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 }
 
 .export-tagline {
-  color: rgb(44 62 80 / 45%);
+  color: rgb(44 62 80 / 42%);
   font-family: Outfit, sans-serif;
   font-size: 13px;
   font-style: italic;
-  letter-spacing: 0.06em;
-  margin: 0;
+  letter-spacing: 0.04em;
 }
 </style>

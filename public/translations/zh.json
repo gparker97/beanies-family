@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-19",
-    "translationCount": 4043
+    "translationCount": 4046
   },
   "translations": {
     "app.name": {
@@ -20186,16 +20186,6 @@
       "hash": "nhr6k0",
       "lastUpdated": "2026-08-19"
     },
-    "mealPlanner.export.sectionTitle": {
-      "translation": "分享本周内容",
-      "hash": "zf3xyc",
-      "lastUpdated": "2026-08-19"
-    },
-    "mealPlanner.export.sendToChat": {
-      "translation": "发送到聊天",
-      "hash": "ceocws",
-      "lastUpdated": "2026-08-19"
-    },
     "mealPlanner.export.exportPdf": {
       "translation": "导出为 PDF",
       "hash": "nrwtrk",
@@ -20206,11 +20196,6 @@
       "hash": "bncl36",
       "lastUpdated": "2026-08-19"
     },
-    "mealPlanner.export.sheetTitle": {
-      "translation": "膳食计划",
-      "hash": "oxm3qe",
-      "lastUpdated": "2026-08-19"
-    },
     "mealPlanner.export.failed": {
       "translation": "无法创建文件",
       "hash": "utcu21",
@@ -20219,6 +20204,36 @@
     "mealPlanner.export.failedHelp": {
       "translation": "准备您的膳食计划时出错了。请重试。",
       "hash": "e9vzgp",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.share": {
+      "translation": "分享",
+      "hash": "1bjem7",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.heading": {
+      "translation": "本周餐点",
+      "hash": "gnyk0e",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.accent": {
+      "translation": "今天吃什么？🌱",
+      "hash": "z3w140",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.weekOf": {
+      "translation": "本周",
+      "hash": "kaeiyr",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.cooksLabel": {
+      "translation": "厨师",
+      "hash": "12vg97",
+      "lastUpdated": "2026-08-19"
+    },
+    "mealPlanner.export.legendHint": {
+      "translation": "⏰ 上菜时间 · 👥 客人",
+      "hash": "85eeaw",
       "lastUpdated": "2026-08-19"
     }
   }
