@@ -3,11 +3,12 @@
  * ExportSheet — the reusable one-page "paper" shell for a shareable export.
  *
  * A landscape Cloud-White sheet with a soft Heritage-Orange→Terracotta header
- * (hugging-beanies mark + heading + Caveat accent on the left, "week of" + the
- * date range anchored on the right) and a brand footer (a slotted legend on the
- * left; the hugging-beanies mark + right-justified wordmark with the tagline
- * stacked below it, on the right). The body is a `<slot>`, so #66's weekly
- * agenda reuses this shell unchanged.
+ * (heading + Caveat accent on the left; "week of" + the date range, then the
+ * family-hugging mark, on the right) and a brand footer (a slotted legend on the
+ * left; the father-son logo mark + right-justified wordmark with the tagline
+ * stacked below it, on the right — a different mark from the header so the two
+ * don't repeat). The body is a `<slot>`, so #66's weekly agenda reuses this
+ * shell unchanged.
  *
  * All strings arrive already-resolved via `t()` from the caller, so this stays
  * i18n-agnostic and pure. It is rendered OFF-SCREEN and rasterised by
@@ -38,11 +39,6 @@ withDefaults(
 <template>
   <div class="export-sheet">
     <header class="export-header">
-      <img
-        class="export-mark"
-        src="/brand/beanies_logo_transparent_logo_only_192x192.png"
-        alt="beanies.family"
-      />
       <h2 class="export-heading">{{ heading }}</h2>
       <span v-if="accent" class="export-accent">{{ accent }}</span>
       <span class="export-spacer" />
@@ -50,6 +46,11 @@ withDefaults(
         <span class="export-dates-label">{{ dateLabel }}</span>
         <span class="export-dates-range">{{ dateRange }}</span>
       </span>
+      <img
+        class="export-mark"
+        src="/brand/beanies_family_hugging_transparent_192x192.png"
+        alt="beanies.family"
+      />
     </header>
 
     <main class="export-body">
@@ -99,9 +100,9 @@ withDefaults(
 
 .export-mark {
   flex-shrink: 0;
-  height: 46px;
+  height: 54px;
   object-fit: contain;
-  width: 46px;
+  width: 54px;
 }
 
 .export-heading {
