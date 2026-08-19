@@ -1,17 +1,13 @@
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 /**
- * The single resolver shape consumed by BOTH the text share
- * (`formatMealPlanShare`) and the grid export (`buildMealExportRows`), so a meal
- * is named, attributed, and labelled identically on every surface and can never
- * drift. The View builds ONE resolver object (i18n-resolved labels + store
- * lookups) and hands the same object to both.
+ * The resolver shape `buildMealExportRows` consumes: the View builds one object
+ * (i18n-resolved labels + store lookups) so a meal is named, attributed, and
+ * labelled identically across the grid and can never drift.
  *
  * Pure/injected — no store or i18n imports here, so the model stays testable.
  */
 export interface MealResolvers {
-  /** Localized long day heading for the TEXT share, e.g. "Monday, 17 August 2026". */
-  dayLabel: (dateISO: string) => string;
   /** Short weekday + day-of-month for the GRID header, e.g. { weekday: 'Mon', dayNum: '17' }. */
   dayHeading: (dateISO: string) => { weekday: string; dayNum: string };
   /** Localized slot label, e.g. "Dinner". */
