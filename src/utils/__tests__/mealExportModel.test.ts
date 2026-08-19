@@ -21,7 +21,6 @@ const cooks: Record<string, { name: string; color?: string }> = {
   u2: { name: 'ben', color: undefined },
 };
 const resolvers: MealResolvers = {
-  dayLabel: (d) => `long:${d}`,
   dayHeading: (d) => ({ weekday: `wd:${d.slice(-2)}`, dayNum: d.slice(-2) }),
   slotLabel: (s) => `slot:${s}`,
   mealName: (m) => m.label ?? m.id,
