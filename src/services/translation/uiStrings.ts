@@ -1223,7 +1223,6 @@ const STRING_DEFS = {
     beanie: 'this removes every meal planned this week. cook logs you already saved are kept.',
   },
   'mealPlanner.clear.confirmLabel': { en: 'Clear', beanie: 'clear' },
-  'mealPlanner.shareAction': { en: 'Share', beanie: 'share' },
   'mealPlanner.cookbook': { en: 'Cookbook', beanie: 'cookbook' },
   'mealPlanner.railHint': {
     en: 'drag a recipe onto a day 🍝',
@@ -1311,11 +1310,7 @@ const STRING_DEFS = {
     beanie:
       'this recipe is used in {count} meal plan(s). deleting it removes the recipe and marks those meals as "recipe removed". cook logs are kept.',
   },
-  'mealPlanner.share.day': { en: 'This day', beanie: 'this day' },
-  'mealPlanner.share.week': { en: 'This week', beanie: 'this week' },
-  'mealPlanner.share.header': { en: '🍲 beanies meal plan', beanie: '🍲 beanies meal plan' },
   'mealPlanner.share.title': { en: 'Meal plan', beanie: 'meal plan' },
-  'mealPlanner.export.copyText': { en: 'Copy as Text', beanie: 'copy as text' },
   'mealPlanner.export.share': { en: 'Share', beanie: 'share' },
   'mealPlanner.export.exportPdf': { en: 'Export as PDF', beanie: 'export as pdf' },
   'mealPlanner.export.building': { en: 'Preparing…', beanie: 'preparing…' },

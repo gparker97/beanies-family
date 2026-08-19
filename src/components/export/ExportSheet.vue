@@ -5,8 +5,9 @@
  * A landscape Cloud-White sheet with a soft Heritage-Orange→Terracotta header
  * (hugging-beanies mark + heading + Caveat accent on the left, "week of" + the
  * date range anchored on the right) and a brand footer (a slotted legend on the
- * left, the Pod + wordmark + tagline on the right). The body is a `<slot>`, so
- * #66's weekly agenda reuses this shell unchanged.
+ * left; the hugging-beanies mark + right-justified wordmark with the tagline
+ * stacked below it, on the right). The body is a `<slot>`, so #66's weekly
+ * agenda reuses this shell unchanged.
  *
  * All strings arrive already-resolved via `t()` from the caller, so this stays
  * i18n-agnostic and pure. It is rendered OFF-SCREEN and rasterised by
@@ -32,9 +33,6 @@ withDefaults(
   }>(),
   { accent: '', tagline: '' }
 );
-
-/** The Pod — four beans, always Slate → Terracotta → Orange → Sky Silk. */
-const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 </script>
 
 <template>
@@ -42,7 +40,7 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
     <header class="export-header">
       <img
         class="export-mark"
-        src="/brand/beanies_logo_transparent_192x192.png"
+        src="/brand/beanies_logo_transparent_logo_only_192x192.png"
         alt="beanies.family"
       />
       <h2 class="export-heading">{{ heading }}</h2>
@@ -62,11 +60,15 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
       <div class="export-legend"><slot name="legend" /></div>
       <span class="export-spacer" />
       <div class="export-brand">
-        <span class="export-pod" aria-hidden="true">
-          <span v-for="(c, i) in POD" :key="i" class="export-bean" :style="{ background: c }" />
+        <img
+          class="export-brand-mark"
+          src="/brand/beanies_logo_transparent_logo_only_192x192.png"
+          alt="beanies.family"
+        />
+        <span class="export-brand-text">
+          <span class="export-wordmark">beanies<span class="export-tld">.family</span></span>
+          <span v-if="tagline" class="export-tagline">{{ tagline }}</span>
         </span>
-        <span class="export-wordmark">beanies<span class="export-tld">.family</span></span>
-        <span v-if="tagline" class="export-tagline">{{ tagline }}</span>
       </div>
     </footer>
   </div>
@@ -172,18 +174,20 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 .export-brand {
   align-items: center;
   display: flex;
-  gap: 9px;
+  gap: 10px;
 }
 
-.export-pod {
+.export-brand-mark {
+  height: 36px;
+  object-fit: contain;
+  width: 36px;
+}
+
+.export-brand-text {
+  align-items: flex-end;
   display: flex;
-  gap: 4px;
-}
-
-.export-bean {
-  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
-  height: 15px;
-  width: 12px;
+  flex-direction: column;
+  line-height: 1.15;
 }
 
 .export-wordmark {
@@ -200,7 +204,7 @@ const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 .export-tagline {
   color: rgb(44 62 80 / 42%);
   font-family: Outfit, sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-style: italic;
   letter-spacing: 0.04em;
 }

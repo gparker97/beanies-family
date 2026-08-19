@@ -11,18 +11,14 @@ import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
 import MealDayStack from '@/components/mealplan/MealDayStack.vue';
 import MealEditModal from '@/components/mealplan/MealEditModal.vue';
 import MealPickerSheet from '@/components/mealplan/MealPickerSheet.vue';
-import BaseModal from '@/components/ui/BaseModal.vue';
-import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
-import { useShareText } from '@/composables/useShareText';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
-import { formatMealPlanShare } from '@/utils/formatMealPlanShare';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import ExportSheet from '@/components/export/ExportSheet.vue';
 import MealPlanExportBody from '@/components/export/MealPlanExportBody.vue';
@@ -64,7 +60,6 @@ const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
-const { share } = useShareText();
 
 // ── Week navigation (desktop) + day navigation (mobile) ─────────────────────
 const referenceDate = ref(new Date());
@@ -161,21 +156,15 @@ async function clearDay(date: string) {
   if (ok) await mealPlanStore.clearDates([date]);
 }
 
-// ── Share ───────────────────────────────────────────────────────────────────
-const shareOpen = ref(false);
-const shareScope = ref<'day' | 'week'>('week');
-const shareOptions = computed(() => [
-  { value: 'day', label: t('mealPlanner.share.day') },
-  { value: 'week', label: t('mealPlanner.share.week') },
-]);
-
+// ── Share / export the week ──────────────────────────────────────────────────
 function cook(id?: string): { name: string; color?: string } | undefined {
   const m = id ? familyStore.members.find((mm) => mm.id === id) : undefined;
   return m ? { name: m.name, color: m.color } : undefined;
 }
 
-// One resolver object feeds BOTH the text share and the grid export, so a meal
-// is named/attributed identically on every surface (DRY — no drift).
+// Resolver object handed to `buildMealExportRows` so a meal is named/attributed
+// identically everywhere. `dayLabel` (long form) is retained on the shared shape
+// for `formatMealPlanShare`; the grid uses `dayHeading`.
 const mealResolvers = computed<MealResolvers>(() => ({
   dayLabel: (d) => formatDayLong(d),
   dayHeading,
@@ -183,31 +172,6 @@ const mealResolvers = computed<MealResolvers>(() => ({
   mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
   cook,
 }));
-
-const sharePreview = computed(() => {
-  // 'day' shares the day the user is actually looking at (the mobile day-stack /
-  // its ref, which defaults to today) — not always today.
-  const meals =
-    shareScope.value === 'week'
-      ? mealPlanStore.mealsForWeek(weekDates.value)
-      : mealPlanStore.mealsForDate(mobileDate.value);
-  return formatMealPlanShare(meals, {
-    ...mealResolvers.value,
-    header: `${t('mealPlanner.share.header')} · ${weekLabel.value}`,
-  });
-});
-
-async function doShare() {
-  const ok = await share(t('mealPlanner.share.title'), sharePreview.value);
-  if (!ok) return; // cancelled sheet / failed copy — don't record a success or close
-  logEvent({
-    level: 'info',
-    surface: 'meal-planner',
-    message: 'plan shared',
-    context: { action: 'plan-shared', share_scope: shareScope.value },
-  });
-  shareOpen.value = false;
-}
 
 // ── Export the week as an image / PDF ────────────────────────────────────────
 // One layout source (the off-screen ExportSheet) → PNG (share sheet) or PDF
@@ -286,7 +250,6 @@ async function runExport(format: ExportFormat): Promise<void> {
         format,
       },
     });
-    shareOpen.value = false;
   } catch (err) {
     const failStage = err instanceof ExportError ? err.stage : stage;
     // ONE call: showToast('error') auto-invokes reportError with this
@@ -331,12 +294,25 @@ async function runExport(format: ExportFormat): Promise<void> {
         >
           ⧉ {{ t('mealPlanner.copyHere') }}
         </button>
+        <!-- Two conventional actions: social Share (image → OS share sheet) and
+             Export as PDF (downloads the week). Both always cover the week. -->
         <button
           type="button"
-          class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white"
-          @click="shareOpen = true"
+          class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          :disabled="exporting"
+          @click="runExport('image')"
         >
-          ↗ {{ t('mealPlanner.shareAction') }}
+          {{ exporting ? t('mealPlanner.export.building') : `↗ ${t('mealPlanner.export.share')}` }}
+        </button>
+        <button
+          type="button"
+          class="font-outfit text-secondary-500 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60 dark:text-slate-100"
+          :disabled="exporting"
+          @click="runExport('pdf')"
+        >
+          {{
+            exporting ? t('mealPlanner.export.building') : `⬇ ${t('mealPlanner.export.exportPdf')}`
+          }}
         </button>
       </div>
     </div>
@@ -420,56 +396,6 @@ async function runExport(format: ExportFormat): Promise<void> {
       :meal-slot="pickerTarget.slot"
       @close="pickerOpen = false"
     />
-
-    <BaseModal
-      :open="shareOpen"
-      :title="t('mealPlanner.shareAction')"
-      size="md"
-      @close="shareOpen = false"
-    >
-      <div class="space-y-3">
-        <TogglePillGroup v-model="shareScope" :options="shareOptions" />
-        <pre
-          class="font-inter max-h-52 overflow-auto rounded-xl bg-[var(--cloud)] p-3 text-xs whitespace-pre-wrap text-[rgba(44,62,80,0.72)] dark:bg-slate-900 dark:text-slate-300"
-          >{{ sharePreview }}</pre>
-
-        <!-- Conventional two-action row: Share (image → OS share sheet) and
-             Export as PDF (downloads to the device). -->
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r py-3 text-sm font-bold text-white disabled:opacity-60"
-            :disabled="exporting"
-            @click="runExport('image')"
-          >
-            {{
-              exporting ? t('mealPlanner.export.building') : `↗ ${t('mealPlanner.export.share')}`
-            }}
-          </button>
-          <button
-            type="button"
-            class="font-outfit rounded-2xl border border-[rgba(44,62,80,0.15)] py-3 text-sm font-semibold text-[var(--color-secondary-500)] disabled:opacity-60 dark:border-slate-600 dark:text-slate-200"
-            :disabled="exporting"
-            @click="runExport('pdf')"
-          >
-            {{
-              exporting
-                ? t('mealPlanner.export.building')
-                : `⬇ ${t('mealPlanner.export.exportPdf')}`
-            }}
-          </button>
-        </div>
-
-        <button
-          type="button"
-          class="font-outfit w-full py-1 text-xs font-semibold text-[rgba(44,62,80,0.6)] hover:text-[#F15D22] disabled:opacity-60 dark:text-slate-400"
-          :disabled="exporting"
-          @click="doShare"
-        >
-          📋 {{ t('mealPlanner.export.copyText') }}
-        </button>
-      </div>
-    </BaseModal>
 
     <!-- Off-screen export sheet: rendered declaratively so it inherits Pinia /
          i18n / theme; unmounted by flipping `exportMounting` in the handler's
