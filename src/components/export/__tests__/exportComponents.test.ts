@@ -27,8 +27,12 @@ describe('ExportSheet', () => {
     expect(wrapper.find('.export-tagline').text()).toBe('every bean counts');
     expect(wrapper.find('.slotted').text()).toBe('BODY');
     expect(wrapper.find('.leg').text()).toBe('LEGEND');
-    // The Pod — four beans, always present.
-    expect(wrapper.findAll('.export-bean')).toHaveLength(4);
+    // Footer brand: the hugging-beanies mark + wordmark with the tagline stacked
+    // below it (right-aligned), not a row of Pod beans.
+    expect(wrapper.find('.export-brand-mark').exists()).toBe(true);
+    expect(wrapper.find('.export-brand-text .export-wordmark').exists()).toBe(true);
+    expect(wrapper.find('.export-brand-text .export-tagline').text()).toBe('every bean counts');
+    expect(wrapper.find('.export-bean').exists()).toBe(false);
   });
 
   it('omits the accent when not provided', () => {
