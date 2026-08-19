@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { shareOrDownloadFile } from '@/utils/shareOrDownloadFile';
+import { shareOrDownloadFile, downloadFile } from '@/utils/shareOrDownloadFile';
 
 const blob = new Blob(['x'], { type: 'image/png' });
 
@@ -74,5 +74,20 @@ describe('shareOrDownloadFile', () => {
     const result = await shareOrDownloadFile(blob, 'plan.png', 'image/png', 'Meal plan');
     expect(result.outcome).toBe('failed');
     expect(result.error).toBe(boom);
+  });
+
+  it('downloadFile always downloads (never touches the share sheet)', () => {
+    // Even when file sharing IS available, "Export as PDF" downloads.
+    (navigator as { canShare?: unknown }).canShare = vi.fn(() => true);
+    const share = vi.fn();
+    (navigator as { share?: unknown }).share = share;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const result = downloadFile(blob, 'plan.pdf');
+
+    expect(result.outcome).toBe('downloaded');
+    expect(share).not.toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock');
   });
 });

@@ -2,52 +2,68 @@
 /**
  * MealPlanExportBody — the meal grid slotted into `ExportSheet` (days across,
  * four slot rows down). A dumb renderer of a pre-built `MealExportRows`
- * view-model (`buildMealExportRows`), so it holds no store or i18n coupling —
- * every label is already resolved, and cell chrome is emoji/colour only. #66
- * will add its own `AgendaExportBody` against the same slot contract.
+ * view-model (`buildMealExportRows`): every label is already resolved and cell
+ * chrome is emoji/colour only, so it holds no store or i18n coupling. #66 will
+ * add its own `AgendaExportBody` against the same slot contract.
  *
- * Static print artifact: no "today" highlight, no cooked ticks. Px-pinned type
- * for the same reason as `ExportSheet` (fixed-size export, must not rescale).
+ * Static print artifact: no "today" highlight, no cooked ticks. Rows are
+ * content-sized (never clip); px-pinned type (matches ExportSheet).
  */
 import type { MealExportRows } from '@/utils/mealExportModel';
+import type { MealSlot } from '@/types/models';
 
 const props = defineProps<{ rows: MealExportRows }>();
 
-/** Grid columns: a slot-label gutter + one equal column per day. */
-const columns = `104px repeat(${props.rows.dayColumns.length}, minmax(0, 1fr))`;
+/** Grid columns: a slot-label rail + one equal column per day. */
+const columns = `74px repeat(${props.rows.dayColumns.length}, minmax(0, 1fr))`;
+
+/** Fixed per-slot glyph for the rail (presentation, not translated). */
+const SLOT_ICON: Record<MealSlot, string> = {
+  breakfast: '🍳',
+  lunch: '🥪',
+  dinner: '🍽️',
+  snack: '🍎',
+};
 </script>
 
 <template>
   <div class="grid" :style="{ gridTemplateColumns: columns }">
     <!-- Day-header row: empty corner + one heading per day. -->
     <div class="corner" />
-    <div v-for="col in rows.dayColumns" :key="col.dateISO" class="day-head">{{ col.label }}</div>
+    <div v-for="col in rows.dayColumns" :key="col.dateISO" class="day-head">
+      {{ col.weekday }}<span class="day-num">{{ col.dayNum }}</span>
+    </div>
 
     <!-- One row per slot. -->
     <template v-for="row in rows.rows" :key="row.slot">
-      <div class="slot-head">{{ row.slotLabel }}</div>
-      <div v-for="(cell, i) in row.cells" :key="`${row.slot}-${i}`" class="cell">
-        <template v-if="cell.length">
-          <div
-            v-for="(meal, j) in cell"
-            :key="meal.id"
-            class="meal"
-            :class="{ 'meal-divided': j > 0 }"
-          >
-            <p class="meal-name">{{ meal.name }}</p>
-            <div class="meal-meta">
-              <span v-if="meal.cook" class="cook">
-                <span class="cook-dot" :style="{ background: meal.cook.color || '#2C3E50' }">{{
-                  meal.cook.initial
-                }}</span>
-                <span class="cook-name">{{ meal.cook.name }}</span>
-              </span>
-              <span v-if="meal.serveTime" class="meta-chip">🕐 {{ meal.serveTime }}</span>
-              <span v-if="meal.guests" class="meta-chip">👥 {{ meal.guests.join(', ') }}</span>
-            </div>
+      <div class="slot-head">
+        <span class="slot-ic" aria-hidden="true">{{ SLOT_ICON[row.slot] }}</span
+        >{{ row.slotLabel }}
+      </div>
+      <div
+        v-for="(cell, i) in row.cells"
+        :key="`${row.slot}-${i}`"
+        class="cell"
+        :class="{ empty: cell.length === 0 }"
+      >
+        <div
+          v-for="(meal, j) in cell"
+          :key="meal.id"
+          class="dish"
+          :class="{ divided: j > 0, type: meal.isType }"
+        >
+          <div class="dish-name">{{ meal.name }}</div>
+          <div v-if="meal.cook" class="dish-who">
+            <span class="cook-dot" :style="{ background: meal.cook.color || '#2C3E50' }">{{
+              meal.cook.initial
+            }}</span>
+            <span>{{ meal.cook.name }}</span>
           </div>
-        </template>
-        <span v-else class="empty" aria-hidden="true">–</span>
+          <div v-if="meal.serveTime || meal.guestCount" class="dish-meta">
+            <span v-if="meal.serveTime">⏰ {{ meal.serveTime }}</span>
+            <span v-if="meal.guestCount">👥 +{{ meal.guestCount }}</span>
+          </div>
+        </div>
       </div>
     </template>
   </div>
@@ -60,75 +76,100 @@ const columns = `104px repeat(${props.rows.dayColumns.length}, minmax(0, 1fr))`;
   display: grid;
   flex: 1;
   font-family: Inter, system-ui, sans-serif;
-  gap: 6px;
-  grid-auto-rows: minmax(0, 1fr);
-  min-height: 0;
+  gap: 5px;
+  grid-template-rows: auto repeat(4, minmax(116px, auto));
 }
 
-/* corner + day-heads are the first N+1 grid items, so auto-placement fills
-   row 1 with them (columns = 1 gutter + N days) — no explicit grid-row needed. */
+.corner {
+  grid-column: 1;
+}
+
 .day-head {
-  align-items: center;
-  background: rgb(174 214 241 / 30%);
-  border-radius: 12px;
+  align-self: end;
   color: #2c3e50;
-  display: flex;
   font-family: Outfit, sans-serif;
   font-size: 15px;
   font-weight: 700;
-  justify-content: center;
-  padding: 6px 4px;
+  padding-bottom: 3px;
   text-align: center;
+}
+
+.day-num {
+  color: rgb(44 62 80 / 45%);
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .slot-head {
   align-items: center;
+  background: rgb(44 62 80 / 5%);
+  border-radius: 10px;
   color: rgb(44 62 80 / 55%);
   display: flex;
+  flex-direction: column;
   font-family: Outfit, sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 4px;
+  justify-content: center;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
+.slot-ic {
+  font-size: 17px;
+}
+
 .cell {
-  background: rgb(44 62 80 / 4%);
-  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgb(44 62 80 / 8%);
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  overflow: hidden;
-  padding: 8px 9px;
+  padding: 7px 8px;
 }
 
-.meal-divided {
-  border-top: 1px solid rgb(44 62 80 / 10%);
+.cell.empty {
+  align-items: center;
+  border-color: rgb(44 62 80 / 12%);
+  border-style: dashed;
+  justify-content: center;
+}
+
+.cell.empty::before {
+  color: rgb(44 62 80 / 25%);
+  content: '·';
+  font-size: 20px;
+}
+
+.dish.divided {
+  border-top: 1px dashed rgb(44 62 80 / 14%);
   padding-top: 5px;
 }
 
-.meal-name {
+.dish-name {
   color: #2c3e50;
   font-family: Outfit, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.18;
+}
+
+.dish.type .dish-name {
+  color: rgb(44 62 80 / 62%);
+  font-style: italic;
   font-weight: 600;
-  line-height: 1.2;
-  margin: 0;
 }
 
-.meal-meta {
+.dish-who {
   align-items: center;
+  color: rgb(44 62 80 / 60%);
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px 8px;
+  font-size: 12px;
+  gap: 4px;
   margin-top: 3px;
-}
-
-.cook {
-  align-items: center;
-  display: inline-flex;
-  gap: 5px;
 }
 
 .cook-dot {
@@ -136,26 +177,23 @@ const columns = `104px repeat(${props.rows.dayColumns.length}, minmax(0, 1fr))`;
   border-radius: 999px;
   color: #fff;
   display: inline-flex;
+  flex: none;
+  font-family: Outfit, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  height: 16px;
+  justify-content: center;
+  width: 16px;
+}
+
+.dish-meta {
+  color: rgb(44 62 80 / 50%);
+  display: flex;
+  flex-wrap: wrap;
   font-family: Outfit, sans-serif;
   font-size: 11px;
-  font-weight: 700;
-  height: 18px;
-  justify-content: center;
-  width: 18px;
-}
-
-.cook-name,
-.meta-chip {
-  color: rgb(44 62 80 / 70%);
-  font-size: 12px;
-}
-
-.empty {
-  align-items: center;
-  color: rgb(44 62 80 / 20%);
-  display: flex;
-  flex: 1;
-  font-size: 18px;
-  justify-content: center;
+  font-weight: 600;
+  gap: 4px 8px;
+  margin-top: 3px;
 }
 </style>

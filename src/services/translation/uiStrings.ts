@@ -1316,11 +1316,18 @@ const STRING_DEFS = {
   'mealPlanner.share.header': { en: '🍲 beanies meal plan', beanie: '🍲 beanies meal plan' },
   'mealPlanner.share.title': { en: 'Meal plan', beanie: 'meal plan' },
   'mealPlanner.export.copyText': { en: 'Copy as Text', beanie: 'copy as text' },
-  'mealPlanner.export.sectionTitle': { en: 'Share the Week', beanie: 'share the week' },
-  'mealPlanner.export.sendToChat': { en: 'Send to a Chat', beanie: 'send to a chat' },
+  'mealPlanner.export.share': { en: 'Share', beanie: 'share' },
   'mealPlanner.export.exportPdf': { en: 'Export as PDF', beanie: 'export as pdf' },
   'mealPlanner.export.building': { en: 'Preparing…', beanie: 'preparing…' },
-  'mealPlanner.export.sheetTitle': { en: 'Meal Plan', beanie: 'meal plan' },
+  // The exported sheet's own copy (rendered into the picture/PDF).
+  'mealPlanner.export.heading': { en: "This Week's Meals", beanie: "this week's meals" },
+  'mealPlanner.export.accent': { en: "what's cooking? 🌱", beanie: "what's cooking? 🌱" },
+  'mealPlanner.export.weekOf': { en: 'week of', beanie: 'week of' },
+  'mealPlanner.export.cooksLabel': { en: 'Cooks', beanie: 'cooks' },
+  'mealPlanner.export.legendHint': {
+    en: '⏰ serve time · 👥 guests',
+    beanie: '⏰ serve time · 👥 guests',
+  },
   'mealPlanner.export.failed': {
     en: "Couldn't create the file",
     beanie: "couldn't create the file",

@@ -134,8 +134,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Copy as text</strong> — a tidy plain-text list of the day or the week, ready to paste anywhere.',
-          "<strong>Send to a chat</strong> — turns the whole week into a friendly one-page picture and hands it to your phone's share sheet, so you can drop it straight into WhatsApp, Messages or email.",
-          '<strong>Export as PDF</strong> — the same one-page week as a PDF, perfect for printing and sticking on the fridge.',
+          "<strong>Share</strong> — turns the whole week into a friendly one-page picture and hands it to your phone's share sheet, so you can drop it straight into WhatsApp, Messages or email.",
+          '<strong>Export as PDF</strong> — downloads the same one-page week as a PDF, perfect for printing and sticking on the fridge.',
         ],
       },
       {

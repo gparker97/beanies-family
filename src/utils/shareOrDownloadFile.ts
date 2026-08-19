@@ -22,6 +22,31 @@ function isAbortError(err: unknown): boolean {
 }
 
 /**
+ * Download `blob` to the device via an object URL + a programmatic `<a download>`
+ * (revoked after). The unconditional-download path — used for "Export as PDF",
+ * where the conventional expectation is a file saved to the device, not the OS
+ * share sheet. Returns `downloaded` or `failed` (with the error).
+ */
+export function downloadFile(blob: Blob, filename: string): ShareOrDownloadResult {
+  try {
+    const url = URL.createObjectURL(blob);
+    try {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return { outcome: 'downloaded' };
+  } catch (err) {
+    return { outcome: 'failed', error: err };
+  }
+}
+
+/**
  * Share `blob` as a file where supported, otherwise download it.
  *
  * - `navigator.canShare({ files })` true → `navigator.share({ files, title })`
@@ -54,21 +79,6 @@ export async function shareOrDownloadFile(
     }
   }
 
-  // Download fallback: object URL + a programmatic anchor click, revoked after.
-  try {
-    const url = URL.createObjectURL(blob);
-    try {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-    return { outcome: 'downloaded' };
-  } catch (err) {
-    return { outcome: 'failed', error: err };
-  }
+  // No file-share support → download instead (shared path with "Export as PDF").
+  return downloadFile(blob, filename);
 }

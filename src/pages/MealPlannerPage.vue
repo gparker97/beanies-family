@@ -26,13 +26,14 @@ import { formatMealPlanShare } from '@/utils/formatMealPlanShare';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import ExportSheet from '@/components/export/ExportSheet.vue';
 import MealPlanExportBody from '@/components/export/MealPlanExportBody.vue';
+import MealExportLegend from '@/components/export/MealExportLegend.vue';
 import {
   exportElementToPng,
   pngBlobToPdf,
   ExportError,
   type ExportStage,
 } from '@/composables/useSheetExport';
-import { shareOrDownloadFile } from '@/utils/shareOrDownloadFile';
+import { shareOrDownloadFile, downloadFile } from '@/utils/shareOrDownloadFile';
 import {
   buildMealExportRows,
   type MealResolvers,
@@ -44,7 +45,20 @@ import { addDays, toDateInputValue, formatDayLong } from '@/utils/date';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 /** Faces the export sheet renders — forced into flight before capture (no FOUT). */
-const EXPORT_FONTS = ['600 15px Outfit', '700 16px Outfit', '800 40px Outfit', '400 14px Inter'];
+const EXPORT_FONTS = [
+  '600 15px Outfit',
+  '700 16px Outfit',
+  '800 24px Outfit',
+  '400 14px Inter',
+  '700 22px Caveat',
+];
+
+/** Short weekday for the grid header (mirrors MealWeekBoard's en-US short format). */
+const WEEKDAY_SHORT = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+function dayHeading(dateISO: string): { weekday: string; dayNum: string } {
+  const d = new Date(`${dateISO}T00:00:00`);
+  return { weekday: WEEKDAY_SHORT.format(d), dayNum: String(d.getDate()) };
+}
 
 const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
@@ -164,6 +178,7 @@ function cook(id?: string): { name: string; color?: string } | undefined {
 // is named/attributed identically on every surface (DRY — no drift).
 const mealResolvers = computed<MealResolvers>(() => ({
   dayLabel: (d) => formatDayLong(d),
+  dayHeading,
   slotLabel: (s: MealSlot) => t(`mealPlanner.slot.${s}`),
   mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
   cook,
@@ -244,10 +259,14 @@ async function runExport(format: ExportFormat): Promise<void> {
       mime = 'application/pdf';
     }
 
-    // 4. Deliver via the share sheet (image) / download (pdf).
+    // 4. Deliver: "Share" hands the image to the OS share sheet; "Export as PDF"
+    //    downloads straight to the device (the conventional download action).
     stage = 'deliver';
     const filename = `beanies-meal-plan-${weekDates.value[0]}.${ext}`;
-    const result = await shareOrDownloadFile(blob, filename, mime, t('mealPlanner.share.title'));
+    const result =
+      format === 'pdf'
+        ? downloadFile(blob, filename)
+        : await shareOrDownloadFile(blob, filename, mime, t('mealPlanner.share.title'));
     if (result.outcome === 'failed') throw new ExportError('deliver', result.error);
     if (result.outcome === 'cancelled') {
       logEvent({
@@ -411,49 +430,44 @@ async function runExport(format: ExportFormat): Promise<void> {
       <div class="space-y-3">
         <TogglePillGroup v-model="shareScope" :options="shareOptions" />
         <pre
-          class="font-inter max-h-60 overflow-auto rounded-xl bg-[var(--cloud)] p-3 text-xs whitespace-pre-wrap text-[rgba(44,62,80,0.72)] dark:bg-slate-900 dark:text-slate-300"
+          class="font-inter max-h-52 overflow-auto rounded-xl bg-[var(--cloud)] p-3 text-xs whitespace-pre-wrap text-[rgba(44,62,80,0.72)] dark:bg-slate-900 dark:text-slate-300"
           >{{ sharePreview }}</pre>
+
+        <!-- Conventional two-action row: Share (image → OS share sheet) and
+             Export as PDF (downloads to the device). -->
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r py-3 text-sm font-bold text-white disabled:opacity-60"
+            :disabled="exporting"
+            @click="runExport('image')"
+          >
+            {{
+              exporting ? t('mealPlanner.export.building') : `↗ ${t('mealPlanner.export.share')}`
+            }}
+          </button>
+          <button
+            type="button"
+            class="font-outfit rounded-2xl border border-[rgba(44,62,80,0.15)] py-3 text-sm font-semibold text-[var(--color-secondary-500)] disabled:opacity-60 dark:border-slate-600 dark:text-slate-200"
+            :disabled="exporting"
+            @click="runExport('pdf')"
+          >
+            {{
+              exporting
+                ? t('mealPlanner.export.building')
+                : `⬇ ${t('mealPlanner.export.exportPdf')}`
+            }}
+          </button>
+        </div>
+
         <button
           type="button"
-          class="font-outfit w-full rounded-2xl border border-[rgba(44,62,80,0.15)] py-3 text-sm font-semibold text-[var(--color-secondary-500)] dark:border-slate-600 dark:text-slate-200"
+          class="font-outfit w-full py-1 text-xs font-semibold text-[rgba(44,62,80,0.6)] hover:text-[#F15D22] disabled:opacity-60 dark:text-slate-400"
+          :disabled="exporting"
           @click="doShare"
         >
           📋 {{ t('mealPlanner.export.copyText') }}
         </button>
-
-        <div class="border-t border-[rgba(44,62,80,0.1)] pt-3 dark:border-slate-700">
-          <p
-            class="font-outfit mb-2 text-xs font-semibold tracking-[0.04em] text-[rgba(44,62,80,0.5)] uppercase dark:text-slate-400"
-          >
-            {{ t('mealPlanner.export.sectionTitle') }}
-          </p>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r py-3 text-sm font-bold text-white disabled:opacity-60"
-              :disabled="exporting"
-              @click="runExport('image')"
-            >
-              {{
-                exporting
-                  ? t('mealPlanner.export.building')
-                  : `🖼️ ${t('mealPlanner.export.sendToChat')}`
-              }}
-            </button>
-            <button
-              type="button"
-              class="font-outfit bg-secondary-500 rounded-2xl py-3 text-sm font-bold text-white disabled:opacity-60"
-              :disabled="exporting"
-              @click="runExport('pdf')"
-            >
-              {{
-                exporting
-                  ? t('mealPlanner.export.building')
-                  : `📄 ${t('mealPlanner.export.exportPdf')}`
-              }}
-            </button>
-          </div>
-        </div>
       </div>
     </BaseModal>
 
@@ -463,11 +477,21 @@ async function runExport(format: ExportFormat): Promise<void> {
     <div v-if="exportMounting" class="export-host" aria-hidden="true">
       <ExportSheet
         ref="sheetComp"
-        :title="`🍲 ${t('mealPlanner.export.sheetTitle')}`"
+        :heading="t('mealPlanner.export.heading')"
+        :accent="t('mealPlanner.export.accent')"
+        :date-label="t('mealPlanner.export.weekOf')"
         :date-range="weekLabel"
         :tagline="t('app.tagline')"
       >
         <MealPlanExportBody v-if="exportRows" :rows="exportRows" />
+        <template #legend>
+          <MealExportLegend
+            v-if="exportRows"
+            :cooks-label="t('mealPlanner.export.cooksLabel')"
+            :cooks="exportRows.cooks"
+            :hint="t('mealPlanner.export.legendHint')"
+          />
+        </template>
       </ExportSheet>
     </div>
   </div>
