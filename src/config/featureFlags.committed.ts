@@ -13,4 +13,5 @@ export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   familyLists: true,
   googleCalendarSync: true,
   helpfulHints: true,
+  mealPlanner: false,
 };

@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **The Meal Planner is temporarily tucked away while we finish polishing it.** It's now behind a feature flag and hidden from the app for the moment — your saved meal plans are safe and untouched, and it'll be back. (The Cookbook and your recipes are unaffected.)
 - **Clearer medication schedule.** The medication form's plain "ongoing" switch is now an explicit choice — "Ongoing" or "Has an end date" — shown before the date, so it's obvious why the end date is or isn't there. Choosing "Has an end date" reveals the date field and now requires a date before saving, so a medication can't be marked as ending with no end date recorded.
 
 ### Fixed

@@ -46,6 +46,12 @@ export const FLAG_REGISTRY = [
     label: 'Helpful Hints',
     description: 'Auto-generated to-do reminders before upcoming birthdays, parties, and trips.',
   },
+  {
+    id: 'mealPlanner',
+    label: 'Meal Planner',
+    description:
+      "The week-first meal board under The Treehouse (page, nav, nook 'today's meals', and briefing cook assignments). Cookbook is separate.",
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

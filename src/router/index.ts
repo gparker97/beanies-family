@@ -246,7 +246,7 @@ const routes: RouteRecordRaw[] = [
     path: '/meal-planner',
     name: 'MealPlanner',
     component: () => import('@/pages/MealPlannerPage.vue'),
-    meta: { titleKey: 'nav.mealPlanner', requiresAuth: true },
+    meta: { titleKey: 'nav.mealPlanner', requiresAuth: true, requiresFlag: 'mealPlanner' },
   },
   {
     path: '/lists',
