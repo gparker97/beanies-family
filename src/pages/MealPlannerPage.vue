@@ -12,6 +12,7 @@ import MealDayStack from '@/components/mealplan/MealDayStack.vue';
 import MealEditModal from '@/components/mealplan/MealEditModal.vue';
 import MealPickerSheet from '@/components/mealplan/MealPickerSheet.vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -298,21 +299,21 @@ async function runExport(format: ExportFormat): Promise<void> {
              Export as PDF (downloads the week). Both always cover the week. -->
         <button
           type="button"
-          class="from-primary-500 to-terracotta-400 font-outfit rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           :disabled="exporting"
           @click="runExport('image')"
         >
-          {{ exporting ? t('mealPlanner.export.building') : `↗ ${t('mealPlanner.export.share')}` }}
+          <BeanieIcon v-if="!exporting" name="share" size="sm" />
+          {{ exporting ? t('mealPlanner.export.building') : t('mealPlanner.export.share') }}
         </button>
         <button
           type="button"
-          class="font-outfit text-secondary-500 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60 dark:text-slate-100"
+          class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60 dark:text-slate-100"
           :disabled="exporting"
           @click="runExport('pdf')"
         >
-          {{
-            exporting ? t('mealPlanner.export.building') : `⬇ ${t('mealPlanner.export.exportPdf')}`
-          }}
+          <BeanieIcon v-if="!exporting" name="download" size="sm" />
+          {{ exporting ? t('mealPlanner.export.building') : t('mealPlanner.export.exportPdf') }}
         </button>
       </div>
     </div>
