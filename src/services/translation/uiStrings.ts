@@ -494,7 +494,13 @@ const STRING_DEFS = {
   },
   'medications.field.startDate': { en: 'Start date', beanie: 'start date' },
   'medications.field.endDate': { en: 'End date', beanie: 'end date' },
-  'medications.field.ongoing': { en: 'Ongoing', beanie: 'ongoing' },
+  'medications.field.schedule': { en: 'Schedule', beanie: 'schedule' },
+  'medications.schedule.ongoing': { en: 'Ongoing', beanie: 'ongoing' },
+  'medications.schedule.hasEndDate': { en: 'Has an End Date', beanie: 'has an end date' },
+  'medications.schedule.ongoingHint': {
+    en: 'No end date — this stays on the active list until you remove it.',
+    beanie: 'no end date — this stays on the active list until you remove it.',
+  },
   'medications.field.notes': { en: 'Notes', beanie: 'notes' },
   'medications.field.photo': { en: 'Bottle photo', beanie: 'bottle photo' },
   'medications.placeholder.name': {
@@ -802,6 +808,9 @@ const STRING_DEFS = {
   'careSafety.section.allergies': { en: 'Allergies', beanie: 'allergies' },
   'careSafety.section.medications': { en: 'Active Medications', beanie: 'active meds' },
   'careSafety.section.keyContacts': { en: 'Key Contacts', beanie: 'key contacts' },
+  'careSafety.add.allergy': { en: 'Add Allergy', beanie: 'add allergy' },
+  'careSafety.add.medication': { en: 'Add Medication', beanie: 'add medication' },
+  'careSafety.add.contact': { en: 'Add Contact', beanie: 'add contact' },
   'careSafety.keyContacts.cta': {
     en: 'Open full Emergency Contacts →',
     beanie: 'open emergency contacts →',

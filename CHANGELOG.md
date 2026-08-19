@@ -13,6 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - **The family meal board.** Plan the week's meals on a days-across board, with a cookbook rail you can drag from (or tap, if you'd rather). Add a meal by name alone, or pick a recipe with its photo; note who's cooking, who's eating (guests included), the serve time and anything else worth remembering. Nights out, leftovers and skipped meals have their own card types. Mark a meal cooked, copy a whole week forward, clear a day or a week, and share a day or week as text. Today's meals also appear on the family nook.
+- **Add allergies, medications and key contacts straight from Care & Safety.** Each section on the Care & Safety page now has its own "+ Add" button — pick the family member (just like the quick-add button) and the right form opens, without hunting for the person's profile first.
+
+### Changed
+
+- **Clearer medication schedule.** The medication form's plain "ongoing" switch is now an explicit choice — "Ongoing" or "Has an end date" — shown before the date, so it's obvious why the end date is or isn't there. Choosing "Has an end date" reveals the date field and now requires a date before saving, so a medication can't be marked as ending with no end date recorded.
 
 ### Fixed
 
