@@ -430,6 +430,28 @@ open-skip  unchanged-revision-in-window  rec=1 reads=0 writes=0 snap=hit  (03:00
 
 This is the target column met on a live build: **`rec=1 reads=0 writes=0`, `action=open-skip`** against the PR-1 prod baseline of `rec=2 reads=1`. The `unchanged-revision-in-window` reason re-confirms Drive's `version` counter is populated and compared in prod (no `no-revision` fallback). **Caveat on the prod population:** in the 60h since the R9 deploy, no _organic_ skip was observed — the family carrying nearly all R9 opens (`…fa046620`) is a change-heavy dual-client testing setup that structurally never hits "unchanged," and the one other R9 user had opened only once (recording its baseline, `no-baseline`). The skip is therefore verified by a deliberate clean-reopen rather than by ambient traffic; §10 is considered closed on the mechanism. This R9 skip figure is the like-for-like baseline for validating #65 (R10), which layers a second skip barrier on top of this path.
 
+**⚠️ REGRESSION ON R10 (#65) — the skip no longer fires on the open path (measured 2026-08-19).** The R9 figures above still stand, but they are now a HISTORICAL baseline, not current behaviour. A full `open-cycle` capture across 2026-08-17 00:00Z → 2026-08-19 (n=24, all builds) reads:
+
+| build            | reason                             |     n | rec/reads                       |
+| ---------------- | ---------------------------------- | ----: | ------------------------------- |
+| `10d88180` (R8)  | _(pre-guard)_                      |     6 | `rec=2 reads=1`                 |
+| `46108bbb` (R9)  | `no-baseline`                      |     6 | `rec=2 reads=1`                 |
+| `46108bbb` (R9)  | `trust-expired`/`auth`/`changed`   |     5 | `rec=2 reads=1`                 |
+| `46108bbb` (R9)  | **`unchanged-revision-in-window`** | **3** | **`rec=1 reads=0 writes=0`** ✅ |
+| `70f03983` (R10) | **`baseline-heads-unknown`**       |     3 | `rec=2 reads=1`                 |
+| `70f03983` (R10) | `unpushed-local-changes`           |     1 | `rec=2 reads=1`                 |
+| `70f03983` (R10) | `unchanged-revision-in-window`     | **0** | —                               |
+
+The same client (family `…fa046620`, Windows Chrome 151) that produced all three R9 skips at 02:59–03:01Z reported `baseline-heads-unknown` on R10 at 03:23:17, 03:23:19 and again at **22:46:55 — 19.4h later**. The upgrade cohort is specified as one-shot and self-clearing within the hour, so this is the BAD signature STATUS's validation plan named, not the deploy-day burst.
+
+**Root cause — terminus 1 nulls the Drive fingerprint on every cold open.** `merging = !!options.merge` (`syncStore.ts:845`), and _every_ cold-open/sign-in call site passes no options — `App.vue:527`, `LoadPodView.vue:295`, `LoginPage.vue:341` + `:478`, `syncStore.ts:579`. Only the background/poll paths (`syncStore.ts:2366`, `:2475`) pass `{ merge: true }`. So a cold open takes the **replace** branch, which leaves `driveHeads = null` (`syncStore.ts:936`), and terminus 1 then calls `commitRemoteBaseline(null)` unconditionally (`syncStore.ts:986`). That persists `headsFp: null` into the durable row, so the next open passes `no-baseline` and `trust-expired` and then trips `baseline-heads-unknown` at `unpushedLocalChangesCheck` (`syncService.ts:719`). Because the cold-open write is last-write-wins (C10b), it also **overwrites** any good fingerprint that `doSave`'s terminus 3 recorded — so the skip can effectively never fire on the open path.
+
+**Why the null is wrong (not merely conservative).** The replace branch's comment justifies `null` as "our doc is knowably AHEAD of Drive, so no fingerprint may be claimed". That conflates two different facts. The fingerprint records **what DRIVE holds** (`remoteHeads`, captured pre-migrate from the unmigrated decrypted remote), not what our doc holds. Being ahead of Drive is what #65's `unpushedLocalChangesCheck` already expresses, correctly, as `unpushed-local-changes`. `replaceDocWithCacheRecovery` in fact already calls `mergeRemoteEnvelope` and destructures only `{ dirty }` (`syncStore.ts:790`) — `remoteHeads` is available at that line and discarded.
+
+**Net effect:** #61's win (`rec=2 reads=1` → `rec=1 reads=0`) was inert in production from the R10 deploy until the fix below. No data was ever at risk and nothing was user-visible; opens were simply as slow and read-heavy as they were pre-R9.
+
+**FIXED on `main` 2026-08-19 (not yet deployed).** `replaceDocWithCacheRecovery` now returns the `remoteHeads` it was already computing and discarding, and terminus 1 commits it on both branches. Covered by `src/stores/__tests__/syncStore.openBaselineTerminus.test.ts`, which asserts the ARGUMENT rather than the call — the old code called `commitRemoteBaseline`, just with `null`, so a call-count assertion would have passed throughout the regression. The merging and replace branches are given deliberately different heads so a branch mix-up cannot coincidentally pass. **The fix is unvalidated in prod:** re-run the capture 24h after the next deploy and confirm organic `unchanged-revision-in-window` at `rec=1 reads=0` returns.
+
 Full design + review: `docs/plans/2026-08-13-open-cycle-redundant-loads.md`. Audit: `docs/investigations/2026-08-13-open-cycle-load-audit.md`.
 
 ---

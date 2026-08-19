@@ -761,11 +761,20 @@ export const useSyncStore = defineStore('sync', () => {
    * If the cache has changes not present in the remote doc (e.g. the
    * previous save to Drive failed), Automerge CRDT merge preserves both.
    * If the cache matches the remote, the merge is a no-op.
+   *
+   * Returns the heads of the bytes DRIVE HOLDS (#65) so the caller can commit the
+   * open-guard baseline. It is the merge's `remoteHeads` — captured in the worker
+   * from the UNMIGRATED decrypted remote — which the worker documents as the only
+   * value a caller may record as the Drive baseline. It is sound here for exactly
+   * the reason it is sound on the merging branch: it describes the REMOTE, not our
+   * doc, so the cache changes this function may re-apply cannot taint it. Returning
+   * `null` would not be "conservative" — it would clobber the durable fingerprint
+   * (the commit is last-write-wins, C10b) and permanently disable #61's skip.
    */
   async function replaceDocWithCacheRecovery(
     remoteEnvelope: BeanpodFileV4,
     familyId: string
-  ): Promise<void> {
+  ): Promise<readonly string[] | null> {
     // Load THIS family's cache as the worker's doc, then CRDT-merge the remote in.
     // Merge is commutative, so cache∪remote == the old replace(remote)+merge(cache).
     //
@@ -787,11 +796,14 @@ export const useSyncStore = defineStore('sync', () => {
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
     if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
-    const { dirty } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
+    const { dirty, remoteHeads } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
     // Clean up duplicate recurring transactions from the CRDT merge.
     await deduplicateRecurringTransactions();
     // Re-upload the converged doc only if local carried unsynced changes.
     if (dirty) syncService.triggerDebouncedSave();
+    // `?? null` — same fail-safe every other `remoteHeads` reader applies: a partial
+    // worker double degrades to "unknown => read", never to a false skip.
+    return remoteHeads ?? null;
   }
 
   /**
@@ -930,9 +942,20 @@ export const useSyncStore = defineStore('sync', () => {
           // #65: the heads of the bytes DRIVE HOLDS, for the open-guard baseline.
           // Same fail-safe default as above but inverted in form: `null` means "we
           // cannot prove what Drive holds", which makes the next open decline to
-          // skip. The replace branch leaves it null — `replaceDocWithCacheRecovery`
-          // deliberately re-applies unsynced cache changes, so our doc is knowably
-          // AHEAD of Drive there and no fingerprint may be claimed.
+          // skip.
+          //
+          // BOTH branches below now supply it. The replace branch used to leave it
+          // null, reasoning that `replaceDocWithCacheRecovery` re-applies unsynced
+          // cache changes so "our doc is knowably AHEAD of Drive and no fingerprint
+          // may be claimed". That conflated two different facts and was a bug (see
+          // PERFORMANCE.md §10): this fingerprint records what DRIVE holds, not what
+          // our doc holds, and being ahead of Drive is precisely what #65's own
+          // `unpushedLocalChangesCheck` already reports as `unpushed-local-changes`.
+          // Because the commit at terminus 1 is last-write-wins (C10b) and EVERY
+          // cold open takes the replace branch (every `loadFromFile()` call site
+          // outside the poll paths passes no `merge`), the null also overwrote the
+          // good fingerprint `doSave` had recorded — so the skip could never fire on
+          // the open path at all. Measured in prod on R10: zero skips in 44h.
           let driveHeads: readonly string[] | null = null;
           if (merging) {
             // CRDT merge remote into the worker's doc.
@@ -957,7 +980,7 @@ export const useSyncStore = defineStore('sync', () => {
             // Replace: adopt remote (+ recover any unsynced cache) to prevent loss.
             const famId = useFamilyContextStore().activeFamilyId;
             if (famId) {
-              await replaceDocWithCacheRecovery(remoteEnvelope, famId);
+              driveHeads = await replaceDocWithCacheRecovery(remoteEnvelope, famId);
             } else {
               await docClient.dropDoc(); // no cache to recover — adopt remote fresh
               // This branch adopts Drive's document verbatim (nothing local survived
