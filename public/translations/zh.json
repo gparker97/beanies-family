@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-18",
-    "translationCount": 4029
+    "lastUpdated": "2026-08-19",
+    "translationCount": 4035
   },
   "translations": {
     "app.name": {
@@ -9974,11 +9974,6 @@
     "medications.field.endDate": {
       "translation": "结束日期",
       "hash": "smwovn",
-      "lastUpdated": "2026-04-19"
-    },
-    "medications.field.ongoing": {
-      "translation": "进行中",
-      "hash": "5q1umz",
       "lastUpdated": "2026-04-19"
     },
     "medications.field.notes": {
@@ -20150,6 +20145,41 @@
       "translation": "那个已经在这顿饭里了。",
       "hash": "7m68ih",
       "lastUpdated": "2026-08-18"
+    },
+    "medications.field.schedule": {
+      "translation": "用药安排",
+      "hash": "ah1bgp",
+      "lastUpdated": "2026-08-19"
+    },
+    "medications.schedule.ongoing": {
+      "translation": "进行中",
+      "hash": "5q1umz",
+      "lastUpdated": "2026-08-19"
+    },
+    "medications.schedule.hasEndDate": {
+      "translation": "有结束日期",
+      "hash": "jwh9fk",
+      "lastUpdated": "2026-08-19"
+    },
+    "medications.schedule.ongoingHint": {
+      "translation": "没有结束日期—在您将其删除之前，它将保留在活动列表中。",
+      "hash": "84opm4",
+      "lastUpdated": "2026-08-19"
+    },
+    "careSafety.add.allergy": {
+      "translation": "添加过敏",
+      "hash": "lsahfl",
+      "lastUpdated": "2026-08-19"
+    },
+    "careSafety.add.medication": {
+      "translation": "添加药物",
+      "hash": "4k8ovi",
+      "lastUpdated": "2026-08-19"
+    },
+    "careSafety.add.contact": {
+      "translation": "添加联系人",
+      "hash": "ifjbmn",
+      "lastUpdated": "2026-08-19"
     }
   }
 }

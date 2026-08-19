@@ -25,6 +25,7 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router';
 import router from '@/router';
 import { hasOpenOverlays } from '@/utils/overlayStack';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { QUICK_ADD_ITEMS } from '@/constants/quickAddItems';
 import type { QuickAddContextKey, QuickAddItem } from '@/constants/quickAddItems';
 
@@ -317,6 +318,59 @@ export function cancelPicker(): void {
   stage.value = { mode: 'main' };
 }
 
+/**
+ * Programmatically start a quick-add for a specific action — the entry
+ * point used by in-page "Add" affordances (e.g. the Care & Safety
+ * section headers) that want the SAME flow as the FAB without making
+ * the user open the sheet and hunt for the tile.
+ *
+ * - Context-required item on a route that can't supply the id (e.g.
+ *   `add-medication` on `/pod/safety`, which has no `:memberId`) →
+ *   open the sheet straight into the parent picker. On commit the
+ *   existing intent pipeline navigates + opens the target form.
+ * - Otherwise (no context needed, or the route already supplies it) →
+ *   navigate straight to the target form, no sheet flash.
+ */
+export function startQuickAddItem(action: QuickAddAction): void {
+  const item = QUICK_ADD_ITEMS.find((i) => i.action === action);
+  if (!item) {
+    // No silent failure — a caller passed an action that isn't in the
+    // vocabulary (typo, stale constant). Surface it rather than no-op.
+    console.error(`[useQuickAdd] startQuickAddItem: unknown action "${action}"`);
+    reportError({
+      surface: 'quick-add-inline',
+      message: 'startQuickAddItem called with unknown action',
+      context: { action },
+    });
+    return;
+  }
+
+  // Firehose the entry point so we can see in-page adds being used and
+  // diagnose blind if the picker/form ever fails to appear. Both keys
+  // are on the ALLOWED_CONTEXT_KEYS allowlist already.
+  logEvent({
+    level: 'info',
+    surface: 'quick-add-inline',
+    message: 'quick-add started from in-page affordance',
+    context: { action, route_path: router.currentRoute.value.path },
+  });
+
+  if (needsPicker(item)) {
+    openQuickAdd();
+    // openQuickAdd no-ops if another overlay owns focus; only force the
+    // picker stage if the sheet actually opened, else the picker would
+    // render into a closed (invisible) sheet.
+    if (isOpen.value) {
+      stage.value = { mode: 'picker', pending: item };
+    }
+    return;
+  }
+
+  closeSheetForNavigation();
+  const query = buildIntentQuery(item, router.currentRoute.value);
+  navigateToIntent(item, query);
+}
+
 // --- Composable ----------------------------------------------------------
 
 /**
@@ -333,6 +387,7 @@ export function useQuickAdd() {
     close: closeQuickAdd,
     toggle: toggleQuickAdd,
     triggerAction: triggerQuickAddAction,
+    startItem: startQuickAddItem,
     commitPicker: commitPickerSelection,
     cancelPicker,
   };
