@@ -142,6 +142,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     emoji: '\u{1F372}',
     section: 'treehouse',
     mobileCategory: 'planning',
+    requiresFlag: 'mealPlanner',
   },
   {
     labelKey: 'nav.pod',

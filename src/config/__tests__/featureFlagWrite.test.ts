@@ -39,6 +39,7 @@ describe('config/featureFlagWrite', () => {
       familyLists: false,
       googleCalendarSync: false,
       helpfulHints: false,
+      mealPlanner: false,
     });
     expect(result.source).toContain('aiPhotoExtract: true,');
   });
@@ -73,6 +74,7 @@ describe('config/featureFlagWrite', () => {
       familyLists: false,
       googleCalendarSync: false,
       helpfulHints: false,
+      mealPlanner: false,
     });
     expect(Object.keys(result.nextState)).not.toContain('bogusOld');
     expect(result.source).not.toContain('bogusOld');
