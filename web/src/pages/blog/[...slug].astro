@@ -408,6 +408,134 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 }
 .blog-prose blockquote p { margin: 0; color: inherit; font-family: inherit; font-size: inherit; line-height: inherit; }
 
+/* Alert callout — for time-sensitive notices bolted onto an existing post
+   (a competitor shutting down, a deadline, a correction). Deliberately uses
+   Heritage Orange directly rather than the per-post `--tint-hex`, because the
+   point is to break OUT of the post's palette and be noticed. Per the CIG,
+   Alert Red is never used for routine notices; orange is the alert colour.
+   Usage in markdown: <div class="post-alert">…</div>, or add `is-lead` for
+   the heavier treatment used at the very top of a post. */
+.blog-prose .post-alert {
+  background: rgb(241 93 34 / 8%);
+  border: 1.5px solid rgb(241 93 34 / 35%);
+  border-left: 4px solid #f15d22;
+  border-radius: 12px;
+  color: #2c3e50;
+  font-size: 1rem;
+  line-height: 1.55;
+  margin: 1.75rem 0;
+  padding: 0.95rem 1.15rem;
+}
+.blog-prose .post-alert p { margin: 0; }
+.blog-prose .post-alert p + p { margin-top: 0.5rem; }
+.blog-prose .post-alert strong { color: #c4430f; }
+.blog-prose .post-alert a {
+  color: #c4430f;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.blog-prose .post-alert.is-lead {
+  background: rgb(241 93 34 / 12%);
+  font-size: 1.05rem;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────
+   Markdown tables arrive with zero styling, so this is the whole treatment.
+   Goals: readable at a glance across a wide row, and a clear visual split
+   between the two header axes (top row = what's being compared, first
+   column = the feature being compared) and the data in between.
+
+   `.table-scroll` is injected by rehype-table-wrap.mjs — it bounds the width
+   so a 3-column comparison can't push the page sideways on a phone. */
+.blog-prose .table-scroll {
+  margin: 1.9rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  /* Right-edge fade hints there's more table when it's scrollable. */
+  -webkit-overflow-scrolling: touch;
+}
+.blog-prose .table-scroll:focus-visible {
+  border-radius: 14px;
+  outline: 2px solid var(--tint-hex, #f15d22);
+  outline-offset: 3px;
+}
+.blog-prose table {
+  border: 1px solid rgb(44 62 80 / 12%);
+  border-collapse: separate;
+  border-radius: 14px;
+  border-spacing: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  min-width: 34rem;
+  overflow: hidden;
+  width: 100%;
+}
+/* Header row — tinted wash, the post's own accent, heavier type. */
+.blog-prose table th {
+  background: var(--tint-accent, rgb(241 93 34 / 16%));
+  border-bottom: 1px solid rgb(44 62 80 / 16%);
+  color: #2c3e50;
+  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  padding: 0.75rem 0.95rem;
+  text-align: left;
+  vertical-align: middle;
+}
+.blog-prose table th strong { font-weight: 800; }
+/* Optional per-column mark (a product logo in a comparison table). Authored
+   in the markdown header cell as <img class="th-mark" …>. Sized in `em` so
+   it tracks the header type rather than a fixed pixel size.
+
+   Note the resets: `.blog-prose img` gives content images a white photo
+   frame (padding, border, radius, shadow, display:block, margin:auto).
+   That's right for a screenshot and completely wrong for an 18px glyph
+   sitting inline in a header cell, so every part of it is undone here. */
+.blog-prose table th .th-mark {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: inherit;
+  display: inline-block;
+  height: 1.15em;
+  margin: 0 0.4em -0.2em 0;
+  max-width: none;
+  padding: 0;
+  vertical-align: baseline;
+  width: 1.15em;
+}
+.blog-prose table td {
+  border-top: 1px solid rgb(44 62 80 / 9%);
+  padding: 0.7rem 0.95rem;
+  vertical-align: middle;
+}
+.blog-prose table tr:first-child td { border-top: 0; }
+/* Zebra striping keeps the eye on one row across a wide table. */
+.blog-prose table tbody tr:nth-child(even) td { background: rgb(44 62 80 / 3%); }
+/* Header column — the second header axis. Tinted a touch darker than the
+   zebra so it reads as a label rail rather than just another cell. */
+.blog-prose table td:first-child,
+.blog-prose table th:first-child {
+  border-right: 1px solid rgb(44 62 80 / 12%);
+}
+.blog-prose table td:first-child {
+  background: rgb(44 62 80 / 5%);
+  color: #2c3e50;
+  font-weight: 600;
+}
+.blog-prose table tbody tr:nth-child(even) td:first-child { background: rgb(44 62 80 / 7%); }
+.blog-prose table td strong { font-weight: 600; }
+.blog-prose table p { margin: 0; }
+
+@media (max-width: 40rem) {
+  .blog-prose table { font-size: 0.88rem; }
+  .blog-prose table th,
+  .blog-prose table td { padding: 0.6rem 0.7rem; }
+}
+
 .blog-prose code {
   background: rgb(44 62 80 / 5%);
   border-radius: 6px;

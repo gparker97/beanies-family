@@ -4,8 +4,9 @@ slug: local-first-family-finance-planning-tools
 excerpt: "a guide to family and financial planning apps that don't harvest your data. what local-first actually means, the trade-offs, and the tools worth trying."
 heroEmoji: 🔒
 publishedDate: 2026-04-22
-lastUpdated: 2026-04-22
+lastUpdated: 2026-08-20
 relatedPosts:
+  - maple-alternative
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
   - made-a-wish-to-become-a-real-boy

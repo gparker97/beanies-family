@@ -7,6 +7,7 @@ import tailwindcss from '@tailwindcss/vite';
 import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
 import rehypeExternalLinks from './src/lib/rehype-external-links.mjs';
 import rehypeImageDims from './src/lib/rehype-image-dims.mjs';
+import rehypeTableWrap from './src/lib/rehype-table-wrap.mjs';
 
 export default defineConfig({
   site: 'https://beanies.family',
@@ -41,7 +42,7 @@ export default defineConfig({
     inlineStylesheets: 'always',
   },
   markdown: {
-    rehypePlugins: [rehypeGuideAnnotations, rehypeExternalLinks, rehypeImageDims],
+    rehypePlugins: [rehypeGuideAnnotations, rehypeExternalLinks, rehypeImageDims, rehypeTableWrap],
   },
   // Canonical homepage is the apex (beanies.family). Anyone hitting /home
   // gets sent there. /welcome is an app-surface URL — kick it to the PWA so
