@@ -9,8 +9,15 @@ excerpt: 'a human + AI co-written tour of cozi, maple, ynab, greenlight, timetre
 subtitle: 'this post was written by AI. sort of.'
 featured: false
 author: greg
+updatedDate: 2026-08-20
 draft: false
 ---
+
+<div class="post-alert is-lead">
+
+**📢 UPDATE as of August 2026: Maple is shutting down.** Maple has announced it's retiring on December 31, 2026, and deleting all user data after that. If you're a Maple user wondering where to go next, here's [**the best Maple alternative, and how to get your data out before it's gone**](/blog/maple-alternative). The quick version is in the Maple section below.
+
+</div>
 
 Ok, time for full disclosure: This post was written by AI. Well, not specifically _this_ part. This is still me. But all that family software comparison stuff you're gonna read down below? Pure AI. For the most part.
 
@@ -47,6 +54,12 @@ You may like some of these more than beanies, and that's ok. Remember, this was 
 - **What is it:** AI-powered family hub: calendar, email inbox, meal planning, chores, grocery lists. Auto-imports school emails and suggests meals.
 - **Pros:** Modern and well-designed
 - **Cons:** Limited to 5 household members. No financial tracking.
+
+<div class="post-alert">
+
+**Heads up! Maple is shutting down on December 31, 2026, and deleting all user data.** If you liked what Maple did, [here's the best alternative for Maple users](/blog/maple-alternative), and how to move your family over before the deadline.
+
+</div>
 
 ### TimeTree
 
