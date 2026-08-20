@@ -2086,6 +2086,56 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Persist a family-name rename to the DURABLE .beanpod envelope.
+   *
+   * The family name lives in the V4 envelope metadata (`familyName`), NOT in the
+   * Automerge document — so an ordinary doc autosave never carries a rename, and
+   * `reEncryptEnvelope` preserves the loaded envelope's `familyName` on every
+   * save. Left alone, a rename only reaches the LOCAL registry (familyContext),
+   * which a fresh load rebuilds from `envelope.familyName` (see syncService's
+   * load path), so the new name is silently lost on a new device, a cleared
+   * cache, or the in-memory review demo. This updates the in-memory envelope via
+   * `replaceEnvelope` (per the write invariant — it also pushes the envelope to
+   * the worker/service cache the durable save reads) and forces a save so the
+   * file the NEXT load reads carries the new name.
+   *
+   * Returns whether the durable save succeeded. A `false` is non-fatal: the new
+   * name is already staged in the service envelope, so the next successful save
+   * (any doc change) will carry it. Never throws.
+   */
+  async function persistFamilyName(name: string): Promise<boolean> {
+    if (!envelope.value) {
+      // No durable pod yet (pre-creation) or an in-memory review-demo session —
+      // there is no file to persist into; the local registry update is all there is.
+      logEvent({
+        level: 'info',
+        surface: 'family-rename',
+        message: 'family rename: no envelope loaded, skipping durable persist',
+        context: { action: 'persist-skip-no-envelope' },
+      });
+      return false;
+    }
+    if (envelope.value.familyName === name) return true;
+
+    replaceEnvelope({ ...envelope.value, familyName: name });
+    const saved = await syncNow(true);
+    // Mirror the new name into the remote registry so the account's family list
+    // reflects it without waiting for the next login event. Best-effort (the call
+    // is fire-and-forget and self-logs its own failures).
+    registerCurrentFamily({}, { isLoginEvent: false });
+
+    logEvent({
+      level: saved ? 'info' : 'warn',
+      surface: 'family-rename',
+      message: saved
+        ? 'family rename persisted to durable envelope'
+        : 'family rename staged but durable save failed; will persist on the next save',
+      context: { action: saved ? 'persist-ok' : 'persist-deferred' },
+    });
+    return saved;
+  }
+
+  /**
    * Disconnect from sync file
    */
   async function disconnect(): Promise<void> {
@@ -4109,6 +4159,7 @@ export const useSyncStore = defineStore('sync', () => {
     addMemberWrappedKey,
     setMemberWrappedKey,
     addInvitePackage,
+    persistFamilyName,
     disconnect,
     manualExport,
     manualImport,

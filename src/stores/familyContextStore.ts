@@ -122,6 +122,26 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
         activeFamily.value = updated;
         // Immutable update: assign a new array so downstream computeds re-evaluate
         allFamilies.value = allFamilies.value.map((f) => (f.id === updated.id ? updated : f));
+
+        // The registry now has the new name, but the name also lives in the
+        // durable .beanpod envelope, which a fresh load reads as the source of
+        // truth — persist it there too, or the rename is lost on a new device /
+        // cleared cache / the review demo. Guarded + lazy-imported so a persist
+        // failure can't revert the successful local rename, and to avoid a static
+        // store import cycle (syncStore already references this store).
+        try {
+          const { useSyncStore } = await import('@/stores/syncStore');
+          await useSyncStore().persistFamilyName(name);
+        } catch (persistErr) {
+          const { logEvent } = await import('@/services/telemetry/logEvent');
+          logEvent({
+            level: 'warn',
+            surface: 'family-rename',
+            message: 'durable familyName persist threw; local rename kept, will retry on next save',
+            error: persistErr instanceof Error ? persistErr : new Error(String(persistErr)),
+            context: { action: 'persist-threw' },
+          });
+        }
         return true;
       }
       return false;
