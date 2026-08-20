@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-19",
-    "translationCount": 4041
+    "lastUpdated": "2026-08-20",
+    "translationCount": 4059
   },
   "translations": {
     "app.name": {
@@ -20210,6 +20210,96 @@
       "translation": "⏰ 上菜时间 · 👥 客人",
       "hash": "85eeaw",
       "lastUpdated": "2026-08-19"
+    },
+    "reviewDemo.entry": {
+      "translation": "应用审阅访问权限",
+      "hash": "cex41f",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.modalTitle": {
+      "translation": "应用审阅访问权限",
+      "hash": "cex41f",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.description": {
+      "translation": "输入App Review备注中的访问代码以打开演示系列。无需登录。",
+      "hash": "lk3bsx",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.codeLabel": {
+      "translation": "访问代码",
+      "hash": "9iug4p",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.codePlaceholder": {
+      "translation": "输入代码",
+      "hash": "kf5oia",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.unlock": {
+      "translation": "打开演示曲目",
+      "hash": "dauf47",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.unlocking": {
+      "translation": "数着豆子……",
+      "hash": "wg3bo8",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.codeRequired": {
+      "translation": "请输入访问码",
+      "hash": "dg2q70",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.codeInvalid": {
+      "translation": "该代码看起来不正确。请查看应用审核备注，然后重试。",
+      "hash": "bo37l4",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.codeExpired": {
+      "translation": "此演示代码已过期。请请求更新的版本。",
+      "hash": "xinzp2",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.cryptoUnavailable": {
+      "translation": "此浏览器无法安全地验证代码。通过https://打开应用，然后重试。",
+      "hash": "tl5xjf",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.bannerTitle": {
+      "translation": "演示系列",
+      "hash": "e824ox",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.bannerMessage": {
+      "translation": "这是应用审核的示例数据。此处没有任何内容保存到云中，并且在您注销时会消失。",
+      "hash": "cuuz2d",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.seedFailedTitle": {
+      "translation": "无法打开演示",
+      "hash": "n3gh36",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.seedFailed.sessionExists": {
+      "translation": "有人已在此设备上登录。请先注销，然后重新输入验证码。",
+      "hash": "pk6ao6",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.seedFailed.unavailable": {
+      "translation": "演示模式在此版本中不可用。请请求更新的版本。",
+      "hash": "63ycz4",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.seedFailed.storage": {
+      "translation": "演示无法设置其临时存储。请重试。",
+      "hash": "bo1sj2",
+      "lastUpdated": "2026-08-20"
+    },
+    "reviewDemo.seedFailed.generic": {
+      "translation": "无法创建演示系列。请重试。",
+      "hash": "tzyr10",
+      "lastUpdated": "2026-08-20"
     }
   }
 }

@@ -2,6 +2,8 @@
 import { useTranslation } from '@/composables/useTranslation';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import { getBuildVersionLabel } from '@/utils/diagnosticContext';
+// REVIEW-DEMO: gates the app-review access affordance below.
+import { isReviewDemoAvailable } from '@/utils/reviewDemo';
 import LoginChoiceCard from './LoginChoiceCard.vue';
 
 const { t } = useTranslation();
@@ -17,7 +19,9 @@ const MARKETING_HOME_URL = import.meta.env.DEV
   ? 'http://localhost:4321/'
   : 'https://beanies.family/';
 
-type LoginView = 'load-pod' | 'create' | 'join';
+// REVIEW-DEMO: 'review-demo' opens a modal rather than switching view — see the
+// early-returning first branch of LoginPage's handleNavigate.
+type LoginView = 'load-pod' | 'create' | 'join' | 'review-demo';
 
 const emit = defineEmits<{
   navigate: [view: LoginView];
@@ -262,6 +266,23 @@ function promptParts() {
         </svg>
         {{ t('homepage.learnMore') }}
       </a>
+    </div>
+
+    <!-- REVIEW-DEMO: app-review access. Rendered ONLY in a build that was
+         deliberately armed AND is still inside its expiry window, so it is
+         absent from every web, dev, self-host and expired build. Intentionally
+         a plain labelled button rather than a hidden tap-count gesture: a
+         reviewer following written instructions handles a visible control far
+         more reliably, and a gesture would be untestable and inaccessible.
+         Delete this block when demo mode is retired. -->
+    <div v-if="isReviewDemoAvailable()" class="mt-3 text-center">
+      <button
+        type="button"
+        class="font-outfit rounded-full px-3 py-1.5 text-xs font-semibold text-gray-400 underline-offset-2 transition-colors hover:text-[var(--heritage-orange)] hover:underline dark:text-gray-500 dark:hover:text-[var(--heritage-orange)]"
+        @click="emit('navigate', 'review-demo')"
+      >
+        {{ t('reviewDemo.entry') }}
+      </button>
     </div>
 
     <!-- Subtle build/version marker. Lets us confirm which deployed bundle is

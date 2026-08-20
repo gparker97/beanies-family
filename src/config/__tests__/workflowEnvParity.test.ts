@@ -62,6 +62,23 @@ describe('CI client-env parity', () => {
     });
   }
 
+  /**
+   * REVIEW-DEMO: the reverse direction, which the parity loop above is
+   * structurally incapable of checking.
+   *
+   * That loop asserts release ⊇ web, so it can only catch a var that the web
+   * deploy has and a native lane lacks. The demo bypass is the opposite shape —
+   * mobile-only, and it must STAY that way: shipping it on the web bundle would
+   * put a code-gated bypass on the public app for every visitor, permanently,
+   * with no store-review reason for it to be there.
+   *
+   * Delete this test when demo mode is retired.
+   */
+  it('deploy.yml never carries the review-demo bypass', () => {
+    const demoVars = [...web].filter((v) => v.startsWith('VITE_REVIEW_DEMO'));
+    expect(demoVars).toEqual([]);
+  });
+
   it('the shipped store builds wire the feedback webhook', () => {
     // Called out separately from the parity loop: feedback is fire-and-forget over
     // `no-cors` and persisted nowhere, so a missing URL is invisible at both ends.
