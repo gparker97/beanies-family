@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-20
 
+### Fixed
+
+- **Renaming your family now sticks.** Changing your family's name from the Meet the Beans page updated it on screen and on the device you were using, but the new name wasn't written into your family's data file - so opening beanies on another device, or after clearing the app's cache, brought back the old name. The rename is now saved into the family data file itself (the thing that travels with you), so your chosen name follows you everywhere and survives signing out and back in.
+
 ### Added
 
 - **A guide for families leaving Maple.** Maple announced it's shutting down on 31 December 2026 and deleting all user data, so there's a new post covering what to export before the deadline and how beanies compares — including a one-page infographic you can take in at a glance. The existing "best cozi & maple alternatives" post now carries a prominent notice pointing there.
