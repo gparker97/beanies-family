@@ -26,9 +26,16 @@
 import type {
   Account,
   Asset,
+  Budget,
   FamilyActivity,
+  FamilyList,
   FamilyMember,
+  FamilyVacation,
   Goal,
+  Medication,
+  Milestone,
+  RecurringItem,
+  SayingItem,
   TodoItem,
   Transaction,
   UUID,
@@ -391,6 +398,28 @@ export function materializeFixture(args: { today: Date; ownerMemberId: UUID }): 
       [ID.kidA, ID.kidB, ID.kidC],
       'Town Library'
     ),
+    // The trip's all-day calendar span. A real trip is created via
+    // vacationStore.createVacation, which mints exactly this shape: an all-day,
+    // multi-day 'other_activity' back-linked to the vacation via `vacationId`.
+    {
+      id: 'demo-activity-trip',
+      title: 'Seaside Getaway',
+      icon: '🏖️',
+      date: dayOffset(today, 30),
+      endDate: dayOffset(today, 34),
+      isAllDay: true,
+      recurrence: 'none',
+      category: 'other_activity',
+      assigneeIds: [ownerMemberId, ID.partner, ID.kidA, ID.kidB, ID.kidC],
+      location: 'Seaside',
+      feeSchedule: 'none',
+      reminderMinutes: 1440,
+      isActive: true,
+      createdBy: ownerMemberId,
+      vacationId: 'demo-vacation-seaside',
+      createdAt: created,
+      updatedAt: created,
+    },
   ];
 
   const todos: TodoItem[] = [
@@ -449,5 +478,294 @@ export function materializeFixture(args: { today: Date; ownerMemberId: UUID }): 
     },
   ];
 
-  return { familyMembers: members, accounts, transactions, goals, assets, activities, todos };
+  // Recurring money items — the templates the forecast projects forward. All
+  // dayOfMonth ≤ 28 (the model's ceiling, so they land every month). The savings
+  // item links to the emergency-fund goal so goal auto-funding shows on the page.
+  const recurringItems: RecurringItem[] = [
+    {
+      id: 'demo-recurring-salary',
+      accountId: ID.current,
+      type: 'income',
+      amount: 3200,
+      currency: 'USD',
+      category: 'salary',
+      description: 'Monthly salary',
+      frequency: 'monthly',
+      dayOfMonth: 25,
+      startDate: dayOffset(today, -120),
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+    },
+    {
+      id: 'demo-recurring-rent',
+      accountId: ID.current,
+      type: 'expense',
+      amount: 1450,
+      currency: 'USD',
+      category: 'rent',
+      description: 'Rent',
+      frequency: 'monthly',
+      dayOfMonth: 1,
+      startDate: dayOffset(today, -120),
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+    },
+    {
+      id: 'demo-recurring-utilities',
+      accountId: ID.current,
+      type: 'expense',
+      amount: 145,
+      currency: 'USD',
+      category: 'utilities',
+      description: 'Electricity + gas',
+      frequency: 'monthly',
+      dayOfMonth: 11,
+      startDate: dayOffset(today, -120),
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+    },
+    {
+      id: 'demo-recurring-streaming',
+      accountId: ID.card,
+      type: 'expense',
+      amount: 18.99,
+      currency: 'USD',
+      category: 'streaming',
+      description: 'Family streaming plan',
+      frequency: 'monthly',
+      dayOfMonth: 8,
+      startDate: dayOffset(today, -120),
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+    },
+    {
+      id: 'demo-recurring-savings',
+      accountId: ID.current,
+      type: 'expense',
+      amount: 250,
+      currency: 'USD',
+      category: 'other_financial',
+      description: 'Monthly savings',
+      frequency: 'monthly',
+      dayOfMonth: 26,
+      startDate: dayOffset(today, -120),
+      goalId: 'demo-goal-emergency',
+      goalAllocMode: 'fixed',
+      goalAllocValue: 250,
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  // Family-wide monthly budget: a 20% target, with per-category line items.
+  const budgets: Budget[] = [
+    {
+      id: 'demo-budget-family',
+      mode: 'percentage',
+      totalAmount: 640,
+      percentage: 20,
+      currency: 'USD',
+      categories: [
+        { categoryId: 'groceries', amount: 320 },
+        { categoryId: 'dining_out', amount: 60 },
+        { categoryId: 'utilities', amount: 145 },
+        { categoryId: 'streaming', amount: 19 },
+        { categoryId: 'music_lessons', amount: 35 },
+        { categoryId: 'clothing', amount: 61 },
+      ],
+      isActive: true,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  // A travel plan: the FamilyVacation half of the 'demo-activity-trip' pairing
+  // above. Two flight legs, a hotel, an airport shuttle and a couple of ideas —
+  // the same structure vacationStore.createVacation produces.
+  const vacations: FamilyVacation[] = [
+    {
+      id: 'demo-vacation-seaside',
+      activityId: 'demo-activity-trip',
+      name: 'Seaside Getaway',
+      tripType: 'fly_and_stay',
+      tripPurpose: 'vacation',
+      assigneeIds: [ownerMemberId, ID.partner, ID.kidA, ID.kidB, ID.kidC],
+      travelSegments: [
+        {
+          id: 'demo-seg-flight-out',
+          type: 'flight_outbound',
+          title: 'Flight to the coast',
+          status: 'booked',
+          airline: 'Beanstalk Air',
+          flightNumber: 'BN220',
+          departureAirport: 'Home City',
+          arrivalAirport: 'Seaside',
+          departureDate: dayOffset(today, 30),
+          departureTime: '09:15',
+          arrivalDate: dayOffset(today, 30),
+          arrivalTime: '11:30',
+          bookingReference: 'BNSTLK1',
+        },
+        {
+          id: 'demo-seg-flight-return',
+          type: 'flight_return',
+          title: 'Flight home',
+          status: 'booked',
+          airline: 'Beanstalk Air',
+          flightNumber: 'BN221',
+          departureAirport: 'Seaside',
+          arrivalAirport: 'Home City',
+          departureDate: dayOffset(today, 34),
+          departureTime: '18:00',
+          arrivalDate: dayOffset(today, 34),
+          arrivalTime: '20:10',
+          bookingReference: 'BNSTLK1',
+        },
+      ],
+      accommodations: [
+        {
+          id: 'demo-acc-hotel',
+          type: 'hotel',
+          title: 'Seaview Family Hotel',
+          status: 'booked',
+          name: 'Seaview Family Hotel',
+          address: '1 Shoreline Road, Seaside',
+          checkInDate: dayOffset(today, 30),
+          checkOutDate: dayOffset(today, 34),
+          confirmationNumber: 'HTL-8842',
+          roomType: 'Family room (2 adults, 3 children)',
+          breakfastIncluded: true,
+        },
+      ],
+      transportation: [
+        {
+          id: 'demo-trans-shuttle',
+          type: 'airport_shuttle',
+          title: 'Airport shuttle',
+          status: 'pending',
+        },
+      ],
+      ideas: [
+        {
+          id: 'demo-idea-sandcastle',
+          title: 'Sandcastle competition on the beach',
+          category: 'beach',
+          costType: 'free',
+          votes: [],
+          createdBy: ownerMemberId,
+          createdAt: created,
+        },
+        {
+          id: 'demo-idea-aquarium',
+          title: 'Visit the Seaside Aquarium',
+          category: 'activity',
+          costType: 'paid',
+          estimatedCost: 48,
+          estimatedCostCurrency: 'USD',
+          needsBooking: true,
+          votes: [],
+          createdBy: ownerMemberId,
+          createdAt: created,
+        },
+      ],
+      startDate: dayOffset(today, 30),
+      endDate: dayOffset(today, 34),
+      createdBy: ownerMemberId,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  // Care & Safety: one ongoing daily medication for a child.
+  const medications: Medication[] = [
+    {
+      id: 'demo-medication-1',
+      memberId: ID.kidA,
+      name: 'Antihistamine',
+      dose: '5 ml',
+      frequency: 'once daily',
+      dosesPerDay: 1,
+      ongoing: true,
+      startDate: dayOffset(today, -60),
+      notes: 'Hay-fever season — with breakfast.',
+      createdBy: ownerMemberId,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  // Scrapbook: a quotable family saying, and a milestone.
+  const sayings: SayingItem[] = [
+    {
+      id: 'demo-saying-1',
+      memberId: ID.kidC,
+      words: 'Beans are just tiny grown-ups.',
+      saidOn: dayOffset(today, -12),
+      place: 'At the dinner table',
+      context: 'When asked what beans are.',
+      createdBy: ownerMemberId,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  const milestones: Milestone[] = [
+    {
+      id: 'demo-milestone-1',
+      memberId: ID.kidB,
+      category: 'lost_tooth',
+      title: 'Milo lost his first tooth',
+      occurredOn: dayOffset(today, -20),
+      description: 'Wobbly all week — finally out at breakfast.',
+      createdBy: ownerMemberId,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  // A beanie list — a named family checklist (recurring weekly).
+  const lists: FamilyList[] = [
+    {
+      id: 'demo-list-groceries',
+      title: 'Weekly Groceries',
+      emoji: '🛒',
+      category: 'home',
+      ownerId: ownerMemberId,
+      items: [
+        { id: 'demo-list-item-1', title: 'Milk', completed: true, completedBy: ownerMemberId },
+        { id: 'demo-list-item-2', title: 'Bread', completed: true, completedBy: ID.partner },
+        { id: 'demo-list-item-3', title: 'Bananas', completed: false },
+        { id: 'demo-list-item-4', title: 'Pasta', completed: false },
+        { id: 'demo-list-item-5', title: 'Washing-up liquid', completed: false },
+      ],
+      lifecycle: 'recurring',
+      frequency: 'weekly',
+      completed: false,
+      createdBy: ownerMemberId,
+      createdAt: created,
+      updatedAt: created,
+    },
+  ];
+
+  return {
+    familyMembers: members,
+    accounts,
+    transactions,
+    recurringItems,
+    budgets,
+    goals,
+    assets,
+    activities,
+    vacations,
+    todos,
+    lists,
+    medications,
+    sayings,
+    milestones,
+  };
 }
