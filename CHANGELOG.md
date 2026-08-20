@@ -12,7 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **A guide for families leaving Maple.** Maple announced it's shutting down on 31 December 2026 and deleting all user data, so there's a new post covering what to export before the deadline and how beanies compares — including a one-page infographic you can take in at a glance. The existing "best cozi & maple alternatives" post now carries a prominent notice pointing there.
+
 - **A demo family for app store reviewers.** App Store and Play reviewers can now open a fully-populated sample family from an access code on the welcome screen, with no Google sign-in at all. Google's security checks challenge every sign-in from an unfamiliar device and location — which is exactly what a reviewer's machine looks like — and there is no way to switch that off, so review kept getting blocked at the front door. The sample data is entirely made up, stays on the device for that one session, and is clearly marked with a banner throughout. The access code is only present in official mobile store builds, is useless without the secret code itself, and stops working on a set date.
+
+### Changed
+
+- **Tables in blog posts are readable now.** Comparison tables were rendering with no styling at all — no borders, no header treatment, rows running together. They now have a tinted header row, a shaded first column so you can track a feature across, light rules and stripes, and proper spacing. On a phone a wide table scrolls inside its own box instead of dragging the whole page sideways.
 
 ---
 
