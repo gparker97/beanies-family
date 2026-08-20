@@ -9,7 +9,7 @@ excerpt: 'maple shuts down on december 31, 2026 and deletes every account. here 
 subtitle: 'a (genuinely shocking) announcement that one of the largest (and most well funded) family apps is being retired. what are the alternatives?'
 featured: false
 author: greg
-draft: true
+draft: false
 ---
 
 **📢 BREAKING NEWS 📢**
