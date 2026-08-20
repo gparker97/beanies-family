@@ -17,6 +17,18 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.20',
+    date: '2026-08-20',
+    month: '20 august 2026',
+    // Summary-only (no `features`) → not a spotlight: badges the bell, doesn't
+    // auto-open the drawer. Generic line by design — covers minor fixes plus
+    // dependency/security updates without naming specifics (per this file's rule).
+    summary: {
+      en: 'Minor revisions and security updates.',
+      beanie: 'minor revisions and security updates.',
+    },
+  },
+  {
     version: '2026.08.17',
     date: '2026-08-17',
     month: '17 august 2026',
