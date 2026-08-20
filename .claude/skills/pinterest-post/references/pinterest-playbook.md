@@ -39,21 +39,46 @@ engagement because the audience is tightly matched.
 
 ## Boards (keyword-named for SEO)
 
-The 8 canonical boards to pin into (create if missing):
+**This list is the single source of truth, and it must mirror the boards that actually
+exist on greg's Pinterest account — not an aspirational set.** Assign every pin to a board
+NAMED HERE, and pick from what exists rather than inventing a new one. Subtly-different
+boards for the same topic (e.g. "family calendar & organization" vs "family organization
+and planning" vs "family organization / all-in-one family app") are a mistake: Pinterest
+reads them as one topic and splits the ranking signal across all three. Consolidate; don't
+proliferate.
 
-1. Family Budgeting & Money
-2. Family Meal Planning
-3. Chore Charts & Kids
-4. Large Family Life
-5. Family Calendar & Organization
-6. Homeschool Planning
-7. Family Command Center
-8. Money-Saving Tips for Parents
+**Actual boards (keep this in sync with the live account):**
 
-Pick the **single most topically-relevant board** for each pin (board topic is a ranking
-input). A pin may be added to a second relevant board later, but publish it fresh to its
-best-fit board first. If a pin's topic fits none of the 8, propose a new keyword-named
-board rather than forcing a bad fit.
+1. **Family Organization and Planning** — the ONLY board on the account as of 2026-08-20.
+
+On 2026-08-20 greg consolidated everything into this single board (Pinterest has no merge
+button — he bulk-moved pins in, then deleted the emptied boards). The retired/merged-away
+boards were "Family Organization / All-in-one Family App", "Large Family Life", "Family
+Command Center" and "Family Budgeting & Money" — **do NOT recreate any of them**; they no
+longer exist. The Pin Tracker's `Board (s)` options were pruned to match (only this one
+option remains), and all logged pins point at it.
+
+> **Creating a new board:** greg's rule is keep the list clean — add one ONLY when a
+> genuinely distinct keyword topic clearly benefits, and get his ok first (then add it here
+> AND to the Tracker's options). The strongest future candidate is a real **Family Budgeting
+> & Money** board: "money/budgeting" is a distinct high-intent search cluster from
+> "organization", so once there are several money-angle pins it may earn its own board. Never
+> auto-spawn a near-duplicate of the organization board to fit a single pin.
+
+**Retired assumption (do NOT recreate these unless greg actually makes them):** the earlier
+draft of this playbook listed Family Budgeting & Money, Family Meal Planning, Chore Charts &
+Kids, Large Family Life, Family Calendar & Organization, Homeschool Planning, Family Command
+Center, Money-Saving Tips for Parents. These were aspirational, not real boards. Some may be
+worth creating deliberately later as distinct keyword topics — but only as a considered
+decision, one at a time, never auto-spawned to fit a pin.
+
+Rules:
+- Pick the **single most topically-relevant EXISTING board** for each pin (board topic is a
+  ranking input).
+- If a pin genuinely fits no existing board, **propose creating one and get greg's ok** —
+  then add it here — rather than silently forcing a near-duplicate.
+- A pin may be added to a second relevant board later, but publish it fresh to its best-fit
+  board first.
 
 ## The "fresh pins" mechanic — why we make 2–3 per post
 
