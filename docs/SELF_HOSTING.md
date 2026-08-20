@@ -129,6 +129,16 @@ These features have their own env vars and silently disable when unset. They wor
 
 The free MyMemory translation API has a 5k chars/day anonymous quota; setting your email upgrades it to 50k. For a single family with translation caching, the lower quota is usually plenty. Set this only if you hit the limit.
 
+### Store-review demo mode — `VITE_REVIEW_DEMO*` (you do not want this)
+
+<!-- REVIEW-DEMO: delete this section at retirement. -->
+
+`VITE_REVIEW_DEMO`, `VITE_REVIEW_DEMO_CODE_HASH` and `VITE_REVIEW_DEMO_EXPIRES` gate a temporary bypass that lets an App Store / Play reviewer into a fully-seeded **synthetic** family without signing in to Google — added because Google's risk engine challenges every reviewer sign-in and there is no setting that disables that.
+
+Leave all three unset. They are listed here only so the variables aren't a mystery if you see them: with them unset the gate is closed, no affordance renders, and no code is accepted. It is armed only on the official mobile release builds, is useless without a secret code whose SHA-256 is the only thing in the bundle, and disarms itself on the baked-in expiry date.
+
+If you did want a seeded family for your own demo purposes, creating one through the normal flow is simpler and gives you a real, durable pod.
+
 ---
 
 ## Known limitations (cosmetic, non-gated)

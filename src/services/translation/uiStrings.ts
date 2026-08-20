@@ -6664,6 +6664,61 @@ const STRING_DEFS = {
     beanie: 'back to homepage',
   },
 
+  // REVIEW-DEMO: store-review demo mode. One contiguous block so retirement is a
+  // single delete — see docs/runbooks/native-store-submission.md.
+  'reviewDemo.entry': { en: 'App Review Access', beanie: 'app review access' },
+  'reviewDemo.modalTitle': { en: 'App Review Access', beanie: 'app review access' },
+  'reviewDemo.description': {
+    en: 'Enter the access code from the App Review notes to open a demo family. No sign-in needed.',
+    beanie:
+      'enter the access code from the app review notes to open a demo family. no sign-in needed.',
+  },
+  'reviewDemo.codeLabel': { en: 'Access Code', beanie: 'access code' },
+  'reviewDemo.codePlaceholder': { en: 'Enter your code', beanie: 'enter your code' },
+  'reviewDemo.unlock': { en: 'Open Demo', beanie: 'open demo' },
+  'reviewDemo.unlocking': { en: 'counting beans...', beanie: 'counting beans...' },
+  'reviewDemo.codeRequired': {
+    en: 'Please enter the access code',
+    beanie: 'please enter the access code',
+  },
+  'reviewDemo.codeInvalid': {
+    en: "That code doesn't look right. Check the App Review notes and try again.",
+    beanie: "that code doesn't look right. check the app review notes and try again.",
+  },
+  'reviewDemo.codeExpired': {
+    en: 'This demo code has expired. Please request an updated build.',
+    beanie: 'this demo code has expired. please request an updated build.',
+  },
+  'reviewDemo.cryptoUnavailable': {
+    en: "This browser can't verify the code securely. Open the app over https:// and try again.",
+    beanie:
+      "this browser can't verify the code securely. open the app over https:// and try again.",
+  },
+  'reviewDemo.bannerTitle': { en: 'Demo Family', beanie: 'demo family' },
+  'reviewDemo.bannerMessage': {
+    en: 'This is sample data for app review. Nothing here is saved to the cloud, and it disappears when you sign out.',
+    beanie:
+      'this is sample data for app review. nothing here is saved to the cloud, and it disappears when you sign out.',
+  },
+  'reviewDemo.seedFailedTitle': { en: "Couldn't open the demo", beanie: "couldn't open the demo" },
+  'reviewDemo.seedFailed.sessionExists': {
+    en: 'Someone is already signed in on this device. Sign out first, then enter the code again.',
+    beanie:
+      'someone is already signed in on this device. sign out first, then enter the code again.',
+  },
+  'reviewDemo.seedFailed.unavailable': {
+    en: 'Demo mode is not available in this build. Please request an updated build.',
+    beanie: 'demo mode is not available in this build. please request an updated build.',
+  },
+  'reviewDemo.seedFailed.storage': {
+    en: "The demo couldn't set up its temporary storage. Please try again.",
+    beanie: "the demo couldn't set up its temporary storage. please try again.",
+  },
+  'reviewDemo.seedFailed.generic': {
+    en: "The demo family couldn't be created. Please try again.",
+    beanie: "the demo family couldn't be created. please try again.",
+  },
+
   // Invite gate
   'inviteGate.title': { en: 'Invite Only', beanie: 'invite only' },
   'inviteGate.description': {
