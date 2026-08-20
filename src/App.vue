@@ -1193,31 +1193,60 @@ onMounted(async () => {
         syncStore.showGoogleReconnect ||
         syncStore.reconnecting ||
         syncStore.reconnectEscalationPending;
-      if (!onLoginFlowRoute && !awaitingReconnect) {
-        initError.value = 'Initialization completed but no data was loaded';
-        initErrorDetail.value = breadcrumbLog;
-        console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
-        // Surface it — a `podCreated` user reaching `/nook` with no decrypted
-        // doc is a real init failure (a half-finished onboarding would have
-        // been routed to resume-setup above). The full breadcrumb trail is in
-        // the console and the recovery overlay; Slack just needs the signal.
+      // The instant-open snapshot may have painted cached data into the stores even
+      // though the authoritative Automerge doc rebuild produced no doc (a cache
+      // hiccup, or no provider yet to re-fetch from — the `provider_type: null`
+      // firing on 2026-08-20). The user is looking at their data, so this is a
+      // DEGRADED READ-ONLY state, not the blank-screen "data unreachable" case the
+      // critical page exists for. Downgrade to non-paging telemetry and do NOT raise
+      // the (wrong) "data missing" recovery overlay on top of visible data.
+      const snapshotDataVisible = syncStore.snapshotPaintedThisSession;
+      if (onLoginFlowRoute || awaitingReconnect) {
+        console.warn(
+          '[App] Post-init health check: no doc, but on a login-flow route or awaiting ' +
+            `Google reconnect (reconnect=${awaitingReconnect}) — suppressing recovery UI\n` +
+            breadcrumbLog
+        );
+      } else if (snapshotDataVisible) {
+        console.warn(
+          '[App] Post-init health check: no doc, but the open-snapshot painted cached ' +
+            'data — degraded read-only, not data loss; not paging.\n' +
+            breadcrumbLog
+        );
         reportError({
           surface: 'app.postInitNoData',
-          message: 'App init completed but no Automerge doc loaded — recovery overlay shown',
-          // Recovery overlay shown to a podCreated user = data unreachable. The
-          // onLoginFlowRoute guard above filters the historical false-fires.
-          severity: 'critical',
+          message:
+            'App init completed with snapshot data shown but no Automerge doc rebuilt — degraded read-only, not data loss',
+          // Firehose + console only (NOT critical): data is on screen from the
+          // snapshot, so this is not a user-facing data-loss event. A truly failed
+          // rebuild with no snapshot still pages via the critical branch below.
+          severity: 'error',
           context: {
             route_path: route.path,
             breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
           },
         });
       } else {
-        console.warn(
-          '[App] Post-init health check: no doc, but on a login-flow route or awaiting ' +
-            `Google reconnect (reconnect=${awaitingReconnect}) — suppressing recovery UI\n` +
-            breadcrumbLog
-        );
+        initError.value = 'Initialization completed but no data was loaded';
+        initErrorDetail.value = breadcrumbLog;
+        console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
+        // Surface it — a `podCreated` user reaching `/nook` with no decrypted
+        // doc AND no snapshot data on screen is a real init failure (a half-finished
+        // onboarding would have been routed to resume-setup above). The full
+        // breadcrumb trail is in the console and the recovery overlay; Slack just
+        // needs the signal.
+        reportError({
+          surface: 'app.postInitNoData',
+          message: 'App init completed but no Automerge doc loaded — recovery overlay shown',
+          // Recovery overlay shown to a podCreated user with a blank screen = data
+          // unreachable. The onLoginFlowRoute / reconnect / snapshot guards above
+          // filter the false-fires.
+          severity: 'critical',
+          context: {
+            route_path: route.path,
+            breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
+          },
+        });
       }
     }
 

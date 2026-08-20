@@ -178,6 +178,12 @@ vi.mock('@/config/features', () => ({
   },
 }));
 
+// syncStore imports `isDemoSession` from reviewDemo, whose module-load reads
+// `features.reviewDemo` — which trips this file's hoisted-const features mock (TDZ).
+// Stub it with a MUTABLE ref so the demo-suppression tests can flip it.
+const demoRef = vi.hoisted(() => ({ value: false }));
+vi.mock('@/utils/reviewDemo', () => ({ isDemoSession: demoRef }));
+
 vi.mock('@/services/sync/fileSync', () => ({
   reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
   parseBeanpodV4: vi.fn(() => ({})),
@@ -521,5 +527,36 @@ describe('syncStore.verifyPodAccess', () => {
       expect(mockCreateNew).not.toHaveBeenCalled();
       expect(mockSelectNativeLocalFile).not.toHaveBeenCalled();
     }
+  });
+
+  // ── Fix A (2026-08-20): config-heal total failure must NOT page for the review
+  //    demo — it has no durable storage provider and nothing to reconnect, and a
+  //    reviewer reload was repeatedly paging `sync-config-total-failure` to Slack.
+  const pagedTotalFailure = () =>
+    mockReportError.mock.calls.some(
+      (c) => (c[0] as { surface?: string })?.surface === 'sync-config-total-failure'
+    );
+
+  it('pages sync-config-total-failure when a NON-demo family cannot re-establish its config', async () => {
+    demoRef.value = false;
+    mockGetProviderType.mockReturnValue(null); // no provider installed → heal proceeds
+    mockLookupFamilyResult.mockResolvedValue({ status: 'absent' }); // nothing to rebuild from
+    const store = useSyncStore();
+
+    await store.attemptSilentConfigHeal('family-123');
+
+    expect(pagedTotalFailure()).toBe(true);
+  });
+
+  it('does NOT page sync-config-total-failure for a review-demo session', async () => {
+    demoRef.value = true; // in-memory demo: nothing to reconnect
+    mockGetProviderType.mockReturnValue(null);
+    mockLookupFamilyResult.mockResolvedValue({ status: 'absent' });
+    const store = useSyncStore();
+
+    await store.attemptSilentConfigHeal('family-123');
+
+    expect(pagedTotalFailure()).toBe(false);
+    demoRef.value = false; // don't leak demo state into other tests
   });
 });
