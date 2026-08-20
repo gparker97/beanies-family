@@ -1540,6 +1540,11 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
   language: LanguageCode;
   textSize?: 'normal' | 'large';
+  // Dual-persisted (device GlobalSettings + this family doc) like textSize, so the
+  // beanie-mode cosmetic overlay follows the family across devices instead of
+  // resetting to the default on a new device / cleared cache. Device value wins on
+  // read; the doc value is the cross-device fallback. See settingsStore `beanieMode`.
+  beanieMode?: boolean;
   syncEnabled: boolean;
   syncFilePath?: string; // Display name of sync file
   autoSyncEnabled: boolean;

@@ -93,7 +93,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const beanieMode = computed(() => {
     // E2E tests inject this flag to force standard English for stable text selectors
     if (typeof window !== 'undefined' && (window as any).__e2e_beanie_off) return false;
-    return globalSettings.value.beanieMode ?? true;
+    // Dual-persisted like textSize: the device value wins so a per-device toggle
+    // sticks, but a fresh device (no local value) falls back to the family-synced
+    // doc value instead of resetting to the default.
+    return globalSettings.value.beanieMode ?? settings.value.beanieMode ?? true;
   });
   const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
   // Per-device opt-in to The Beanie Lab (experimental features). Default OFF;
@@ -640,14 +643,20 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   async function setBeanieMode(enabled: boolean): Promise<void> {
-    isLoading.value = true;
-    error.value = null;
+    // Dual-persist (device + family doc) so the choice follows the family across
+    // devices, unlike soundEnabled which stays device-local by design.
+    //
+    // persistDualSetting fully handles a failure (toast + console + telemetry) and
+    // then re-throws so a BaseSelect can revert its optimistic value. The Beanie
+    // Mode toggle instead binds to the `beanieMode` COMPUTED, which already reverts
+    // on its own when the write didn't land, and its `@update:model-value` handler
+    // is not awaited — so swallow the re-throw here (the failure is not silent; it
+    // was surfaced upstream) to keep this setter non-throwing and avoid an
+    // unhandled rejection.
     try {
-      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ beanieMode: enabled });
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update beanie mode';
-    } finally {
-      isLoading.value = false;
+      await persistDualSetting('beanieMode', enabled);
+    } catch {
+      // Already reported inside persistDualSetting; the computed reverts the toggle.
     }
   }
 
