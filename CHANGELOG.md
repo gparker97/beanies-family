@@ -23,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Beanie mode now follows your family across devices.** The playful "beanie mode" overlay was remembered only on the device you set it on, so a new phone or a cleared cache reset it to on. Your choice is now saved with your family's data too, so it carries over to your other devices. (The sound on/off setting stays per-device on purpose - you might want sound on your phone but not your laptop.)
 - **Tables in blog posts are readable now.** Comparison tables were rendering with no styling at all — no borders, no header treatment, rows running together. They now have a tinted header row, a shaded first column so you can track a feature across, light rules and stripes, and proper spacing. On a phone a wide table scrolls inside its own box instead of dragging the whole page sideways.
 
 ---
