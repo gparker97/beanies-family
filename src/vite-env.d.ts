@@ -11,6 +11,14 @@ interface ImportMetaEnv {
   readonly VITE_INVITE_GATE: string | undefined;
   readonly VITE_INVITE_BEAN_HASHES: string | undefined;
   readonly VITE_INVITE_WEBHOOK_URL: string | undefined;
+  // REVIEW-DEMO: store-review demo bypass. "true" arms it; the hash is a
+  // comma-separated list of SHA-256 hex digests of valid codes; EXPIRES is an
+  // ISO date parsed as UTC MIDNIGHT — i.e. the first instant the demo is DEAD,
+  // so set it to the day AFTER the last day it should work. Armed only on the
+  // two mobile release lanes. See src/utils/reviewDemo.ts.
+  readonly VITE_REVIEW_DEMO: string | undefined;
+  readonly VITE_REVIEW_DEMO_CODE_HASH: string | undefined;
+  readonly VITE_REVIEW_DEMO_EXPIRES: string | undefined;
   readonly VITE_SLACK_WEBHOOK_URL: string | undefined;
   readonly VITE_BEANIES_ERROR_WEBHOOK_URL: string | undefined;
   readonly VITE_FEEDBACK_WEBHOOK_URL: string | undefined;

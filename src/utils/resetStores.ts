@@ -14,6 +14,7 @@ import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useCalendarClashStore } from '@/stores/calendarClashStore';
 import { isFlagEnabled } from '@/config/flags';
+import { clearDemoSession } from '@/utils/reviewDemo';
 
 /**
  * Reset every Pinia store that holds family-scoped state — call on sign-out and
@@ -41,4 +42,8 @@ export function resetAllAppStores(): void {
   if (isFlagEnabled('googleCalendarSync')) useCalendarSyncStore().stop();
   // Clear the read-only clash engine's ephemeral busy cache + decoration (#34).
   if (isFlagEnabled('calendarClashNudge')) useCalendarClashStore().stop();
+  // REVIEW-DEMO: drop the demo-session flag. Sign-out here does NOT reload the
+  // page (AppHeader does router.replace), so a demo banner would otherwise
+  // follow the user to /login and onto the next real pod in this JS session.
+  clearDemoSession();
 }

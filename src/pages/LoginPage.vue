@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router';
 import LoginBackground from '@/components/login/LoginBackground.vue';
 import LoginSecurityFooter from '@/components/login/LoginSecurityFooter.vue';
 import WelcomeGate from '@/components/login/WelcomeGate.vue';
+// REVIEW-DEMO: access-code entry for store-review demo mode.
+import ReviewDemoCodeModal from '@/components/login/ReviewDemoCodeModal.vue';
 import FamilyPickerView from '@/components/login/FamilyPickerView.vue';
 import LoadPodView from '@/components/login/LoadPodView.vue';
 import PickBeanView from '@/components/login/PickBeanView.vue';
@@ -58,6 +60,10 @@ const props = withDefaults(defineProps<{ initialView?: LoginView }>(), {
 });
 
 const activeView = ref<LoginView>(props.initialView);
+
+// REVIEW-DEMO: the demo code modal is an overlay over whatever view is active,
+// so it gets its own visibility flag rather than a LoginView member.
+const showReviewDemoModal = ref(false);
 const needsPermissionGrant = ref(false);
 const autoLoadPod = ref(false);
 /**
@@ -555,7 +561,17 @@ function handleLoadDifferentFile() {
   activeView.value = 'load-pod';
 }
 
-function handleNavigate(view: 'load-pod' | 'create' | 'join') {
+function handleNavigate(view: 'load-pod' | 'create' | 'join' | 'review-demo') {
+  // REVIEW-DEMO: a modal, NOT a view — it must return before the tail
+  // `activeView.value = view` below, which only accepts real views. Keeping this
+  // first also lets TypeScript narrow `view` back to the three real views for
+  // that assignment, so no cast is needed. Note 'review-demo' is deliberately
+  // NOT added to the `LoginView` union.
+  if (view === 'review-demo') {
+    showReviewDemoModal.value = true;
+    return;
+  }
+
   resetLoadPodState();
   forceNewGoogleAccount.value = false;
 
@@ -667,6 +683,9 @@ async function handleStartOver() {
       />
 
       <WelcomeGate v-else-if="activeView === 'welcome'" @navigate="handleNavigate" />
+
+      <!-- REVIEW-DEMO: overlay, not a view. -->
+      <ReviewDemoCodeModal v-if="showReviewDemoModal" @close="showReviewDemoModal = false" />
 
       <!-- Branded loading spinner during auto-load -->
       <div

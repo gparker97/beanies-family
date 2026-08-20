@@ -15,10 +15,10 @@ import {
   getSettings as projectionGetSettings,
 } from '@/services/automerge/projection';
 import * as docClient from '@/services/automerge/worker/docClient';
+import { seedDocument } from '@/services/automerge/seedDocument';
 import { bufferToBase64 } from '@/utils/encoding';
 import { COLLECTION_NAMES } from '@/types/automerge';
-import type { FamilyDocument, CollectionName, CollectionEntity } from '@/types/automerge';
-import type { MutationOp } from '@/services/automerge/worker/protocol';
+import type { FamilyDocument, CollectionName } from '@/types/automerge';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { removeFamily } from '@/services/registry/registryService';
 
@@ -84,23 +84,10 @@ export function initDataBridge(): void {
     },
 
     async seedData(data: Partial<Record<keyof FamilyDocument, unknown>>) {
-      const ops: MutationOp[] = [];
-      for (const col of COLLECTIONS) {
-        const items = data[col] as Array<{ id: string }> | undefined;
-        if (!items) continue;
-        for (const item of items) {
-          ops.push({ op: 'set', collection: col, id: item.id, entity: item });
-        }
-      }
-      if (ops.length) await docClient.mutate({ op: 'batch', ops });
-      if (data.settings !== undefined) {
-        await docClient.mutate({
-          op: 'named',
-          name: 'setSettings',
-          args: { settings: data.settings as CollectionEntity<'familyMembers'> },
-        });
-      }
-      // Pre-stage the binary so it's in sessionStorage before the reload.
+      // The batching itself lives in `services/automerge/seedDocument.ts`, shared
+      // with demo-mode seeding. This bridge keeps only its own responsibility:
+      // pre-staging the binary so it's in sessionStorage before the reload.
+      await seedDocument(data);
       await refreshSnapshot();
     },
   };

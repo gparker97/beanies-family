@@ -71,6 +71,24 @@ jobs:
           VITE_INVITE_GATE: ${{ vars.INVITE_GATE }}
           VITE_INVITE_BEAN_HASHES: ${{ secrets.INVITE_BEAN_HASHES }}
           VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
+          # REVIEW-DEMO: (TEMPORARY) store-review demo bypass — a code-gated demo
+          # family that needs no Google sign-in, because reviewers cannot get past
+          # Google's risk-based verification challenges. Deliberately set ONLY on the
+          # two mobile RELEASE lanes: never on deploy.yml (a negative assertion in
+          # workflowEnvParity.test.ts enforces that the web bundle never carries it)
+          # and never on the debug lanes (dev builds use .env.local).
+          #
+          # All three are repo VARIABLES, so their values are visible and editable in
+          # the UI. The hash is deliberately NOT a secret: it is a one-way digest that
+          # ships in the client bundle regardless, so the repo setting is not where the
+          # exposure lives — the PLAINTEXT code is the thing that stays out of the repo.
+          # EXPIRES is parsed as UTC MIDNIGHT, i.e. the first DEAD instant — set it to the day
+          # AFTER the last day the demo should work. Unset = permanently disarmed.
+          # Remove all three when demo mode is retired (see
+          # docs/runbooks/native-store-submission.md).
+          VITE_REVIEW_DEMO: ${{ vars.REVIEW_DEMO }}
+          VITE_REVIEW_DEMO_CODE_HASH: ${{ vars.REVIEW_DEMO_CODE_HASH }}
+          VITE_REVIEW_DEMO_EXPIRES: ${{ vars.REVIEW_DEMO_EXPIRES }}
           VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
           VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           VITE_BEANIES_ERROR_WEBHOOK_URL: ${{ vars.BEANIES_ERROR_WEBHOOK_URL }}

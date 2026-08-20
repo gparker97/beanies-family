@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-20
+
+### Added
+
+- **A demo family for app store reviewers.** App Store and Play reviewers can now open a fully-populated sample family from an access code on the welcome screen, with no Google sign-in at all. Google's security checks challenge every sign-in from an unfamiliar device and location — which is exactly what a reviewer's machine looks like — and there is no way to switch that off, so review kept getting blocked at the front door. The sample data is entirely made up, stays on the device for that one session, and is clearly marked with a banner throughout. The access code is only present in official mobile store builds, is useless without the secret code itself, and stops working on a set date.
+
+---
+
 ## 2026-08-19
 
 ### Added

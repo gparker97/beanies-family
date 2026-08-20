@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { withAnalyticsSuppressed } from './plausible';
+
 async function importInit() {
   vi.resetModules();
   return (await import('./plausible')).initAnalytics;
@@ -73,5 +75,72 @@ describe('services/analytics/plausible', () => {
     expect(String(warnSpy.mock.calls[0][0])).toContain('[analytics]');
     expect(String(warnSpy.mock.calls[0][0])).toContain('failed to initialize');
     createElementSpy.mockRestore();
+  });
+});
+
+describe('withAnalyticsSuppressed', () => {
+  afterEach(() => {
+    delete window.plausible;
+  });
+
+  it('swallows events fired inside and restores the original afterwards', async () => {
+    const original = vi.fn() as unknown as PlausibleQueue;
+    window.plausible = original;
+
+    await withAnalyticsSuppressed(async () => {
+      window.plausible?.('signup');
+      window.plausible?.('login');
+    });
+
+    expect(original).not.toHaveBeenCalled();
+    expect(window.plausible).toBe(original);
+  });
+
+  it('returns the callback result', async () => {
+    await expect(withAnalyticsSuppressed(async () => 'seeded')).resolves.toBe('seeded');
+  });
+
+  // The store binaries genuinely have no `window.plausible` (VITE_PLAUSIBLE_DOMAIN
+  // is exempted from both mobile release lanes), so restoring `undefined` by
+  // assignment would leave an installed no-op where there had been nothing —
+  // turning every `window.plausible?.()` short-circuit into a silent call.
+  it('restores absence as absence, not as an installed no-op', async () => {
+    delete window.plausible;
+
+    await withAnalyticsSuppressed(async () => {
+      window.plausible?.('signup');
+    });
+
+    expect('plausible' in window).toBe(false);
+  });
+
+  it('restores even when the callback throws', async () => {
+    const original = vi.fn() as unknown as PlausibleQueue;
+    window.plausible = original;
+
+    await expect(
+      withAnalyticsSuppressed(async () => {
+        throw new Error('seed failed');
+      })
+    ).rejects.toThrow('seed failed');
+
+    expect(window.plausible).toBe(original);
+  });
+
+  it('is re-entrant — nested calls restore exactly once, at the outermost exit', async () => {
+    const original = vi.fn() as unknown as PlausibleQueue;
+    window.plausible = original;
+
+    await withAnalyticsSuppressed(async () => {
+      await withAnalyticsSuppressed(async () => {
+        window.plausible?.('inner');
+      });
+      // Still suppressed here — the inner exit must NOT have restored it.
+      expect(window.plausible).not.toBe(original);
+      window.plausible?.('outer');
+    });
+
+    expect(original).not.toHaveBeenCalled();
+    expect(window.plausible).toBe(original);
   });
 });

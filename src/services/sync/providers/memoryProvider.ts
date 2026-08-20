@@ -1,5 +1,5 @@
 /**
- * In-memory storage provider — DEV/E2E ONLY.
+ * In-memory storage provider — DEV/E2E, plus REVIEW-DEMO.
  *
  * The create-a-family flow finishes on `ResumePodSetup` and calls
  * `syncStore.createNewFile`, which hard-fails unless a real `StorageProvider`
@@ -10,12 +10,18 @@
  * the create flow (password → write → verify → members → /nook) runs through
  * the REAL UI and the REAL store path, with nothing else mocked.
  *
- * Constructed ONLY behind `import.meta.env.DEV` (see `createMemoryProvider`),
- * so it is tree-shaken out of production builds and can never be installed by
- * a real user. It implements the full `StorageProvider` contract honestly and
- * throws on genuine misuse rather than failing silently.
+ * REVIEW-DEMO: it is ALSO the storage layer for store-review demo mode, which
+ * runs in production builds — a demo pod that never touches Drive or the
+ * filesystem is exactly what this provider already is. Hence `createMemoryProvider`
+ * gates on `DEV || isReviewDemoAvailable()` rather than `DEV` alone.
+ *
+ * Constructed ONLY behind that gate, so it can never be installed by a real
+ * user: an un-armed or expired build throws. It implements the full
+ * `StorageProvider` contract honestly and throws on genuine misuse rather than
+ * failing silently.
  */
 import type { StorageProvider } from '@/services/sync/storageProvider';
+import { isReviewDemoAvailable } from '@/utils/reviewDemo';
 import { toISODateString } from '@/utils/date';
 
 class MemoryProvider implements StorageProvider {
@@ -102,12 +108,22 @@ class MemoryProvider implements StorageProvider {
 }
 
 /**
- * Build a DEV/E2E in-memory provider. Throws in production so a stray call can
- * never install a non-durable provider for a real family.
+ * Build an in-memory provider for DEV/E2E or for REVIEW-DEMO seeding.
+ *
+ * Throws otherwise, so a stray call can never install a non-durable provider for
+ * a real family — that would silently discard their data.
+ *
+ * REVIEW-DEMO: the gate deliberately reuses `isReviewDemoAvailable()`, the SAME
+ * predicate the welcome-screen affordance and the code validator bind to, so an
+ * expired or un-armed build cannot install this either. Do NOT replace it with an
+ * `allowInProd` argument: an argument can be passed from anywhere, whereas the
+ * predicate is the one place demo mode is switched on.
  */
 export function createMemoryProvider(fileName?: string): StorageProvider {
-  if (!import.meta.env.DEV) {
-    throw new Error('[MemoryProvider] is DEV/E2E only and must never run in production');
+  if (!import.meta.env.DEV && !isReviewDemoAvailable()) {
+    throw new Error(
+      '[MemoryProvider] is DEV/E2E + review-demo only and must never run for a real family'
+    );
   }
   return new MemoryProvider(fileName);
 }

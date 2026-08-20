@@ -279,7 +279,149 @@ verification is gated on the release-signing fingerprints from §3. Validate:
 
 ---
 
-## 6. Notes
+## 6. App Review demo access (TEMPORARY — has a retirement checklist)
+
+### Why this exists
+
+Reviewers could not sign in with the `beaniesdemo@gmail.com` demo account: Google's
+risk engine issues a "verify it's you" challenge for every sign-in from an
+unfamiliar device + IP + country, which is exactly what a reviewer VM looks like
+against a young, low-activity account. Turning off 2-Step Verification does not
+stop it, and there is no consumer setting that does. Apple's own App Review
+Information guidance is to supply a demo mode that needs no third-party sign-in —
+so we did.
+
+A demo code opens a fully-populated **synthetic** family with no Google sign-in,
+no Drive and no network calls at all.
+
+### Arming a build
+
+Three build-time values, set **only** on `mobile-ios-release.yml` and
+`mobile-android-release.yml` (never `deploy.yml` — a test enforces that):
+
+| Name                    | Kind              | Value                                                |
+| ----------------------- | ----------------- | ---------------------------------------------------- |
+| `REVIEW_DEMO`           | repo **variable** | `true`                                               |
+| `REVIEW_DEMO_CODE_HASH` | repo **variable** | SHA-256 hex of the code (comma-separate for several) |
+| `REVIEW_DEMO_EXPIRES`   | repo **variable** | ISO date — see the warning below                     |
+
+All three are **variables**, not secrets. The hash is a one-way digest that ships
+in the client bundle regardless, so hiding it in a secret would buy nothing — the
+thing that stays out of the repo is the **plaintext code**, which lives only in
+App Store Connect and greg's notes.
+
+Generate the hash (the plaintext never enters the repo or the bundle):
+
+```bash
+echo -n "your-demo-code" | sha256sum | cut -d' ' -f1
+```
+
+> **`REVIEW_DEMO_EXPIRES` is UTC midnight — the first DEAD instant, not the last
+> working day.** `2026-11-01` keeps the demo live through 31 Oct UTC and kills it
+> at 00:00 on 1 Nov. **Set it to the day AFTER the last day you want it working.**
+> Leave generous headroom over the review window: an expired build fails the same
+> way an un-armed one does.
+>
+> If the variable is unset or unparseable the build is armed-but-permanently-dead.
+> The app logs an explicit `[reviewDemo] ARMED but …` console warning at startup
+> for exactly this case — check it if the button doesn't appear.
+
+Use a **fresh code per submission**. It ships in the released binary (Apple
+releases the binary it reviewed), so treat a used code as burnt.
+
+### What to paste into App Review Information
+
+> **Demo mode — no account needed**
+>
+> beanies.family stores your family's data in your own Google Drive, so the normal
+> first-run flow asks you to sign in with Google. Google's security checks send a
+> verification code to the account owner's device on sign-ins from new locations,
+> which we cannot disable and which would block your review.
+>
+> Please use our built-in demo instead — no sign-in of any kind is required:
+>
+> 1. Launch the app.
+> 2. On the welcome screen, tap **"App Review Access"** (below the three main
+>    buttons).
+> 3. Enter the access code: `<CODE>`
+> 4. Tap **Open Demo**.
+> 5. The app will ask **"do you trust this device?"** — tap **not now**. (This is
+>    the app's normal local-caching prompt; either answer is fine for the demo.)
+>
+> You will land on the home screen of a sample family with accounts,
+> transactions, a calendar, and to-dos already populated, and can explore every
+> feature of the app from there.
+>
+> Notes:
+>
+> - The data is entirely fictional and lives only on the device.
+> - Reloading or reopening the app is fine — you stay in the demo family.
+> - If someone is already signed in on the device, sign out first (avatar →
+>   Sign Out), then enter the code.
+>
+> The `beaniesdemo@gmail.com` account remains available if you would prefer to
+> test the real Google Drive flow, but expect the verification prompt described
+> above.
+
+Fill in `<CODE>` with the plaintext of whatever hash you configured.
+
+### On-device check BEFORE submitting
+
+Non-negotiable — it is the only test that proves the submission works:
+
+1. Install the armed build (TestFlight / Play internal testing) on a device with
+   **no existing pod**, in an app that has never signed in to Google.
+2. Follow the reviewer instructions above verbatim.
+3. Confirm: the demo family loads, a "Demo Family" banner is visible throughout,
+   and no Google prompt appears at any point.
+   3b. The trusted-device prompt appears on landing. It is deliberately NOT
+   suppressed for demo sessions — doing so would mean another demo-specific
+   branch in shared code, and the reviewer seeing the app's genuine behaviour is
+   the better trade. The reviewer instructions above tell them to dismiss it. If
+   this ever reads as a blocker in review feedback, revisit it as its own change.
+4. Confirm nothing reached `#beanies-*` in Slack and no junk family appeared in
+   the registry.
+
+### Retirement checklist
+
+Demo mode is temporary. The expiry date makes a stale build harmless, but the
+code should still come out.
+
+> **First, check whether it is being repurposed rather than retired.** Greg has
+> flagged a possible future "try beanies" demo for prospective users. That is a
+> different feature with a different threat model — no secret code means nothing
+> limits who can seed a pod — so plan it separately rather than widening this
+> gate.
+
+`grep -rn "REVIEW-DEMO:" src/ .github/ .env.example docs/` returns the complete
+removal surface. Then:
+
+- [ ] Delete the demo-only files whole: `src/utils/reviewDemo.ts`,
+      `src/services/demo/`, `src/components/login/ReviewDemoCodeModal.vue`,
+      `src/components/common/ReviewDemoBanner.vue`, and their tests.
+- [ ] Delete every `REVIEW-DEMO:`-marked block in shared code.
+- [ ] Remove `VITE_REVIEW_DEMO`, `VITE_REVIEW_DEMO_CODE_HASH` and
+      `VITE_REVIEW_DEMO_EXPIRES` from both mobile release workflows,
+      `src/vite-env.d.ts`, `.env.example` and `docs/SELF_HOSTING.md` — and delete
+      the three GitHub repo variables.
+- [ ] Revert `createMemoryProvider`'s guard to `import.meta.env.DEV` and restore
+      its "DEV/E2E ONLY" doc comments (both occurrences).
+- [ ] Revert `createNewFile`'s seventh parameter and its three conditionals, and
+      drop the two suppression tests.
+- [ ] Remove the `clearDemoSession()` call from `resetAllAppStores()`.
+- [ ] Revert `handleNavigate`'s parameter union and `WelcomeGate`'s local
+      `LoginView` union.
+- [ ] Drop the negative `workflowEnvParity` assertion and the `reviewDemo.*`
+      block in `uiStrings.ts` (plus `public/translations/zh.json` on the next
+      `npm run translate`).
+- [ ] **Keep** `src/utils/hashedCodeGate.ts`, `encoding.ts`'s `sha256*`,
+      `seedDocument.ts` and `withAnalyticsSuppressed` — each has non-demo callers
+      and stands alone.
+- [ ] Delete this section, and add a CHANGELOG entry.
+
+---
+
+## 7. Notes
 
 - **Prereq to verify:** the Google **Web** OAuth client must already have
   `https://beanies.family/oauth/native` as an authorized redirect URI, else OAuth fails

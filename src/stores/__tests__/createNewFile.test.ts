@@ -289,6 +289,13 @@ vi.mock('@/services/sync/offlineQueue', () => ({
   clearQueue: vi.fn(),
 }));
 
+// REVIEW-DEMO: the pod-created Slack ping fires from INSIDE createNewFile
+// (step 8), not from CreatePodView — mocked so the suppression tests below can
+// assert on it.
+vi.mock('@/utils/slackNotify', () => ({
+  slackNotify: vi.fn(),
+}));
+
 // Registry service
 vi.mock('@/services/registry/registryService', () => ({
   registerFamily: vi.fn(async () => {}),
@@ -753,6 +760,78 @@ describe('pod creation: full end-to-end flow', () => {
     });
     expect(newMember).not.toBeNull();
     expect(newMember!.name).toBe('Child Bean');
+  });
+
+  /**
+   * REVIEW-DEMO: `createNewFile`'s remote-side-effect suppression.
+   *
+   * Demo mode drives the real create path, so the three REMOTE things this
+   * function does — the pre-write existing-pod registry lookup, the registry
+   * registration, and the pod-created Slack ping — must all be skippable. One
+   * option controls all three, deliberately: three separate flags could be set
+   * inconsistently.
+   *
+   * The second test here is the one that matters most. It pins the DEFAULT, so a
+   * flag that gets inverted or defaults wrong shows up as a failure rather than as
+   * silently unregistered real families.
+   */
+  describe('createNewFile — REVIEW-DEMO remote side-effect suppression', () => {
+    async function createPod(opts?: { suppressRemoteSideEffects?: boolean }) {
+      const authStore = useAuthStore();
+      const syncStore = useSyncStore();
+
+      await authStore.signUp({
+        email: 'demo@example.invalid',
+        password: 'password123',
+        familyName: 'Demo Family',
+        memberName: 'Demo Owner',
+      });
+      const memberId = authStore.currentUser!.memberId;
+
+      stateChangeCallbackHolder.callback?.({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'demo.beanpod',
+        isSyncing: false,
+        lastError: null,
+      });
+
+      return syncStore.createNewFile(
+        'demo.beanpod',
+        'pod-password-123',
+        memberId,
+        // The shared mock provider reads back a fixture pinned to this family
+        // id; using anything else fails verify with a familyId mismatch.
+        'fam-test-1',
+        'Demo Family',
+        null,
+        opts
+      );
+    }
+
+    it('skips the registry lookup, the registration and the Slack ping when suppressed', async () => {
+      const registryService = await import('@/services/registry/registryService');
+      const { slackNotify } = await import('@/utils/slackNotify');
+
+      const result = await createPod({ suppressRemoteSideEffects: true });
+
+      expect(result.ok).toBe(true);
+      expect(vi.mocked(registryService.lookupFamilyResult)).not.toHaveBeenCalled();
+      expect(vi.mocked(registryService.registerFamilyOrThrow)).not.toHaveBeenCalled();
+      expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
+    });
+
+    it('still does all three by default — every real create must register', async () => {
+      const registryService = await import('@/services/registry/registryService');
+      const { slackNotify } = await import('@/utils/slackNotify');
+
+      const result = await createPod();
+
+      expect(result.ok).toBe(true);
+      expect(vi.mocked(registryService.lookupFamilyResult)).toHaveBeenCalled();
+      expect(vi.mocked(registryService.registerFamilyOrThrow)).toHaveBeenCalled();
+      expect(vi.mocked(slackNotify)).toHaveBeenCalled();
+    });
   });
 });
 

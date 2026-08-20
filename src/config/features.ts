@@ -57,6 +57,14 @@ export const features = {
   // `utils/marketing.ts`'s MARKETING_URL, which has its own apex fallback). A derived
   // `features.*` flag for either would be dead, so it isn't added (feature-gate by
   // request only).
+  // REVIEW-DEMO: temporary store-review bypass — a code-gated demo pod that needs
+  // no Google sign-in, because reviewers could not get past Google's risk-based
+  // verification. TWO conditions, the same interlock as inviteGate above: arming
+  // the gate with no valid code hash would ship a dead affordance. Armed ONLY on
+  // the two mobile RELEASE lanes; never on web (a negative assertion in
+  // workflowEnvParity.test.ts enforces that). Retirement checklist lives in
+  // docs/runbooks/native-store-submission.md.
+  reviewDemo: flagOn(env.VITE_REVIEW_DEMO) && ok(env.VITE_REVIEW_DEMO_CODE_HASH),
   slackPodCreate: ok(env.VITE_SLACK_WEBHOOK_URL),
   errorReporter: ok(env.VITE_BEANIES_ERROR_WEBHOOK_URL),
   // #45 in-app feedback/NPS. Gated here (rather than read only at the call site)

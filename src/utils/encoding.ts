@@ -58,3 +58,29 @@ export function base64urlToBuffer(base64url: string): ArrayBuffer {
   }
   return base64ToBuffer(base64);
 }
+
+// ─── SHA-256 digests ─────────────────────────────────────────────────────────
+//
+// Shared because more than one gate needs "hash this string and compare it to a
+// configured digest" (the invite-token gate and the store-review demo gate both
+// route through `hashedCodeGate.ts`). Inputs here are short strings — tokens and
+// codes, never document bytes — so unlike the base64 helpers above they are not
+// wrapped in `measureSync`: they would sit permanently below the telemetry floor
+// and only add noise.
+//
+// These THROW if `crypto.subtle` is unavailable (a non-secure context). That is
+// deliberate: callers must decide how to surface it, and every current caller
+// catches and reports rather than failing closed in silence.
+
+/** SHA-256 a UTF-8 string. Throws when `crypto.subtle` is unavailable. */
+export async function sha256(input: string): Promise<ArrayBuffer> {
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+}
+
+/** SHA-256 a UTF-8 string, returning lowercase hex. */
+export async function sha256Hex(input: string): Promise<string> {
+  const hash = await sha256(input);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}

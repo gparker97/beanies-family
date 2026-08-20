@@ -1574,8 +1574,27 @@ export const useSyncStore = defineStore('sync', () => {
     familyName: string,
     /** Optional "how did you hear about us?" answer (stable English label or free
      *  text) — appended to the pod-created Slack notification only. Never persisted. */
-    heardVia?: string | null
+    heardVia?: string | null,
+    /**
+     * REVIEW-DEMO: demo/review seeding ONLY — skip every REMOTE interaction of
+     * this create: the existing-pod registry LOOKUP (pre-write), the registry
+     * REGISTRATION (step 6), and the pod-created Slack ping (step 8).
+     *
+     * Skipping the lookup is safe HERE AND ONLY HERE: `signUp` minted this
+     * familyId seconds earlier, so it cannot already have a pod.
+     *
+     * LOCAL writes (cache, envelope, cached family key, session) are deliberately
+     * UNAFFECTED — the demo session should behave exactly like a real local one
+     * on-device, and `signOutAndClearData` cleans all of it up.
+     *
+     * Set ONLY by `seedDemoFamily`. A real pod must ALWAYS register: the registry
+     * entry is the recovery anchor for `ResumePodSetup`. Delete this parameter
+     * when demo mode is retired.
+     */
+    opts?: { suppressRemoteSideEffects?: boolean }
   ): Promise<CreatePodResult> {
+    // REVIEW-DEMO: read once so the three call sites below can't diverge.
+    const suppressRemote = opts?.suppressRemoteSideEffects === true;
     // Re-entrancy guard. The UI shouldn't be able to call this twice
     // concurrently (the storage step disables its CTA while in flight), but
     // returning a typed reason instead of throwing makes any misuse loud and
@@ -1636,26 +1655,31 @@ export const useSyncStore = defineStore('sync', () => {
     // block a legitimate create — log and proceed (write/verify/register still
     // guard true collisions).
     let existingLookup: registry.RegistryLookup | null = null;
-    try {
-      existingLookup = await registry.lookupFamilyResult(familyId);
-      const existing = existingLookup.status === 'found' ? existingLookup.entry : null;
-      if (existing?.fileId) {
-        return {
-          ok: false,
-          reason: 'existing-pod',
-          error: new Error(
-            `createNewFile refused: registry already has a pod for family ${familyId} (fileId present)`
-          ),
-        };
+    // REVIEW-DEMO: skip this ENTIRE block for demo seeding — it is a live network
+    // call and demo mode guarantees none. Safe here and only here: `signUp`
+    // minted this familyId seconds ago, so it cannot already have a pod.
+    if (!suppressRemote) {
+      try {
+        existingLookup = await registry.lookupFamilyResult(familyId);
+        const existing = existingLookup.status === 'found' ? existingLookup.entry : null;
+        if (existing?.fileId) {
+          return {
+            ok: false,
+            reason: 'existing-pod',
+            error: new Error(
+              `createNewFile refused: registry already has a pod for family ${familyId} (fileId present)`
+            ),
+          };
+        }
+      } catch (e) {
+        console.warn('[syncStore] createNewFile existing-pod lookup failed; proceeding:', e);
+        reportError({
+          surface: 'syncStore.createNewFile.lookupFailed',
+          message: `existing-pod lookup failed before create (proceeding): ${(e as Error).message}`,
+          error: e,
+          severity: 'warning',
+        });
       }
-    } catch (e) {
-      console.warn('[syncStore] createNewFile existing-pod lookup failed; proceeding:', e);
-      reportError({
-        surface: 'syncStore.createNewFile.lookupFailed',
-        message: `existing-pod lookup failed before create (proceeding): ${(e as Error).message}`,
-        error: e,
-        severity: 'warning',
-      });
     }
     // DELIBERATE FAIL-OPEN, recorded so nobody "hardens" it without seeing the
     // trade: when the registry is unreachable we proceed with the create. Blocking
@@ -1740,7 +1764,8 @@ export const useSyncStore = defineStore('sync', () => {
       // 6. Register with the family registry (was fire-and-forget — now the
       //    recovery anchor for `ResumePodSetup`'s registry-first flow).
       step = 'register';
-      await _registerCurrentFamilySync();
+      // REVIEW-DEMO: never plant a synthetic family in the real registry.
+      if (!suppressRemote) await _registerCurrentFamilySync();
 
       // 7. Cache the family key for auto-decrypt on reload — symmetric with
       //    what `decryptPendingFile` does for the load path. Without this,
@@ -1788,11 +1813,14 @@ export const useSyncStore = defineStore('sync', () => {
           : providerType === 'local'
             ? 'Local File'
             : '(unknown)';
-      slackNotify(
-        `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
-          (heardVia ? `\n*Heard via:* ${heardVia}` : '') +
-          `\n*Platform:* ${getPlatformLabel()}\n*Device:* ${getDeviceLabel()}`
-      );
+      // REVIEW-DEMO: a reviewer tapping the demo button must not ping #beanies.
+      if (!suppressRemote) {
+        slackNotify(
+          `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
+            (heardVia ? `\n*Heard via:* ${heardVia}` : '') +
+            `\n*Platform:* ${getPlatformLabel()}\n*Device:* ${getDeviceLabel()}`
+        );
+      }
 
       return { ok: true };
     } catch (e) {
