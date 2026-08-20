@@ -62,6 +62,7 @@ import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { isDemoSession } from '@/utils/reviewDemo';
 import {
   bump as bumpOpenCycle,
   noteSnapshot as noteOpenCycleSnapshot,
@@ -191,6 +192,8 @@ export const useSyncStore = defineStore('sync', () => {
   function clearEnvelope(): void {
     envelope.value = null;
     syncService.setEnvelope(null);
+    // A new session must not inherit the previous family's "snapshot painted" state.
+    snapshotPaintedThisSession.value = false;
   }
 
   // Pending encrypted file — V4 envelope that needs password to unlock
@@ -491,6 +494,14 @@ export const useSyncStore = defineStore('sync', () => {
   // Background sync state (cache-first loading)
   const isBackgroundSyncing = ref(false);
   const backgroundSyncError = ref<string | null>(null);
+  // True once the instant-open snapshot has painted cached data into the stores
+  // this session (the user is looking at their data), regardless of whether the
+  // authoritative Automerge doc rebuild then succeeded. App.vue's post-init health
+  // check reads this to tell "blank screen, no doc = data unreachable (page it)"
+  // apart from "data on screen from the snapshot, doc rebuild lagged/failed = a
+  // degraded read-only state, not data loss (don't page)". Reset on sign-out /
+  // disconnect via clearEnvelope.
+  const snapshotPaintedThisSession = ref(false);
   /**
    * Classifies why `backgroundSyncError` is set so consumers can pick an
    * appropriate UI response:
@@ -1354,6 +1365,7 @@ export const useSyncStore = defineStore('sync', () => {
           }
           await reloadAllStores();
           paintedFromSnapshot = true;
+          snapshotPaintedThisSession.value = true; // user is now looking at cached data
           isBackgroundSyncing.value = true; // reuse the existing orange bar until authoritative
           recordPerf('snapshot.hydrate', performance.now() - paintStart);
           logEvent({ level: 'info', surface: 'open-snapshot', message: 'painted from snapshot' });
@@ -3005,6 +3017,23 @@ export const useSyncStore = defineStore('sync', () => {
    *  (Layer 3) and page ONCE (mirrors the `zombieStateReported` once-guard). */
   function configHealTotalFailure(registryProvider: string | null, hadFileId: boolean): void {
     reconnecting.value = false;
+    // A review-demo session runs entirely in memory: it never installs a durable
+    // storage provider and never registers, so the config-heal has nothing to
+    // rebuild and there is genuinely NOTHING to reconnect. Paging critical (and
+    // raising the Layer-3 reconnect affordance) here is a false alarm — a reviewer
+    // reload was repeatedly spamming #beanies-errors with a null-provider
+    // "user must reconnect". No-op it for demo sessions; the demo keeps running on
+    // its in-memory/cached state.
+    if (isDemoSession.value) {
+      logEvent({
+        level: 'info',
+        surface: 'sync-config-total-failure',
+        message:
+          'config-heal total failure suppressed for review-demo session (no durable storage)',
+        context: { action: 'demo-suppressed' },
+      });
+      return;
+    }
     configHealFailed.value = true;
     if (!configHealTotalFailureReported) {
       configHealTotalFailureReported = true;
@@ -4125,6 +4154,7 @@ export const useSyncStore = defineStore('sync', () => {
     cachePersistFailed,
     isBackgroundSyncing,
     backgroundSyncError,
+    snapshotPaintedThisSession,
     backgroundSyncErrorKind,
     // Actions
     initialize,

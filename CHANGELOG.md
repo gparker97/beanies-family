@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **No more false "data missing" screen when your data is actually on the screen.** On a fast open, beanies shows your data instantly from a local snapshot while it rebuilds the full data model in the background. On slower devices that rebuild occasionally lagged, and a health check would wrongly conclude "no data" and flash a recovery screen (and page our error monitor) even though your data was right there. It now recognises the snapshot is showing and treats this as a harmless, self-healing lag instead of an emergency. (A genuinely blank open with no data still surfaces recovery, as before.)
 - **Renaming your family now sticks.** Changing your family's name from the Meet the Beans page updated it on screen and on the device you were using, but the new name wasn't written into your family's data file - so opening beanies on another device, or after clearing the app's cache, brought back the old name. The rename is now saved into the family data file itself (the thing that travels with you), so your chosen name follows you everywhere and survives signing out and back in.
 
 ### Added
