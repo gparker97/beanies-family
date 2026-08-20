@@ -1,7 +1,8 @@
 ---
-title: 'maple is shutting down, here’s what to do (and why it can’t happen here)'
+title: 'maple is shutting down, here’s what to do (and why it can’t happen to us)'
 slug: maple-alternative
 date: 2026-08-20
+updatedDate: 2026-08-20
 category: review
 coverEmoji: 🍁
 coverImage: /blog/maple-alternative-infographic.webp
@@ -37,7 +38,7 @@ Export your data ASAP, including your calendars, lists, notes, and whatever else
 
 ## Not for nothing, but hey - this is _exactly_ the thing I've been going on about
 
-Not to say I told you so (I would never do that), but [I wrote a whole guide](/guides/local-first-family-finance-planning-tools) about local-first apps. One of the main reasons to choose local-first is this exact scenario - your favorite software company disappears, and poof! Your data goes with it.
+Not to say I told you so (I would never do that), but I wrote a [whole guide about local-first apps](/guides/local-first-family-finance-planning-tools). One of the main reasons to choose local-first is this exact scenario - your favorite software company disappears, and poof! Your data goes with it.
 
 When your data lives on someone else's servers, your family's entire life, activities, schedules, notes, medications, and whatever other little details you spent your time painstakingly cultivating are a business decision away from being jettisoned to oblivion.
 
@@ -73,7 +74,9 @@ Check out how we measure up:
 
 ## But.. wait? What about…?
 
-And yeah, I know what you're all probably thinking: "greg, you're one cool dude, but what happens if YOU go away?" Ok, first of all, thanks for thinking I'm cool. And also, how _dare_ you? Like that would ever happen.
+And yeah, I know what you're all probably thinking: "greg, you're one cool dude, but what happens if YOU go away?"
+
+Ok, first of all, thanks for thinking I'm cool. And also, how _dare_ you? Like that would ever happen.
 
 But, second of all, yeah, that's kind of the whole point. Let's say I got hit by a bus tomorrow (by the way, why is the go-to IT metaphor for losing somebody always getting hit by a bus? A bit macabre, but sure, let's go with it). Anyway, let's say that I do, in fact, get clobbered by a speeding bus, my body careening across the highway, my bones crushed to a fine powder, bringing the life of an unassuming IT engineer to a violent end. Your data is _still_ not going anywhere. It was always yours.
 
