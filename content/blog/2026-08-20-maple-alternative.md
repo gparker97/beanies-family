@@ -78,7 +78,7 @@ And yeah, I know what you're all probably thinking: "greg, you're one cool dude,
 
 Ok, first of all, thanks for thinking I'm cool. And also, how _dare_ you? Like that would ever happen.
 
-But, second of all, yeah, that's kind of the whole point. Let's say I got hit by a bus tomorrow (by the way, why is the go-to IT metaphor for losing somebody always getting hit by a bus? A bit macabre, but sure, let's go with it). Anyway, let's say that I do, in fact, get clobbered by a speeding bus, my body careening across the highway, my bones crushed to a fine powder, bringing the life of an unassuming IT engineer to a violent end. Your data is _still_ not going anywhere. It was always yours.
+But, second of all, yeah, that's kind of the whole point. Let's say I got hit by a bus tomorrow (by the way, why is the go-to IT metaphor for losing somebody always getting hit by a bus? A bit macabre, but sure, let's go with it). Anyway, let's say that I do, in fact, get clobbered by a speeding bus, my body careening across the highway, my bones crushed to a fine powder, bringing the life of an unassuming IT engineer to a violent end. Your data is _still_ not going anywhere. It was always yours. And you're invited to my funeral. There will be cake.
 
 That's what local-first means, and it's what would have saved every Maple family from the scramble they're in now.
 
