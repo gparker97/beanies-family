@@ -124,15 +124,29 @@ platform :ios do
         )
       end
 
+    # Apple requires a "What's New" note on every update version — without it the new
+    # version record stays in an unsubmittable state and submit_for_review fails with
+    # "appStoreVersions ... is not in valid state" (learned the hard way on the first
+    # 0.9.12 submit). Fail loud rather than upload a build that then can't be submitted.
+    whats_new = ENV["WHATS_NEW"].to_s.strip
+    UI.user_error!(
+      "WHATS_NEW is required for an App Store submission (Apple requires a 'What's New' note on every update). " \
+      "Pass it via the workflow's `whats_new` input."
+    ) if whats_new.empty?
+
     build_ipa
     upload_to_app_store(
       api_key: asc_api_key,
       ipa: IPA_PATH,
       submit_for_review: true,
       force: true,                      # no interactive HTML preview on CI
-      run_precheck_before_submit: false, # nothing local to check (metadata/screenshots skipped); avoids a flaky ASC round-trip
-      skip_metadata: true,              # reuse the existing ASC listing — nothing checked in to push
+      run_precheck_before_submit: false, # avoids a flaky ASC round-trip
+      # We set ONLY the version "What's New" note. Passing release_notes as a direct
+      # option (not a metadata dir) is surgical — deliver uploads just this field and
+      # leaves the app's approved name/description/keywords/screenshots untouched. The
+      # `default` locale key applies it to every App Store localization.
       skip_screenshots: true,
+      release_notes: { "default" => whats_new },
       # Belt-and-braces to Info.plist's ITSAppUsesNonExemptEncryption=false so a
       # submission never stalls on the export-compliance prompt.
       submission_information: { export_compliance_uses_encryption: false },
