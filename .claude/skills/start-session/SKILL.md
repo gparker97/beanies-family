@@ -1,6 +1,6 @@
 ---
 name: start-session
-description: Fresh-session ritual — sync the repo, surface project status, fetch top news + today's calendar, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings.
+description: Fresh-session ritual — sync the repo, surface project status, fetch top news + a famtech (family-technology) competitor-news sweep + today's calendar, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings.
 ---
 
 # start-session — Session Start Ritual
@@ -95,13 +95,33 @@ For each candidate item from STATUS.md, ask: would this leave a fingerprint in t
 
 Run the checks in parallel (one bash call per item, batched in a single message) — most checks are fast greps. Don't ask greg before each verification — only ask after, if the verdict is genuinely ambiguous.
 
-### Step 4: Fetch news headlines
+### Step 4: Fetch news — general headlines + famtech watch
+
+Two independent sweeps here. They don't depend on each other, so kick them off together.
+
+#### 4a) General headlines
 
 Surface 1–2 major news stories from the last 24 hours. Use `WebSearch` with a query like `"top news today"` or `"major news headlines [today's date]"`. Pick stories that are genuinely top-of-the-news — world events, major tech/AI announcements, market moves. Skip clickbait, sports, celebrity gossip.
 
 For each story: one short line — headline + a 5-10 word context phrase. No links unless the source is canonical (Reuters, AP, official press release).
 
 If the search returns nothing useful, skip this section silently — don't pad with filler.
+
+#### 4b) Famtech watch — competitive-intelligence sweep
+
+beanies.family competes in the family-technology ("famtech") space, and greg wants to stay on top of what's moving there. The trigger for this feature was Maple — a large family-organizer app that announced it's retiring at the end of 2026, which opened a real migration opportunity greg turned into blog + pillar content. That's the class of event worth catching early: a rival **shutting down or migrating users out**, a **funding round or acquisition**, a **major feature launch** that shifts the competitive picture, a **notable spike in users**, or **people joining/leaving/founding** these companies. This is market awareness that directly feeds positioning, blog angles, and pilot outreach — so cast a wide net.
+
+**Delegate this to a subagent** (Explore or general-purpose) so the multi-query searching stays out of the main session context. Ask it to return a short digest — **3–6 bullets max**, most notable first, each with a one-line "why it matters for beanies" tag and a canonical source link where one exists. Fall back to running the `WebSearch` calls inline only if subagents aren't available.
+
+Search several angles, not one query — comprehensiveness is the point:
+
+- **Category events:** `"family organizer app" OR "family calendar app" funding OR acquired OR "shutting down" 2026`, `famtech OR "family tech" startup funding OR acquisition 2026`, `family finance app kids allowance news 2026`, `"shared family calendar" app launch OR update 2026`.
+- **Named products** (seed list — not exhaustive; add any you know, drop any that have clearly died): Cozi, Maple, FamilyWall, Picniic, Hearth Display, Skylight (Calendar), TimeTree, Jam, OurHome, Google Family Link, Life360, Greenlight, GoHenry, BusyKid, FamZoo, Bark, Qustodio, Canopy, Milo. Search the notable ones by `<name> news OR funding OR "shutting down" OR update 2026`.
+- **People moves:** founders/execs of the above joining, leaving, or starting something new.
+
+**Freshness:** favor the last ~30 days, lead with anything from the last 7. Famtech news is lower-frequency than world news, so a wider window is correct — a competitor shutdown or raise from three weeks ago is still worth surfacing if it hasn't come up before. Dedupe within the sweep; don't list the same story twice, and don't re-run identical searches across angles.
+
+**Relevance bar:** only surface things that would actually make greg lean in — a Maple-class shutdown/migration opening, a funding round, an acquisition, a competitive-picture-changing feature, or a notable hire/departure. Skip routine app updates, "best family apps 2026" listicles, SEO spam, and anything about beanies.family itself (greg already knows his own news). If nothing clears the bar, **skip the section silently** — an empty famtech watch is honest and far better than padding.
 
 ### Step 5: Fetch today's calendar
 
@@ -180,6 +200,10 @@ Deliver as a single scannable message. Use bold section labels so Greg can jump 
 - [Headline 1 + 5-10 word context]
 - [Headline 2 + 5-10 word context]
 
+**Famtech watch:**
+- [Competitor/product event + one-line why-it-matters + source link]
+- [etc — 3-6 items max, or omit the whole section if nothing notable]
+
 **Today's calendar:**
 - [HH:MM] [event title]
 - [HH:MM] [event title]
@@ -192,7 +216,7 @@ Deliver as a single scannable message. Use bold section labels so Greg can jump 
 [etc — max 7 items]
 ```
 
-Order matters: greeting → state → news → calendar → pending work. State and pending work are repo-driven and always present. News and calendar are best-effort — skip silently if unavailable.
+Order matters: greeting → state → news → famtech watch → calendar → pending work. State and pending work are repo-driven and always present. News, famtech watch, and calendar are best-effort — skip silently if unavailable or nothing clears the bar.
 
 ---
 
@@ -206,3 +230,4 @@ Order matters: greeting → state → news → calendar → pending work. State 
 - **Skip the launch dashboard.** That's `/launch-status`'s job. Mention it as "run /launch-status if you want the launch metrics" only if the most recent STATUS update is launch-relevant.
 - **Be honest about empty sections.** If nothing's pending, say so. If calendar isn't connected, say so. No filler.
 - **News stays real.** 1-2 genuinely top stories from the last 24 hours. No clickbait, no padding. Skip the section if WebSearch returns nothing useful.
+- **Famtech watch is competitive intel, not filler.** Delegate the multi-query sweep to a subagent to keep main context clean. Only surface events that move the needle (shutdown/migration, funding, acquisition, picture-changing feature, notable people move); ~30-day window, freshest first. Dedupe, cite canonical sources, and skip the section silently when nothing clears the bar. Never include beanies.family's own news here.
