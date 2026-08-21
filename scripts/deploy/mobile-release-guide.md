@@ -57,6 +57,10 @@ the App Store for review. **Ask which destination:**
   Release click after Apple approves — it does **not** skip review or ship instantly.
 - Export compliance is already declared in Info.plist (`ITSAppUsesNonExemptEncryption`
   = `false`), so App Store submits do not stall on the encryption prompt.
+- **Every `appstore-*` submit needs a "What's New" note** (`whats_new` input) — Apple
+  rejects an update version without one, and the lane fails loud if it's empty. Propose a
+  short user-facing line at the gate and get it approved alongside the destination. The
+  lane sets only this note (via `release_notes`), leaving the approved listing untouched.
 
 ### Android — Google Play (`MOBILE_ANDROID: yes`)
 
