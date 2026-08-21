@@ -96,9 +96,10 @@ Every Vue deploy ships a brief user-facing release note (it becomes the in-app `
 **Read `scripts/deploy/mobile-release-guide.md`** for the options/defaults, then present how far behind each flagged platform is (the classifier's `N commit(s) behind`) and ask:
 
 - **iOS** — ask the **destination**: `testflight` (no review; internal testers — default for an unverified change) · `appstore-manual` (submit for review, hold for greg's Release click) · `appstore-automatic` (submit; auto-release once approved) · `appstore-phased` (submit; 7-day phased rollout), or **skip**. Options/defaults live in `mobile-release-guide.md` (already read above); record the chosen `destination`. Note App Store review still takes ~1-3 days — `automatic` only removes the final Release click, it does not ship instantly.
+  - **If the chosen destination is `appstore-*`, ALSO propose an App Store "What's New" line in the SAME gate message and get it approved.** Apple requires a per-version "What's New" note, and the lane fails loud without it. Generate a short (1-3 sentence), user-facing, App-Store-voice line (standard English, no em-dashes, `beanies.family` lowercase — NOT the lowercase-beanie overlay) from the change set: reuse Decision A's `en` summary if a release note was written, else synthesize one from the shipped commits (fall back to an honest "Bug fixes and performance improvements." only when there's genuinely nothing user-facing). Record the approved text; it is passed as `-f whats_new=...` in Step 9. (`testflight` needs no What's New.)
 - **Android** — ask the **track**: `internal` (no review; test devices — default for an unverified change) · `alpha` (closed testing, review) · `beta` · `production`, or **skip**. Map "closed testing" → `alpha`; keep `upload_to_play=true`.
 
-Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS `destination` or skip; Android track or skip) — Phase 2 consumes them without asking again.
+Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS `destination` + the approved `whats_new` for `appstore-*`, or skip; Android track or skip) — Phase 2 consumes them without asking again.
 
 ---
 
@@ -201,9 +202,9 @@ gh run list --workflow=mobile-android-release.yml --limit=1
 gh run watch <android-run-id> --exit-status
 ```
 
-**iOS**, only if greg chose a destination (pass the chosen `destination`):
+**iOS**, only if greg chose a destination (pass the chosen `destination`; for any `appstore-*`, also pass the approved `whats_new` from Step 4):
 ```
-gh workflow run mobile-ios-release.yml --ref main -f destination=<testflight|appstore-manual|appstore-automatic|appstore-phased>
+gh workflow run mobile-ios-release.yml --ref main -f destination=<testflight|appstore-manual|appstore-automatic|appstore-phased> -f whats_new="<approved What's New line>"
 ```
 ```
 sleep 10

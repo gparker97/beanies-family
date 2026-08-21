@@ -182,6 +182,28 @@ This is CI/release infrastructure, not app runtime code — there is no client `
 
 > Yes, plan it via /beanies-plan.
 
+### Outcome (2026-08-21)
+
+Implemented + shipped the same day. First live use surfaced two real-world facts the
+plan hadn't anticipated, both now fixed:
+
+1. **Apple's already-approved version was 0.9.11, not 0.9.10.** Submitting `0.9.11R4`
+   (store version 0.9.11 after R-strip) was rejected — `CFBundleShortVersionString` must
+   be strictly higher than the last approved version. Bumped to `0.9.12`. Lesson: the
+   store marketing version must always exceed the last _approved_ App Store version, and
+   the R-suffix does not count (it's stripped).
+2. **`submit_for_review` fails without a "What's New" note.** With `skip_metadata: true`
+   the new version record had no release notes, so ASC returned "appStoreVersions … is not
+   in valid state." Fix: the lane now **requires** a `whats_new` input (fails loud if
+   empty) and sets it surgically via `release_notes: { "default" => ... }` (no metadata
+   dir, so the approved listing is untouched), and `deploy-prod-auto` generates + asks for
+   the What's New line at its Step 4 gate. The build itself uploaded fine both times — only
+   the submit step needed the note.
+
+Also shipped in the same deploy: Astro site, Vue PWA, and Android production (all 0.9.11).
+The iOS build (0.9.12, build 30) uploaded to App Store Connect; the very first submit was
+completed manually in the console while the lane fix landed for next time.
+
 ### Planning brief (verbatim args passed to /beanies-plan)
 
 > Feature: Add an App Store submission capability to the iOS release lane, mirroring how the Android lane ships to a Play track ... [full brief with proposed design, known gotchas — export compliance/API-key role/no-auto-retry/observability/backward-compat — and the deliverable: a plan covering the workflow input, fastlane lane, Info.plist export-compliance, deploy-skill + guide updates, tests, edge cases, and the 0.9.11 submission sequence].

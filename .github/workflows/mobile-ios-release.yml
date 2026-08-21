@@ -33,6 +33,10 @@ on:
         # appstore-automatic→ submit to App Store review; release automatically once approved.
         # appstore-phased   → submit to App Store review; 7-day phased rollout after approval.
         options: [testflight, appstore-manual, appstore-automatic, appstore-phased]
+      whats_new:
+        description: "App Store 'What's New' note (REQUIRED for appstore-* — Apple rejects an update without one; ignored for testflight)"
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -141,6 +145,9 @@ jobs:
           # The `release` lane strips the `appstore-` prefix to resolve the release
           # mode; the `beta` lane ignores it.
           IOS_DESTINATION: ${{ inputs.destination }}
+          # The App Store "What's New" note. Required by the `release` lane for any
+          # appstore-* destination (it fails loud if empty); unused by `beta`.
+          WHATS_NEW: ${{ inputs.whats_new }}
         run: |
           gem install fastlane --no-document
           # Routing rule (kept legible so control flow doesn't hide in the expression):
