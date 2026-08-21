@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-21
+
+### Changed
+
+- **The native apps caught up to the latest build.** Rolled out build 0.9.12 to Android on Google Play (production) and submitted it to the Apple App Store, bringing the recent startup-speed, cross-device syncing, and meal-planner sharing improvements to the phone apps. (The iOS update is with Apple for review; Android reaches everyone once Google's review clears.)
+
+---
+
 ## 2026-08-20
 
 ### Fixed
