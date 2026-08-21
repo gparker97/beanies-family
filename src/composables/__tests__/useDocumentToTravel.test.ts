@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref } from 'vue';
 
 // --- mocks ---
@@ -80,6 +80,10 @@ beforeEach(() => {
   vacations.value = [];
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('useDocumentToTravel', () => {
   it('offline: info toast, no extraction', async () => {
     isOnline.value = false;
@@ -157,6 +161,12 @@ describe('useDocumentToTravel', () => {
   });
 
   it('attaches to the single overlapping trip', async () => {
+    // Overlap detection ignores trips already in the past (tripPhase === 'past'), so this
+    // test must pin "today" to a date inside the trip window — otherwise the fixed dates
+    // below drift into the past and the trip is filtered out (attach → create). Fake only
+    // Date so awaited promises in processFile still resolve normally.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-15T00:00:00Z'));
     vacations.value = [
       {
         id: 'trip-1',
