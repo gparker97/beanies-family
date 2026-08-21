@@ -1,31 +1,50 @@
-# Fastlane — iOS TestFlight lane for the Capacitor app (ADR-029).
+# Fastlane — iOS release lanes for the Capacitor app (ADR-029).
 #
-# DORMANT until the Apple Developer (Organization) account exists (gated on the
-# D-U-N-S number). This lane signs via an **App Store Connect API key** with
-# Xcode cloud-managed automatic signing (`-allowProvisioningUpdates`), so there
-# is no manual certificate/provisioning-profile juggling and no separate
-# `match` certificates repo to maintain — the right trade-off for a solo
-# publisher. If automatic signing is ever rejected for distribution, switch to
-# `match` (App Store) here; the rest of the lane is unchanged.
+# Two lanes, chosen by the workflow's `destination` input:
+#   `beta`    → build a signed Release IPA and upload it to TestFlight (internal).
+#   `release` → build the same signed IPA and SUBMIT it to the App Store for review,
+#               with a post-approval release mode from IOS_DESTINATION.
+#
+# Both lanes sign via an **App Store Connect API key** with Xcode cloud-managed
+# automatic signing (`-allowProvisioningUpdates`), so there is no manual
+# certificate/provisioning-profile juggling and no separate `match` repo — the right
+# trade-off for a solo publisher. If automatic signing is ever rejected for
+# distribution, switch to `match` (App Store) inside `build_ipa`; the rest is unchanged.
+# The API key needs the "App Manager" (or Admin) role, which it already has for
+# cloud-managed signing — the same role is what `upload_to_app_store` uses to create
+# the version and submit for review, so no new credential is needed.
 #
 # Env provided by .github/workflows/mobile-ios-release.yml:
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
 #   APP_STORE_CONNECT_API_KEY_PATH (decoded .p8 on disk), APPLE_TEAM_ID,
-#   BUILD_NUMBER (CI run number), MARKETING_VERSION.
+#   BUILD_NUMBER (CI run number), MARKETING_VERSION, and (for `release`) IOS_DESTINATION.
 
 default_platform(:ios)
 
+# The built IPA path, defined once. `build_app` takes the directory and name as
+# SEPARATE args, so we split this — never pass the combined string to either, or you
+# get build/build/beanies.ipa. Both upload steps pass the whole path as `ipa:`.
+IPA_PATH = "build/beanies.ipa"
+
 platform :ios do
-  desc "Build the Release IPA and upload it to TestFlight"
-  lane :beta do
-    api_key = app_store_connect_api_key(
+  # ── Shared building blocks ────────────────────────────────────────────────
+
+  # The App Store Connect API key, used by both lanes' upload step. `build_app` does
+  # NOT use it — it authenticates via the `-authenticationKey*` xcargs below — so this
+  # is only consumed by upload_to_testflight / upload_to_app_store.
+  private_lane :asc_api_key do
+    app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
       key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
       duration: 1200,
       in_house: false
     )
+  end
 
+  # Build the signed Release IPA for App Store distribution. Identical for both lanes
+  # (TestFlight and App Store both use the `app-store` export), so it lives here once.
+  private_lane :build_ipa do
     build_app(
       project: "App.xcodeproj",
       scheme: "App",
@@ -33,23 +52,23 @@ platform :ios do
       export_method: "app-store",
       export_team_id: ENV["APPLE_TEAM_ID"],
       # Build the archive UNSIGNED, then sign at the export step for App Store
-      # distribution. Xcode's `archive` action signs development-style, which
-      # would require a registered device to mint a development profile ("your
-      # team has no devices") - pointless for a CI distribution build. Skipping
-      # codesign on the archive and letting export_method: app-store handle
-      # distribution signing (App Store profiles need no devices) sidesteps it.
+      # distribution. Xcode's `archive` action signs development-style, which would
+      # require a registered device to mint a development profile ("your team has no
+      # devices") - pointless for a CI distribution build. Skipping codesign on the
+      # archive and letting export_method: app-store handle distribution signing
+      # (App Store profiles need no devices) sidesteps it.
       skip_codesigning: true,
       # Cloud-managed automatic signing via the App Store Connect API key. The
-      # version/build numbers are stamped here (rather than via agvtool) so the
-      # lane doesn't depend on the project's versioning system being configured.
+      # version/build numbers are stamped here (rather than via agvtool) so the lane
+      # doesn't depend on the project's versioning system being configured.
       #
       # `-allowProvisioningUpdates` lets Xcode create/download the distribution
       # profile, and the `-authenticationKey*` flags give xcodebuild the App Store
-      # Connect API-key credentials to do it headlessly (no signed-in Xcode
-      # account on the CI runner). DEVELOPMENT_TEAM + CODE_SIGN_STYLE=Automatic are
-      # injected from the APPLE_TEAM_ID var because the checked-in project has no
-      # team set (keeps the Team ID out of project.pbxproj). Same auth flags on
-      # export_xcargs so the export step can re-resolve signing too.
+      # Connect API-key credentials to do it headlessly (no signed-in Xcode account on
+      # the CI runner). DEVELOPMENT_TEAM + CODE_SIGN_STYLE=Automatic are injected from
+      # the APPLE_TEAM_ID var because the checked-in project has no team set (keeps the
+      # Team ID out of project.pbxproj). Same auth flags on export_xcargs so the export
+      # step can re-resolve signing too.
       xcargs: "-allowProvisioningUpdates " \
               "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
               "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
@@ -61,16 +80,63 @@ platform :ios do
       # NB: no `export_xcargs` — gym applies `xcargs` to the export xcodebuild
       # invocation too, so repeating the auth flags there passes
       # `-authenticationKeyID` twice ("may only be provided once").
-      output_directory: "build",
-      output_name: "beanies.ipa"
+      output_directory: File.dirname(IPA_PATH),
+      output_name: File.basename(IPA_PATH)
     )
+  end
 
+  # ── Lanes ─────────────────────────────────────────────────────────────────
+
+  desc "Build the Release IPA and upload it to TestFlight (internal testers)"
+  lane :beta do
+    build_ipa
     upload_to_testflight(
-      api_key: api_key,
-      ipa: "build/beanies.ipa",
+      api_key: asc_api_key,
+      ipa: IPA_PATH,
       # Don't block the CI job on Apple's async build processing; check status in
       # App Store Connect / TestFlight.
       skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Build the Release IPA and submit it to the App Store for review"
+  lane :release do
+    # IOS_DESTINATION carries the workflow's full `destination` value (e.g.
+    # "appstore-automatic"). The workflow already routed us here by matching the
+    # `appstore-` prefix (see the run: step in mobile-ios-release.yml); here we strip
+    # that same prefix to resolve the post-approval release mode. That prefix is the
+    # ONLY cross-file coupling — adding a destination option means updating both the
+    # workflow's `options:` list AND this case. Unset defaults to the safest hold
+    # (manual); it only bites on a bare local `fastlane release`, since the workflow
+    # always sets the env.
+    raw = ENV["IOS_DESTINATION"] || "appstore-manual"
+    release_opts =
+      case raw.sub(/^appstore-/, "")
+      when "manual" then { automatic_release: false, phased_release: false }
+      when "automatic" then { automatic_release: true }
+      # phased => 7-day staged rollout. VERIFY ON FIRST RUN whether ASC starts the
+      # rollout automatically on approval or waits for a manual Release click; if it
+      # holds, add automatic_release: true here.
+      when "phased" then { phased_release: true }
+      else
+        UI.user_error!(
+          "IOS_DESTINATION must be appstore-manual|appstore-automatic|appstore-phased, got '#{raw}'"
+        )
+      end
+
+    build_ipa
+    upload_to_app_store(
+      api_key: asc_api_key,
+      ipa: IPA_PATH,
+      submit_for_review: true,
+      force: true,                      # no interactive HTML preview on CI
+      run_precheck_before_submit: false, # nothing local to check (metadata/screenshots skipped); avoids a flaky ASC round-trip
+      skip_metadata: true,              # reuse the existing ASC listing — nothing checked in to push
+      skip_screenshots: true,
+      # Belt-and-braces to Info.plist's ITSAppUsesNonExemptEncryption=false so a
+      # submission never stalls on the export-compliance prompt.
+      submission_information: { export_compliance_uses_encryption: false },
+      **release_opts
     )
   end
 end

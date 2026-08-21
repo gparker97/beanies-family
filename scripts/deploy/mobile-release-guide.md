@@ -36,21 +36,27 @@ mobile release).
 This is one of the skill's few allowed pauses. Present, for each platform the classifier
 flagged, how far behind it is and what would ship, then ask:
 
-### iOS — TestFlight (`MOBILE_IOS: yes`)
+### iOS — TestFlight or App Store (`MOBILE_IOS: yes`)
 
-`mobile-ios-release.yml` takes **no inputs** — it always builds a signed IPA and uploads
-it to **TestFlight**. So the only question is **release to TestFlight now, or skip?**
+`mobile-ios-release.yml` takes a single `destination` input — iOS's analog of Android's
+`track`. It always builds a signed IPA, then either uploads to TestFlight or submits to
+the App Store for review. **Ask which destination:**
 
-- **Internal testers** (greg + up to 100) get the build within minutes of processing —
-  this is the lane for the live-only on-device verification.
-- **External TestFlight testing** and, separately, **App Store submission** are **manual
-  App Store Connect console steps** — the workflow does neither. When a build is meant for
-  the public App Store, remind greg of the console steps that are his: set the ASC record
-  **version to match `APP_VERSION`** (e.g. `1.0` → `0.9.9`), attach the build, submit for
-  review. Do **not** imply the workflow submits to the App Store.
+| Answer greg might give    | `destination`        | Review? | Result                                                          |
+| ------------------------- | -------------------- | ------- | --------------------------------------------------------------- |
+| internal test / on-device | `testflight`         | no      | internal TestFlight testers (greg + up to 100), within minutes  |
+| submit, hold release      | `appstore-manual`    | yes     | App Store review; after approval **greg clicks Release** in ASC |
+| submit, auto-release      | `appstore-automatic` | yes     | App Store review; **releases automatically** once approved      |
+| submit, phased rollout    | `appstore-phased`    | yes     | App Store review; 7-day phased rollout after approval           |
+| not this time             | —                    | —       | skip iOS                                                        |
 
-Default when unsure: **release to TestFlight** (it is low-stakes — internal only until greg
-promotes it).
+- **Default `testflight`** for an unverified native change (same low-stakes default as
+  Android's `internal`) — internal only until greg promotes it, ideal for the live-only
+  on-device check.
+- App Store review takes ~1-3 days regardless of mode; "automatic" only removes the final
+  Release click after Apple approves — it does **not** skip review or ship instantly.
+- Export compliance is already declared in Info.plist (`ITSAppUsesNonExemptEncryption`
+  = `false`), so App Store submits do not stall on the encryption prompt.
 
 ### Android — Google Play (`MOBILE_ANDROID: yes`)
 
@@ -92,10 +98,12 @@ step — do not dispatch a release from a HEAD that lacks the bump.
   code / build number. Fetch `gh run view <id> --log-failed`, report, and let greg decide.
 - **Review-track Android uploads auto-submit for Google review** (`alpha` / `beta` /
   `production`); `internal` does not. Say which happened.
-- **iOS App Store submission is never automatic** — it is the manual ASC console step
-  above. TestFlight internal distribution is the most the workflow does.
-- **On-device verification happens on the build you just shipped.** Remind greg, and that
-  promoting internal → a review track (Play) or TestFlight → App Store (Apple) is his
-  manual console step.
+- **iOS now submits to the App Store from the workflow** (`appstore-*` destinations) —
+  it is no longer a manual ASC console step. After Apple approves: `appstore-manual`
+  waits for greg's **Release** click, while `appstore-automatic`/`appstore-phased`
+  self-release. `testflight` stays no-review, internal only.
+- **On-device verification happens on the build you just shipped.** Remind greg. For iOS
+  App Store submits, the review verdict (and, for `appstore-manual`, the Release click)
+  still land later in App Store Connect.
 - **iOS is live-only for greg** — he can only verify on the deployed TestFlight build,
   never locally. Sequence any "does it work on device?" expectation after the build lands.

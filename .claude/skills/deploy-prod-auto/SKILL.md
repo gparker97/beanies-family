@@ -95,10 +95,10 @@ Every Vue deploy ships a brief user-facing release note (it becomes the in-app `
 
 **Read `scripts/deploy/mobile-release-guide.md`** for the options/defaults, then present how far behind each flagged platform is (the classifier's `N commit(s) behind`) and ask:
 
-- **iOS** — the workflow only ever uploads to **TestFlight** (no track input). Ask **release to TestFlight now, or skip?** (Flag that external TestFlight + App Store submission — set the ASC record version to `APP_VERSION`, attach, submit — are greg's manual console steps.)
+- **iOS** — ask the **destination**: `testflight` (no review; internal testers — default for an unverified change) · `appstore-manual` (submit for review, hold for greg's Release click) · `appstore-automatic` (submit; auto-release once approved) · `appstore-phased` (submit; 7-day phased rollout), or **skip**. Options/defaults live in `mobile-release-guide.md` (already read above); record the chosen `destination`. Note App Store review still takes ~1-3 days — `automatic` only removes the final Release click, it does not ship instantly.
 - **Android** — ask the **track**: `internal` (no review; test devices — default for an unverified change) · `alpha` (closed testing, review) · `beta` · `production`, or **skip**. Map "closed testing" → `alpha`; keep `upload_to_play=true`.
 
-Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS release y/n; Android track or skip) — Phase 2 consumes them without asking again.
+Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS `destination` or skip; Android track or skip) — Phase 2 consumes them without asking again.
 
 ---
 
@@ -201,9 +201,9 @@ gh run list --workflow=mobile-android-release.yml --limit=1
 gh run watch <android-run-id> --exit-status
 ```
 
-**iOS** (TestFlight), only if greg chose to release it:
+**iOS**, only if greg chose a destination (pass the chosen `destination`):
 ```
-gh workflow run mobile-ios-release.yml --ref main
+gh workflow run mobile-ios-release.yml --ref main -f destination=<testflight|appstore-manual|appstore-automatic|appstore-phased>
 ```
 ```
 sleep 10
@@ -215,7 +215,7 @@ gh run list --workflow=mobile-ios-release.yml --limit=1
 gh run watch <ios-run-id> --exit-status
 ```
 
-On a release failure, fetch logs (`gh run view <id> --log-failed`) and report — do **not** auto-retry a store upload (a partial upload can consume a version code / build number). A successful Android upload to a review track (`alpha`/`beta`/`production`) is **auto-submitted for Google review**; `internal` is not.
+On a release failure, fetch logs (`gh run view <id> --log-failed`) and report — do **not** auto-retry a store upload (a partial upload can consume a version code / build number). A successful Android upload to a review track (`alpha`/`beta`/`production`) is **auto-submitted for Google review**; `internal` is not. An iOS `appstore-*` run **submits to App Store review**; after approval `appstore-manual` waits for greg's Release click while `appstore-automatic`/`appstore-phased` self-release. `testflight` is internal, no review.
 
 ## Step 10: Report
 
@@ -224,8 +224,8 @@ Summarise:
 - Which workflows ran (Main CI, Security, Vue Deploy, Astro Deploy, Mobile iOS/Android Release) + durations (`gh run view --json startedAt,updatedAt`)
 - The release note that shipped (if any) — the `en` line + version
 - Production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro)
-- **Mobile (per flagged platform)** — iOS released to TestFlight or skipped (+ the ASC submission step if App-Store-bound); Android track it went to (and whether auto-submitted for review) or skipped
-- The on-device verify + promote-in-console next steps that are greg's (internal → review track on Play; TestFlight → App Store on Apple)
+- **Mobile (per flagged platform)** — iOS destination (TestFlight, or which `appstore-*` mode and that it was submitted for review) or skipped; Android track it went to (and whether auto-submitted for review) or skipped
+- The on-device verify + post-approval next steps that are greg's (Play: internal → review track; Apple: the review verdict, and for `appstore-manual` the Release click in App Store Connect)
 
 ---
 

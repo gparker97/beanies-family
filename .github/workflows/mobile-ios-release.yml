@@ -1,9 +1,10 @@
-name: Mobile — iOS TestFlight release
+name: Mobile — iOS release (TestFlight / App Store)
 
-# Step 3 of the iOS lane (ADR-029): build a signed Release IPA and upload it to
-# TestFlight. DORMANT until the Apple Developer (Organization) account + an App
-# Store Connect API key exist — both gated on the D-U-N-S number. This is
-# manual-dispatch ONLY, so it never auto-runs on a push and can sit here ready.
+# iOS release lane (ADR-029): build a signed Release IPA and ship it to the
+# destination chosen by the `destination` input — TestFlight (internal testers) or
+# the App Store (submit for review, with a post-approval release mode). Manual-dispatch
+# ONLY, so it never auto-runs on a push. The App Store path became usable once Apple
+# approved the first version (2026-08-21); see docs/plans/2026-08-21-ios-appstore-submit-lane.md.
 #
 # Before the first run, add these in Settings → Secrets and variables → Actions.
 # The three identifiers are non-sensitive (useless without the .p8 private key),
@@ -22,6 +23,16 @@ name: Mobile — iOS TestFlight release
 
 on:
   workflow_dispatch:
+    inputs:
+      destination:
+        description: 'Where to ship the signed build'
+        type: choice
+        default: testflight
+        # testflight        → upload to TestFlight (internal testers), no review.
+        # appstore-manual   → submit to App Store review; hold for a manual Release click after approval.
+        # appstore-automatic→ submit to App Store review; release automatically once approved.
+        # appstore-phased   → submit to App Store review; 7-day phased rollout after approval.
+        options: [testflight, appstore-manual, appstore-automatic, appstore-phased]
 
 permissions:
   contents: read
@@ -116,7 +127,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/asc"
           echo "$APP_STORE_CONNECT_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey.p8"
 
-      - name: Build + upload to TestFlight (Fastlane)
+      - name: Build + ship (Fastlane)
         working-directory: ios/App
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ vars.APP_STORE_CONNECT_API_KEY_ID }}
@@ -127,6 +138,12 @@ jobs:
           # APP_VERSION (derived above, R-suffix stripped).
           BUILD_NUMBER: ${{ github.run_number }}
           MARKETING_VERSION: ${{ env.STORE_VERSION }}
+          # The `release` lane strips the `appstore-` prefix to resolve the release
+          # mode; the `beta` lane ignores it.
+          IOS_DESTINATION: ${{ inputs.destination }}
         run: |
           gem install fastlane --no-document
-          fastlane beta
+          # Routing rule (kept legible so control flow doesn't hide in the expression):
+          #   any `appstore-*` destination → `release` (App Store submit)
+          #   `testflight`                 → `beta`    (TestFlight upload)
+          fastlane ${{ startsWith(inputs.destination, 'appstore') && 'release' || 'beta' }}
