@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — hero: desktop + phone + store badges</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --heritage-orange: #f15d22;
+        --deep-slate: #2c3e50;
+        --sky-silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud-white: #f8f9fa;
+        --soft-green: #27ae60;
+        --ink: #2c3e50;
+        --hairline: rgba(44, 62, 80, 0.09);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--cloud-white);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, .display { font-family: 'Outfit', system-ui, sans-serif; }
+
+      /* ---- mockup chrome (not part of the design) ---- */
+      .mock-note {
+        background: var(--deep-slate);
+        color: #fff;
+        padding: 12px 20px;
+        font-size: 0.82rem;
+        text-align: center;
+      }
+      .mock-note strong { color: var(--sky-silk); }
+
+      /* =========================== HERO =========================== */
+      .hero {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(165deg, #ffffff 0%, var(--cloud-white) 52%, #eef6fd 100%);
+        padding: 64px 24px 88px;
+      }
+      .hero__deco {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        filter: blur(2px);
+      }
+      .hero__bean {
+        position: absolute;
+        opacity: 0.13;
+        pointer-events: none;
+        user-select: none;
+      }
+      .hero__grid {
+        position: relative;
+        z-index: 2;
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+        align-items: center;
+        gap: 40px;
+      }
+
+      /* ---- left column: copy ---- */
+      .hero__eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        color: var(--deep-slate);
+        background: rgba(174, 214, 241, 0.28);
+        border: 1px solid rgba(174, 214, 241, 0.6);
+        padding: 5px 12px;
+        border-radius: 999px;
+        margin-bottom: 20px;
+      }
+      .hero__headline {
+        font-size: clamp(2.7rem, 5.4vw, 4.1rem);
+        font-weight: 800;
+        line-height: 1.0;
+        letter-spacing: -0.025em;
+        color: var(--deep-slate);
+      }
+      .hero__headline em { color: var(--heritage-orange); font-style: normal; }
+      .hero__sub {
+        margin: 20px 0 10px;
+        font-size: 1.14rem;
+        color: #4a5b6a;
+        max-width: 480px;
+      }
+      .hero__privacy {
+        font-size: 0.95rem;
+        color: #6b7a89;
+        margin-bottom: 28px;
+      }
+      .hero__privacy a {
+        color: var(--heritage-orange);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .hero__privacy a:hover { text-decoration: underline; }
+
+      .hero__cta-group {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--heritage-orange);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 1.06rem;
+        padding: 15px 30px;
+        border-radius: 16px;
+        text-decoration: none;
+        box-shadow: 0 8px 20px rgba(241, 93, 34, 0.28);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(241, 93, 34, 0.36); }
+      .hero__jump {
+        color: var(--deep-slate);
+        text-decoration: none;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        opacity: 0.72;
+        font-size: 0.98rem;
+      }
+      .hero__jump:hover { opacity: 1; }
+
+      /* ---- store badges beneath the CTA ---- */
+      .hero__stores {
+        margin-top: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .hero__stores-label {
+        font-size: 0.78rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        color: #8a97a4;
+      }
+      .store-badges { display: flex; gap: 12px; flex-wrap: wrap; }
+      /* NOTE: production uses Apple's + Google's OFFICIAL badge SVGs
+         (already inlined in app-store-badges-promo-2026-08-21.html).
+         These CSS approximations exist only to show layout + scale. */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        background: #000;
+        color: #fff;
+        text-decoration: none;
+        padding: 9px 15px 9px 13px;
+        border-radius: 11px;
+        height: 52px;
+        transition: transform 0.15s ease, filter 0.15s ease;
+      }
+      .badge:hover { transform: translateY(-2px); filter: brightness(1.15); }
+      .badge svg { flex: none; }
+      .badge__txt { display: flex; flex-direction: column; line-height: 1.05; }
+      .badge__top { font-size: 0.6rem; letter-spacing: 0.02em; opacity: 0.92; }
+      .badge__big { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.02rem; }
+
+      /* =========================== DEVICE STAGE =========================== */
+      .stage {
+        position: relative;
+        height: 500px;
+        aria-hidden: true;
+      }
+
+      /* ---- floating stat chips ---- */
+      .chip {
+        position: absolute;
+        z-index: 8;
+        background: #fff;
+        border-radius: 14px;
+        padding: 9px 13px;
+        box-shadow: 0 12px 30px rgba(44, 62, 80, 0.14);
+        border: 1px solid var(--hairline);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        animation: floatY 6s ease-in-out infinite;
+      }
+      .chip__icon { font-size: 1.1rem; }
+      .chip__label { font-size: 0.62rem; color: #90a0ad; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+      .chip__val { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.86rem; color: var(--deep-slate); }
+      .chip--nw { top: -6px; left: 40px; animation-delay: 0s; }
+      .chip--sync { bottom: 8px; left: 4px; animation-delay: 2s; }
+      .chip--enc { top: 66px; right: -6px; animation-delay: 3.4s; }
+      @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+      /* ---- desktop browser frame ---- */
+      .desktop {
+        position: absolute;
+        top: 34px;
+        left: 0;
+        width: 660px;
+        max-width: 100%;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 30px 70px rgba(44, 62, 80, 0.22), 0 6px 16px rgba(44, 62, 80, 0.08);
+        border: 1px solid var(--hairline);
+        overflow: hidden;
+        z-index: 3;
+      }
+      .browserbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 13px;
+        background: #f2f4f6;
+        border-bottom: 1px solid var(--hairline);
+      }
+      .browserbar__dots { display: flex; gap: 6px; }
+      .browserbar__dots span { width: 10px; height: 10px; border-radius: 50%; display: block; }
+      .browserbar__url {
+        flex: 1;
+        background: #fff;
+        border-radius: 7px;
+        font-size: 0.66rem;
+        color: #7b8894;
+        padding: 5px 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--hairline);
+      }
+      .browserbar__url span { color: #b3bcc5; }
+
+      /* app shell inside the frame */
+      .appshell { display: grid; grid-template-columns: 148px 1fr; height: 372px; }
+      .sidebar {
+        background: var(--deep-slate);
+        padding: 14px 10px;
+        color: #fff;
+        overflow: hidden;
+      }
+      .sidebar__brand {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 16px;
+        padding: 0 4px;
+      }
+      .sidebar__brand img { width: 22px; height: 22px; }
+      .sidebar__brand b { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.82rem; }
+      .sidebar__brand b em { color: var(--heritage-orange); font-style: normal; }
+      .nav-sec { font-size: 0.56rem; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255,255,255,0.42); font-weight: 700; margin: 12px 6px 6px; }
+      .nav-sec:first-of-type { margin-top: 0; }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        color: rgba(255, 255, 255, 0.82);
+        margin-bottom: 1px;
+      }
+      .nav-item span:first-child { font-size: 0.8rem; width: 16px; text-align: center; }
+      .nav-item--active { background: var(--heritage-orange); color: #fff; font-weight: 600; }
+      .nav-item--badge::after {
+        content: '';
+        margin-left: auto;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--heritage-orange);
+      }
+      .nav-item--active.nav-item--badge::after { background: #fff; }
+
+      .board { background: var(--cloud-white); padding: 16px 16px 8px; overflow: hidden; }
+      .board__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+      .board__title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.98rem; color: var(--deep-slate); }
+      .board__title span { font-size: 0.9rem; }
+      .board__date { font-size: 0.64rem; color: #97a3ae; }
+
+      .nw-card {
+        background: linear-gradient(135deg, #ffffff 0%, #fbfcfd 100%);
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        padding: 14px 15px;
+        box-shadow: 0 4px 14px rgba(44, 62, 80, 0.05);
+        margin-bottom: 12px;
+        position: relative;
+        overflow: hidden;
+      }
+      .nw-card__label { font-size: 0.62rem; color: #90a0ad; font-weight: 600; }
+      .nw-card__amount { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.7rem; color: var(--deep-slate); letter-spacing: -0.01em; line-height: 1.1; }
+      .nw-card__chg { font-size: 0.66rem; color: var(--soft-green); font-weight: 600; margin-top: 1px; }
+      .nw-card__pills { position: absolute; top: 14px; right: 15px; display: flex; gap: 4px; }
+      .nw-card__pill { font-size: 0.56rem; padding: 3px 8px; border-radius: 6px; background: rgba(44,62,80,0.05); color: #8a97a4; font-weight: 600; }
+      .nw-card__pill--on { background: var(--heritage-orange); color: #fff; }
+      .nw-card__chart { margin-top: 10px; height: 46px; }
+
+      .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 12px; }
+      .stat {
+        background: #fff;
+        border: 1px solid var(--hairline);
+        border-radius: 11px;
+        padding: 9px 10px;
+      }
+      .stat--dark { background: var(--deep-slate); border-color: var(--deep-slate); }
+      .stat__ic { font-size: 0.82rem; }
+      .stat__lbl { font-size: 0.56rem; color: #90a0ad; font-weight: 600; margin-top: 3px; }
+      .stat--dark .stat__lbl { color: rgba(255,255,255,0.5); }
+      .stat__amt { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.86rem; color: var(--deep-slate); }
+      .stat__amt--green { color: var(--soft-green); }
+      .stat__amt--orange { color: var(--heritage-orange); }
+      .stat--dark .stat__amt { color: #fff; }
+
+      .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+      .panel { background: #fff; border: 1px solid var(--hairline); border-radius: 11px; padding: 10px 11px; }
+      .panel__h { display: flex; align-items: center; gap: 5px; font-size: 0.62rem; color: #7b8894; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 7px; }
+      .row { display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem; margin-bottom: 5px; }
+      .row__name { color: #64717d; }
+      .row__val { font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--deep-slate); }
+      .goal { margin-bottom: 7px; }
+      .goal__top { display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 2px; }
+      .goal__pct { font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--heritage-orange); }
+      .goal__bar { height: 5px; background: rgba(44,62,80,0.06); border-radius: 3px; overflow: hidden; }
+      .goal__fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta)); }
+
+      /* ---- phone in front ---- */
+      .phone {
+        position: absolute;
+        z-index: 5;
+        right: -6px;
+        bottom: -30px;
+        width: 216px;
+        background: #1c2733;
+        border-radius: 30px;
+        padding: 8px;
+        box-shadow: 0 34px 60px rgba(44, 62, 80, 0.32), 0 8px 18px rgba(44, 62, 80, 0.14);
+      }
+      .phone__notch { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 62px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22); z-index: 2; }
+      .phone__screen {
+        background: var(--cloud-white);
+        border-radius: 23px;
+        overflow: hidden;
+        padding: 16px 12px 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .pl-head { display: flex; align-items: flex-start; justify-content: space-between; }
+      .pl-title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--deep-slate); }
+      .pl-sub { font-size: 0.56rem; color: #97a3ae; }
+      .pl-add { background: var(--heritage-orange); color: #fff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.56rem; padding: 4px 9px; border-radius: 8px; }
+      .pl-chips { display: flex; gap: 4px; }
+      .pl-chip { font-size: 0.52rem; padding: 3px 7px; border-radius: 999px; background: #fff; border: 1px solid var(--hairline); color: #64717d; display: flex; align-items: center; gap: 3px; }
+      .pl-chip--on { background: var(--deep-slate); color: #fff; border-color: var(--deep-slate); }
+      .pl-dot { width: 5px; height: 5px; border-radius: 50%; }
+      .cal { background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 9px; }
+      .cal__wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+      .cal__wk span { text-align: center; font-size: 0.5rem; color: #b3bcc5; font-weight: 700; }
+      .cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+      .cal__c { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.54rem; color: #64717d; border-radius: 6px; position: relative; }
+      .cal__c--ev::after { content: ''; position: absolute; bottom: 2px; width: 3px; height: 3px; border-radius: 50%; background: var(--heritage-orange); }
+      .cal__c--ev2::after { content: ''; position: absolute; bottom: 2px; width: 11px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--heritage-orange), var(--sky-silk)); }
+      .cal__c--blue::after { content: ''; position: absolute; bottom: 2px; width: 3px; height: 3px; border-radius: 50%; background: #3b82f6; }
+      .cal__c--today { background: var(--heritage-orange); color: #fff; font-weight: 700; }
+      .cal__c--today.cal__c--ev2::after { background: rgba(255,255,255,0.8); }
+      .pl-up { background: #fff; border: 1px solid var(--hairline); border-radius: 10px; padding: 8px 9px; display: flex; align-items: center; gap: 8px; }
+      .pl-up__ic { width: 24px; height: 24px; border-radius: 7px; background: rgba(174,214,241,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; }
+      .pl-up__t { font-size: 0.6rem; font-weight: 600; color: var(--deep-slate); }
+      .pl-up__s { font-size: 0.52rem; color: #97a3ae; }
+
+      /* ---- phone label tag ---- */
+      .tag {
+        position: absolute;
+        z-index: 9;
+        background: #fff;
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        padding: 4px 11px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 0.62rem;
+        color: var(--deep-slate);
+        box-shadow: 0 8px 20px rgba(44,62,80,0.12);
+        display: flex; align-items: center; gap: 5px;
+      }
+      .tag--desktop { top: 22px; left: 18px; }
+      .tag--phone { bottom: 2px; right: 150px; }
+
+      /* =========================== RESPONSIVE =========================== */
+      @media (max-width: 940px) {
+        .hero__grid { grid-template-columns: 1fr; gap: 12px; }
+        .hero__copy { text-align: center; }
+        .hero__eyebrow { margin-inline: auto; }
+        .hero__sub { margin-inline: auto; }
+        .hero__cta-group { justify-content: center; }
+        .hero__stores { align-items: center; }
+        .stage { height: 440px; margin-top: 8px; }
+        .desktop { width: 560px; left: 50%; transform: translateX(-54%); }
+        .phone { right: 4%; }
+      }
+      @media (max-width: 620px) {
+        .hero { padding: 44px 16px 64px; }
+        .stage { height: 400px; }
+        .desktop { width: 116%; left: 50%; transform: translateX(-50%); }
+        .appshell { grid-template-columns: 96px 1fr; height: 340px; }
+        .nav-item span:last-child, .sidebar__brand b, .nav-sec { font-size: 0.6rem; }
+        .phone { width: 168px; right: -2%; bottom: -22px; }
+        .tag--phone { right: 120px; }
+        .chip--enc { right: 2px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .chip { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-note">
+      MOCKUP — proposed homepage hero: <strong>desktop + phone pair</strong>, store badges beneath the
+      <strong>get started</strong> CTA. CSS-rendered (no heavy images); badges shown as CSS
+      approximations — production uses the official Apple/Google SVGs.
+    </div>
+
+    <section class="hero">
+      <!-- decorative layer -->
+      <div class="hero__deco" style="background: var(--sky-silk); opacity: 0.5; width: 380px; height: 380px; right: -140px; top: -120px;"></div>
+      <div class="hero__deco" style="background: radial-gradient(circle, var(--heritage-orange) 0%, transparent 70%); opacity: 0.06; width: 720px; height: 720px; left: -340px; bottom: -300px;"></div>
+      <div class="hero__bean" style="left: 4%; top: 16%; font-size: 1.7rem; transform: rotate(-15deg)">🫘</div>
+      <div class="hero__bean" style="left: 44%; top: 6%; font-size: 1.2rem; transform: rotate(18deg)">🫘</div>
+      <div class="hero__bean" style="left: 30%; bottom: 10%; font-size: 1.4rem; transform: rotate(-24deg)">🫘</div>
+
+      <div class="hero__grid">
+        <!-- LEFT: copy -->
+        <div class="hero__copy">
+          <div class="hero__eyebrow">🔒 local-first · private by design</div>
+          <h1 class="hero__headline">every. bean.<br /><em>counts.</em></h1>
+          <p class="hero__sub">
+            the calm home for your family's week and money — plans, budgets, to-dos and
+            memories, all in one private place.
+          </p>
+          <p class="hero__privacy">
+            your data never leaves your hands. <a href="#security">privacy, guaranteed ↓</a>
+          </p>
+
+          <div class="hero__cta-group">
+            <a class="btn-primary" href="https://app.beanies.family/welcome">get started — it's free</a>
+            <a class="hero__jump" href="#features">see what's inside ↓</a>
+          </div>
+
+          <div class="hero__stores">
+            <span class="hero__stores-label">or get the app</span>
+            <div class="store-badges">
+              <!-- App Store (CSS approximation of the official badge) -->
+              <a class="badge" href="https://beanies.family/ios" aria-label="Download on the App Store">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+                  <path d="M16.36 12.9c.02 2.32 2.04 3.09 2.06 3.1-.02.05-.32 1.11-1.06 2.2-.64.95-1.3 1.9-2.36 1.92-1.03.02-1.37-.61-2.55-.61-1.18 0-1.55.59-2.53.63-1.01.04-1.79-1.02-2.44-1.97-1.32-1.92-2.33-5.42-.97-7.79.67-1.17 1.88-1.92 3.19-1.94.99-.02 1.93.67 2.54.67.61 0 1.75-.83 2.95-.71.5.02 1.92.2 2.83 1.53-.07.05-1.69.99-1.67 2.95M14.4 5.6c.54-.66.9-1.57.8-2.48-.78.03-1.72.52-2.28 1.18-.5.58-.94 1.5-.82 2.39.87.07 1.76-.44 2.3-1.09"/>
+                </svg>
+                <span class="badge__txt"><span class="badge__top">Download on the</span><span class="badge__big">App Store</span></span>
+              </a>
+              <!-- Google Play (CSS approximation of the official badge) -->
+              <a class="badge" href="https://beanies.family/android" aria-label="Get it on Google Play">
+                <svg width="20" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3.5 2.1c-.3.2-.5.6-.5 1.1v17.6c0 .5.2.9.5 1.1l10.2-9.9L3.5 2.1z" fill="#3bccff"/>
+                  <path d="M17.8 8.4l-3.6-2.1-2.7 2.6 2.7 2.6 3.6-2.1c.9-.5.9-1.4 0-1.9v-.2z" fill="#ffd400"/>
+                  <path d="M3.5 2.1l10.7 6.3 2.7-2.6L6.1.6C5.2.1 4.2.2 3.5 1v1.1z" fill="#00e676"/>
+                  <path d="M3.5 21.9l10.7-6.3-2.7-2.6L6.1 16.5c-.9.5-1.9.4-2.6-.4v5.8z" fill="#ff3d47"/>
+                </svg>
+                <span class="badge__txt"><span class="badge__top">GET IT ON</span><span class="badge__big">Google Play</span></span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: device stage -->
+        <div class="stage" aria-hidden="true">
+          <!-- floating chips -->
+          <div class="chip chip--nw">
+            <span class="chip__icon">📈</span>
+            <span><span class="chip__label">net worth</span><br /><span class="chip__val">+3.2% this month</span></span>
+          </div>
+          <div class="chip chip--sync">
+            <span class="chip__icon">🔄</span>
+            <span><span class="chip__label">synced</span><br /><span class="chip__val">all your devices</span></span>
+          </div>
+          <div class="chip chip--enc">
+            <span class="chip__icon">🔒</span>
+            <span><span class="chip__label">security</span><br /><span class="chip__val" style="color:var(--soft-green)">AES-256 encrypted</span></span>
+          </div>
+
+          <span class="tag tag--desktop">🖥️ on your laptop</span>
+          <span class="tag tag--phone">📱 & your phone</span>
+
+          <!-- DESKTOP FRAME: Piggy Bank → Overview -->
+          <div class="desktop">
+            <div class="browserbar">
+              <div class="browserbar__dots"><span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span></div>
+              <div class="browserbar__url">🔒 app.beanies.family<span>/dashboard</span></div>
+            </div>
+            <div class="appshell">
+              <!-- sidebar -->
+              <aside class="sidebar">
+                <div class="sidebar__brand">
+                  <img src="https://beanies.family/brand/beanies_small_bean_favicon_512x512.webp" alt="" onerror="this.style.display='none'" />
+                  <b>beanies<em>.family</em></b>
+                </div>
+                <div class="nav-sec">🌳 The Treehouse</div>
+                <div class="nav-item"><span>🏡</span><span>Family Nook</span></div>
+                <div class="nav-item"><span>📅</span><span>Calendar</span></div>
+                <div class="nav-item nav-item--badge"><span>✈️</span><span>Travel</span></div>
+                <div class="nav-item nav-item--badge"><span>✅</span><span>To-Do</span></div>
+                <div class="nav-item"><span>🌱</span><span>The Pod</span></div>
+                <div class="nav-sec">🐷 The Piggy Bank</div>
+                <div class="nav-item nav-item--active"><span>🏠</span><span>Overview</span></div>
+                <div class="nav-item"><span>💰</span><span>Accounts</span></div>
+                <div class="nav-item nav-item--badge"><span>💵</span><span>Budgets</span></div>
+                <div class="nav-item"><span>🎯</span><span>Goals</span></div>
+              </aside>
+              <!-- board -->
+              <div class="board">
+                <div class="board__head">
+                  <div class="board__title"><span>🐷</span> Overview</div>
+                  <div class="board__date">Monday, March 10</div>
+                </div>
+                <div class="nw-card">
+                  <div class="nw-card__pills">
+                    <span class="nw-card__pill">1M</span><span class="nw-card__pill nw-card__pill--on">1Y</span><span class="nw-card__pill">All</span>
+                  </div>
+                  <div class="nw-card__label">🐷 Net Worth</div>
+                  <div class="nw-card__amount">$125,400</div>
+                  <div class="nw-card__chg">↑ +12.5% this month</div>
+                  <svg class="nw-card__chart" viewBox="0 0 300 46" preserveAspectRatio="none" fill="none">
+                    <defs>
+                      <linearGradient id="cF" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#F15D22" stop-opacity="0.28"></stop>
+                        <stop offset="100%" stop-color="#F15D22" stop-opacity="0"></stop>
+                      </linearGradient>
+                    </defs>
+                    <path d="M0,40 C36,35 66,30 100,24 C140,17 168,26 200,16 C236,9 268,7 300,4" stroke="#F15D22" stroke-width="2" fill="none"></path>
+                    <path d="M0,40 C36,35 66,30 100,24 C140,17 168,26 200,16 C236,9 268,7 300,4 L300,46 L0,46 Z" fill="url(#cF)"></path>
+                    <circle cx="300" cy="4" r="3" fill="#F15D22" stroke="white" stroke-width="1.5"></circle>
+                  </svg>
+                </div>
+                <div class="stat-row">
+                  <div class="stat"><div class="stat__ic">📈</div><div class="stat__lbl">Income</div><div class="stat__amt stat__amt--green">$8,500</div></div>
+                  <div class="stat"><div class="stat__ic">📉</div><div class="stat__lbl">Expenses</div><div class="stat__amt stat__amt--orange">$6,200</div></div>
+                  <div class="stat stat--dark"><div class="stat__ic">💰</div><div class="stat__lbl">Cash Flow</div><div class="stat__amt">+$2,300</div></div>
+                </div>
+                <div class="cols">
+                  <div class="panel">
+                    <div class="panel__h">🏦 Accounts</div>
+                    <div class="row"><span class="row__name">Checking</span><span class="row__val">$12,400</span></div>
+                    <div class="row"><span class="row__name">Savings</span><span class="row__val">$45,600</span></div>
+                    <div class="row"><span class="row__name">Investments</span><span class="row__val">$67,400</span></div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel__h">🎯 Goals</div>
+                    <div class="goal">
+                      <div class="goal__top"><span class="row__name">Emergency fund</span><span class="goal__pct">82%</span></div>
+                      <div class="goal__bar"><div class="goal__fill" style="width:82%"></div></div>
+                    </div>
+                    <div class="goal">
+                      <div class="goal__top"><span class="row__name">Summer trip</span><span class="goal__pct">45%</span></div>
+                      <div class="goal__bar"><div class="goal__fill" style="width:45%"></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHONE: Family Planner -->
+          <div class="phone">
+            <div class="phone__notch"></div>
+            <div class="phone__screen">
+              <div class="pl-head">
+                <div>
+                  <div class="pl-title">📅 March 2026</div>
+                  <div class="pl-sub">12 activities this month</div>
+                </div>
+                <div class="pl-add">+ Add</div>
+              </div>
+              <div class="pl-chips">
+                <div class="pl-chip pl-chip--on">All</div>
+                <div class="pl-chip"><span class="pl-dot" style="background:#3b82f6"></span>Greg</div>
+                <div class="pl-chip"><span class="pl-dot" style="background:#ec4899"></span>Sarah</div>
+              </div>
+              <div class="cal">
+                <div class="cal__wk"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+                <div class="cal__grid">
+                  <div class="cal__c cal__c--ev">1</div><div class="cal__c cal__c--ev2">2</div><div class="cal__c cal__c--ev">3</div><div class="cal__c cal__c--blue">4</div><div class="cal__c">5</div><div class="cal__c cal__c--ev">6</div><div class="cal__c">7</div>
+                  <div class="cal__c cal__c--blue">8</div><div class="cal__c cal__c--ev2">9</div><div class="cal__c cal__c--today cal__c--ev2">10</div><div class="cal__c cal__c--ev">11</div><div class="cal__c">12</div><div class="cal__c cal__c--ev">13</div><div class="cal__c">14</div>
+                  <div class="cal__c">15</div><div class="cal__c cal__c--ev">16</div><div class="cal__c cal__c--blue">17</div><div class="cal__c cal__c--ev2">18</div><div class="cal__c">19</div><div class="cal__c cal__c--ev">20</div><div class="cal__c">21</div>
+                  <div class="cal__c cal__c--ev">22</div><div class="cal__c cal__c--ev2">23</div><div class="cal__c">24</div><div class="cal__c cal__c--ev">25</div><div class="cal__c cal__c--blue">26</div><div class="cal__c">27</div><div class="cal__c">28</div>
+                </div>
+              </div>
+              <div class="pl-up">
+                <div class="pl-up__ic">📚</div>
+                <div><div class="pl-up__t">Piano Lesson</div><div class="pl-up__s">Today · 3pm · Emma</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

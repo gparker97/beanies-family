@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import WorldsBeanstalk from '../components/WorldsBeanstalk.astro';
+import HeroShowcase from '../components/HeroShowcase.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL } from '@beanies/brand/nav';
 
@@ -82,317 +83,22 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
         <a class="hero__jump-link" href="#features" data-scroll-to="features">see what's inside ↓</a>
       </div>
 
-      <!-- FLOATING DEVICE SHOWCASE
-           Decorative mockup of the app's UI — pure illustration of what the
-           product looks like. The tiny labels inside (6-7px stat text, mock
-           account names, etc.) are visual prop, not readable content for
-           assistive tech. aria-hidden tells screen readers + Lighthouse's
-           color-contrast audit to skip — the audit was flagging the demo's
-           intentionally-low-contrast 6px label text against white as if it
-           were real body content. -->
-      <div class="showcase" aria-hidden="true">
-        <div class="hero__float" style="animation-delay: 0s; left: 50px; top: 10px; z-index: 6">
-          <div class="hero__float-icon">📈</div>
-          <div class="hero__float-label">net worth</div>
-          <div class="hero__float-val" style="color: #27ae60">+3.2%</div>
-        </div>
-        <div class="hero__float" style="animation-delay: 1.5s; bottom: 60px; right: 50px; z-index: 6">
-          <div class="hero__float-icon">🎯</div>
-          <div class="hero__float-label">goal reached</div>
-          <div class="hero__float-val">$10,000 🎉</div>
-        </div>
-        <div class="hero__float" style="animation-delay: 3s; right: 20px; top: 200px; z-index: 6">
-          <div class="hero__float-icon">🚗</div>
-          <div class="hero__float-label">reminder</div>
-          <div class="hero__float-val" style="font-size: 0.72rem">pick up Emma at 4pm</div>
-        </div>
-        <div class="hero__float" style="animation-delay: 4.5s; bottom: 140px; left: 30px; z-index: 6">
-          <div class="hero__float-icon">🔒</div>
-          <div class="hero__float-label">security</div>
-          <div class="hero__float-val" style="color: var(--soft-green); font-size: 0.72rem">AES-256 encrypted</div>
-        </div>
-
-        <!-- LEFT: Piggy Bank -->
-        <div class="showcase__device showcase__device--left">
-          <div class="showcase__device-label"><span>🐷</span> <span>Piggy Bank</span></div>
-          <div class="mock-screen">
-            <div class="mock-hero-card">
-              <div style="align-items: flex-start; display: flex; justify-content: space-between; position: relative;">
-                <div>
-                  <div class="mock-hero-label">🐷 Net Worth</div>
-                  <div class="mock-hero-amount">$125,400</div>
-                  <div class="mock-hero-change">↑ +12.5% <span>this month</span></div>
-                </div>
-                <div class="mock-period-pills">
-                  <div class="mock-period-pill">1M</div>
-                  <div class="mock-period-pill mock-period-pill--active">1Y</div>
-                  <div class="mock-period-pill">All</div>
-                </div>
-              </div>
-              <div class="mock-chart-area">
-                <svg class="mock-chart-line" viewBox="0 0 280 36" preserveAspectRatio="none" fill="none">
-                  <defs>
-                    <linearGradient id="cF" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="#F15D22" stop-opacity="0.3"></stop>
-                      <stop offset="100%" stop-color="#F15D22" stop-opacity="0"></stop>
-                    </linearGradient>
-                  </defs>
-                  <path d="M0,32 C30,28 60,24 90,20 C120,16 150,22 180,14 C210,8 240,6 280,3" stroke="#F15D22" stroke-width="1.5" fill="none"></path>
-                  <path d="M0,32 C30,28 60,24 90,20 C120,16 150,22 180,14 C210,8 240,6 280,3 L280,36 L0,36 Z" fill="url(#cF)"></path>
-                  <circle cx="280" cy="3" r="2.5" fill="#F15D22" stroke="white" stroke-width="1.5"></circle>
-                </svg>
-              </div>
-            </div>
-            <div class="mock-stats-row">
-              <div class="mock-stat-card">
-                <div class="mock-stat-icon mock-stat-icon--green">📈</div>
-                <div class="mock-stat-label">Income</div>
-                <div class="mock-stat-amount mock-stat-amount--green">$8,500</div>
-              </div>
-              <div class="mock-stat-card">
-                <div class="mock-stat-icon mock-stat-icon--orange">📉</div>
-                <div class="mock-stat-label">Expenses</div>
-                <div class="mock-stat-amount mock-stat-amount--orange">$6,200</div>
-              </div>
-              <div class="mock-stat-card mock-stat-card--dark">
-                <div class="mock-stat-icon mock-stat-icon--white">💰</div>
-                <div class="mock-stat-label" style="color: rgb(255 255 255 / 40%)">Cash Flow</div>
-                <div class="mock-stat-amount" style="color: white">$2,300</div>
-              </div>
-            </div>
-            <div class="mock-accounts-row">
-              <div class="mock-account-card">
-                <div class="mock-account-header">
-                  <span style="font-size: 9px">🏦</span>
-                  <span class="mock-account-label">Accounts</span>
-                </div>
-                <div class="mock-account-item">
-                  <span class="mock-account-name">Checking</span><span class="mock-account-bal">$12,400</span>
-                </div>
-                <div class="mock-account-item">
-                  <span class="mock-account-name">Savings</span><span class="mock-account-bal">$45,600</span>
-                </div>
-              </div>
-              <div class="mock-account-card">
-                <div class="mock-account-header">
-                  <span style="font-size: 9px">🎯</span>
-                  <span class="mock-account-label">Goals</span>
-                </div>
-                <div style="margin-bottom: 4px">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 1px">
-                    <span class="mock-account-name">Emergency</span><span style="color: #27ae60; font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 700">82%</span>
-                  </div>
-                  <div style="background: rgb(44 62 80 / 5%); border-radius: 2px; height: 4px; overflow: hidden;">
-                    <div style="background: linear-gradient(90deg, #f15d22, #e67e22); border-radius: 2px; height: 100%; width: 82%"></div>
-                  </div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 1px">
-                    <span class="mock-account-name">Vacation</span><span style="color: var(--heritage-orange); font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 700">45%</span>
-                  </div>
-                  <div style="background: rgb(44 62 80 / 5%); border-radius: 2px; height: 4px; overflow: hidden;">
-                    <div style="background: linear-gradient(90deg, #f15d22, #e67e22); border-radius: 2px; height: 100%; width: 45%"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CENTER: Family Nook -->
-        <div class="showcase__device showcase__device--center">
-          <div class="showcase__device-label"><span>🏡</span> <span>Family Nook</span></div>
-          <div class="mock-screen">
-            <div>
-              <div class="mock-greeting">Welcome home, <span>Greg</span></div>
-              <div class="mock-date">Monday, March 10, 2026</div>
-            </div>
-            <div class="mock-toast">
-              <div class="mock-toast-header">
-                <div class="mock-toast-icon">🌳</div>
-                <div>
-                  <div class="mock-toast-title">Small steps, big adventures</div>
-                  <div class="mock-toast-sub">4 activities, 3 tasks today</div>
-                </div>
-              </div>
-              <div class="mock-toast-sep"></div>
-              <div class="mock-toast-item">
-                <div class="mock-toast-item-icon">🚗</div>
-                <div class="mock-toast-item-text">Pick up Emma from Soccer at 4pm</div>
-              </div>
-              <div class="mock-toast-item">
-                <div class="mock-toast-item-icon">📋</div>
-                <div class="mock-toast-item-text">Sarah asked you to buy groceries</div>
-              </div>
-            </div>
-            <div class="mock-beans-row">
-              <div class="mock-bean">
-                <div class="mock-bean-avatar" style="border-color: #3b82f6">
-                  <img src="/brand/beanies_father_icon_transparent_360x360.webp" alt="" width="360" height="360" loading="lazy" decoding="async" />
-                </div>
-                <div class="mock-bean-name">Greg</div>
-              </div>
-              <div class="mock-bean">
-                <div class="mock-bean-avatar" style="border-color: #ec4899">
-                  <img src="/brand/beanies_mother_icon_transparent_350x350.webp" alt="" width="350" height="350" loading="lazy" decoding="async" />
-                </div>
-                <div class="mock-bean-name">Sarah</div>
-              </div>
-              <div class="mock-bean">
-                <div class="mock-bean-avatar" style="border-color: #f59e0b">
-                  <img src="/brand/beanies_baby_girl_icon_transparent_300x300.webp" alt="" width="300" height="300" loading="lazy" decoding="async" />
-                </div>
-                <div class="mock-bean-name">Emma</div>
-              </div>
-              <div class="mock-bean">
-                <div class="mock-bean-avatar" style="border-color: #10b981">
-                  <img src="/brand/beanies_baby_boy_icon_transparent_300x300.webp" alt="" width="300" height="300" loading="lazy" decoding="async" />
-                </div>
-                <div class="mock-bean-name">Liam</div>
-              </div>
-            </div>
-            <div class="mock-schedule-row">
-              <div class="mock-schedule-card mock-schedule-card--sky">
-                <div class="mock-schedule-header">
-                  <div class="mock-schedule-label">📆 Today</div>
-                  <div class="mock-schedule-badge mock-schedule-badge--sky">Mar 10</div>
-                </div>
-                <div class="mock-schedule-item">
-                  <div class="mock-schedule-item-icon mock-schedule-item-icon--sky">📚</div>
-                  <div>
-                    <div class="mock-item-title">Piano Lesson</div>
-                    <div class="mock-item-time">3pm · Emma</div>
-                  </div>
-                </div>
-                <div class="mock-schedule-item">
-                  <div class="mock-schedule-item-icon mock-schedule-item-icon--sky">⚽</div>
-                  <div>
-                    <div class="mock-item-title">Soccer Practice</div>
-                    <div class="mock-item-time">4pm · Liam</div>
-                  </div>
-                </div>
-              </div>
-              <div class="mock-schedule-card mock-schedule-card--orange">
-                <div class="mock-schedule-header">
-                  <div class="mock-schedule-label">🗓️ This Week</div>
-                  <div class="mock-schedule-badge mock-schedule-badge--orange">Calendar →</div>
-                </div>
-                <div class="mock-schedule-item">
-                  <div class="mock-schedule-item-icon mock-schedule-item-icon--orange">🏥</div>
-                  <div>
-                    <div class="mock-item-title">Dentist</div>
-                    <div class="mock-item-time">Tue · 10am</div>
-                  </div>
-                </div>
-                <div class="mock-schedule-item">
-                  <div class="mock-schedule-item-icon mock-schedule-item-icon--orange">🥋</div>
-                  <div>
-                    <div class="mock-item-title">Taekwondo</div>
-                    <div class="mock-item-time">Wed · 5pm</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- RIGHT: Family Planner -->
-        <div class="showcase__device showcase__device--right">
-          <div class="showcase__device-label"><span>📅</span> <span>Family Planner</span></div>
-          <div class="mock-screen" style="gap: 5px">
-            <div class="mock-planner-header">
-              <div>
-                <div class="mock-planner-title">📅 March 2026</div>
-                <div class="mock-planner-sub">12 activities this month</div>
-              </div>
-              <div class="mock-add-btn">+ Add</div>
-            </div>
-            <div style="align-items: center; display: flex; justify-content: space-between">
-              <div class="mock-view-toggle">
-                <div class="mock-view-btn mock-view-btn--active">Month</div>
-                <div class="mock-view-btn">Week</div>
-              </div>
-              <div class="mock-member-chips">
-                <div class="mock-member-chip mock-member-chip--active">All</div>
-                <div class="mock-member-chip">
-                  <div class="mock-member-chip-dot" style="background: #3b82f6"></div>Greg
-                </div>
-                <div class="mock-member-chip">
-                  <div class="mock-member-chip-dot" style="background: #ec4899"></div>Sarah
-                </div>
-              </div>
-            </div>
-            <div class="mock-calendar">
-              <div class="mock-cal-header">
-                <div class="mock-cal-day-label">S</div>
-                <div class="mock-cal-day-label">M</div>
-                <div class="mock-cal-day-label">T</div>
-                <div class="mock-cal-day-label">W</div>
-                <div class="mock-cal-day-label">T</div>
-                <div class="mock-cal-day-label">F</div>
-                <div class="mock-cal-day-label">S</div>
-              </div>
-              <div class="mock-cal-grid">
-                <div class="mock-cal-cell mock-cal-cell--has-events">1</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-multi">2</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">3</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-blue">4</div>
-                <div class="mock-cal-cell">5</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">6</div>
-                <div class="mock-cal-cell">7</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-blue">8</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-multi">9</div>
-                <div class="mock-cal-cell mock-cal-cell--today mock-cal-cell--has-events-multi">10</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">11</div>
-                <div class="mock-cal-cell">12</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">13</div>
-                <div class="mock-cal-cell">14</div>
-                <div class="mock-cal-cell">15</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">16</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-blue">17</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-multi">18</div>
-                <div class="mock-cal-cell">19</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">20</div>
-                <div class="mock-cal-cell">21</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">22</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-multi">23</div>
-                <div class="mock-cal-cell">24</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">25</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-blue">26</div>
-                <div class="mock-cal-cell">27</div>
-                <div class="mock-cal-cell">28</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events">29</div>
-                <div class="mock-cal-cell mock-cal-cell--has-events-multi">30</div>
-                <div class="mock-cal-cell">31</div>
-                <div class="mock-cal-cell mock-cal-cell--other">1</div>
-                <div class="mock-cal-cell mock-cal-cell--other">2</div>
-                <div class="mock-cal-cell mock-cal-cell--other">3</div>
-                <div class="mock-cal-cell mock-cal-cell--other">4</div>
-              </div>
-            </div>
-            <div style="display: flex; gap: 5px">
-              <div style="background: white; border-left: 2px solid var(--heritage-orange); border-radius: 8px; box-shadow: 0 1px 6px rgb(44 62 80 / 3%); flex: 1; padding: 5px 7px;">
-                <div style="font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6px; font-weight: 700; margin-bottom: 3px; opacity: 0.4; text-transform: uppercase;">📌 Today</div>
-                <div style="align-items: center; display: flex; gap: 3px; margin-bottom: 2px">
-                  <span style="font-size: 8px">📚</span><span style="font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600">Piano 3pm</span><span style="background: rgb(249 115 22 / 10%); border-radius: 3px; color: var(--heritage-orange); font-size: 5.5px; font-weight: 600; padding: 1px 3px;">Emma</span>
-                </div>
-                <div style="align-items: center; display: flex; gap: 3px">
-                  <span style="font-size: 8px">⚽</span><span style="font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600">Soccer 4pm</span><span style="background: rgb(16 185 129 / 10%); border-radius: 3px; color: #10b981; font-size: 5.5px; font-weight: 600; padding: 1px 3px;">Liam</span>
-                </div>
-              </div>
-              <div style="background: white; border-left: 2px solid #9b59b6; border-radius: 8px; box-shadow: 0 1px 6px rgb(44 62 80 / 3%); flex: 1; padding: 5px 7px;">
-                <div style="font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6px; font-weight: 700; margin-bottom: 3px; opacity: 0.4; text-transform: uppercase;">✅ Tasks</div>
-                <div style="align-items: center; display: flex; gap: 3px; margin-bottom: 2px">
-                  <span style="border: 1.5px solid var(--heritage-orange); border-radius: 1.5px; flex-shrink: 0; height: 6px; width: 6px;"></span><span style="font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600">Buy groceries</span>
-                </div>
-                <div style="align-items: center; display: flex; gap: 3px">
-                  <span style="border: 1.5px solid var(--heritage-orange); border-radius: 1.5px; flex-shrink: 0; height: 6px; width: 6px;"></span><span style="font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600">Book dentist</span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div class="hero__stores">
+        <span class="hero__stores-label">or get the app</span>
+        <div class="hero__stores-badges">
+          <a href="/ios" aria-label="Download beanies.family on the App Store">
+            <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
+          </a>
+          <a href="/android" aria-label="Get beanies.family on Google Play">
+            <img src="/badges/google-play.svg" alt="Get it on Google Play" width="239" height="71" loading="lazy" decoding="async" />
+          </a>
         </div>
       </div>
+
+      <!-- App preview: browser-framed desktop + two phones on desktop; a swipe
+           carousel of the app screens on mobile. Pure-CSS (no images) so it adds
+           no LCP/CLS weight. See src/components/HeroShowcase.astro. -->
+      <HeroShowcase />
 
       <div class="trust-row">
         <div class="trust-badge"><div class="trust-icon">🔒</div>encrypted everything</div>
@@ -1101,220 +807,36 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
   opacity: 0.85;
 }
 
-/* SHOWCASE */
-/* Devices inside are absolutely positioned, so this height is reserved by
-   hand. Keep it just past the tallest device (~381px) plus its drop shadow —
-   surplus here reads as dead space above the trust row. */
-.showcase { height: 400px; margin: 32px auto 0; max-width: 1000px; position: relative; width: 100%; }
-.showcase__device {
-  background: var(--cloud-white);
-  border: 1px solid rgb(44 62 80 / 8%);
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgb(44 62 80 / 12%), 0 4px 16px rgb(44 62 80 / 6%);
-  overflow: hidden;
-  position: absolute;
-  transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 400ms ease;
-}
-.showcase__device:hover {
-  box-shadow: 0 28px 72px rgb(44 62 80 / 16%), 0 8px 24px rgb(44 62 80 / 8%);
-  transform: translateY(-6px) !important;
-}
-.showcase__device--center { left: 50%; top: 10px; transform: translateX(-50%); width: 360px; z-index: 3; }
-.showcase__device--center:hover { transform: translateX(-50%) translateY(-6px) !important; }
-.showcase__device--left { left: 1%; top: 40px; transform: rotate(-4deg); width: 320px; z-index: 2; }
-.showcase__device--left:hover { transform: rotate(-4deg) translateY(-6px) !important; }
-.showcase__device--right { right: 1%; top: 40px; transform: rotate(4deg); width: 320px; z-index: 2; }
-.showcase__device--right:hover { transform: rotate(4deg) translateY(-6px) !important; }
-
-.showcase__device-label {
-  align-items: center;
-  background: white;
-  border-bottom: 1px solid rgb(44 62 80 / 6%);
-  display: flex;
-  gap: 8px;
-  padding: 10px 16px;
-}
-.showcase__device-label span:first-child { font-size: 14px; }
-.showcase__device-label span:last-child {
-  color: var(--deep-slate);
-  font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.hero__float {
-  animation: heroFloat 6s ease-in-out infinite;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgb(44 62 80 / 10%);
-  font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
-  padding: 12px 16px;
-  position: absolute;
-  z-index: 5;
-}
-@keyframes heroFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-
-.hero__float-icon { font-size: 1rem; margin-bottom: 3px; }
-.hero__float-label { font-size: 0.5rem; letter-spacing: 0.08em; opacity: 0.3; text-transform: uppercase; }
-.hero__float-val { font-size: 0.85rem; font-weight: 700; }
-
-.trust-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 20px; position: relative; }
-.trust-badge {
-  align-items: center;
-  background: white;
-  border: 1px solid rgb(44 62 80 / 6%);
-  border-radius: 20px;
-  box-shadow: 0 2px 12px rgb(44 62 80 / 6%);
-  color: var(--deep-slate);
-  display: flex;
-  font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
-  font-size: 0.8rem;
-  font-weight: 600;
-  gap: 10px;
-  padding: 12px 20px;
-  transition: all 200ms ease;
-}
-.trust-badge:hover { box-shadow: 0 6px 20px rgb(44 62 80 / 10%); transform: translateY(-2px); }
-
-.trust-icon {
-  align-items: center;
-  background: rgb(174 214 241 / 15%);
-  border-radius: 12px;
-  display: flex;
-  font-size: 1rem;
-  height: 36px;
-  justify-content: center;
-  width: 36px;
-}
-
-.scroll-cue { align-items: center; display: flex; flex-direction: column; gap: 6px; margin-top: 24px; opacity: 0.15; position: relative; }
-.scroll-cue span {
-  color: var(--deep-slate);
-  font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
-  font-size: 0.55rem;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  opacity: 0.5;
-  text-transform: uppercase;
-}
-.scroll-line { animation: scrollPulse 2.2s ease-in-out infinite; background: linear-gradient(transparent, var(--deep-slate)); height: 24px; width: 1px; }
-@keyframes scrollPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
-
-/* MOCK SCREENS */
-.mock-screen {
-  background: var(--cloud-white);
-  color: var(--deep-slate);
+/* STORE BADGES (below the CTA) */
+.hero__stores {
   display: flex;
   flex-direction: column;
-  font-family: 'Inter Variable', Inter, sans-serif;
-  font-size: 9px;
-  gap: 7px;
-  line-height: 1.4;
-  overflow: hidden;
-  padding: 12px;
-  width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
 }
-.mock-screen * { box-sizing: border-box; }
-
-.mock-greeting { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 12px; font-weight: 700; }
-.mock-greeting span { color: var(--heritage-orange); }
-.mock-date { color: var(--muted-text); font-size: 7.5px; margin-top: 1px; }
-
-.mock-toast {
-  background: linear-gradient(135deg, #f15d22 0%, #e67e22 55%, #d4701e 100%);
-  border-radius: 11px;
-  box-shadow: 0 4px 14px rgb(241 93 34 / 18%);
-  color: white;
-  overflow: hidden;
-  padding: 9px 11px;
-  position: relative;
+.hero__stores-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a97a4;
 }
-.mock-toast-header { align-items: center; display: flex; gap: 7px; position: relative; }
-.mock-toast-icon { align-items: center; background: rgb(255 255 255 / 18%); border-radius: 8px; display: flex; flex-shrink: 0; font-size: 12px; height: 26px; justify-content: center; width: 26px; }
-.mock-toast-title { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 8px; font-weight: 600; }
-.mock-toast-sub { font-size: 7px; margin-top: 1px; opacity: 0.65; }
-.mock-toast-sep { background: linear-gradient(90deg, transparent, rgb(255 255 255 / 25%) 20%, rgb(255 255 255 / 25%) 80%, transparent); height: 1px; margin-top: 6px; }
-.mock-toast-item { align-items: center; background: rgb(255 255 255 / 10%); border: 1px solid rgb(255 255 255 / 8%); border-radius: 8px; display: flex; gap: 5px; margin-top: 4px; padding: 4px 6px; }
-.mock-toast-item-icon { align-items: center; background: rgb(255 255 255 / 12%); border-radius: 5px; display: flex; flex-shrink: 0; font-size: 9px; height: 18px; justify-content: center; width: 18px; }
-.mock-toast-item-text { flex: 1; font-size: 7px; font-weight: 500; opacity: 0.9; }
-
-.mock-beans-row { display: flex; gap: 8px; padding: 2px 0; }
-.mock-bean { align-items: center; display: flex; flex-direction: column; gap: 1px; }
-.mock-bean-avatar { align-items: center; border: 2px solid; border-radius: 50%; display: flex; height: 24px; justify-content: center; overflow: hidden; width: 24px; }
-.mock-bean-avatar img { height: 80%; object-fit: contain; width: 80%; }
-.mock-bean-name { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600; }
-
-.mock-schedule-row { display: flex; gap: 6px; }
-.mock-schedule-card { background: white; border-radius: 11px; box-shadow: 0 1px 8px rgb(44 62 80 / 3%); flex: 1; padding: 8px; }
-.mock-schedule-card--sky { border-left: 3px solid var(--sky-silk); }
-.mock-schedule-card--orange { border-left: 3px solid var(--heritage-orange); }
-.mock-schedule-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 5px; }
-.mock-schedule-label { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 7px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.mock-schedule-badge { border-radius: 8px; font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6px; font-weight: 600; padding: 2px 5px; }
-.mock-schedule-badge--sky { background: rgb(174 214 241 / 20%); color: #3a7bad; }
-.mock-schedule-badge--orange { color: var(--heritage-orange); }
-.mock-schedule-item { align-items: center; display: flex; gap: 5px; padding: 2px 0; }
-.mock-schedule-item-icon { align-items: center; border-radius: 6px; display: flex; flex-shrink: 0; font-size: 9px; height: 20px; justify-content: center; width: 20px; }
-.mock-schedule-item-icon--sky { background: rgb(174 214 241 / 20%); }
-.mock-schedule-item-icon--orange { background: rgb(241 93 34 / 8%); }
-.mock-item-title { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 7.5px; font-weight: 600; }
-.mock-item-time { color: var(--muted-text); font-size: 6.5px; opacity: 0.55; }
-
-.mock-hero-card { background: linear-gradient(135deg, #2c3e50, #3d5368); border-radius: 11px; color: white; overflow: hidden; padding: 10px 12px; position: relative; }
-.mock-hero-card::before { background: radial-gradient(circle, rgb(241 93 34 / 15%), transparent 70%); border-radius: 50%; content: ''; height: 70px; pointer-events: none; position: absolute; right: -20px; top: -20px; width: 70px; }
-.mock-hero-label { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.5; text-transform: uppercase; }
-.mock-hero-amount { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 20px; font-weight: 800; margin: 2px 0 1px; position: relative; }
-.mock-hero-change { align-items: center; color: #6ee7b7; display: flex; font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 7px; font-weight: 600; gap: 3px; }
-.mock-hero-change span { color: white; opacity: 0.35; }
-.mock-chart-area { background: linear-gradient(180deg, rgb(241 93 34 / 10%) 0%, transparent 100%); border-radius: 6px; height: 44px; margin-top: 6px; overflow: hidden; position: relative; }
-.mock-chart-line { bottom: 4px; height: 36px; left: 0; position: absolute; right: 0; }
-.mock-period-pills { background: rgb(255 255 255 / 8%); border-radius: 6px; display: flex; gap: 2px; padding: 2px; position: absolute; right: 0; top: 6px; }
-.mock-period-pill { border-radius: 5px; color: rgb(255 255 255 / 35%); font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6px; font-weight: 600; padding: 2px 5px; }
-.mock-period-pill--active { background: rgb(241 93 34 / 40%); color: white; }
-
-.mock-stats-row { display: flex; gap: 5px; }
-.mock-stat-card { background: white; border-radius: 10px; box-shadow: 0 1px 8px rgb(44 62 80 / 3%); flex: 1; padding: 7px 8px; }
-.mock-stat-card--dark { background: linear-gradient(135deg, #2c3e50, #3d5368); color: white; }
-.mock-stat-icon { align-items: center; border-radius: 6px; display: flex; font-size: 9px; height: 20px; justify-content: center; margin-bottom: 3px; width: 20px; }
-.mock-stat-icon--green { background: rgb(39 174 96 / 10%); }
-.mock-stat-icon--orange { background: rgb(241 93 34 / 8%); }
-.mock-stat-icon--white { background: rgb(255 255 255 / 12%); }
-.mock-stat-label { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 1px; opacity: 0.4; text-transform: uppercase; }
-.mock-stat-amount { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 11px; font-weight: 800; }
-.mock-stat-amount--green { color: #27ae60; }
-.mock-stat-amount--orange { color: var(--heritage-orange); }
-
-.mock-accounts-row { display: flex; gap: 5px; }
-.mock-account-card { background: white; border-radius: 10px; box-shadow: 0 1px 8px rgb(44 62 80 / 3%); flex: 1; padding: 7px 8px; }
-.mock-account-header { align-items: center; display: flex; gap: 4px; margin-bottom: 4px; }
-.mock-account-label { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 700; letter-spacing: 0.06em; opacity: 0.4; text-transform: uppercase; }
-.mock-account-item { align-items: center; border-bottom: 1px solid rgb(44 62 80 / 4%); display: flex; justify-content: space-between; padding: 2px 0; }
-.mock-account-item:last-child { border-bottom: none; }
-.mock-account-name { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 7px; font-weight: 600; }
-.mock-account-bal { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 7px; font-weight: 700; }
-
-.mock-planner-header { align-items: center; display: flex; justify-content: space-between; }
-.mock-planner-title { font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 12px; font-weight: 700; }
-.mock-planner-sub { color: var(--muted-text); font-size: 7px; margin-top: 1px; }
-.mock-add-btn { background: linear-gradient(135deg, #f15d22, #e67e22); border: none; border-radius: 8px; color: white; font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 700; padding: 4px 8px; }
-.mock-view-toggle { background: rgb(44 62 80 / 5%); border-radius: 8px; display: flex; gap: 2px; padding: 2px; }
-.mock-view-btn { border-radius: 6px; color: var(--muted-text); font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600; padding: 2px 7px; }
-.mock-view-btn--active { background: white; box-shadow: 0 1px 4px rgb(44 62 80 / 8%); color: var(--deep-slate); }
-.mock-member-chips { display: flex; gap: 3px; }
-.mock-member-chip { align-items: center; background: white; border: 1px solid rgb(44 62 80 / 8%); border-radius: 8px; display: flex; font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600; gap: 2px; padding: 2px 6px; }
-.mock-member-chip--active { background: rgb(241 93 34 / 8%); border-color: rgb(241 93 34 / 20%); color: var(--heritage-orange); }
-.mock-member-chip-dot { border-radius: 50%; height: 6px; width: 6px; }
-
-.mock-calendar { background: white; border-radius: 11px; box-shadow: 0 1px 8px rgb(44 62 80 / 3%); display: flex; flex: 1; flex-direction: column; padding: 6px; }
-.mock-cal-header { display: grid; gap: 1px; grid-template-columns: repeat(7, 1fr); margin-bottom: 3px; text-align: center; }
-.mock-cal-day-label { color: var(--muted-text); font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6px; font-weight: 600; opacity: 0.5; padding: 1px 0; }
-.mock-cal-grid { display: grid; flex: 1; gap: 1px; grid-template-columns: repeat(7, 1fr); }
-.mock-cal-cell { border-radius: 6px; color: var(--deep-slate); font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 6.5px; font-weight: 600; min-height: 20px; padding: 1px 2px; position: relative; text-align: center; }
-.mock-cal-cell--today { background: rgb(241 93 34 / 8%); box-shadow: inset 0 0 0 1.5px var(--heritage-orange); }
-.mock-cal-cell--other { opacity: 0.2; }
-.mock-cal-cell--has-events::after { background: var(--heritage-orange); border-radius: 50%; bottom: 2px; content: ''; height: 3px; left: 50%; position: absolute; transform: translateX(-50%); width: 3px; }
-.mock-cal-cell--has-events-blue::after { background: var(--sky-silk); border-radius: 50%; bottom: 2px; content: ''; height: 3px; left: 50%; position: absolute; transform: translateX(-50%); width: 3px; }
-.mock-cal-cell--has-events-multi::after { background: linear-gradient(90deg, var(--heritage-orange), var(--sky-silk)); border-radius: 2px; bottom: 2px; content: ''; height: 3px; left: 50%; position: absolute; transform: translateX(-50%); width: 8px; }
+.hero__stores-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+.hero__stores-badges img {
+  display: block;
+  height: 47px;
+  width: auto;
+  transition: transform 0.15s ease;
+}
+.hero__stores-badges a:hover img {
+  transform: translateY(-2px);
+}
 
 /* SECTION TRANSITIONS */
 .section-fade { height: 120px; pointer-events: none; position: relative; }
@@ -1487,26 +1009,14 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
-  .hero__float { animation: none; }
   .scroll-cue .scroll-line { animation: none; }
   .hero__mascot { animation: none; }
   .hero__deco-img { animation: none !important; }
 }
 
 /* RESPONSIVE */
-@media (max-width: 900px) {
-  .showcase { height: 340px; }
-  .showcase__device--center { width: 280px; }
-  .showcase__device--left { left: -2%; width: 250px; }
-  .showcase__device--right { right: -2%; width: 250px; }
-  .hero__float { display: none; }
-}
-
 @media (max-width: 640px) {
   .hero { padding: 120px 20px 24px; }
-  .showcase { display: flex; flex-direction: column; gap: 16px; height: auto; }
-  .showcase__device { left: auto !important; position: relative !important; right: auto !important; top: auto !important; transform: none !important; width: 100% !important; }
-  .showcase__device:hover { transform: translateY(-4px) !important; }
   .security-grid { grid-template-columns: 1fr; }
   .story__body p { font-size: 0.95rem; }
   .story__tech-list li { font-size: 0.84rem; }
