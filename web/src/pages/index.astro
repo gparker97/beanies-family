@@ -84,6 +84,7 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       </div>
 
       <div class="hero__stores">
+        <span class="hero__stores-label">or get the app</span>
         <div class="hero__stores-badges">
           <a href="/ios" aria-label="Download beanies.family on the App Store">
             <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
@@ -809,8 +810,15 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 /* STORE BADGES (below the CTA) */
 .hero__stores {
   display: flex;
-  justify-content: center;
-  margin-top: 18px;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+}
+.hero__stores-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #8a97a4;
 }
 .hero__stores-badges {
   display: flex;
