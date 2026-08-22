@@ -1,0 +1,54 @@
+---
+// Stable short link to the beanies.family Google Play listing. Every "get the
+// Android app" CTA (homepage badge, Pinterest pins, print collateral) points at
+// beanies.family/android so the destination can be rotated here — a small web
+// deploy — without touching the app, and so links can carry UTM tags in one place.
+//
+// Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer, a pure
+// forward. Mirrors src/pages/discord.astro.
+//
+// To change the destination: edit PLAY_URL below and deploy the web site.
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=family.beanies.app';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${PLAY_URL}`} />
+    <link rel="canonical" href={PLAY_URL} />
+    <meta name="robots" content="noindex" />
+    <title>Opening beanies.family on Google Play…</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-family: Outfit, system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      a {
+        color: #f15d22;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <p>taking you to google play… 🫘</p>
+    <p>
+      not redirected? <a href={PLAY_URL} rel="noopener">tap here to open google play</a>.
+    </p>
+    <script is:inline define:vars={{ PLAY_URL }}>
+      // Belt-and-braces: also redirect via JS in case meta-refresh is delayed.
+      window.location.replace(PLAY_URL);
+    </script>
+  </body>
+</html>

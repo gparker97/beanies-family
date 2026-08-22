@@ -1,0 +1,86 @@
+---
+// Stable short link that sends the visitor to the right app store for their
+// device. One URL (beanies.family/download) works on any phone and is safe to
+// print on a QR code: iOS visitors land on the App Store, Android visitors on
+// Google Play, and anyone on desktop sees both choices.
+//
+// Redirects are done in JS (no meta-refresh) because desktop should NOT redirect
+// — it should show both options. The per-store destinations live in /ios and
+// /android; this page forwards to those so there is a single source of truth.
+//
+// Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer.
+const APP_STORE_URL = 'https://apps.apple.com/app/id6798513944';
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=family.beanies.app';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Get the beanies.family app</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-family: Outfit, system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin: 0;
+      }
+      h1 span {
+        color: #f15d22;
+      }
+      .choices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+      }
+      .choices a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #2c3e50;
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 12px 20px;
+        border-radius: 14px;
+      }
+      .choices a:hover {
+        background: #f15d22;
+      }
+      .muted {
+        color: #6b7a89;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>get <span>beanies.family</span> on your phone</h1>
+    <div class="choices">
+      <a href="/ios" rel="noopener">📱 App Store — iPhone &amp; iPad</a>
+      <a href="/android" rel="noopener">🤖 Google Play — Android</a>
+    </div>
+    <p class="muted">no phone handy? open <strong>app.beanies.family</strong> in your browser — it works there too.</p>
+    <script is:inline define:vars={{ APP_STORE_URL, PLAY_URL }}>
+      // On a phone, skip the chooser and go straight to the right store.
+      var ua = navigator.userAgent || '';
+      if (/iPhone|iPad|iPod/i.test(ua)) window.location.replace(APP_STORE_URL);
+      else if (/Android/i.test(ua)) window.location.replace(PLAY_URL);
+      // Desktop / unknown: leave the two choices visible.
+    </script>
+  </body>
+</html>
