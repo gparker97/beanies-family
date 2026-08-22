@@ -917,6 +917,14 @@
   .hsx-sticky .hsx-sq { font-family: 'Caveat Variable', cursive; font-size: 0.82rem; font-weight: 700; color: var(--hsx-slate); line-height: 1.1; }
   .hsx-sticky .hsx-sm { font-size: 0.42rem; color: #97a3ae; margin-top: 3px; }
 
+  /* Beanie-mode / brand lowercase — the app's playful all-lowercase look. The
+     micro-labels the app uppercases via CSS keep their uppercase (they declare it
+     directly, which beats this inherited value); monograms + codes keep their
+     authored case. This mirrors how the real app renders in beanie mode. */
+  .hsx-device { text-transform: lowercase; }
+  .hsx-cal__wk span, .hsx-slot-l { text-transform: uppercase; }
+  .hsx-av, .hsx-dot, .hsx-sav, .hsx-ctl, .hsx-bbar__url { text-transform: none; }
+
   @media (prefers-reduced-motion: reduce) {
     .hsx-dots b { transition: none; }
   }
