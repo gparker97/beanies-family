@@ -9,21 +9,20 @@
 //
 // Every screen is a pure-CSS render (NO images) so it adds no LCP/CLS weight —
 // the same reason the previous showcase was CSS. All classes are namespaced with
-// `hsx-` because the marketing site defines global `.card`, `.tag`, `.btn-primary`
-// etc.; combined with Astro's scoped <style>, the showcase can neither collide
-// with nor be affected by the rest of the site.
+// `hsx-` (or scoped under `.hsx`) because the marketing site defines global
+// `.card`, `.tag`, `.btn-primary` etc. The <style> is `is:global`, NOT Astro-
+// scoped, on purpose: the cluster/carousel/scaleboxes/dots are created in JS, and
+// Astro scoped styles only reach server-rendered elements — the hsx- prefix is
+// what keeps it collision-safe.
 //
 // Screens are pre-rendered once into a hidden pool and MOVED (never cloned) into
-// the cluster or carousel by the inline script, so Astro's scoping attributes —
-// and therefore the scoped styles — survive the move. Content is illustrative
-// (fake demo family), mirrors the real app's layout, and is aria-hidden.
+// the cluster or carousel by the inline script. Content is illustrative (fake
+// demo family), mirrors the real app's layout, and is aria-hidden.
 ---
 
 <div class="hsx" aria-hidden="true">
   <div class="hsx-stage" data-hsx-stage>
     <div class="hsx-inner" data-hsx-inner>
-      <span class="hsx-tag" style="top:18px;left:2%">🖥️ on your laptop</span>
-      <span class="hsx-tag" style="bottom:0;right:24%">📱 &amp; your phone</span>
       <div class="hsx-anchor hsx-anchor--d" data-hsx-ad></div>
       <div class="hsx-anchor hsx-anchor--a" data-hsx-aa></div>
       <div class="hsx-anchor hsx-anchor--b" data-hsx-ab></div>
@@ -310,7 +309,12 @@
   </div>
 </div>
 
-<style>
+<style is:global>
+  /* NAMESPACED-GLOBAL: every selector is prefixed hsx- (or scoped under .hsx), so
+     this stylesheet is collision-safe with the marketing site's global classes
+     (.card/.tag/.btn-primary). It must be GLOBAL, not Astro-scoped, because the
+     cluster, carousel, scaleboxes and dots are created in JS — and Astro scoped
+     styles only reach server-rendered elements. */
   .hsx {
     --hsx-orange: #f15d22;
     --hsx-terracotta: #e67e22;
@@ -327,8 +331,8 @@
     --hsx-emma: #f59e0b;
     --hsx-liam: #10b981;
     width: 100%;
-    max-width: 1000px;
-    margin: 28px auto 0;
+    max-width: 1160px;
+    margin: 16px auto 0;
     font-family: Inter, system-ui, sans-serif;
     color: var(--hsx-slate);
   }
@@ -340,16 +344,15 @@
   .hsx .hsx-badge-cd { font-weight: 700; }
 
   .hsx-stage { position: relative; min-width: 0; }
-  .hsx-inner { position: absolute; top: 0; left: 50%; width: 720px; height: 470px; transform-origin: top center; }
+  /* Desktop cluster: a browser-framed desktop on the left, two phones to its
+     right with a clear gap (only the two phones lightly overlap, for depth).
+     Content spans x:0..962 inside a 970-wide box that the script scales to fill
+     the stage (up to 1.18x on wide screens) and centers via translateX(-50%). */
+  .hsx-inner { position: absolute; top: 0; left: 50%; width: 970px; height: 478px; transform-origin: top center; }
   .hsx-anchor { position: absolute; }
   .hsx-anchor--d { top: 30px; left: 0; z-index: 2; }
-  .hsx-anchor--a { z-index: 4; right: 150px; bottom: -6px; }
-  .hsx-anchor--b { z-index: 5; right: 0; bottom: 26px; }
-  .hsx-tag {
-    position: absolute; z-index: 9; background: #fff; border: 1px solid var(--hsx-hair);
-    border-radius: 999px; padding: 4px 11px; font-family: Outfit, sans-serif; font-weight: 600;
-    font-size: 0.62rem; color: var(--hsx-slate); box-shadow: 0 8px 20px rgba(44, 62, 80, 0.12);
-  }
+  .hsx-anchor--a { top: 4px; left: 566px; z-index: 4; }
+  .hsx-anchor--b { top: 26px; left: 742px; z-index: 5; }
   .hsx-scalebox { position: relative; }
   .hsx-scalebox > .hsx-device { position: absolute; top: 0; left: 0; transform-origin: top left; }
 
@@ -546,7 +549,7 @@
       const ab = root.querySelector('[data-hsx-ab]');
       if (!stage || !inner || !pool || !ad || !aa || !ab) return;
 
-      const DES_W = 720, DES_H = 470;
+      const DES_W = 970, DES_H = 478;
       const screens = {};
       pool.querySelectorAll('[data-screen]').forEach((el) => { screens[el.getAttribute('data-screen')] = el; });
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -590,10 +593,12 @@
         inner.style.display = '';
         ad.innerHTML = ''; aa.innerHTML = ''; ab.innerHTML = '';
         toPool();
-        ad.appendChild(box(screens.overview, 0.66));
-        aa.appendChild(box(screens.nook, 0.74));
-        ab.appendChild(box(screens.calendar, 0.82));
-        const s = Math.min(1, stage.clientWidth / DES_W);
+        ad.appendChild(box(screens.overview, 0.7));
+        aa.appendChild(box(screens.nook, 0.66));
+        ab.appendChild(box(screens.calendar, 0.76));
+        // Scale the whole cluster to fill the stage, growing up to 1.18x on wide
+        // screens so desktop space is used rather than left as big side margins.
+        const s = Math.min(1.18, stage.clientWidth / DES_W);
         inner.style.transform = 'translateX(-50%) scale(' + s + ')';
         stage.style.height = DES_H * s + 'px';
       }

@@ -84,7 +84,6 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       </div>
 
       <div class="hero__stores">
-        <span class="hero__stores-label">or get the app</span>
         <div class="hero__stores-badges">
           <a href="/ios" aria-label="Download beanies.family on the App Store">
             <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
@@ -810,17 +809,8 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 /* STORE BADGES (below the CTA) */
 .hero__stores {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-}
-.hero__stores-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #8a97a4;
+  justify-content: center;
+  margin-top: 18px;
 }
 .hero__stores-badges {
   display: flex;
@@ -830,13 +820,54 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 }
 .hero__stores-badges img {
   display: block;
-  height: 47px;
+  height: 46px;
   width: auto;
   transition: transform 0.15s ease;
 }
 .hero__stores-badges a:hover img {
   transform: translateY(-2px);
 }
+
+/* TRUST ROW + SCROLL CUE */
+.trust-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 20px; position: relative; }
+.trust-badge {
+  align-items: center;
+  background: white;
+  border: 1px solid rgb(44 62 80 / 6%);
+  border-radius: 20px;
+  box-shadow: 0 2px 12px rgb(44 62 80 / 6%);
+  color: var(--deep-slate);
+  display: flex;
+  font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  gap: 10px;
+  padding: 12px 20px;
+  transition: all 200ms ease;
+}
+.trust-badge:hover { box-shadow: 0 6px 20px rgb(44 62 80 / 10%); transform: translateY(-2px); }
+.trust-icon {
+  align-items: center;
+  background: rgb(174 214 241 / 15%);
+  border-radius: 12px;
+  display: flex;
+  font-size: 1rem;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+.scroll-cue { align-items: center; display: flex; flex-direction: column; gap: 6px; margin-top: 24px; opacity: 0.15; position: relative; }
+.scroll-cue span {
+  color: var(--deep-slate);
+  font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+.scroll-line { animation: scrollPulse 2.2s ease-in-out infinite; background: linear-gradient(transparent, var(--deep-slate)); height: 24px; width: 1px; }
+@keyframes scrollPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 
 /* SECTION TRANSITIONS */
 .section-fade { height: 120px; pointer-events: none; position: relative; }
