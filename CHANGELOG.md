@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- **A fresh homepage app preview.** The above-the-fold preview now shows beanies on a laptop and a phone together on desktop, and a swipe-through carousel of the app's screens on mobile — the Family Nook, calendar, travel, to-dos and the money side — all redrawn to match today's app. It stays image-free, so it adds nothing to page-load time.
+- **A fresh, interactive homepage app preview.** The above-the-fold preview now shows beanies on a laptop and two phones together on desktop, and a swipe-through carousel on mobile. You can browse the app's screens — the family nook, calendar, travel plans, to-dos, meal planner, budgets, assets, goals and the family scrapbook — and the set you see changes on every visit. It's drawn entirely in code (no images), so it adds nothing to page-load time, and a subtle "or get the app" now sits beside the download badges so it's clear the free browser app and the phone apps are both options.
 
 ## 2026-08-21
 
