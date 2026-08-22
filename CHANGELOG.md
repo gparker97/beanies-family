@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-22
+
+### Added
+
+- **Download buttons for the phone apps, right on the homepage.** Below "start counting beans" there are now official App Store and Google Play badges so visitors can grab the native app in a tap. They point at new stable short links — `beanies.family/ios`, `beanies.family/android`, and a `beanies.family/download` that sends each visitor to the right store for their phone — so the same links can go on pins, flyers and a QR code, and the destinations can be updated without an app release.
+
+### Changed
+
+- **A fresh homepage app preview.** The above-the-fold preview now shows beanies on a laptop and a phone together on desktop, and a swipe-through carousel of the app's screens on mobile — the Family Nook, calendar, travel, to-dos and the money side — all redrawn to match today's app. It stays image-free, so it adds nothing to page-load time.
+
 ## 2026-08-21
 
 ### Changed

@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanies.family — hero screen gallery</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --slate2: #3d5368;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --green: #27ae60;
+        --purple: #9b59b6;
+        --teal: #00b4d8;
+        --hair: rgba(44, 62, 80, 0.09);
+        --m-greg: #3b82f6;
+        --m-sarah: #ec4899;
+        --m-emma: #f59e0b;
+        --m-liam: #10b981;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Inter', system-ui, sans-serif; color: var(--slate); background: var(--cloud); line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+      h1, h2, h3, .ff { font-family: 'Outfit', system-ui, sans-serif; }
+      .hand { font-family: 'Caveat', cursive; color: var(--orange); }
+
+      /* ===== page scaffold (mockup chrome) ===== */
+      .doc-note { background: var(--slate); color: #fff; padding: 12px 20px; font-size: 0.82rem; text-align: center; }
+      .doc-note strong { color: var(--sky); }
+      .wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+      .sec-head { margin: 56px 0 8px; }
+      .sec-head .kicker { font-family: 'Outfit'; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); }
+      .sec-head h2 { font-size: 1.7rem; color: var(--slate); margin-top: 4px; }
+      .sec-head p { color: #5b6b7a; max-width: 720px; margin-top: 6px; font-size: 0.96rem; }
+
+      /* =========================================================
+         DEVICE CHROME
+         ========================================================= */
+      .device { background: #fff; position: relative; font-family: 'Inter', sans-serif; }
+      .device--desktop { width: 760px; border-radius: 13px; overflow: hidden; box-shadow: 0 28px 64px rgba(44,62,80,0.22), 0 5px 14px rgba(44,62,80,0.08); border: 1px solid var(--hair); }
+      .device--phone { width: 290px; border-radius: 34px; background: #1c2733; padding: 9px; box-shadow: 0 30px 56px rgba(44,62,80,0.28), 0 6px 16px rgba(44,62,80,0.12); }
+
+      /* browser bar */
+      .bbar { display: flex; align-items: center; gap: 12px; padding: 9px 13px; background: #eef1f4; border-bottom: 1px solid var(--hair); }
+      .bbar__dots { display: flex; gap: 6px; }
+      .bbar__dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+      .bbar__url { flex: 1; background: #fff; border-radius: 7px; font-size: 0.64rem; color: #7b8894; padding: 5px 12px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--hair); }
+      .bbar__url b { color: var(--slate); font-weight: 600; }
+      .bbar__url span { color: #b3bcc5; }
+
+      /* desktop app shell */
+      .shell { display: grid; grid-template-columns: 172px 1fr; height: 452px; }
+
+      /* sidebar */
+      .sb { background: var(--slate); color: #fff; padding: 13px 9px; overflow: hidden; }
+      .sb__logo { display: flex; align-items: center; gap: 7px; padding: 0 4px 12px; }
+      .sb__logo .mark { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--orange), var(--terracotta)); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+      .sb__logo b { font-family: 'Outfit'; font-weight: 800; font-size: 0.84rem; }
+      .sb__logo b em { color: var(--orange); font-style: normal; }
+      .sb__sec { font-size: 0.55rem; letter-spacing: 0.09em; text-transform: uppercase; font-weight: 800; margin: 11px 6px 5px; display: flex; align-items: center; gap: 5px; }
+      .sb__sec--tree { color: #f8b78f; }
+      .sb__sec--pig { color: #7fd6a1; }
+      .sb__item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 0.7rem; color: rgba(255,255,255,0.72); margin-bottom: 1px; position: relative; }
+      .sb__item i { width: 15px; text-align: center; font-size: 0.78rem; font-style: normal; }
+      .sb__item.on { background: linear-gradient(90deg, rgba(241,93,34,0.95), rgba(230,126,34,0.85)); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 #fff3; }
+      .sb__item.badge::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }
+      .sb__item.on.badge::after { background: #fff; }
+
+      /* top header */
+      .hd { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--hair); background: #fff; }
+      .hd__title b { font-family: 'Outfit'; font-weight: 700; font-size: 0.94rem; color: var(--slate); display: block; line-height: 1.1; }
+      .hd__title span { font-size: 0.6rem; color: var(--orange); font-weight: 600; }
+      .hd__ctrls { display: flex; align-items: center; gap: 7px; }
+      .ctl { height: 26px; min-width: 26px; padding: 0 7px; border-radius: 8px; background: #fff; border: 1px solid var(--hair); box-shadow: 0 1px 3px rgba(44,62,80,0.06); display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 0.62rem; color: #6b7a89; }
+      .ctl--on { background: var(--orange); color: #fff; border-color: var(--orange); font-weight: 700; }
+      .ctl .grn { color: var(--green); font-weight: 700; }
+      .av { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, var(--m-greg), #6ea8ff); color: #fff; font-family: 'Outfit'; font-weight: 700; font-size: 0.66rem; display: flex; align-items: center; justify-content: center; }
+
+      /* board (desktop main content) */
+      .board { background: var(--cloud); padding: 15px 16px; overflow: hidden; }
+
+      /* phone chrome */
+      .ph { background: var(--cloud); border-radius: 26px; overflow: hidden; height: 574px; display: flex; flex-direction: column; position: relative; }
+      .ph__status { height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 20px; font-family: 'Outfit'; font-weight: 700; font-size: 0.66rem; color: var(--slate); flex: none; }
+      .ph__status .sigs { display: flex; align-items: center; gap: 3px; }
+      .ph__status .sigs b { width: 15px; height: 8px; border: 1px solid var(--slate); border-radius: 2px; display: inline-block; position: relative; }
+      .ph__status .sigs b::after { content: ''; position: absolute; inset: 1px; right: 4px; background: var(--slate); border-radius: 1px; }
+      .ph__hd { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; flex: none; }
+      .ph__hd .burger { display: flex; flex-direction: column; gap: 3px; }
+      .ph__hd .burger i { width: 15px; height: 2px; background: var(--slate); border-radius: 2px; }
+      .ph__hd .t { font-family: 'Outfit'; font-weight: 700; font-size: 0.8rem; color: var(--slate); }
+      .ph__hd .t span { color: var(--orange); }
+      .ph__hd .r { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+      .ph__hd .r .av { width: 22px; height: 22px; }
+      .ph__body { flex: 1; overflow: hidden; padding: 4px 11px 8px; display: flex; flex-direction: column; gap: 8px; }
+      .ph__body > * { flex: 0 0 auto; }
+      .ph__body::-webkit-scrollbar { display: none; }
+
+      /* phone bottom tab bar */
+      .tabs { flex: none; height: 54px; background: #fff; border-top: 1px solid var(--hair); display: flex; align-items: flex-start; justify-content: space-around; padding-top: 7px; position: relative; }
+      .tab { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.5rem; font-weight: 600; color: rgba(44,62,80,0.4); width: 46px; }
+      .tab i { font-size: 1.05rem; font-style: normal; line-height: 1; }
+      .tab.on { color: var(--orange); }
+      .tab.on span { color: var(--orange); }
+      .tab--pill.on { }
+      .tab--pill.on i { background: rgba(241,93,34,0.1); border-radius: 9px; padding: 3px 8px; }
+      .tab--hero { position: relative; }
+      .tab--hero .bub { position: absolute; top: -20px; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--orange), var(--terracotta)); border: 3px solid #fff; box-shadow: 0 6px 14px rgba(241,93,34,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; }
+      .tab--hero span { margin-top: 26px; color: var(--orange); }
+
+      /* ===== shared mini components ===== */
+      .mchip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.56rem; padding: 3px 8px; border-radius: 999px; background: #fff; border: 1px solid var(--hair); color: #64717d; font-weight: 600; }
+      .mchip.on { background: var(--slate); color: #fff; border-color: var(--slate); }
+      .dot { width: 14px; height: 14px; border-radius: 50%; color: #fff; font-size: 0.5rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-family: 'Outfit'; flex: none; }
+      .pill-btn { background: linear-gradient(135deg, var(--orange), var(--terracotta)); color: #fff; font-family: 'Outfit'; font-weight: 700; font-size: 0.6rem; padding: 5px 11px; border-radius: 10px; box-shadow: 0 3px 8px rgba(241,93,34,0.3); }
+      .card { background: #fff; border: 1px solid var(--hair); border-radius: 13px; padding: 11px 12px; }
+      .card--l { border-left: 4px solid var(--sky); }
+      .card--lo { border-left: 4px solid var(--orange); }
+      .card--lp { border-left: 4px solid var(--purple); }
+      .card--lg { border-left: 4px solid var(--green); }
+      .lbl { font-size: 0.56rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #90a0ad; }
+      .see { font-size: 0.56rem; color: var(--orange); font-weight: 700; }
+
+      /* net worth hero (finance) */
+      .nw { background: linear-gradient(135deg, var(--slate), var(--slate2)); border-radius: 15px; padding: 15px 16px; color: #fff; position: relative; overflow: hidden; }
+      .nw::after { content: ''; position: absolute; width: 220px; height: 220px; border-radius: 50%; right: -80px; top: -90px; background: radial-gradient(circle, rgba(241,93,34,0.5), transparent 68%); }
+      .nw__lbl { font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.6); font-weight: 700; }
+      .nw__amt { font-family: 'Outfit'; font-weight: 800; font-size: 2rem; letter-spacing: -0.01em; line-height: 1.05; }
+      .nw__chg { font-size: 0.62rem; color: #6ee7b7; font-weight: 600; }
+      .nw__pills { position: absolute; top: 14px; right: 15px; display: flex; gap: 3px; z-index: 2; }
+      .nw__pills b { font-size: 0.5rem; font-weight: 700; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+      .nw__pills b.on { background: var(--orange); color: #fff; }
+      .nw__chart { margin-top: 9px; height: 42px; }
+
+      .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+      .tiles--3 { grid-template-columns: repeat(3, 1fr); }
+      .tile { background: #fff; border: 1px solid var(--hair); border-radius: 10px; padding: 8px 8px 9px; position: relative; overflow: hidden; }
+      .tile::before { content: ''; position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--accent, var(--orange)); }
+      .tile i { font-size: 0.78rem; font-style: normal; }
+      .tile .k { font-size: 0.5rem; text-transform: uppercase; color: #90a0ad; font-weight: 700; margin-top: 2px; }
+      .tile .v { font-family: 'Outfit'; font-weight: 800; font-size: 0.82rem; color: var(--slate); }
+      .tile .pct { font-size: 0.5rem; font-weight: 700; color: var(--accent, var(--orange)); }
+
+      .srow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .stat { background: #fff; border: 1px solid var(--hair); border-radius: 11px; padding: 9px 10px; }
+      .stat--dark { background: linear-gradient(135deg, var(--slate), var(--slate2)); border: none; color: #fff; }
+      .stat .si { width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; }
+      .stat .sk { font-size: 0.5rem; text-transform: uppercase; color: #90a0ad; font-weight: 700; margin-top: 5px; }
+      .stat--dark .sk { color: rgba(255,255,255,0.55); }
+      .stat .sv { font-family: 'Outfit'; font-weight: 800; font-size: 0.92rem; }
+      .stat .sc { font-size: 0.5rem; color: var(--green); font-weight: 600; }
+
+      .list-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+      .list-row .ic { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; flex: none; }
+      .list-row .nm { font-size: 0.64rem; font-weight: 600; color: var(--slate); }
+      .list-row .sub { font-size: 0.52rem; color: #97a3ae; }
+      .list-row .amt { margin-left: auto; font-family: 'Outfit'; font-weight: 700; font-size: 0.66rem; }
+
+      .prog { height: 5px; background: rgba(44,62,80,0.07); border-radius: 3px; overflow: hidden; }
+      .prog i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--orange), var(--terracotta)); }
+
+      /* calendar */
+      .cmd { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 9px; }
+      .cmd h3 { font-size: 1rem; color: var(--slate); }
+      .cmd .nav { display: flex; align-items: center; gap: 3px; }
+      .cmd .nav b { width: 18px; height: 18px; border-radius: 6px; background: #fff; border: 1px solid var(--hair); display: flex; align-items: center; justify-content: center; font-size: 0.62rem; color: #7b8894; }
+      .cmd .today { font-size: 0.56rem; color: var(--orange); font-weight: 700; padding: 3px 8px; border-radius: 7px; background: rgba(241,93,34,0.08); }
+      .vtog { display: flex; background: #fff; border: 1px solid var(--hair); border-radius: 9px; overflow: hidden; margin-left: auto; }
+      .vtog b { font-size: 0.54rem; font-weight: 700; padding: 4px 9px; color: #90a0ad; }
+      .vtog b.on { background: linear-gradient(135deg, var(--orange), var(--terracotta)); color: #fff; }
+      .cal { background: #fff; border: 1px solid var(--hair); border-radius: 13px; padding: 11px; }
+      .cal__wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
+      .cal__wk span { text-align: center; font-size: 0.5rem; color: #b3bcc5; font-weight: 800; letter-spacing: 0.05em; }
+      .cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .cell { min-height: 52px; border-radius: 7px; padding: 3px; background: #fcfdfe; border: 1px solid rgba(44,62,80,0.04); display: flex; flex-direction: column; gap: 2px; }
+      .cell .d { font-size: 0.5rem; color: #8a97a4; font-weight: 700; text-align: center; }
+      .cell.wknd { background: #fafbfc; }
+      .cell.tdy .d { background: linear-gradient(135deg, var(--orange), var(--terracotta)); color: #fff; border-radius: 50%; width: 14px; height: 14px; line-height: 14px; margin: 0 auto; box-shadow: 0 2px 5px rgba(241,93,34,0.4); }
+      .ev { font-size: 0.46rem; padding: 1px 3px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid var(--c, var(--orange)); background: color-mix(in srgb, var(--c, var(--orange)) 13%, #fff); color: var(--slate); font-weight: 600; }
+      .vac { grid-column: var(--span, auto); font-size: 0.46rem; background: color-mix(in srgb, var(--teal) 16%, #fff); color: #0077b6; border-radius: 4px; padding: 1px 4px; font-weight: 700; }
+
+      /* travel */
+      .trip { border-radius: 14px; border: 1px solid var(--hair); overflow: hidden; background: #fff; }
+      .trip__hero { height: 46px; background: linear-gradient(120deg, color-mix(in srgb, var(--teal) 22%, #fff), color-mix(in srgb, #ffd93d 30%, #fff)); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+      .trip__b { padding: 9px 11px; }
+      .trip__nm { font-family: 'Outfit'; font-weight: 700; font-size: 0.76rem; color: var(--slate); }
+      .trip__dt { font-size: 0.54rem; color: #97a3ae; margin-bottom: 5px; }
+      .badge-cd { display: inline-block; font-size: 0.5rem; font-weight: 700; color: #fff; padding: 2px 8px; border-radius: 999px; background: linear-gradient(135deg, var(--teal), #0077b6); }
+      .badge-warn { font-size: 0.5rem; font-weight: 700; color: #b8860b; background: #fff6da; padding: 2px 7px; border-radius: 999px; }
+
+      /* todo */
+      .todo-sec-lbl { font-size: 0.6rem; font-weight: 800; margin: 2px 0 5px; }
+      .todo { display: flex; align-items: flex-start; gap: 8px; background: #fff; border: 1px solid var(--hair); border-radius: 11px; padding: 8px 10px; }
+      .todo .box { width: 17px; height: 17px; border-radius: 5px; border: 2.5px solid var(--orange); flex: none; margin-top: 1px; }
+      .todo .box.red { border-color: #e74c3c; }
+      .todo .box.sky { border-color: var(--sky); }
+      .todo .box.done { background: var(--green); border-color: var(--green); position: relative; }
+      .todo .box.done::after { content: '✓'; color: #fff; font-size: 0.6rem; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+      .todo .tt { font-size: 0.64rem; font-weight: 600; color: var(--slate); }
+      .todo .tt.strike { text-decoration: line-through; color: #b3bcc5; font-weight: 500; }
+      .todo .meta { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+      .tag { font-size: 0.48rem; font-weight: 700; padding: 2px 6px; border-radius: 999px; }
+      .tag--over { background: var(--orange); color: #fff; }
+      .tag--due { background: rgba(241,93,34,0.12); color: var(--orange); }
+      .tag--date { color: var(--orange); }
+
+      /* nook */
+      .greet { font-family: 'Outfit'; font-weight: 800; font-size: 1rem; color: var(--slate); }
+      .greet span { color: var(--orange); }
+      .toast { background: linear-gradient(135deg, var(--orange), var(--terracotta) 70%, #d4701e); border-radius: 14px; padding: 11px 12px; color: #fff; box-shadow: 0 8px 20px rgba(241,93,34,0.28); }
+      .toast__h { display: flex; align-items: center; gap: 8px; }
+      .toast__ic { width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
+      .toast__t { font-family: 'Outfit'; font-weight: 700; font-size: 0.72rem; }
+      .toast__s { font-size: 0.52rem; opacity: 0.85; font-style: italic; }
+      .toast__row { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 5px 7px; margin-top: 6px; font-size: 0.56rem; }
+      .beans { display: flex; gap: 10px; }
+      .bean { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+      .bean .a { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Outfit'; font-weight: 800; font-size: 0.8rem; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(44,62,80,0.15); position: relative; }
+      .bean .a::after { content: ''; position: absolute; right: 0; bottom: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--green); border: 1.5px solid #fff; }
+      .bean .nm { font-size: 0.5rem; font-weight: 700; color: var(--slate); }
+      .bean .rl { font-size: 0.44rem; color: #97a3ae; }
+      .bean .add { border: 1.5px dashed #c3ccd4; color: #97a3ae; box-shadow: none; }
+      .bean .add::after { display: none; }
+
+      /* meal board */
+      .mealwrap { display: grid; grid-template-columns: 128px 1fr; gap: 9px; align-items: start; }
+      .rail { background: #fff; border: 1px solid var(--hair); border-radius: 12px; padding: 9px; }
+      .rail h4 { font-family: 'Outfit'; font-size: 0.66rem; color: var(--slate); }
+      .rail .recipe { display: flex; align-items: center; gap: 6px; background: var(--cloud); border-radius: 8px; padding: 5px; margin-top: 5px; }
+      .rail .recipe .th { width: 22px; height: 22px; border-radius: 6px; background: #fde3c8; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+      .rail .recipe .rn { font-size: 0.54rem; font-weight: 600; color: var(--slate); }
+      .rail .alt { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 7px; }
+      .rail .alt b { font-size: 0.46rem; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--cloud); border: 1px solid var(--hair); color: #64717d; }
+      .mgrid { background: #fff; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; }
+      .mgrid__days { display: grid; grid-template-columns: 42px repeat(4, 1fr); }
+      .mgrid__days b { font-size: 0.5rem; font-weight: 700; color: #90a0ad; text-align: center; padding: 6px 2px; }
+      .mgrid__days b.tdy { background: linear-gradient(135deg, var(--orange), var(--terracotta)); color: #fff; }
+      .mgrid__r { display: grid; grid-template-columns: 42px repeat(4, 1fr); border-top: 1px solid var(--hair); }
+      .mgrid__r .slot-l { font-size: 0.44rem; font-weight: 800; color: #90a0ad; padding: 8px 3px; writing-mode: horizontal-tb; letter-spacing: 0.03em; }
+      .mgrid__c { border-left: 1px solid var(--hair); padding: 4px; min-height: 34px; }
+      .meal { background: #fff; border: 1px solid var(--hair); border-radius: 7px; padding: 3px 4px; font-size: 0.46rem; font-weight: 600; color: var(--slate); display: flex; align-items: center; gap: 3px; }
+      .meal .st { width: 5px; height: 5px; border-radius: 50%; margin-left: auto; }
+      .meal--out { background: color-mix(in srgb, var(--sky) 20%, #fff); }
+
+      /* =========================================================
+         SCALE + LAYOUT
+         ========================================================= */
+      .scalebox { position: relative; }
+      .scalebox > .device { position: absolute; top: 0; left: 0; transform-origin: top left; }
+
+      /* ---- rotation hero ---- */
+      .hero { position: relative; overflow: hidden; background: linear-gradient(165deg, #fff 0%, var(--cloud) 52%, #eef6fd 100%); border-radius: 20px; border: 1px solid var(--hair); margin-top: 16px; }
+      .hero__grid { display: grid; grid-template-columns: 0.82fr 1.18fr; align-items: center; gap: 24px; padding: 40px 36px; }
+      .hero__eyebrow { display: inline-flex; align-items: center; gap: 6px; font-family: 'Outfit'; font-weight: 600; font-size: 0.72rem; color: var(--slate); background: rgba(174,214,241,0.28); border: 1px solid rgba(174,214,241,0.6); padding: 5px 12px; border-radius: 999px; margin-bottom: 16px; }
+      .hero__h1 { font-family: 'Outfit'; font-weight: 800; font-size: clamp(2.2rem, 4vw, 3.4rem); line-height: 1.0; letter-spacing: -0.025em; color: var(--slate); }
+      .hero__h1 em { color: var(--orange); font-style: normal; }
+      .hero__sub { margin: 16px 0 8px; font-size: 1.04rem; color: #4a5b6a; max-width: 420px; }
+      .hero__priv { font-size: 0.9rem; color: #6b7a89; margin-bottom: 22px; }
+      .hero__priv a { color: var(--orange); font-weight: 600; text-decoration: none; }
+      .hero__cta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+      .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: var(--orange); color: #fff; font-family: 'Outfit'; font-weight: 700; font-size: 1rem; padding: 14px 28px; border-radius: 15px; text-decoration: none; box-shadow: 0 8px 20px rgba(241,93,34,0.28); }
+      .btn-primary:hover { transform: translateY(-2px); }
+      .hero__jump { color: var(--slate); font-family: 'Outfit'; font-weight: 600; opacity: 0.72; font-size: 0.94rem; text-decoration: none; }
+      .hero__stores { margin-top: 26px; }
+      .hero__stores .cap { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-family: 'Outfit'; font-weight: 600; color: #8a97a4; margin-bottom: 8px; }
+      .badges { display: flex; gap: 11px; }
+      .badge { display: inline-flex; align-items: center; gap: 8px; background: #000; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 10px; height: 48px; }
+      .badge__txt { display: flex; flex-direction: column; line-height: 1.1; }
+      .badge small { font-size: 0.56rem; opacity: 0.9; display: block; line-height: 1; }
+      .badge b { font-family: 'Outfit'; font-weight: 600; font-size: 0.96rem; line-height: 1.15; }
+
+      .stage { position: relative; height: 460px; min-width: 0; }
+      .stage__inner { position: absolute; top: 0; left: 0; width: 660px; height: 470px; transform-origin: top left; }
+      .stage__mobrow { display: flex; gap: 16px; justify-content: center; align-items: flex-end; height: 100%; }
+      .stage__carousel { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+      .stage__carousel::-webkit-scrollbar { display: none; }
+      .carcell { flex: 0 0 auto; scroll-snap-align: center; }
+      .stage__dots { display: flex; gap: 7px; justify-content: center; margin-top: 12px; }
+      .stage__dots b { width: 7px; height: 7px; border-radius: 50%; background: rgba(44, 62, 80, 0.18); cursor: pointer; transition: width 0.2s, background 0.2s; display: block; }
+      .stage__dots b.on { background: var(--orange); width: 20px; border-radius: 4px; }
+      .anchor { position: absolute; }
+      .anchor--desktop { top: 30px; left: 0; z-index: 2; }
+      .anchor--pa { z-index: 4; right: 128px; bottom: -6px; }
+      .anchor--pb { z-index: 5; right: -6px; bottom: 26px; }
+      .tag-lbl { position: absolute; z-index: 9; background: #fff; border: 1px solid var(--hair); border-radius: 999px; padding: 4px 10px; font-family: 'Outfit'; font-weight: 600; font-size: 0.6rem; color: var(--slate); box-shadow: 0 8px 20px rgba(44,62,80,0.12); }
+
+      /* rotation control bar */
+      .rot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff; border: 1px solid var(--hair); border-radius: 12px; padding: 10px 14px; margin-top: 14px; }
+      .rot b.name { font-family: 'Outfit'; font-weight: 700; color: var(--slate); font-size: 0.9rem; }
+      .rot .muted { color: #8a97a4; font-size: 0.8rem; }
+      .rot button { font-family: 'Outfit'; font-weight: 700; font-size: 0.8rem; padding: 7px 14px; border-radius: 9px; border: 1px solid var(--hair); background: var(--cloud); color: var(--slate); cursor: pointer; }
+      .rot button:hover { background: #fff; border-color: var(--orange); color: var(--orange); }
+      .rot button.pri { background: var(--orange); color: #fff; border-color: var(--orange); }
+      .rot .spacer { margin-left: auto; }
+      .rot .seed { font-size: 0.74rem; color: #8a97a4; font-family: 'Outfit'; }
+
+      /* ---- library grid ---- */
+      .lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; margin-top: 20px; align-items: start; }
+      .lib--desktop { grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); }
+      .libcard { background: #fff; border: 1px solid var(--hair); border-radius: 14px; padding: 16px; min-width: 0; }
+      .libcard .cap { font-family: 'Outfit'; font-weight: 700; color: var(--slate); font-size: 0.92rem; margin-bottom: 3px; }
+      .libcard .desc { font-size: 0.74rem; color: #8a97a4; margin-bottom: 12px; }
+      .libcard .holder { display: flex; justify-content: center; overflow: hidden; }
+
+      @media (max-width: 900px) {
+        .hero__grid { grid-template-columns: 1fr; padding: 30px 22px; }
+        .lib--desktop { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 560px) {
+        .wrap { padding: 0 14px; }
+        .sec-head { margin-top: 44px; }
+        .sec-head h2 { font-size: 1.35rem; }
+        .lib, .lib--desktop { grid-template-columns: 1fr; }
+        .rot { gap: 7px; }
+        .rot .spacer { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-note">
+      MOCKUP GALLERY — faithful CSS renders of the real app (full chrome: sidebar, top bar, mobile tab bar).
+      <strong>Rotation hero</strong> up top (step / shuffle / daily-pick) · <strong>full screen library</strong> below.
+      Badges are CSS approximations; production uses the official Apple/Google SVGs.
+    </div>
+
+    <div class="wrap">
+      <!-- ============================================================= -->
+      <!-- ROTATION HERO -->
+      <!-- ============================================================= -->
+      <div class="sec-head">
+        <div class="kicker">Above the fold</div>
+        <h2>Hero — desktop + two phones, rotating</h2>
+        <p>On desktop: one desktop frame + two phones, so a visitor sees the money side, the family side, and the "works on every device" story at once — the trio rotates on a daily seed (step through combos or flip to random below). On a phone: a swipe carousel of the app screens with dots and gentle autoplay, so the hero stays short and the CTA stays high. Narrow your window past ~820px to see it switch.</p>
+      </div>
+
+      <div class="hero">
+        <div class="hero__grid">
+          <div>
+            <div class="hero__eyebrow">🔒 local-first · private by design</div>
+            <h1 class="hero__h1">every. bean.<br /><em>counts.</em></h1>
+            <p class="hero__sub">the calm home for your family's week and money — plans, budgets, to-dos and memories, all in one private place.</p>
+            <p class="hero__priv">your data never leaves your hands. <a href="#">privacy, guaranteed ↓</a></p>
+            <div class="hero__cta">
+              <a class="btn-primary" href="#">get started — it's free</a>
+              <a class="hero__jump" href="#">see what's inside ↓</a>
+            </div>
+            <div class="hero__stores">
+              <div class="cap">or get the app</div>
+              <div class="badges">
+                <a class="badge" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M16.36 12.9c.02 2.32 2.04 3.09 2.06 3.1-.02.05-.32 1.11-1.06 2.2-.64.95-1.3 1.9-2.36 1.92-1.03.02-1.37-.61-2.55-.61-1.18 0-1.55.59-2.53.63-1.01.04-1.79-1.02-2.44-1.97-1.32-1.92-2.33-5.42-.97-7.79.67-1.17 1.88-1.92 3.19-1.94.99-.02 1.93.67 2.54.67.61 0 1.75-.83 2.95-.71.5.02 1.92.2 2.83 1.53-.07.05-1.69.99-1.67 2.95M14.4 5.6c.54-.66.9-1.57.8-2.48-.78.03-1.72.52-2.28 1.18-.5.58-.94 1.5-.82 2.39.87.07 1.76-.44 2.3-1.09"/></svg><span class="badge__txt"><small>Download on the</small><b>App Store</b></span></a>
+                <a class="badge" href="#"><svg width="18" height="20" viewBox="0 0 24 24"><path d="M3.5 2.1c-.3.2-.5.6-.5 1.1v17.6c0 .5.2.9.5 1.1l10.2-9.9L3.5 2.1z" fill="#3bccff"/><path d="M17.8 8.4l-3.6-2.1-2.7 2.6 2.7 2.6 3.6-2.1c.9-.5.9-1.4 0-1.9z" fill="#ffd400"/><path d="M3.5 2.1l10.7 6.3 2.7-2.6L6.1.6C5.2.1 4.2.2 3.5 1z" fill="#00e676"/><path d="M3.5 21.9l10.7-6.3-2.7-2.6L6.1 16.5c-.9.5-1.9.4-2.6-.4z" fill="#ff3d47"/></svg><span class="badge__txt"><small>GET IT ON</small><b>Google Play</b></span></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage" id="stage">
+            <div class="stage__inner" id="stage-inner">
+              <span class="tag-lbl" style="top:20px;left:8px">🖥️ on your laptop</span>
+              <span class="tag-lbl" style="bottom:2px;right:96px">📱 & your phones</span>
+              <div class="anchor anchor--desktop" id="anchor-desktop"></div>
+              <div class="anchor anchor--pa" id="anchor-pa"></div>
+              <div class="anchor anchor--pb" id="anchor-pb"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rot">
+        <b class="name" id="rot-name">—</b>
+        <span class="muted" id="rot-combo">—</span>
+        <div class="spacer"></div>
+        <span class="seed" id="rot-seed"></span>
+        <button id="rot-prev">◀ prev</button>
+        <button id="rot-next">next ▶</button>
+        <button id="rot-mode" class="pri">🎲 shuffle: off</button>
+      </div>
+
+      <!-- ============================================================= -->
+      <!-- LIBRARY: PHONES -->
+      <!-- ============================================================= -->
+      <div class="sec-head">
+        <div class="kicker">Screen library · phone</div>
+        <h2>The app screens</h2>
+        <p>Each drawn with its real chrome — status bar, app header, and the 5-tab bottom bar (🏡 Nook · 🌳 Planning · the raised 📅 Calendar hero · 🐷 Money · 🌱 Pod) with the correct tab lit per screen.</p>
+      </div>
+      <div class="lib" id="lib-phone"></div>
+
+      <!-- ============================================================= -->
+      <!-- LIBRARY: DESKTOP -->
+      <!-- ============================================================= -->
+      <div class="sec-head">
+        <div class="kicker">Screen library · desktop</div>
+        <h2>The desktop views</h2>
+        <p>Browser frame + the real left sidebar (🌳 The Treehouse / 🐷 The Piggy Bank) and top header with its squircle controls, active nav item matched to the page.</p>
+      </div>
+      <div class="lib lib--desktop" id="lib-desktop" style="margin-bottom:64px"></div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- SCREEN TEMPLATES -->
+    <!-- ============================================================= -->
+
+    <!-- reusable sidebar (desktop). data-active sets the lit item -->
+    <template id="frag-sidebar">
+      <aside class="sb">
+        <div class="sb__logo"><span class="mark">🫘</span><b>beanies<em>.family</em></b></div>
+        <div class="sb__sec sb__sec--tree">🌳 The Treehouse</div>
+        <div class="sb__item" data-k="nook"><i>🏡</i>Family Dashboard</div>
+        <div class="sb__item" data-k="activities"><i>📅</i>Family Activities</div>
+        <div class="sb__item badge" data-k="travel"><i>✈️</i>Travel Plans</div>
+        <div class="sb__item badge" data-k="todo"><i>✅</i>To-Dos</div>
+        <div class="sb__item" data-k="meals"><i>🍲</i>Meal Planner</div>
+        <div class="sb__item" data-k="pod"><i>🌱</i>The Pod</div>
+        <div class="sb__sec sb__sec--pig">🐷 The Piggy Bank</div>
+        <div class="sb__item" data-k="overview"><i>🏠</i>Overview</div>
+        <div class="sb__item" data-k="accounts"><i>💰</i>Accounts</div>
+        <div class="sb__item badge" data-k="budgets"><i>💵</i>Budgets</div>
+        <div class="sb__item" data-k="transactions"><i>💳</i>Transactions</div>
+        <div class="sb__item" data-k="goals"><i>🎯</i>Goals</div>
+        <div class="sb__item" data-k="assets"><i>🏢</i>Assets</div>
+      </aside>
+    </template>
+
+    <!-- reusable top header. data-title / data-date filled by JS -->
+    <template id="frag-header">
+      <div class="hd">
+        <div class="hd__title"><b class="t">—</b><span class="dt">—</span></div>
+        <div class="hd__ctrls">
+          <div class="ctl ctl--on"><span>$</span>USD</div>
+          <div class="ctl">🇸🇬</div>
+          <div class="ctl">🔔</div>
+          <div class="ctl">🫙<span class="grn">●</span></div>
+          <div class="ctl">🔍</div>
+          <div class="av">G</div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ DESKTOP: OVERVIEW (finance) ============ -->
+    <template id="tpl-d-overview">
+      <div class="device device--desktop">
+        <div class="bbar"><div class="bbar__dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><div class="bbar__url">🔒 <b>app.beanies.family</b><span>/dashboard</span></div></div>
+        <div class="shell">
+          <div data-slot="sidebar" data-active="overview"></div>
+          <div style="display:flex;flex-direction:column">
+            <div data-slot="header" data-title="Good morning, Greg" data-date="Monday, 22 August"></div>
+            <div class="board" style="display:flex;flex-direction:column;gap:11px">
+              <div class="nw">
+                <div class="nw__pills"><b>1M</b><b class="on">1Y</b><b>All</b></div>
+                <div class="nw__lbl">Family Net Worth</div>
+                <div class="nw__amt">$125,400</div>
+                <div class="nw__chg">↑ +12.5% this month · +$1,240</div>
+                <svg class="nw__chart" viewBox="0 0 340 42" preserveAspectRatio="none" fill="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F15D22" stop-opacity="0.3"/><stop offset="100%" stop-color="#F15D22" stop-opacity="0"/></linearGradient></defs><path d="M0,36 C40,32 74,27 110,21 C150,15 186,24 220,14 C260,8 300,6 340,3" stroke="#F15D22" stroke-width="2" fill="none"/><path d="M0,36 C40,32 74,27 110,21 C150,15 186,24 220,14 C260,8 300,6 340,3 L340,42 L0,42 Z" fill="url(#g1)"/><circle cx="340" cy="3" r="3" fill="#F15D22" stroke="#fff" stroke-width="1.5"/></svg>
+              </div>
+              <div class="tiles">
+                <div class="tile" style="--accent:#27ae60"><i>💵</i><div class="k">Cash</div><div class="v">$58k</div><div class="pct">46%</div></div>
+                <div class="tile" style="--accent:#3498db"><i>📈</i><div class="k">Invest</div><div class="v">$67k</div><div class="pct">32%</div></div>
+                <div class="tile" style="--accent:#9b59b6"><i>🪙</i><div class="k">Crypto</div><div class="v">$8k</div><div class="pct">6%</div></div>
+                <div class="tile" style="--accent:#2c3e50"><i>🏠</i><div class="k">Assets</div><div class="v">$420k</div><div class="pct">—</div></div>
+                <div class="tile" style="--accent:#e67e22"><i>🏖️</i><div class="k">Retire</div><div class="v">$31k</div><div class="pct">16%</div></div>
+              </div>
+              <div class="srow">
+                <div class="stat"><div class="si" style="background:rgba(39,174,96,0.12)">📈</div><div class="sk">Income</div><div class="sv" style="color:#27ae60">$8,500</div><div class="sc">↑ +$300</div></div>
+                <div class="stat"><div class="si" style="background:rgba(241,93,34,0.12)">📉</div><div class="sk">Expenses</div><div class="sv" style="color:#f15d22">$6,200</div><div class="sc" style="color:#97a3ae">−$120</div></div>
+                <div class="stat stat--dark"><div class="si" style="background:rgba(255,255,255,0.14)">💰</div><div class="sk">Cash Flow</div><div class="sv">+$2,300</div><div class="sc">🌱 42% saved</div></div>
+              </div>
+              <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="lbl">Budget · August</span><span class="see">See All →</span></div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span style="font-family:'Outfit';font-weight:800;font-size:0.9rem;color:#27ae60">👍 On track</span><span style="font-size:0.56rem;color:#97a3ae;margin-left:auto">$3,760 / $5,032 · 75%</span></div>
+                <div class="prog"><i style="width:75%"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ DESKTOP: CALENDAR (month) ============ -->
+    <template id="tpl-d-calendar">
+      <div class="device device--desktop">
+        <div class="bbar"><div class="bbar__dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><div class="bbar__url">🔒 <b>app.beanies.family</b><span>/activities</span></div></div>
+        <div class="shell">
+          <div data-slot="sidebar" data-active="activities"></div>
+          <div style="display:flex;flex-direction:column">
+            <div data-slot="header" data-title="Family Activities" data-date="Monday, 22 August"></div>
+            <div class="board">
+              <div class="cmd">
+                <h3 class="ff">August 2026</h3>
+                <div class="nav"><b>‹</b><span class="today">Today</span><b>›</b></div>
+                <div class="vtog"><b class="on">Month</b><b>Week</b><b>Day</b></div>
+              </div>
+              <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+                <span class="mchip on">👨‍👩‍👧 All</span>
+                <span class="mchip"><span class="dot" style="background:var(--m-greg)">G</span>Greg</span>
+                <span class="mchip"><span class="dot" style="background:var(--m-sarah)">S</span>Sarah</span>
+                <span class="mchip"><span class="dot" style="background:var(--m-emma)">E</span>Emma</span>
+                <span class="mchip"><span class="dot" style="background:var(--m-liam)">L</span>Liam</span>
+              </div>
+              <div class="cal">
+                <div class="cal__wk"><span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span></div>
+                <div class="cal__grid">
+                  <div class="cell wknd"><div class="d">1</div></div>
+                  <div class="cell"><div class="d">2</div><div class="ev" style="--c:var(--m-emma)">🎹 Piano</div></div>
+                  <div class="cell"><div class="d">3</div><div class="ev" style="--c:var(--m-liam)">⚽ Soccer</div></div>
+                  <div class="cell"><div class="d">4</div><div class="ev" style="--c:var(--orange)">🏥 Dentist</div></div>
+                  <div class="cell"><div class="d">5</div></div>
+                  <div class="cell"><div class="d">6</div><div class="ev" style="--c:var(--m-sarah)">🧘 Yoga</div></div>
+                  <div class="cell wknd"><div class="d">7</div><div class="ev" style="--c:var(--orange)">🎂 Party</div></div>
+                  <div class="cell wknd"><div class="d">8</div></div>
+                  <div class="cell"><div class="d">9</div><div class="ev" style="--c:var(--m-emma)">🎹 Piano</div></div>
+                  <div class="cell"><div class="d">10</div><div class="ev" style="--c:var(--m-liam)">⚽ Soccer</div><div class="ev" style="--c:var(--m-greg)">💼 Work</div></div>
+                  <div class="cell"><div class="d">11</div><div class="ev" style="--c:var(--orange)">🍽️ Dinner</div></div>
+                  <div class="cell"><div class="d">12</div></div>
+                  <div class="cell"><div class="d">13</div><div class="ev" style="--c:var(--m-emma)">🩰 Ballet</div></div>
+                  <div class="cell wknd"><div class="d">14</div><div class="vac" style="grid-column:auto">🏖️ Beach</div></div>
+                  <div class="cell wknd"><div class="d">15</div><div class="vac">Beach Wk</div></div>
+                  <div class="cell"><div class="d">16</div><div class="vac">Beach Wk</div></div>
+                  <div class="cell"><div class="d">17</div><div class="vac">Beach Wk</div></div>
+                  <div class="cell"><div class="d">18</div><div class="vac">Beach →</div></div>
+                  <div class="cell"><div class="d">19</div><div class="ev" style="--c:var(--m-sarah)">🧘 Yoga</div></div>
+                  <div class="cell"><div class="d">20</div><div class="ev" style="--c:var(--m-liam)">🥋 TKD</div></div>
+                  <div class="cell wknd"><div class="d">21</div></div>
+                  <div class="cell tdy wknd"><div class="d">22</div><div class="ev" style="--c:var(--m-emma)">🎹 Piano</div><div class="ev" style="--c:var(--m-liam)">🤸 Gym</div></div>
+                  <div class="cell"><div class="d">23</div><div class="ev" style="--c:var(--orange)">🎉 BBQ</div></div>
+                  <div class="cell"><div class="d">24</div></div>
+                  <div class="cell"><div class="d">25</div><div class="ev" style="--c:var(--m-greg)">✈️ Trip</div></div>
+                  <div class="cell"><div class="d">26</div><div class="ev" style="--c:var(--m-emma)">🎹 Piano</div></div>
+                  <div class="cell"><div class="d">27</div><div class="ev" style="--c:var(--m-liam)">⚽ Soccer</div></div>
+                  <div class="cell wknd"><div class="d">28</div></div>
+                </div>
+              </div>
+              <div style="margin-top:9px;display:flex;align-items:center;gap:8px;background:rgba(174,214,241,0.18);border:1px solid rgba(174,214,241,0.5);border-radius:10px;padding:8px 12px">
+                <span style="font-size:0.9rem">📆</span><span style="font-size:0.62rem;color:#3a7bad;font-weight:600">Connect Google Calendar to keep everything in one place</span><span class="see" style="margin-left:auto">Connect →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ DESKTOP: MEAL PLANNER ============ -->
+    <template id="tpl-d-meals">
+      <div class="device device--desktop">
+        <div class="bbar"><div class="bbar__dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><div class="bbar__url">🔒 <b>app.beanies.family</b><span>/meal-planner</span></div></div>
+        <div class="shell">
+          <div data-slot="sidebar" data-active="meals"></div>
+          <div style="display:flex;flex-direction:column">
+            <div data-slot="header" data-title="Meal Planner" data-date="Monday, 22 August"></div>
+            <div class="board">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+                <div><div style="font-family:'Outfit';font-weight:700;font-size:0.9rem;color:var(--slate)">🍲 This week</div><div class="hand" style="font-size:0.82rem">what's cooking this week? 🌱</div></div>
+                <div style="margin-left:auto;display:flex;gap:6px"><span class="mchip">⧉ Copy last week</span><span class="pill-btn">⬆ Share</span></div>
+              </div>
+              <div class="mealwrap">
+                <div class="rail">
+                  <h4 class="ff">📖 Cookbook</h4>
+                  <div class="hand" style="font-size:0.72rem">drag a recipe onto a day 🍝</div>
+                  <div class="recipe"><span class="th">🍝</span><span class="rn">Spaghetti Bol.</span></div>
+                  <div class="recipe"><span class="th">🍛</span><span class="rn">Chicken Curry</span></div>
+                  <div class="recipe"><span class="th">🥗</span><span class="rn">Greek Salad</span></div>
+                  <div class="recipe"><span class="th">🌮</span><span class="rn">Taco Night</span></div>
+                  <div class="alt"><b>🍜 Eat out</b><b>♻️ Leftovers</b><b>⊘ Skip</b></div>
+                </div>
+                <div class="mgrid">
+                  <div class="mgrid__days"><b></b><b>Mon 22</b><b class="tdy">Tue 23</b><b>Wed 24</b><b>Thu 25</b></div>
+                  <div class="mgrid__r"><div class="slot-l">🍳 B'FAST</div><div class="mgrid__c"><div class="meal">🥣 Oats<span class="st" style="background:#27ae60"></span></div></div><div class="mgrid__c"><div class="meal">🥞 Pancakes<span class="st" style="background:#f15d22"></span></div></div><div class="mgrid__c"><div class="meal">🍳 Eggs<span class="st" style="background:#f15d22"></span></div></div><div class="mgrid__c"></div></div>
+                  <div class="mgrid__r"><div class="slot-l">🥪 LUNCH</div><div class="mgrid__c"><div class="meal meal--out">🍜 Eat out</div></div><div class="mgrid__c"><div class="meal">🥗 Salad<span class="st" style="background:#f15d22"></span></div></div><div class="mgrid__c"></div><div class="mgrid__c"><div class="meal">♻️ Leftovers</div></div></div>
+                  <div class="mgrid__r"><div class="slot-l">🍽️ DINNER</div><div class="mgrid__c"><div class="meal">🍝 Spaghetti<span class="st" style="background:#f15d22"></span></div></div><div class="mgrid__c"><div class="meal">🍛 Curry<span class="st" style="background:#f15d22"></span></div></div><div class="mgrid__c"><div class="meal">🌮 Tacos<span class="st" style="background:#f15d22"></span></div></div><div class="mgrid__c"><div class="meal">🐟 Fish<span class="st" style="background:#f15d22"></span></div></div></div>
+                  <div class="mgrid__r"><div class="slot-l">🍎 SNACK</div><div class="mgrid__c"><div class="meal">🍎 Fruit</div></div><div class="mgrid__c"></div><div class="mgrid__c"><div class="meal">🧀 Cheese</div></div><div class="mgrid__c"></div></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;margin-top:10px;background:#fff;border:1px solid var(--hair);border-radius:11px;padding:9px 12px">
+                <span style="font-size:0.95rem">🛒</span>
+                <div><div style="font-family:'Outfit';font-weight:700;font-size:0.72rem;color:var(--slate)">Shopping list ready</div><div style="font-size:0.56rem;color:#97a3ae">14 ingredients from this week's meals</div></div>
+                <span class="pill-btn" style="margin-left:auto">View list →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ PHONE: NOOK ============ -->
+    <template id="tpl-p-nook">
+      <div class="device device--phone">
+        <div class="ph">
+          <div class="ph__status"><span>9:41</span><span class="sigs">📶 <b></b></span></div>
+          <div class="ph__hd"><div class="burger"><i></i><i></i><i></i></div><div class="t">Good morning, <span>Greg</span></div><div class="r">🔔🔍<span class="av">G</span></div></div>
+          <div class="ph__body">
+            <div class="greet">Welcome Home, <span>Greg</span></div>
+            <div class="toast">
+              <div class="toast__h"><div class="toast__ic">🌳</div><div><div class="toast__t">Everyone's having a great week!</div><div class="toast__s">Your Daily Briefing · 3 today · 5 coming up</div></div></div>
+              <div class="toast__row">🚗 Pick up Emma from soccer · 3:30 PM</div>
+              <div class="toast__row">💊 Liam's medicine · 6 PM</div>
+            </div>
+            <div>
+              <div class="lbl" style="margin-bottom:5px">Your Beans</div>
+              <div class="beans">
+                <div class="bean"><div class="a" style="background:var(--m-greg)">G</div><div class="nm">Greg</div><div class="rl">Owner</div></div>
+                <div class="bean"><div class="a" style="background:var(--m-sarah)">S</div><div class="nm">Sarah</div><div class="rl">Admin</div></div>
+                <div class="bean"><div class="a" style="background:var(--m-emma)">E</div><div class="nm">Emma</div><div class="rl">Member</div></div>
+                <div class="bean"><div class="a" style="background:var(--m-liam)">L</div><div class="nm">Liam</div><div class="rl">Member</div></div>
+                <div class="bean"><div class="a add">＋</div><div class="nm">Add</div></div>
+              </div>
+            </div>
+            <div class="nw" style="padding:11px 12px">
+              <div class="nw__lbl">The Piggy Bank</div>
+              <div class="nw__amt" style="font-size:1.5rem">$125,400</div>
+              <div class="nw__chg">↑ +$1,240 this month</div>
+              <div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:0.5rem;color:rgba(255,255,255,0.6);margin-bottom:3px"><span>Monthly budget</span><span>$3,760 / $5,032</span></div><div class="prog" style="background:rgba(255,255,255,0.15)"><i style="width:75%"></i></div></div>
+            </div>
+            <div class="card card--l">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="lbl">Today's Schedule</span><span class="mchip" style="font-size:0.5rem">Aug 22</span></div>
+              <div class="list-row"><span class="ic" style="background:rgba(174,214,241,0.3)">🎹</span><div><div class="nm">Piano Lesson</div><div class="sub">3:00 PM · Emma</div></div></div>
+              <div class="list-row"><span class="ic" style="background:rgba(174,214,241,0.3)">🤸</span><div><div class="nm">Gymnastics</div><div class="sub">4:00 PM · Liam</div></div></div>
+            </div>
+            <div class="card card--lo">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="lbl">This Week</span><span class="see">Full Calendar →</span></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(241,93,34,0.1)">🏥</span><div><div class="nm">Dentist · Emma</div><div class="sub">Tue · 10:00 AM</div></div></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(241,93,34,0.1)">🥋</span><div><div class="nm">Taekwondo · Liam</div><div class="sub">Wed · 5:00 PM</div></div></div>
+            </div>
+            <div class="card" style="border-left:4px solid var(--terracotta)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="lbl">Family Milestones</span><span class="see" style="color:var(--terracotta)">2 Upcoming</span></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(230,126,34,0.12)">🎂</span><div><div class="nm">Emma turns 8</div><div class="sub">in 6 days</div></div></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(174,214,241,0.3)">✈️</span><div><div class="nm">Beach Week trip</div><div class="sub">in 3 weeks</div></div></div>
+            </div>
+          </div>
+          <div class="tabs" data-slot="tabs" data-active="nook"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ PHONE: CALENDAR ============ -->
+    <template id="tpl-p-calendar">
+      <div class="device device--phone">
+        <div class="ph">
+          <div class="ph__status"><span>9:41</span><span class="sigs">📶 <b></b></span></div>
+          <div class="ph__hd"><div class="burger"><i></i><i></i><i></i></div><div class="t">📅 August</div><div class="r">🔔🔍<span class="av">G</span></div></div>
+          <div class="ph__body">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="nav" style="display:flex;gap:3px"><b style="width:18px;height:18px;border-radius:6px;background:#fff;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font-size:0.62rem;color:#7b8894">‹</b><b style="width:18px;height:18px;border-radius:6px;background:#fff;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font-size:0.62rem;color:#7b8894">›</b></div>
+              <span class="today" style="font-size:0.54rem;color:var(--orange);font-weight:700;padding:3px 8px;border-radius:7px;background:rgba(241,93,34,0.08)">Today</span>
+              <div class="vtog" style="margin-left:auto"><b class="on">M</b><b>W</b><b>D</b></div>
+            </div>
+            <div class="cal" style="padding:9px">
+              <div class="cal__wk"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+              <div class="cal__grid">
+                <div class="cell" style="min-height:38px"><div class="d">1</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">2</div><div class="ev" style="--c:var(--m-emma)">🎹</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">3</div><div class="ev" style="--c:var(--m-liam)">⚽</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">4</div><div class="ev" style="--c:var(--orange)">🏥</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">5</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">6</div><div class="ev" style="--c:var(--m-sarah)">🧘</div></div>
+                <div class="cell wknd" style="min-height:38px"><div class="d">7</div><div class="ev" style="--c:var(--orange)">🎂</div></div>
+                <div class="cell wknd" style="min-height:38px"><div class="d">8</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">9</div><div class="ev" style="--c:var(--m-emma)">🎹</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">10</div><div class="ev" style="--c:var(--m-liam)">⚽</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">11</div><div class="ev" style="--c:var(--orange)">🍽️</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">12</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">13</div><div class="ev" style="--c:var(--m-emma)">🩰</div></div>
+                <div class="cell wknd" style="min-height:38px"><div class="d">14</div><div class="vac" style="grid-column:auto">🏖️</div></div>
+                <div class="cell wknd" style="min-height:38px"><div class="d">15</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">16</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">17</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">18</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">19</div><div class="ev" style="--c:var(--m-sarah)">🧘</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">20</div><div class="ev" style="--c:var(--m-liam)">🥋</div></div>
+                <div class="cell wknd" style="min-height:38px"><div class="d">21</div></div>
+                <div class="cell tdy wknd" style="min-height:38px"><div class="d">22</div><div class="ev" style="--c:var(--m-emma)">🎹</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">23</div><div class="ev" style="--c:var(--orange)">🎉</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">24</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">25</div><div class="ev" style="--c:var(--m-greg)">✈️</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">26</div><div class="ev" style="--c:var(--m-emma)">🎹</div></div>
+                <div class="cell" style="min-height:38px"><div class="d">27</div><div class="ev" style="--c:var(--m-liam)">⚽</div></div>
+                <div class="cell wknd" style="min-height:38px"><div class="d">28</div></div>
+              </div>
+            </div>
+            <div class="card card--lo" style="padding:9px 11px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="lbl">Up Next</span><span class="see">Agenda →</span></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(174,214,241,0.3)">🎹</span><div><div class="nm">Piano Lesson</div><div class="sub">Today · 3:00 PM · Emma</div></div></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(16,185,129,0.14)">🤸</span><div><div class="nm">Gymnastics</div><div class="sub">Today · 4:00 PM · Liam</div></div></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(241,93,34,0.1)">🎉</span><div><div class="nm">Family BBQ</div><div class="sub">Tomorrow · 12:00 PM</div></div></div>
+              <div class="list-row" style="padding:3px 0"><span class="ic" style="background:rgba(241,93,34,0.1)">🏥</span><div><div class="nm">Dentist · Emma</div><div class="sub">Thu · 10:00 AM</div></div></div>
+            </div>
+          </div>
+          <div class="tabs" data-slot="tabs" data-active="calendar"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ PHONE: TRAVEL ============ -->
+    <template id="tpl-p-travel">
+      <div class="device device--phone">
+        <div class="ph">
+          <div class="ph__status"><span>9:41</span><span class="sigs">📶 <b></b></span></div>
+          <div class="ph__hd"><div class="burger"><i></i><i></i><i></i></div><div class="t">✈️ Travel Plans</div><div class="r">🔔🔍<span class="av">G</span></div></div>
+          <div class="ph__body">
+            <div class="hand" style="font-size:0.86rem">Where are the beans headed next?</div>
+            <div class="trip">
+              <div class="trip__hero">🏖️</div>
+              <div class="trip__b">
+                <div class="trip__nm">Beach Week — Phuket</div>
+                <div class="trip__dt">📅 Aug 14 – 20 · 6 nights</div>
+                <div style="display:flex;gap:4px;margin-bottom:6px"><span class="mchip"><span class="dot" style="background:var(--m-greg)">G</span></span><span class="mchip"><span class="dot" style="background:var(--m-sarah)">S</span></span><span class="mchip"><span class="dot" style="background:var(--m-emma)">E</span></span><span class="mchip"><span class="dot" style="background:var(--m-liam)">L</span></span></div>
+                <div class="prog" style="margin-bottom:6px"><i style="width:66%;background:linear-gradient(90deg,var(--teal),#0077b6)"></i></div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="badge-cd">⏳ 3 weeks to go!</span><span class="badge-warn">🏨 2 nights need booking</span></div>
+              </div>
+            </div>
+            <div class="trip">
+              <div class="trip__hero" style="background:linear-gradient(120deg,color-mix(in srgb,#9b59b6 18%,#fff),color-mix(in srgb,#ffd93d 26%,#fff))">🎒</div>
+              <div class="trip__b">
+                <div class="trip__nm">Japan — Autumn</div>
+                <div class="trip__dt">📅 Nov 3 – 14 · 11 nights</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="mchip">💡 5 open ideas</span><span class="badge-warn">⏳ needs flights</span></div>
+              </div>
+            </div>
+            <div class="trip">
+              <div class="trip__hero" style="background:linear-gradient(120deg,color-mix(in srgb,#10b981 16%,#fff),color-mix(in srgb,var(--sky) 32%,#fff))">🚗</div>
+              <div class="trip__b">
+                <div class="trip__nm">Grandma's — Long Weekend</div>
+                <div class="trip__dt">📅 Sep 5 – 7 · road trip</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="badge-cd" style="background:linear-gradient(135deg,#10b981,#0e9f6e)">✓ all booked</span><span class="mchip"><span class="dot" style="background:var(--m-emma)">E</span><span class="dot" style="background:var(--m-liam)">L</span></span></div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 4px"><span class="lbl">Past Trips (3)</span><span class="see" style="color:#97a3ae">▾</span></div>
+          </div>
+          <div class="tabs" data-slot="tabs" data-active="planning"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ PHONE: TO-DO ============ -->
+    <template id="tpl-p-todo">
+      <div class="device device--phone">
+        <div class="ph">
+          <div class="ph__status"><span>9:41</span><span class="sigs">📶 <b></b></span></div>
+          <div class="ph__hd"><div class="burger"><i></i><i></i><i></i></div><div class="t">✅ To-Dos</div><div class="r">🔔🔍<span class="av">G</span></div></div>
+          <div class="ph__body">
+            <div class="hand" style="font-size:0.82rem">Keep track of tasks for the whole family</div>
+            <div style="display:flex;align-items:center;gap:6px;background:rgba(44,62,80,0.04);border-radius:11px;padding:7px 9px"><span>✏️</span><span style="font-size:0.6rem;color:#97a3ae;flex:1">What needs to be done?</span><span style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;font-size:0.56rem;font-weight:700;padding:4px 9px;border-radius:8px">Add</span></div>
+            <div>
+              <div class="todo-sec-lbl" style="color:var(--purple)">Open Tasks (4)</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div class="todo"><span class="box red"></span><div><div class="tt">Buy groceries for the week</div><div class="meta"><span class="tag tag--over">⏰ Aug 20 · Overdue</span><span class="mchip" style="font-size:0.46rem"><span class="dot" style="background:var(--m-sarah)">S</span>Sarah</span></div></div></div>
+                <div class="todo" style="border-color:var(--orange);box-shadow:0 0 0 3px rgba(241,93,34,0.06)"><span class="box"></span><div><div class="tt">Sign Emma's permission slip</div><div class="meta"><span class="tag tag--due">📅 Today</span><span class="mchip" style="font-size:0.46rem"><span class="dot" style="background:var(--m-greg)">G</span>Greg</span></div></div></div>
+                <div class="todo"><span class="box"></span><div><div class="tt">Book dentist for Liam</div><div class="meta"><span class="tag tag--date">📅 Aug 25</span></div></div></div>
+                <div class="todo"><span class="box"></span><div><div class="tt">Renew library books</div><div class="meta"><span style="font-size:0.48rem;color:#b3bcc5">No date set</span></div></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="todo-sec-lbl" style="color:#3a7bad">💭 Someday · Maybe (2)</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div class="todo" style="background:color-mix(in srgb,var(--sky) 14%,#fff)"><span class="box sky"></span><div><div class="tt">💭 Plan Emma's birthday party</div></div></div>
+                <div class="todo" style="background:color-mix(in srgb,var(--sky) 14%,#fff)"><span class="box sky"></span><div><div class="tt">💭 Repaint the garden fence</div></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="todo-sec-lbl" style="color:var(--green)">Completed (1)</div>
+              <div class="todo"><span class="box done"></span><div><div class="tt strike">Pay electricity bill</div></div></div>
+            </div>
+          </div>
+          <div class="tabs" data-slot="tabs" data-active="planning"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ PHONE: MONEY (Piggy Bank) ============ -->
+    <template id="tpl-p-money">
+      <div class="device device--phone">
+        <div class="ph">
+          <div class="ph__status"><span>9:41</span><span class="sigs">📶 <b></b></span></div>
+          <div class="ph__hd"><div class="burger"><i></i><i></i><i></i></div><div class="t">🐷 Overview</div><div class="r">🔔🔍<span class="av">G</span></div></div>
+          <div class="ph__body">
+            <div class="nw">
+              <div class="nw__pills"><b>1M</b><b class="on">1Y</b><b>All</b></div>
+              <div class="nw__lbl">Family Net Worth</div>
+              <div class="nw__amt">$125,400</div>
+              <div class="nw__chg">↑ +12.5% · +$1,240 this month</div>
+              <svg class="nw__chart" viewBox="0 0 250 42" preserveAspectRatio="none" fill="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F15D22" stop-opacity="0.3"/><stop offset="100%" stop-color="#F15D22" stop-opacity="0"/></linearGradient></defs><path d="M0,36 C30,32 55,27 82,21 C112,15 138,24 165,14 C195,8 222,6 250,3" stroke="#F15D22" stroke-width="2" fill="none"/><path d="M0,36 C30,32 55,27 82,21 C112,15 138,24 165,14 C195,8 222,6 250,3 L250,42 L0,42 Z" fill="url(#g2)"/><circle cx="250" cy="3" r="3" fill="#F15D22" stroke="#fff" stroke-width="1.5"/></svg>
+            </div>
+            <div class="tiles" style="grid-template-columns:repeat(2,1fr)">
+              <div class="tile" style="--accent:#27ae60"><i>💵</i><div class="k">Cash</div><div class="v">$58,000</div><div class="pct">46%</div></div>
+              <div class="tile" style="--accent:#3498db"><i>📈</i><div class="k">Investments</div><div class="v">$67,400</div><div class="pct">32%</div></div>
+            </div>
+            <div class="srow" style="grid-template-columns:1fr 1fr">
+              <div class="stat"><div class="si" style="background:rgba(39,174,96,0.12)">📈</div><div class="sk">Income</div><div class="sv" style="color:#27ae60;font-size:0.82rem">$8,500</div></div>
+              <div class="stat"><div class="si" style="background:rgba(241,93,34,0.12)">📉</div><div class="sk">Expenses</div><div class="sv" style="color:#f15d22;font-size:0.82rem">$6,200</div></div>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="lbl">🎯 Goals</span><span class="see">See All →</span></div>
+              <div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:0.56rem;margin-bottom:2px"><span style="color:#64717d">Emergency fund</span><span style="color:var(--orange);font-weight:700">82%</span></div><div class="prog"><i style="width:82%"></i></div></div>
+              <div><div style="display:flex;justify-content:space-between;font-size:0.56rem;margin-bottom:2px"><span style="color:#64717d">Summer trip</span><span style="color:var(--orange);font-weight:700">45%</span></div><div class="prog"><i style="width:45%"></i></div></div>
+            </div>
+          </div>
+          <div class="tabs" data-slot="tabs" data-active="money"></div>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      'use strict';
+      const NATIVE = { desktop: [760, 496], phone: [290, 594] };
+
+      // ---- tab bar builder (5 tabs, correct active) ----
+      const TABS = [
+        { k: 'nook', e: '🏡', l: 'Nook', cls: 'tab--pill' },
+        { k: 'planning', e: '🌳', l: 'Planning', cls: 'tab--pill' },
+        { k: 'calendar', e: '📅', l: 'Calendar', cls: 'tab--hero' },
+        { k: 'money', e: '🐷', l: 'Money', cls: 'tab--pill' },
+        { k: 'pod', e: '🌱', l: 'Pod', cls: 'tab--pill' },
+      ];
+      function fillTabs(el, active) {
+        el.innerHTML = '';
+        for (const t of TABS) {
+          const d = document.createElement('div');
+          d.className = 'tab ' + t.cls + (t.k === active ? ' on' : '');
+          if (t.cls === 'tab--hero') {
+            d.innerHTML = '<div class="bub">' + t.e + '</div><span>' + t.l + '</span>';
+          } else {
+            d.innerHTML = '<i>' + t.e + '</i><span>' + t.l + '</span>';
+          }
+          el.appendChild(d);
+        }
+      }
+
+      // ---- hydrate a cloned screen (sidebar active item, header text, tabs) ----
+      const sidebarFrag = document.getElementById('frag-sidebar');
+      const headerFrag = document.getElementById('frag-header');
+      function hydrate(node) {
+        node.querySelectorAll('[data-slot="sidebar"]').forEach((h) => {
+          const sb = sidebarFrag.content.firstElementChild.cloneNode(true);
+          const act = h.getAttribute('data-active');
+          const item = sb.querySelector('[data-k="' + act + '"]');
+          if (item) item.classList.add('on');
+          h.replaceWith(sb);
+        });
+        node.querySelectorAll('[data-slot="header"]').forEach((h) => {
+          const hd = headerFrag.content.firstElementChild.cloneNode(true);
+          hd.querySelector('.t').textContent = h.getAttribute('data-title');
+          hd.querySelector('.dt').textContent = h.getAttribute('data-date');
+          h.replaceWith(hd);
+        });
+        node.querySelectorAll('[data-slot="tabs"]').forEach((t) => {
+          fillTabs(t, t.getAttribute('data-active'));
+        });
+        return node;
+      }
+
+      function screenKind(id) { return id.startsWith('tpl-d-') ? 'desktop' : 'phone'; }
+
+      function mount(container, tplId, scale) {
+        const tpl = document.getElementById(tplId);
+        const node = hydrate(tpl.content.firstElementChild.cloneNode(true));
+        const [w, h] = NATIVE[screenKind(tplId)];
+        const box = document.createElement('div');
+        box.className = 'scalebox';
+        box.style.width = w * scale + 'px';
+        box.style.height = h * scale + 'px';
+        node.style.transform = 'scale(' + scale + ')';
+        container.appendChild(box);
+        box.appendChild(node);
+        return { box, node, w, h };
+      }
+
+      // ================= LIBRARY =================
+      const PHONES = [
+        ['tpl-p-nook', 'Family Nook', 'the home page — daily briefing, your beans, today'],
+        ['tpl-p-calendar', 'Calendar', 'the month at a glance, colour-coded by member'],
+        ['tpl-p-travel', 'Travel Plans', 'trips with booking progress + countdown'],
+        ['tpl-p-todo', 'To-Dos', 'family tasks, overdue + due-today surfaced'],
+        ['tpl-p-money', 'Money · Piggy Bank', 'net worth, breakdown and goals'],
+      ];
+      const DESKTOPS = [
+        ['tpl-d-overview', 'Piggy Bank · Overview', 'net worth hero, breakdown tiles, budget'],
+        ['tpl-d-calendar', 'Family Activities', 'the full month grid with a trip band'],
+        ['tpl-d-meals', 'Meal Planner', 'the week board + drag-from cookbook rail'],
+      ];
+      const fitEntries = []; // responsive library screens: {box, node, nativeW, nativeH, holder, max}
+      function buildLib(containerId, list, maxScale) {
+        const c = document.getElementById(containerId);
+        for (const [id, cap, desc] of list) {
+          const card = document.createElement('div');
+          card.className = 'libcard';
+          card.innerHTML = '<div class="cap">' + cap + '</div><div class="desc">' + desc + '</div><div class="holder"></div>';
+          c.appendChild(card);
+          const holder = card.querySelector('.holder');
+          const m = mount(holder, id, maxScale);
+          fitEntries.push({ box: m.box, node: m.node, nativeW: m.w, nativeH: m.h, holder, max: maxScale });
+        }
+      }
+      function relayoutLib() {
+        for (const e of fitEntries) {
+          const s = Math.min(e.max, e.holder.clientWidth / e.nativeW);
+          e.node.style.transform = 'scale(' + s + ')';
+          e.box.style.width = e.nativeW * s + 'px';
+          e.box.style.height = e.nativeH * s + 'px';
+        }
+      }
+      buildLib('lib-phone', PHONES, 0.92);
+      buildLib('lib-desktop', DESKTOPS, 0.62);
+
+      // ================= ROTATION HERO =================
+      // curated combos (each = one desktop + two phones), hand-picked for balance
+      const COMBOS = [
+        { name: 'Money & family', d: 'tpl-d-overview', a: 'tpl-p-nook', b: 'tpl-p-calendar' },
+        { name: 'Plan the week', d: 'tpl-d-calendar', a: 'tpl-p-travel', b: 'tpl-p-todo' },
+        { name: 'Around the table', d: 'tpl-d-meals', a: 'tpl-p-nook', b: 'tpl-p-money' },
+        { name: 'Life & money', d: 'tpl-d-overview', a: 'tpl-p-todo', b: 'tpl-p-calendar' },
+        { name: 'Adventures', d: 'tpl-d-calendar', a: 'tpl-p-money', b: 'tpl-p-nook' },
+      ];
+      const comb0 = COMBOS.map((c) => c.d + c.a + c.b); // labels for readouts
+      const anchors = {
+        d: document.getElementById('anchor-desktop'),
+        a: document.getElementById('anchor-pa'),
+        b: document.getElementById('anchor-pb'),
+      };
+      const capOf = {
+        'tpl-d-overview': 'Overview', 'tpl-d-calendar': 'Calendar', 'tpl-d-meals': 'Meals',
+        'tpl-p-nook': 'Nook', 'tpl-p-calendar': 'Calendar', 'tpl-p-travel': 'Travel',
+        'tpl-p-todo': 'To-Dos', 'tpl-p-money': 'Money',
+      };
+      let idx = 0;
+      let shuffle = false;
+      let mobileMode = false;
+      const stage = document.getElementById('stage');
+      const stageInner = document.getElementById('stage-inner');
+      const DES_W = 660, DES_H = 470;
+
+      function dayOfYear() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 0);
+        return Math.floor((now - start) / 86400000);
+      }
+      function fitStage() {
+        const s = Math.min(1, stage.clientWidth / DES_W);
+        stageInner.style.transform = 'scale(' + s + ')';
+        stage.style.height = DES_H * s + 'px';
+      }
+      // ---- desktop cluster (rotation of curated desktop + two-phone combos) ----
+      function renderCluster(i) {
+        idx = i;
+        const c = COMBOS[i];
+        stage.querySelectorAll('.stage__carousel, .stage__dots').forEach((e) => e.remove());
+        stageInner.style.display = '';
+        anchors.d.innerHTML = ''; anchors.a.innerHTML = ''; anchors.b.innerHTML = '';
+        mount(anchors.d, c.d, 0.66);
+        mount(anchors.a, c.a, 0.74);
+        mount(anchors.b, c.b, 0.82);
+        fitStage();
+        document.getElementById('rot-name').textContent = c.name;
+        document.getElementById('rot-combo').textContent = '🖥️ ' + capOf[c.d] + '  ·  📱 ' + capOf[c.a] + ' + ' + capOf[c.b];
+        document.getElementById('rot-seed').textContent = shuffle
+          ? 'mode: random each load'
+          : 'daily pick #' + (idx + 1) + ' of ' + COMBOS.length + ' (rotates by date)';
+      }
+
+      // ---- mobile swipe carousel (all phone screens) ----
+      const PHONE_ORDER = ['tpl-p-nook', 'tpl-p-calendar', 'tpl-p-travel', 'tpl-p-todo', 'tpl-p-money'];
+      const PHONE_CAP = { 'tpl-p-nook': 'Family Nook', 'tpl-p-calendar': 'Calendar', 'tpl-p-travel': 'Travel', 'tpl-p-todo': 'To-Dos', 'tpl-p-money': 'Money' };
+      let carEls = [], carIndex = 0, autoplay = true, autoTimer = null;
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function buildCarousel() {
+        stageInner.style.display = 'none';
+        stage.querySelectorAll('.stage__carousel, .stage__dots').forEach((e) => e.remove());
+        const avail = stage.clientWidth;
+        const scale = Math.min(0.85, (avail * 0.72) / NATIVE.phone[0]);
+        const track = document.createElement('div');
+        track.className = 'stage__carousel';
+        carEls = [];
+        for (const id of PHONE_ORDER) {
+          const cell = document.createElement('div');
+          cell.className = 'carcell';
+          mount(cell, id, scale);
+          track.appendChild(cell);
+          carEls.push(cell);
+        }
+        const pad = Math.max(8, (avail - NATIVE.phone[0] * scale) / 2);
+        track.style.paddingLeft = pad + 'px';
+        track.style.paddingRight = pad + 'px';
+        stage.appendChild(track);
+        const dots = document.createElement('div');
+        dots.className = 'stage__dots';
+        PHONE_ORDER.forEach((_, i) => { const d = document.createElement('b'); d.onclick = () => scrollToCar(i); dots.appendChild(d); });
+        stage.appendChild(dots);
+        stage.style.height = NATIVE.phone[1] * scale + 34 + 'px';
+        track.addEventListener('scroll', () => {
+          const center = track.scrollLeft + track.clientWidth / 2;
+          let best = 0, bd = 1e9;
+          carEls.forEach((c, i) => { const cc = c.offsetLeft + c.offsetWidth / 2; const dd = Math.abs(cc - center); if (dd < bd) { bd = dd; best = i; } });
+          setCarDot(best);
+        }, { passive: true });
+        track.addEventListener('pointerdown', () => { if (autoplay) { autoplay = false; stopAuto(); document.getElementById('rot-mode').textContent = '⏸ autoplay: off'; setCarDot(carIndex); } });
+        carIndex = 0; setCarDot(0);
+        if (autoplay) startAuto();
+      }
+      function setCarDot(i) {
+        carIndex = i;
+        const dots = stage.querySelector('.stage__dots');
+        if (dots) [...dots.children].forEach((d, j) => d.classList.toggle('on', j === i));
+        document.getElementById('rot-name').textContent = PHONE_CAP[PHONE_ORDER[i]];
+        document.getElementById('rot-combo').textContent = '📱 swipe to explore  (' + (i + 1) + '/' + PHONE_ORDER.length + ')';
+        document.getElementById('rot-seed').textContent = autoplay ? 'mobile · auto-advancing' : 'mobile · swipe or tap dots';
+      }
+      function scrollToCar(i) {
+        i = (i + PHONE_ORDER.length) % PHONE_ORDER.length;
+        const track = stage.querySelector('.stage__carousel');
+        if (!track || !carEls[i]) return;
+        const cell = carEls[i];
+        track.scrollTo({ left: cell.offsetLeft - (track.clientWidth - cell.offsetWidth) / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+      }
+      function startAuto() { stopAuto(); if (!autoplay || reduceMotion) return; autoTimer = setInterval(() => scrollToCar(carIndex + 1), 3600); }
+      function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
+
+      // ---- dispatch by viewport ----
+      function renderHero() {
+        mobileMode = window.innerWidth < 820;
+        stopAuto();
+        if (mobileMode) buildCarousel();
+        else renderCluster(idx);
+        document.getElementById('rot-mode').textContent = mobileMode
+          ? (autoplay ? '▶ autoplay: on' : '⏸ autoplay: off')
+          : (shuffle ? '🎲 shuffle: on' : '🎲 shuffle: off');
+      }
+      function go(i) { idx = (i + COMBOS.length) % COMBOS.length; renderCluster(idx); }
+
+      document.getElementById('rot-prev').onclick = () => { if (mobileMode) scrollToCar(carIndex - 1); else go(idx - 1); };
+      document.getElementById('rot-next').onclick = () => { if (mobileMode) scrollToCar(carIndex + 1); else go(idx + 1); };
+      document.getElementById('rot-mode').onclick = (e) => {
+        if (mobileMode) {
+          autoplay = !autoplay;
+          e.target.textContent = autoplay ? '▶ autoplay: on' : '⏸ autoplay: off';
+          if (autoplay) startAuto(); else stopAuto();
+          setCarDot(carIndex);
+        } else {
+          shuffle = !shuffle;
+          e.target.textContent = shuffle ? '🎲 shuffle: on' : '🎲 shuffle: off';
+          if (shuffle) go(Math.floor(Math.random() * COMBOS.length));
+          else document.getElementById('rot-seed').textContent = 'daily pick #' + (idx + 1) + ' of ' + COMBOS.length + ' (rotates by date)';
+        }
+      };
+
+      let raf;
+      window.addEventListener('resize', () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => { renderHero(); relayoutLib(); });
+      });
+
+      // initial pick = deterministic by day
+      idx = dayOfYear() % COMBOS.length;
+      renderHero();
+      relayoutLib();
+    </script>
+  </body>
+</html>

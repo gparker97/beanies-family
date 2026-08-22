@@ -1,0 +1,648 @@
+---
+// HeroShowcase — the above-the-fold app preview on the homepage.
+//
+// Desktop (>= 820px): a browser-framed desktop view (Piggy Bank Overview) with
+// two phones in front (Family Nook + Calendar) — the "works on your laptop AND
+// your phone" story.
+// Mobile (< 820px): a swipe carousel of the five core app screens with dots and
+// gentle autoplay, so the hero stays short and the CTA stays high.
+//
+// Every screen is a pure-CSS render (NO images) so it adds no LCP/CLS weight —
+// the same reason the previous showcase was CSS. All classes are namespaced with
+// `hsx-` because the marketing site defines global `.card`, `.tag`, `.btn-primary`
+// etc.; combined with Astro's scoped <style>, the showcase can neither collide
+// with nor be affected by the rest of the site.
+//
+// Screens are pre-rendered once into a hidden pool and MOVED (never cloned) into
+// the cluster or carousel by the inline script, so Astro's scoping attributes —
+// and therefore the scoped styles — survive the move. Content is illustrative
+// (fake demo family), mirrors the real app's layout, and is aria-hidden.
+---
+
+<div class="hsx" aria-hidden="true">
+  <div class="hsx-stage" data-hsx-stage>
+    <div class="hsx-inner" data-hsx-inner>
+      <span class="hsx-tag" style="top:18px;left:2%">🖥️ on your laptop</span>
+      <span class="hsx-tag" style="bottom:0;right:24%">📱 &amp; your phone</span>
+      <div class="hsx-anchor hsx-anchor--d" data-hsx-ad></div>
+      <div class="hsx-anchor hsx-anchor--a" data-hsx-aa></div>
+      <div class="hsx-anchor hsx-anchor--b" data-hsx-ab></div>
+    </div>
+  </div>
+
+  <!-- Pre-rendered screen pool (hidden; nodes are moved into place by script) -->
+  <div class="hsx-pool" data-hsx-pool hidden>
+    <!-- ===================== DESKTOP: Piggy Bank Overview ===================== -->
+    <div class="hsx-device hsx-device--desktop" data-screen="overview">
+      <div class="hsx-bbar"><div class="hsx-bbar__dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><div class="hsx-bbar__url">🔒 <b>app.beanies.family</b><span>/dashboard</span></div></div>
+      <div class="hsx-shell">
+        <aside class="hsx-sb">
+          <div class="hsx-sb__logo"><span class="hsx-mark">🫘</span><b>beanies<em>.family</em></b></div>
+          <div class="hsx-sb__sec hsx-sb__sec--tree">🌳 The Treehouse</div>
+          <div class="hsx-sb__item"><i>🏡</i>Family Dashboard</div>
+          <div class="hsx-sb__item"><i>📅</i>Family Activities</div>
+          <div class="hsx-sb__item hsx-badge"><i>✈️</i>Travel Plans</div>
+          <div class="hsx-sb__item hsx-badge"><i>✅</i>To-Dos</div>
+          <div class="hsx-sb__item"><i>🌱</i>The Pod</div>
+          <div class="hsx-sb__sec hsx-sb__sec--pig">🐷 The Piggy Bank</div>
+          <div class="hsx-sb__item hsx-on"><i>🏠</i>Overview</div>
+          <div class="hsx-sb__item"><i>💰</i>Accounts</div>
+          <div class="hsx-sb__item hsx-badge"><i>💵</i>Budgets</div>
+          <div class="hsx-sb__item"><i>🎯</i>Goals</div>
+        </aside>
+        <div class="hsx-main">
+          <div class="hsx-hd"><div class="hsx-hd__title"><b>Good morning, Greg</b><span>Monday, 22 August</span></div><div class="hsx-hd__ctrls"><div class="hsx-ctl hsx-ctl--on"><span>$</span>USD</div><div class="hsx-ctl">🔔</div><div class="hsx-ctl">🔍</div><div class="hsx-av">G</div></div></div>
+          <div class="hsx-board">
+            <div class="hsx-nw">
+              <div class="hsx-nw__pills"><b>1M</b><b class="hsx-on">1Y</b><b>All</b></div>
+              <div class="hsx-nw__lbl">Family Net Worth</div>
+              <div class="hsx-nw__amt">$125,400</div>
+              <div class="hsx-nw__chg">↑ +12.5% this month · +$1,240</div>
+              <svg class="hsx-nw__chart" viewBox="0 0 340 42" preserveAspectRatio="none" fill="none"><defs><linearGradient id="hsxg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F15D22" stop-opacity="0.3"></stop><stop offset="100%" stop-color="#F15D22" stop-opacity="0"></stop></linearGradient></defs><path d="M0,36 C40,32 74,27 110,21 C150,15 186,24 220,14 C260,8 300,6 340,3" stroke="#F15D22" stroke-width="2" fill="none"></path><path d="M0,36 C40,32 74,27 110,21 C150,15 186,24 220,14 C260,8 300,6 340,3 L340,42 L0,42 Z" fill="url(#hsxg1)"></path><circle cx="340" cy="3" r="3" fill="#F15D22" stroke="#fff" stroke-width="1.5"></circle></svg>
+            </div>
+            <div class="hsx-tiles">
+              <div class="hsx-tile" style="--accent:#27ae60"><i>💵</i><div class="hsx-k">Cash</div><div class="hsx-v">$58k</div><div class="hsx-pct">46%</div></div>
+              <div class="hsx-tile" style="--accent:#3498db"><i>📈</i><div class="hsx-k">Invest</div><div class="hsx-v">$67k</div><div class="hsx-pct">32%</div></div>
+              <div class="hsx-tile" style="--accent:#9b59b6"><i>🪙</i><div class="hsx-k">Crypto</div><div class="hsx-v">$8k</div><div class="hsx-pct">6%</div></div>
+              <div class="hsx-tile" style="--accent:#2c3e50"><i>🏠</i><div class="hsx-k">Assets</div><div class="hsx-v">$420k</div><div class="hsx-pct">—</div></div>
+              <div class="hsx-tile" style="--accent:#e67e22"><i>🏖️</i><div class="hsx-k">Retire</div><div class="hsx-v">$31k</div><div class="hsx-pct">16%</div></div>
+            </div>
+            <div class="hsx-srow">
+              <div class="hsx-stat"><div class="hsx-si" style="background:rgba(39,174,96,0.12)">📈</div><div class="hsx-sk">Income</div><div class="hsx-sv" style="color:#27ae60">$8,500</div><div class="hsx-sc">↑ +$300</div></div>
+              <div class="hsx-stat"><div class="hsx-si" style="background:rgba(241,93,34,0.12)">📉</div><div class="hsx-sk">Expenses</div><div class="hsx-sv" style="color:#f15d22">$6,200</div><div class="hsx-sc" style="color:#97a3ae">−$120</div></div>
+              <div class="hsx-stat hsx-stat--dark"><div class="hsx-si" style="background:rgba(255,255,255,0.14)">💰</div><div class="hsx-sk">Cash Flow</div><div class="hsx-sv">+$2,300</div><div class="hsx-sc">🌱 42% saved</div></div>
+            </div>
+            <div class="hsx-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="hsx-lbl">Budget · August</span><span class="hsx-see">See All →</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span style="font-family:'Outfit';font-weight:800;font-size:0.9rem;color:#27ae60">👍 On track</span><span style="font-size:0.56rem;color:#97a3ae;margin-left:auto">$3,760 / $5,032 · 75%</span></div>
+              <div class="hsx-prog"><i style="width:75%"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PHONE: Family Nook ===================== -->
+    <div class="hsx-device hsx-device--phone" data-screen="nook">
+      <div class="hsx-ph">
+        <div class="hsx-ph__status"><span>9:41</span><span class="hsx-sigs">📶 <b></b></span></div>
+        <div class="hsx-ph__hd"><div class="hsx-burger"><i></i><i></i><i></i></div><div class="hsx-t">Good morning, <span>Greg</span></div><div class="hsx-r">🔔🔍<span class="hsx-av">G</span></div></div>
+        <div class="hsx-ph__body">
+          <div class="hsx-greet">Welcome Home, <span>Greg</span></div>
+          <div class="hsx-toast">
+            <div class="hsx-toast__h"><div class="hsx-toast__ic">🌳</div><div><div class="hsx-toast__t">Everyone's having a great week!</div><div class="hsx-toast__s">Your Daily Briefing · 3 today · 5 coming up</div></div></div>
+            <div class="hsx-toast__row">🚗 Pick up Emma from soccer · 3:30 PM</div>
+            <div class="hsx-toast__row">💊 Liam's medicine · 6 PM</div>
+          </div>
+          <div>
+            <div class="hsx-lbl" style="margin-bottom:5px">Your Beans</div>
+            <div class="hsx-beans">
+              <div class="hsx-bean"><div class="hsx-a" style="background:var(--hsx-greg)">G</div><div class="hsx-nm">Greg</div><div class="hsx-rl">Owner</div></div>
+              <div class="hsx-bean"><div class="hsx-a" style="background:var(--hsx-sarah)">S</div><div class="hsx-nm">Sarah</div><div class="hsx-rl">Admin</div></div>
+              <div class="hsx-bean"><div class="hsx-a" style="background:var(--hsx-emma)">E</div><div class="hsx-nm">Emma</div><div class="hsx-rl">Member</div></div>
+              <div class="hsx-bean"><div class="hsx-a" style="background:var(--hsx-liam)">L</div><div class="hsx-nm">Liam</div><div class="hsx-rl">Member</div></div>
+              <div class="hsx-bean"><div class="hsx-a hsx-add">＋</div><div class="hsx-nm">Add</div></div>
+            </div>
+          </div>
+          <div class="hsx-nw" style="padding:11px 12px">
+            <div class="hsx-nw__lbl">The Piggy Bank</div>
+            <div class="hsx-nw__amt" style="font-size:1.5rem">$125,400</div>
+            <div class="hsx-nw__chg">↑ +$1,240 this month</div>
+            <div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:0.5rem;color:rgba(255,255,255,0.6);margin-bottom:3px"><span>Monthly budget</span><span>$3,760 / $5,032</span></div><div class="hsx-prog" style="background:rgba(255,255,255,0.15)"><i style="width:75%"></i></div></div>
+          </div>
+          <div class="hsx-card hsx-card--l">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="hsx-lbl">Today's Schedule</span><span class="hsx-mchip" style="font-size:0.5rem">Aug 22</span></div>
+            <div class="hsx-row"><span class="hsx-ic" style="background:rgba(174,214,241,0.3)">🎹</span><div><div class="hsx-nm">Piano Lesson</div><div class="hsx-sub">3:00 PM · Emma</div></div></div>
+            <div class="hsx-row"><span class="hsx-ic" style="background:rgba(174,214,241,0.3)">🤸</span><div><div class="hsx-nm">Gymnastics</div><div class="hsx-sub">4:00 PM · Liam</div></div></div>
+          </div>
+          <div class="hsx-card hsx-card--lo">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="hsx-lbl">This Week</span><span class="hsx-see">Full Calendar →</span></div>
+            <div class="hsx-row" style="padding:3px 0"><span class="hsx-ic" style="background:rgba(241,93,34,0.1)">🏥</span><div><div class="hsx-nm">Dentist · Emma</div><div class="hsx-sub">Tue · 10:00 AM</div></div></div>
+            <div class="hsx-row" style="padding:3px 0"><span class="hsx-ic" style="background:rgba(241,93,34,0.1)">🥋</span><div><div class="hsx-nm">Taekwondo · Liam</div><div class="hsx-sub">Wed · 5:00 PM</div></div></div>
+          </div>
+        </div>
+        <div class="hsx-tabs">
+          <div class="hsx-tab hsx-tab--pill hsx-on"><i>🏡</i><span>Nook</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌳</i><span>Planning</span></div>
+          <div class="hsx-tab hsx-tab--hero"><div class="hsx-bub">📅</div><span>Calendar</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🐷</i><span>Money</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌱</i><span>Pod</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PHONE: Calendar ===================== -->
+    <div class="hsx-device hsx-device--phone" data-screen="calendar">
+      <div class="hsx-ph">
+        <div class="hsx-ph__status"><span>9:41</span><span class="hsx-sigs">📶 <b></b></span></div>
+        <div class="hsx-ph__hd"><div class="hsx-burger"><i></i><i></i><i></i></div><div class="hsx-t">📅 August</div><div class="hsx-r">🔔🔍<span class="hsx-av">G</span></div></div>
+        <div class="hsx-ph__body">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="hsx-nav"><b>‹</b><b>›</b></div>
+            <span class="hsx-today">Today</span>
+            <div class="hsx-vtog" style="margin-left:auto"><b class="hsx-on">M</b><b>W</b><b>D</b></div>
+          </div>
+          <div class="hsx-cal" style="padding:9px">
+            <div class="hsx-cal__wk"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+            <div class="hsx-cal__grid">
+              <div class="hsx-cell"><div class="hsx-d">1</div></div>
+              <div class="hsx-cell"><div class="hsx-d">2</div><div class="hsx-ev" style="--c:var(--hsx-emma)">🎹</div></div>
+              <div class="hsx-cell"><div class="hsx-d">3</div><div class="hsx-ev" style="--c:var(--hsx-liam)">⚽</div></div>
+              <div class="hsx-cell"><div class="hsx-d">4</div><div class="hsx-ev" style="--c:var(--hsx-orange)">🏥</div></div>
+              <div class="hsx-cell"><div class="hsx-d">5</div></div>
+              <div class="hsx-cell"><div class="hsx-d">6</div><div class="hsx-ev" style="--c:var(--hsx-sarah)">🧘</div></div>
+              <div class="hsx-cell hsx-wknd"><div class="hsx-d">7</div><div class="hsx-ev" style="--c:var(--hsx-orange)">🎂</div></div>
+              <div class="hsx-cell hsx-wknd"><div class="hsx-d">8</div></div>
+              <div class="hsx-cell"><div class="hsx-d">9</div><div class="hsx-ev" style="--c:var(--hsx-emma)">🎹</div></div>
+              <div class="hsx-cell"><div class="hsx-d">10</div><div class="hsx-ev" style="--c:var(--hsx-liam)">⚽</div></div>
+              <div class="hsx-cell"><div class="hsx-d">11</div><div class="hsx-ev" style="--c:var(--hsx-orange)">🍽️</div></div>
+              <div class="hsx-cell"><div class="hsx-d">12</div></div>
+              <div class="hsx-cell"><div class="hsx-d">13</div><div class="hsx-ev" style="--c:var(--hsx-emma)">🩰</div></div>
+              <div class="hsx-cell hsx-wknd"><div class="hsx-d">14</div><div class="hsx-vac">🏖️</div></div>
+              <div class="hsx-cell hsx-wknd"><div class="hsx-d">15</div></div>
+              <div class="hsx-cell"><div class="hsx-d">16</div></div>
+              <div class="hsx-cell"><div class="hsx-d">17</div></div>
+              <div class="hsx-cell"><div class="hsx-d">18</div></div>
+              <div class="hsx-cell"><div class="hsx-d">19</div><div class="hsx-ev" style="--c:var(--hsx-sarah)">🧘</div></div>
+              <div class="hsx-cell"><div class="hsx-d">20</div><div class="hsx-ev" style="--c:var(--hsx-liam)">🥋</div></div>
+              <div class="hsx-cell hsx-wknd"><div class="hsx-d">21</div></div>
+              <div class="hsx-cell hsx-tdy hsx-wknd"><div class="hsx-d">22</div><div class="hsx-ev" style="--c:var(--hsx-emma)">🎹</div></div>
+              <div class="hsx-cell"><div class="hsx-d">23</div><div class="hsx-ev" style="--c:var(--hsx-orange)">🎉</div></div>
+              <div class="hsx-cell"><div class="hsx-d">24</div></div>
+              <div class="hsx-cell"><div class="hsx-d">25</div><div class="hsx-ev" style="--c:var(--hsx-greg)">✈️</div></div>
+              <div class="hsx-cell"><div class="hsx-d">26</div><div class="hsx-ev" style="--c:var(--hsx-emma)">🎹</div></div>
+              <div class="hsx-cell"><div class="hsx-d">27</div><div class="hsx-ev" style="--c:var(--hsx-liam)">⚽</div></div>
+              <div class="hsx-cell hsx-wknd"><div class="hsx-d">28</div></div>
+            </div>
+          </div>
+          <div class="hsx-card hsx-card--lo" style="padding:9px 11px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span class="hsx-lbl">Up Next</span><span class="hsx-see">Agenda →</span></div>
+            <div class="hsx-row" style="padding:3px 0"><span class="hsx-ic" style="background:rgba(174,214,241,0.3)">🎹</span><div><div class="hsx-nm">Piano Lesson</div><div class="hsx-sub">Today · 3:00 PM · Emma</div></div></div>
+            <div class="hsx-row" style="padding:3px 0"><span class="hsx-ic" style="background:rgba(16,185,129,0.14)">🤸</span><div><div class="hsx-nm">Gymnastics</div><div class="hsx-sub">Today · 4:00 PM · Liam</div></div></div>
+            <div class="hsx-row" style="padding:3px 0"><span class="hsx-ic" style="background:rgba(241,93,34,0.1)">🎉</span><div><div class="hsx-nm">Family BBQ</div><div class="hsx-sub">Tomorrow · 12:00 PM</div></div></div>
+          </div>
+        </div>
+        <div class="hsx-tabs">
+          <div class="hsx-tab hsx-tab--pill"><i>🏡</i><span>Nook</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌳</i><span>Planning</span></div>
+          <div class="hsx-tab hsx-tab--hero hsx-on"><div class="hsx-bub">📅</div><span>Calendar</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🐷</i><span>Money</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌱</i><span>Pod</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PHONE: Travel ===================== -->
+    <div class="hsx-device hsx-device--phone" data-screen="travel">
+      <div class="hsx-ph">
+        <div class="hsx-ph__status"><span>9:41</span><span class="hsx-sigs">📶 <b></b></span></div>
+        <div class="hsx-ph__hd"><div class="hsx-burger"><i></i><i></i><i></i></div><div class="hsx-t">✈️ Travel Plans</div><div class="hsx-r">🔔🔍<span class="hsx-av">G</span></div></div>
+        <div class="hsx-ph__body">
+          <div class="hsx-hand">Where are the beans headed next?</div>
+          <div class="hsx-trip">
+            <div class="hsx-trip__hero">🏖️</div>
+            <div class="hsx-trip__b">
+              <div class="hsx-trip__nm">Beach Week — Phuket</div>
+              <div class="hsx-trip__dt">📅 Aug 14 – 20 · 6 nights</div>
+              <div style="display:flex;gap:4px;margin-bottom:6px"><span class="hsx-mchip"><span class="hsx-dot" style="background:var(--hsx-greg)">G</span></span><span class="hsx-mchip"><span class="hsx-dot" style="background:var(--hsx-sarah)">S</span></span><span class="hsx-mchip"><span class="hsx-dot" style="background:var(--hsx-emma)">E</span></span><span class="hsx-mchip"><span class="hsx-dot" style="background:var(--hsx-liam)">L</span></span></div>
+              <div class="hsx-prog" style="margin-bottom:6px"><i style="width:66%;background:linear-gradient(90deg,var(--hsx-teal),#0077b6)"></i></div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="hsx-badge-cd">⏳ 3 weeks to go!</span><span class="hsx-badge-warn">🏨 2 nights need booking</span></div>
+            </div>
+          </div>
+          <div class="hsx-trip">
+            <div class="hsx-trip__hero" style="background:linear-gradient(120deg,color-mix(in srgb,#9b59b6 18%,#fff),color-mix(in srgb,#ffd93d 26%,#fff))">🎒</div>
+            <div class="hsx-trip__b">
+              <div class="hsx-trip__nm">Japan — Autumn</div>
+              <div class="hsx-trip__dt">📅 Nov 3 – 14 · 11 nights</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="hsx-mchip">💡 5 open ideas</span><span class="hsx-badge-warn">⏳ needs flights</span></div>
+            </div>
+          </div>
+          <div class="hsx-trip">
+            <div class="hsx-trip__hero" style="background:linear-gradient(120deg,color-mix(in srgb,#10b981 16%,#fff),color-mix(in srgb,var(--hsx-sky) 32%,#fff))">🚗</div>
+            <div class="hsx-trip__b">
+              <div class="hsx-trip__nm">Grandma's — Long Weekend</div>
+              <div class="hsx-trip__dt">📅 Sep 5 – 7 · road trip</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="hsx-badge-cd" style="background:linear-gradient(135deg,#10b981,#0e9f6e)">✓ all booked</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="hsx-tabs">
+          <div class="hsx-tab hsx-tab--pill"><i>🏡</i><span>Nook</span></div>
+          <div class="hsx-tab hsx-tab--pill hsx-on"><i>🌳</i><span>Planning</span></div>
+          <div class="hsx-tab hsx-tab--hero"><div class="hsx-bub">📅</div><span>Calendar</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🐷</i><span>Money</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌱</i><span>Pod</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PHONE: To-Dos ===================== -->
+    <div class="hsx-device hsx-device--phone" data-screen="todo">
+      <div class="hsx-ph">
+        <div class="hsx-ph__status"><span>9:41</span><span class="hsx-sigs">📶 <b></b></span></div>
+        <div class="hsx-ph__hd"><div class="hsx-burger"><i></i><i></i><i></i></div><div class="hsx-t">✅ To-Dos</div><div class="hsx-r">🔔🔍<span class="hsx-av">G</span></div></div>
+        <div class="hsx-ph__body">
+          <div class="hsx-hand">Keep track of tasks for the whole family</div>
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(44,62,80,0.04);border-radius:11px;padding:7px 9px"><span>✏️</span><span style="font-size:0.6rem;color:#97a3ae;flex:1">What needs to be done?</span><span style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;font-size:0.56rem;font-weight:700;padding:4px 9px;border-radius:8px">Add</span></div>
+          <div>
+            <div class="hsx-todo-lbl" style="color:var(--hsx-purple)">Open Tasks (4)</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="hsx-todo"><span class="hsx-box hsx-red"></span><div><div class="hsx-tt">Buy groceries for the week</div><div class="hsx-meta"><span class="hsx-ttag hsx-ttag--over">⏰ Aug 20 · Overdue</span><span class="hsx-mchip" style="font-size:0.46rem"><span class="hsx-dot" style="background:var(--hsx-sarah)">S</span>Sarah</span></div></div></div>
+              <div class="hsx-todo" style="border-color:var(--hsx-orange);box-shadow:0 0 0 3px rgba(241,93,34,0.06)"><span class="hsx-box"></span><div><div class="hsx-tt">Sign Emma's permission slip</div><div class="hsx-meta"><span class="hsx-ttag hsx-ttag--due">📅 Today</span><span class="hsx-mchip" style="font-size:0.46rem"><span class="hsx-dot" style="background:var(--hsx-greg)">G</span>Greg</span></div></div></div>
+              <div class="hsx-todo"><span class="hsx-box"></span><div><div class="hsx-tt">Book dentist for Liam</div><div class="hsx-meta"><span class="hsx-ttag hsx-ttag--date">📅 Aug 25</span></div></div></div>
+              <div class="hsx-todo"><span class="hsx-box"></span><div><div class="hsx-tt">Renew library books</div><div class="hsx-meta"><span style="font-size:0.48rem;color:#b3bcc5">No date set</span></div></div></div>
+            </div>
+          </div>
+          <div>
+            <div class="hsx-todo-lbl" style="color:#3a7bad">💭 Someday · Maybe (2)</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="hsx-todo" style="background:color-mix(in srgb,var(--hsx-sky) 14%,#fff)"><span class="hsx-box hsx-sky"></span><div><div class="hsx-tt">💭 Plan Emma's birthday party</div></div></div>
+              <div class="hsx-todo" style="background:color-mix(in srgb,var(--hsx-sky) 14%,#fff)"><span class="hsx-box hsx-sky"></span><div><div class="hsx-tt">💭 Repaint the garden fence</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="hsx-tabs">
+          <div class="hsx-tab hsx-tab--pill"><i>🏡</i><span>Nook</span></div>
+          <div class="hsx-tab hsx-tab--pill hsx-on"><i>🌳</i><span>Planning</span></div>
+          <div class="hsx-tab hsx-tab--hero"><div class="hsx-bub">📅</div><span>Calendar</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🐷</i><span>Money</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌱</i><span>Pod</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PHONE: Money (Piggy Bank) ===================== -->
+    <div class="hsx-device hsx-device--phone" data-screen="money">
+      <div class="hsx-ph">
+        <div class="hsx-ph__status"><span>9:41</span><span class="hsx-sigs">📶 <b></b></span></div>
+        <div class="hsx-ph__hd"><div class="hsx-burger"><i></i><i></i><i></i></div><div class="hsx-t">🐷 Overview</div><div class="hsx-r">🔔🔍<span class="hsx-av">G</span></div></div>
+        <div class="hsx-ph__body">
+          <div class="hsx-nw">
+            <div class="hsx-nw__pills"><b>1M</b><b class="hsx-on">1Y</b><b>All</b></div>
+            <div class="hsx-nw__lbl">Family Net Worth</div>
+            <div class="hsx-nw__amt">$125,400</div>
+            <div class="hsx-nw__chg">↑ +12.5% · +$1,240 this month</div>
+            <svg class="hsx-nw__chart" viewBox="0 0 250 42" preserveAspectRatio="none" fill="none"><defs><linearGradient id="hsxg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F15D22" stop-opacity="0.3"></stop><stop offset="100%" stop-color="#F15D22" stop-opacity="0"></stop></linearGradient></defs><path d="M0,36 C30,32 55,27 82,21 C112,15 138,24 165,14 C195,8 222,6 250,3" stroke="#F15D22" stroke-width="2" fill="none"></path><path d="M0,36 C30,32 55,27 82,21 C112,15 138,24 165,14 C195,8 222,6 250,3 L250,42 L0,42 Z" fill="url(#hsxg2)"></path><circle cx="250" cy="3" r="3" fill="#F15D22" stroke="#fff" stroke-width="1.5"></circle></svg>
+          </div>
+          <div class="hsx-tiles" style="grid-template-columns:repeat(2,1fr)">
+            <div class="hsx-tile" style="--accent:#27ae60"><i>💵</i><div class="hsx-k">Cash</div><div class="hsx-v">$58,000</div><div class="hsx-pct">46%</div></div>
+            <div class="hsx-tile" style="--accent:#3498db"><i>📈</i><div class="hsx-k">Investments</div><div class="hsx-v">$67,400</div><div class="hsx-pct">32%</div></div>
+          </div>
+          <div class="hsx-srow" style="grid-template-columns:1fr 1fr">
+            <div class="hsx-stat"><div class="hsx-si" style="background:rgba(39,174,96,0.12)">📈</div><div class="hsx-sk">Income</div><div class="hsx-sv" style="font-size:0.82rem;color:#27ae60">$8,500</div></div>
+            <div class="hsx-stat"><div class="hsx-si" style="background:rgba(241,93,34,0.12)">📉</div><div class="hsx-sk">Expenses</div><div class="hsx-sv" style="font-size:0.82rem;color:#f15d22">$6,200</div></div>
+          </div>
+          <div class="hsx-card">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="hsx-lbl">🎯 Goals</span><span class="hsx-see">See All →</span></div>
+            <div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:0.56rem;margin-bottom:2px"><span style="color:#64717d">Emergency fund</span><span style="color:var(--hsx-orange);font-weight:700">82%</span></div><div class="hsx-prog"><i style="width:82%"></i></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:0.56rem;margin-bottom:2px"><span style="color:#64717d">Summer trip</span><span style="color:var(--hsx-orange);font-weight:700">45%</span></div><div class="hsx-prog"><i style="width:45%"></i></div></div>
+          </div>
+        </div>
+        <div class="hsx-tabs">
+          <div class="hsx-tab hsx-tab--pill"><i>🏡</i><span>Nook</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌳</i><span>Planning</span></div>
+          <div class="hsx-tab hsx-tab--hero"><div class="hsx-bub">📅</div><span>Calendar</span></div>
+          <div class="hsx-tab hsx-tab--pill hsx-on"><i>🐷</i><span>Money</span></div>
+          <div class="hsx-tab hsx-tab--pill"><i>🌱</i><span>Pod</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hsx {
+    --hsx-orange: #f15d22;
+    --hsx-terracotta: #e67e22;
+    --hsx-slate: #2c3e50;
+    --hsx-slate2: #3d5368;
+    --hsx-sky: #aed6f1;
+    --hsx-cloud: #f8f9fa;
+    --hsx-green: #27ae60;
+    --hsx-purple: #9b59b6;
+    --hsx-teal: #00b4d8;
+    --hsx-hair: rgba(44, 62, 80, 0.09);
+    --hsx-greg: #3b82f6;
+    --hsx-sarah: #ec4899;
+    --hsx-emma: #f59e0b;
+    --hsx-liam: #10b981;
+    width: 100%;
+    max-width: 1000px;
+    margin: 28px auto 0;
+    font-family: Inter, system-ui, sans-serif;
+    color: var(--hsx-slate);
+  }
+  .hsx *,
+  .hsx *::before,
+  .hsx *::after { box-sizing: border-box; }
+  .hsx b,
+  .hsx .hsx-mchip,
+  .hsx .hsx-badge-cd { font-weight: 700; }
+
+  .hsx-stage { position: relative; min-width: 0; }
+  .hsx-inner { position: absolute; top: 0; left: 50%; width: 720px; height: 470px; transform-origin: top center; }
+  .hsx-anchor { position: absolute; }
+  .hsx-anchor--d { top: 30px; left: 0; z-index: 2; }
+  .hsx-anchor--a { z-index: 4; right: 150px; bottom: -6px; }
+  .hsx-anchor--b { z-index: 5; right: 0; bottom: 26px; }
+  .hsx-tag {
+    position: absolute; z-index: 9; background: #fff; border: 1px solid var(--hsx-hair);
+    border-radius: 999px; padding: 4px 11px; font-family: Outfit, sans-serif; font-weight: 600;
+    font-size: 0.62rem; color: var(--hsx-slate); box-shadow: 0 8px 20px rgba(44, 62, 80, 0.12);
+  }
+  .hsx-scalebox { position: relative; }
+  .hsx-scalebox > .hsx-device { position: absolute; top: 0; left: 0; transform-origin: top left; }
+
+  .hsx-carousel { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .hsx-carousel::-webkit-scrollbar { display: none; }
+  .hsx-carcell { flex: 0 0 auto; scroll-snap-align: center; }
+  .hsx-dots { display: flex; gap: 7px; justify-content: center; margin-top: 12px; }
+  .hsx-dots b { width: 7px; height: 7px; border-radius: 50%; background: rgba(44, 62, 80, 0.18); cursor: pointer; transition: width 0.2s, background 0.2s; display: block; }
+  .hsx-dots b.hsx-on { background: var(--hsx-orange); width: 20px; border-radius: 4px; }
+
+  /* ---- device shells ---- */
+  .hsx-device { background: #fff; position: relative; }
+  .hsx-device--desktop { width: 760px; border-radius: 13px; overflow: hidden; box-shadow: 0 28px 64px rgba(44,62,80,0.22), 0 5px 14px rgba(44,62,80,0.08); border: 1px solid var(--hsx-hair); }
+  .hsx-device--phone { width: 290px; border-radius: 34px; background: #1c2733; padding: 9px; box-shadow: 0 30px 56px rgba(44,62,80,0.28), 0 6px 16px rgba(44,62,80,0.12); }
+
+  .hsx-bbar { display: flex; align-items: center; gap: 12px; padding: 9px 13px; background: #eef1f4; border-bottom: 1px solid var(--hsx-hair); }
+  .hsx-bbar__dots { display: flex; gap: 6px; }
+  .hsx-bbar__dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+  .hsx-bbar__url { flex: 1; background: #fff; border-radius: 7px; font-size: 0.64rem; color: #7b8894; padding: 5px 12px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--hsx-hair); }
+  .hsx-bbar__url b { color: var(--hsx-slate); font-weight: 600; }
+  .hsx-bbar__url span { color: #b3bcc5; }
+
+  .hsx-shell { display: grid; grid-template-columns: 172px 1fr; height: 452px; }
+  .hsx-main { display: flex; flex-direction: column; }
+  .hsx-sb { background: var(--hsx-slate); color: #fff; padding: 13px 9px; overflow: hidden; }
+  .hsx-sb__logo { display: flex; align-items: center; gap: 7px; padding: 0 4px 12px; }
+  .hsx-mark { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--hsx-orange), var(--hsx-terracotta)); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+  .hsx-sb__logo b { font-family: Outfit, sans-serif; font-weight: 800; font-size: 0.84rem; }
+  .hsx-sb__logo b em { color: var(--hsx-orange); font-style: normal; }
+  .hsx-sb__sec { font-size: 0.55rem; letter-spacing: 0.09em; text-transform: uppercase; font-weight: 800; margin: 11px 6px 5px; display: flex; align-items: center; gap: 5px; }
+  .hsx-sb__sec--tree { color: #f8b78f; }
+  .hsx-sb__sec--pig { color: #7fd6a1; }
+  .hsx-sb__item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 0.7rem; color: rgba(255,255,255,0.72); margin-bottom: 1px; position: relative; }
+  .hsx-sb__item i { width: 15px; text-align: center; font-size: 0.78rem; font-style: normal; }
+  .hsx-sb__item.hsx-on { background: linear-gradient(90deg, rgba(241,93,34,0.95), rgba(230,126,34,0.85)); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 #fff3; }
+  .hsx-sb__item.hsx-badge::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--hsx-orange); }
+
+  .hsx-hd { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--hsx-hair); background: #fff; }
+  .hsx-hd__title b { font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.94rem; color: var(--hsx-slate); display: block; line-height: 1.1; }
+  .hsx-hd__title span { font-size: 0.6rem; color: var(--hsx-orange); font-weight: 600; }
+  .hsx-hd__ctrls { display: flex; align-items: center; gap: 7px; }
+  .hsx-ctl { height: 26px; min-width: 26px; padding: 0 7px; border-radius: 8px; background: #fff; border: 1px solid var(--hsx-hair); box-shadow: 0 1px 3px rgba(44,62,80,0.06); display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 0.62rem; color: #6b7a89; }
+  .hsx-ctl--on { background: var(--hsx-orange); color: #fff; border-color: var(--hsx-orange); font-weight: 700; }
+  .hsx-av { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, var(--hsx-greg), #6ea8ff); color: #fff; font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.66rem; display: flex; align-items: center; justify-content: center; }
+
+  .hsx-board { background: var(--hsx-cloud); padding: 15px 16px; overflow: hidden; display: flex; flex-direction: column; gap: 11px; }
+
+  .hsx-nw { background: linear-gradient(135deg, var(--hsx-slate), var(--hsx-slate2)); border-radius: 15px; padding: 15px 16px; color: #fff; position: relative; overflow: hidden; }
+  .hsx-nw::after { content: ''; position: absolute; width: 220px; height: 220px; border-radius: 50%; right: -80px; top: -90px; background: radial-gradient(circle, rgba(241,93,34,0.5), transparent 68%); }
+  .hsx-nw__lbl { font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.6); font-weight: 700; }
+  .hsx-nw__amt { font-family: Outfit, sans-serif; font-weight: 800; font-size: 2rem; letter-spacing: -0.01em; line-height: 1.05; }
+  .hsx-nw__chg { font-size: 0.62rem; color: #6ee7b7; font-weight: 600; }
+  .hsx-nw__pills { position: absolute; top: 14px; right: 15px; display: flex; gap: 3px; z-index: 2; }
+  .hsx-nw__pills b { font-size: 0.5rem; font-weight: 700; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+  .hsx-nw__pills b.hsx-on { background: var(--hsx-orange); color: #fff; }
+  .hsx-nw__chart { margin-top: 9px; height: 42px; }
+
+  .hsx-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+  .hsx-tile { background: #fff; border: 1px solid var(--hsx-hair); border-radius: 10px; padding: 8px; position: relative; overflow: hidden; }
+  .hsx-tile::before { content: ''; position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--accent, var(--hsx-orange)); }
+  .hsx-tile i { font-size: 0.78rem; font-style: normal; }
+  .hsx-tile .hsx-k { font-size: 0.5rem; text-transform: uppercase; color: #90a0ad; font-weight: 700; margin-top: 2px; }
+  .hsx-tile .hsx-v { font-family: Outfit, sans-serif; font-weight: 800; font-size: 0.82rem; color: var(--hsx-slate); }
+  .hsx-tile .hsx-pct { font-size: 0.5rem; font-weight: 700; color: var(--accent, var(--hsx-orange)); }
+
+  .hsx-srow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .hsx-stat { background: #fff; border: 1px solid var(--hsx-hair); border-radius: 11px; padding: 9px 10px; }
+  .hsx-stat--dark { background: linear-gradient(135deg, var(--hsx-slate), var(--hsx-slate2)); border: none; color: #fff; }
+  .hsx-si { width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; }
+  .hsx-sk { font-size: 0.5rem; text-transform: uppercase; color: #90a0ad; font-weight: 700; margin-top: 5px; }
+  .hsx-stat--dark .hsx-sk { color: rgba(255,255,255,0.55); }
+  .hsx-sv { font-family: Outfit, sans-serif; font-weight: 800; font-size: 0.92rem; }
+  .hsx-sc { font-size: 0.5rem; color: var(--hsx-green); font-weight: 600; }
+
+  .hsx-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .hsx-ic { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; flex: none; }
+  .hsx-nm { font-size: 0.64rem; font-weight: 600; color: var(--hsx-slate); }
+  .hsx-sub { font-size: 0.52rem; color: #97a3ae; }
+
+  .hsx-prog { height: 5px; background: rgba(44,62,80,0.07); border-radius: 3px; overflow: hidden; }
+  .hsx-prog i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--hsx-orange), var(--hsx-terracotta)); }
+  .hsx-lbl { font-size: 0.56rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #90a0ad; }
+  .hsx-see { font-size: 0.56rem; color: var(--hsx-orange); font-weight: 700; }
+  .hsx-card { background: #fff; border: 1px solid var(--hsx-hair); border-radius: 13px; padding: 11px 12px; }
+  .hsx-card--l { border-left: 4px solid var(--hsx-sky); }
+  .hsx-card--lo { border-left: 4px solid var(--hsx-orange); }
+
+  .hsx-mchip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.56rem; padding: 3px 8px; border-radius: 999px; background: #fff; border: 1px solid var(--hsx-hair); color: #64717d; }
+  .hsx-dot { width: 14px; height: 14px; border-radius: 50%; color: #fff; font-size: 0.5rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-family: Outfit, sans-serif; flex: none; }
+
+  /* calendar */
+  .hsx-nav { display: flex; gap: 3px; }
+  .hsx-nav b { width: 18px; height: 18px; border-radius: 6px; background: #fff; border: 1px solid var(--hsx-hair); display: flex; align-items: center; justify-content: center; font-size: 0.62rem; color: #7b8894; }
+  .hsx-today { font-size: 0.54rem; color: var(--hsx-orange); font-weight: 700; padding: 3px 8px; border-radius: 7px; background: rgba(241,93,34,0.08); }
+  .hsx-vtog { display: flex; background: #fff; border: 1px solid var(--hsx-hair); border-radius: 9px; overflow: hidden; }
+  .hsx-vtog b { font-size: 0.54rem; font-weight: 700; padding: 4px 9px; color: #90a0ad; }
+  .hsx-vtog b.hsx-on { background: linear-gradient(135deg, var(--hsx-orange), var(--hsx-terracotta)); color: #fff; }
+  .hsx-cal { background: #fff; border: 1px solid var(--hsx-hair); border-radius: 13px; padding: 11px; }
+  .hsx-cal__wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
+  .hsx-cal__wk span { text-align: center; font-size: 0.5rem; color: #b3bcc5; font-weight: 800; }
+  .hsx-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .hsx-cell { min-height: 40px; border-radius: 7px; padding: 3px; background: #fcfdfe; border: 1px solid rgba(44,62,80,0.04); display: flex; flex-direction: column; gap: 2px; }
+  .hsx-cell .hsx-d { font-size: 0.5rem; color: #8a97a4; font-weight: 700; text-align: center; }
+  .hsx-cell.hsx-wknd { background: #fafbfc; }
+  .hsx-cell.hsx-tdy .hsx-d { background: linear-gradient(135deg, var(--hsx-orange), var(--hsx-terracotta)); color: #fff; border-radius: 50%; width: 14px; height: 14px; line-height: 14px; margin: 0 auto; }
+  .hsx-ev { font-size: 0.46rem; padding: 1px 3px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid var(--c, var(--hsx-orange)); background: color-mix(in srgb, var(--c, var(--hsx-orange)) 13%, #fff); color: var(--hsx-slate); font-weight: 600; }
+  .hsx-vac { font-size: 0.46rem; background: color-mix(in srgb, var(--hsx-teal) 16%, #fff); color: #0077b6; border-radius: 4px; padding: 1px 4px; font-weight: 700; }
+
+  /* travel */
+  .hsx-hand { font-family: Caveat, cursive; color: var(--hsx-orange); font-size: 0.86rem; font-weight: 700; }
+  .hsx-trip { border-radius: 14px; border: 1px solid var(--hsx-hair); overflow: hidden; background: #fff; }
+  .hsx-trip__hero { height: 46px; background: linear-gradient(120deg, color-mix(in srgb, var(--hsx-teal) 22%, #fff), color-mix(in srgb, #ffd93d 30%, #fff)); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+  .hsx-trip__b { padding: 9px 11px; }
+  .hsx-trip__nm { font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.76rem; color: var(--hsx-slate); }
+  .hsx-trip__dt { font-size: 0.54rem; color: #97a3ae; margin-bottom: 5px; }
+  .hsx-badge-cd { display: inline-block; font-size: 0.5rem; color: #fff; padding: 2px 8px; border-radius: 999px; background: linear-gradient(135deg, var(--hsx-teal), #0077b6); }
+  .hsx-badge-warn { font-size: 0.5rem; font-weight: 700; color: #b8860b; background: #fff6da; padding: 2px 7px; border-radius: 999px; }
+
+  /* todo */
+  .hsx-todo-lbl { font-size: 0.6rem; font-weight: 800; margin: 2px 0 5px; }
+  .hsx-todo { display: flex; align-items: flex-start; gap: 8px; background: #fff; border: 1px solid var(--hsx-hair); border-radius: 11px; padding: 8px 10px; }
+  .hsx-box { width: 17px; height: 17px; border-radius: 5px; border: 2.5px solid var(--hsx-orange); flex: none; margin-top: 1px; }
+  .hsx-box.hsx-red { border-color: #e74c3c; }
+  .hsx-box.hsx-sky { border-color: var(--hsx-sky); }
+  .hsx-tt { font-size: 0.64rem; font-weight: 600; color: var(--hsx-slate); }
+  .hsx-meta { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+  .hsx-ttag { font-size: 0.48rem; font-weight: 700; padding: 2px 6px; border-radius: 999px; }
+  .hsx-ttag--over { background: var(--hsx-orange); color: #fff; }
+  .hsx-ttag--due { background: rgba(241,93,34,0.12); color: var(--hsx-orange); }
+  .hsx-ttag--date { color: var(--hsx-orange); }
+
+  /* nook */
+  .hsx-greet { font-family: Outfit, sans-serif; font-weight: 800; font-size: 1rem; color: var(--hsx-slate); }
+  .hsx-greet span { color: var(--hsx-orange); }
+  .hsx-toast { background: linear-gradient(135deg, var(--hsx-orange), var(--hsx-terracotta) 70%, #d4701e); border-radius: 14px; padding: 11px 12px; color: #fff; box-shadow: 0 8px 20px rgba(241,93,34,0.28); }
+  .hsx-toast__h { display: flex; align-items: center; gap: 8px; }
+  .hsx-toast__ic { width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
+  .hsx-toast__t { font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.72rem; }
+  .hsx-toast__s { font-size: 0.52rem; opacity: 0.85; font-style: italic; }
+  .hsx-toast__row { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 5px 7px; margin-top: 6px; font-size: 0.56rem; }
+  .hsx-beans { display: flex; gap: 10px; }
+  .hsx-bean { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .hsx-bean .hsx-a { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-family: Outfit, sans-serif; font-weight: 800; font-size: 0.8rem; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(44,62,80,0.15); position: relative; }
+  .hsx-bean .hsx-a::after { content: ''; position: absolute; right: 0; bottom: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--hsx-green); border: 1.5px solid #fff; }
+  .hsx-bean .hsx-nm { font-size: 0.5rem; font-weight: 700; color: var(--hsx-slate); }
+  .hsx-bean .hsx-rl { font-size: 0.44rem; color: #97a3ae; }
+  .hsx-bean .hsx-add { border: 1.5px dashed #c3ccd4; color: #97a3ae; box-shadow: none; }
+  .hsx-bean .hsx-add::after { display: none; }
+
+  /* phone chrome */
+  .hsx-ph { background: var(--hsx-cloud); border-radius: 26px; overflow: hidden; height: 574px; display: flex; flex-direction: column; position: relative; }
+  .hsx-ph__status { height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 20px; font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.66rem; color: var(--hsx-slate); flex: none; }
+  .hsx-sigs { display: flex; align-items: center; gap: 3px; }
+  .hsx-sigs b { width: 15px; height: 8px; border: 1px solid var(--hsx-slate); border-radius: 2px; display: inline-block; position: relative; }
+  .hsx-sigs b::after { content: ''; position: absolute; inset: 1px; right: 4px; background: var(--hsx-slate); border-radius: 1px; }
+  .hsx-ph__hd { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; flex: none; }
+  .hsx-burger { display: flex; flex-direction: column; gap: 3px; }
+  .hsx-burger i { width: 15px; height: 2px; background: var(--hsx-slate); border-radius: 2px; }
+  .hsx-ph__hd .hsx-t { font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--hsx-slate); }
+  .hsx-ph__hd .hsx-t span { color: var(--hsx-orange); }
+  .hsx-ph__hd .hsx-r { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+  .hsx-ph__hd .hsx-r .hsx-av { width: 22px; height: 22px; }
+  .hsx-ph__body { flex: 1; overflow: hidden; padding: 4px 11px 8px; display: flex; flex-direction: column; gap: 8px; }
+  .hsx-ph__body > * { flex: 0 0 auto; }
+
+  .hsx-tabs { flex: none; height: 54px; background: #fff; border-top: 1px solid var(--hsx-hair); display: flex; align-items: flex-start; justify-content: space-around; padding-top: 7px; position: relative; }
+  .hsx-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.5rem; font-weight: 600; color: rgba(44,62,80,0.4); width: 46px; }
+  .hsx-tab i { font-size: 1.05rem; font-style: normal; line-height: 1; }
+  .hsx-tab.hsx-on { color: var(--hsx-orange); }
+  .hsx-tab.hsx-on span { color: var(--hsx-orange); }
+  .hsx-tab.hsx-on.hsx-tab--pill i { background: rgba(241,93,34,0.1); border-radius: 9px; padding: 3px 8px; }
+  .hsx-tab--hero { position: relative; }
+  .hsx-tab--hero .hsx-bub { position: absolute; top: -20px; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--hsx-orange), var(--hsx-terracotta)); border: 3px solid #fff; box-shadow: 0 6px 14px rgba(241,93,34,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; }
+  .hsx-tab--hero span { margin-top: 26px; color: var(--hsx-orange); }
+
+  /* meal board (unused on homepage cluster but kept for parity) */
+  .hsx-pool { position: absolute; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hsx-dots b { transition: none; }
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const NATIVE = { desktop: [760, 496], phone: [290, 594] };
+
+    document.querySelectorAll('.hsx').forEach((root) => {
+      const stage = root.querySelector('[data-hsx-stage]');
+      const inner = root.querySelector('[data-hsx-inner]');
+      const pool = root.querySelector('[data-hsx-pool]');
+      const ad = root.querySelector('[data-hsx-ad]');
+      const aa = root.querySelector('[data-hsx-aa]');
+      const ab = root.querySelector('[data-hsx-ab]');
+      if (!stage || !inner || !pool || !ad || !aa || !ab) return;
+
+      const DES_W = 720, DES_H = 470;
+      const screens = {};
+      pool.querySelectorAll('[data-screen]').forEach((el) => { screens[el.getAttribute('data-screen')] = el; });
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let carEls = [], carIndex = 0, autoTimer = null, track = null, userInteracted = false;
+
+      function box(node, scale) {
+        const kind = node.classList.contains('hsx-device--phone') ? 'phone' : 'desktop';
+        const dims = NATIVE[kind];
+        const b = document.createElement('div');
+        b.className = 'hsx-scalebox';
+        b.style.width = dims[0] * scale + 'px';
+        b.style.height = dims[1] * scale + 'px';
+        node.style.transform = 'scale(' + scale + ')';
+        b.appendChild(node);
+        return b;
+      }
+      function toPool() {
+        for (const id in screens) {
+          const el = screens[id];
+          el.style.transform = '';
+          if (el.parentElement && el.parentElement.classList.contains('hsx-scalebox')) pool.appendChild(el);
+        }
+        stage.querySelectorAll('.hsx-scalebox').forEach((b) => b.remove());
+      }
+      function scrollToCar(i) {
+        if (!track || !carEls.length) return;
+        i = (i + carEls.length) % carEls.length;
+        const cell = carEls[i];
+        track.scrollTo({ left: cell.offsetLeft - (track.clientWidth - cell.offsetWidth) / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+      }
+      function setDot(i) {
+        carIndex = i;
+        const dots = stage.querySelector('.hsx-dots');
+        if (dots) Array.prototype.forEach.call(dots.children, (d, j) => d.classList.toggle('hsx-on', j === i));
+      }
+      function startAuto() { stopAuto(); if (userInteracted || reduceMotion) return; autoTimer = window.setInterval(() => scrollToCar(carIndex + 1), 3600); }
+      function stopAuto() { if (autoTimer) { window.clearInterval(autoTimer); autoTimer = null; } }
+
+      function renderDesktop() {
+        stage.querySelectorAll('.hsx-carousel, .hsx-dots').forEach((e) => e.remove());
+        inner.style.display = '';
+        ad.innerHTML = ''; aa.innerHTML = ''; ab.innerHTML = '';
+        toPool();
+        ad.appendChild(box(screens.overview, 0.66));
+        aa.appendChild(box(screens.nook, 0.74));
+        ab.appendChild(box(screens.calendar, 0.82));
+        const s = Math.min(1, stage.clientWidth / DES_W);
+        inner.style.transform = 'translateX(-50%) scale(' + s + ')';
+        stage.style.height = DES_H * s + 'px';
+      }
+
+      function renderMobile() {
+        inner.style.display = 'none';
+        stage.querySelectorAll('.hsx-carousel, .hsx-dots').forEach((e) => e.remove());
+        toPool();
+        const order = ['nook', 'calendar', 'travel', 'todo', 'money'];
+        const avail = stage.clientWidth;
+        const scale = Math.min(0.85, (avail * 0.72) / NATIVE.phone[0]);
+        track = document.createElement('div');
+        track.className = 'hsx-carousel';
+        carEls = [];
+        for (const id of order) {
+          const cell = document.createElement('div');
+          cell.className = 'hsx-carcell';
+          cell.appendChild(box(screens[id], scale));
+          track.appendChild(cell);
+          carEls.push(cell);
+        }
+        const pad = Math.max(8, (avail - NATIVE.phone[0] * scale) / 2);
+        track.style.paddingLeft = pad + 'px';
+        track.style.paddingRight = pad + 'px';
+        stage.appendChild(track);
+        const dots = document.createElement('div');
+        dots.className = 'hsx-dots';
+        order.forEach((_, i) => { const d = document.createElement('b'); d.addEventListener('click', () => scrollToCar(i)); dots.appendChild(d); });
+        stage.appendChild(dots);
+        stage.style.height = NATIVE.phone[1] * scale + 34 + 'px';
+        track.addEventListener('scroll', () => {
+          const center = track.scrollLeft + track.clientWidth / 2;
+          let best = 0, bd = 1e9;
+          carEls.forEach((c, i) => { const cc = c.offsetLeft + c.offsetWidth / 2; const dd = Math.abs(cc - center); if (dd < bd) { bd = dd; best = i; } });
+          setDot(best);
+        }, { passive: true });
+        track.addEventListener('pointerdown', () => { userInteracted = true; stopAuto(); });
+        carIndex = 0; setDot(0); startAuto();
+      }
+
+      function render() {
+        stopAuto();
+        if (window.innerWidth < 820) renderMobile();
+        else renderDesktop();
+      }
+
+      let raf = 0;
+      window.addEventListener('resize', () => { window.cancelAnimationFrame(raf); raf = window.requestAnimationFrame(render); });
+      render();
+    });
+  })();
+</script>

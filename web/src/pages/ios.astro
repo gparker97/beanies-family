@@ -1,0 +1,55 @@
+---
+// Stable short link to the beanies.family App Store listing. Every "get the iOS
+// app" CTA (homepage badge, Pinterest pins, print collateral) points at
+// beanies.family/ios so the destination can be rotated here — a small web
+// deploy — without touching the app, and so links can carry UTM tags in one place.
+//
+// Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer, a pure
+// forward. Mirrors src/pages/discord.astro.
+//
+// To change the destination: edit APP_STORE_URL below and deploy the web site.
+// Region-less Apple link (/app/id…) resolves to each visitor's local storefront.
+const APP_STORE_URL = 'https://apps.apple.com/app/id6798513944';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${APP_STORE_URL}`} />
+    <link rel="canonical" href={APP_STORE_URL} />
+    <meta name="robots" content="noindex" />
+    <title>Opening beanies.family on the App Store…</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-family: Outfit, system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      a {
+        color: #f15d22;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <p>taking you to the app store… 🫘</p>
+    <p>
+      not redirected? <a href={APP_STORE_URL} rel="noopener">tap here to open the app store</a>.
+    </p>
+    <script is:inline define:vars={{ APP_STORE_URL }}>
+      // Belt-and-braces: also redirect via JS in case meta-refresh is delayed.
+      window.location.replace(APP_STORE_URL);
+    </script>
+  </body>
+</html>
