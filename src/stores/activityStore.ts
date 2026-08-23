@@ -79,6 +79,11 @@ export const OVERRIDE_INVALID_KEYS = [
   ...SPLIT_INVALID_KEYS,
   'recurrence',
   'daysOfWeek',
+  // #70: the canonical series rule must NOT ride onto a one-off override child —
+  // `expandRecurring` checks `activity.rule` before honoring `recurrence:'none'`,
+  // so a child that kept the parent's rule would re-expand as a full duplicate
+  // series (in-app + as a Google RRULE).
+  'rule',
   'linkedRecurringItemId',
 ] as const satisfies readonly (keyof FamilyActivity)[];
 

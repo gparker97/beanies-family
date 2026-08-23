@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-23
 
+### Fixed
+
+- **Dates written as `YYYY-MM-DD` no longer read a day early in timezones west of UTC.** A couple of shared date formatters parsed a bare date as UTC midnight, so someone in the Americas could see "22 Aug" for a 23 Aug date in some places. They now parse in your local timezone.
+
 ### Added
 
 - **Recurring money can now repeat any way your life does.** Setting up a recurring income or expense used to offer only daily, monthly or yearly. Now there's a single, friendly schedule picker: the common cadences (daily, weekly, every 2 weeks, monthly, yearly) are one tap, and a "custom" option covers the rest — every N weeks or months, specific weekdays, "the last day of the month" or "the 4th Sunday", and an end that can be never, a date, or after a set number of times. It shows only the options that apply to what you picked, with a plain-language summary of the schedule as you build it. (This is the first surface of a shared recurrence control that will come to the planner and lists next, so repeating anything works the same way everywhere.) Your existing recurring items are untouched and keep working exactly as before.

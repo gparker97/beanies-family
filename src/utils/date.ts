@@ -32,7 +32,10 @@ export function fromISODateString(isoString: ISODateString): Date {
  * Accepts ISO date strings or YYYY-MM-DD.
  */
 export function formatDate(isoString: ISODateString): string {
-  const date = fromISODateString(isoString);
+  // parseLocalDate (not fromISODateString) so a bare `YYYY-MM-DD` is read as a
+  // LOCAL date — `new Date('2026-08-23')` is UTC midnight and reads back a day
+  // early west of UTC. Full ISO timestamps parse identically to before.
+  const date = parseLocalDate(isoString);
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
 }
 
@@ -41,7 +44,8 @@ export function formatDate(isoString: ISODateString): string {
  * Accepts ISO date strings or YYYY-MM-DD.
  */
 export function formatDateShort(isoString: ISODateString): string {
-  const date = fromISODateString(isoString);
+  // Local-safe date-only parse (see `formatDate`).
+  const date = parseLocalDate(isoString);
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
 }
 

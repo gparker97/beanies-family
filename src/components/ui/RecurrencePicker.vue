@@ -3,7 +3,7 @@ import { computed, reactive, watch } from 'vue';
 import FrequencyChips, { type ChipOption } from '@/components/ui/FrequencyChips.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { describeRule } from '@/services/recurrence/describe';
+import { describeRule, WEEKDAY_SHORT } from '@/services/recurrence/describe';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
@@ -38,16 +38,6 @@ const emit = defineEmits<{ 'update:modelValue': [value: RecurrenceRule] }>();
 
 const { t } = useTranslation();
 
-const WEEKDAY_SHORT = [
-  'planner.weekday.short.sun',
-  'planner.weekday.short.mon',
-  'planner.weekday.short.tue',
-  'planner.weekday.short.wed',
-  'planner.weekday.short.thu',
-  'planner.weekday.short.fri',
-  'planner.weekday.short.sat',
-] as const;
-
 type SimpleCadence = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 type CustomUnit = 'days' | 'weeks' | 'months' | 'years';
 const UNIT_OF: Record<CustomUnit, RecurrenceUnit> = {
@@ -69,62 +59,34 @@ const s = reactive({
   customUnit: 'weeks' as CustomUnit,
   weekdays: [] as number[],
   monthlyMode: 'date' as 'date' | 'weekday',
+  // Preserved from a loaded rule (so editing a legacy item on the 15th doesn't
+  // silently reschedule to the start-date day); re-derived only when the user
+  // changes the start date. New selections cap >28 → 'last' per the CIG picker.
+  monthlyDay: 'last' as number | 'last',
   endKind: 'never' as RecurrenceEnd['kind'],
   endDate: '',
   endCount: 12,
 });
 
+/** Start-date-derived monthly day for a NEW/re-derived selection (CIG: 1–28 or last). */
+function deriveMonthlyDay(): number | 'last' {
+  const day = anchorDate.value.getDate();
+  return day <= 28 ? day : 'last';
+}
+
 /** Which simple cadence, if any, a rule matches — else null → custom mode. */
 function matchSimple(rule: RecurrenceRule): SimpleCadence | null {
+  if (rule.unit === 'week' && rule.interval === 2) return 'biweekly';
   if (rule.interval === 1) {
     if (rule.unit === 'day') return 'daily';
     if (rule.unit === 'week') return 'weekly';
     if (rule.unit === 'month') return 'monthly';
     if (rule.unit === 'year') return 'yearly';
   }
-  if (rule.unit === 'week' && rule.interval === 2) return 'biweekly';
   return null;
 }
 
-let syncing = false;
-function syncFromModel(rule: RecurrenceRule | null): void {
-  syncing = true;
-  const anchorDow = anchorDate.value.getDay();
-  if (!rule) {
-    s.uiMode = 'simple';
-    s.simple = 'monthly';
-    s.customN = 2;
-    s.customUnit = 'weeks';
-    s.weekdays = [anchorDow];
-    s.monthlyMode = 'date';
-    s.endKind = 'never';
-  } else {
-    s.weekdays = rule.weekdays?.length ? [...rule.weekdays] : [anchorDow];
-    s.monthlyMode = rule.monthlyAnchor === 'weekday' ? 'weekday' : 'date';
-    s.endKind = rule.end.kind;
-    if (rule.end.kind === 'onDate') s.endDate = rule.end.date;
-    if (rule.end.kind === 'afterCount') s.endCount = rule.end.count;
-    const simple = matchSimple(rule);
-    if (simple) {
-      s.uiMode = 'simple';
-      s.simple = simple;
-    } else {
-      s.uiMode = 'custom';
-      s.customN = rule.interval;
-      s.customUnit = (Object.keys(UNIT_OF) as CustomUnit[]).find((k) => UNIT_OF[k] === rule.unit)!;
-    }
-  }
-  syncing = false;
-}
-syncFromModel(props.modelValue);
-watch(
-  () => props.modelValue,
-  (v) => {
-    if (!syncing) syncFromModel(v);
-  }
-);
-
-// ── Derived: the current unit + interval ────────────────────────────────────
+// ── Derived: unit + interval + which contextual sub-control applies ──────────
 const activeUnit = computed<RecurrenceUnit>(() => {
   if (s.uiMode === 'custom') return UNIT_OF[s.customUnit];
   return s.simple === 'daily'
@@ -139,8 +101,6 @@ const activeInterval = computed(() => {
   if (s.uiMode === 'custom') return Math.max(1, Math.floor(s.customN));
   return s.simple === 'biweekly' ? 2 : 1;
 });
-
-// Which contextual sub-control applies (null → render nothing).
 const ctx = computed<'weekdays-multi' | 'weekday-single' | 'monthly' | null>(() => {
   if (activeUnit.value === 'week')
     return activeInterval.value === 1 ? 'weekdays-multi' : 'weekday-single';
@@ -148,14 +108,18 @@ const ctx = computed<'weekdays-multi' | 'weekday-single' | 'monthly' | null>(() 
   return null; // day, year
 });
 
-// ── Build + emit the canonical rule ─────────────────────────────────────────
+// ── Build the canonical rule ────────────────────────────────────────────────
 const builtRule = computed<RecurrenceRule>(() => {
   const unit = activeUnit.value;
   const interval = activeInterval.value;
   const end: RecurrenceEnd = isReset.value
     ? { kind: 'never' }
     : s.endKind === 'onDate'
-      ? { kind: 'onDate', date: s.endDate || anchorYmd.value }
+      ? // An "on a date" end with no date chosen must NOT collapse to the start
+        // date (that would end the series on its first occurrence) — treat as never.
+        s.endDate
+        ? { kind: 'onDate', date: s.endDate }
+        : { kind: 'never' }
       : s.endKind === 'afterCount'
         ? { kind: 'afterCount', count: Math.max(1, Math.floor(s.endCount)) }
         : { kind: 'never' };
@@ -169,17 +133,73 @@ const builtRule = computed<RecurrenceRule>(() => {
       rule.monthlyAnchor = 'weekday';
     } else {
       rule.monthlyAnchor = 'date';
-      const day = anchorDate.value.getDate();
-      rule.monthlyDay = day <= 28 ? day : 'last';
+      rule.monthlyDay = s.monthlyDay;
     }
   }
   return rule;
 });
 
+// ── Model <-> state sync (echo-guarded to prevent an infinite v-model loop) ──
+// `watch(builtRule)` flushes async, so a synchronous flag can't suppress the
+// emit's echo — instead we compare against the JSON we last emitted/applied and
+// skip both the re-emit and the re-sync when they match.
+let lastJson = '';
+function syncFromModel(rule: RecurrenceRule | null): void {
+  const anchorDow = anchorDate.value.getDay();
+  if (!rule) {
+    s.uiMode = 'simple';
+    s.simple = 'monthly';
+    s.customN = 2;
+    s.customUnit = 'weeks';
+    s.weekdays = [anchorDow];
+    s.monthlyMode = 'date';
+    s.monthlyDay = deriveMonthlyDay();
+    s.endKind = 'never';
+  } else {
+    s.weekdays = rule.weekdays?.length ? [...rule.weekdays] : [anchorDow];
+    s.monthlyMode = rule.monthlyAnchor === 'weekday' ? 'weekday' : 'date';
+    s.monthlyDay =
+      rule.unit === 'month' && rule.monthlyAnchor !== 'weekday' && rule.monthlyDay !== undefined
+        ? rule.monthlyDay
+        : deriveMonthlyDay();
+    s.endKind = rule.end.kind;
+    if (rule.end.kind === 'onDate') s.endDate = rule.end.date;
+    if (rule.end.kind === 'afterCount') s.endCount = rule.end.count;
+    const simple = matchSimple(rule);
+    if (simple) {
+      s.uiMode = 'simple';
+      s.simple = simple;
+    } else {
+      s.uiMode = 'custom';
+      s.customN = rule.interval;
+      s.customUnit = (Object.keys(UNIT_OF) as CustomUnit[]).find((k) => UNIT_OF[k] === rule.unit)!;
+    }
+  }
+  lastJson = JSON.stringify(builtRule.value);
+}
+syncFromModel(props.modelValue);
+
+watch(
+  () => props.modelValue,
+  (v) => {
+    if (JSON.stringify(v) === lastJson) return; // our own echo — ignore
+    syncFromModel(v);
+  }
+);
+
+// The monthly/yearly anchor follows the start date (greg's steer). Re-derive the
+// monthly day only on a genuine start-date change, so a loaded rule's stored day
+// survives opening the form.
+watch(anchorYmd, () => {
+  if (activeUnit.value === 'month' && s.monthlyMode === 'date') s.monthlyDay = deriveMonthlyDay();
+});
+
 watch(
   builtRule,
   (rule) => {
-    if (syncing) return;
+    const json = JSON.stringify(rule);
+    if (json === lastJson) return; // no real change (or an apply we already recorded)
+    lastJson = json;
     emit('update:modelValue', rule);
   },
   { deep: true }
@@ -195,12 +215,11 @@ const simpleOptions = computed<ChipOption[]>(() => [
 ]);
 const unitOptions: CustomUnit[] = ['days', 'weeks', 'months', 'years'];
 
-const monthlyDateLabel = computed(() => {
-  const day = anchorDate.value.getDate();
-  return day <= 28
-    ? fillTemplate(t('recurrence.monthly.onDate'), { date: getOrdinalSuffix(day) })
-    : t('recurrence.monthly.lastDay');
-});
+const monthlyDateLabel = computed(() =>
+  s.monthlyDay === 'last'
+    ? t('recurrence.monthly.lastDay')
+    : fillTemplate(t('recurrence.monthly.onDate'), { date: getOrdinalSuffix(s.monthlyDay) })
+);
 const monthlyDayLabel = computed(() =>
   fillTemplate(t('recurrence.monthly.onDay'), {
     ordinal: getOrdinalSuffix(getWeekdayOrdinalInMonth(anchorDate.value)),

@@ -243,7 +243,15 @@ export const useRecurringStore = defineStore('recurring', () => {
       frequency: original.frequency,
       dayOfMonth: original.dayOfMonth,
       monthOfYear: original.monthOfYear,
-      rule: original.rule, // #70: carry the canonical rule across a split
+      // #70: carry the canonical rule, but drop an `afterCount` end — the count
+      // is measured from the ORIGINAL anchor, so re-anchoring it at the split
+      // date would silently extend the series past its intended total. The
+      // "and future" split continues on the same cadence with no count.
+      rule: original.rule
+        ? original.rule.end.kind === 'afterCount'
+          ? { ...original.rule, end: { kind: 'never' } }
+          : original.rule
+        : undefined,
       startDate: fromDate,
       endDate: original.endDate, // preserve original end date if any
       isActive: true,

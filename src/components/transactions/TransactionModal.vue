@@ -7,6 +7,7 @@ import AmountInput from '@/components/ui/AmountInput.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import { resolveRecurringItemRule, legacyShadowFromRule } from '@/services/recurrence/adapters';
+import { isRuleComplete } from '@/services/recurrence/recurrenceEngine';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import type { RecurrenceRule } from '@/types/recurrence';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
@@ -172,8 +173,15 @@ const { isEditing, isSubmitting } = useFormModal(
         description.value = item.description;
         category.value = item.category;
         recurrenceMode.value = 'recurring';
-        rule.value = resolveRecurringItemRule(item).rule;
-        startDate.value = item.startDate ? item.startDate.substring(0, 10) : todayStr();
+        // #70: use the resolver's rebuilt anchor as the start date — for a legacy
+        // yearly item the recurrence date (monthOfYear/dayOfMonth) differs from
+        // startDate, and the engine anchors monthly/yearly on this date. Using it
+        // keeps the schedule from silently jumping to the raw startDate on edit.
+        {
+          const resolved = resolveRecurringItemRule(item);
+          rule.value = resolved.rule;
+          startDate.value = resolved.anchor;
+        }
         accountId.value = item.accountId;
         if (item.loanId) {
           linkType.value = 'loan';
@@ -314,7 +322,13 @@ const canSave = computed(() => {
       transferHasRate.value
     );
   }
-  return description.value.trim().length > 0 && hasAmount && !!accountId.value;
+  const base = description.value.trim().length > 0 && hasAmount && !!accountId.value;
+  // #70: a recurring save must carry a structurally valid rule (belt-and-braces —
+  // the picker can't normally emit an invalid one).
+  if (base && (recurrenceMode.value === 'recurring' || isEditingRecurring.value)) {
+    return isRuleComplete(buildEffectiveRule(startDate.value || toDateInputValue(new Date())));
+  }
+  return base;
 });
 
 const modalTitle = computed(() => {

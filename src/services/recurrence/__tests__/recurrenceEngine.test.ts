@@ -171,13 +171,23 @@ describe('recurrenceEngine — validity', () => {
     expect(isRuleComplete({ unit: 'day', interval: 0, end: never })).toBe(false);
     // multi-day weekday with interval >= 2 is not supported
     expect(isRuleComplete({ unit: 'week', interval: 2, weekdays: [1, 3], end: never })).toBe(false);
-    // month-on-date out of the 1..28 safe range
+    // month-on-date out of the 1..31 range (31 is valid — the engine skips
+    // months lacking it; 32 is not)
     expect(
       isRuleComplete({
         unit: 'month',
         interval: 1,
         monthlyAnchor: 'date',
         monthlyDay: 31,
+        end: never,
+      })
+    ).toBe(true);
+    expect(
+      isRuleComplete({
+        unit: 'month',
+        interval: 1,
+        monthlyAnchor: 'date',
+        monthlyDay: 32,
         end: never,
       })
     ).toBe(false);

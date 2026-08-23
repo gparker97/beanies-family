@@ -51,9 +51,13 @@ export function resolveRecurringItemRule(item: RecurringItem): ResolvedRule {
         anchor: startYmd,
       };
     case 'yearly': {
-      const start = parseLocalDate(startYmd);
+      const y = parseLocalDate(startYmd).getFullYear();
       const month = (item.monthOfYear ?? 1) - 1;
-      const anchor = toDateInputValue(new Date(start.getFullYear(), month, item.dayOfMonth));
+      // Clamp the day to the month's length so an impossible (month, day) — e.g.
+      // Feb 29 in a non-leap start year — does NOT JS-overflow into the next
+      // month (which would mislabel + mis-anchor the series).
+      const maxDay = new Date(y, month + 1, 0).getDate();
+      const anchor = toDateInputValue(new Date(y, month, Math.min(item.dayOfMonth, maxDay)));
       return { rule: { unit: 'year', interval: 1, end }, anchor };
     }
     case 'daily':
@@ -132,16 +136,17 @@ export function activityRuleAdapter(activity: ActivityRecurrenceFields): Recurre
       };
     case 'biweekly':
       return { unit: 'week', interval: 2, weekdays: [anchor.getDay()], end };
-    case 'monthly': {
-      const d = anchor.getDate();
+    case 'monthly':
+      // Verbatim day (1–31) for a faithful label; the engine skips months lacking
+      // it. (Legacy activity generation clamps instead of skips — reconciled when
+      // the ActivityModal UI adopts the picker; today this adapter is display-only.)
       return {
         unit: 'month',
         interval: 1,
         monthlyAnchor: 'date',
-        monthlyDay: d <= 28 ? d : 'last',
+        monthlyDay: anchor.getDate(),
         end,
       };
-    }
     case 'monthly-by-day':
       return { unit: 'month', interval: 1, monthlyAnchor: 'weekday', end };
     case 'yearly':
