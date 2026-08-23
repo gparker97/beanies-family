@@ -105,19 +105,28 @@ signal, not every field.
 3. **Engagement & retention** — bucket table (active_7d / active_30d / dormant /
    churned / never); engaged vs non-engaged; **never-logged-in** count (activation
    gap); median days-active-before-quiet (time-to-quiet, with the date-only caveat).
-4. **Who to nurture** — top engaged families (score, recency, beanpod size). Full
+4. **Conversion funnels** (`funnelAcq`, `funnelRet`) — two funnels:
+   - **Acquisition** (Plausible, app-site: arrivals → welcome gate → started
+     creation → completed signup). Report step conversion %. State that the
+     marketing→app step is a *cross-site aggregate* (two Plausible sites, no shared
+     visitor id), not per-visitor tracking.
+   - **Activation/retention** (registry+CloudWatch cohort of families created ≥28d
+     ago: signed up → used beyond day 0 → active at 1 week → at 4 weeks). This is
+     the actionable one — a true per-family cohort. Note it's a floor (activity older
+     than CloudWatch's 90d window isn't observable) and N is small (call the noise).
+5. **Who to nurture** — top engaged families (score, recency, beanpod size). Full
    emails/names OK here (terminal is local). **Who we lost** — families that were
    active and are now dormant/churned.
-5. **Data volume** — median beanpod size, count of empty/tiny pods (signed-up-but-
+6. **Data volume** — median beanpod size, count of empty/tiny pods (signed-up-but-
    -barely-used).
-6. **Geography / sync / newsletter** — country spread, google_drive vs local, opt-in %.
-7. **Usage (CloudWatch)** — top subsystems by events/families, app-open counts.
-8. **Traffic & acquisition (Plausible marketing)** — visitors, top sources,
+7. **Geography / sync / newsletter** — country spread, google_drive vs local, opt-in %.
+8. **Usage (CloudWatch)** — top subsystems by events/families, app-open counts.
+9. **Traffic & acquisition (Plausible marketing)** — visitors, top sources,
    channels, referrers, UTM campaigns, top pages, entry→exit funnel. (Skip w/ note
    if no token.)
-9. **App usage (Plausible app)** — goals/conversions (signups, logins,
-   member_joined, discord clicks…), feature_used breakdown, login-method mix.
-10. **Founder callouts** — 3–5 bullets: the one number that moved most, the biggest
+10. **App usage (Plausible app)** — goals/conversions (signups, logins,
+    member_joined, discord clicks…), feature_used breakdown, login-method mix.
+11. **Founder callouts** — 3–5 bullets: the one number that moved most, the biggest
     risk (e.g. activation gap), the best acquisition channel, one concrete action.
 
 ## Deliverable 2 — HTML dashboard artifact (ONE standing URL, updated in place)

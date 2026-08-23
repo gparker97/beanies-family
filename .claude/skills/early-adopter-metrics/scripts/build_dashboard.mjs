@@ -134,12 +134,66 @@ const startD = new Date(endD.getTime() - WINDOW_DAYS * DAY * 1000);
 const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 const dateRange = { start: startD.toISOString().slice(0, 10), end: endD.toISOString().slice(0, 10), label: `${fmt(startD)} – ${fmt(endD)}`, days: WINDOW_DAYS };
 
+// Acquisition funnel (Plausible). The app-site steps are a real single-site
+// funnel (shared sessions); marketing visitors is context only — the two sites
+// have no shared visitor id, so that top step is an aggregate, not a per-visitor
+// hand-off. All numbers are within the same window.
+let funnelAcq = null;
+if (pl) {
+  const goalV = (needle) => {
+    const g = pl.app.goals.find((x) => x['event:goal'].includes(needle));
+    return g ? g.visitors : 0;
+  };
+  const pageV = (path) => {
+    const p = pl.app.topPages.find((x) => x['event:page'] === path);
+    return p ? p.visitors : 0;
+  };
+  funnelAcq = {
+    marketingVisitors: pl.marketing.overview.visitors,
+    steps: [
+      { label: 'App arrivals', value: pl.app.overview.visitors },
+      { label: 'Reached welcome gate', value: pageV('/welcome') },
+      { label: 'Started family creation', value: goalV('Button Clicked') },
+      { label: 'Completed signup', value: goalV('Signup Completed') },
+    ],
+  };
+}
+
+// Activation & retention cohort (registry createdAt joined to CloudWatch last-seen).
+// A true per-family funnel over a single denominator: families created >=28d ago
+// (so every one has had the chance to hit all thresholds). "Retained at N days" =
+// the family had activity at least N days after signup. Retention is a floor —
+// activity older than CloudWatch's 90-day window isn't observable.
+let funnelRet = null;
+if (hasCw) {
+  const createdDaysAgo = (f) => (f.createdAt ? (NOW - new Date(f.createdAt).getTime() / 1000) / DAY : null);
+  const cohort = fams.filter((f) => { const d = createdDaysAgo(f); return d != null && d >= 28; });
+  const obsDays = (f) => {
+    const c = cw[f.familyId];
+    if (!c) return -1;
+    return (c.last - new Date(f.createdAt).getTime() / 1000) / DAY;
+  };
+  const N = cohort.length;
+  funnelRet = {
+    cohortN: N,
+    cohortDef: 'families created ≥28 days ago',
+    steps: [
+      { label: 'Signed up', value: N },
+      { label: 'Used beyond day 0', value: cohort.filter((f) => obsDays(f) >= 1).length },
+      { label: 'Active after 1 week', value: cohort.filter((f) => obsDays(f) >= 7).length },
+      { label: 'Active after 4 weeks', value: cohort.filter((f) => obsDays(f) >= 28).length },
+    ],
+  };
+}
+
 const data = {
   generatedAt: reg.generatedAt,
   dateRange,
   counts: reg.counts,
   engagement: reg.engagement,
   dau: { series: dailyActive, avg: avgDau, peak: peakDau, mau, stickiness },
+  funnelAcq,
+  funnelRet,
   activeReal30,
   activeReal7,
   engagedPctReal: reg.counts.realFamilies ? Math.round((activeReal30 / reg.counts.realFamilies) * 100) : 0,

@@ -88,6 +88,16 @@
   .pill.warn{background:rgba(224,138,30,.14);color:var(--warn)}
   .pill.bad{background:rgba(192,86,59,.13);color:var(--bad)}
   .pill.neu{background:var(--rail);color:var(--ink-soft)}
+  /* conversion funnels */
+  .funnel{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .fstep{display:grid;grid-template-columns:140px 1fr 40px 62px;align-items:center;gap:10px;font-size:13px}
+  .fstep .fl{color:var(--ink-soft);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fstep .ftrack{background:var(--rail);border-radius:8px;height:22px;overflow:hidden}
+  .fstep .ffill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--orange),var(--terra));min-width:4px}
+  .fstep .fv{text-align:right;font-weight:700;color:var(--ink)}
+  .fstep .fpc{text-align:right;font-weight:700;color:var(--good);font-size:12.5px;line-height:1.15}
+  .fstep .fpc.first{color:var(--ink-faint)}
+  .fstep .fof{display:block;font-weight:500;color:var(--ink-faint);font-size:10px}
   /* funnel / stacked engagement */
   .segbar{display:flex;height:34px;border-radius:9px;overflow:hidden;margin:4px 0 14px}
   .segbar span{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#fff;min-width:0}
@@ -139,6 +149,19 @@
       <div class="daustats" id="daustats"></div>
     </div>
     <div class="daubars" id="daubars"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Acquisition funnel</h2>
+      <p class="cap" id="acqcap"></p>
+      <div class="funnel" id="acqfunnel"></div>
+    </div>
+    <div class="panel">
+      <h2>Activation &amp; retention</h2>
+      <p class="cap" id="retcap"></p>
+      <div class="funnel" id="retfunnel"></div>
+    </div>
   </div>
 
   <div class="grid">
@@ -250,6 +273,28 @@ if(D.dau&&D.dau.series&&D.dau.series.length){
   ax.innerHTML=`<span>${s[0].day.slice(5)}</span><span>DAU/MAU = active-on-an-average-day ÷ monthly-active (${D.dau.mau})</span><span>${s[s.length-1].day.slice(5)}</span>`;
   $('daubars').after(ax);
 }else{$('daucap').textContent='No CloudWatch DAU data this run.';}
+
+// conversion funnels — width vs top step, with step-conversion % and % of top
+function renderFunnel(elId,steps){
+  const top=steps[0].value||1;
+  $(elId).innerHTML=steps.map((s,i)=>{
+    const w=Math.max(4,Math.round(s.value/top*100));
+    const ofTop=Math.round(s.value/top*100);
+    const step=i>0&&steps[i-1].value?Math.round(s.value/steps[i-1].value*100):null;
+    return `<div class="fstep"><div class="fl" title="${s.label}">${s.label}</div>`
+      +`<div class="ftrack"><div class="ffill" style="width:${w}%"></div></div>`
+      +`<div class="fv">${s.value}</div>`
+      +`<div class="fpc ${i===0?'first':''}">${i===0?'top':step+'%'}<span class="fof">${i===0?'':ofTop+'% of top'}</span></div></div>`;
+  }).join('');
+}
+if(D.funnelAcq){
+  $('acqcap').innerHTML=`App-site funnel (shared sessions). Marketing site drew <b>${D.funnelAcq.marketingVisitors}</b> visitors — a separate Plausible site, so that step is an aggregate, not a per-visitor hand-off.`;
+  renderFunnel('acqfunnel',D.funnelAcq.steps);
+}else{$('acqcap').textContent='No Plausible token — acquisition funnel unavailable this run.';}
+if(D.funnelRet){
+  $('retcap').innerHTML=`Cohort: ${D.funnelRet.cohortDef} (<b>${D.funnelRet.cohortN}</b> families). Per-family, joined via CloudWatch — a floor (activity older than 90 days isn't observable).`;
+  renderFunnel('retfunnel',D.funnelRet.steps);
+}else{$('retcap').textContent='No CloudWatch data — retention funnel unavailable this run.';}
 
 // engagement segbar (of real 56): active7, active8-30, quiet/lost, never
 const seg=[
