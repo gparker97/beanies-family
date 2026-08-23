@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>unified recurrence picker — beanies.family</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --slate: #2C3E50; --slate-dark: #1a252f;
+    --orange: #F15D22; --orange-hover: #D14D1A;
+    --terracotta: #E67E22; --silk: #AED6F1; --cloud: #F8F9FA;
+    --purple: #9B59B6; --green: #27AE60;
+    --tint-orange-8: rgba(241,93,34,0.08); --tint-orange-15: rgba(241,93,34,0.15);
+    --tint-silk-20: rgba(174,214,241,0.2); --tint-slate-5: rgba(44,62,80,0.05);
+    --tint-purple-12: rgba(155,89,182,0.12); --tint-success-10: rgba(39,174,96,0.1);
+    --card-shadow: 0 4px 20px rgba(44,62,80,0.05); --soft-shadow: 0 8px 40px rgba(44,62,80,0.08);
+    --sq: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif; background: var(--cloud); color: var(--slate);
+    line-height: 1.55; -webkit-font-smoothing: antialiased; padding: 2.5rem 1.25rem 4rem;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1,h2,h3,.chip,.btn,.eyebrow,.seg,.stepper-val,.unit,.mm,.field-label,.wordmark,.surface-title { font-family: 'Outfit', system-ui, sans-serif; }
+
+  /* header */
+  .masthead { margin-bottom: 2.5rem; }
+  .eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--orange); display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; }
+  .eyebrow .pod { display: inline-flex; gap: 4px; }
+  .eyebrow .pod i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+  .pod .b1{background:var(--slate)} .pod .b2{background:var(--terracotta)} .pod .b3{background:var(--orange)} .pod .b4{background:var(--silk)}
+  h1 { font-size: 2.15rem; font-weight: 800; line-height: 1.08; letter-spacing: -0.02em; color: var(--slate); max-width: 20ch; text-wrap: balance; }
+  h1 em { color: var(--orange); font-style: normal; }
+  .thesis { margin-top: 1rem; font-size: 1rem; color: rgba(44,62,80,0.72); max-width: 62ch; }
+  .thesis b { color: var(--slate); font-weight: 600; }
+
+  /* layout: picker + parity side by side on desktop */
+  .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1.5rem; align-items: start; }
+  @media (max-width: 820px){ .grid { grid-template-columns: 1fr; } }
+
+  .card { background: #fff; border-radius: var(--sq); box-shadow: var(--card-shadow); border: 1px solid rgba(44,62,80,0.04); }
+
+  /* the picker card — styled like a form modal body */
+  .picker { padding: 1.5rem 1.6rem 1.7rem; }
+  .modal-tag { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.2rem; }
+  .modal-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--tint-orange-8); display: grid; place-items: center; font-size: 1.1rem; }
+  .modal-title { font-size: 1.0625rem; font-weight: 600; color: var(--slate); }
+  .modal-title small { display: block; font-size: 0.75rem; font-weight: 400; color: rgba(44,62,80,0.5); }
+
+  .field-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(44,62,80,0.42); margin-bottom: 0.6rem; display: block; }
+
+  /* simple/custom segmented — first-class, up top */
+  .seg-group { display: inline-flex; background: var(--tint-slate-5); border-radius: 14px; padding: 4px; gap: 4px; margin-bottom: 1.1rem; width: 100%; }
+  .seg { flex: 1; font-size: 0.8125rem; font-weight: 600; color: rgba(44,62,80,0.6); padding: 0.5rem 1rem;
+    border-radius: 10px; border: none; background: transparent; cursor: pointer; transition: all 150ms; }
+  .seg[aria-pressed="true"] { background: #fff; color: var(--slate); box-shadow: 0 2px 8px rgba(44,62,80,0.08); }
+  .seg .tag { display: block; font-size: 0.6875rem; font-weight: 400; color: rgba(44,62,80,0.45); margin-top: 1px; }
+  .seg[aria-pressed="true"] .tag { color: var(--orange); }
+
+  /* cadence chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip { font-size: 0.8125rem; font-weight: 600; color: var(--slate); background: var(--cloud);
+    border: 1.5px solid rgba(44,62,80,0.09); padding: 0.5rem 0.9rem; border-radius: 999px; cursor: pointer;
+    transition: background 160ms, border-color 160ms, color 160ms, transform 120ms; user-select: none; white-space: nowrap; }
+  .chip:hover { border-color: rgba(241,93,34,0.4); transform: translateY(-1px); }
+  .chip[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #fff; box-shadow: 0 4px 14px rgba(241,93,34,0.28); }
+
+  /* custom: repeat every N unit */
+  .repeat-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .row-label { font-size: 0.875rem; color: rgba(44,62,80,0.72); font-weight: 500; }
+  .stepper { display: inline-flex; align-items: center; background: #fff; border: 1.5px solid rgba(44,62,80,0.12); border-radius: 12px; overflow: hidden; }
+  .stepper button { width: 34px; height: 40px; border: none; background: #fff; cursor: pointer; font-size: 1.25rem; color: var(--orange); font-weight: 600; line-height: 1; transition: background 140ms; }
+  .stepper button:hover { background: var(--tint-orange-8); }
+  .stepper .stepper-val { min-width: 42px; text-align: center; font-size: 1rem; font-weight: 700; color: var(--slate);
+    border-left: 1.5px solid rgba(44,62,80,0.08); border-right: 1.5px solid rgba(44,62,80,0.08); padding: 0.4rem 0.2rem; font-variant-numeric: tabular-nums; }
+  .unit { font-size: 0.875rem; font-weight: 600; color: var(--slate); background: #fff; border: 1.5px solid rgba(44,62,80,0.12);
+    border-radius: 12px; padding: 0.55rem 2rem 0.55rem 0.85rem; cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%232C3E50' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.7rem center; }
+
+  /* contextual zone */
+  .ctx { margin-top: 1rem; background: var(--tint-orange-8); border: 1px solid var(--tint-orange-15); border-radius: 18px; padding: 1rem 1.1rem 1.1rem; }
+  .ctx.empty { background: var(--tint-slate-5); border-color: rgba(44,62,80,0.06); }
+  .ctx-hand { font-family: 'Caveat', cursive; font-size: 1.05rem; font-weight: 600; color: var(--orange); display: block; margin-bottom: 0.7rem; }
+  .ctx.empty .ctx-hand { color: rgba(44,62,80,0.55); }
+  .ctx-block { display: none; }
+  .ctx-block.on { display: block; }
+
+  /* weekday selector */
+  .weekdays { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .wd { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid rgba(44,62,80,0.12); background: #fff;
+    color: var(--slate); font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 600; cursor: pointer; transition: all 150ms; }
+  .wd:hover { border-color: rgba(241,93,34,0.4); }
+  .wd[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .wd-hint { font-size: 0.75rem; color: rgba(44,62,80,0.5); margin-top: 0.55rem; }
+
+  /* monthly framing toggle */
+  .mm-group { display: flex; flex-direction: column; gap: 0.5rem; }
+  .mm { display: flex; align-items: center; gap: 0.6rem; background: #fff; border: 1.5px solid rgba(44,62,80,0.12);
+    border-radius: 14px; padding: 0.7rem 0.9rem; cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--slate); transition: all 150ms; text-align: left; }
+  .mm:hover { border-color: rgba(241,93,34,0.4); }
+  .mm[aria-pressed="true"] { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px var(--tint-orange-15); }
+  .mm .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(44,62,80,0.25); flex: none; position: relative; }
+  .mm[aria-pressed="true"] .radio { border-color: var(--orange); }
+  .mm[aria-pressed="true"] .radio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--orange); }
+  .mm .mm-sub { font-weight: 400; color: rgba(44,62,80,0.5); font-family: 'Inter', sans-serif; font-size: 0.8125rem; }
+
+  /* end date */
+  .ends { margin-top: 1.1rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.8125rem; color: rgba(44,62,80,0.6); }
+  .ends select, .ends .enddate { font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--slate); background: #fff;
+    border: 1.5px solid rgba(44,62,80,0.12); border-radius: 10px; padding: 0.4rem 0.7rem; cursor: pointer; }
+  .ends select { padding-right: 1.6rem; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%232C3E50' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.55rem center; }
+  .ends .enddate { accent-color: var(--orange); }
+  .after-wrap { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .stepper-sm button { height: 34px; width: 32px; font-size: 1.1rem; }
+  .stepper-sm .stepper-val { min-width: 36px; padding: 0.3rem 0.2rem; }
+  .times-label { font-size: 0.8125rem; color: rgba(44,62,80,0.6); }
+
+  /* visible keyboard focus (Sky Silk ring, per CIG) */
+  .seg:focus-visible, .chip:focus-visible, .wd:focus-visible, .mm:focus-visible,
+  .stepper button:focus-visible, .unit:focus-visible, .ends select:focus-visible, .ends .enddate:focus-visible {
+    outline: none; box-shadow: 0 0 0 3px var(--silk); }
+
+  /* live summary */
+  .summary { margin-top: 1.25rem; font-size: 0.875rem; color: var(--slate); background: var(--tint-success-10);
+    border-radius: 14px; padding: 0.8rem 1rem; display: flex; align-items: center; gap: 0.6rem; }
+  .summary .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex: none; }
+  .summary b { font-weight: 700; }
+
+  /* parity card */
+  .parity { padding: 1.5rem 1.5rem 1.6rem; }
+  .parity h2 { font-size: 1.0625rem; font-weight: 700; color: var(--slate); }
+  .parity .p-sub { font-size: 0.8125rem; color: rgba(44,62,80,0.6); margin: 0.3rem 0 1.1rem; }
+  .p-item { display: flex; gap: 0.7rem; padding: 0.7rem 0; border-top: 1px solid rgba(44,62,80,0.07); }
+  .p-item:first-of-type { border-top: none; }
+  .p-check { width: 22px; height: 22px; border-radius: 50%; background: var(--tint-success-10); color: var(--green);
+    display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; flex: none; margin-top: 1px; }
+  .p-text { font-size: 0.8125rem; }
+  .p-text .cap { font-weight: 600; color: var(--slate); }
+  .p-text .where { color: rgba(44,62,80,0.58); }
+  .p-new { display: inline-block; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--orange); background: var(--tint-orange-8); padding: 0.1rem 0.4rem; border-radius: 6px; margin-left: 0.4rem; vertical-align: middle; }
+
+  /* consistency note */
+  .consistency { margin-top: 2rem; text-align: center; font-size: 0.9375rem; color: rgba(44,62,80,0.62); }
+  .consistency b { color: var(--slate); font-weight: 600; }
+
+  footer { margin-top: 2.75rem; padding-top: 1.5rem; border-top: 1px solid rgba(44,62,80,0.08);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; font-size: 0.8125rem; color: rgba(44,62,80,0.5); }
+  .wordmark { font-weight: 700; font-size: 1rem; color: var(--slate); }
+  .wordmark .tld { color: var(--orange); }
+
+  @media (prefers-reduced-motion: reduce){ * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">recurrence · direction b · nothing lost
+      <span class="pod"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></span>
+    </div>
+    <h1>one recurrence control — <em>every rule</em> you can set today.</h1>
+    <p class="thesis">
+      <b>Simple</b> and <b>Custom</b> up top — custom is its own place, not buried in a chip.
+      Pick a cadence and only the controls that make sense appear: weekly shows the weekday
+      picker, monthly asks <b>“on the 23rd”</b> or <b>“the 4th Sunday”</b>, daily and yearly ask nothing.
+      Everything activities can do today still lives here (see the panel on the right) — plus the new
+      “every N weeks.” <b>Try it — change the cadence and watch the controls follow.</b>
+    </p>
+  </header>
+
+  <div class="grid">
+
+    <!-- ============ THE PICKER ============ -->
+    <div class="card picker">
+      <div class="modal-tag">
+        <div class="modal-icon">🔁</div>
+        <div class="modal-title">Repeat<small>example: activity starting Sun 23 Aug</small></div>
+      </div>
+
+      <span class="field-label">Repeats</span>
+      <div class="seg-group" role="group" aria-label="Recurrence mode">
+        <button class="seg" aria-pressed="true"  data-mode="simple">Simple<span class="tag">common cadences</span></button>
+        <button class="seg" aria-pressed="false" data-mode="custom">Custom<span class="tag">every N · advanced</span></button>
+      </div>
+
+      <!-- SIMPLE panel -->
+      <div data-panel="simple">
+        <div class="chips" role="group" aria-label="Cadence">
+          <button class="chip" aria-pressed="false" data-cad="daily">Daily</button>
+          <button class="chip" aria-pressed="false" data-cad="weekly">Weekly</button>
+          <button class="chip" aria-pressed="false" data-cad="biweekly">Every 2 weeks</button>
+          <button class="chip" aria-pressed="true"  data-cad="monthly">Monthly</button>
+          <button class="chip" aria-pressed="false" data-cad="yearly">Yearly</button>
+        </div>
+      </div>
+
+      <!-- CUSTOM panel -->
+      <div data-panel="custom" hidden>
+        <div class="repeat-row">
+          <span class="row-label">Repeat every</span>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="decrease">−</button>
+            <span class="stepper-val" data-n>2</span>
+            <button type="button" data-step="1" aria-label="increase">+</button>
+          </div>
+          <select class="unit" data-unit aria-label="unit">
+            <option value="days">days</option>
+            <option value="weeks" selected>weeks</option>
+            <option value="months">months</option>
+            <option value="years">years</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SHARED contextual zone -->
+      <div class="ctx" data-ctx>
+        <span class="ctx-hand" data-ctx-hand>on which days?</span>
+
+        <!-- weekday multi (weekly / every N weeks) -->
+        <div class="ctx-block" data-block="weekdays">
+          <div class="weekdays" role="group" aria-label="Days of week">
+            <button class="wd" aria-pressed="false" data-d="0">S</button>
+            <button class="wd" aria-pressed="false" data-d="1">M</button>
+            <button class="wd" aria-pressed="false" data-d="2">T</button>
+            <button class="wd" aria-pressed="false" data-d="3">W</button>
+            <button class="wd" aria-pressed="false" data-d="4">T</button>
+            <button class="wd" aria-pressed="false" data-d="5">F</button>
+            <button class="wd" aria-pressed="true"  data-d="6">S</button>
+          </div>
+          <p class="wd-hint">pick one or more</p>
+        </div>
+
+        <!-- single weekday (biweekly) -->
+        <div class="ctx-block" data-block="weekday-single">
+          <div class="weekdays" role="group" aria-label="Day of week">
+            <button class="wd" aria-pressed="false" data-ds="0">S</button>
+            <button class="wd" aria-pressed="false" data-ds="1">M</button>
+            <button class="wd" aria-pressed="false" data-ds="2">T</button>
+            <button class="wd" aria-pressed="false" data-ds="3">W</button>
+            <button class="wd" aria-pressed="false" data-ds="4">T</button>
+            <button class="wd" aria-pressed="false" data-ds="5">F</button>
+            <button class="wd" aria-pressed="true"  data-ds="6">S</button>
+          </div>
+          <p class="wd-hint">every other week lands on one day</p>
+        </div>
+
+        <!-- monthly framing (monthly / every N months) -->
+        <div class="ctx-block" data-block="monthmode">
+          <div class="mm-group" role="radiogroup" aria-label="Monthly anchor">
+            <button class="mm" role="radio" aria-checked="true" aria-pressed="true" data-mm="date">
+              <span class="radio"></span>
+              <span>on the 23rd<span class="mm-sub"> — same date each month</span></span>
+            </button>
+            <button class="mm" role="radio" aria-checked="false" aria-pressed="false" data-mm="day">
+              <span class="radio"></span>
+              <span>on the 4th Sunday<span class="mm-sub"> — same weekday each month</span></span>
+            </button>
+          </div>
+          <p class="wd-hint">both follow your start date · Sun 23 Aug</p>
+        </div>
+      </div>
+
+      <div class="ends">
+        Ends
+        <select data-ends aria-label="Ends">
+          <option value="never">never</option>
+          <option value="on">on a date</option>
+          <option value="after">after a number of times</option>
+        </select>
+        <input type="date" class="enddate" data-enddate value="2026-12-31" hidden aria-label="End date" />
+        <span class="after-wrap" data-afterwrap hidden>
+          <span class="stepper stepper-sm">
+            <button type="button" data-astep="-1" aria-label="fewer">−</button>
+            <span class="stepper-val" data-afn>12</span>
+            <button type="button" data-astep="1" aria-label="more">+</button>
+          </span>
+          <span class="times-label">times</span>
+        </span>
+      </div>
+
+      <div class="summary">
+        <span class="dot"></span>
+        <span data-summary>Repeats <b>monthly on the 23rd</b></span>
+      </div>
+    </div>
+
+    <!-- ============ PARITY PANEL ============ -->
+    <div class="card parity">
+      <h2>nothing lost</h2>
+      <p class="p-sub">every rule the app can set today, and where it lives in the new control.</p>
+
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">daily</span> · <span class="where">simple → daily</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">weekly, multiple weekdays</span> <span class="where">(mon + wed + fri)</span> · <span class="where">simple → weekly → day picker</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">every 2 weeks</span> · <span class="where">simple → every 2 weeks</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">monthly on the date</span> <span class="where">(the 23rd)</span> · <span class="where">monthly → “on the 23rd”</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">monthly on the Nth weekday</span> <span class="where">(4th Sunday · 5th → “last”)</span> · <span class="where">monthly → “the 4th Sunday”</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">yearly</span> · <span class="where">simple → yearly</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">ends</span> <span class="where">— never · on a date</span> · <span class="where">“ends” control</span></span></div>
+      <div class="p-item"><span class="p-check" style="background:var(--tint-orange-8);color:var(--orange)">＋</span><span class="p-text">
+        <span class="cap">ends after N times</span><span class="p-new">new</span> · <span class="where">ends → after a number of times</span></span></div>
+      <div class="p-item"><span class="p-check">✓</span><span class="p-text">
+        <span class="cap">multi-weekday ⇒ weekly only</span> · <span class="where">day picker only shows where it applies</span></span></div>
+      <div class="p-item"><span class="p-check" style="background:var(--tint-orange-8);color:var(--orange)">＋</span><span class="p-text">
+        <span class="cap">every N weeks / months</span><span class="p-new">new</span><br><span class="where">custom → repeat every N …</span></span></div>
+    </div>
+
+  </div>
+
+  <p class="consistency">
+    the same control on <b>transactions</b>, <b>activities</b> and <b>lists</b> — lists say
+    <b>“resets”</b> instead of <b>“repeats,”</b> same picker underneath. learn it once, know it everywhere.
+  </p>
+
+  <footer>
+    <span class="wordmark">beanies<span class="tld">.family</span></span>
+    <span>mockup · unified recurrence picker · direction b · #70 · 2026-08-23</span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var root = document.querySelector('.picker');
+  var state = { mode: 'simple', cad: 'monthly', unit: 'weeks', n: 2, mm: 'date' };
+
+  var segs = root.querySelectorAll('[data-mode]');
+  var panels = { simple: root.querySelector('[data-panel="simple"]'), custom: root.querySelector('[data-panel="custom"]') };
+  var chips = root.querySelectorAll('[data-cad]');
+  var unitSel = root.querySelector('[data-unit]');
+  var nEl = root.querySelector('[data-n]');
+  var ctx = root.querySelector('[data-ctx]');
+  var ctxHand = root.querySelector('[data-ctx-hand]');
+  var blocks = {
+    weekdays: root.querySelector('[data-block="weekdays"]'),
+    'weekday-single': root.querySelector('[data-block="weekday-single"]'),
+    monthmode: root.querySelector('[data-block="monthmode"]')
+  };
+  var summary = root.querySelector('[data-summary]');
+  var endsSel = root.querySelector('[data-ends]');
+  var endDate = root.querySelector('[data-enddate]');
+  var afterWrap = root.querySelector('[data-afterwrap]');
+  var afn = root.querySelector('[data-afn]');
+  var DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var DOWA = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtDate(v) { if (!v) return ''; var p = v.split('-'); return (+p[2]) + ' ' + MON[(+p[1]) - 1] + ' ' + p[0]; }
+
+  // which contextual block applies?
+  function ctxKind() {
+    if (state.mode === 'simple') {
+      if (state.cad === 'weekly') return 'weekdays';
+      if (state.cad === 'biweekly') return 'weekday-single';
+      if (state.cad === 'monthly') return 'monthmode';
+      return 'none'; // daily, yearly
+    } else {
+      if (state.unit === 'weeks') return 'weekdays';
+      if (state.unit === 'months') return 'monthmode';
+      return 'none'; // days, years
+    }
+  }
+
+  function selectedMultiDays() {
+    return Array.from(blocks.weekdays.querySelectorAll('.wd[aria-pressed="true"]')).map(function (b) { return +b.dataset.d; }).sort();
+  }
+  function selectedSingleDay() {
+    var b = blocks['weekday-single'].querySelector('.wd[aria-pressed="true"]');
+    return b ? +b.dataset.ds : 0;
+  }
+
+  function render() {
+    var kind = ctxKind();
+    ctx.hidden = (kind === 'none'); // no empty box — hide the zone entirely when nothing applies
+    if (kind !== 'none') {
+      Object.keys(blocks).forEach(function (k) { blocks[k].classList.toggle('on', k === kind); });
+      if (kind === 'weekdays') ctxHand.textContent = 'on which days?';
+      else if (kind === 'weekday-single') ctxHand.textContent = 'on which day?';
+      else if (kind === 'monthmode') ctxHand.textContent = 'how should it land each month?';
+    }
+
+    // build the plain-language summary
+    var s = '';
+    if (state.mode === 'simple') {
+      if (state.cad === 'daily') s = 'every day';
+      else if (state.cad === 'weekly') {
+        var d = selectedMultiDays();
+        s = 'weekly on ' + (d.length ? d.map(function (i) { return DOWA[i]; }).join(', ') : '—');
+      }
+      else if (state.cad === 'biweekly') s = 'every 2 weeks on ' + DOW[selectedSingleDay()];
+      else if (state.cad === 'monthly') s = state.mm === 'date' ? 'monthly on the 23rd' : 'monthly on the 4th Sunday';
+      else if (state.cad === 'yearly') s = 'every year on 23 Aug';
+    } else {
+      var unitLabel = state.n === 1 ? state.unit.replace(/s$/, '') : state.unit;
+      s = 'every ' + state.n + ' ' + unitLabel;
+      if (state.unit === 'weeks') {
+        var dd = selectedMultiDays();
+        s += ' on ' + (dd.length ? dd.map(function (i) { return DOWA[i]; }).join(', ') : '—');
+      } else if (state.unit === 'months') {
+        s += state.mm === 'date' ? ' on the 23rd' : ' on the 4th Sunday';
+      }
+    }
+    if (endsSel.value === 'on' && endDate.value) s += ' · until ' + fmtDate(endDate.value);
+    else if (endsSel.value === 'after') s += ' · ' + afn.textContent + ' times';
+    summary.innerHTML = 'Repeats <b>' + s + '</b>';
+  }
+
+  // mode toggle
+  segs.forEach(function (sg) {
+    sg.addEventListener('click', function () {
+      state.mode = sg.dataset.mode;
+      segs.forEach(function (x) { x.setAttribute('aria-pressed', String(x === sg)); });
+      panels.simple.hidden = state.mode !== 'simple';
+      panels.custom.hidden = state.mode !== 'custom';
+      render();
+    });
+  });
+  // cadence chips
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      state.cad = c.dataset.cad;
+      chips.forEach(function (x) { x.setAttribute('aria-pressed', String(x === c)); });
+      render();
+    });
+  });
+  // unit
+  unitSel.addEventListener('change', function () { state.unit = unitSel.value; render(); });
+  // stepper
+  root.querySelectorAll('.stepper button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.n = Math.min(30, Math.max(1, state.n + (+b.dataset.step)));
+      nEl.textContent = state.n; render();
+    });
+  });
+  // weekday multi — keep at least one day selected (a recurrence needs a day)
+  blocks.weekdays.querySelectorAll('.wd').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var on = b.getAttribute('aria-pressed') === 'true';
+      if (on && selectedMultiDays().length === 1) return; // don't allow zero days
+      b.setAttribute('aria-pressed', on ? 'false' : 'true'); render();
+    });
+  });
+  // ends → reveal the date picker or the "N times" stepper for the chosen mode
+  endsSel.addEventListener('change', function () {
+    endDate.hidden = endsSel.value !== 'on';
+    afterWrap.hidden = endsSel.value !== 'after';
+    render();
+  });
+  endDate.addEventListener('change', render);
+  root.querySelectorAll('[data-astep]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      afn.textContent = Math.min(999, Math.max(1, (+afn.textContent) + (+b.dataset.astep)));
+      render();
+    });
+  });
+  // weekday single (radio behaviour)
+  blocks['weekday-single'].querySelectorAll('.wd').forEach(function (b) {
+    b.addEventListener('click', function () {
+      blocks['weekday-single'].querySelectorAll('.wd').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      render();
+    });
+  });
+  // monthly framing
+  blocks.monthmode.querySelectorAll('.mm').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.mm = b.dataset.mm;
+      blocks.monthmode.querySelectorAll('.mm').forEach(function (x) { var on = x === b; x.setAttribute('aria-pressed', String(on)); x.setAttribute('aria-checked', String(on)); });
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
