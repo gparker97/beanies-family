@@ -607,8 +607,16 @@ async function syncLinkedTransactions(recurringItemId: string, data: CreateRecur
   // re-dating from it dragged every materialized transaction of a weekly item
   // onto one day of the month. A non-monthly schedule has no "day of month" to
   // re-apply — the amount/description/category still sync, the dates stay put.
+  // Must match `legacyShadowFromRule`'s predicate EXACTLY. Without the anchor
+  // clauses a monthly-BY-WEEKDAY rule ("the 2nd Tuesday") passes here but falls
+  // to the inert shadow placeholder in the adapter — so `dayOfMonth` is a
+  // meaningless `min(startDay, 28)` and every materialized transaction gets
+  // re-dated onto it. Same class as the weekly bug this block fixes.
   const isMonthlyShaped = data.rule
-    ? data.rule.unit === 'month' && data.rule.interval === 1
+    ? data.rule.unit === 'month' &&
+      data.rule.interval === 1 &&
+      data.rule.monthlyAnchor === 'date' &&
+      typeof (data.rule.monthlyDay === 'last' ? 31 : data.rule.monthlyDay) === 'number'
     : data.frequency === 'monthly';
   for (const tx of linked) {
     if (!isMonthlyShaped) {

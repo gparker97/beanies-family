@@ -10,16 +10,36 @@ import type {
 } from '@/types/models';
 import { extractDatePart, toDateInputValue, parseLocalDate } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { firstDueOnOrAfter } from '@/services/recurrence/recurrenceEngine';
 
-/** One place to record a stored recurrence shape that fell outside the model. */
+/**
+ * One place to record a stored recurrence shape that fell outside the model.
+ *
+ * DE-DUPLICATED per (surface, reason) for the session. These resolvers run
+ * inside Vue computeds and, in `ReportsPage`, inside a nested
+ * `for (month) { for (item) }` — so ONE corrupt item would otherwise emit dozens
+ * of identical events per interaction, trip `logEvent`'s 50/surface/min rate
+ * limit, and suppress the very diagnostic that explains the wrong number on
+ * screen. One event carries the same information.
+ */
+const reportedFallbacks = new Set<string>();
 function reportUnmappable(surface: 'transaction' | 'activity' | 'list', reason: string): null {
-  logEvent({
-    level: 'warn',
-    surface: 'recurrence',
-    message: 'rule-adapter-fallback',
-    context: { recur_surface: surface, recur_reason: reason },
-  });
+  const key = `${surface}:${reason}`;
+  if (!reportedFallbacks.has(key)) {
+    reportedFallbacks.add(key);
+    logEvent({
+      level: 'warn',
+      surface: 'recurrence',
+      message: 'rule-adapter-fallback',
+      context: { recur_surface: surface, recur_reason: reason },
+    });
+  }
   return null;
+}
+
+/** Test seam — clears the per-session de-dup set. */
+export function __resetFallbackDedupeForTests(): void {
+  reportedFallbacks.clear();
 }
 
 /**
@@ -352,4 +372,34 @@ export function listShadowFromCadence(cadence: Cadence): ListFrequency | undefin
     return cadence.monthlyAnchor !== 'weekday' && cadence.monthlyDay === 1 ? 'monthly' : undefined;
   }
   return undefined; // yearly has no legacy equivalent
+}
+
+/**
+ * Is a recurring item still running on `todayYmd`?
+ *
+ * #70 made "ends after N times" expressible on transactions, and that end lives
+ * ONLY in `rule.end` — `RecurringItem.endDate` stays undefined for it (see
+ * `TransactionModal`'s save). So every money surface that gated on `endDate`
+ * alone counted an exhausted series forever: a $200/month expense set to "ends
+ * after 12 times" kept contributing to the dashboard's monthly total and to
+ * every future month of the Reports chart, while Upcoming Transactions
+ * correctly dropped it — three surfaces disagreeing about one item.
+ *
+ * `isActive` is still the caller's concern; this answers only "has the schedule
+ * run out?". An unmappable item (resolver returns null, already logged) is
+ * treated as still running, so a reporting bug can never silently hide money.
+ */
+export function isRecurringItemLive(item: RecurringItem, todayYmd: string): boolean {
+  const resolved = resolveTransactionRule(item);
+  if (!resolved) return true;
+  return nextDueAfterOrOn(resolved.rule, resolved.anchor, todayYmd);
+}
+
+/** Does the rule have any occurrence on/after `fromYmd`? */
+function nextDueAfterOrOn(
+  rule: import('@/types/recurrence').RecurrenceRule,
+  anchorYmd: string,
+  fromYmd: string
+): boolean {
+  return firstDueOnOrAfter(rule, anchorYmd, fromYmd) !== null;
 }

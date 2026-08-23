@@ -1,4 +1,5 @@
 import type { Cadence, RecurrenceRule } from '@/types/recurrence';
+import { logEvent } from '@/services/telemetry/logEvent';
 import {
   addDays,
   addMonths,
@@ -65,6 +66,14 @@ function weekSet(cadence: Cadence, anchor: Date): number[] {
  */
 function* generate(cadence: Cadence, anchor: Date): Generator<Date> {
   const a = atMidnight(anchor);
+  // An invalid anchor must terminate, not spin. Every branch below except `day`
+  // gates its yield on `occ >= a`, which is `NaN >= NaN` — always false — so the
+  // generator would loop forever WITHOUT YIELDING, and every consumer's
+  // `if (++i > HARD_CAP) break` lives in a loop body that therefore never runs.
+  // That is a hard tab freeze, reachable from a cleared start date (an empty
+  // string survives `extractDatePart` as the truthy "NaN-NaN-NaN"). The cap
+  // cannot save us here; only bailing can.
+  if (Number.isNaN(a.getTime())) return;
   const interval = Math.max(1, Math.floor(cadence.interval || 1));
 
   switch (cadence.unit) {
@@ -281,6 +290,20 @@ export function monthlyFactor(cadence: Cadence): number {
       return 1 / interval;
     case 'year':
       return 1 / (12 * interval);
+    default:
+      // An out-of-union unit (a rule merged from a newer client, or a
+      // hand-edited .beanpod) must NOT return undefined: this feeds
+      // calculateMonthlyFee, whose floor is Math.max(x, 0), and
+      // `Math.max(undefined, 0)` is NaN — which `toPlain`
+      // (JSON.parse(JSON.stringify(...))) then persists into the family's file
+      // as a NULL amount. Fall back to "once a month" and report it.
+      logEvent({
+        level: 'warn',
+        surface: 'recurrence',
+        message: 'rule-adapter-fallback',
+        context: { recur_surface: 'transaction', recur_reason: 'unknown-unit' },
+      });
+      return 1;
   }
 }
 
@@ -298,6 +321,9 @@ export function monthlyFactor(cadence: Cadence): number {
 export function occurrenceCount(rule: RecurrenceRule, anchorYmd: string): number | null {
   if (rule.end.kind === 'never') return null;
   const anchor = parseLocalDate(anchorYmd);
+  // An invalid anchor is "cannot determine", not "zero occurrences" — the
+  // generator bails, and reporting 0 would state a fact we do not have.
+  if (Number.isNaN(anchor.getTime())) return null;
   const endBound = endDateBound(rule);
   let i = 0;
   let produced = 0;

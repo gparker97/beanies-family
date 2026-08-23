@@ -298,6 +298,7 @@ const { isEditing, isSubmitting } = useFormModal(
       mode.value = activity.recurrence === 'none' ? 'one-off' : 'recurring';
       // The SERIES start, which for a recurring activity differs from `date`
       // (seeded from the opened occurrence).
+      seriesAnchorReady.value = false;
       seriesAnchor.value = extractDatePart(activity.date);
       // Resolve through the shared adapter: `rule` when the series has one,
       // else derived from the legacy fields. An untouched form therefore emits
@@ -343,6 +344,7 @@ const { isEditing, isSubmitting } = useFormModal(
       endTime.value = addHourToTime(startTime.value);
       mode.value = 'recurring';
       rule.value = null;
+      seriesAnchorReady.value = false;
       seriesAnchor.value = date.value;
       category.value = '' as ActivityCategory;
       assigneeIds.value = props.defaultAssigneeIds ?? [];
@@ -429,12 +431,23 @@ watch(
       suppressEndTimeSync = true;
       nextTick(() => {
         suppressEndTimeSync = false;
+        // Only NOW may the series-anchor watcher act on `date` changes: both
+        // refs are seeded, so any further change is a real user edit rather
+        // than the previous open's value flushing through.
+        seriesAnchorReady.value = true;
         // Taken AFTER the flags release so watcher-settled values are part of
         // the baseline rather than surfacing as phantom user changes.
         // Skipped for the AI update-existing flow — see the ref's docblock.
         editBaseline.value = props.sourcePhoto ? null : buildPayload();
       });
+    } else if (open) {
+      // New-activity path: `onNew` has seeded `date` + `seriesAnchor`.
+      nextTick(() => {
+        seriesAnchorReady.value = true;
+      });
+      editBaseline.value = null;
     } else {
+      seriesAnchorReady.value = false;
       editBaseline.value = null;
     }
   }
@@ -473,18 +486,25 @@ const seriesAnchor = ref('');
  *
  * `props.activity.date` alone is a CONSTANT while the modal is open, so binding
  * the picker to it makes the picker's own re-anchor watcher unreachable in edit
- * mode — and this modal's date watcher was removed on the grounds that the
- * picker had taken that job over. Instead the anchor moves by the same DELTA the
- * user applied to `date`, which is exactly what `useActivityScopeEdit.shiftAnchor`
- * does to the stored template on save. The two therefore agree.
+ * mode. Instead the anchor moves by the same DELTA the user applied to `date`,
+ * which is exactly what `useActivityScopeEdit.shiftAnchor` does to the stored
+ * template on save. The two therefore agree.
+ *
+ * GUARDED BY `seriesAnchorReady`: this modal is never `v-if`'d away
+ * (FamilyPlannerPage/FamilyNookPage bind `:open`), so `date` survives between
+ * opens and this watcher would otherwise fire on the NEXT open with `oldDate`
+ * still holding the PREVIOUS session's date — shifting the new activity's
+ * anchor by a delta the user never applied. The flag is cleared on open and set
+ * only once `onNew`/`onEdit` has seeded both refs.
  */
+const seriesAnchorReady = ref(false);
 watch(date, (newDate, oldDate) => {
-  if (!newDate || !seriesAnchor.value) return;
-  if (!oldDate) return;
+  if (!seriesAnchorReady.value) return;
+  if (!newDate || !oldDate || !seriesAnchor.value) return;
   const deltaDays = Math.round(
     (parseLocalDate(newDate).getTime() - parseLocalDate(oldDate).getTime()) / 86_400_000
   );
-  if (deltaDays === 0) return;
+  if (!Number.isFinite(deltaDays) || deltaDays === 0) return;
   seriesAnchor.value = toDateInputValue(addDays(parseLocalDate(seriesAnchor.value), deltaDays));
 });
 

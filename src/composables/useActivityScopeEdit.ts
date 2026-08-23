@@ -2,7 +2,8 @@ import { ref } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { chooseScope } from '@/composables/useRecurringEditScope';
 import { confirm } from '@/composables/useConfirm';
-import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
+import { toDateInputValue, addDays, parseLocalDate, extractDatePart } from '@/utils/date';
+import { lastOccurrenceOf } from '@/utils/activitySeriesEnd';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { endSeriesPatch } from '@/utils/activitySeriesEnd';
 import { showToast } from '@/composables/useToast';
@@ -47,6 +48,40 @@ export function useActivityScopeEdit() {
     const occurrenceDate = viewingOccurrenceDate.value;
     viewingActivity.value = null;
     return { activity, occurrenceDate };
+  }
+
+  /**
+   * Delete override children stranded past a newly-truncated series end.
+   *
+   * The cut date must come from whichever representation actually carries the
+   * end. Gating on `typeof changes.recurrenceEndDate === 'string'` alone was
+   * correct only while "ends on a date" was the sole option: #70's picker also
+   * offers "after N times", which lives ONLY in `rule.end` and writes NO
+   * `recurrenceEndDate`. Setting a 20-session series to "after 5 times" left
+   * the 15 override children past the cut rendering on the calendar and in the
+   * Google push forever — the Recurring Invariant 7 breach this reap exists to
+   * prevent. Switching onDate -> afterCount was worse: `recurrenceEndDate` is
+   * present-but-`undefined`, so it was explicitly cleared too.
+   */
+  async function reapOrphansAfterTruncation(
+    id: string,
+    changes: UpdateFamilyActivityInput
+  ): Promise<void> {
+    let cutYmd: string | null = null;
+    if (typeof changes.recurrenceEndDate === 'string') {
+      cutYmd = changes.recurrenceEndDate;
+    } else if (changes.rule) {
+      const template = activityStore.activities.find((a) => a.id === id);
+      const anchor = template ? extractDatePart(template.date) : null;
+      // The last occurrence the truncated rule still owns; everything after it
+      // is an orphan. `null` for a never-ending rule — nothing to reap.
+      if (anchor) cutYmd = lastOccurrenceOf(changes.rule, anchor);
+    }
+    if (!cutYmd) return;
+    await activityStore.deleteChildrenFrom(
+      id,
+      toDateInputValue(addDays(parseLocalDate(cutYmd), 1))
+    );
   }
 
   /**
@@ -161,21 +196,11 @@ export function useActivityScopeEdit() {
       }
       // Truncating a series via an "ends on" edit strands the children past the
       // cut exactly as the delete path does (Recurring Invariant 7).
-      if (typeof safeChanges.recurrenceEndDate === 'string') {
-        await activityStore.deleteChildrenFrom(
-          newTemplate.id,
-          toDateInputValue(addDays(parseLocalDate(safeChanges.recurrenceEndDate), 1))
-        );
-      }
+      await reapOrphansAfterTruncation(newTemplate.id, safeChanges);
     }
-    // An "ends on" edit at 'all' scope truncates the series in place — same
-    // orphan risk, same reap.
-    if (scope === 'all' && typeof changes.recurrenceEndDate === 'string') {
-      await activityStore.deleteChildrenFrom(
-        templateId,
-        toDateInputValue(addDays(parseLocalDate(changes.recurrenceEndDate), 1))
-      );
-    }
+    // An "ends" edit at 'all' scope truncates the series in place — same orphan
+    // risk, same reap.
+    if (scope === 'all') await reapOrphansAfterTruncation(templateId, changes);
     logEvent({
       surface: 'activity-scope-edit',
       level: 'info',

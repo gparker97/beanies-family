@@ -17,6 +17,7 @@ import { useMonthOverMonthCashFlow } from '@/composables/useMonthOverMonthCashFl
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { getAccountTypeIcon, getAssetTypeIcon } from '@/constants/icons';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
@@ -37,6 +38,7 @@ const recurringStore = useRecurringStore();
 const settingsStore = useSettingsStore();
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { describeRecurringItem } = useRecurrenceLabel();
 const { syncHighlightClass } = useSyncHighlight();
 
 // ── Net worth history ───────────────────────────────────────────────────────
@@ -282,7 +284,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
           >
             <ActivityItem
               :name="item.description"
-              :subtitle="`${getDaysUntil(nextDate!)}, ${item.frequency}`"
+              :subtitle="`${getDaysUntil(nextDate!)}, ${describeRecurringItem(item)}`"
               :amount="item.amount"
               :currency="item.currency"
               :type="item.type === 'income' ? 'income' : 'expense'"

@@ -1,6 +1,7 @@
 import type { RecurrenceRule } from '@/types/recurrence';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
   parseLocalDate,
@@ -33,7 +34,12 @@ export const WEEKDAY_SHORT: readonly UIStringKey[] = [
 ];
 
 function joinWeekdays(list: number[] | undefined, anchorYmd: string, t: T): string {
-  const set = list && list.length ? list : [parseLocalDate(anchorYmd).getDay()];
+  // Filter to real weekdays. `WEEKDAY_SHORT[7]` is undefined, so an out-of-range
+  // value (which `isRuleComplete` does not validate) would render the literal
+  // text "undefined" in the summary. The deleted `formatActivityRecurrence` had
+  // this filter; it was not carried over.
+  const valid = (list ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const set = valid.length ? valid : [parseLocalDate(anchorYmd).getDay()];
   return [...new Set(set)]
     .sort((a, b) => a - b)
     .map((d) => t(WEEKDAY_SHORT[d]!))
@@ -44,13 +50,40 @@ export function describeRule(rule: RecurrenceRule, anchorYmd: string, t: T): str
   const n = rule.interval;
   let core = '';
   // A malformed anchor must never crash a render. `getWeekdayOrdinalInMonth`
-  // THROWS on an invalid Date, and this now runs inside list/card templates
+  // THROWS on an invalid Date, and this runs inside list/card templates
   // (`ActivityListCard`, `ListTile`) where an activity with a bad `date` — a
   // state `expandRecurring` already reports-and-skips, so it exists in the wild
-  // — would tear the whole list down. The deleted `formatActivityRecurrence`
-  // guarded this explicitly; keep the guarantee.
+  // — would tear the whole list down.
+  //
+  // Fall back to the plain CADENCE WORD, never to "One-time": the caller has
+  // already established that this thing recurs (the chip is gated on
+  // `recurrence !== 'none'`), so returning the one-time label would state
+  // something actively false about the family's schedule. Only the DATE-derived
+  // detail is unavailable here; the unit and interval are still known.
   if (Number.isNaN(parseLocalDate(anchorYmd).getTime())) {
-    return t('planner.recurrence.none');
+    logEvent({
+      level: 'warn',
+      surface: 'recurrence',
+      message: 'rule-adapter-fallback',
+      context: { recur_surface: 'activity', recur_reason: 'invalid-anchor' },
+    });
+    const n = rule.interval;
+    switch (rule.unit) {
+      case 'day':
+        return n === 1
+          ? t('recurrence.desc.daily')
+          : fillTemplate(t('recurrence.desc.everyNDays'), { n });
+      case 'week':
+        return n === 1
+          ? t('recurrence.cadence.weekly')
+          : fillTemplate(t('recurrence.desc.everyNWeeksOn'), { n, days: '' }).trim();
+      case 'month':
+        return t('recurrence.cadence.monthly');
+      case 'year':
+        return t('recurrence.cadence.yearly');
+      default:
+        return t('recurrence.cadence.monthly');
+    }
   }
 
   switch (rule.unit) {

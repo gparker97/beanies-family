@@ -245,9 +245,14 @@ export function isDateBetween(
  */
 export function extractDatePart(dateStr: string): string {
   // If it's already a date-only string (YYYY-MM-DD), return as-is
-  if (dateStr.length === 10) return dateStr;
+  if (dateStr?.length === 10) return dateStr;
   // For full ISO timestamps, parse and extract local date
   const d = new Date(dateStr);
+  // An unparseable input previously produced the string "NaN-NaN-NaN" — 11
+  // characters, and therefore TRUTHY, which silently defeated every
+  // `if (!ymd)` guard downstream and carried a poison value deep into date
+  // math. Return '' so those guards work as their authors intended.
+  if (Number.isNaN(d.getTime())) return '';
   return toDateInputValue(d);
 }
 
