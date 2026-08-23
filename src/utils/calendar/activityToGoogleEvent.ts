@@ -173,6 +173,12 @@ export function computePushHash(
     recurrence: activity.recurrence,
     daysOfWeek: activity.daysOfWeek,
     recurrenceEndDate: activity.recurrenceEndDate,
+    // #70: the RULE is what `activityToGoogleEvent` actually serializes, and the
+    // legacy shadow above is LOSSY — changing monthlyDay 15 -> 20, every-2 ->
+    // every-3 weeks, or never -> after-10-times all leave the shadow
+    // byte-identical. Without this the hash matches, `reconcilePlan` skips the
+    // upsert, and Google keeps the stale RRULE forever with no error.
+    rule: activity.rule,
     assigneeIds: activity.assigneeIds,
     assigneeId: activity.assigneeId,
     pickupMemberId: activity.pickupMemberId,

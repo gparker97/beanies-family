@@ -117,3 +117,103 @@ describe('listLifecycle predicates', () => {
     });
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LEGACY RESET PARITY (#70) — the engine must reproduce the old rule exactly
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The pre-#70 reset rule, kept here verbatim as the PARITY ORACLE. It used to
+ * live in `listLifecycle.ts`; the engine replaced it, and this is what proves
+ * the replacement is faithful. Do not "simplify" these — they are a fixture.
+ */
+function legacyMondayOf(ymd: string): string {
+  const d = new Date(`${ymd.slice(0, 10)}T00:00:00`);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+function legacyShouldReset(freq: 'daily' | 'weekly' | 'monthly', last: string, today: string) {
+  if (freq === 'daily') return today > last;
+  if (freq === 'weekly') return legacyMondayOf(today) > legacyMondayOf(last);
+  return today.slice(0, 7) > last.slice(0, 7);
+}
+
+function recurringList(over: Partial<FamilyList>): FamilyList {
+  return {
+    id: 'l1',
+    title: 'Chores',
+    emoji: '🧹',
+    category: 'chores',
+    ownerId: 'm1',
+    items: [],
+    lifecycle: 'recurring',
+    completed: false,
+    createdBy: 'm1',
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+    ...over,
+  } as FamilyList;
+}
+
+describe('list reset parity — engine reproduces the legacy boundaries', () => {
+  const freqs = ['daily', 'weekly', 'monthly'] as const;
+  // A month of consecutive days crossing a month boundary, week boundaries and
+  // a weekend — every reset boundary the legacy rule could produce.
+  const days: string[] = [];
+  for (let d = new Date('2026-08-20T00:00:00'); d <= new Date('2026-09-10T00:00:00');) {
+    days.push(d.toISOString().slice(0, 10));
+    d = new Date(d.getTime() + 86400000);
+  }
+
+  it.each(freqs)('%s: every (lastReset, today) pair matches the legacy rule', (frequency) => {
+    for (const last of days) {
+      for (const today of days) {
+        if (today < last) continue;
+        const list = recurringList({ frequency, lastResetDate: last, createdAt: '2026-08-01' });
+        expect({
+          frequency,
+          last,
+          today,
+          reset: computeRecurringReset(list, today).shouldReset,
+        }).toEqual({ frequency, last, today, reset: legacyShouldReset(frequency, last, today) });
+      }
+    }
+  });
+
+  it('weekly is anchored to MONDAY, not the list creation weekday', () => {
+    // The discriminating fixture: created on a THURSDAY, last reset FRIDAY,
+    // checked the following MONDAY. This fails if someone maps weekly to
+    // `weekdays: [createdAt.getDay()]` instead of Monday.
+    const list = recurringList({
+      frequency: 'weekly',
+      createdAt: '2026-08-20', // Thursday
+      lastResetDate: '2026-08-21', // Friday
+    });
+    expect(computeRecurringReset(list, '2026-08-24').shouldReset).toBe(true); // Monday
+    expect(computeRecurringReset(list, '2026-08-23').shouldReset).toBe(false); // Sunday
+  });
+
+  it('a list with no lastResetDate never resets', () => {
+    const list = recurringList({ frequency: 'daily', lastResetDate: undefined });
+    expect(computeRecurringReset(list, '2026-09-01').shouldReset).toBe(false);
+  });
+
+  it('a list with neither cadence nor frequency never resets', () => {
+    const list = recurringList({ frequency: undefined, lastResetDate: '2026-08-01' });
+    expect(computeRecurringReset(list, '2026-09-01').shouldReset).toBe(false);
+  });
+
+  it('an every-2-weeks cadence does NOT drift when a reset day is missed', () => {
+    // Anchor and cursor are separate parameters precisely for this: anchoring on
+    // `lastResetDate` would push the next reset two weeks past the missed day.
+    const list = recurringList({
+      cadence: { unit: 'week', interval: 2, weekdays: [1] },
+      createdAt: '2026-08-03', // Monday
+      lastResetDate: '2026-08-17', // Monday, on-cycle
+    });
+    // Next on-cycle Monday is 31 Aug. The family doesn't open the app until 2 Sep.
+    expect(computeRecurringReset(list, '2026-08-24').shouldReset).toBe(false); // off-cycle week
+    expect(computeRecurringReset(list, '2026-08-31').shouldReset).toBe(true);
+    expect(computeRecurringReset(list, '2026-09-02').shouldReset).toBe(true); // still due, not skipped
+  });
+});

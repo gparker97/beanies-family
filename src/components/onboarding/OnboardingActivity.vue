@@ -98,8 +98,23 @@ async function handleAddActivity() {
       date: today,
       startTime: startTime.value || undefined,
       endTime: endTime.value || undefined,
+      // #70: write the canonical rule alongside the legacy shadow, so an
+      // onboarding activity is on the same footing as one created in the full
+      // modal. This step deliberately keeps its simple day picker rather than
+      // the full RecurrencePicker — it cannot fit the narrow column beside the
+      // two time pickers, and a first-run flow built around one decision should
+      // not grow a five-decision control.
       daysOfWeek: activityDays.value.length > 0 ? activityDays.value : undefined,
       recurrence: activityDays.value.length > 0 ? 'weekly' : 'none',
+      rule:
+        activityDays.value.length > 0
+          ? {
+              unit: 'week' as const,
+              interval: 1,
+              weekdays: [...activityDays.value],
+              end: { kind: 'never' as const },
+            }
+          : undefined,
       feeAmount: activityFee.value,
       feeCurrency: activityCurrency.value as CurrencyCode,
       feeSchedule: 'monthly',

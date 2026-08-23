@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue';
+import { computed, onMounted, reactive, watch } from 'vue';
 import FrequencyChips, { type ChipOption } from '@/components/ui/FrequencyChips.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -11,6 +11,7 @@ import {
   parseLocalDate,
   getWeekdayOrdinalInMonth,
   formatDayLong,
+  toDateInputValue,
 } from '@/utils/date';
 import type { RecurrenceRule, RecurrenceUnit, RecurrenceEnd } from '@/types/recurrence';
 
@@ -47,7 +48,18 @@ const UNIT_OF: Record<CustomUnit, RecurrenceUnit> = {
   years: 'year',
 };
 
-const anchorYmd = computed(() => extractDatePart(props.startDate));
+// A cleared/absent start date must NOT reach the label helpers:
+// `getWeekdayOrdinalInMonth` THROWS on an invalid Date, which would tear down
+// the whole modal mid-render (reachable in two taps — clear the start date on a
+// recurring activity). Fall back to today, which keeps the control rendering a
+// sensible default until a real date is chosen. The old
+// `formatActivityRecurrence` had an equivalent `dateValid` guard.
+const anchorYmd = computed(() => {
+  const ymd = extractDatePart(props.startDate ?? '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) && !Number.isNaN(parseLocalDate(ymd).getTime())
+    ? ymd
+    : toDateInputValue(new Date());
+});
 const anchorDate = computed(() => parseLocalDate(anchorYmd.value));
 const isReset = computed(() => props.mode === 'reset');
 
@@ -61,17 +73,22 @@ const s = reactive({
   monthlyMode: 'date' as 'date' | 'weekday',
   // Preserved from a loaded rule (so editing a legacy item on the 15th doesn't
   // silently reschedule to the start-date day); re-derived only when the user
-  // changes the start date. New selections cap >28 → 'last' per the CIG picker.
-  monthlyDay: 'last' as number | 'last',
+  // changes the start date. New selections take the start date's day verbatim
+  // (1–31) — a day the month lacks CLAMPS to its last day (#70), so there is no
+  // need to cap. `'last'` still arrives here from an already-stored rule.
+  monthlyDay: 1 as number | 'last',
   endKind: 'never' as RecurrenceEnd['kind'],
   endDate: '',
   endCount: 12,
 });
 
-/** Start-date-derived monthly day for a NEW/re-derived selection (CIG: 1–28 or last). */
-function deriveMonthlyDay(): number | 'last' {
-  const day = anchorDate.value.getDate();
-  return day <= 28 ? day : 'last';
+/**
+ * Start-date-derived monthly day for a NEW/re-derived selection. Verbatim 1–31:
+ * a month lacking the day clamps to its last day (#70), and the hint below says
+ * so, so there is nothing to cap.
+ */
+function deriveMonthlyDay(): number {
+  return anchorDate.value.getDate();
 }
 
 /** Which simple cadence, if any, a rule matches — else null → custom mode. */
@@ -179,6 +196,21 @@ function syncFromModel(rule: RecurrenceRule | null): void {
 }
 syncFromModel(props.modelValue);
 
+// #70: publish the default when we start from nothing. The control SHOWS a
+// concrete schedule ("repeats monthly on the 23rd"), so a parent that saves
+// without the user ever touching it must receive that rule — otherwise the form
+// silently persists "does not repeat" while displaying a schedule. `watch` is
+// not `immediate`, so nothing was emitted and each consumer had to reconstruct
+// the default itself (the two copies had already drifted).
+//
+// On MOUNTED, not during setup: emitting mid-setup runs the parent's handler
+// before the parent has finished initializing.
+onMounted(() => {
+  if (props.modelValue) return;
+  lastJson = JSON.stringify(builtRule.value);
+  emit('update:modelValue', builtRule.value);
+});
+
 watch(
   () => props.modelValue,
   (v) => {
@@ -187,11 +219,24 @@ watch(
   }
 );
 
-// The monthly/yearly anchor follows the start date (greg's steer). Re-derive the
-// monthly day only on a genuine start-date change, so a loaded rule's stored day
-// survives opening the form.
-watch(anchorYmd, () => {
-  if (activeUnit.value === 'month' && s.monthlyMode === 'date') s.monthlyDay = deriveMonthlyDay();
+// Every anchor the rule derives follows the start date (greg's steer) — but only
+// on a genuine start-date change, so a loaded rule's stored values survive
+// opening the form.
+watch(anchorYmd, (newYmd, oldYmd) => {
+  // NOT gated on the active unit: a start-date change made while Weekly is
+  // selected must still move the monthly anchor, or switching to Monthly
+  // afterwards emits a rule anchored on a day the series never starts on.
+  if (s.monthlyMode === 'date') s.monthlyDay = deriveMonthlyDay();
+  // Weekdays re-anchor too, but ONLY while untouched — i.e. still exactly the
+  // previous start date's weekday. A user-chosen set is never rewritten. Without
+  // this a series moved from a Monday to a Tuesday keeps repeating on Mondays.
+  // (Same "untouched" heuristic ActivityModal used before it adopted this
+  // control, so the modal no longer needs its own date watcher.)
+  if (!oldYmd || oldYmd === newYmd) return;
+  const prevDow = parseLocalDate(oldYmd).getDay();
+  if (s.weekdays.length === 1 && s.weekdays[0] === prevDow) {
+    s.weekdays = [parseLocalDate(newYmd).getDay()];
+  }
 });
 
 watch(
@@ -226,9 +271,14 @@ const monthlyDayLabel = computed(() =>
     day: t(WEEKDAY_SHORT[anchorDate.value.getDay()]!),
   })
 );
-const startHint = computed(() =>
-  fillTemplate(t('recurrence.startHint'), { date: formatDayLong(anchorYmd.value) })
-);
+const monthlyHint = computed(() => {
+  const base = fillTemplate(t('recurrence.startHint'), { date: formatDayLong(anchorYmd.value) });
+  // A 29th/30th/31st anchor is "missable" — say plainly what happens in the
+  // months that lack it, rather than letting the user discover it (#70).
+  return s.monthlyMode === 'date' && typeof s.monthlyDay === 'number' && s.monthlyDay > 28
+    ? `${base} ${fillTemplate(t('recurrence.monthly.clampHint'), { date: getOrdinalSuffix(s.monthlyDay) })}`
+    : base;
+});
 const summary = computed(() => describeRule(builtRule.value, anchorYmd.value, t));
 
 // ── Handlers ────────────────────────────────────────────────────────────────
@@ -388,7 +438,7 @@ function stepN(delta: number) {
             </span>
           </button>
         </div>
-        <p class="mt-2 text-xs text-[var(--color-text-muted)]">{{ startHint }}</p>
+        <p class="mt-2 text-xs text-[var(--color-text-muted)]">{{ monthlyHint }}</p>
       </div>
     </div>
 
@@ -414,6 +464,7 @@ function stepN(delta: number) {
         v-if="s.endKind === 'onDate'"
         type="date"
         :value="s.endDate"
+        :min="anchorYmd"
         class="font-outfit rounded-xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 py-2 text-base font-semibold text-[var(--color-text)]"
         :aria-label="t('recurrence.ends.onDate')"
         @change="(e) => (s.endDate = (e.target as HTMLInputElement).value)"

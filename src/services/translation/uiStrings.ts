@@ -5993,6 +5993,15 @@ const STRING_DEFS = {
     en: 'Something went wrong — please try again.',
     beanie: 'something went wrong — please try again.',
   },
+  'planner.scopeEditFailed.title': {
+    en: "Couldn't move that",
+    beanie: "couldn't move that",
+  },
+  'planner.scopeEditFailed.message': {
+    en: "This plan's series couldn't be found, so the new date wasn't saved. Close and reopen the plan, then try again.",
+    beanie:
+      "this plan's series couldn't be found, so the new date wasn't saved. close and reopen the plan, then try again.",
+  },
   'planner.multiDayMoveBlocked.title': {
     en: 'Pick a different option to move this',
     beanie: 'pick a different option to move this',
@@ -6252,6 +6261,10 @@ const STRING_DEFS = {
   'recurrence.monthly.onDate': { en: 'on the {date}', beanie: 'on the {date}' },
   'recurrence.monthly.onDay': { en: 'on the {ordinal} {day}', beanie: 'on the {ordinal} {day}' },
   'recurrence.monthly.lastDay': { en: 'on the last day', beanie: 'on the last day' },
+  'recurrence.monthly.clampHint': {
+    en: 'Months without a {date} use the last day.',
+    beanie: 'months without a {date} use the last day.',
+  },
   'recurrence.monthly.dateSub': { en: 'same date each month', beanie: 'same date each month' },
   'recurrence.monthly.daySub': { en: 'same weekday each month', beanie: 'same weekday each month' },
   'recurrence.startHint': {

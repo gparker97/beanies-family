@@ -15,7 +15,9 @@ import {
   nthWeekdayOfMonth,
   extractDatePart,
 } from '@/utils/date';
-import { occurrencesInRange } from '@/services/recurrence/recurrenceEngine';
+import { occurrencesInRange, monthlyFactor } from '@/services/recurrence/recurrenceEngine';
+import { resolveActivityRule } from '@/services/recurrence/adapters';
+import { endSeriesPatch, rebaseRuleForSplit } from '@/utils/activitySeriesEnd';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { overrideOccurrenceYmd } from '@/utils/calendar/overrideOccurrenceYmd';
@@ -698,17 +700,21 @@ export const useActivityStore = defineStore('activities', () => {
     const enabled = !!(activity.payFromAccountId && activity.feeAmount);
     const settingsStore = useSettingsStore();
     const isAllSchedule = activity.feeSchedule === 'all';
-    const isOneOff = activity.recurrence === 'none';
+    // #70: resolve the cadence rather than reading `recurrence`/`daysOfWeek`
+    // directly — `null` means the activity does not recur at all.
+    const resolved = resolveActivityRule(activity);
 
     // One-off activities and 'all' schedule use the full amount as a one-time payment;
     // recurring activities calculate the monthly equivalent
-    const isOneTimePayment = isOneOff || isAllSchedule;
+    const isOneTimePayment = !resolved || isAllSchedule;
     const paymentAmount = isOneTimePayment
       ? (activity.feeAmount ?? 0)
       : calculateMonthlyFee({
           feeSchedule: activity.feeSchedule,
           feeAmount: activity.feeAmount ?? 0,
-          sessionsPerWeek: activity.daysOfWeek?.length || 1,
+          // The REAL occurrence rate. `daysOfWeek.length || 1` used to stand in
+          // for this and was only ever right for weekly activities.
+          monthlyOccurrences: monthlyFactor(resolved.rule),
           feeCustomPeriod: activity.feeCustomPeriod,
           feeCustomPeriodUnit: activity.feeCustomPeriodUnit,
         });
@@ -1072,8 +1078,16 @@ export const useActivityStore = defineStore('activities', () => {
     // session renders twice, forever. Mirrors the master-first ordering
     // `deleteActivity` documents.
     const { payload, strippedKeys } = deriveFromTemplate(original, SPLIT_INVALID_KEYS);
+    // #70: the replacement CONTINUES the same cadence, so it keeps `rule` — but
+    // an `afterCount` end is anchor-relative and would restart the count from
+    // the split point (a 10-session course split at session 4 becoming 13, then
+    // 16). Re-base it against what the original already consumed.
+    const splitRule = original.rule
+      ? rebaseRuleForSplit(original.rule, extractDatePart(original.date), fromDate)
+      : undefined;
     const newTemplate = await createActivity({
       ...payload,
+      ...(splitRule ? { rule: splitRule } : {}),
       date: fromDate,
       recurrenceEndDate: original.recurrenceEndDate,
       // Fee ownership TRANSFERS to the new template: carrying the id means the
@@ -1087,7 +1101,12 @@ export const useActivityStore = defineStore('activities', () => {
     if (!newTemplate) return null;
 
     const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
-    if (!(await updateActivity(activityId, { recurrenceEndDate: dayBefore }))) {
+    // Must end the AUTHORITATIVE representation: `expandRecurring` reads
+    // `rule.end` for a rule-bearing series and ignores `recurrenceEndDate`
+    // entirely, so writing only the shadow would leave both templates expanding
+    // from `fromDate` — the duplicate-series state the comment above calls
+    // unrecoverable.
+    if (!(await updateActivity(activityId, endSeriesPatch(original, dayBefore)))) {
       // The replacement exists but the original was never truncated — both
       // would expand from `fromDate`. Roll the replacement back so the user is
       // left with the un-split series rather than a permanent duplicate.

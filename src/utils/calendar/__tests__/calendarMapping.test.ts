@@ -66,7 +66,7 @@ describe('buildRecurrenceRule', () => {
       buildRecurrenceRule({ recurrence: 'weekly', date: '2026-06-10', daysOfWeek: [1, 3] })
     ).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO,WE']);
     expect(buildRecurrenceRule({ recurrence: 'biweekly', date: '2026-06-10' })).toEqual([
-      'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=WE',
+      'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=WE;WKST=SU',
     ]);
     expect(buildRecurrenceRule({ recurrence: 'monthly', date: '2026-06-10' })).toEqual([
       'RRULE:FREQ=MONTHLY;BYMONTHDAY=10',

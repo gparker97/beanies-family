@@ -6,7 +6,7 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
-import { resolveRecurringItemRule, legacyShadowFromRule } from '@/services/recurrence/adapters';
+import { resolveTransactionRule, legacyShadowFromRule } from '@/services/recurrence/adapters';
 import { isRuleComplete } from '@/services/recurrence/recurrenceEngine';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import type { RecurrenceRule } from '@/types/recurrence';
@@ -178,9 +178,11 @@ const { isEditing, isSubmitting } = useFormModal(
         // startDate, and the engine anchors monthly/yearly on this date. Using it
         // keeps the schedule from silently jumping to the raw startDate on edit.
         {
-          const resolved = resolveRecurringItemRule(item);
-          rule.value = resolved.rule;
-          startDate.value = resolved.anchor;
+          const resolved = resolveTransactionRule(item);
+          if (resolved) {
+            rule.value = resolved.rule;
+            startDate.value = resolved.anchor;
+          }
         }
         accountId.value = item.accountId;
         if (item.loanId) {
@@ -508,16 +510,26 @@ watch([loanId, activityId], () => {
   }
 });
 
-// The rule to persist: the picker's value, or its default (monthly on the start
-// date) when the user opened "recurring" and saved without touching the picker.
+/**
+ * The rule to persist.
+ *
+ * #70: this used to RECONSTRUCT the picker's default when the user saved
+ * without touching the control, because the picker never emitted on mount. It
+ * now does, so `rule` is always populated while the control is shown — and the
+ * reconstruction had already drifted from the real default (it kept a `day <= 28
+ * ? day : 'last'` cap the picker dropped when month-ends began clamping, so a
+ * 30 Jan start displayed "on the 30th" and persisted "last day").
+ *
+ * The fallback remains only as a defensive floor for a save that somehow races
+ * the mount emit; it now matches the picker exactly.
+ */
 function buildEffectiveRule(startYmd: string): RecurrenceRule {
   if (rule.value) return rule.value;
-  const day = new Date(extractDatePart(startYmd) + 'T00:00:00').getDate();
   return {
     unit: 'month',
     interval: 1,
     monthlyAnchor: 'date',
-    monthlyDay: day <= 28 ? day : 'last',
+    monthlyDay: new Date(extractDatePart(startYmd) + 'T00:00:00').getDate(),
     end: { kind: 'never' },
   };
 }

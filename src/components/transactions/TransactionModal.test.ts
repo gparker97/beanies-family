@@ -451,7 +451,11 @@ describe('TransactionModal — Save Flow', () => {
       // #70: no legacy dayOfMonth/monthOfYear refs — the picker derives its
       // anchor from startDate, which is seeded from the transaction date.
       expect(wrapper.vm.startDate).toBe('2026-03-15');
-      expect(wrapper.vm.rule).toBeNull();
+      // The picker emits its default on mount, so the form holds a concrete rule
+      // even if the user never touches the control — saving a one-time-to-
+      // recurring conversion without opening it must not silently persist
+      // "does not repeat".
+      expect(wrapper.vm.rule).toMatchObject({ unit: 'month', interval: 1 });
     });
 
     it('should not emit save for one-time path during conversion', async () => {
