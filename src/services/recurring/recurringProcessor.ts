@@ -15,7 +15,6 @@ import {
 } from '@/utils/date';
 import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
-import { getOrdinalSuffix } from '@/utils/format';
 import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenceEngine';
 import { resolveRecurringItemRule } from '@/services/recurrence/adapters';
 
@@ -369,42 +368,6 @@ export function previewUpcomingDates(item: RecurringItem, count: number = 5): Da
 export function getNextDueDateForItem(item: RecurringItem): Date | null {
   const dates = previewUpcomingDates(item, 1);
   return dates.length > 0 ? (dates[0] ?? null) : null;
-}
-
-/**
- * Format frequency for display.
- */
-export function formatFrequency(item: RecurringItem): string {
-  switch (item.frequency) {
-    case 'daily':
-      return 'Daily';
-    case 'monthly':
-      return `Monthly (${getOrdinalSuffix(item.dayOfMonth)})`;
-    case 'yearly': {
-      const month = getMonthName(item.monthOfYear ?? 1);
-      return `Yearly (${month} ${getOrdinalSuffix(item.dayOfMonth)})`;
-    }
-    default:
-      return item.frequency;
-  }
-}
-
-function getMonthName(month: number): string {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return months[(month - 1) % 12] ?? 'Jan';
 }
 
 /**

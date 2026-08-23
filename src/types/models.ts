@@ -11,6 +11,19 @@ export type CurrencyCode = string; // ISO 4217 codes (e.g., 'USD', 'EUR', 'GBP')
 export type LanguageCode = 'en' | 'zh'; // Supported UI languages
 export type CountryCode = string; // ISO 3166-1 alpha-2, uppercase (e.g., 'SG', 'US', 'GB')
 
+// Unified recurrence rule (#70) — canonical model shared across transactions,
+// activities and lists. Re-exported here so `@/types/models` stays the single
+// import site for entity types. Type-only, so the models<->recurrence import is
+// erased at build (no runtime cycle).
+import type { RecurrenceRule } from './recurrence';
+export type {
+  RecurrenceUnit,
+  MonthlyAnchor,
+  RecurrenceEnd,
+  Cadence,
+  RecurrenceRule,
+} from './recurrence';
+
 // Family - Top-level tenant entity (one per family)
 export interface Family {
   id: UUID;
@@ -275,14 +288,6 @@ export interface Account {
 // Transaction - Income and expenses
 export type TransactionType = 'income' | 'expense' | 'transfer' | 'balance_adjustment';
 
-export interface RecurringConfig {
-  frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
-  interval: number; // e.g., every 2 weeks
-  startDate: ISODateString;
-  endDate?: ISODateString;
-  lastProcessed?: ISODateString;
-}
-
 /** Metadata attached to `balance_adjustment` transactions. Never set for other types. */
 export interface BalanceAdjustmentMeta {
   delta: number; // signed; positive = credit, negative = debit
@@ -315,7 +320,6 @@ export interface Transaction {
   category: string;
   date: ISODateString;
   description: string;
-  recurring?: RecurringConfig;
   recurringItemId?: UUID; // Links to source RecurringItem if auto-generated
   adjustment?: BalanceAdjustmentMeta; // only set when type === 'balance_adjustment'
   isReconciled: boolean;
@@ -346,6 +350,13 @@ export interface RecurringItem {
   activityId?: UUID; // Link to a family activity for fee tracking
   lastProcessedDate?: ISODateString;
   isActive: boolean;
+  /**
+   * Canonical unified recurrence rule (#70). When present it is the SOLE
+   * authority; when absent, the legacy `frequency`/`dayOfMonth`/`monthOfYear`
+   * fields are read through `resolveRecurringItemRule` (adapters.ts). New/edited
+   * items write this; existing items keep running the legacy path until re-saved.
+   */
+  rule?: RecurrenceRule;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

@@ -185,8 +185,8 @@ describe('TransactionModal — Save Flow', () => {
       const wrapper = mountModal();
       fillRequiredFields(wrapper);
       wrapper.vm.recurrenceMode = 'recurring';
-      wrapper.vm.recurrenceFrequency = 'monthly';
-      wrapper.vm.dayOfMonth = 15;
+      // #70: the picker's default (monthly) derives its anchor from startDate.
+      wrapper.vm.startDate = '2026-03-15';
       await nextTick();
 
       wrapper.vm.handleSave();
@@ -201,6 +201,14 @@ describe('TransactionModal — Save Flow', () => {
       expect(payload.description).toBe('Test expense');
       expect(payload.amount).toBe(42.5);
       expect(payload.type).toBe('expense');
+      // Canonical rule (#70) + inert legacy shadow.
+      expect(payload.rule).toEqual({
+        unit: 'month',
+        interval: 1,
+        monthlyAnchor: 'date',
+        monthlyDay: 15,
+        end: { kind: 'never' },
+      });
       expect(payload.frequency).toBe('monthly');
       expect(payload.dayOfMonth).toBe(15);
       expect(payload.isActive).toBe(true);
@@ -213,14 +221,14 @@ describe('TransactionModal — Save Flow', () => {
       const wrapper = mountModal();
       fillRequiredFields(wrapper);
       wrapper.vm.recurrenceMode = 'recurring';
-      wrapper.vm.recurrenceFrequency = 'yearly';
-      wrapper.vm.monthOfYear = 6;
-      wrapper.vm.dayOfMonth = 10;
+      wrapper.vm.startDate = '2026-06-10';
+      wrapper.vm.rule = { unit: 'year', interval: 1, end: { kind: 'never' } };
       await nextTick();
 
       wrapper.vm.handleSave();
 
       const payload = wrapper.emitted('save-recurring')![0][0] as CreateRecurringItemInput;
+      expect(payload.rule).toEqual({ unit: 'year', interval: 1, end: { kind: 'never' } });
       expect(payload.frequency).toBe('yearly');
       expect(payload.monthOfYear).toBe(6);
       expect(payload.dayOfMonth).toBe(10);
@@ -318,8 +326,14 @@ describe('TransactionModal — Save Flow', () => {
       expect(wrapper.vm.amount).toBe(500);
       expect(wrapper.vm.direction).toBe('out');
       expect(wrapper.vm.category).toBe('housing');
-      expect(wrapper.vm.recurrenceFrequency).toBe('monthly');
-      expect(wrapper.vm.dayOfMonth).toBe(1);
+      // #70: the legacy monthly/dayOfMonth-1 item resolves to a canonical rule.
+      expect(wrapper.vm.rule).toEqual({
+        unit: 'month',
+        interval: 1,
+        monthlyAnchor: 'date',
+        monthlyDay: 1,
+        end: { kind: 'never' },
+      });
       expect(wrapper.vm.isActive).toBe(true);
       expect(wrapper.vm.accountId).toBe('account-1');
     });
@@ -431,20 +445,13 @@ describe('TransactionModal — Save Flow', () => {
       expect(wrapper.emitted('save')).toBeFalsy();
     });
 
-    it('should initialize dayOfMonth from transaction date when editing', async () => {
+    it('should seed startDate from the transaction date for the recurrence picker', async () => {
       const wrapper = await mountAndOpen({ transaction: existingTransaction });
 
-      // dayOfMonth should be initialized from the transaction date (March 15)
-      expect(wrapper.vm.dayOfMonth).toBe(15);
+      // #70: no legacy dayOfMonth/monthOfYear refs — the picker derives its
+      // anchor from startDate, which is seeded from the transaction date.
       expect(wrapper.vm.startDate).toBe('2026-03-15');
-      expect(wrapper.vm.recurrenceFrequency).toBe('monthly');
-    });
-
-    it('should initialize monthOfYear from transaction date when editing', async () => {
-      const wrapper = await mountAndOpen({ transaction: existingTransaction });
-
-      // monthOfYear should be initialized from the transaction date (March = 3)
-      expect(wrapper.vm.monthOfYear).toBe(3);
+      expect(wrapper.vm.rule).toBeNull();
     });
 
     it('should not emit save for one-time path during conversion', async () => {
@@ -545,7 +552,7 @@ describe('TransactionModal — Save Flow', () => {
     });
   });
 
-  describe('startDate → dayOfMonth auto-sync', () => {
+  describe('startDate drives the recurrence anchor (#70)', () => {
     const existingRecurringItem: RecurringItem = {
       id: 'ri-sync',
       accountId: 'account-1',
@@ -562,69 +569,26 @@ describe('TransactionModal — Save Flow', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
 
-    it('should sync dayOfMonth when startDate changes (monthly)', async () => {
+    it('changing startDate updates the emitted rule + shadow dayOfMonth', async () => {
       const wrapper = await mountAndOpen({ recurringItem: existingRecurringItem });
 
-      expect(wrapper.vm.dayOfMonth).toBe(1);
-
-      // User changes startDate to the 20th
-      wrapper.vm.startDate = '2026-03-20';
-      await nextTick();
-
-      expect(wrapper.vm.dayOfMonth).toBe(20);
-    });
-
-    it('should include synced dayOfMonth in emitted save-recurring data', async () => {
-      const wrapper = await mountAndOpen({ recurringItem: existingRecurringItem });
-
-      // User changes startDate to the 15th
+      // Monthly-on-date anchors to the start day; moving the start date to the
+      // 15th re-derives the rule (the picker owns this now — no legacy sync).
       wrapper.vm.startDate = '2026-04-15';
       await nextTick();
 
       wrapper.vm.handleSave();
 
       const payload = wrapper.emitted('save-recurring')![0][0] as CreateRecurringItemInput;
+      expect(payload.rule).toEqual({
+        unit: 'month',
+        interval: 1,
+        monthlyAnchor: 'date',
+        monthlyDay: 15,
+        end: { kind: 'never' },
+      });
       expect(payload.dayOfMonth).toBe(15);
       expect(payload.startDate).toBe('2026-04-15');
-    });
-
-    it('should clamp dayOfMonth to 28 for dates above 28', async () => {
-      const wrapper = await mountAndOpen({ recurringItem: existingRecurringItem });
-
-      wrapper.vm.startDate = '2026-01-31';
-      await nextTick();
-
-      expect(wrapper.vm.dayOfMonth).toBe(28);
-    });
-
-    it('should NOT override dayOfMonth during initial form population', async () => {
-      const itemWithDay15: RecurringItem = {
-        ...existingRecurringItem,
-        dayOfMonth: 15,
-        startDate: '2026-01-01T00:00:00.000Z', // day 1 in startDate
-      };
-
-      const wrapper = await mountAndOpen({ recurringItem: itemWithDay15 });
-
-      // dayOfMonth should be 15 (from the recurring item), not 1 (from startDate)
-      expect(wrapper.vm.dayOfMonth).toBe(15);
-    });
-
-    it('should sync monthOfYear when startDate changes (yearly)', async () => {
-      const yearlyItem: RecurringItem = {
-        ...existingRecurringItem,
-        frequency: 'yearly',
-        dayOfMonth: 1,
-        monthOfYear: 1,
-      };
-
-      const wrapper = await mountAndOpen({ recurringItem: yearlyItem });
-
-      wrapper.vm.startDate = '2026-06-20';
-      await nextTick();
-
-      expect(wrapper.vm.dayOfMonth).toBe(20);
-      expect(wrapper.vm.monthOfYear).toBe(6);
     });
   });
 
