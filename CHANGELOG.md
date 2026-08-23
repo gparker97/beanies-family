@@ -12,11 +12,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Paid activities that don't happen weekly were costing too much on paper.** The monthly estimate for an activity charged per session assumed it happened every week, so a fortnightly class showed double its real monthly cost, a monthly one over four times, and a yearly one far more again. Each now reflects how often the activity actually happens. The figure updates the next time you save the activity. (Weekly activities are unchanged.)
+- **A monthly schedule on the 29th, 30th or 31st no longer skips the short months.** It now falls on the last day of any month that doesn't have that date — so a bill on the 31st lands on 28 February rather than disappearing from February altogether. This holds in your linked Google Calendar too. The schedule picker says so plainly when you pick one of those days.
+- **Moving a repeating plan's start date now moves the days it repeats on.** Changing the start from a Monday to a Tuesday used to leave the schedule on Mondays.
 - **Dates written as `YYYY-MM-DD` no longer read a day early in timezones west of UTC.** A couple of shared date formatters parsed a bare date as UTC midnight, so someone in the Americas could see "22 Aug" for a 23 Aug date in some places. They now parse in your local timezone.
+
+### Changed
+
+- **The same repeat control now appears everywhere — money, the planner, and beanie lists.** Activities and lists have adopted the schedule picker that recurring money already uses: the common cadences are one tap, "custom" covers every N days/weeks/months/years, specific weekdays, "the last day of the month" or "the 4th Sunday", and an end that can be never, a date, or after a set number of times. Lists say "resets" rather than "repeats" and have no end, because a list resets rather than being scheduled. Existing plans and lists keep their exact behaviour until you deliberately change them — a weekly list still resets on the same day it always did.
 
 ### Added
 
-- **Recurring money can now repeat any way your life does.** Setting up a recurring income or expense used to offer only daily, monthly or yearly. Now there's a single, friendly schedule picker: the common cadences (daily, weekly, every 2 weeks, monthly, yearly) are one tap, and a "custom" option covers the rest — every N weeks or months, specific weekdays, "the last day of the month" or "the 4th Sunday", and an end that can be never, a date, or after a set number of times. It shows only the options that apply to what you picked, with a plain-language summary of the schedule as you build it. (This is the first surface of a shared recurrence control that will come to the planner and lists next, so repeating anything works the same way everywhere.) Your existing recurring items are untouched and keep working exactly as before.
+- **Recurring money can now repeat any way your life does.** Setting up a recurring income or expense used to offer only daily, monthly or yearly. Now there's a single, friendly schedule picker: the common cadences (daily, weekly, every 2 weeks, monthly, yearly) are one tap, and a "custom" option covers the rest — every N weeks or months, specific weekdays, "the last day of the month" or "the 4th Sunday", and an end that can be never, a date, or after a set number of times. It shows only the options that apply to what you picked, with a plain-language summary of the schedule as you build it. (This is the first surface of a shared recurrence control that now also covers the planner and beanie lists, so repeating anything works the same way everywhere.) Your existing recurring items are untouched and keep working exactly as before.
 
 ## 2026-08-22
 
