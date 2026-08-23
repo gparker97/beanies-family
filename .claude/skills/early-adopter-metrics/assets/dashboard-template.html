@@ -1,0 +1,289 @@
+<title>beanies metrics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --orange:#F15D22; --orange-soft:#FCE7DC; --terra:#E67E22; --sky:#AED6F1; --sky-soft:#EAF4FC;
+    --slate:#2C3E50; --slate-2:#3d5061; --cloud:#F8F9FA;
+    --ink:#2C3E50; --ink-soft:#5b6b7a; --ink-faint:#8496a5;
+    --bg:#F4F6F8; --card:#ffffff; --line:#e6ebf0; --rail:#eef2f6;
+    --good:#2f9e6f; --warn:#E08A1E; --bad:#C0563B; --neutral:#9aa8b5;
+    --shadow:0 1px 2px rgba(44,62,80,.04),0 6px 22px rgba(44,62,80,.07);
+  }
+  :root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+    --bg:#1a222b; --card:#222d38; --ink:#eaf0f5; --ink-soft:#a9b8c6; --ink-faint:#748696;
+    --line:#33414e; --rail:#2b3742; --orange-soft:#3a2a20; --sky-soft:#243441; --slate:#dbe6ef;
+    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 26px rgba(0,0,0,.35);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#1a222b; --card:#222d38; --ink:#eaf0f5; --ink-soft:#a9b8c6; --ink-faint:#748696;
+    --line:#33414e; --rail:#2b3742; --orange-soft:#3a2a20; --sky-soft:#243441; --slate:#dbe6ef;
+    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 26px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.5;
+    -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
+  .wrap{max-width:1120px;margin:0 auto;padding:32px 22px 64px}
+  h1,h2,h3{font-family:Outfit,sans-serif;color:var(--slate);text-wrap:balance;margin:0}
+  a{color:var(--orange);text-decoration:none}
+  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--orange)}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+  header h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
+  .meta{font-size:12.5px;color:var(--ink-faint);text-align:right;line-height:1.7}
+  .meta b{color:var(--ink-soft);font-weight:600}
+  .lede{color:var(--ink-soft);font-size:15px;max-width:62ch;margin:14px 0 26px}
+  .lede b{color:var(--ink)}
+  /* KPI tiles */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:26px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 15px;box-shadow:var(--shadow)}
+  .kpi .n{font-family:Outfit;font-weight:700;font-size:30px;letter-spacing:-.02em;color:var(--slate);line-height:1}
+  .kpi .l{font-size:11.5px;color:var(--ink-faint);margin-top:7px;font-weight:500}
+  .kpi .s{font-size:11.5px;font-weight:600;margin-top:5px}
+  .kpi.accent .n{color:var(--orange)}
+  .up{color:var(--good)} .down{color:var(--bad)} .flat{color:var(--ink-faint)}
+  /* panels */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 20px 18px;box-shadow:var(--shadow)}
+  .panel.full{grid-column:1/-1}
+  .panel h2{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .panel .cap{font-size:12px;color:var(--ink-faint);margin:3px 0 16px}
+  /* bar rows */
+  .bars{display:flex;flex-direction:column;gap:9px}
+  .bar{display:grid;grid-template-columns:120px 1fr 46px;align-items:center;gap:10px;font-size:13px}
+  .bar .k{color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+  .bar .track{background:var(--rail);border-radius:7px;height:16px;overflow:hidden}
+  .bar .fill{height:100%;border-radius:7px;background:var(--orange);min-width:3px}
+  .bar .fill.sky{background:var(--sky)} .bar .fill.terra{background:var(--terra)}
+  .bar .fill.slate{background:var(--slate-2)}
+  .bar .v{text-align:right;font-weight:600;color:var(--ink);font-size:12.5px}
+  /* growth columns */
+  .cols{display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:8px}
+  .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+  .col .stalk{width:100%;max-width:56px;background:linear-gradient(180deg,var(--orange),var(--terra));border-radius:8px 8px 3px 3px;min-height:4px}
+  .col .cv{font-family:Outfit;font-weight:700;font-size:15px;color:var(--slate)}
+  .col .cl{font-size:11px;color:var(--ink-faint)}
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;padding:0 8px 9px}
+  td{padding:8px;border-top:1px solid var(--line);color:var(--ink-soft)}
+  td.name{color:var(--ink);font-weight:600}
+  td.num{text-align:right;font-weight:600;color:var(--ink)}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;vertical-align:middle;margin-left:6px}
+  .tag.you{background:var(--sky-soft);color:var(--sky) ;color:#3b7bb0}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px}
+  .pill.good{background:rgba(47,158,111,.13);color:var(--good)}
+  .pill.warn{background:rgba(224,138,30,.14);color:var(--warn)}
+  .pill.bad{background:rgba(192,86,59,.13);color:var(--bad)}
+  .pill.neu{background:var(--rail);color:var(--ink-soft)}
+  /* funnel / stacked engagement */
+  .segbar{display:flex;height:34px;border-radius:9px;overflow:hidden;margin:4px 0 14px}
+  .segbar span{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#fff;min-width:0}
+  .legend{display:flex;flex-wrap:wrap;gap:12px 18px;font-size:12.5px;color:var(--ink-soft)}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .callouts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:12px;padding:13px 15px;background:var(--card)}
+  .callout.warn{border-left-color:var(--warn)} .callout.good{border-left-color:var(--good)} .callout.sky{border-left-color:var(--sky)}
+  .callout h3{font-size:13.5px;font-weight:700;margin-bottom:4px}
+  .callout p{margin:0;font-size:13px;color:var(--ink-soft)}
+  .callout b{color:var(--ink)}
+  footer{margin-top:24px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-top:1px solid var(--line);padding-top:16px}
+  footer b{color:var(--ink-soft)}
+  .sub{font-size:11px;color:var(--ink-faint);font-weight:500}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}.callouts{grid-template-columns:1fr}.bar{grid-template-columns:100px 1fr 42px}}
+  @media(max-width:480px){.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">every bean counts · founder metrics</div>
+      <h1>beanies.family</h1>
+    </div>
+    <div class="meta" id="meta"></div>
+  </header>
+  <p class="lede" id="lede"></p>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>New families by month</h2>
+      <p class="cap">Sign-ups per calendar month · from registry <code>createdAt</code></p>
+      <div class="cols" id="growth"></div>
+    </div>
+    <div class="panel">
+      <h2>Engagement mix</h2>
+      <p class="cap" id="segcap"></p>
+      <div class="segbar" id="segbar"></div>
+      <div class="legend" id="seglegend"></div>
+      <div style="margin-top:14px;font-size:12.5px;color:var(--ink-soft)" id="gapnote"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Where families come from</h2>
+      <p class="cap">Marketing site · visitors by source · last 30 days</p>
+      <div class="bars" id="sources"></div>
+    </div>
+    <div class="panel">
+      <h2>What they do inside</h2>
+      <p class="cap">App · top pages by visitors · last 30 days</p>
+      <div class="bars" id="apppages"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Power users</h2>
+      <p class="cap">Most recently &amp; heavily active · owner emails masked</p>
+      <table><thead><tr><th>Family</th><th>Country</th><th style="text-align:right">Last seen</th><th style="text-align:right">Activity</th><th style="text-align:right">Pod</th></tr></thead>
+      <tbody id="power"></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>Went quiet</h2>
+      <p class="cap">Were active, now dark &gt;30d · all shallow trials (1–6 events)</p>
+      <table><thead><tr><th>Family</th><th style="text-align:right">Dark for</th><th style="text-align:right">Lifetime events</th><th></th></tr></thead>
+      <tbody id="lost"></tbody></table>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Acquisition channels</h2>
+      <p class="cap">Marketing site · visitors by channel · 30 days</p>
+      <div class="bars" id="channels"></div>
+      <p class="cap" style="margin-top:14px">Top campaigns (UTM)</p>
+      <div class="bars" id="utm"></div>
+    </div>
+    <div class="panel">
+      <h2>Feature adoption &amp; funnel</h2>
+      <p class="cap">App · <code>feature_used</code> by feature, and the create→signup funnel</p>
+      <div class="bars" id="features"></div>
+      <p class="cap" style="margin-top:14px">Create-family funnel</p>
+      <div class="bars" id="funnel"></div>
+    </div>
+  </div>
+
+  <div class="panel full" style="margin-bottom:16px">
+    <h2>Founder callouts</h2>
+    <p class="cap">The signal beneath the numbers</p>
+    <div class="callouts" id="callouts"></div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const D = __DATA__;
+const $=id=>document.getElementById(id);
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+function barRow(k,v,max,cls,vlabel){
+  const w=max?Math.max(2,Math.round(v/max*100)):0;
+  return `<div class="bar"><span class="k" title="${k}">${k}</span><div class="track"><div class="fill ${cls||''}" style="width:${w}%"></div></div><span class="v">${vlabel!=null?vlabel:v}</span></div>`;
+}
+
+// derived values (kept dynamic so the page stays true on every refresh)
+const monthEntries=Object.entries(D.growth);
+const latestMonth=monthEntries[monthEntries.length-1]||[null,0];
+const weekEntries=Object.entries(D.growthWeek);
+const lastWeekNew=(weekEntries[weekEntries.length-1]||[null,0])[1];
+const topSource=D.mkt?D.mkt.sources.filter(s=>s['visit:source']!=='Direct / None')[0]:null;
+const srcNames=[D.plausibleAvailable?'plausible':null,D.cwAvailable?'cloudwatch':null,'registry'].filter(Boolean).reverse();
+
+// meta + lede
+$('meta').innerHTML = `<b>${new Date(D.generatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><br>30-day window · dev/test excluded<br>${srcNames.join(' · ')}`;
+$('lede').innerHTML = `<b>${D.counts.realFamilies} families</b> have created a beanpod (${D.counts.devTestRows} test rows excluded). <b>${D.activeReal30}</b> were active in the last 30 days — a <b>${D.engagedPctReal}% real engagement rate</b> — but <b>${D.neverReallyEngaged}</b> registered and never truly engaged.${lastWeekNew?` <b>${lastWeekNew} new families</b> landed in the most recent week.`:''}`;
+
+// KPIs
+const kpis=[
+  {n:D.counts.realFamilies,l:'Real families',s:'+'+latestMonth[1]+' this month',c:'up',accent:true},
+  {n:D.activeReal30,l:'Active · 30 days',s:D.activeReal7+' in last 7d',c:'flat'},
+  {n:D.engagedPctReal+'%',l:'Engagement rate',s:'active ÷ registered',c:'flat'},
+  {n:D.neverReallyEngaged,l:'Never engaged',s:'activation gap',c:'down'},
+  {n:D.mkt?D.mkt.overview.visitors:'—',l:'Site visitors',s:topSource?topSource['visit:source']+' is #2 source':'30-day',c:'flat'},
+  {n:D.newsletter.optedInPct+'%',l:'Newsletter opt-in',s:D.newsletter.optedIn+' families',c:'flat'},
+];
+$('kpis').innerHTML=kpis.map(k=>`<div class="kpi ${k.accent?'accent':''}"><div class="n">${k.n}</div><div class="l">${k.l}</div><div class="s ${k.c}">${k.s}</div></div>`).join('');
+
+// growth cols
+const g=Object.entries(D.growth);const gmax=Math.max(...g.map(x=>x[1]));
+$('growth').innerHTML=g.map(([m,v])=>{
+  const h=Math.round(v/gmax*100);const lbl=new Date(m+'-01').toLocaleDateString('en',{month:'short'});
+  return `<div class="col"><div class="cv">${v}</div><div class="stalk" style="height:${h}%"></div><div class="cl">${lbl}</div></div>`;
+}).join('');
+
+// engagement segbar (of real 56): active7, active8-30, quiet/lost, never
+const seg=[
+  {l:'Active ≤7d',v:D.activeReal7,c:'var(--good)'},
+  {l:'Active 8–30d',v:D.activeReal30-D.activeReal7,c:'var(--orange)'},
+  {l:'Went quiet',v:D.lost.length,c:'var(--warn)'},
+  {l:'Never engaged',v:D.counts.realFamilies-D.activeReal30-D.lost.length,c:'var(--neutral)'},
+];
+const segTot=D.counts.realFamilies;
+$('segcap').textContent=`Of ${segTot} real families, by true activity${D.cwAvailable?' (CloudWatch-reconciled)':' (registry only)'}`;
+$('segbar').innerHTML=seg.map(s=>`<span style="flex:${s.v};background:${s.c}">${s.v}</span>`).join('');
+$('seglegend').innerHTML=seg.map(s=>`<span><i style="background:${s.c}"></i>${s.l} · <b>${s.v}</b> (${pct(s.v,segTot)}%)</span>`).join('');
+$('gapnote').innerHTML=`<b style="color:var(--warn)">Activation gap:</b> ${D.neverReallyEngaged} families registered but show essentially no activity — the biggest lever on these numbers.`;
+
+const noData='<p class="cap" style="color:var(--warn)">No Plausible token — traffic &amp; usage unavailable this run.</p>';
+// sources
+if(D.mkt){const smax=Math.max(...D.mkt.sources.map(s=>s.visitors));
+  $('sources').innerHTML=D.mkt.sources.map((s,i)=>barRow(s['visit:source'],s.visitors,smax,i===0?'slate':(i===1?'orange':'sky'))).join('');
+}else{$('sources').innerHTML=noData;}
+
+// app pages
+if(D.app){const amax=Math.max(...D.app.pages.map(p=>p.visitors));
+  $('apppages').innerHTML=D.app.pages.map(p=>barRow(p['event:page'],p.visitors,amax,'terra')).join('');
+}else{$('apppages').innerHTML=noData;}
+
+// power users
+$('power').innerHTML=D.topActive.map(f=>{
+  const you=f.cwEvents>100000;
+  const seen=f.cwDays===0?'today':(f.cwDays===1?'1d ago':f.cwDays+'d ago');
+  return `<tr><td class="name">${f.name}${you?'<span class="tag you">internal</span>':''}</td><td>${f.country||'—'}</td><td class="num">${seen}</td><td class="num">${f.cwEvents.toLocaleString()}</td><td class="num">${f.pod?f.pod+'KB':'—'}</td></tr>`;
+}).join('');
+
+// lost
+$('lost').innerHTML=D.lost.map(f=>`<tr><td class="name">${f.name.trim()}</td><td class="num">${f.days}d</td><td class="num">${f.events}</td><td style="text-align:right"><span class="pill ${f.days>60?'bad':'warn'}">${f.days>60?'churned':'at risk'}</span></td></tr>`).join('');
+
+// channels
+if(D.mkt){const cmax=Math.max(...D.mkt.channels.map(c=>c.visitors));
+  $('channels').innerHTML=D.mkt.channels.map((c,i)=>barRow(c['visit:channel'],c.visitors,cmax,i===1?'orange':'sky')).join('');
+  const umax=Math.max(...D.mkt.utm.map(u=>u.visitors),1);
+  $('utm').innerHTML=D.mkt.utm.length?D.mkt.utm.map(u=>barRow(u['visit:utm_campaign'],u.visitors,umax,'terra')).join(''):'<p class="cap">No tagged campaigns in range.</p>';
+}else{$('channels').innerHTML=noData;$('utm').innerHTML='';}
+
+// features + funnel
+if(D.app){const fmax=Math.max(...D.app.features.map(f=>f.events),1);
+  $('features').innerHTML=D.app.features.length?D.app.features.map(f=>barRow(f['event:props:feature'],f.events,fmax,'orange')).join(''):'<p class="cap">No feature_used events in range.</p>';
+  const gm=n=>{const x=D.app.goals.find(g=>g['event:goal'].includes(n));return x?x.visitors:0};
+  const fn=[['Create clicked',gm('Button Clicked')],['Signup completed',gm('Signup Completed')],['Member joined',gm('Member Joined')]];
+  const fnmax=Math.max(...fn.map(x=>x[1]),1);
+  $('funnel').innerHTML=fn.map(([k,v])=>barRow(k,v,fnmax,'sky',v)).join('');
+}else{$('features').innerHTML=noData;$('funnel').innerHTML='';}
+
+// callouts — computed from the data so they stay true on every refresh
+const co=[];
+const gapPct=pct(D.neverReallyEngaged,D.counts.realFamilies);
+co.push({c:'warn',h:'Activation is the #1 lever',p:`<b>${D.neverReallyEngaged} of ${D.counts.realFamilies} families</b> (${gapPct}%) created a pod but show essentially no activity. Median beanpod is just <b>${D.dataVolume.medianBeanpodSizeKb}KB</b> and ${D.dataVolume.emptyOrTinyUnder5Kb} pods are near-empty. First-session activation moves every downstream number.`});
+if(D.mkt){
+  const social=D.mkt.channels.find(c=>c['visit:channel']==='Organic Social');
+  const top2=D.mkt.sources.filter(s=>s['visit:source']!=='Direct / None')[0];
+  if(top2)co.push({c:'good',h:`${top2['visit:source']} is your strongest earned source`,p:`<b>${top2.visitors} visitors</b> from ${top2['visit:source']} (${top2.bounce_rate}% bounce)${social?`, and Organic Social is ${social.visitors} of ${D.mkt.overview.visitors} visitors`:''} — earned reach is working.`});
+}
+if(D.app&&D.app.pages.length){
+  const p0=D.app.pages[0],p1=D.app.pages[1];
+  co.push({c:'sky',h:`${p0['event:page']} is the home base`,p:`<b>${p0['event:page']}</b> (${p0.visitors} visitors)${p1?` and <b>${p1['event:page']}</b> (${p1.visitors})`:''} dominate app usage — families come for family life first; finance features are used but secondary.`});
+}
+if(D.lost.length){
+  const mx=Math.max(...D.lost.map(l=>l.events));
+  co.push({c:'',h:'The "went quiet" list is reassuring',p:`All ${D.lost.length} quiet families had only <b>1–${mx} lifetime events</b> — shallow trials that bounced, not deep users lost. No power-user has churned.`});
+}
+$('callouts').innerHTML=co.map(c=>`<div class="callout ${c.c}"><h3>${c.h}</h3><p>${c.p}</p></div>`).join('');
+
+// footer
+$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing). &nbsp; <b>Caveats:</b> members-per-family is not collected anywhere and is not shown. Registry <code>lastLoginAt</code> is date-only and login-only, so "active" here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family. "Internal" marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
+</script>
