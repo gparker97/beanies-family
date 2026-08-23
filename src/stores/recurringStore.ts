@@ -5,10 +5,11 @@ import { useMemberFilterStore } from './memberFilterStore';
 import { useTransactionsStore } from './transactionsStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
-import { toDateInputValue, parseLocalDate, addDays } from '@/utils/date';
+import { toDateInputValue, parseLocalDate, addDays, extractDatePart } from '@/utils/date';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
-import { resolveTransactionRule } from '@/services/recurrence/adapters';
+import { resolveTransactionRule, isRecurringItemLive } from '@/services/recurrence/adapters';
+import { rebaseRuleForSplit } from '@/utils/activitySeriesEnd';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type {
   RecurringItem,
@@ -24,7 +25,16 @@ export const useRecurringStore = defineStore('recurring', () => {
   const error = ref<string | null>(null);
 
   // Getters
-  const activeItems = computed(() => recurringItems.value.filter((item) => item.isActive));
+  // `isActive` is the user's on/off switch; `isRecurringItemLive` additionally
+  // drops a series whose SCHEDULE has run out. #70 made "ends after N times"
+  // expressible, and that end lives only in `rule.end` — so without this an
+  // exhausted series kept contributing to every monthly total forever while
+  // Upcoming Transactions correctly dropped it.
+  const activeItems = computed(() =>
+    recurringItems.value.filter(
+      (item) => item.isActive && isRecurringItemLive(item, toDateInputValue(new Date()))
+    )
+  );
 
   const incomeItems = computed(() => recurringItems.value.filter((item) => item.type === 'income'));
 
@@ -227,8 +237,18 @@ export const useRecurringStore = defineStore('recurring', () => {
     // 1. Calculate day before split date for endDate
     const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
 
-    // 2. End-date the original item
-    await updateRecurringItem(itemId, { endDate: dayBefore });
+    // 2. End-date the original item — in the AUTHORITATIVE representation.
+    // Writing only the `endDate` shadow is not enough once items are
+    // rule-bearing: `resolveTransactionRule` returns `item.rule` verbatim and
+    // never consults `endDate` (adapters.ts), so the one rule-reading consumer
+    // (`budgetStore.upcomingTransactions`) kept expanding the original forever
+    // and double-counted it against its own replacement.
+    await updateRecurringItem(itemId, {
+      endDate: dayBefore,
+      ...(original.rule
+        ? { rule: { ...original.rule, end: { kind: 'onDate' as const, date: dayBefore } } }
+        : {}),
+    });
 
     // 3. Create new item from split date forward
     const newItem = await createRecurringItem({
@@ -241,14 +261,14 @@ export const useRecurringStore = defineStore('recurring', () => {
       frequency: original.frequency,
       dayOfMonth: original.dayOfMonth,
       monthOfYear: original.monthOfYear,
-      // #70: carry the canonical rule, but drop an `afterCount` end — the count
-      // is measured from the ORIGINAL anchor, so re-anchoring it at the split
-      // date would silently extend the series past its intended total. The
-      // "and future" split continues on the same cadence with no count.
+      // #70: carry the canonical rule, RE-BASING an `afterCount` end. The count
+      // is measured from the ORIGINAL anchor, so handing it over verbatim
+      // restarts it (a 10-instalment plan split at instalment 4 becomes 13,
+      // then 16 on the next split). Dropping it to `never` — the previous
+      // behaviour here — is equally wrong in the other direction: the plan
+      // would never end. Same helper the activity split uses.
       rule: original.rule
-        ? original.rule.end.kind === 'afterCount'
-          ? { ...original.rule, end: { kind: 'never' } }
-          : original.rule
+        ? rebaseRuleForSplit(original.rule, extractDatePart(original.startDate), fromDate)
         : undefined,
       startDate: fromDate,
       endDate: original.endDate, // preserve original end date if any

@@ -178,11 +178,13 @@ const { isEditing, isSubmitting } = useFormModal(
         // startDate, and the engine anchors monthly/yearly on this date. Using it
         // keeps the schedule from silently jumping to the raw startDate on edit.
         {
+          // Reset UNCONDITIONALLY. This modal is bound `:open`, not `v-if`'d,
+          // so its refs survive between opens — leaving them untouched on an
+          // unmappable item (resolver returns null) would render the PREVIOUS
+          // item's schedule and then persist it onto this one.
           const resolved = resolveTransactionRule(item);
-          if (resolved) {
-            rule.value = resolved.rule;
-            startDate.value = resolved.anchor;
-          }
+          rule.value = resolved?.rule ?? null;
+          startDate.value = resolved?.anchor ?? extractDatePart(item.startDate);
         }
         accountId.value = item.accountId;
         if (item.loanId) {

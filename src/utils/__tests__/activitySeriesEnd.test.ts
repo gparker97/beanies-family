@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { endSeriesPatch, rebaseRuleForSplit } from '../activitySeriesEnd';
+import { endSeriesPatch, rebaseRuleForSplit, lastOccurrenceOf } from '../activitySeriesEnd';
 import type { RecurrenceRule } from '@/types/recurrence';
 
 const weekly = (end: RecurrenceRule['end']): RecurrenceRule => ({
@@ -55,5 +55,30 @@ describe('rebaseRuleForSplit — an afterCount end is anchor-relative (#70)', ()
     const rule = weekly({ kind: 'afterCount', count: 2 });
     const rebased = rebaseRuleForSplit(rule, '2026-01-05', '2026-06-01');
     expect(rebased.end).toEqual({ kind: 'afterCount', count: 1 });
+  });
+});
+
+describe('lastOccurrenceOf — the cut point for reaping orphans (#70)', () => {
+  it('counts out an afterCount end, which writes no recurrenceEndDate shadow', () => {
+    // This is why the orphan reap could not key off `recurrenceEndDate`: setting
+    // "after 5 times" truncates the series but leaves that field undefined, so
+    // every override child past the cut survived on the calendar forever.
+    expect(lastOccurrenceOf(weekly({ kind: 'afterCount', count: 5 }), '2026-01-05')).toBe(
+      '2026-02-02'
+    ); // Mondays: 05, 12, 19, 26 Jan, 02 Feb
+  });
+
+  it('returns the date directly for an onDate end', () => {
+    expect(lastOccurrenceOf(weekly({ kind: 'onDate', date: '2026-06-30' }), '2026-01-05')).toBe(
+      '2026-06-30'
+    );
+  });
+
+  it('returns null for a never-ending series — nothing to reap', () => {
+    expect(lastOccurrenceOf(weekly({ kind: 'never' }), '2026-01-05')).toBeNull();
+  });
+
+  it('returns null for an invalid anchor rather than a wrong cut date', () => {
+    expect(lastOccurrenceOf(weekly({ kind: 'afterCount', count: 5 }), 'not-a-date')).toBeNull();
   });
 });

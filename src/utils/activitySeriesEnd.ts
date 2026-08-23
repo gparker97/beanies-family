@@ -1,4 +1,8 @@
-import { occurrencesInRange } from '@/services/recurrence/recurrenceEngine';
+import {
+  occurrencesInRange,
+  occurrenceCount,
+  previewNext,
+} from '@/services/recurrence/recurrenceEngine';
 import { extractDatePart } from '@/utils/date';
 import type { FamilyActivity, UpdateFamilyActivityInput } from '@/types/models';
 import type { RecurrenceRule } from '@/types/recurrence';
@@ -58,4 +62,23 @@ export function rebaseRuleForSplit(
     (ymd) => ymd < cutoff
   ).length;
   return { ...rule, end: { kind: 'afterCount', count: Math.max(1, rule.end.count - consumed) } };
+}
+
+/**
+ * The LAST date a bounded rule still owns, or `null` if it never ends.
+ *
+ * The cut point for reaping override children stranded past a truncation.
+ * `onDate` answers directly; `afterCount` has to be counted out, because that
+ * end is expressed as a quantity rather than a date and writes no
+ * `recurrenceEndDate` shadow.
+ */
+export function lastOccurrenceOf(rule: RecurrenceRule, anchorYmd: string): string | null {
+  if (rule.end.kind === 'never') return null;
+  if (rule.end.kind === 'onDate') return rule.end.date;
+  const total = occurrenceCount(rule, anchorYmd);
+  if (!total) return null;
+  // Walk out to the final occurrence. Bounded by `total`, which
+  // `occurrenceCount` already capped.
+  const dates = previewNext(rule, anchorYmd, anchorYmd, total);
+  return dates.length ? (dates[dates.length - 1] ?? null) : null;
 }

@@ -180,12 +180,22 @@ const resetAnchor = computed(() => (list.value ? extractDatePart(list.value.crea
  * So: hold the rule locally, and persist only when the CADENCE actually changed.
  */
 const resetRule = ref<RecurrenceRule | null>(null);
+// Track the list's OWN cadence, not just its id: the id does not change when
+// `setLifecycle` flips one-off -> recurring, so keying on the id alone left
+// `resetRule` null at the moment the picker mounted. The picker then published
+// its monthly DEFAULT through `setCadence` with no user input, overwriting the
+// `frequency: 'weekly'` that `setLifecycle` had just written — and clearing the
+// legacy shadow, which `automergeRepository.update` treats as a key DELETE. A
+// list the family asked to reset weekly silently began resetting monthly, and
+// pre-#70 clients stopped resetting it at all. Reset is destructive and has no
+// undo, so this must never happen without an explicit user choice.
 watch(
-  () => list.value?.id,
+  () =>
+    [list.value?.id, list.value?.lifecycle, list.value?.frequency, list.value?.cadence] as const,
   () => {
     resetRule.value = list.value ? (resolveListRule(list.value)?.rule ?? null) : null;
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 );
 
 function cadenceOf(rule: RecurrenceRule): Cadence {
@@ -195,10 +205,16 @@ function cadenceOf(rule: RecurrenceRule): Cadence {
 }
 
 function setCadence(rule: RecurrenceRule): void {
-  // We own the model, so keep the picker fed from our own ref (never from a
-  // freshly-reconstructed store read — see the docblock above).
+  // `RecurrencePicker` emits its DEFAULT on mount when it starts from nothing,
+  // so a form saved without touching the control still carries a rule (#70).
+  // For a list that is the wrong thing to persist: a reset is destructive and
+  // has no undo, so a schedule must only ever change on a real user choice.
+  // An emit arriving while our model is still null IS that mount default —
+  // seed the local ref from it so the control renders, but write nothing. Any
+  // subsequent emit has a seeded model behind it and is a genuine change.
+  const wasSeeded = resetRule.value !== null;
   resetRule.value = rule;
-  if (!list.value) return;
+  if (!list.value || !wasSeeded) return;
   const cadence = cadenceOf(rule);
   const current = resolveListRule(list.value)?.rule;
   // Compare the CADENCE, field by field via a stable key order, so an
