@@ -169,7 +169,8 @@ export function useCommunityNudge() {
         state.value = next;
         store.save(next);
       }
-      if (shown) window.plausible?.('community_nudge_shown');
+      // Shown by us, not clicked by them — see plausible.d.ts.
+      if (shown) window.plausible?.('community_nudge_shown', { interactive: false });
     } catch (err) {
       reportError({
         surface: 'community-nudge-issuance',

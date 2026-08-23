@@ -105,7 +105,8 @@ export function useInstallNudge() {
       if (!isIosSafariNotInstalled()) return;
       if (state.value.shownAt === null) {
         commit({ ...state.value, shownAt: Date.now() });
-        window.plausible?.('install_nudge_shown');
+        // Shown by us, not clicked by them — see plausible.d.ts.
+        window.plausible?.('install_nudge_shown', { interactive: false });
       }
     } catch (err) {
       reportError({
