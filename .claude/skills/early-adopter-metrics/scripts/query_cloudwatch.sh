@@ -8,6 +8,7 @@
 #
 # Usage:
 #   query_cloudwatch.sh activity [DAYS]   # distinct active families + event volume + by-surface
+#   query_cloudwatch.sh daily [DAYS]      # daily active families (DAU series) per calendar day
 #   query_cloudwatch.sh last-seen [DAYS]  # last activity timestamp per family_id
 #   query_cloudwatch.sh opens [DAYS]      # app-open count per family_id (surface=open-cycle)
 #   query_cloudwatch.sh errors [DAYS]     # error events grouped by surface
@@ -26,6 +27,9 @@ DAYS="${2:-30}"
 case "$SUB" in
   activity)
     Q='fields @timestamp | filter t = "beanlog" | stats count() as events, count_distinct(family_id) as active_families' ;;
+  daily)
+    # Daily active families (DAU, unit = pods). count_distinct(family_id) per calendar day.
+    Q='filter t = "beanlog" and ispresent(family_id) | stats count_distinct(family_id) as dau by bin(1d) as day | sort day asc | limit 120' ;;
   by-surface)
     Q='filter t = "beanlog" | stats count() as events, count_distinct(family_id) as families by surface | sort events desc | limit 40' ;;
   last-seen)

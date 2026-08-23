@@ -60,6 +60,7 @@ const lastseen = load('cw_lastseen.json', true);
 const act30 = load('cw_activity.json', true);
 const act7 = load('cw_activity7.json', true);
 const surf = load('cw_surface.json', true);
+const daily = load('cw_daily.json', true);
 const pl = load('plausible.json', true);
 
 const NOW = new Date(reg.generatedAt).getTime() / 1000;
@@ -112,10 +113,33 @@ const neverReallyEngaged = reg.counts.realFamilies - activeReal30 - lost.length;
 const scalar30 = cwScalar(act30);
 const scalar7 = cwScalar(act7);
 
+// Daily active families (DAU, unit = pods). Series of {day, dau} over the window.
+const dailyActive = cwRows(daily)
+  .map((r) => ({ day: (r.day || '').slice(0, 10), dau: Number(r.dau || 0) }))
+  .filter((d) => d.day);
+const dauVals = dailyActive.map((d) => d.dau);
+const avgDau = dauVals.length ? Math.round((dauVals.reduce((a, b) => a + b, 0) / dauVals.length) * 10) / 10 : null;
+const peakDau = dauVals.length ? Math.max(...dauVals) : null;
+// MAU = CloudWatch distinct active family_ids over the 30d window (raw, incl. internal pods).
+const mau = hasCw ? Number(scalar30.active_families || 0) : null;
+// Stickiness = avg DAU / MAU — the fraction of monthly-active families active on an average day.
+const stickiness = avgDau != null && mau ? Math.round((avgDau / mau) * 100) : null;
+
+// Window + human date range, derived from generatedAt (no wall-clock dependency).
+// Nominal 30-day window (the daily series can carry 31 bins due to inclusive
+// calendar-day binning; the label uses the nominal window, not the bin count).
+const WINDOW_DAYS = 30;
+const endD = new Date(reg.generatedAt);
+const startD = new Date(endD.getTime() - WINDOW_DAYS * DAY * 1000);
+const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const dateRange = { start: startD.toISOString().slice(0, 10), end: endD.toISOString().slice(0, 10), label: `${fmt(startD)} – ${fmt(endD)}`, days: WINDOW_DAYS };
+
 const data = {
   generatedAt: reg.generatedAt,
+  dateRange,
   counts: reg.counts,
   engagement: reg.engagement,
+  dau: { series: dailyActive, avg: avgDau, peak: peakDau, mau, stickiness },
   activeReal30,
   activeReal7,
   engagedPctReal: reg.counts.realFamilies ? Math.round((activeReal30 / reg.counts.realFamilies) * 100) : 0,

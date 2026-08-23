@@ -64,6 +64,17 @@
   .col .stalk{width:100%;max-width:56px;background:linear-gradient(180deg,var(--orange),var(--terra));border-radius:8px 8px 3px 3px;min-height:4px}
   .col .cv{font-family:Outfit;font-weight:700;font-size:15px;color:var(--slate)}
   .col .cl{font-size:11px;color:var(--ink-faint)}
+  /* DAU trend */
+  .daustats{display:flex;gap:22px;flex-wrap:wrap}
+  .daustats .ds{text-align:right}
+  .daustats .ds .dn{font-family:Outfit;font-weight:700;font-size:22px;color:var(--slate);line-height:1}
+  .daustats .ds .dl{font-size:11px;color:var(--ink-faint);margin-top:3px}
+  .daustats .ds.accent .dn{color:var(--orange)}
+  .daubars{display:flex;align-items:flex-end;gap:3px;height:84px;margin-top:16px}
+  .daubars .db{flex:1;min-width:2px;background:var(--sky);border-radius:3px 3px 0 0;position:relative}
+  .daubars .db.hi{background:var(--orange)}
+  .daubars .db:hover{background:var(--terra)}
+  .dauaxis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-faint);margin-top:6px}
   /* tables */
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;padding:0 8px 9px}
@@ -120,6 +131,14 @@
       <div class="legend" id="seglegend"></div>
       <div style="margin-top:14px;font-size:12.5px;color:var(--ink-soft)" id="gapnote"></div>
     </div>
+  </div>
+
+  <div class="panel full" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap">
+      <div><h2>Daily active families</h2><p class="cap" id="daucap"></p></div>
+      <div class="daustats" id="daustats"></div>
+    </div>
+    <div class="daubars" id="daubars"></div>
   </div>
 
   <div class="grid">
@@ -194,8 +213,9 @@ const topSource=D.mkt?D.mkt.sources.filter(s=>s['visit:source']!=='Direct / None
 const srcNames=[D.plausibleAvailable?'plausible':null,D.cwAvailable?'cloudwatch':null,'registry'].filter(Boolean).reverse();
 
 // meta + lede
-$('meta').innerHTML = `<b>${new Date(D.generatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><br>30-day window · dev/test excluded<br>${srcNames.join(' · ')}`;
-$('lede').innerHTML = `<b>${D.counts.realFamilies} families</b> have created a beanpod (${D.counts.devTestRows} test rows excluded). <b>${D.activeReal30}</b> were active in the last 30 days — a <b>${D.engagedPctReal}% real engagement rate</b> — but <b>${D.neverReallyEngaged}</b> registered and never truly engaged.${lastWeekNew?` <b>${lastWeekNew} new families</b> landed in the most recent week.`:''}`;
+const rng=D.dateRange||{label:'',days:30};
+$('meta').innerHTML = `<b>${new Date(D.generatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><br>past ${rng.days} days · ${rng.label}<br>dev/test excluded · ${srcNames.join(' · ')}`;
+$('lede').innerHTML = `<b>${D.counts.realFamilies} families</b> have created a beanpod (${D.counts.devTestRows} test rows excluded). <b>${D.activeReal30}</b> were active in the last ${rng.days} days — a <b>${D.engagedPctReal}% real engagement rate</b> — but <b>${D.neverReallyEngaged}</b> registered and never truly engaged.${lastWeekNew?` <b>${lastWeekNew} new families</b> landed in the most recent week.`:''}`;
 
 // KPIs
 const kpis=[
@@ -214,6 +234,22 @@ $('growth').innerHTML=g.map(([m,v])=>{
   const h=Math.round(v/gmax*100);const lbl=new Date(m+'-01').toLocaleDateString('en',{month:'short'});
   return `<div class="col"><div class="cv">${v}</div><div class="stalk" style="height:${h}%"></div><div class="cl">${lbl}</div></div>`;
 }).join('');
+
+// DAU — daily active families trend + avg / peak / stickiness
+if(D.dau&&D.dau.series&&D.dau.series.length){
+  const s=D.dau.series, dmax=Math.max(...s.map(x=>x.dau),1);
+  $('daucap').textContent=`Distinct families active per day (CloudWatch) · unit = families, not members · a floor (offline use flushes later)`;
+  const stats=[
+    {n:D.dau.avg,l:'avg / day',accent:true},
+    {n:D.dau.peak,l:'peak'},
+    {n:D.dau.stickiness!=null?D.dau.stickiness+'%':'—',l:'DAU/MAU stickiness'},
+  ];
+  $('daustats').innerHTML=stats.map(x=>`<div class="ds ${x.accent?'accent':''}"><div class="dn">${x.n}</div><div class="dl">${x.l}</div></div>`).join('');
+  $('daubars').innerHTML=s.map(x=>`<div class="db ${x.dau>=dmax?'hi':''}" style="height:${Math.max(4,Math.round(x.dau/dmax*100))}%" title="${x.day}: ${x.dau}"></div>`).join('');
+  const ax=document.createElement('div');ax.className='dauaxis';
+  ax.innerHTML=`<span>${s[0].day.slice(5)}</span><span>DAU/MAU = active-on-an-average-day ÷ monthly-active (${D.dau.mau})</span><span>${s[s.length-1].day.slice(5)}</span>`;
+  $('daubars').after(ax);
+}else{$('daucap').textContent='No CloudWatch DAU data this run.';}
 
 // engagement segbar (of real 56): active7, active8-30, quiet/lost, never
 const seg=[

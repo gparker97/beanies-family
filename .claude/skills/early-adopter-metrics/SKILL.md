@@ -61,6 +61,7 @@ bash $SKILL/query_cloudwatch.sh activity 7     > "$OUT/cw_activity7.json"
 bash $SKILL/query_cloudwatch.sh by-surface 30  > "$OUT/cw_surface.json"
 bash $SKILL/query_cloudwatch.sh last-seen 90   > "$OUT/cw_lastseen.json"
 bash $SKILL/query_cloudwatch.sh opens 30       > "$OUT/cw_opens.json"
+bash $SKILL/query_cloudwatch.sh daily 30       > "$OUT/cw_daily.json"   # DAU series
 
 # 3. Plausible traffic + usage (exits 3 if no token — the pipeline degrades
 #    gracefully: the dashboard hides the traffic panels with a note).
@@ -76,7 +77,7 @@ Then interpret `dashboard_data.json` for the terminal report and publish the
 HTML. Don't dump raw JSON at greg — lead with what changed and what it means.
 The filenames above are exact — `build_dashboard.mjs` expects `registry.json`,
 `cw_activity.json`, `cw_activity7.json`, `cw_surface.json`, `cw_lastseen.json`,
-and (optionally) `plausible.json` in `$OUT`.
+`cw_daily.json`, and (optionally) `plausible.json` in `$OUT`.
 
 ### Cross-source reconciliation (do this — it's where the insight is)
 - Registry `lastLoginAt` is date-only and login-only; CloudWatch `last-seen` fires on
@@ -92,9 +93,14 @@ and (optionally) `plausible.json` in `$OUT`.
 Structure it in this order. Be concrete with numbers and deltas; call out the
 signal, not every field.
 
-1. **Snapshot** — real families (dev/test excluded, show excluded count), engaged
-   %, active families (CloudWatch 30d & 7d), new this month / this week, growth
-   direction.
+1. **Snapshot** — open with the **date range** (`dateRange.label`, e.g. "past 30
+   days · 24 Jul – 23 Aug 2026"). Then real families (dev/test excluded, show
+   excluded count), engaged %, active families (CloudWatch 30d & 7d), new this
+   month / this week, growth direction.
+   - **Daily active families (DAU):** `dau.avg` / `dau.peak` and the **DAU/MAU
+     stickiness** (`dau.stickiness`%). Always label the unit as *families, not
+     members*, and note it's a floor (offline use flushes telemetry later) and
+     that raw DAU includes the founder's own pod(s).
 2. **Growth** — new families by month and recent weeks; note acceleration/stall.
 3. **Engagement & retention** — bucket table (active_7d / active_30d / dormant /
    churned / never); engaged vs non-engaged; **never-logged-in** count (activation
