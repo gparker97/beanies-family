@@ -17,6 +17,8 @@ import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
 import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenceEngine';
 import { resolveRecurringItemRule } from '@/services/recurrence/adapters';
+import { reportError } from '@/utils/errorReporter';
+import * as perfTiming from '@/utils/perfTiming';
 
 export interface ProcessResult {
   processed: number;
@@ -30,6 +32,7 @@ export interface ProcessResult {
 export async function processRecurringItems(): Promise<ProcessResult> {
   const result: ProcessResult = { processed: 0, errors: [] };
 
+  const startedAt = performance.now();
   try {
     const activeItems = await recurringRepo.getActiveRecurringItems();
     const allTransactions = await transactionRepo.getAllTransactions();
@@ -72,11 +75,25 @@ export async function processRecurringItems(): Promise<ProcessResult> {
         }
       } catch (e) {
         result.errors.push(`Failed to process ${item.description}: ${(e as Error).message}`);
+        // #70: a rule that reaches expansion and throws is a real (rare) defect —
+        // surface it to the firehose (non-critical: no data at risk, the item is
+        // just skipped this run). Fixed enums only; never the description.
+        reportError({
+          surface: 'recurrence',
+          message: 'expansion-failed',
+          severity: 'error',
+          error: e,
+          context: { recur_surface: 'transaction', recur_reason: item.rule ? 'rule' : 'legacy' },
+        });
       }
     }
   } catch (e) {
     result.errors.push(`Failed to load recurring items: ${(e as Error).message}`);
   }
+
+  // Correlates a slow expansion regression by family in CloudWatch. Sub-floor
+  // (fast) runs are dropped by the perf floor; only meaningful durations surface.
+  perfTiming.record('recurrence.expand', performance.now() - startedAt);
 
   return result;
 }

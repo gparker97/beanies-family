@@ -278,6 +278,17 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'recur_outcome',
   'recur_children_removed',
   'recur_children_expected',
+  // Unified recurrence engine (#70, surface 'recurrence'). All PII-free fixed
+  // enums/ints — no descriptions, titles, or dates ever ship: `recur_surface`
+  // (transaction|activity|list), `recur_unit` (day|week|month|year),
+  // `recur_interval` (small int), `recur_end` (never|onDate|afterCount — the
+  // DISCRIMINANT only, never the end date), `recur_reason` (a fixed adapter-
+  // fallback label). Same Diagnostics category already declared to the stores.
+  'recur_surface',
+  'recur_unit',
+  'recur_interval',
+  'recur_end',
+  'recur_reason',
 ]);
 
 export const MAX_STRING_LEN = 200;
