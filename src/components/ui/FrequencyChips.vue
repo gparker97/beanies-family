@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 export interface ChipOption {
   value: string;
   label: string;
@@ -11,13 +13,21 @@ interface Props {
   modelValue: string;
   options: ChipOption[];
   disabled?: boolean;
+  /** Selected-chip accent. Defaults to Heritage Orange; 'purple' for to-do surfaces. */
+  accent?: 'orange' | 'purple';
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
 }>();
+
+const selectedClass = computed(() =>
+  props.accent === 'purple'
+    ? 'border-purple-500 text-purple-500 dark:bg-purple-500/15 border-2 bg-[var(--tint-purple-12)]'
+    : 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
+);
 </script>
 
 <template>
@@ -28,7 +38,7 @@ const emit = defineEmits<{
         class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
         :class="[
           modelValue === opt.value
-            ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
+            ? selectedClass
             : opt.disabled
               ? 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] opacity-40 dark:bg-slate-700 dark:text-gray-500'
               : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400',

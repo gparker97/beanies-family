@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-23",
-    "translationCount": 4104
+    "translationCount": 4107
   },
   "translations": {
     "app.name": {
@@ -20524,6 +20524,21 @@
     "recurrence.desc.timesN": {
       "translation": "{n} times",
       "hash": "43gpn4",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.a11y.decrease": {
+      "translation": "减少",
+      "hash": "ajzwzi",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.a11y.increase": {
+      "translation": "提升",
+      "hash": "2n8mea",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.a11y.unit": {
+      "translation": "单位",
+      "hash": "1km1w",
       "lastUpdated": "2026-08-23"
     }
   }
