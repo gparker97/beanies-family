@@ -34,7 +34,8 @@ export function useStalePwaNotice() {
         (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') +
         url.hash;
       window.history.replaceState({}, '', cleaned);
-      window.plausible?.('pwa_stale_detected');
+      // Detected automatically — see plausible.d.ts.
+      window.plausible?.('pwa_stale_detected', { interactive: false });
     }
 
     const isStandalone =
