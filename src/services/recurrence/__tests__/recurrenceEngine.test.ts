@@ -7,6 +7,7 @@ import {
   isResetDue,
   isRuleComplete,
   occurrenceCount,
+  monthlyFactor,
 } from '../recurrenceEngine';
 import type { RecurrenceRule, Cadence } from '@/types/recurrence';
 
@@ -296,5 +297,51 @@ describe('occurrenceCount — one place that knows how both ends terminate (#70)
 
   it('returns null for a never-ending series rather than a guess', () => {
     expect(occurrenceCount(rule({ unit: 'day', interval: 1 }), A)).toBeNull();
+  });
+});
+
+describe('engine hardening — malformed input must terminate, not hang (#70)', () => {
+  // These exist because HARD_CAP could not save us: it lives in each consumer's
+  // loop BODY, and with an invalid anchor every `if (occ >= a) yield` is
+  // `NaN >= NaN` — false — so the generator spun forever WITHOUT yielding and
+  // the cap was never reached. A hard tab freeze, reachable from a cleared
+  // start date. Each assertion below would time out against the old code.
+  const bad = 'not-a-date';
+
+  it('occurrencesInRange returns empty for an invalid anchor', () => {
+    expect(
+      occurrencesInRange(rule({ unit: 'month', interval: 1 }), bad, '2026-01-01', '2026-12-31')
+    ).toEqual([]);
+  });
+
+  it('previewNext returns empty for an invalid anchor', () => {
+    expect(previewNext(rule({ unit: 'week', interval: 2, weekdays: [1] }), bad, bad, 5)).toEqual(
+      []
+    );
+  });
+
+  it('nextDueAfter / firstDueOnOrAfter return null for an invalid anchor', () => {
+    expect(nextDueAfter(rule({ unit: 'year', interval: 1 }), bad, bad)).toBeNull();
+    expect(firstDueOnOrAfter(rule({ unit: 'month', interval: 1 }), bad, bad)).toBeNull();
+  });
+
+  it('occurrenceCount returns null for an invalid anchor', () => {
+    expect(
+      occurrenceCount({ unit: 'month', interval: 1, end: { kind: 'afterCount', count: 5 } }, bad)
+    ).toBeNull();
+  });
+
+  it('isResetDue does not hang on an invalid anchor', () => {
+    expect(isResetDue({ unit: 'week', interval: 1, weekdays: [1] }, bad, bad, '2026-09-01')).toBe(
+      false
+    );
+  });
+
+  it('monthlyFactor falls back to 1/month for an out-of-model unit instead of undefined', () => {
+    // `Math.max(undefined, 0)` is NaN, and `toPlain` (JSON round-trip) persists
+    // NaN as NULL — writing a null amount into the family's file.
+    const factor = monthlyFactor({ unit: 'fortnight' as never, interval: 1 });
+    expect(Number.isFinite(factor)).toBe(true);
+    expect(factor).toBe(1);
   });
 });

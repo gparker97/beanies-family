@@ -63,14 +63,24 @@ export function recurringToTransactionFields(
  * side removed in this change. Pass `originalEndDate` (what the split
  * inherited) so an UNCHANGED end date is dropped while a CHANGED one applies.
  * Omit the argument and `endDate` is always stripped.
+ *
+ * `rule` is stripped for the same reason `startDate` is (#70). The split has
+ * already re-anchored the cadence at the split date and RE-BASED any
+ * `afterCount` end (`rebaseRuleForSplit`); writing the form's `rule` back over
+ * it restores the ORIGINAL count against the NEW anchor, so a 10-instalment
+ * plan split at instalment 4 materializes 3 + 10 = 13 real transactions, and
+ * compounds on every further split. A deliberate cadence edit made in the same
+ * save is handled by the split re-basing what it inherited, not by replaying
+ * the pre-split rule.
  */
 export function recurringTemplateFields(
   data: CreateRecurringItemInput,
   originalEndDate?: string
 ): UpdateRecurringItemInput {
-  const { startDate: _s, endDate, lastProcessedDate: _l, ...rest } = data;
+  const { startDate: _s, endDate, lastProcessedDate: _l, rule: _r, ...rest } = data;
   void _s;
   void _l;
+  void _r;
   const endDateChanged =
     originalEndDate !== undefined && (endDate || undefined) !== (originalEndDate || undefined);
   return endDateChanged ? ({ ...rest, endDate } as UpdateRecurringItemInput) : rest;

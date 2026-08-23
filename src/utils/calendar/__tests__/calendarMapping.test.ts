@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FamilyActivity } from '@/types/models';
+import type { RecurrenceRule } from '@/types/recurrence';
 import { deterministicEventId } from '../deterministicEventId';
 import { buildRecurrenceRule } from '../recurrenceRrule';
 import { buildEventDescription, SYNCED_MARKER } from '../eventDescription';
@@ -242,5 +243,45 @@ describe('computePushHash', () => {
     const base = computePushHash(makeActivity({ reminderMinutes: 0 }));
     expect(computePushHash(makeActivity({ reminderMinutes: 30 }))).toBe(base);
     expect(computePushHash(makeActivity({ reminderMinutes: 1440 }))).toBe(base);
+  });
+});
+
+describe('computePushHash covers the canonical rule (#70)', () => {
+  // REGRESSION GUARD: `rule` was added to the hash, but no fixture populated it,
+  // so deleting the line kept the suite green while every cadence-only edit left
+  // Google on a stale RRULE forever. These fixtures make that revert fail.
+  const withRule = (rule: RecurrenceRule) =>
+    ({ ...makeActivity(), recurrence: 'monthly' as const, rule }) as FamilyActivity;
+
+  const base: RecurrenceRule = {
+    unit: 'month',
+    interval: 1,
+    monthlyAnchor: 'date',
+    monthlyDay: 15,
+    end: { kind: 'never' },
+  };
+
+  it('changing only monthlyDay changes the hash', () => {
+    expect(computePushHash(withRule(base))).not.toBe(
+      computePushHash(withRule({ ...base, monthlyDay: 20 }))
+    );
+  });
+
+  it('changing only the interval changes the hash', () => {
+    expect(computePushHash(withRule(base))).not.toBe(
+      computePushHash(withRule({ ...base, interval: 3 }))
+    );
+  });
+
+  it('changing only the end kind changes the hash', () => {
+    // The legacy shadow is byte-identical across these two (no recurrenceEndDate
+    // either way), so the hash can only differ if `rule` is part of it.
+    expect(computePushHash(withRule(base))).not.toBe(
+      computePushHash(withRule({ ...base, end: { kind: 'afterCount', count: 10 } }))
+    );
+  });
+
+  it('an identical rule still hashes identically (no spurious re-push)', () => {
+    expect(computePushHash(withRule(base))).toBe(computePushHash(withRule({ ...base })));
   });
 });

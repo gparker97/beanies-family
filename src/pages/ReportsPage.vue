@@ -38,7 +38,8 @@ import {
 import { useTranslation } from '@/composables/useTranslation';
 import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { accountNetWorthMultiplier } from '@/utils/finance';
-import { resolveTransactionRule } from '@/services/recurrence/adapters';
+import { resolveTransactionRule, isRecurringItemLive } from '@/services/recurrence/adapters';
+import { toDateInputValue } from '@/utils/date';
 import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
 import type {
   CurrencyCode,
@@ -510,7 +511,11 @@ const incomeExpenseChartData = computed(() => {
       const endDate = item.endDate ? new Date(item.endDate) : null;
       const monthDateObj = new Date(monthStart);
 
-      if (startDate <= monthDateObj && (!endDate || endDate >= monthDateObj)) {
+      // #70: `endDate` alone no longer bounds a series — an "ends after N times"
+      // end is stored only in `rule.end`, so this gate counted an exhausted
+      // series into month 13, 14, 15... forever. Ask the engine instead.
+      const stillRunning = isRecurringItemLive(item, toDateInputValue(monthDateObj));
+      if (startDate <= monthDateObj && (!endDate || endDate >= monthDateObj) && stillRunning) {
         // #70: same shared normalization as above — the per-category monthly
         // chart was understating every week-based item identically.
         const amount = monthlyAmountOf(item);

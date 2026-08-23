@@ -14,6 +14,21 @@
 import type { ActivityRecurrence, RecurrenceRule } from '@/types/models';
 import { getWeekdayOrdinalInMonth, parseLocalDate } from '@/utils/date';
 
+/**
+ * `BYMONTHDAY` parts that CLAMP a day the month lacks to that month's last day,
+ * matching the engine (#70). RFC 5545's plain `BYMONTHDAY=31` SKIPS February, so
+ * a naive serialization shows Feb 28 in beanies and nothing in Google.
+ * `BYMONTHDAY=28,..,N` + `BYSETPOS=-1` picks the last day that exists; day 31
+ * (and `'last'`) collapse to the simpler `BYMONTHDAY=-1`.
+ */
+function clampedMonthDayParts(day: number): string[] {
+  if (day >= 31) return ['BYMONTHDAY=-1'];
+  if (day <= 28) return [`BYMONTHDAY=${day}`];
+  const candidates = [];
+  for (let d = 28; d <= day; d++) candidates.push(d);
+  return [`BYMONTHDAY=${candidates.join(',')}`, 'BYSETPOS=-1'];
+}
+
 /** RRULE day codes indexed by JS weekday (0=Sun..6=Sat) — matches `daysOfWeek`. */
 const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 
@@ -83,10 +98,12 @@ function ruleToRrule(rule: RecurrenceRule, start: Date, isAllDay: boolean): stri
             ? rule.weekdays
             : [start.getDay()]
           : [rule.weekdays?.[0] ?? start.getDay()];
-      const byday = days
-        .filter((d) => d >= 0 && d <= 6)
-        .map((d) => RRULE_DAYS[d])
-        .join(',');
+      const valid = days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+      // Never serialize an empty `BYDAY=` — Google rejects the whole event with
+      // a 400, so one out-of-range weekday would stop the activity syncing at
+      // all. Fall back to the anchor's own weekday, which is what an absent
+      // weekday set already means everywhere else.
+      const byday = (valid.length ? valid : [start.getDay()]).map((d) => RRULE_DAYS[d]).join(',');
       parts.push('FREQ=WEEKLY');
       parts.push(`BYDAY=${byday}`);
       // WKST is load-bearing for INTERVAL >= 2 (#70). RFC 5545 defaults it to
@@ -112,20 +129,18 @@ function ruleToRrule(rule: RecurrenceRule, start: Date, isAllDay: boolean): stri
         // the days that actually exist in each month — exactly the clamp.
         // Day 31 (and 'last') collapse to the simpler `BYMONTHDAY=-1`.
         const day = rule.monthlyDay === 'last' ? 31 : (rule.monthlyDay ?? start.getDate());
-        if (day >= 31) {
-          parts.push('BYMONTHDAY=-1');
-        } else if (day > 28) {
-          const candidates = [];
-          for (let d = 28; d <= day; d++) candidates.push(d);
-          parts.push(`BYMONTHDAY=${candidates.join(',')}`);
-          parts.push('BYSETPOS=-1');
-        } else {
-          parts.push(`BYMONTHDAY=${day}`);
-        }
+        parts.push(...clampedMonthDayParts(day));
       }
       break;
     case 'year':
       parts.push('FREQ=YEARLY');
+      // The engine clamps yearly too (`Math.min(day, daysInMonth(...))`), so a
+      // 29 Feb anchor yields 28 Feb in common years. A bare FREQ=YEARLY inherits
+      // BYMONTHDAY from DTSTART and SKIPS those years per RFC 5545 — beanies
+      // would show 28 Feb and Google nothing until the next leap year.
+      if (start.getMonth() === 1 && start.getDate() === 29) {
+        parts.push('BYMONTH=2', 'BYMONTHDAY=28,29', 'BYSETPOS=-1');
+      }
       break;
   }
   if (interval > 1) parts.splice(1, 0, `INTERVAL=${interval}`);
@@ -157,10 +172,9 @@ export function buildRecurrenceRule(input: RecurrenceInput): string[] {
     case 'weekly': {
       const days =
         input.daysOfWeek && input.daysOfWeek.length > 0 ? input.daysOfWeek : [start.getDay()];
-      const byday = days
-        .filter((d) => d >= 0 && d <= 6)
-        .map((d) => RRULE_DAYS[d])
-        .join(',');
+      const valid = days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+      // See the rule path: an empty BYDAY= is a Google 400.
+      const byday = (valid.length ? valid : [start.getDay()]).map((d) => RRULE_DAYS[d]).join(',');
       rule = `FREQ=WEEKLY;BYDAY=${byday}`;
       break;
     }
@@ -173,7 +187,13 @@ export function buildRecurrenceRule(input: RecurrenceInput): string[] {
       rule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${RRULE_DAYS[start.getDay()]};WKST=SU`;
       break;
     case 'monthly':
-      rule = `FREQ=MONTHLY;BYMONTHDAY=${start.getDate()}`;
+      // The legacy IN-APP expander clamps (`expandMonthlyByDate` does
+      // `Math.min(dayOfMonth, monthEnd.getDate())`), so an unclamped
+      // BYMONTHDAY here reproduces the exact beanies-vs-Google divergence #70
+      // set out to remove — for every PRE-#70 monthly activity anchored on the
+      // 29th-31st, which is the majority of existing data (there is no at-rest
+      // migration, and an untouched edit never writes `rule`).
+      rule = `FREQ=MONTHLY;${clampedMonthDayParts(start.getDate()).join(';')}`;
       break;
     case 'monthly-by-day': {
       const ordinal = getWeekdayOrdinalInMonth(start); // 1..4 or -1 (last)
@@ -181,7 +201,12 @@ export function buildRecurrenceRule(input: RecurrenceInput): string[] {
       break;
     }
     case 'yearly':
-      rule = 'FREQ=YEARLY';
+      // Same clamp as the rule path — a 29 Feb anchor must not vanish from
+      // Google in common years while beanies shows 28 Feb.
+      rule =
+        start.getMonth() === 1 && start.getDate() === 29
+          ? 'FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=28,29;BYSETPOS=-1'
+          : 'FREQ=YEARLY';
       break;
     default: {
       // Exhaustiveness guard — a new ActivityRecurrence kind must be handled here.
