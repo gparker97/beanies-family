@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-20",
-    "translationCount": 4059
+    "lastUpdated": "2026-08-23",
+    "translationCount": 4104
   },
   "translations": {
     "app.name": {
@@ -20300,6 +20300,231 @@
       "translation": "无法创建演示系列。请重试。",
       "hash": "tzyr10",
       "lastUpdated": "2026-08-20"
+    },
+    "recurrence.repeats": {
+      "translation": "重复",
+      "hash": "peiciw",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.resets": {
+      "translation": "重生",
+      "hash": "uls8gs",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.mode.simple": {
+      "translation": "简单",
+      "hash": "u2n1ny",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.mode.custom": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.mode.simpleTag": {
+      "translation": "常用节奏",
+      "hash": "xyzmaf",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.mode.customTag": {
+      "translation": "每N · ADVANCED",
+      "hash": "inn0iq",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.cadence.daily": {
+      "translation": "每天",
+      "hash": "1366m1",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.cadence.weekly": {
+      "translation": "每周",
+      "hash": "s8sy1r",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.cadence.biweekly": {
+      "translation": "每2周",
+      "hash": "anic4",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.cadence.monthly": {
+      "translation": "每月",
+      "hash": "n1rd3n",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.cadence.yearly": {
+      "translation": "每年",
+      "hash": "ras40m",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.customEvery": {
+      "translation": "重复周期",
+      "hash": "acfqly",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.resetEvery": {
+      "translation": "重置的时间间隔",
+      "hash": "9kglxy",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.unit.days": {
+      "translation": "天",
+      "hash": "1txlj",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.unit.weeks": {
+      "translation": "周",
+      "hash": "1va5tr",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.unit.months": {
+      "translation": "百萬港元",
+      "hash": "ho5dzh",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.unit.years": {
+      "translation": "年",
+      "hash": "1wdo7q",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ctx.days": {
+      "translation": "在哪几天？",
+      "hash": "m7pt2c",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ctx.day": {
+      "translation": "哪一天？",
+      "hash": "5arsw7",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ctx.monthly": {
+      "translation": "每个月应该如何降落？",
+      "hash": "oncsrj",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.weekdayHint": {
+      "translation": "选择一天或几天",
+      "hash": "40vom1",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.monthly.onDate": {
+      "translation": "于{date}",
+      "hash": "ld3mho",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.monthly.onDay": {
+      "translation": "在{ordinal} {day}",
+      "hash": "e7wx0z",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.monthly.lastDay": {
+      "translation": "在最后一天",
+      "hash": "qjlldu",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.monthly.dateSub": {
+      "translation": "每月相同日期",
+      "hash": "v5bnfr",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.monthly.daySub": {
+      "translation": "每月相同的工作日",
+      "hash": "cwq4q5",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.startHint": {
+      "translation": "基于您的开始日期， {date}",
+      "hash": "sc6irx",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ends": {
+      "translation": "端部",
+      "hash": "1ae54",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ends.never": {
+      "translation": "从不",
+      "hash": "1qccy4",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ends.onDate": {
+      "translation": "在约会中",
+      "hash": "di771q",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ends.after": {
+      "translation": "次数之后",
+      "hash": "xysd69",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.ends.times": {
+      "translation": "倍",
+      "hash": "1tphs6",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.daily": {
+      "translation": "每天",
+      "hash": "2gphjr",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.everyNDays": {
+      "translation": "每{n}天",
+      "hash": "9b1ab2",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.weeklyOn": {
+      "translation": "每周在%{days}",
+      "hash": "pckob7",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.everyNWeeksOn": {
+      "translation": "每{n}周的{days}",
+      "hash": "i42p5c",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.monthlyOnDate": {
+      "translation": "每月的{date}",
+      "hash": "u2uaun",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.everyNMonthsOnDate": {
+      "translation": "每{n}个月的{date}",
+      "hash": "ewt8aa",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.monthlyOnDay": {
+      "translation": "每月的{ordinal} {day}",
+      "hash": "hlo862",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.everyNMonthsOnDay": {
+      "translation": "每{n}个月的{ordinal} {day}",
+      "hash": "4lvjfp",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.yearlyOn": {
+      "translation": "每年的{date}",
+      "hash": "zei09j",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.everyNYearsOn": {
+      "translation": "每{n}年{date}",
+      "hash": "vas2uo",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.lastDay": {
+      "translation": "最后一天",
+      "hash": "o5tlv2",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.untilDate": {
+      "translation": "until {date}",
+      "hash": "jqqtiu",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.desc.timesN": {
+      "translation": "{n} times",
+      "hash": "43gpn4",
+      "lastUpdated": "2026-08-23"
     }
   }
 }
