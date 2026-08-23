@@ -474,7 +474,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'For regular income or bills, toggle <strong>Recurring</strong> when creating a transaction. You can set daily, weekly, monthly, or yearly schedules. Recurring transactions are automatically generated and show up on your calendar in the Family Planner.',
+          'For regular income or bills, toggle <strong>Recurring</strong> when creating a transaction, then choose how it repeats. The common cadences — daily, weekly, every 2 weeks, monthly, yearly — are one tap. Pick <strong>Custom</strong> for anything else: every few weeks or months, specific weekdays, or the day of the month it lands on.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A monthly schedule can land <strong>on a set date</strong> (for example the 23rd) or <strong>on a weekday</strong> (for example the 4th Sunday). To keep it valid in every month, the set-date option tops out at the 28th, with a <strong>last day of the month</strong> choice for month-ends. The schedule follows the start date you choose, and a plain-language summary shows exactly what you set as you build it.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can also decide when it <strong>ends</strong>: never, on a specific date, or after a set number of times. Recurring transactions are generated automatically and show up on your calendar in the Family Planner.',
       },
       {
         type: 'heading',
