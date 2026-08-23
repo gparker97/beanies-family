@@ -8,6 +8,7 @@ import { convertToBaseCurrency } from '@/utils/currency';
 import { toDateInputValue, parseLocalDate, addDays } from '@/utils/date';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type {
   RecurringItem,
   CreateRecurringItemInput,
@@ -152,6 +153,21 @@ export const useRecurringStore = defineStore('recurring', () => {
       recurringItems.value = [...recurringItems.value, item];
       return item;
     });
+    // #70: success-path adoption counter so cadence usage is measurable (and the
+    // adapter-fallback rate becomes computable). Fixed enums/ints only.
+    if (result?.rule) {
+      logEvent({
+        level: 'info',
+        surface: 'recurrence',
+        message: 'rule-materialized',
+        context: {
+          recur_surface: 'transaction',
+          recur_unit: result.rule.unit,
+          recur_interval: result.rule.interval,
+          recur_end: result.rule.end.kind,
+        },
+      });
+    }
     return result ?? null;
   }
 

@@ -195,6 +195,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'recur_outcome',
   'recur_children_removed',
   'recur_children_expected',
+  // Unified recurrence engine (#70, surface 'recurrence') — PII-free enums/ints.
+  'recur_surface',
+  'recur_unit',
+  'recur_interval',
+  'recur_end',
+  'recur_reason',
 ]);
 
 function getHeaders(event) {
