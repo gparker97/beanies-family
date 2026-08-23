@@ -9,6 +9,7 @@ without the masking rules below.
 1. DynamoDB family registry (primary)
 2. CloudWatch telemetry firehose (activity)
 3. Plausible Analytics (traffic + product usage)
+3b. Google Search Console (search terms — optional)
 4. What is NOT available
 5. Privacy / masking rules
 
@@ -106,9 +107,58 @@ top **sources**, **feature usage** (`feature_used` broken down by the `feature` 
 transaction / budget / goal / vacation — the "most-used features" answer), and **login
 method** mix (password / passkey / cross_device).
 
+**Enrichment queries** (all optional, via `soft()` — a failure degrades one panel and
+is recorded in `_degraded`, never breaking the run):
+- `channelSources` — `dimensions: ['visit:channel','visit:source']`. Resolves the
+  channel bucket to named sources ("Organic Social" → Reddit, Pinterest). **Verified
+  working.**
+- `direct.*` — the same queries filtered to `visit:channel == "Direct"`, broken down by
+  entry page / country / device, plus an overview for `visits ÷ visitors`.
+- `outbound` + `outboundToApp` — `Outbound Link: Click` by `event:props:url`, and a
+  **deduplicated** `contains` query for links to `app.beanies.family`. Use the deduped
+  one for the hand-off number: summing per-URL rows double-counts a visitor who
+  clicked both `/welcome` and `/login`.
+- `returning` — `visit:is_returning`. **Verified NOT available** (this query degrades
+  against the live API). `visits ÷ visitors` is the repeat-visit proxy; do not claim a
+  new-vs-returning split.
+
+**Goal names are matched by substring**, so the live goals resolve as:
+`Family Create - Button Clicked (top of funnel)` ← `'Button Clicked'`;
+`Family Create - Signup Completed` ← `'Signup Completed'`;
+`Family Member Joined` ← `'Member Joined'`. Renaming a goal in Plausible silently
+zeroes a funnel step — check here first if a step reads 0.
+
 **Caveats:** Plausible is aggregate and privacy-first — **no `family_id`**, so it can't
 be joined per-family. Custom goals only count if the Plausible dashboard has them
 configured as goals (pageviews + any received custom event still show via `event:goal`).
+Observed `bounce_rate` on the marketing site is implausibly low (1–2%) — outbound-link
+and file-download events appear to suppress bounces, so treat bounce as unreliable here.
+
+---
+
+## 3b. Google Search Console — search terms (optional)
+
+- **Why it exists:** Plausible **cannot** report Google search terms and neither can any
+  other analytics tool. Google strips the query from the referrer, so an organic Google
+  visit arrives as nothing but `source = Google`. Search Console is the only source.
+- **API:** `POST https://searchconsole.googleapis.com/webmasters/v3/sites/{site}/searchAnalytics/query`
+- **Property:** defaults to `sc-domain:beanies.family` (pass `https://beanies.family/`
+  instead if the property is URL-prefix rather than domain).
+- **Auth:** service-account key at `~/.config/beanies/gsc-service-account.json`
+  (or `GSC_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS`), or a pre-minted
+  `GSC_ACCESS_TOKEN`. Scope `webmasters.readonly`. `query_search_console.mjs` signs its
+  own JWT — no `googleapis` dependency.
+- **Setup:** Google Cloud → enable the **Google Search Console API** → create a service
+  account → JSON key → then Search Console → Settings → Users and permissions → add the
+  service-account email with **Restricted** access.
+- **Returns:** per `query` and per `page`, plus the `query × page` join — clicks,
+  impressions, CTR, average position. Data lags ~2 days.
+
+**⚠️ The hard limit on "highest-converting search terms":** Search Console knows
+**clicks, not conversions**, and shares no identifier with Plausible. No tool can say
+"this term produced a signup". The only honest construction is term → landing page
+(GSC) → that page's downstream behaviour (Plausible), and it must be labelled
+**inferred**. Never present it as tracked attribution.
 
 ---
 

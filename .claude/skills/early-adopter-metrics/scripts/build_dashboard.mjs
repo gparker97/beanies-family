@@ -62,6 +62,7 @@ const act7 = load('cw_activity7.json', true);
 const surf = load('cw_surface.json', true);
 const daily = load('cw_daily.json', true);
 const pl = load('plausible.json', true);
+const gsc = load('search_console.json', true);
 
 const NOW = new Date(reg.generatedAt).getTime() / 1000;
 const DAY = 86400;
@@ -134,28 +135,178 @@ const startD = new Date(endD.getTime() - WINDOW_DAYS * DAY * 1000);
 const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 const dateRange = { start: startD.toISOString().slice(0, 10), end: endD.toISOString().slice(0, 10), label: `${fmt(startD)} – ${fmt(endD)}`, days: WINDOW_DAYS };
 
-// Acquisition funnel (Plausible). The app-site steps are a real single-site
-// funnel (shared sessions); marketing visitors is context only — the two sites
-// have no shared visitor id, so that top step is an aggregate, not a per-visitor
-// hand-off. All numbers are within the same window.
+// ── Acquisition funnel + overall conversion ─────────────────────────────────
+// TWO honest rates, because there are two different questions:
+//   overallPct = completed signups / MARKETING visitors — "of everyone who
+//     reached the site, how many became a family?" This is the headline number,
+//     but it is a CROSS-SITE AGGREGATE RATIO, not a tracked per-visitor funnel:
+//     beanies.family and app.beanies.family are separate Plausible sites with no
+//     shared visitor id, so no one visitor can be followed across the boundary.
+//   inAppPct  = completed signups / APP arrivals — a TRUE single-site funnel
+//     (shared sessions). It isolates "once someone reaches the app, does the
+//     signup flow work?" and is the one to optimise against.
+// They differ because app arrivals also include returning users signing in, who
+// were never marketing visitors in this window.
 let funnelAcq = null;
+let conversion = null;
 if (pl) {
   const goalV = (needle) => {
-    const g = pl.app.goals.find((x) => x['event:goal'].includes(needle));
+    const g = (pl.app.goals || []).find((x) => x['event:goal'].includes(needle));
     return g ? g.visitors : 0;
   };
   const pageV = (path) => {
-    const p = pl.app.topPages.find((x) => x['event:page'] === path);
+    const p = (pl.app.topPages || []).find((x) => x['event:page'] === path);
     return p ? p.visitors : 0;
   };
+  const siteVisitors = pl.marketing.overview.visitors || 0;
+  const appArrivals = pl.app.overview.visitors || 0;
+  const welcome = pageV('/welcome');
+  const started = goalV('Button Clicked');
+  const completed = goalV('Signup Completed');
+
+  // Outbound clicks from the marketing site to the app — the only *measured*
+  // hand-off between the two sites. Absent unless Plausible's outbound-link
+  // extension is enabled on the marketing site.
+  // Use the DEDUPLICATED single-query count; summing the per-URL rows would
+  // double-count anyone who clicked both /welcome and /login.
+  const outboundToApp = pl.marketing.outboundToApp?.visitors || null;
+
+  // Step choice matters. `appArrivals` is NOT a funnel step under the marketing
+  // site: it also contains returning users signing in, who were never marketing
+  // visitors this window — so placing it below the hand-off makes the funnel
+  // *widen*, which reads as nonsense. When we have a measured hand-off we use it
+  // and keep appArrivals as context; without one, appArrivals is the best
+  // available second step and the boundary is drawn there instead.
   funnelAcq = {
-    marketingVisitors: pl.marketing.overview.visitors,
     steps: [
-      { label: 'App arrivals', value: pl.app.overview.visitors },
-      { label: 'Reached welcome gate', value: pageV('/welcome') },
-      { label: 'Started family creation', value: goalV('Button Clicked') },
-      { label: 'Completed signup', value: goalV('Signup Completed') },
+      { label: 'Reached the marketing site', value: siteVisitors, site: 'marketing' },
+      ...(outboundToApp
+        ? [{ label: 'Clicked through to the app', value: outboundToApp, site: 'boundary', sub: 'measured outbound clicks' }]
+        : [{ label: 'Arrived at the app', value: appArrivals, site: 'app', boundary: true, sub: 'incl. returning sign-ins' }]),
+      { label: 'Reached the welcome gate', value: welcome, site: 'app' },
+      { label: 'Started creating a family', value: started, site: 'app' },
+      { label: 'Completed signup', value: completed, site: 'app' },
     ],
+    hasMeasuredHandoff: !!outboundToApp,
+    appArrivals,
+  };
+
+  conversion = {
+    siteVisitors,
+    appArrivals,
+    started,
+    completed,
+    overallPct: siteVisitors ? Math.round((completed / siteVisitors) * 1000) / 10 : null,
+    inAppPct: appArrivals ? Math.round((completed / appArrivals) * 1000) / 10 : null,
+    // Of those who *started* creating a family, how many finished? The single
+    // most fixable number on the page — pure product friction, no traffic mix.
+    finishPct: started ? Math.round((completed / started) * 1000) / 10 : null,
+  };
+}
+
+// Registry cross-check on the funnel's bottom step. The registry is ground truth
+// for "a family was actually created", so it validates (or contradicts) the
+// Plausible signup goal. A large gap means the goal is mis-fired or mis-configured.
+const newInWindow = fams.filter((f) => {
+  if (!f.createdAt) return false;
+  const t = new Date(f.createdAt).getTime() / 1000;
+  return t >= NOW - WINDOW_DAYS * DAY && t <= NOW;
+}).length;
+if (conversion) {
+  conversion.actualNewFamilies = newInWindow;
+  conversion.goalVsRegistryGap = newInWindow - conversion.completed;
+  // The HEADLINE is the same-source rate (Plausible signup goal / Plausible
+  // marketing visitors). Both halves come from one tool with one definition, so
+  // it is the defensible number even though the goal may under-fire.
+  //
+  // The registry rate is deliberately NOT the headline. Its numerator counts
+  // every family created anywhere — direct app arrivals, invited members, native
+  // app installs — while the denominator is marketing visitors only. Dividing
+  // one by the other mixes populations and inflates the rate, so it is exposed
+  // as a labelled upper bound, never as "the" conversion rate.
+  conversion.overallPctUpperBound = conversion.siteVisitors
+    ? Math.round((newInWindow / conversion.siteVisitors) * 1000) / 10
+    : null;
+  // A large gap means one of two things, and both are worth knowing: the signup
+  // goal is mis-firing, or most families never touch the marketing site.
+  conversion.gapIsMaterial = newInWindow > 0 && Math.abs(conversion.goalVsRegistryGap) >= Math.max(3, newInWindow * 0.34);
+}
+
+// ── Channel -> source drill-down ────────────────────────────────────────────
+// "Organic Social" is a bucket; the actionable fact is *Reddit* or *Pinterest*.
+// Nest the specific sources under each channel so one panel answers both.
+let channelBreakdown = null;
+if (pl?.marketing?.channelSources) {
+  const byChannel = new Map();
+  for (const r of pl.marketing.channelSources) {
+    const ch = r['visit:channel'] || 'Unknown';
+    const src = r['visit:source'] || 'Unknown';
+    if (!byChannel.has(ch)) byChannel.set(ch, { channel: ch, visitors: 0, sources: [] });
+    const e = byChannel.get(ch);
+    e.visitors += r.visitors || 0;
+    e.sources.push({ source: src, visitors: r.visitors || 0, bounce: r.bounce_rate ?? null });
+  }
+  channelBreakdown = [...byChannel.values()]
+    .map((c) => ({ ...c, sources: c.sources.sort((a, b) => b.visitors - a.visitors).slice(0, 6) }))
+    .sort((a, b) => b.visitors - a.visitors);
+} else if (pl?.marketing?.channels) {
+  // Degraded: channel totals only, no source detail.
+  channelBreakdown = pl.marketing.channels.map((c) => ({
+    channel: c['visit:channel'], visitors: c.visitors, sources: null,
+  }));
+}
+
+// ── Direct-traffic deep-dive ────────────────────────────────────────────────
+// "Direct" is the biggest bucket and looks like a dead end, but the ENTRY PAGE
+// splits it into two very different populations:
+//   - landing on "/"        -> typed the domain / bookmark / brand-aware return
+//   - landing on a deep URL -> DARK SOCIAL: a link pasted into WhatsApp, Discord,
+//     iMessage, Slack or an email client, all of which strip the referrer.
+// That distinction is the actionable part: dark social is earned distribution
+// that is invisible to every referrer report.
+let direct = null;
+if (pl?.marketing?.direct) {
+  const d = pl.marketing.direct;
+  const entries = d.entryPages || [];
+  const home = entries.filter((e) => ['/', '', '/index.html'].includes(e['visit:entry_page']));
+  const deep = entries.filter((e) => !['/', '', '/index.html'].includes(e['visit:entry_page']));
+  const sum = (rowsArr) => rowsArr.reduce((a, r) => a + (r.visitors || 0), 0);
+  const ov = d.overview;
+  direct = {
+    visitors: ov?.visitors ?? null,
+    visits: ov?.visits ?? null,
+    bounce: ov?.bounce_rate ?? null,
+    duration: ov?.visit_duration ?? null,
+    // sessions per visitor — our only repeat-visit proxy unless Plausible
+    // exposes a true returning dimension (probed separately, often absent).
+    sessionsPerVisitor: ov?.visitors ? Math.round((ov.visits / ov.visitors) * 100) / 100 : null,
+    homepageVisitors: sum(home),
+    deepLinkVisitors: sum(deep),
+    entryPages: entries.slice(0, 8),
+    countries: d.countries || null,
+    devices: d.devices || null,
+    // A true new-vs-returning split if the API gave us one; null otherwise.
+    returning: pl.marketing.returning || null,
+  };
+}
+
+// ── Google search terms (Search Console) ────────────────────────────────────
+// Ranked by clicks. "Converting" terms are INFERRED via the landing page, never
+// tracked — GSC has no conversion signal and shares no id with Plausible.
+let searchTerms = null;
+if (gsc) {
+  searchTerms = {
+    site: gsc.site,
+    dateRange: gsc.dateRange,
+    totals: gsc.totals,
+    top: (gsc.queries || []).sort((a, b) => b.clicks - a.clicks).slice(0, 15),
+    // Terms with impressions but poor CTR = ranking but not winning the click.
+    // The cheapest SEO win on the page: rewrite those titles/descriptions.
+    opportunities: (gsc.queries || [])
+      .filter((q) => q.impressions >= 20 && q.ctr < 2 && q.position <= 20)
+      .sort((a, b) => b.impressions - a.impressions)
+      .slice(0, 8),
+    topPages: (gsc.pages || []).sort((a, b) => b.clicks - a.clicks).slice(0, 8),
   };
 }
 
@@ -194,6 +345,14 @@ const data = {
   dau: { series: dailyActive, avg: avgDau, peak: peakDau, mau, stickiness },
   funnelAcq,
   funnelRet,
+  conversion,
+  channelBreakdown,
+  direct,
+  searchTerms,
+  searchConsoleAvailable: !!gsc,
+  // Which optional Plausible queries degraded this run, so the page can say so
+  // rather than rendering a silently-empty panel.
+  degraded: pl?._degraded || [],
   activeReal30,
   activeReal7,
   engagedPctReal: reg.counts.realFamilies ? Math.round((activeReal30 / reg.counts.realFamilies) * 100) : 0,
@@ -219,6 +378,9 @@ const data = {
         sources: pl.marketing.topSources.slice(0, 8),
         channels: pl.marketing.channels.slice(0, 6),
         pages: pl.marketing.topPages.slice(0, 8),
+        referrers: (pl.marketing.topReferrers || [])
+          .filter((r) => r['visit:referrer'] && r['visit:referrer'] !== 'Direct / None')
+          .slice(0, 8),
         utm: pl.marketing.utmCampaigns
           .filter((u) => u['visit:utm_campaign'] && u['visit:utm_campaign'] !== '(not set)')
           .slice(0, 6),

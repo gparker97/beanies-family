@@ -10,22 +10,23 @@
     --bg:#F4F6F8; --card:#ffffff; --line:#e6ebf0; --rail:#eef2f6;
     --good:#2f9e6f; --warn:#E08A1E; --bad:#C0563B; --neutral:#9aa8b5;
     --shadow:0 1px 2px rgba(44,62,80,.04),0 6px 22px rgba(44,62,80,.07);
+    --band:#ffffff;
   }
   :root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
     --bg:#1a222b; --card:#222d38; --ink:#eaf0f5; --ink-soft:#a9b8c6; --ink-faint:#748696;
     --line:#33414e; --rail:#2b3742; --orange-soft:#3a2a20; --sky-soft:#243441; --slate:#dbe6ef;
-    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 26px rgba(0,0,0,.35);
+    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 26px rgba(0,0,0,.35); --band:#222d38;
   }}
   :root[data-theme="dark"]{
     --bg:#1a222b; --card:#222d38; --ink:#eaf0f5; --ink-soft:#a9b8c6; --ink-faint:#748696;
     --line:#33414e; --rail:#2b3742; --orange-soft:#3a2a20; --sky-soft:#243441; --slate:#dbe6ef;
-    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 26px rgba(0,0,0,.35);
+    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 26px rgba(0,0,0,.35); --band:#222d38;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
     font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.5;
     -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
-  .wrap{max-width:1120px;margin:0 auto;padding:32px 22px 64px}
+  .wrap{max-width:1140px;margin:0 auto;padding:32px 22px 64px}
   h1,h2,h3{font-family:Outfit,sans-serif;color:var(--slate);text-wrap:balance;margin:0}
   a{color:var(--orange);text-decoration:none}
   .eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--orange)}
@@ -33,22 +34,38 @@
   header h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
   .meta{font-size:12.5px;color:var(--ink-faint);text-align:right;line-height:1.7}
   .meta b{color:var(--ink-soft);font-weight:600}
-  .lede{color:var(--ink-soft);font-size:15px;max-width:62ch;margin:14px 0 26px}
+  .lede{color:var(--ink-soft);font-size:15px;max-width:64ch;margin:14px 0 8px}
   .lede b{color:var(--ink)}
+
+  /* ── Act bands: the two top-level domains of the page ────────────────── */
+  .act{margin-top:34px}
+  .actbar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    padding:0 0 12px;border-bottom:2px solid var(--slate);margin-bottom:18px}
+  .actnum{font-family:Outfit;font-weight:800;font-size:13px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--orange)}
+  .actbar h2{font-size:23px;font-weight:800;letter-spacing:-.02em}
+  .actbar .actsub{font-size:13px;color:var(--ink-faint);margin-left:auto;text-align:right}
+
   /* KPI tiles */
-  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:26px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .kpis.six{grid-template-columns:repeat(6,1fr)}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 15px;box-shadow:var(--shadow)}
   .kpi .n{font-family:Outfit;font-weight:700;font-size:30px;letter-spacing:-.02em;color:var(--slate);line-height:1}
   .kpi .l{font-size:11.5px;color:var(--ink-faint);margin-top:7px;font-weight:500}
   .kpi .s{font-size:11.5px;font-weight:600;margin-top:5px}
   .kpi.accent .n{color:var(--orange)}
   .up{color:var(--good)} .down{color:var(--bad)} .flat{color:var(--ink-faint)}
+
   /* panels */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 20px 18px;box-shadow:var(--shadow)}
+  .grid.wide{grid-template-columns:1.35fr 1fr}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 20px 18px;box-shadow:var(--shadow);min-width:0}
   .panel.full{grid-column:1/-1}
   .panel h2{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .panel h3{font-size:13px;font-weight:700;margin:16px 0 8px;color:var(--ink-soft)}
   .panel .cap{font-size:12px;color:var(--ink-faint);margin:3px 0 16px}
+  .panel .cap b{color:var(--ink-soft)}
+
   /* bar rows */
   .bars{display:flex;flex-direction:column;gap:9px}
   .bar{display:grid;grid-template-columns:120px 1fr 46px;align-items:center;gap:10px;font-size:13px}
@@ -58,6 +75,67 @@
   .bar .fill.sky{background:var(--sky)} .bar .fill.terra{background:var(--terra)}
   .bar .fill.slate{background:var(--slate-2)}
   .bar .v{text-align:right;font-weight:600;color:var(--ink);font-size:12.5px}
+
+  /* ── The journey: channels feeding the funnel (signature element) ────── */
+  .journey{display:grid;grid-template-columns:290px 1fr;gap:0;align-items:stretch}
+  .jl{padding-right:22px;border-right:2px dashed var(--line);position:relative}
+  .jr{padding-left:26px;position:relative}
+  /* the arrow that makes "these channels FEED this funnel" literal */
+  .jr::before{content:"";position:absolute;left:-7px;top:78px;width:12px;height:12px;
+    border-right:2px solid var(--orange);border-bottom:2px solid var(--orange);
+    transform:rotate(-45deg);background:var(--card)}
+  .jhead{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-faint);margin-bottom:12px}
+
+  /* channel group: channel total + its specific sources nested beneath */
+  .chgroup{margin-bottom:13px}
+  .chtop{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:600;color:var(--ink)}
+  .chtop .chv{font-weight:700}
+  .chtrack{background:var(--rail);border-radius:6px;height:12px;overflow:hidden;margin:5px 0 6px}
+  .chfill{height:100%;border-radius:6px;background:var(--orange)}
+  .chfill.c1{background:var(--slate-2)} .chfill.c2{background:var(--terra)}
+  .chfill.c3{background:var(--sky)} .chfill.c4{background:var(--good)}
+  .chsrc{display:flex;flex-wrap:wrap;gap:5px 7px;padding-left:2px}
+  .chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
+    background:var(--rail);color:var(--ink-soft);white-space:nowrap}
+  .chip b{color:var(--ink);font-weight:700}
+
+  /* funnel: centered bands, width proportional to volume */
+  .fnl{display:flex;flex-direction:column;gap:7px}
+  .fstep{display:grid;grid-template-columns:168px 1fr 52px 58px;align-items:center;gap:11px;font-size:12.5px}
+  .fstep .fl{color:var(--ink-soft);font-weight:500;line-height:1.25}
+  .fstep .fl small{display:block;color:var(--ink-faint);font-size:10px;font-weight:500}
+  .ftrack{display:flex;justify-content:center;align-items:center}
+  .fshape{height:34px;border-radius:5px;background:linear-gradient(90deg,var(--orange),var(--terra));
+    min-width:5px;display:flex;align-items:center;justify-content:center}
+  .fshape.app{background:linear-gradient(90deg,var(--slate-2),var(--slate-2))}
+  .fstep .fv{text-align:right;font-weight:700;color:var(--ink);font-size:14px}
+  .fstep .fpc{text-align:right;font-weight:700;color:var(--good);font-size:12px;line-height:1.2}
+  .fstep .fpc.first{color:var(--ink-faint)}
+  .fstep .fof{display:block;font-weight:500;color:var(--ink-faint);font-size:9.5px}
+  /* the cross-site measurement boundary — a real caveat, drawn as one */
+  .fbound{display:flex;align-items:center;gap:9px;margin:3px 0 1px;font-size:10.5px;
+    color:var(--warn);font-weight:600}
+  .fbound::before,.fbound::after{content:"";flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--warn) 0 4px,transparent 4px 8px);opacity:.55}
+
+  /* the headline conversion readout */
+  .convbox{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;
+    margin-top:18px;padding:16px 18px;border-radius:14px;
+    background:var(--orange-soft);border:1px solid var(--orange)}
+  .convbig{font-family:Outfit;font-weight:800;font-size:46px;line-height:.95;
+    color:var(--orange);letter-spacing:-.03em}
+  .convbig small{display:block;font-family:Inter;font-size:11px;font-weight:600;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-top:6px}
+  .convnote{font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+  .convnote b{color:var(--ink)}
+  .convrow{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px}
+  .convrow .cr{font-size:12px;color:var(--ink-faint)}
+  .convrow .cr b{display:block;font-family:Outfit;font-size:19px;font-weight:700;color:var(--slate);line-height:1.1}
+
+  /* split stat (direct traffic) */
+  .split{display:flex;height:30px;border-radius:8px;overflow:hidden;margin:8px 0 10px}
+  .split span{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#fff;min-width:0}
+
   /* growth columns */
   .cols{display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:8px}
   .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
@@ -76,29 +154,21 @@
   .daubars .db:hover{background:var(--terra)}
   .dauaxis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-faint);margin-top:6px}
   /* tables */
-  table{width:100%;border-collapse:collapse;font-size:13px}
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:340px}
   th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;padding:0 8px 9px}
   td{padding:8px;border-top:1px solid var(--line);color:var(--ink-soft)}
   td.name{color:var(--ink);font-weight:600}
   td.num{text-align:right;font-weight:600;color:var(--ink)}
+  td.q{color:var(--ink);font-weight:600}
   .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;vertical-align:middle;margin-left:6px}
-  .tag.you{background:var(--sky-soft);color:var(--sky) ;color:#3b7bb0}
+  .tag.you{background:var(--sky-soft);color:#3b7bb0}
   .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px}
   .pill.good{background:rgba(47,158,111,.13);color:var(--good)}
   .pill.warn{background:rgba(224,138,30,.14);color:var(--warn)}
   .pill.bad{background:rgba(192,86,59,.13);color:var(--bad)}
   .pill.neu{background:var(--rail);color:var(--ink-soft)}
-  /* conversion funnels */
-  .funnel{display:flex;flex-direction:column;gap:9px;margin-top:4px}
-  .fstep{display:grid;grid-template-columns:140px 1fr 40px 62px;align-items:center;gap:10px;font-size:13px}
-  .fstep .fl{color:var(--ink-soft);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .fstep .ftrack{background:var(--rail);border-radius:8px;height:22px;overflow:hidden}
-  .fstep .ffill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--orange),var(--terra));min-width:4px}
-  .fstep .fv{text-align:right;font-weight:700;color:var(--ink)}
-  .fstep .fpc{text-align:right;font-weight:700;color:var(--good);font-size:12.5px;line-height:1.15}
-  .fstep .fpc.first{color:var(--ink-faint)}
-  .fstep .fof{display:block;font-weight:500;color:var(--ink-faint);font-size:10px}
-  /* funnel / stacked engagement */
+  /* stacked engagement */
   .segbar{display:flex;height:34px;border-radius:9px;overflow:hidden;margin:4px 0 14px}
   .segbar span{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#fff;min-width:0}
   .legend{display:flex;flex-wrap:wrap;gap:12px 18px;font-size:12.5px;color:var(--ink-soft)}
@@ -106,14 +176,29 @@
   .callouts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .callout{border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:12px;padding:13px 15px;background:var(--card)}
   .callout.warn{border-left-color:var(--warn)} .callout.good{border-left-color:var(--good)} .callout.sky{border-left-color:var(--sky)}
-  .callout h3{font-size:13.5px;font-weight:700;margin-bottom:4px}
+  .callout h3{font-size:13.5px;font-weight:700;margin:0 0 4px}
   .callout p{margin:0;font-size:13px;color:var(--ink-soft)}
   .callout b{color:var(--ink)}
+  .note{font-size:11.5px;color:var(--ink-faint);margin-top:12px;line-height:1.5}
+  .missing{font-size:12.5px;color:var(--warn);background:rgba(224,138,30,.09);
+    border:1px solid rgba(224,138,30,.3);border-radius:10px;padding:11px 13px;line-height:1.5}
+  .missing b{color:var(--warn)}
   footer{margin-top:24px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-top:1px solid var(--line);padding-top:16px}
   footer b{color:var(--ink-soft)}
-  .sub{font-size:11px;color:var(--ink-faint);font-weight:500}
-  @media(max-width:820px){.kpis{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}.callouts{grid-template-columns:1fr}.bar{grid-template-columns:100px 1fr 42px}}
-  @media(max-width:480px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:900px){
+    .journey{grid-template-columns:1fr}
+    .jl{border-right:none;border-bottom:2px dashed var(--line);padding-right:0;padding-bottom:18px;margin-bottom:18px}
+    .jr{padding-left:0}.jr::before{display:none}
+  }
+  @media(max-width:820px){
+    .kpis,.kpis.six{grid-template-columns:repeat(3,1fr)}
+    .grid,.grid.wide{grid-template-columns:1fr}
+    .callouts{grid-template-columns:1fr}
+    .bar{grid-template-columns:100px 1fr 42px}
+    .fstep{grid-template-columns:120px 1fr 44px 50px}
+    .convbox{grid-template-columns:1fr}
+  }
+  @media(max-width:480px){.kpis,.kpis.six{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <div class="wrap">
@@ -125,91 +210,140 @@
     <div class="meta" id="meta"></div>
   </header>
   <p class="lede" id="lede"></p>
+  <div id="degraded"></div>
 
-  <div class="kpis" id="kpis"></div>
+  <!-- ══ ACT 1 — how strangers become families ══════════════════════════ -->
+  <section class="act">
+    <div class="actbar">
+      <span class="actnum">Part one</span>
+      <h2>Acquisition &amp; conversion</h2>
+      <span class="actsub">How strangers find us, and how many become a family</span>
+    </div>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>New families by month</h2>
-      <p class="cap">Sign-ups per calendar month · from registry <code>createdAt</code></p>
-      <div class="cols" id="growth"></div>
-    </div>
-    <div class="panel">
-      <h2>Engagement mix</h2>
-      <p class="cap" id="segcap"></p>
-      <div class="segbar" id="segbar"></div>
-      <div class="legend" id="seglegend"></div>
-      <div style="margin-top:14px;font-size:12.5px;color:var(--ink-soft)" id="gapnote"></div>
-    </div>
-  </div>
+    <div class="kpis" id="kpisAcq"></div>
 
-  <div class="panel full" style="margin-bottom:16px">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap">
-      <div><h2>Daily active families</h2><p class="cap" id="daucap"></p></div>
-      <div class="daustats" id="daustats"></div>
+    <div class="panel full" style="margin-bottom:16px">
+      <h2>The journey — from channel to family</h2>
+      <p class="cap" id="journeycap"></p>
+      <div class="journey">
+        <div class="jl">
+          <div class="jhead">Where they come from</div>
+          <div id="channels"></div>
+        </div>
+        <div class="jr">
+          <div class="jhead">What happens next</div>
+          <div class="fnl" id="acqfunnel"></div>
+          <div id="convbox"></div>
+        </div>
+      </div>
     </div>
-    <div class="daubars" id="daubars"></div>
-  </div>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>Acquisition funnel</h2>
-      <p class="cap" id="acqcap"></p>
-      <div class="funnel" id="acqfunnel"></div>
+    <div class="grid wide">
+      <div class="panel">
+        <h2>Inside “Direct”</h2>
+        <p class="cap" id="directcap"></p>
+        <div id="direct"></div>
+      </div>
+      <div class="panel">
+        <h2>Google search terms</h2>
+        <p class="cap" id="gsccap"></p>
+        <div id="gsc"></div>
+      </div>
     </div>
-    <div class="panel">
-      <h2>Activation &amp; retention</h2>
-      <p class="cap" id="retcap"></p>
-      <div class="funnel" id="retfunnel"></div>
-    </div>
-  </div>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>Where families come from</h2>
-      <p class="cap">Marketing site · visitors by source · last 30 days</p>
-      <div class="bars" id="sources"></div>
+    <div class="grid">
+      <div class="panel">
+        <h2>Named referrers &amp; campaigns</h2>
+        <p class="cap">Marketing site · who actually linked to us, and which tagged campaigns landed</p>
+        <div class="bars" id="referrers"></div>
+        <h3>Tagged campaigns (UTM)</h3>
+        <div class="bars" id="utm"></div>
+      </div>
+      <div class="panel">
+        <h2>Top marketing pages</h2>
+        <p class="cap">Marketing site · the content doing the acquiring</p>
+        <div class="bars" id="mktpages"></div>
+      </div>
     </div>
-    <div class="panel">
-      <h2>What they do inside</h2>
-      <p class="cap">App · top pages by visitors · last 30 days</p>
-      <div class="bars" id="apppages"></div>
-    </div>
-  </div>
+  </section>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>Power users</h2>
-      <p class="cap">Most recently &amp; heavily active · owner emails masked</p>
-      <table><thead><tr><th>Family</th><th>Country</th><th style="text-align:right">Last seen</th><th style="text-align:right">Activity</th><th style="text-align:right">Pod</th></tr></thead>
-      <tbody id="power"></tbody></table>
+  <!-- ══ ACT 2 — the families we have, and what they do ═════════════════ -->
+  <section class="act">
+    <div class="actbar">
+      <span class="actnum">Part two</span>
+      <h2>Families &amp; usage</h2>
+      <span class="actsub">Who we have today, and what they actually do</span>
     </div>
-    <div class="panel">
-      <h2>Went quiet</h2>
-      <p class="cap">Were active, now dark &gt;30d · all shallow trials (1–6 events)</p>
-      <table><thead><tr><th>Family</th><th style="text-align:right">Dark for</th><th style="text-align:right">Lifetime events</th><th></th></tr></thead>
-      <tbody id="lost"></tbody></table>
-    </div>
-  </div>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>Acquisition channels</h2>
-      <p class="cap">Marketing site · visitors by channel · 30 days</p>
-      <div class="bars" id="channels"></div>
-      <p class="cap" style="margin-top:14px">Top campaigns (UTM)</p>
-      <div class="bars" id="utm"></div>
-    </div>
-    <div class="panel">
-      <h2>Feature adoption &amp; funnel</h2>
-      <p class="cap">App · <code>feature_used</code> by feature, and the create→signup funnel</p>
-      <div class="bars" id="features"></div>
-      <p class="cap" style="margin-top:14px">Create-family funnel</p>
-      <div class="bars" id="funnel"></div>
-    </div>
-  </div>
+    <div class="kpis" id="kpisFam"></div>
 
-  <div class="panel full" style="margin-bottom:16px">
+    <div class="grid">
+      <div class="panel">
+        <h2>New families by month</h2>
+        <p class="cap">Sign-ups per calendar month · from registry <code>createdAt</code></p>
+        <div class="cols" id="growth"></div>
+      </div>
+      <div class="panel">
+        <h2>Engagement mix</h2>
+        <p class="cap" id="segcap"></p>
+        <div class="segbar" id="segbar"></div>
+        <div class="legend" id="seglegend"></div>
+        <div style="margin-top:14px;font-size:12.5px;color:var(--ink-soft)" id="gapnote"></div>
+      </div>
+    </div>
+
+    <div class="panel full" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <div><h2>Daily active families</h2><p class="cap" id="daucap"></p></div>
+        <div class="daustats" id="daustats"></div>
+      </div>
+      <div class="daubars" id="daubars"></div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Activation &amp; retention</h2>
+        <p class="cap" id="retcap"></p>
+        <div class="fnl" id="retfunnel"></div>
+      </div>
+      <div class="panel">
+        <h2>Feature adoption</h2>
+        <p class="cap" id="featcap"></p>
+        <div class="bars" id="features"></div>
+        <div class="note" id="featnote"></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Power users</h2>
+        <p class="cap">Most recently &amp; heavily active · owner emails masked</p>
+        <div class="tscroll"><table><thead><tr><th>Family</th><th>Country</th><th style="text-align:right">Last seen</th><th style="text-align:right">Activity</th><th style="text-align:right">Pod</th></tr></thead>
+        <tbody id="power"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <h2>Went quiet</h2>
+        <p class="cap" id="lostcap"></p>
+        <div class="tscroll"><table><thead><tr><th>Family</th><th style="text-align:right">Dark for</th><th style="text-align:right">Lifetime events</th><th></th></tr></thead>
+        <tbody id="lost"></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Where they spend their time</h2>
+        <p class="cap">App · top pages by visitors</p>
+        <div class="bars" id="apppages"></div>
+      </div>
+      <div class="panel">
+        <h2>Subsystems exercised</h2>
+        <p class="cap">CloudWatch · events by <code>surface</code> · a diagnostic proxy for what's being used</p>
+        <div class="bars" id="surfaces"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel full" style="margin-top:26px;margin-bottom:16px">
     <h2>Founder callouts</h2>
     <p class="cap">The signal beneath the numbers</p>
     <div class="callouts" id="callouts"></div>
@@ -222,81 +356,183 @@
 const D = __DATA__;
 const $=id=>document.getElementById(id);
 const pct=(a,b)=>b?Math.round(a/b*100):0;
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=n=>(n==null?'—':Number(n).toLocaleString());
 function barRow(k,v,max,cls,vlabel){
   const w=max?Math.max(2,Math.round(v/max*100)):0;
-  return `<div class="bar"><span class="k" title="${k}">${k}</span><div class="track"><div class="fill ${cls||''}" style="width:${w}%"></div></div><span class="v">${vlabel!=null?vlabel:v}</span></div>`;
+  return `<div class="bar"><span class="k" title="${esc(k)}">${esc(k)}</span><div class="track"><div class="fill ${cls||''}" style="width:${w}%"></div></div><span class="v">${vlabel!=null?esc(vlabel):num(v)}</span></div>`;
 }
+const noData='<p class="cap" style="color:var(--warn)">No Plausible token — unavailable this run.</p>';
 
 // derived values (kept dynamic so the page stays true on every refresh)
 const monthEntries=Object.entries(D.growth);
 const latestMonth=monthEntries[monthEntries.length-1]||[null,0];
 const weekEntries=Object.entries(D.growthWeek);
 const lastWeekNew=(weekEntries[weekEntries.length-1]||[null,0])[1];
-const topSource=D.mkt?D.mkt.sources.filter(s=>s['visit:source']!=='Direct / None')[0]:null;
-const srcNames=[D.plausibleAvailable?'plausible':null,D.cwAvailable?'cloudwatch':null,'registry'].filter(Boolean).reverse();
+const srcNames=[D.plausibleAvailable?'plausible':null,D.searchConsoleAvailable?'search console':null,D.cwAvailable?'cloudwatch':null,'registry'].filter(Boolean).reverse();
+const C=D.conversion;
 
 // meta + lede
 const rng=D.dateRange||{label:'',days:30};
-$('meta').innerHTML = `<b>${new Date(D.generatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><br>past ${rng.days} days · ${rng.label}<br>dev/test excluded · ${srcNames.join(' · ')}`;
+$('meta').innerHTML = `<b>${new Date(D.generatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><br>past ${rng.days} days · ${esc(rng.label)}<br>dev/test excluded · ${srcNames.join(' · ')}`;
 $('lede').innerHTML = `<b>${D.counts.realFamilies} families</b> have created a beanpod (${D.counts.devTestRows} test rows excluded). <b>${D.activeReal30}</b> were active in the last ${rng.days} days — a <b>${D.engagedPctReal}% real engagement rate</b> — but <b>${D.neverReallyEngaged}</b> registered and never truly engaged.${lastWeekNew?` <b>${lastWeekNew} new families</b> landed in the most recent week.`:''}`;
 
-// KPIs
-const kpis=[
+// degraded-source notice — never render a silently-empty panel
+const gaps=[];
+if(!D.plausibleAvailable)gaps.push('<b>Plausible</b> (no API token) — every traffic, channel and conversion panel in Part one is blank');
+if(!D.searchConsoleAvailable)gaps.push('<b>Search Console</b> (no credentials) — Google search terms unavailable');
+(D.degraded||[]).forEach(x=>gaps.push(`<b>${esc(x.name)}</b> — optional query failed`));
+$('degraded').innerHTML=gaps.length?`<div class="missing" style="margin:14px 0 4px"><b>Missing this run:</b> ${gaps.join(' · ')}.</div>`:'';
+
+/* ══ ACT 1 ══════════════════════════════════════════════════════════════ */
+
+// KPIs — acquisition
+$('kpisAcq').innerHTML=[
+  {n:C?num(C.siteVisitors):'—',l:'Marketing-site visitors',s:'past '+rng.days+' days',c:'flat'},
+  {n:C?num(C.appArrivals):'—',l:'App arrivals',s:'incl. returning sign-ins',c:'flat'},
+  {n:num(C?C.actualNewFamilies:null),l:'New families',s:'registry — ground truth',c:'up'},
+  {n:C&&C.overallPct!=null?C.overallPct+'%':'—',l:'Overall conversion',s:'signups ÷ site visitors',c:'flat',accent:true},
+].map(k=>`<div class="kpi ${k.accent?'accent':''}"><div class="n">${k.n}</div><div class="l">${k.l}</div><div class="s ${k.c}">${k.s}</div></div>`).join('');
+
+// Channels — each channel with its SPECIFIC sources nested beneath it
+if(D.channelBreakdown&&D.channelBreakdown.length){
+  const cmax=Math.max(...D.channelBreakdown.map(c=>c.visitors),1);
+  $('channels').innerHTML=D.channelBreakdown.slice(0,6).map((c,i)=>{
+    const w=Math.max(3,Math.round(c.visitors/cmax*100));
+    // "Direct / None" under the Direct channel restates the channel name — drop it.
+    // Direct gets its own dedicated panel below, so point there instead.
+    const named=(c.sources||[]).filter(s=>s.source&&s.source!=='Unknown'&&s.source!=='Direct / None');
+    const chips=c.sources===null
+      ? '<span class="chip" style="font-style:italic">source detail unavailable</span>'
+      : (named.length
+          ? named.map(s=>`<span class="chip">${esc(s.source)} <b>${num(s.visitors)}</b></span>`).join('')
+          : (c.channel==='Direct'?'<span class="chip" style="font-style:italic">no referrer — broken out below</span>':''));
+    return `<div class="chgroup">
+      <div class="chtop"><span>${esc(c.channel)}</span><span class="chv">${num(c.visitors)}</span></div>
+      <div class="chtrack"><div class="chfill c${i%5}" style="width:${w}%"></div></div>
+      <div class="chsrc">${chips}</div></div>`;
+  }).join('');
+}else{$('channels').innerHTML=noData;}
+
+// Funnel — centred bands, width proportional to the top step
+function renderFunnel(elId,steps,opts){
+  const o=opts||{};
+  const top=steps[0].value||1;
+  $(elId).innerHTML=steps.map((s,i)=>{
+    const w=Math.max(1.5,(s.value/top*100));
+    const ofTop=Math.round(s.value/top*100);
+    const step=i>0&&steps[i-1].value?Math.round(s.value/steps[i-1].value*100):null;
+    const bound=s.boundary?`<div class="fbound">cross-site boundary — not per-visitor tracked</div>`:'';
+    const grew=i>0&&s.value>steps[i-1].value;
+    return bound+`<div class="fstep"${grew?' title="wider than the step above — these two steps have different denominators"':''}>
+      <div class="fl">${esc(s.label)}${s.sub?`<small>${esc(s.sub)}</small>`:''}</div>
+      <div class="ftrack"><div class="fshape ${s.site==='app'&&o.dim?'app':''}" style="width:${w}%"></div></div>
+      <div class="fv">${num(s.value)}</div>
+      <div class="fpc ${i===0?'first':''}" style="${grew?'color:var(--warn)':''}">${i===0?'top':step+'%'}<span class="fof">${i===0?'of total':ofTop+'% of top'}</span></div>
+    </div>`;
+  }).join('');
+}
+
+if(D.funnelAcq){
+  $('journeycap').innerHTML=`Channels on the left are the inflow to the funnel on the right. `+
+    (D.funnelAcq.hasMeasuredHandoff
+      ? `The marketing→app hand-off is <b>measured</b> via outbound-link clicks. The app also saw <b>${num(D.funnelAcq.appArrivals)}</b> arrivals in total — the difference is returning families signing in, who never passed through this funnel.`
+      : `The marketing→app hand-off is <b>not tracked</b> — the two sites are separate Plausible properties with no shared visitor id, so that one step is an aggregate ratio, not a followed visitor.`);
+  renderFunnel('acqfunnel',D.funnelAcq.steps);
+}else{
+  $('journeycap').textContent='No Plausible token — the acquisition funnel is unavailable this run.';
+  $('acqfunnel').innerHTML=noData;
+}
+
+// The headline conversion readout — the number greg asked to see prominently
+if(C){
+  const gap=C.gapIsMaterial;
+  $('convbox').innerHTML=`<div class="convbox">
+    <div><div class="convbig">${C.overallPct!=null?C.overallPct+'%':'—'}<small>overall conversion</small></div></div>
+    <div>
+      <div class="convnote"><b>${num(C.completed)} signups</b> from <b>${num(C.siteVisitors)}</b> marketing-site visitors. Both halves come from Plausible, so the definition is consistent — but this is a <b>cross-site ratio, not a tracked funnel</b>: no single visitor can be followed from the marketing site into the app.</div>
+      <div class="convrow">
+        <div class="cr"><b>${C.inAppPct!=null?C.inAppPct+'%':'—'}</b>app arrivals → signup <span style="color:var(--good)">(true funnel)</span></div>
+        <div class="cr"><b>${C.finishPct!=null?C.finishPct+'%':'—'}</b>started → finished creating</div>
+        <div class="cr"><b>${num(C.actualNewFamilies)}</b>families actually created <span style="color:var(--ink-faint)">(registry)</span></div>
+        <div class="cr"><b>${C.overallPctUpperBound!=null?C.overallPctUpperBound+'%':'—'}</b>upper bound <span style="color:var(--ink-faint)">(registry ÷ visitors)</span></div>
+      </div>
+      ${gap?`<div class="missing" style="margin-top:12px">The registry recorded <b>${num(C.actualNewFamilies)}</b> new families but the Plausible signup goal fired <b>${num(C.completed)}</b> times. Either the goal is under-firing, or ${num(C.goalVsRegistryGap)} families arrived without passing through the marketing site (direct, invited, or native app). Worth resolving — it decides which of the two rates above is real.</div>`:''}
+    </div>
+  </div>`;
+}else{$('convbox').innerHTML='';}
+
+// Inside Direct
+if(D.direct){
+  const d=D.direct, tot=(d.homepageVisitors||0)+(d.deepLinkVisitors||0);
+  $('directcap').innerHTML=`<b>${num(d.visitors)}</b> visitors with no referrer. The entry page splits them into two very different groups.`;
+  const homeW=tot?Math.round(d.homepageVisitors/tot*100):50;
+  const ret=(d.returning||[]).length
+    ? d.returning.map(r=>`<span class="chip">${esc(r['visit:is_returning']===true||r['visit:is_returning']==='true'?'returning':'new')} <b>${num(r.visitors)}</b></span>`).join('')
+    : `<span class="chip">${d.sessionsPerVisitor!=null?d.sessionsPerVisitor:'—'} <b>visits / visitor</b></span>`;
+  $('direct').innerHTML=`
+    <div class="split">
+      <span style="flex:${Math.max(d.homepageVisitors,1)};background:var(--slate-2)">${num(d.homepageVisitors)}</span>
+      <span style="flex:${Math.max(d.deepLinkVisitors,1)};background:var(--terra)">${num(d.deepLinkVisitors)}</span>
+    </div>
+    <div class="legend" style="margin-bottom:14px">
+      <span><i style="background:var(--slate-2)"></i>Typed / bookmarked · landed on <code>/</code> — brand-aware</span>
+      <span><i style="background:var(--terra)"></i><b>Dark social</b> · landed deep — a link shared in WhatsApp, Discord, iMessage or email, which strips the referrer</span>
+    </div>
+    <h3>Where direct visitors land</h3>
+    <div class="bars">${(d.entryPages||[]).slice(0,6).map((e,i)=>barRow(e['visit:entry_page'],e.visitors,Math.max(...(d.entryPages||[{visitors:1}]).map(x=>x.visitors),1),i===0?'slate':'terra')).join('')||'<p class="cap">No entry-page detail.</p>'}</div>
+    <h3>Repeat behaviour &amp; texture</h3>
+    <div class="chsrc">${ret}
+      ${d.bounce!=null?`<span class="chip">bounce <b>${d.bounce}%</b></span>`:''}
+      ${d.duration!=null?`<span class="chip">avg visit <b>${Math.round(d.duration)}s</b></span>`:''}
+      ${(d.countries||[]).slice(0,3).map(c=>`<span class="chip">${esc(c['visit:country'])} <b>${num(c.visitors)}</b></span>`).join('')}
+      ${(d.devices||[]).slice(0,3).map(c=>`<span class="chip">${esc(c['visit:device'])} <b>${num(c.visitors)}</b></span>`).join('')}
+    </div>
+    <div class="note">${(d.returning||[]).length?'New-vs-returning comes from Plausible directly.':'Plausible exposes no new-vs-returning dimension on this plan, so <b>visits per visitor</b> is the repeat-visit proxy: above ~1.3 means a meaningful share are coming back.'}</div>`;
+}else{
+  $('directcap').textContent='Direct-traffic detail unavailable this run.';
+  $('direct').innerHTML=noData;
+}
+
+// Google search terms (Search Console)
+if(D.searchTerms){
+  const st=D.searchTerms;
+  $('gsccap').innerHTML=`<b>${num(st.totals.clicks)}</b> clicks from <b>${num(st.totals.impressions)}</b> impressions. Ranked by clicks — Search Console has no conversion signal, so "converting" is <b>inferred</b> from the landing page, never tracked.`;
+  const rowsHtml=st.top.slice(0,10).map(q=>`<tr><td class="q">${esc(q.query)}</td><td class="num">${num(q.clicks)}</td><td class="num">${num(q.impressions)}</td><td class="num">${q.ctr}%</td><td class="num">${q.position}</td></tr>`).join('');
+  $('gsc').innerHTML=`<div class="tscroll"><table><thead><tr><th>Query</th><th style="text-align:right">Clicks</th><th style="text-align:right">Impr.</th><th style="text-align:right">CTR</th><th style="text-align:right">Pos</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+    +(st.opportunities.length?`<h3>Ranking but not winning the click</h3><div class="bars">${st.opportunities.map(q=>barRow(q.query,q.impressions,Math.max(...st.opportunities.map(x=>x.impressions),1),'sky',q.impressions+' impr · '+q.ctr+'%')).join('')}</div><div class="note">These rank on page 1–2 but almost nobody clicks. Rewriting the title and meta description of their landing pages is the cheapest SEO win available.</div>`:'');
+}else{
+  $('gsccap').innerHTML='Not connected. Plausible <b>cannot</b> report search terms — Google strips the query from the referrer, so organic Google visits arrive with no term attached. Search Console is the only source.';
+  $('gsc').innerHTML=`<div class="missing">To switch this on: enable the <b>Google Search Console API</b> in Google Cloud, create a service account + JSON key, save it to <code>~/.config/beanies/gsc-service-account.json</code>, then add that service-account email as a <b>Restricted</b> user on the <code>beanies.family</code> Search Console property.</div>`;
+}
+
+// referrers + utm + marketing pages
+if(D.mkt){
+  const refs=D.mkt.referrers||[];
+  $('referrers').innerHTML=refs.length?refs.map(r=>barRow(r['visit:referrer'],r.visitors,Math.max(...refs.map(x=>x.visitors),1),'slate')).join(''):'<p class="cap">No named referrers in range.</p>';
+  const umax=Math.max(...(D.mkt.utm||[]).map(u=>u.visitors),1);
+  $('utm').innerHTML=(D.mkt.utm||[]).length?D.mkt.utm.map(u=>barRow(u['visit:utm_campaign'],u.visitors,umax,'terra')).join(''):'<p class="cap">No tagged campaigns in range.</p>';
+  const pmax=Math.max(...D.mkt.pages.map(p=>p.visitors),1);
+  $('mktpages').innerHTML=D.mkt.pages.map(p=>barRow(p['event:page'],p.visitors,pmax,'orange')).join('');
+}else{$('referrers').innerHTML=noData;$('utm').innerHTML='';$('mktpages').innerHTML=noData;}
+
+/* ══ ACT 2 ══════════════════════════════════════════════════════════════ */
+
+$('kpisFam').innerHTML=[
   {n:D.counts.realFamilies,l:'Real families',s:'+'+latestMonth[1]+' this month',c:'up',accent:true},
   {n:D.activeReal30,l:'Active · 30 days',s:D.activeReal7+' in last 7d',c:'flat'},
   {n:D.engagedPctReal+'%',l:'Engagement rate',s:'active ÷ registered',c:'flat'},
   {n:D.neverReallyEngaged,l:'Never engaged',s:'activation gap',c:'down'},
-  {n:D.mkt?D.mkt.overview.visitors:'—',l:'Site visitors',s:topSource?topSource['visit:source']+' is #2 source':'30-day',c:'flat'},
-  {n:D.newsletter.optedInPct+'%',l:'Newsletter opt-in',s:D.newsletter.optedIn+' families',c:'flat'},
-];
-$('kpis').innerHTML=kpis.map(k=>`<div class="kpi ${k.accent?'accent':''}"><div class="n">${k.n}</div><div class="l">${k.l}</div><div class="s ${k.c}">${k.s}</div></div>`).join('');
+].map(k=>`<div class="kpi ${k.accent?'accent':''}"><div class="n">${k.n}</div><div class="l">${k.l}</div><div class="s ${k.c}">${k.s}</div></div>`).join('');
 
 // growth cols
-const g=Object.entries(D.growth);const gmax=Math.max(...g.map(x=>x[1]));
+const g=Object.entries(D.growth);const gmax=Math.max(...g.map(x=>x[1]),1);
 $('growth').innerHTML=g.map(([m,v])=>{
   const h=Math.round(v/gmax*100);const lbl=new Date(m+'-01').toLocaleDateString('en',{month:'short'});
   return `<div class="col"><div class="cv">${v}</div><div class="stalk" style="height:${h}%"></div><div class="cl">${lbl}</div></div>`;
 }).join('');
 
-// DAU — daily active families trend + avg / peak / stickiness
-if(D.dau&&D.dau.series&&D.dau.series.length){
-  const s=D.dau.series, dmax=Math.max(...s.map(x=>x.dau),1);
-  $('daucap').textContent=`Distinct families active per day (CloudWatch) · unit = families, not members · a floor (offline use flushes later)`;
-  const stats=[
-    {n:D.dau.avg,l:'avg / day',accent:true},
-    {n:D.dau.peak,l:'peak'},
-    {n:D.dau.stickiness!=null?D.dau.stickiness+'%':'—',l:'DAU/MAU stickiness'},
-  ];
-  $('daustats').innerHTML=stats.map(x=>`<div class="ds ${x.accent?'accent':''}"><div class="dn">${x.n}</div><div class="dl">${x.l}</div></div>`).join('');
-  $('daubars').innerHTML=s.map(x=>`<div class="db ${x.dau>=dmax?'hi':''}" style="height:${Math.max(4,Math.round(x.dau/dmax*100))}%" title="${x.day}: ${x.dau}"></div>`).join('');
-  const ax=document.createElement('div');ax.className='dauaxis';
-  ax.innerHTML=`<span>${s[0].day.slice(5)}</span><span>DAU/MAU = active-on-an-average-day ÷ monthly-active (${D.dau.mau})</span><span>${s[s.length-1].day.slice(5)}</span>`;
-  $('daubars').after(ax);
-}else{$('daucap').textContent='No CloudWatch DAU data this run.';}
-
-// conversion funnels — width vs top step, with step-conversion % and % of top
-function renderFunnel(elId,steps){
-  const top=steps[0].value||1;
-  $(elId).innerHTML=steps.map((s,i)=>{
-    const w=Math.max(4,Math.round(s.value/top*100));
-    const ofTop=Math.round(s.value/top*100);
-    const step=i>0&&steps[i-1].value?Math.round(s.value/steps[i-1].value*100):null;
-    return `<div class="fstep"><div class="fl" title="${s.label}">${s.label}</div>`
-      +`<div class="ftrack"><div class="ffill" style="width:${w}%"></div></div>`
-      +`<div class="fv">${s.value}</div>`
-      +`<div class="fpc ${i===0?'first':''}">${i===0?'top':step+'%'}<span class="fof">${i===0?'':ofTop+'% of top'}</span></div></div>`;
-  }).join('');
-}
-if(D.funnelAcq){
-  $('acqcap').innerHTML=`App-site funnel (shared sessions). Marketing site drew <b>${D.funnelAcq.marketingVisitors}</b> visitors — a separate Plausible site, so that step is an aggregate, not a per-visitor hand-off.`;
-  renderFunnel('acqfunnel',D.funnelAcq.steps);
-}else{$('acqcap').textContent='No Plausible token — acquisition funnel unavailable this run.';}
-if(D.funnelRet){
-  $('retcap').innerHTML=`Cohort: ${D.funnelRet.cohortDef} (<b>${D.funnelRet.cohortN}</b> families). Per-family, joined via CloudWatch — a floor (activity older than 90 days isn't observable).`;
-  renderFunnel('retfunnel',D.funnelRet.steps);
-}else{$('retcap').textContent='No CloudWatch data — retention funnel unavailable this run.';}
-
-// engagement segbar (of real 56): active7, active8-30, quiet/lost, never
+// engagement segbar
 const seg=[
   {l:'Active ≤7d',v:D.activeReal7,c:'var(--good)'},
   {l:'Active 8–30d',v:D.activeReal30-D.activeReal7,c:'var(--orange)'},
@@ -305,66 +541,84 @@ const seg=[
 ];
 const segTot=D.counts.realFamilies;
 $('segcap').textContent=`Of ${segTot} real families, by true activity${D.cwAvailable?' (CloudWatch-reconciled)':' (registry only)'}`;
-$('segbar').innerHTML=seg.map(s=>`<span style="flex:${s.v};background:${s.c}">${s.v}</span>`).join('');
+$('segbar').innerHTML=seg.map(s=>`<span style="flex:${Math.max(s.v,0.4)};background:${s.c}">${s.v}</span>`).join('');
 $('seglegend').innerHTML=seg.map(s=>`<span><i style="background:${s.c}"></i>${s.l} · <b>${s.v}</b> (${pct(s.v,segTot)}%)</span>`).join('');
 $('gapnote').innerHTML=`<b style="color:var(--warn)">Activation gap:</b> ${D.neverReallyEngaged} families registered but show essentially no activity — the biggest lever on these numbers.`;
 
-const noData='<p class="cap" style="color:var(--warn)">No Plausible token — traffic &amp; usage unavailable this run.</p>';
-// sources
-if(D.mkt){const smax=Math.max(...D.mkt.sources.map(s=>s.visitors));
-  $('sources').innerHTML=D.mkt.sources.map((s,i)=>barRow(s['visit:source'],s.visitors,smax,i===0?'slate':(i===1?'orange':'sky'))).join('');
-}else{$('sources').innerHTML=noData;}
+// DAU
+if(D.dau&&D.dau.series&&D.dau.series.length){
+  const s=D.dau.series, dmax=Math.max(...s.map(x=>x.dau),1);
+  $('daucap').textContent=`Distinct families active per day (CloudWatch) · unit = families, not members · a floor (offline use flushes later)`;
+  $('daustats').innerHTML=[
+    {n:D.dau.avg,l:'avg / day',accent:true},{n:D.dau.peak,l:'peak'},
+    {n:D.dau.stickiness!=null?D.dau.stickiness+'%':'—',l:'DAU/MAU stickiness'},
+  ].map(x=>`<div class="ds ${x.accent?'accent':''}"><div class="dn">${x.n}</div><div class="dl">${x.l}</div></div>`).join('');
+  $('daubars').innerHTML=s.map(x=>`<div class="db ${x.dau>=dmax?'hi':''}" style="height:${Math.max(4,Math.round(x.dau/dmax*100))}%" title="${x.day}: ${x.dau}"></div>`).join('');
+  const ax=document.createElement('div');ax.className='dauaxis';
+  ax.innerHTML=`<span>${s[0].day.slice(5)}</span><span>DAU/MAU = active-on-an-average-day ÷ monthly-active (${D.dau.mau})</span><span>${s[s.length-1].day.slice(5)}</span>`;
+  $('daubars').after(ax);
+}else{$('daucap').textContent='No CloudWatch DAU data this run.';}
 
-// app pages
-if(D.app){const amax=Math.max(...D.app.pages.map(p=>p.visitors));
-  $('apppages').innerHTML=D.app.pages.map(p=>barRow(p['event:page'],p.visitors,amax,'terra')).join('');
-}else{$('apppages').innerHTML=noData;}
+// activation & retention (a TRUE per-family cohort — the actionable funnel)
+if(D.funnelRet){
+  $('retcap').innerHTML=`Cohort: ${D.funnelRet.cohortDef} (<b>${D.funnelRet.cohortN}</b> families). Per-family, joined via CloudWatch — a floor (activity older than 90 days isn't observable).`;
+  renderFunnel('retfunnel',D.funnelRet.steps,{dim:false});
+}else{$('retcap').textContent='No CloudWatch data — retention funnel unavailable this run.';}
+
+// feature adoption — its own focused panel now, no duplicated mini-funnel
+if(D.app){
+  const feats=D.app.features||[];
+  $('featcap').innerHTML=`App · <code>feature_used</code> events by feature — what families actually reach for.`;
+  const fmax=Math.max(...feats.map(f=>f.events),1);
+  $('features').innerHTML=feats.length?feats.map(f=>barRow(f['event:props:feature'],f.events,fmax,'orange',`${num(f.events)} · ${num(f.visitors)} fam`)).join(''):'<p class="cap">No feature_used events in range.</p>';
+  const joined=(D.app.goals||[]).find(g=>g['event:goal'].includes('Member Joined'));
+  const login=(D.app.login||[]).map(l=>`<span class="chip">${esc(l['event:props:method'])} <b>${num(l.visitors)}</b></span>`).join('');
+  $('featnote').innerHTML=(joined?`<b>${num(joined.visitors)}</b> families had a member join — family growth after signup. `:'')+(login?`Login mix: ${login}`:'');
+}else{$('features').innerHTML=noData;$('featcap').textContent='App usage unavailable this run.';}
 
 // power users
 $('power').innerHTML=D.topActive.map(f=>{
   const you=f.cwEvents>100000;
   const seen=f.cwDays===0?'today':(f.cwDays===1?'1d ago':f.cwDays+'d ago');
-  return `<tr><td class="name">${f.name}${you?'<span class="tag you">internal</span>':''}</td><td>${f.country||'—'}</td><td class="num">${seen}</td><td class="num">${f.cwEvents.toLocaleString()}</td><td class="num">${f.pod?f.pod+'KB':'—'}</td></tr>`;
+  return `<tr><td class="name">${esc(f.name)}${you?'<span class="tag you">internal</span>':''}</td><td>${esc(f.country||'—')}</td><td class="num">${seen}</td><td class="num">${num(f.cwEvents)}</td><td class="num">${f.pod?f.pod+'KB':'—'}</td></tr>`;
 }).join('');
 
 // lost
-$('lost').innerHTML=D.lost.map(f=>`<tr><td class="name">${f.name.trim()}</td><td class="num">${f.days}d</td><td class="num">${f.events}</td><td style="text-align:right"><span class="pill ${f.days>60?'bad':'warn'}">${f.days>60?'churned':'at risk'}</span></td></tr>`).join('');
+const lostMax=D.lost.length?Math.max(...D.lost.map(l=>l.events)):0;
+$('lostcap').innerHTML=D.lost.length?`Were active, now dark &gt;30d · lifetime events 1–${lostMax}`:'Nobody has gone dark in this window.';
+$('lost').innerHTML=D.lost.map(f=>`<tr><td class="name">${esc(f.name.trim())}</td><td class="num">${f.days}d</td><td class="num">${num(f.events)}</td><td style="text-align:right"><span class="pill ${f.days>60?'bad':'warn'}">${f.days>60?'churned':'at risk'}</span></td></tr>`).join('');
 
-// channels
-if(D.mkt){const cmax=Math.max(...D.mkt.channels.map(c=>c.visitors));
-  $('channels').innerHTML=D.mkt.channels.map((c,i)=>barRow(c['visit:channel'],c.visitors,cmax,i===1?'orange':'sky')).join('');
-  const umax=Math.max(...D.mkt.utm.map(u=>u.visitors),1);
-  $('utm').innerHTML=D.mkt.utm.length?D.mkt.utm.map(u=>barRow(u['visit:utm_campaign'],u.visitors,umax,'terra')).join(''):'<p class="cap">No tagged campaigns in range.</p>';
-}else{$('channels').innerHTML=noData;$('utm').innerHTML='';}
-
-// features + funnel
-if(D.app){const fmax=Math.max(...D.app.features.map(f=>f.events),1);
-  $('features').innerHTML=D.app.features.length?D.app.features.map(f=>barRow(f['event:props:feature'],f.events,fmax,'orange')).join(''):'<p class="cap">No feature_used events in range.</p>';
-  const gm=n=>{const x=D.app.goals.find(g=>g['event:goal'].includes(n));return x?x.visitors:0};
-  const fn=[['Create clicked',gm('Button Clicked')],['Signup completed',gm('Signup Completed')],['Member joined',gm('Member Joined')]];
-  const fnmax=Math.max(...fn.map(x=>x[1]),1);
-  $('funnel').innerHTML=fn.map(([k,v])=>barRow(k,v,fnmax,'sky',v)).join('');
-}else{$('features').innerHTML=noData;$('funnel').innerHTML='';}
+// app pages + surfaces
+if(D.app){const amax=Math.max(...D.app.pages.map(p=>p.visitors),1);
+  $('apppages').innerHTML=D.app.pages.map(p=>barRow(p['event:page'],p.visitors,amax,'terra')).join('');
+}else{$('apppages').innerHTML=noData;}
+if(D.surfaces&&D.surfaces.length){const smax=Math.max(...D.surfaces.map(s=>Number(s.events)||0),1);
+  $('surfaces').innerHTML=D.surfaces.map(s=>barRow(s.surface,Number(s.events)||0,smax,'sky')).join('');
+}else{$('surfaces').innerHTML='<p class="cap">No CloudWatch surface data.</p>';}
 
 // callouts — computed from the data so they stay true on every refresh
 const co=[];
 const gapPct=pct(D.neverReallyEngaged,D.counts.realFamilies);
 co.push({c:'warn',h:'Activation is the #1 lever',p:`<b>${D.neverReallyEngaged} of ${D.counts.realFamilies} families</b> (${gapPct}%) created a pod but show essentially no activity. Median beanpod is just <b>${D.dataVolume.medianBeanpodSizeKb}KB</b> and ${D.dataVolume.emptyOrTinyUnder5Kb} pods are near-empty. First-session activation moves every downstream number.`});
-if(D.mkt){
-  const social=D.mkt.channels.find(c=>c['visit:channel']==='Organic Social');
-  const top2=D.mkt.sources.filter(s=>s['visit:source']!=='Direct / None')[0];
-  if(top2)co.push({c:'good',h:`${top2['visit:source']} is your strongest earned source`,p:`<b>${top2.visitors} visitors</b> from ${top2['visit:source']} (${top2.bounce_rate}% bounce)${social?`, and Organic Social is ${social.visitors} of ${D.mkt.overview.visitors} visitors`:''} — earned reach is working.`});
+if(C&&C.gapIsMaterial){
+  co.push({c:'warn',h:'Signup instrumentation disagrees with the registry',p:`The registry created <b>${num(C.actualNewFamilies)}</b> families this window; the Plausible signup goal fired <b>${num(C.completed)}</b> times. Until that gap is explained — an under-firing goal, or families arriving outside the marketing site — every conversion rate on this page has a factor-of-${(C.actualNewFamilies/Math.max(C.completed,1)).toFixed(1)} uncertainty. This is the first thing to fix.`});
 }
-if(D.app&&D.app.pages.length){
-  const p0=D.app.pages[0],p1=D.app.pages[1];
-  co.push({c:'sky',h:`${p0['event:page']} is the home base`,p:`<b>${p0['event:page']}</b> (${p0.visitors} visitors)${p1?` and <b>${p1['event:page']}</b> (${p1.visitors})`:''} dominate app usage — families come for family life first; finance features are used but secondary.`});
+if(C&&C.finishPct!=null&&C.finishPct<80){
+  co.push({c:'warn',h:'The create-family flow leaks',p:`Only <b>${C.finishPct}%</b> of families who started creating a pod finished. That is pure product friction — no traffic mix explains it, and it is the cheapest number on this page to move.`});
+}
+if(D.direct&&D.direct.deepLinkVisitors>D.direct.homepageVisitors){
+  co.push({c:'sky',h:'Most “direct” traffic is dark social',p:`<b>${num(D.direct.deepLinkVisitors)}</b> of ${num(D.direct.visitors)} direct visitors landed on a deep page, not the homepage — that is a link being shared in private channels (WhatsApp, Discord, iMessage). It is earned distribution that no referrer report can see.`});
+}
+if(D.channelBreakdown&&D.channelBreakdown.length){
+  const earned=D.channelBreakdown.find(c=>c.channel!=='Direct');
+  if(earned&&earned.sources&&earned.sources.length)
+    co.push({c:'good',h:`${earned.channel} is the strongest earned channel`,p:`<b>${num(earned.visitors)} visitors</b>, led by <b>${esc(earned.sources[0].source)}</b> (${num(earned.sources[0].visitors)}). Earned reach is working — this is where to spend the next hour.`});
 }
 if(D.lost.length){
-  const mx=Math.max(...D.lost.map(l=>l.events));
-  co.push({c:'',h:'The "went quiet" list is reassuring',p:`All ${D.lost.length} quiet families had only <b>1–${mx} lifetime events</b> — shallow trials that bounced, not deep users lost. No power-user has churned.`});
+  co.push({c:'',h:'The “went quiet” list is reassuring',p:`All ${D.lost.length} quiet families had only <b>1–${lostMax} lifetime events</b> — shallow trials that bounced, not deep users lost. No power user has churned.`});
 }
 $('callouts').innerHTML=co.map(c=>`<div class="callout ${c.c}"><h3>${c.h}</h3><p>${c.p}</p></div>`).join('');
 
 // footer
-$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing). &nbsp; <b>Caveats:</b> members-per-family is not collected anywhere and is not shown. Registry <code>lastLoginAt</code> is date-only and login-only, so "active" here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family. "Internal" marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
+$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing)${D.searchConsoleAvailable?' · Google Search Console':''}. &nbsp; <b>Caveats:</b> members-per-family is not collected anywhere and is not shown. Registry <code>lastLoginAt</code> is date-only and login-only, so “active” here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family, so <b>overall conversion is a cross-site ratio, not a tracked per-visitor funnel</b>. Search Console reports clicks, never conversions — any “converting term” reading is inferred via the landing page. “Internal” marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
 </script>

@@ -22,11 +22,11 @@ description: >-
 
 A founder's-eye read on how beanies.family is growing and being used. It answers
 "who's actually using this, who's the heaviest, who did we lose, where do new
-families come from, and what do they do once inside?" by combining three sources
+families come from, and what do they do once inside?" by combining four sources
 that each hold part of the picture. Read `references/data-sources.md` for exact
 schemas, identifiers, and caveats before interpreting anything.
 
-## The three sources (and which question each answers)
+## The four sources (and which question each answers)
 
 1. **DynamoDB family registry** (`beanies-family-registry-prod`, ap-southeast-1) —
    the roster. Total families, signup dates (growth), last-login recency,
@@ -36,14 +36,23 @@ schemas, identifiers, and caveats before interpreting anything.
    get exercised. Diagnostic stream, not clean product analytics. **Available via
    the `aws` CLI.**
 3. **Plausible** (sites `beanies.family` + `app.beanies.family`) — traffic and
-   clean product usage. Sources, channels, referrers, UTM, top pages, funnel,
-   custom goals, feature-usage breakdown. **Needs a Stats API token** at
-   `~/.config/beanies/plausible-token` or env `PLAUSIBLE_API_KEY`; if absent,
-   skip those sections with a one-line note — the rest of the report still stands.
+   clean product usage. Sources, channels (with a **channel x source drill-down**,
+   so "Organic Social" resolves to Reddit / Pinterest), referrers, UTM, top pages,
+   funnel, custom goals, feature-usage breakdown, a **Direct-traffic deep-dive**,
+   and **outbound-link clicks** (the only measured marketing->app hand-off).
+   **Needs a Stats API token** at `~/.config/beanies/plausible-token` or env
+   `PLAUSIBLE_API_KEY`; if absent, skip those sections with a one-line note — the
+   rest of the report still stands.
+4. **Google Search Console** (optional) — **the only** source of Google search
+   terms. Plausible cannot report them and no analytics tool can: Google strips
+   the query from the referrer, so organic Google visits arrive with no term
+   attached. Needs a service-account key at
+   `~/.config/beanies/gsc-service-account.json` (or env `GSC_ACCESS_TOKEN`); the
+   script exits 3 and the panel self-hides when absent.
 
 ## Workflow
 
-Run the three collectors (they're read-only), save each JSON to the session
+Run the collectors (they're all read-only), save each JSON to the session
 scratchpad, then synthesize. Default window is 30 days unless greg asks otherwise.
 
 ```bash
@@ -64,8 +73,13 @@ bash $SKILL/query_cloudwatch.sh opens 30       > "$OUT/cw_opens.json"
 bash $SKILL/query_cloudwatch.sh daily 30       > "$OUT/cw_daily.json"   # DAU series
 
 # 3. Plausible traffic + usage (exits 3 if no token — the pipeline degrades
-#    gracefully: the dashboard hides the traffic panels with a note).
+#    gracefully: the dashboard hides the traffic panels with a note). Optional
+#    enrichment queries that fail are listed on stderr and in `_degraded`; the
+#    dashboard names them rather than rendering a silently-empty panel.
 node $SKILL/query_plausible.mjs both 30d > "$OUT/plausible.json" || echo "PLAUSIBLE SKIPPED"
+
+# 3b. Google search terms (optional — exits 3 without credentials).
+node $SKILL/query_search_console.mjs 30 > "$OUT/search_console.json" || echo "SEARCH CONSOLE SKIPPED"
 
 # 4. Consolidate + reconcile registry<->CloudWatch, and render the dashboard HTML
 #    from assets/dashboard-template.html. Writes $OUT/dashboard_data.json (the
@@ -77,7 +91,7 @@ Then interpret `dashboard_data.json` for the terminal report and publish the
 HTML. Don't dump raw JSON at greg — lead with what changed and what it means.
 The filenames above are exact — `build_dashboard.mjs` expects `registry.json`,
 `cw_activity.json`, `cw_activity7.json`, `cw_surface.json`, `cw_lastseen.json`,
-`cw_daily.json`, and (optionally) `plausible.json` in `$OUT`.
+`cw_daily.json`, and (optionally) `plausible.json` + `search_console.json` in `$OUT`.
 
 ### Cross-source reconciliation (do this — it's where the insight is)
 - Registry `lastLoginAt` is date-only and login-only; CloudWatch `last-seen` fires on
@@ -106,10 +120,18 @@ signal, not every field.
    churned / never); engaged vs non-engaged; **never-logged-in** count (activation
    gap); median days-active-before-quiet (time-to-quiet, with the date-only caveat).
 4. **Conversion funnels** (`funnelAcq`, `funnelRet`) — two funnels:
-   - **Acquisition** (Plausible, app-site: arrivals → welcome gate → started
-     creation → completed signup). Report step conversion %. State that the
-     marketing→app step is a *cross-site aggregate* (two Plausible sites, no shared
-     visitor id), not per-visitor tracking.
+   - **Acquisition** (Plausible: marketing site → hand-off → welcome gate → started
+     creation → completed signup). Lead with `conversion.overallPct` — the
+     **same-source** rate (Plausible signup goal ÷ Plausible marketing visitors).
+     Report step conversion %. State that the marketing→app step is a *cross-site
+     aggregate* (two Plausible sites, no shared visitor id), not per-visitor tracking.
+     - ⚠️ **Never lead with `conversion.overallPctUpperBound`** (registry families ÷
+       marketing visitors). Its numerator counts families created *anywhere* —
+       direct, invited, native app — against a marketing-only denominator, so it
+       mixes populations and inflates the rate. It is an upper bound, labelled as one.
+     - If `conversion.gapIsMaterial` is true, **say so prominently**: the registry
+       and the Plausible signup goal disagree, so every conversion rate carries that
+       uncertainty until it's resolved (under-firing goal vs. non-marketing arrivals).
    - **Activation/retention** (registry+CloudWatch cohort of families created ≥28d
      ago: signed up → used beyond day 0 → active at 1 week → at 4 weeks). This is
      the actionable one — a true per-family cohort. Note it's a floor (activity older
@@ -122,8 +144,18 @@ signal, not every field.
 7. **Geography / sync / newsletter** — country spread, google_drive vs local, opt-in %.
 8. **Usage (CloudWatch)** — top subsystems by events/families, app-open counts.
 9. **Traffic & acquisition (Plausible marketing)** — visitors, top sources,
-   channels, referrers, UTM campaigns, top pages, entry→exit funnel. (Skip w/ note
-   if no token.)
+   **channels resolved to named sources** (`channelBreakdown` — say "Organic Social,
+   led by Reddit", never just the bucket), referrers, UTM campaigns, top pages.
+   (Skip w/ note if no token.)
+   - **Direct** (`direct`) is usually the biggest bucket and is not a dead end: split
+     it by entry page. Landing on `/` = typed/bookmarked/brand-aware; landing deep =
+     **dark social** (a link shared in WhatsApp/Discord/iMessage/email, which strips
+     the referrer). Report `sessionsPerVisitor` as the repeat-visit proxy — Plausible
+     exposes no new-vs-returning dimension (verified: the query degrades).
+   - **Google search terms** (`searchTerms`) come from Search Console only. Rank by
+     clicks; call `opportunities` (high impressions, CTR <2%, position ≤20) the
+     cheapest SEO win. Never call any term "converting" without saying it is
+     **inferred via the landing page** — GSC has no conversion signal.
 10. **App usage (Plausible app)** — goals/conversions (signups, logins,
     member_joined, discord clicks…), feature_used breakdown, login-method mix.
 11. **Founder callouts** — 3–5 bullets: the one number that moved most, the biggest
