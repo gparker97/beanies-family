@@ -343,6 +343,9 @@ export default [
       '*.config.js',
       '*.config.ts',
       'scripts/**',
+      // Claude skill tooling (.claude/skills/**) are standalone Node CLI scripts
+      // run outside the app bundle — same rationale as scripts/** above.
+      '.claude/skills/**',
       'playwright-report/**',
       'test-results/**',
       '.github/**',
