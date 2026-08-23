@@ -1,8 +1,9 @@
 import { useTranslation } from '@/composables/useTranslation';
 import { describeRule } from '@/services/recurrence/describe';
-import { resolveRecurringItemRule } from '@/services/recurrence/adapters';
+import { resolveRecurringItemRule, activityRuleAdapter } from '@/services/recurrence/adapters';
+import { extractDatePart } from '@/utils/date';
 import type { RecurrenceRule } from '@/types/recurrence';
-import type { RecurringItem } from '@/types/models';
+import type { RecurringItem, FamilyActivity } from '@/types/models';
 
 /**
  * The one recurrence label resolver (#70) — the id→`t()` pattern (like
@@ -25,5 +26,18 @@ export function useRecurrenceLabel() {
     return describeRule(rule, anchor, t);
   };
 
-  return { describe, describeRecurringItem };
+  /** Summary for a `FamilyActivity` — `rule` first, else the legacy recurrence. */
+  const describeActivity = (
+    activity: Pick<
+      FamilyActivity,
+      'recurrence' | 'date' | 'daysOfWeek' | 'recurrenceEndDate' | 'rule'
+    >
+  ): string => {
+    const rule = activityRuleAdapter(activity);
+    return rule
+      ? describeRule(rule, extractDatePart(activity.date), t)
+      : t('planner.recurrence.none');
+  };
+
+  return { describe, describeRecurringItem, describeActivity };
 }

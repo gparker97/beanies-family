@@ -132,6 +132,7 @@ export function activityToGoogleEvent(
     daysOfWeek: activity.daysOfWeek,
     recurrenceEndDate: activity.recurrenceEndDate,
     isAllDay: isAllDayActivity(activity),
+    rule: activity.rule, // #70: authoritative when present
   });
   return assembleEvent(activity, start, end, recurrence, ctx);
 }
