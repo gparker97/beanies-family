@@ -904,7 +904,8 @@ onMounted(async () => {
             console.warn('[storage] Persistent storage granted');
           } else {
             console.warn('[storage] Persistent storage denied (eviction possible)');
-            window.plausible?.('storage_persist_denied');
+            // Fires on boot, not on a user action — see plausible.d.ts.
+            window.plausible?.('storage_persist_denied', { interactive: false });
           }
         })
         .catch((e) => {
