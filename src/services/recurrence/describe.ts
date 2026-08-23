@@ -20,7 +20,9 @@ import {
 
 type T = (key: UIStringKey) => string;
 
-const WEEKDAY_SHORT: readonly UIStringKey[] = [
+/** Short weekday i18n keys, Sunday-first (JS `Date.getDay()`). Shared so the
+ *  picker, summary and RRULE never drift on weekday labelling. */
+export const WEEKDAY_SHORT: readonly UIStringKey[] = [
   'planner.weekday.short.sun',
   'planner.weekday.short.mon',
   'planner.weekday.short.tue',
