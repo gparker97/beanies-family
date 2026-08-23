@@ -6,6 +6,7 @@ import {
   firstDueOnOrAfter,
   isResetDue,
   isRuleComplete,
+  occurrenceCount,
 } from '../recurrenceEngine';
 import type { RecurrenceRule, Cadence } from '@/types/recurrence';
 
@@ -194,5 +195,106 @@ describe('recurrenceEngine — validity', () => {
     expect(
       isRuleComplete({ unit: 'day', interval: 1, end: { kind: 'afterCount', count: 0 } })
     ).toBe(false);
+  });
+});
+
+describe('recurrenceEngine — month-end CLAMP (#70)', () => {
+  // greg's decision: a month lacking the chosen day uses that month's LAST day.
+  // Skipping is never what a user means by "monthly".
+  const monthly = (day: number | 'last'): RecurrenceRule =>
+    rule({ unit: 'month', interval: 1, monthlyAnchor: 'date', monthlyDay: day });
+
+  it('the 31st clamps rather than skipping short months', () => {
+    expect(previewNext(monthly(31), '2026-01-31', '2026-01-31', 6)).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+      '2026-05-31',
+      '2026-06-30',
+    ]);
+  });
+
+  it('the 30th clamps only where the month is shorter', () => {
+    expect(previewNext(monthly(30), '2026-01-30', '2026-01-30', 4)).toEqual([
+      '2026-01-30',
+      '2026-02-28',
+      '2026-03-30',
+      '2026-04-30',
+    ]);
+  });
+
+  it('the 29th lands on 29 Feb in a leap year and 28 Feb otherwise', () => {
+    // 2028 is a leap year; 2026 is not.
+    expect(previewNext(monthly(29), '2026-01-29', '2026-02-01', 1)).toEqual(['2026-02-28']);
+    expect(previewNext(monthly(29), '2028-01-29', '2028-02-01', 1)).toEqual(['2028-02-29']);
+  });
+
+  it("monthlyDay 31 and 'last' are the same series across 14 months", () => {
+    const from = '2026-01-31';
+    expect(previewNext(monthly(31), from, from, 14)).toEqual(
+      previewNext(monthly('last'), from, from, 14)
+    );
+  });
+
+  it('clamping also applies with an interval >= 2', () => {
+    expect(previewNext(monthly(31), '2026-01-31', '2026-01-31', 3)).not.toContain('2026-03-03');
+    const everyTwo: RecurrenceRule = rule({
+      unit: 'month',
+      interval: 2,
+      monthlyAnchor: 'date',
+      monthlyDay: 31,
+    });
+    expect(previewNext(everyTwo, '2026-01-31', '2026-01-31', 3)).toEqual([
+      '2026-01-31',
+      '2026-03-31',
+      '2026-05-31',
+    ]);
+  });
+
+  it('a clamped month is never dropped from a range', () => {
+    // The regression this exists to catch: February vanishing entirely.
+    const feb = occurrencesInRange(monthly(31), '2026-01-31', '2026-02-01', '2026-02-28');
+    expect(feb).toEqual(['2026-02-28']);
+  });
+});
+
+describe('occurrenceCount — one place that knows how both ends terminate (#70)', () => {
+  it('counts an afterCount series exactly', () => {
+    expect(
+      occurrenceCount(
+        { unit: 'week', interval: 1, weekdays: [1], end: { kind: 'afterCount', count: 6 } },
+        A
+      )
+    ).toBe(6);
+  });
+
+  it('counts an onDate series inclusively', () => {
+    // Mondays from Mon 24 Aug 2026 through 21 Sep inclusive = 5.
+    expect(
+      occurrenceCount(
+        { unit: 'week', interval: 1, weekdays: [1], end: { kind: 'onDate', date: '2026-09-21' } },
+        A
+      )
+    ).toBe(5);
+  });
+
+  it('counts a multi-weekday series', () => {
+    // Mon+Wed from Sun 23 Aug through Wed 2 Sep = 24, 26, 31 Aug + 2 Sep = 4.
+    expect(
+      occurrenceCount(
+        {
+          unit: 'week',
+          interval: 1,
+          weekdays: [1, 3],
+          end: { kind: 'onDate', date: '2026-09-02' },
+        },
+        A
+      )
+    ).toBe(4);
+  });
+
+  it('returns null for a never-ending series rather than a guess', () => {
+    expect(occurrenceCount(rule({ unit: 'day', interval: 1 }), A)).toBeNull();
   });
 });

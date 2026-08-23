@@ -7,6 +7,8 @@ import { getListCategory } from '@/constants/listCategories';
 import { isListDue, isRecurring, listProgress } from '@/utils/listLifecycle';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort } from '@/utils/date';
+import { resolveListRule } from '@/services/recurrence/adapters';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import type { FamilyList } from '@/types/models';
 
@@ -14,6 +16,7 @@ const props = defineProps<{ list: FamilyList }>();
 const emit = defineEmits<{ open: [id: string] }>();
 
 const { t } = useTranslation();
+const { describe } = useRecurrenceLabel();
 const { categoryLabel } = useListCategoryLabel();
 const { today } = useToday();
 
@@ -34,11 +37,14 @@ const statusPill = computed<Pill | null>(() => {
   if (list.linkedVacationId || list.linkedActivityId) {
     return { glyph: '🔗', text: t('lists.status.linked'), kind: 'linked' };
   }
-  if (isRecurring(list) && list.frequency) {
-    // short frequency word (mockup: "🔁 Weekly"), recurring = purple
+  // #70: regenerate from the canonical cadence rather than the legacy word, so
+  // an every-2-weeks reset reads correctly. The pill is a compact chip, so the
+  // template truncates and carries the full text as its title.
+  const resolvedReset = isRecurring(list) ? resolveListRule(list) : null;
+  if (resolvedReset) {
     return {
       glyph: '🔁',
-      text: t(`lists.detail.freq.${list.frequency}` as 'lists.detail.freq.weekly'),
+      text: describe(resolvedReset.rule, resolvedReset.anchor),
       kind: 'recurring',
     };
   }
@@ -86,7 +92,8 @@ const statusPill = computed<Pill | null>(() => {
         </span>
         <span
           v-if="statusPill"
-          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+          class="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full px-2 py-0.5 text-xs font-semibold"
+          :title="statusPill.text"
           :class="{
             'bg-[var(--tint-orange-15)] text-[var(--color-primary-500)]':
               statusPill.kind === 'due' || statusPill.kind === 'overdue',

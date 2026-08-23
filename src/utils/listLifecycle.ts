@@ -11,7 +11,8 @@
 // and safe to call from date-dependent code that reads `useToday`.
 
 import type { FamilyList } from '@/types/models';
-import { parseLocalDate, toDateInputValue } from '@/utils/date';
+import { resolveListRule } from '@/services/recurrence/adapters';
+import { isResetDue } from '@/services/recurrence/recurrenceEngine';
 
 /** A recurring (schedule-driven, auto-resetting) list. */
 export function isRecurring(list: FamilyList): boolean {
@@ -66,19 +67,10 @@ export function isDueSoon(list: FamilyList, todayStr: string): boolean {
   return due === 'overdue' || due === 'today';
 }
 
-/** The Monday (ISO week start) of the week containing `ymd`, as `YYYY-MM-DD`. */
-function mondayOf(ymd: string): string {
-  const d = parseLocalDate(ymd.slice(0, 10));
-  const dow = d.getDay(); // 0=Sun..6=Sat
-  const daysSinceMonday = (dow + 6) % 7;
-  d.setDate(d.getDate() - daysSinceMonday);
-  return toDateInputValue(d);
-}
-
-/** `YYYY-MM` of `ymd` — the calendar-month key. */
-function monthKey(ymd: string): string {
-  return ymd.slice(0, 7);
-}
+// (#70) `mondayOf` / `monthKey` — the old per-frequency reset switch — moved to
+// `listLifecycle.test.ts` as the PARITY ORACLE. The engine now decides the
+// boundary; the test asserts it reproduces the legacy rule exactly, so deleting
+// the implementation here does not destroy the thing that proves it correct.
 
 export interface RecurringResetResult {
   /** True when a new period has started since `lastResetDate`. */
@@ -98,21 +90,18 @@ export interface RecurringResetResult {
  */
 export function computeRecurringReset(list: FamilyList, todayStr: string): RecurringResetResult {
   const last = list.lastResetDate?.slice(0, 10);
-  if (!isRecurring(list) || !list.frequency || !last) {
+  // Both guards preserved verbatim (#70): a non-recurring list, or one with no
+  // `lastResetDate` baseline, never resets. `resolveListRule` returns null for a
+  // recurring list with neither cadence nor frequency, which subsumes the old
+  // `!list.frequency` check without defaulting anything to weekly.
+  const resolved = isRecurring(list) && last ? resolveListRule(list) : null;
+  if (!resolved || !last) {
     return { shouldReset: false, nextResetDate: last ?? todayStr };
   }
 
-  let shouldReset = false;
-  switch (list.frequency) {
-    case 'daily':
-      shouldReset = todayStr > last;
-      break;
-    case 'weekly':
-      shouldReset = mondayOf(todayStr) > mondayOf(last);
-      break;
-    case 'monthly':
-      shouldReset = monthKey(todayStr) > monthKey(last);
-      break;
-  }
+  // The engine decides the boundary. `anchor` (creation) and the `last` cursor
+  // stay separate, so a cycle never re-anchors on a missed reset — an
+  // every-2-weeks list left unopened past its due day does not drift forward.
+  const shouldReset = isResetDue(resolved.rule, resolved.anchor, last, todayStr);
   return { shouldReset, nextResetDate: shouldReset ? todayStr : last };
 }

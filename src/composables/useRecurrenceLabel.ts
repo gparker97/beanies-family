@@ -1,9 +1,12 @@
 import { useTranslation } from '@/composables/useTranslation';
 import { describeRule } from '@/services/recurrence/describe';
-import { resolveRecurringItemRule, activityRuleAdapter } from '@/services/recurrence/adapters';
-import { extractDatePart } from '@/utils/date';
+import {
+  resolveTransactionRule,
+  resolveActivityRule,
+  type ActivityRecurrenceFields,
+} from '@/services/recurrence/adapters';
 import type { RecurrenceRule } from '@/types/recurrence';
-import type { RecurringItem, FamilyActivity } from '@/types/models';
+import type { RecurringItem } from '@/types/models';
 
 /**
  * The one recurrence label resolver (#70) — the id→`t()` pattern (like
@@ -22,20 +25,18 @@ export function useRecurrenceLabel() {
 
   /** Summary for a `RecurringItem` — reads `rule` if present, else the legacy fields. */
   const describeRecurringItem = (item: RecurringItem): string => {
-    const { rule, anchor } = resolveRecurringItemRule(item);
-    return describeRule(rule, anchor, t);
+    const resolved = resolveTransactionRule(item);
+    // null ⟺ unmappable stored shape (already logged) — fall back to the plain
+    // frequency word rather than rendering nothing.
+    if (!resolved) return t('planner.recurrence.none');
+    return describeRule(resolved.rule, resolved.anchor, t);
   };
 
   /** Summary for a `FamilyActivity` — `rule` first, else the legacy recurrence. */
-  const describeActivity = (
-    activity: Pick<
-      FamilyActivity,
-      'recurrence' | 'date' | 'daysOfWeek' | 'recurrenceEndDate' | 'rule'
-    >
-  ): string => {
-    const rule = activityRuleAdapter(activity);
-    return rule
-      ? describeRule(rule, extractDatePart(activity.date), t)
+  const describeActivity = (activity: ActivityRecurrenceFields): string => {
+    const resolved = resolveActivityRule(activity);
+    return resolved
+      ? describeRule(resolved.rule, resolved.anchor, t)
       : t('planner.recurrence.none');
   };
 

@@ -4,6 +4,7 @@ import { chooseScope } from '@/composables/useRecurringEditScope';
 import { confirm } from '@/composables/useConfirm';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
+import { endSeriesPatch } from '@/utils/activitySeriesEnd';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry';
@@ -100,6 +101,23 @@ export function useActivityScopeEdit() {
       // shifted start keeps the same weekday as the moved occurrence and stays
       // consistent with the form's watcher-updated `daysOfWeek`.
       const patch = { ...changes };
+      // #70: `if (movedTo && template)` silently DROPPED the user's date move
+      // when the template lookup above missed — and the save then reported
+      // success. Fail loudly instead. Scoped to `all` deliberately: the
+      // `this-only` and `this-and-future` branches never dereference `template`,
+      // so a blanket guard here would break two working paths.
+      if (movedTo && !template) {
+        showToast(
+          'error',
+          t('planner.scopeEditFailed.title'),
+          t('planner.scopeEditFailed.message'),
+          {
+            surface: 'activity-scope-edit',
+            context: { action: 'template-missing', recur_scope: scope },
+          }
+        );
+        return false;
+      }
       if (movedTo && template) patch.date = shiftAnchor(template.date);
       if (!(await activityStore.updateActivity(templateId, patch))) {
         reportSessionActionFailed();
@@ -195,9 +213,12 @@ export function useActivityScopeEdit() {
         const dayBefore = toDateInputValue(
           addDays(parseLocalDate(viewingOccurrenceDate.value!), -1)
         );
-        const updated = await activityStore.updateActivity(activity.id, {
-          recurrenceEndDate: dayBefore,
-        });
+        // #70: end the authoritative representation, not just the shadow —
+        // `expandRecurring` reads `rule.end` for a rule-bearing series.
+        const updated = await activityStore.updateActivity(
+          activity.id,
+          endSeriesPatch(activity, dayBefore)
+        );
         if (!updated) {
           reportSessionActionFailed();
           return false;

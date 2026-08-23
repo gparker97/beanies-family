@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import { getActivityColor } from '@/stores/activityStore';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -11,6 +12,7 @@ import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
 
 const { t } = useTranslation();
+const { describeActivity } = useRecurrenceLabel();
 
 const props = withDefaults(
   defineProps<{
@@ -80,11 +82,20 @@ function formatDisplayDate(dateStr: string): string {
         <span v-else-if="activity.isAllDay" class="text-primary-500 text-xs font-medium">
           {{ t('planner.allDay') }}
         </span>
+        <!--
+          #70: was `t('planner.recurrence.' + activity.recurrence)` — a translated
+          enum, so an every-3-weeks rule printed "Weekly". Now the canonical
+          summary, truncated because this chip sits in a dense row, with the full
+          text on hover. `activity.recurrence !== 'none'` stays the visibility
+          gate: that bit of the shadow is faithful for every rule (see the
+          fidelity contract in adapters.ts).
+        -->
         <span
           v-if="activity.recurrence !== 'none'"
-          class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"
+          class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 max-w-[10rem] truncate rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"
+          :title="describeActivity(activity)"
         >
-          {{ t(`planner.recurrence.${activity.recurrence}`) }}
+          {{ describeActivity(activity) }}
         </span>
         <span
           v-if="showReminder && activity.reminderMinutes > 0"

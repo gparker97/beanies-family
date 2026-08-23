@@ -15,7 +15,7 @@ export type CountryCode = string; // ISO 3166-1 alpha-2, uppercase (e.g., 'SG', 
 // activities and lists. Re-exported here so `@/types/models` stays the single
 // import site for entity types. Type-only, so the models<->recurrence import is
 // erased at build (no runtime cycle).
-import type { RecurrenceRule } from './recurrence';
+import type { RecurrenceRule, Cadence } from './recurrence';
 export type {
   RecurrenceUnit,
   MonthlyAnchor,
@@ -353,7 +353,7 @@ export interface RecurringItem {
   /**
    * Canonical unified recurrence rule (#70). When present it is the SOLE
    * authority; when absent, the legacy `frequency`/`dayOfMonth`/`monthOfYear`
-   * fields are read through `resolveRecurringItemRule` (adapters.ts). New/edited
+   * fields are read through `resolveTransactionRule` (adapters.ts). New/edited
    * items write this; existing items keep running the legacy path until re-saved.
    */
   rule?: RecurrenceRule;
@@ -547,7 +547,20 @@ export interface FamilyList {
   items: FamilyListItem[]; // flat (no sub-sections)
   lifecycle: ListLifecycle;
   dueDate?: ISODateString; // one-off only
+  /**
+   * @deprecated (#70) Legacy reset cadence — read only through
+   * `resolveListRule`. Now a SHADOW of `cadence`, written for pre-#70 clients
+   * and only when the cadence is exactly expressible in this three-value enum;
+   * a recurring list can therefore legitimately have `cadence` and NO
+   * `frequency` (an old client then never resets it, which is the safe
+   * direction — see `listShadowFromCadence`).
+   */
   frequency?: ListFrequency; // recurring only
+  /**
+   * Canonical reset cadence (#70). Authoritative when present. A bare
+   * `Cadence`, not a `RecurrenceRule`: a reset genuinely has no end.
+   */
+  cadence?: Cadence;
   lastResetDate?: ISODateString; // recurring bookkeeping (last auto-reset day)
   cycleCelebrated?: boolean; // guard: celebrate once per cycle (recurring)
   linkedActivityId?: UUID; // optional attach to an activity

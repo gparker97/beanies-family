@@ -10,6 +10,7 @@ import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { useTranslationStore } from '@/stores/translationStore';
 import { toISODateString } from '@/utils/date';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { generateUUID } from '@/utils/id';
 import type {
   FamilyList,
@@ -400,6 +401,11 @@ export const useListStore = defineStore('lists', () => {
             ...cleared,
             lifecycle: 'oneoff',
             frequency: undefined,
+            // #70: `cadence` must be cleared alongside `frequency`. Leaving it
+            // means a recurring -> oneoff -> recurring round-trip resurrects the
+            // OLD cadence, which `resolveListRule` reads in preference to the
+            // 'weekly' the recurring branch above just wrote.
+            cadence: undefined,
             lastResetDate: undefined,
             cycleCelebrated: undefined,
           };
@@ -433,7 +439,7 @@ export const useListStore = defineStore('lists', () => {
       if (!isRecurring(list)) continue;
       const { shouldReset, nextResetDate } = computeRecurringReset(list, todayStr);
       if (!shouldReset) continue;
-      await updateList(list.id, {
+      const written = await updateList(list.id, {
         items: list.items.map((i) => ({
           ...i,
           completed: false,
@@ -443,6 +449,18 @@ export const useListStore = defineStore('lists', () => {
         lastResetDate: nextResetDate,
         cycleCelebrated: false,
       });
+      // #70: this ran on a background wake (midnight / PWA resume), so a failed
+      // write had no user present to see a toast — the list silently kept its
+      // stale ticks and `lastResetDate` was never stamped, so it would try again
+      // forever with no trace. Record it.
+      if (!written) {
+        logEvent({
+          level: 'warn',
+          surface: 'recurrence',
+          message: 'list-reset-failed',
+          context: { recur_surface: 'list', recur_outcome: 'write-failed' },
+        });
+      }
     }
   }
 

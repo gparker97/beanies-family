@@ -48,24 +48,49 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'per_session',
       feeAmount: 30,
-      sessionsPerWeek: 2,
+      monthlyOccurrences: (52 / 12) * 2, // byte-identical to the old sessionsPerWeek: 2
     });
     expect(result).toBe(260);
   });
 
-  it('per_session: $50/session, 1 session/week (default) → $216.67/mo', () => {
+  it('per_session: $50/session, 1 session/week → $216.67/mo', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'per_session',
       feeAmount: 50,
+      monthlyOccurrences: 52 / 12, // byte-identical to the old sessionsPerWeek: 1
     });
     expect(result).toBe(216.67);
+  });
+
+  // #70: the whole point of the change. `sessionsPerWeek` was only ever
+  // populated for WEEKLY activities, so every other cadence billed as if it
+  // happened every week. These are the rates that were wrong in production.
+  it('per_session: a FORTNIGHTLY $50 class is half the weekly rate, not equal to it', () => {
+    const fortnightly = calculateMonthlyFee({
+      feeSchedule: 'per_session',
+      feeAmount: 50,
+      monthlyOccurrences: 52 / 12 / 2, // monthlyFactor({ unit:'week', interval:2 })
+    });
+    expect(fortnightly).toBe(108.33);
+    // Previously this returned the weekly 216.67 — exactly 2x over.
+    expect(fortnightly * 2).toBeCloseTo(216.67, 1);
+  });
+
+  it('per_session: a MONTHLY $50 class costs $50/mo, not $216.67', () => {
+    expect(
+      calculateMonthlyFee({
+        feeSchedule: 'per_session',
+        feeAmount: 50,
+        monthlyOccurrences: 1, // monthlyFactor({ unit:'month', interval:1 })
+      })
+    ).toBe(50);
   });
 
   it('per_session: $0 amount → $0', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'per_session',
       feeAmount: 0,
-      sessionsPerWeek: 2,
+      monthlyOccurrences: (52 / 12) * 2, // byte-identical to the old sessionsPerWeek: 2
     });
     expect(result).toBe(0);
   });
@@ -74,6 +99,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'weekly',
       feeAmount: 50,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(216.67);
   });
@@ -82,6 +108,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'monthly',
       feeAmount: 200,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(200);
   });
@@ -90,6 +117,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'quarterly',
       feeAmount: 300,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(100);
   });
@@ -98,6 +126,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'yearly',
       feeAmount: 1200,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(100);
   });
@@ -106,6 +135,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'custom',
       feeAmount: 500,
+      monthlyOccurrences: 1,
       feeCustomPeriod: 6,
       feeCustomPeriodUnit: 'weeks',
     });
@@ -116,6 +146,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'custom',
       feeAmount: 900,
+      monthlyOccurrences: 1,
       feeCustomPeriod: 3,
       feeCustomPeriodUnit: 'months',
     });
@@ -126,6 +157,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'custom',
       feeAmount: 250,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(250);
   });
@@ -134,6 +166,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'all',
       feeAmount: 500,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(500);
   });
@@ -142,6 +175,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'all',
       feeAmount: 0,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(0);
   });
@@ -150,6 +184,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'termly',
       feeAmount: 450,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(450);
   });
@@ -158,26 +193,36 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'biannual',
       feeAmount: 600,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(600);
   });
 
   it('all outputs have exactly 2 decimal places (no floating point drift)', () => {
     // per_session with values that produce repeating decimals
-    const r1 = calculateMonthlyFee({ feeSchedule: 'per_session', feeAmount: 50 });
+    const r1 = calculateMonthlyFee({
+      feeSchedule: 'per_session',
+      feeAmount: 50,
+      monthlyOccurrences: 1,
+    });
     expect(Number.isFinite(r1)).toBe(true);
     expect(r1).toBe(Math.round(r1 * 100) / 100);
 
     const r2 = calculateMonthlyFee({
       feeSchedule: 'custom',
       feeAmount: 500,
+      monthlyOccurrences: 1,
       feeCustomPeriod: 6,
       feeCustomPeriodUnit: 'weeks',
     });
     expect(Number.isFinite(r2)).toBe(true);
     expect(r2).toBe(Math.round(r2 * 100) / 100);
 
-    const r3 = calculateMonthlyFee({ feeSchedule: 'quarterly', feeAmount: 100 });
+    const r3 = calculateMonthlyFee({
+      feeSchedule: 'quarterly',
+      feeAmount: 100,
+      monthlyOccurrences: 1,
+    });
     expect(Number.isFinite(r3)).toBe(true);
     expect(r3).toBe(Math.round(r3 * 100) / 100);
   });
@@ -186,6 +231,7 @@ describe('calculateMonthlyFee', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'monthly',
       feeAmount: -50,
+      monthlyOccurrences: 1,
     });
     expect(result).toBe(0);
   });

@@ -22,24 +22,34 @@ describe('RecurrencePicker', () => {
     // straight back as modelValue (real v-model). A loop would recurse until Vue
     // throws "Maximum recursive updates exceeded" and fail this test.
     let model: RecurrenceRule | null = null;
-    const wrapper = mount(RecurrencePicker, {
+    // Held in an object because the picker now emits its default on MOUNT (so a
+    // form saved without touching the control still gets a rule) — that fires
+    // before `mount()` has returned, so the handler cannot close over a binding
+    // that is still being initialized.
+    const held: { wrapper?: ReturnType<typeof mount<typeof RecurrencePicker>> } = {};
+    held.wrapper = mount(RecurrencePicker, {
       props: {
         modelValue: null,
         startDate: ANCHOR,
         'onUpdate:modelValue': (v: RecurrenceRule) => {
           model = v;
-          void wrapper.setProps({ modelValue: v });
+          void held.wrapper?.setProps({ modelValue: v });
         },
       },
     });
+    const wrapper = held.wrapper;
+
+    // The mount emit publishes the default (monthly), before any interaction.
+    expect(model).toMatchObject({ unit: 'month', interval: 1 });
 
     await wrapper.getComponent(FrequencyChips).vm.$emit('update:modelValue', 'biweekly');
     await nextTick();
     await nextTick();
 
     expect(model).toEqual({ unit: 'week', interval: 2, weekdays: [0], end: { kind: 'never' } });
-    // Bounded emits — a loop would produce dozens/hundreds.
-    expect(wrapper.emitted('update:modelValue')!.length).toBeLessThan(4);
+    // Bounded emits — a loop would produce dozens/hundreds. One for the mount
+    // default, one for the selection.
+    expect(wrapper.emitted('update:modelValue')!.length).toBeLessThan(5);
   });
 
   it('loading a monthly-on-15 rule does not silently re-emit or reschedule to the start day', async () => {
@@ -62,5 +72,61 @@ describe('RecurrencePicker', () => {
     // picker re-derived monthlyDay from the start date (5th), builtRule would
     // differ from the loaded rule (15th) and emit. It stays silent → 15 preserved.
     expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+  });
+});
+
+describe('RecurrencePicker — start-date re-anchoring (#70)', () => {
+  it('re-anchors an UNTOUCHED weekday when the start date moves', async () => {
+    // Regression: the anchor watcher only ever re-derived monthlyDay, so a series
+    // moved from a Sunday to a Tuesday kept repeating on Sundays.
+    let model: RecurrenceRule | null = null;
+    const wrapper = mount(RecurrencePicker, {
+      props: {
+        modelValue: { unit: 'week', interval: 1, weekdays: [0], end: { kind: 'never' } },
+        startDate: ANCHOR, // Sunday
+        'onUpdate:modelValue': (v: RecurrenceRule) => {
+          model = v;
+        },
+      },
+    });
+
+    await wrapper.setProps({ startDate: '2026-08-25' }); // Tuesday
+    await nextTick();
+    await nextTick();
+
+    expect(model).toEqual({ unit: 'week', interval: 1, weekdays: [2], end: { kind: 'never' } });
+  });
+
+  it('leaves a USER-CHOSEN weekday set alone when the start date moves', async () => {
+    let model: RecurrenceRule | null = null;
+    const wrapper = mount(RecurrencePicker, {
+      props: {
+        modelValue: { unit: 'week', interval: 1, weekdays: [1, 3], end: { kind: 'never' } },
+        startDate: ANCHOR,
+        'onUpdate:modelValue': (v: RecurrenceRule) => {
+          model = v;
+        },
+      },
+    });
+
+    await wrapper.setProps({ startDate: '2026-08-25' });
+    await nextTick();
+    await nextTick();
+
+    // Mon+Wed was a deliberate choice — moving the start date must not rewrite
+    // it. Either nothing is emitted at all (no change), or the set is unchanged.
+    expect(model === null ? [1, 3] : (model as RecurrenceRule).weekdays).toEqual([1, 3]);
+  });
+
+  it('shows the clamp hint only for a 29th-31st monthly anchor', async () => {
+    const on31 = mount(RecurrencePicker, {
+      props: { modelValue: null, startDate: '2026-01-31' },
+    });
+    expect(on31.text()).toContain('recurrence.monthly.clampHint');
+
+    const on15 = mount(RecurrencePicker, {
+      props: { modelValue: null, startDate: '2026-01-15' },
+    });
+    expect(on15.text()).not.toContain('recurrence.monthly.clampHint');
   });
 });

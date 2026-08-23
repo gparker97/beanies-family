@@ -55,11 +55,28 @@ describe('ListTile', () => {
     expect(wrapper.emitted('open')?.[0]).toEqual(['l-1']);
   });
 
-  it('shows a recurring status pill (short frequency) for a recurring list', () => {
+  it('shows a recurring status pill describing the reset cadence', () => {
+    // #70: was the bare legacy word (`lists.detail.freq.weekly`). It now renders
+    // the canonical summary, so a cadence the legacy enum cannot express reads
+    // correctly instead of collapsing to the nearest word.
     const wrapper = mount(ListTile, {
       props: { list: list({ lifecycle: 'recurring', frequency: 'weekly' }) },
     });
-    expect(wrapper.text()).toContain('lists.detail.freq.weekly');
+    expect(wrapper.text()).toContain('recurrence.desc.weeklyOn');
+  });
+
+  it('describes an every-2-weeks reset as such, not as "weekly"', () => {
+    const wrapper = mount(ListTile, {
+      props: {
+        list: list({
+          lifecycle: 'recurring',
+          // No legacy `frequency` — the enum cannot express this cadence, and
+          // `listShadowFromCadence` deliberately omits it.
+          cadence: { unit: 'week', interval: 2, weekdays: [1] },
+        }),
+      },
+    });
+    expect(wrapper.text()).toContain('recurrence.desc.everyNWeeksOn');
   });
 
   it('shows a link pill when the list is attached to a trip', () => {

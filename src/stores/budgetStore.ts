@@ -11,7 +11,9 @@ import {
   getGroupName,
   getCategoryIdsForGroup,
 } from '@/constants/categories';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, parseLocalDate } from '@/utils/date';
+import { resolveTransactionRule } from '@/services/recurrence/adapters';
+import { firstDueOnOrAfter } from '@/services/recurrence/recurrenceEngine';
 import { convertToBaseCurrency } from '@/utils/currency';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput, CurrencyCode } from '@/types/models';
 
@@ -174,19 +176,22 @@ export const useBudgetStore = defineStore('budget', () => {
   const upcomingTransactions = computed(() => {
     const recurringStore = useRecurringStore();
     const now = new Date();
-    const currentDay = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const todayYmd = toDateInputValue(now);
 
     return recurringStore.activeItems
       .map((item) => {
-        // Calculate next occurrence day this month
-        const dayOfMonth = Math.min(item.dayOfMonth, daysInMonth);
-        const isPast = dayOfMonth <= currentDay;
-        const nextDate = new Date(
-          now.getFullYear(),
-          isPast ? now.getMonth() + 1 : now.getMonth(),
-          dayOfMonth
-        );
+        // #70: ask the engine for the real next occurrence. This used to derive
+        // the date from `item.dayOfMonth` alone — ignoring `frequency` AND
+        // `rule` — so a weekly or every-N item showed a wrong date and
+        // `daysUntil`. Note a due-TODAY item now correctly reports 0 days rather
+        // than being pushed to next month.
+        const resolved = resolveTransactionRule(item);
+        if (!resolved) return null; // unmappable shape (already logged) — omit
+        const nextYmd = firstDueOnOrAfter(resolved.rule, resolved.anchor, todayYmd);
+        // An exhausted series (elapsed `onDate` / spent `afterCount`) has no next
+        // date. `activeItems` filters only on `isActive`, so it can still be here.
+        if (!nextYmd) return null;
+        const nextDate = parseLocalDate(nextYmd);
 
         return {
           id: item.id,
@@ -195,10 +200,14 @@ export const useBudgetStore = defineStore('budget', () => {
           currency: item.currency,
           category: item.category,
           type: item.type,
-          nextDate: toDateInputValue(nextDate),
-          daysUntil: Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+          nextDate: nextYmd,
+          daysUntil: Math.max(
+            0,
+            Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          ),
         };
       })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
       .sort((a, b) => a.daysUntil - b.daysUntil)
       .slice(0, 5);
   });

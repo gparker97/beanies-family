@@ -16,7 +16,7 @@ import {
 import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
 import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenceEngine';
-import { resolveRecurringItemRule } from '@/services/recurrence/adapters';
+import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { reportError } from '@/utils/errorReporter';
 import * as perfTiming from '@/utils/perfTiming';
 
@@ -165,9 +165,13 @@ export function getDueDatesInRange(item: RecurringItem, rangeStart: Date, rangeE
  */
 function getFirstDueDate(item: RecurringItem, startDate: Date): Date | null {
   if (item.rule) {
-    const { rule, anchor } = resolveRecurringItemRule(item);
-    const ymd = firstDueOnOrAfter(rule, anchor, toDateInputValue(startDate));
-    return ymd ? parseLocalDate(ymd) : null;
+    // A rule-bearing item always resolves; `null` here would mean an unmappable
+    // shape (already logged), in which case fall through to the legacy switch.
+    const resolved = resolveTransactionRule(item);
+    if (resolved) {
+      const ymd = firstDueOnOrAfter(resolved.rule, resolved.anchor, toDateInputValue(startDate));
+      return ymd ? parseLocalDate(ymd) : null;
+    }
   }
   switch (item.frequency) {
     case 'daily':
@@ -214,9 +218,11 @@ function getFirstDueDate(item: RecurringItem, startDate: Date): Date | null {
  */
 function getNextDueDate(item: RecurringItem, afterDate: Date): Date | null {
   if (item.rule) {
-    const { rule, anchor } = resolveRecurringItemRule(item);
-    const ymd = nextDueAfter(rule, anchor, toDateInputValue(afterDate));
-    return ymd ? parseLocalDate(ymd) : null;
+    const resolved = resolveTransactionRule(item);
+    if (resolved) {
+      const ymd = nextDueAfter(resolved.rule, resolved.anchor, toDateInputValue(afterDate));
+      return ymd ? parseLocalDate(ymd) : null;
+    }
   }
   switch (item.frequency) {
     case 'daily':

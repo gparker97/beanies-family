@@ -89,6 +89,14 @@ function ruleToRrule(rule: RecurrenceRule, start: Date, isAllDay: boolean): stri
         .join(',');
       parts.push('FREQ=WEEKLY');
       parts.push(`BYDAY=${byday}`);
+      // WKST is load-bearing for INTERVAL >= 2 (#70). RFC 5545 defaults it to
+      // MO, but the engine anchors the N-week cycle on the ANCHOR'S SUNDAY
+      // (`recurrenceEngine.generate`, week branch). Without this the two produce
+      // permanently disjoint sets 7 days apart whenever the chosen weekday falls
+      // earlier in the Sunday-week than the anchor's weekday. Emitted only for
+      // intervals that actually skip weeks — WKST has no effect at INTERVAL=1
+      // and would be noise on every existing weekly export.
+      if (interval > 1) parts.push('WKST=SU');
       break;
     }
     case 'month':
@@ -96,9 +104,24 @@ function ruleToRrule(rule: RecurrenceRule, start: Date, isAllDay: boolean): stri
       if (rule.monthlyAnchor === 'weekday') {
         parts.push(`BYDAY=${getWeekdayOrdinalInMonth(start)}${RRULE_DAYS[start.getDay()]}`);
       } else {
-        parts.push(
-          `BYMONTHDAY=${rule.monthlyDay === 'last' ? -1 : (rule.monthlyDay ?? start.getDate())}`
-        );
+        // The engine CLAMPS a numeric day a month lacks to that month's last
+        // day (#70). Google must do the same or the two diverge: per RFC 5545
+        // `BYMONTHDAY=31` SKIPS February outright, so a naive serialization
+        // would show Feb 28 in beanies and nothing at all in the family's
+        // calendar. `BYMONTHDAY=28,..,N` + `BYSETPOS=-1` selects the last of
+        // the days that actually exist in each month — exactly the clamp.
+        // Day 31 (and 'last') collapse to the simpler `BYMONTHDAY=-1`.
+        const day = rule.monthlyDay === 'last' ? 31 : (rule.monthlyDay ?? start.getDate());
+        if (day >= 31) {
+          parts.push('BYMONTHDAY=-1');
+        } else if (day > 28) {
+          const candidates = [];
+          for (let d = 28; d <= day; d++) candidates.push(d);
+          parts.push(`BYMONTHDAY=${candidates.join(',')}`);
+          parts.push('BYSETPOS=-1');
+        } else {
+          parts.push(`BYMONTHDAY=${day}`);
+        }
       }
       break;
     case 'year':
@@ -143,7 +166,11 @@ export function buildRecurrenceRule(input: RecurrenceInput): string[] {
     }
     case 'biweekly':
       // Single day-of-week anchored to start, step 14 days (daysOfWeek ignored — see model).
-      rule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${RRULE_DAYS[start.getDay()]}`;
+      // `WKST=SU` is a no-op here (BYDAY *is* the start's weekday, so every week
+      // start gives the same dates) but is emitted for consistency with the rule
+      // path, which needs it — see `ruleToRrule`. Keeping both identical also
+      // preserves the legacy-vs-rule byte-parity oracle in the tests.
+      rule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${RRULE_DAYS[start.getDay()]};WKST=SU`;
       break;
     case 'monthly':
       rule = `FREQ=MONTHLY;BYMONTHDAY=${start.getDate()}`;

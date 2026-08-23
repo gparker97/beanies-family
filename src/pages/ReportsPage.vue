@@ -38,6 +38,8 @@ import {
 import { useTranslation } from '@/composables/useTranslation';
 import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { accountNetWorthMultiplier } from '@/utils/finance';
+import { resolveTransactionRule } from '@/services/recurrence/adapters';
+import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
 import type {
   CurrencyCode,
   ExchangeRate,
@@ -195,9 +197,12 @@ function calculateMonthlyRecurring(): { income: number; expenses: number } {
   let expenses = 0;
 
   for (const item of items) {
-    let monthlyAmount = item.amount;
-    if (item.frequency === 'daily') monthlyAmount = item.amount * 30;
-    if (item.frequency === 'yearly') monthlyAmount = item.amount / 12;
+    // #70: normalize through the shared resolver + `monthlyFactor`, not the
+    // LOSSY `frequency` shadow — every rule that isn't month/day/year shadows as
+    // the inert `'monthly'` placeholder, so a $50/week item was reported at $50
+    // a month (4.33x understated) and an every-2-weeks item at half its cost.
+    // Mirrors `recurringStore.normalizeToMonthly`.
+    const monthlyAmount = monthlyAmountOf(item);
 
     const converted = convertToBaseCurrency(monthlyAmount, item.currency);
     if (item.type === 'income') {
@@ -208,6 +213,19 @@ function calculateMonthlyRecurring(): { income: number; expenses: number } {
   }
 
   return { income, expenses };
+}
+
+/**
+ * A recurring item's monthly-equivalent amount (#70).
+ *
+ * The single normalization for this page, matching `recurringStore.normalizeToMonthly`.
+ * Reads the canonical rule via the shared resolver rather than the LOSSY
+ * `frequency` shadow; an unmappable item (resolver returns null, already logged)
+ * falls back to its raw amount.
+ */
+function monthlyAmountOf(item: RecurringItem): number {
+  const resolved = resolveTransactionRule(item);
+  return resolved ? item.amount * monthlyFactor(resolved.rule) : item.amount;
 }
 
 // Store monthly breakdown for tooltips
@@ -493,10 +511,9 @@ const incomeExpenseChartData = computed(() => {
       const monthDateObj = new Date(monthStart);
 
       if (startDate <= monthDateObj && (!endDate || endDate >= monthDateObj)) {
-        let amount = item.amount;
-        // Normalize to monthly
-        if (item.frequency === 'daily') amount *= 30;
-        if (item.frequency === 'yearly') amount /= 12;
+        // #70: same shared normalization as above — the per-category monthly
+        // chart was understating every week-based item identically.
+        const amount = monthlyAmountOf(item);
 
         const converted = convertToBaseCurrency(amount, item.currency);
         const categoryMap =

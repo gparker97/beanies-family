@@ -31,6 +31,8 @@ vi.mock('@/stores/transactionsStore', () => ({
 
 import { syncEntityLinkedRecurringItem } from '../linkedRecurringItem';
 import { calculateMonthlyFee, computeGoalAllocRaw, calculateBalanceAdjustment } from '../finance';
+import { resolveActivityRule } from '@/services/recurrence/adapters';
+import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -112,7 +114,7 @@ describe('Activity → Recurring Item Linking', () => {
       const monthly = calculateMonthlyFee({
         feeSchedule: 'per_session',
         feeAmount: 25,
-        sessionsPerWeek: 2,
+        monthlyOccurrences: (52 / 12) * 2, // byte-identical to the old sessionsPerWeek: 2
       });
       // 25 * 2 * 52 / 12 = 216.67
       expect(monthly).toBe(216.67);
@@ -122,23 +124,29 @@ describe('Activity → Recurring Item Linking', () => {
       const monthly = calculateMonthlyFee({
         feeSchedule: 'weekly',
         feeAmount: 40,
+        monthlyOccurrences: 1,
       });
       // 40 * 52 / 12 = 173.33
       expect(monthly).toBe(173.33);
     });
 
     it('monthly fee is identity', () => {
-      expect(calculateMonthlyFee({ feeSchedule: 'monthly', feeAmount: 150 })).toBe(150);
+      expect(
+        calculateMonthlyFee({ feeSchedule: 'monthly', feeAmount: 150, monthlyOccurrences: 1 })
+      ).toBe(150);
     });
 
     it('yearly fee divides by 12', () => {
-      expect(calculateMonthlyFee({ feeSchedule: 'yearly', feeAmount: 600 })).toBe(50);
+      expect(
+        calculateMonthlyFee({ feeSchedule: 'yearly', feeAmount: 600, monthlyOccurrences: 1 })
+      ).toBe(50);
     });
 
     it('custom weeks: $400 every 8 weeks', () => {
       const monthly = calculateMonthlyFee({
         feeSchedule: 'custom',
         feeAmount: 400,
+        monthlyOccurrences: 1,
         feeCustomPeriod: 8,
         feeCustomPeriodUnit: 'weeks',
       });
@@ -150,6 +158,7 @@ describe('Activity → Recurring Item Linking', () => {
       const monthly = calculateMonthlyFee({
         feeSchedule: 'custom',
         feeAmount: 600,
+        monthlyOccurrences: 1,
         feeCustomPeriod: 2,
         feeCustomPeriodUnit: 'months',
       });
@@ -160,18 +169,23 @@ describe('Activity → Recurring Item Linking', () => {
       const result = calculateMonthlyFee({
         feeSchedule: 'all',
         feeAmount: 800,
+        monthlyOccurrences: 1,
       });
       expect(result).toBe(800);
     });
 
     it('zero amount returns 0 for any schedule', () => {
       for (const schedule of ['per_session', 'weekly', 'monthly', 'yearly', 'all', 'custom']) {
-        expect(calculateMonthlyFee({ feeSchedule: schedule, feeAmount: 0 })).toBe(0);
+        expect(
+          calculateMonthlyFee({ feeSchedule: schedule, feeAmount: 0, monthlyOccurrences: 1 })
+        ).toBe(0);
       }
     });
 
     it('negative amount returns 0', () => {
-      expect(calculateMonthlyFee({ feeSchedule: 'monthly', feeAmount: -100 })).toBe(0);
+      expect(
+        calculateMonthlyFee({ feeSchedule: 'monthly', feeAmount: -100, monthlyOccurrences: 1 })
+      ).toBe(0);
     });
   });
 
@@ -182,7 +196,7 @@ describe('Activity → Recurring Item Linking', () => {
       const monthlyAmount = calculateMonthlyFee({
         feeSchedule: 'per_session',
         feeAmount: 30,
-        sessionsPerWeek: 2,
+        monthlyOccurrences: (52 / 12) * 2, // byte-identical to the old sessionsPerWeek: 2
       });
       mockCreateReturning({ id: 'ri-1', amount: monthlyAmount });
 
@@ -622,6 +636,7 @@ describe('"All Sessions" Fee Schedule — End-to-End', () => {
     const paymentAmount = calculateMonthlyFee({
       feeSchedule: 'all',
       feeAmount: 800,
+      monthlyOccurrences: 1,
     });
     expect(paymentAmount).toBe(800);
 
@@ -819,7 +834,7 @@ describe('Edge Cases', () => {
     const monthly = calculateMonthlyFee({
       feeSchedule: 'per_session',
       feeAmount: 33,
-      sessionsPerWeek: 3,
+      monthlyOccurrences: (52 / 12) * 3, // byte-identical to the old sessionsPerWeek: 3
     });
     // 33 * 3 * 52 / 12 = 429.00
     expect(monthly).toBe(429);
@@ -844,6 +859,7 @@ describe('Edge Cases', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'custom',
       feeAmount: 200,
+      monthlyOccurrences: 1,
       feeCustomPeriod: 0,
       feeCustomPeriodUnit: 'weeks',
     });
@@ -854,8 +870,54 @@ describe('Edge Cases', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'custom',
       feeAmount: 300,
+      monthlyOccurrences: 1,
       feeCustomPeriod: 4,
     });
     expect(result).toBe(300);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CADENCE-CORRECT PER-SESSION FEES (#70)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('per-session fees follow the real cadence, not "sessions per week"', () => {
+  // These are the rates that were WRONG in production. `sessionsPerWeek` was
+  // `daysOfWeek?.length || 1`, and `daysOfWeek` is only ever populated for
+  // weekly activities — so every other cadence billed as if it happened weekly.
+  // The resolver + monthlyFactor now supply the true occurrence rate.
+  const fee = (activity: Parameters<typeof resolveActivityRule>[0], feeAmount: number) => {
+    const resolved = resolveActivityRule(activity);
+    return calculateMonthlyFee({
+      feeSchedule: 'per_session',
+      feeAmount,
+      monthlyOccurrences: monthlyFactor(resolved!.rule),
+    });
+  };
+
+  const base = { date: '2026-08-24', recurrenceEndDate: undefined, rule: undefined } as const;
+
+  it('WEEKLY is unchanged to the cent — the only case that was already right', () => {
+    // Old formula: 30 * 2 * 52/12 = 260. Must still be exactly 260.
+    expect(fee({ ...base, recurrence: 'weekly', daysOfWeek: [1, 3] }, 30)).toBe(260);
+  });
+
+  it('BIWEEKLY is half the weekly rate (was billed at 2x)', () => {
+    const biweekly = fee({ ...base, recurrence: 'biweekly', daysOfWeek: undefined }, 50);
+    const weekly = fee({ ...base, recurrence: 'weekly', daysOfWeek: [1] }, 50);
+    expect(biweekly).toBeCloseTo(weekly / 2, 2);
+    expect(biweekly).toBe(108.33);
+  });
+
+  it('MONTHLY costs the fee once a month (was billed at 4.33x)', () => {
+    expect(fee({ ...base, recurrence: 'monthly', daysOfWeek: undefined }, 50)).toBe(50);
+  });
+
+  it('YEARLY costs a twelfth a month (was billed at 52x)', () => {
+    expect(fee({ ...base, recurrence: 'yearly', daysOfWeek: undefined }, 600)).toBe(50);
+  });
+
+  it('DAILY costs 30x the session fee (was billed at ~1/7th)', () => {
+    expect(fee({ ...base, recurrence: 'daily', daysOfWeek: undefined }, 5)).toBe(150);
   });
 });

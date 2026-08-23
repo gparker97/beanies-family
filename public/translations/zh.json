@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-23",
-    "translationCount": 4107
+    "translationCount": 4110
   },
   "translations": {
     "app.name": {
@@ -20539,6 +20539,21 @@
     "recurrence.a11y.unit": {
       "translation": "单位",
       "hash": "1km1w",
+      "lastUpdated": "2026-08-23"
+    },
+    "recurrence.monthly.clampHint": {
+      "translation": "没有{date}的月份使用最后一天。",
+      "hash": "w9bhsc",
+      "lastUpdated": "2026-08-23"
+    },
+    "planner.scopeEditFailed.title": {
+      "translation": "无法移动它",
+      "hash": "w5s6r4",
+      "lastUpdated": "2026-08-23"
+    },
+    "planner.scopeEditFailed.message": {
+      "translation": "找不到此计划的系列，因此未保存新日期。关闭并重新打开计划，然后重试。",
+      "hash": "720p27",
       "lastUpdated": "2026-08-23"
     }
   }

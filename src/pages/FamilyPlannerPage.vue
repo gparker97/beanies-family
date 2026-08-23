@@ -527,8 +527,18 @@ async function handleSave(
       // the payment, and a date move has its own scoped path.
       const patch = { ...data.data };
       if (isPaymentChange && editingActivity.value?.recurrence !== 'none') {
+        // A payment-only change deliberately skips the scope modal, so it must
+        // not carry ANY schedule field — a date move has its own scoped path.
+        // #70: `rule` and `recurrenceEndDate` belong here too. `rule` is now the
+        // authoritative schedule, so leaving it in rewrote the whole series with
+        // no scope prompt, and left `daysOfWeek` stale relative to it (breaking
+        // the shadow-fidelity contract that the multi-weekday guard and the
+        // Google push hash both depend on).
         delete patch.date;
         delete patch.daysOfWeek;
+        delete patch.rule;
+        delete patch.recurrence;
+        delete patch.recurrenceEndDate;
       }
       if (!(await activityStore.updateActivity(data.id, patch))) {
         reportSessionActionFailed();
