@@ -1,4 +1,10 @@
-import type { RecurringItem, RecurrenceRule, RecurrenceEnd } from '@/types/models';
+import type {
+  RecurringItem,
+  RecurrenceRule,
+  RecurrenceEnd,
+  FamilyActivity,
+  ActivityRecurrence,
+} from '@/types/models';
 import { extractDatePart, toDateInputValue, parseLocalDate } from '@/utils/date';
 
 /**
@@ -90,4 +96,89 @@ export function legacyShadowFromRule(
   }
   // Non-representable in the legacy shape — inert placeholder (rule is authoritative).
   return { frequency: 'monthly', dayOfMonth: Math.min(anchor.getDate(), 28) };
+}
+
+// ── Activities (#70 Phase B) ─────────────────────────────────────────────────
+
+type ActivityRecurrenceFields = Pick<
+  FamilyActivity,
+  'recurrence' | 'date' | 'daysOfWeek' | 'recurrenceEndDate' | 'rule'
+>;
+
+/**
+ * Resolve an activity to its canonical rule — `rule` first, else derived from
+ * the legacy `recurrence`/`daysOfWeek`/`recurrenceEndDate`. Returns `null` for a
+ * one-time activity (`recurrence: 'none'` and no rule). Used by the picker (to
+ * load a legacy activity) and by `describeActivity`; the EXACT legacy expansion
+ * + RRULE paths stay on their own switches for byte-parity (this adapter caps
+ * monthly-on-date at 28/last, which only matters on edit of a rare 29–31 item).
+ */
+export function activityRuleAdapter(activity: ActivityRecurrenceFields): RecurrenceRule | null {
+  if (activity.rule) return activity.rule;
+  if (activity.recurrence === 'none') return null;
+  const anchor = parseLocalDate(extractDatePart(activity.date));
+  const end: RecurrenceEnd = activity.recurrenceEndDate
+    ? { kind: 'onDate', date: extractDatePart(activity.recurrenceEndDate) }
+    : { kind: 'never' };
+  switch (activity.recurrence) {
+    case 'daily':
+      return { unit: 'day', interval: 1, end };
+    case 'weekly':
+      return {
+        unit: 'week',
+        interval: 1,
+        weekdays: activity.daysOfWeek?.length ? [...activity.daysOfWeek] : [anchor.getDay()],
+        end,
+      };
+    case 'biweekly':
+      return { unit: 'week', interval: 2, weekdays: [anchor.getDay()], end };
+    case 'monthly': {
+      const d = anchor.getDate();
+      return {
+        unit: 'month',
+        interval: 1,
+        monthlyAnchor: 'date',
+        monthlyDay: d <= 28 ? d : 'last',
+        end,
+      };
+    }
+    case 'monthly-by-day':
+      return { unit: 'month', interval: 1, monthlyAnchor: 'weekday', end };
+    case 'yearly':
+      return { unit: 'year', interval: 1, end };
+  }
+}
+
+/**
+ * Legacy shadow of a rule for `FamilyActivity` — satisfies the required
+ * `recurrence` enum + `daysOfWeek`/`recurrenceEndDate` when persisting a
+ * rule-bearing activity. INERT: `expandRecurring`/RRULE read `rule` first when
+ * present. Rules the legacy enum can't express (every-N-weeks/months) fall back
+ * to the nearest kind (a pre-#70 client would approximate them).
+ */
+export function activityShadowFromRule(rule: RecurrenceRule): {
+  recurrence: ActivityRecurrence;
+  daysOfWeek?: number[];
+  recurrenceEndDate?: string;
+} {
+  const recurrenceEndDate = rule.end.kind === 'onDate' ? rule.end.date : undefined;
+  switch (rule.unit) {
+    case 'day':
+      return { recurrence: 'daily', recurrenceEndDate };
+    case 'week':
+      return rule.interval === 2
+        ? { recurrence: 'biweekly', recurrenceEndDate }
+        : {
+            recurrence: 'weekly',
+            daysOfWeek: rule.weekdays ? [...rule.weekdays] : undefined,
+            recurrenceEndDate,
+          };
+    case 'month':
+      return {
+        recurrence: rule.monthlyAnchor === 'weekday' ? 'monthly-by-day' : 'monthly',
+        recurrenceEndDate,
+      };
+    case 'year':
+      return { recurrence: 'yearly', recurrenceEndDate };
+  }
 }

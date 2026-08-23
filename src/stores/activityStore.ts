@@ -13,7 +13,9 @@ import {
   parseLocalDate,
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
+  extractDatePart,
 } from '@/utils/date';
+import { occurrencesInRange } from '@/services/recurrence/recurrenceEngine';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { overrideOccurrenceYmd } from '@/utils/calendar/overrideOccurrenceYmd';
@@ -267,6 +269,24 @@ export const useActivityStore = defineStore('activities', () => {
         },
       });
       return [];
+    }
+
+    // #70 dual-path: a rule-bearing activity expands through the canonical engine
+    // (which honors interval, weekdays, monthly anchor, and the rule's end); a
+    // legacy activity (no `rule`) runs the exact switches below, unchanged, so
+    // existing occurrence sets + RRULEs stay byte-identical. The override filter
+    // (parentActivityId + originalOccurrenceDate) is applied the same way for both.
+    if (activity.rule) {
+      const anchor = extractDatePart(activity.date);
+      const dates = occurrencesInRange(
+        activity.rule,
+        anchor,
+        toDateInputValue(new Date(year, month, 1)),
+        toDateInputValue(new Date(year, month + 1, 0))
+      );
+      const ruleResults = dates.map((date) => ({ activity, date }));
+      const ov = overridesByParent.value.get(activity.id);
+      return ov ? ruleResults.filter((r) => !ov.has(r.date)) : ruleResults;
     }
 
     // `recurrenceEndDate` is a SERIES rule — it must never gate a one-off. An
