@@ -7,6 +7,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { toDateInputValue, parseLocalDate, addDays } from '@/utils/date';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
+import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
 import type {
   RecurringItem,
   CreateRecurringItemInput,
@@ -38,23 +39,26 @@ export const useRecurringStore = defineStore('recurring', () => {
   );
 
   // Normalize amount to monthly equivalent
-  function normalizeToMonthly(amount: number, frequency: string): number {
-    switch (frequency) {
+  // Monthly-equivalent of a recurring item's amount. Rule-bearing items (#70)
+  // derive the factor from the canonical rule (honors weekly/biweekly/every-N);
+  // legacy items use the original per-frequency factors, unchanged.
+  function normalizeToMonthly(item: RecurringItem): number {
+    if (item.rule) return item.amount * monthlyFactor(item.rule);
+    switch (item.frequency) {
       case 'daily':
-        return amount * 30;
-      case 'monthly':
-        return amount;
+        return item.amount * 30;
       case 'yearly':
-        return amount / 12;
+        return item.amount / 12;
+      case 'monthly':
       default:
-        return amount;
+        return item.amount;
     }
   }
 
   // Total monthly recurring income - converts each item to base currency first
   const totalMonthlyRecurringIncome = computed(() =>
     activeIncomeItems.value.reduce((sum, item) => {
-      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const monthlyAmount = normalizeToMonthly(item);
       const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
       return sum + convertedAmount;
     }, 0)
@@ -63,7 +67,7 @@ export const useRecurringStore = defineStore('recurring', () => {
   // Total monthly recurring expenses - converts each item to base currency first
   const totalMonthlyRecurringExpenses = computed(() =>
     activeExpenseItems.value.reduce((sum, item) => {
-      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const monthlyAmount = normalizeToMonthly(item);
       const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
       return sum + convertedAmount;
     }, 0)
@@ -109,7 +113,7 @@ export const useRecurringStore = defineStore('recurring', () => {
   // Filtered total monthly recurring income
   const filteredTotalMonthlyRecurringIncome = computed(() =>
     filteredActiveIncomeItems.value.reduce((sum, item) => {
-      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const monthlyAmount = normalizeToMonthly(item);
       const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
       return sum + convertedAmount;
     }, 0)
@@ -118,7 +122,7 @@ export const useRecurringStore = defineStore('recurring', () => {
   // Filtered total monthly recurring expenses
   const filteredTotalMonthlyRecurringExpenses = computed(() =>
     filteredActiveExpenseItems.value.reduce((sum, item) => {
-      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const monthlyAmount = normalizeToMonthly(item);
       const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
       return sum + convertedAmount;
     }, 0)
@@ -223,6 +227,7 @@ export const useRecurringStore = defineStore('recurring', () => {
       frequency: original.frequency,
       dayOfMonth: original.dayOfMonth,
       monthOfYear: original.monthOfYear,
+      rule: original.rule, // #70: carry the canonical rule across a split
       startDate: fromDate,
       endDate: original.endDate, // preserve original end date if any
       isActive: true,

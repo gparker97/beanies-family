@@ -16,6 +16,8 @@ import {
 import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
 import { getOrdinalSuffix } from '@/utils/format';
+import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenceEngine';
+import { resolveRecurringItemRule } from '@/services/recurrence/adapters';
 
 export interface ProcessResult {
   processed: number;
@@ -88,7 +90,7 @@ function getDueDatesSince(item: RecurringItem, today: Date): Date[] {
   const startDate = parseLocalDate(item.startDate);
 
   // Determine the starting point for calculation
-  let checkDate: Date;
+  let checkDate: Date | null;
   if (item.lastProcessedDate) {
     checkDate = getNextDueDate(item, parseLocalDate(item.lastProcessedDate));
   } else {
@@ -96,7 +98,7 @@ function getDueDatesSince(item: RecurringItem, today: Date): Date[] {
   }
 
   // Collect all due dates up to and including today
-  while (checkDate <= today) {
+  while (checkDate && checkDate <= today) {
     // Check end date
     if (item.endDate && checkDate > parseLocalDate(item.endDate)) {
       break;
@@ -118,15 +120,15 @@ export function getDueDatesInRange(item: RecurringItem, rangeStart: Date, rangeE
   const startDate = parseLocalDate(item.startDate);
 
   // Begin from the item's first due date
-  let checkDate = getFirstDueDate(item, startDate);
+  let checkDate: Date | null = getFirstDueDate(item, startDate);
 
   // Advance past rangeStart
-  while (checkDate < rangeStart) {
+  while (checkDate && checkDate < rangeStart) {
     checkDate = getNextDueDate(item, checkDate);
   }
 
   // Collect dates within range
-  while (checkDate <= rangeEnd) {
+  while (checkDate && checkDate <= rangeEnd) {
     if (item.endDate && checkDate > parseLocalDate(item.endDate)) {
       break;
     }
@@ -139,8 +141,18 @@ export function getDueDatesInRange(item: RecurringItem, rangeStart: Date, rangeE
 
 /**
  * Get the first due date on or after start date.
+ *
+ * Dual-path (#70): a rule-bearing item expands through the canonical engine;
+ * a legacy item (no `rule`) runs the exact original switch below, unchanged, so
+ * existing `.beanpod` data behaves identically. Returns `null` when the rule has
+ * no occurrence on/after `startDate` (e.g. an already-elapsed `onDate` end).
  */
-function getFirstDueDate(item: RecurringItem, startDate: Date): Date {
+function getFirstDueDate(item: RecurringItem, startDate: Date): Date | null {
+  if (item.rule) {
+    const { rule, anchor } = resolveRecurringItemRule(item);
+    const ymd = firstDueOnOrAfter(rule, anchor, toDateInputValue(startDate));
+    return ymd ? parseLocalDate(ymd) : null;
+  }
   switch (item.frequency) {
     case 'daily':
       return getStartOfDay(startDate);
@@ -178,9 +190,18 @@ function getFirstDueDate(item: RecurringItem, startDate: Date): Date {
 }
 
 /**
- * Get the next due date after a given date.
+ * Get the next due date strictly after a given date.
+ *
+ * Dual-path (#70): rule-bearing items use the engine (which honors interval,
+ * weekdays, and `afterCount`/`onDate` ends — returning `null` when the series
+ * has ended); legacy items run the original switch unchanged.
  */
-function getNextDueDate(item: RecurringItem, afterDate: Date): Date {
+function getNextDueDate(item: RecurringItem, afterDate: Date): Date | null {
+  if (item.rule) {
+    const { rule, anchor } = resolveRecurringItemRule(item);
+    const ymd = nextDueAfter(rule, anchor, toDateInputValue(afterDate));
+    return ymd ? parseLocalDate(ymd) : null;
+  }
   switch (item.frequency) {
     case 'daily':
       return addDays(afterDate, 1);
@@ -321,16 +342,17 @@ export function previewUpcomingDates(item: RecurringItem, count: number = 5): Da
   const now = new Date();
   const today = getStartOfDay(now);
 
-  let nextDate = item.lastProcessedDate
+  let nextDate: Date | null = item.lastProcessedDate
     ? getNextDueDate(item, parseLocalDate(item.lastProcessedDate))
     : getFirstDueDate(item, parseLocalDate(item.startDate));
 
   // If next date is in the past, advance to future
-  while (nextDate < today) {
+  while (nextDate && nextDate < today) {
     nextDate = getNextDueDate(item, nextDate);
   }
 
   for (let i = 0; i < count; i++) {
+    if (!nextDate) break;
     if (item.endDate && nextDate > parseLocalDate(item.endDate)) {
       break;
     }

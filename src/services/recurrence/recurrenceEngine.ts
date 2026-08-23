@@ -240,6 +240,30 @@ export function isResetDue(
   return parseLocalDate(todayYmd) >= parseLocalDate(next);
 }
 
+const WEEKS_PER_MONTH = 52 / 12; // ≈ 4.345
+
+/**
+ * Average occurrences per month — for normalizing a recurring amount to a
+ * monthly-equivalent (summary widgets). Backward-compatible with the legacy
+ * factors: daily → 30, monthly → 1, yearly → 1/12. Weekly counts the selected
+ * weekdays; intervals divide.
+ */
+export function monthlyFactor(cadence: Cadence): number {
+  const interval = Math.max(1, Math.floor(cadence.interval || 1));
+  switch (cadence.unit) {
+    case 'day':
+      return 30 / interval;
+    case 'week': {
+      const days = cadence.interval === 1 ? Math.max(1, cadence.weekdays?.length ?? 1) : 1;
+      return (WEEKS_PER_MONTH * days) / interval;
+    }
+    case 'month':
+      return 1 / interval;
+    case 'year':
+      return 1 / (12 * interval);
+  }
+}
+
 /** Structural validity of a rule before it is persisted. */
 export function isRuleComplete(rule: RecurrenceRule | null | undefined): rule is RecurrenceRule {
   if (!rule) return false;
