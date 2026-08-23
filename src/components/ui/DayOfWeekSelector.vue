@@ -1,17 +1,30 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 interface Props {
   modelValue: number[];
+  /**
+   * Selected-day accent. Omit to keep the existing default (used by the
+   * activity planner); the recurrence picker passes 'orange' (finance) or
+   * 'purple' (to-do) so the whole control reads as one accent.
+   */
+  accent?: 'orange' | 'purple';
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'update:modelValue': [value: number[]];
 }>();
 
 const { t } = useTranslation();
+
+const selectedClass = computed(() => {
+  if (props.accent === 'orange') return 'bg-primary-500 text-white shadow-sm';
+  if (props.accent === 'purple') return 'bg-purple-500 text-white shadow-sm';
+  return 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-slate-900';
+});
 
 // Day labels: Mon-Sun (indices 1-6, 0)
 const days = [
@@ -45,7 +58,7 @@ function toggle(dayIndex: number, current: number[]) {
       class="font-outfit flex h-[38px] w-[38px] items-center justify-center rounded-[11px] text-xs font-bold transition-all duration-150"
       :class="
         modelValue.includes(day.index)
-          ? 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-slate-900'
+          ? selectedClass
           : 'bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
       "
       @click="toggle(day.index, modelValue)"
