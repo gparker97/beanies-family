@@ -299,7 +299,13 @@ if (gsc) {
     site: gsc.site,
     dateRange: gsc.dateRange,
     totals: gsc.totals,
-    top: (gsc.queries || []).sort((a, b) => b.clicks - a.clicks).slice(0, 15),
+    queryLevelTotals: gsc.queryLevelTotals || null,
+    // Tie-break on impressions. Early on every query has 0 clicks, and sorting
+    // on clicks alone then falls back to API order — which surfaces alphabetical
+    // noise instead of the queries actually being shown.
+    top: (gsc.queries || [])
+      .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
+      .slice(0, 15),
     // Terms with impressions but poor CTR = ranking but not winning the click.
     // The cheapest SEO win on the page: rewrite those titles/descriptions.
     opportunities: (gsc.queries || [])

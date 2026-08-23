@@ -497,9 +497,13 @@ if(D.direct){
 // Google search terms (Search Console)
 if(D.searchTerms){
   const st=D.searchTerms;
-  $('gsccap').innerHTML=`<b>${num(st.totals.clicks)}</b> clicks from <b>${num(st.totals.impressions)}</b> impressions. Ranked by clicks — Search Console has no conversion signal, so "converting" is <b>inferred</b> from the landing page, never tracked.`;
+  const qt=st.queryLevelTotals;
+  $('gsccap').innerHTML=`<b>${num(st.totals.clicks)}</b> clicks from <b>${num(st.totals.impressions)}</b> impressions site-wide.`
+    +(qt?` Only <b>${num(qt.impressions)}</b> impressions are attributable to a named query — Google <b>anonymises rare searches</b> and omits them, so the table below is a sample, not the whole picture.`:'')
+    +` Search Console has no conversion signal, so "converting" is <b>inferred</b> from the landing page, never tracked.`;
   const rowsHtml=st.top.slice(0,10).map(q=>`<tr><td class="q">${esc(q.query)}</td><td class="num">${num(q.clicks)}</td><td class="num">${num(q.impressions)}</td><td class="num">${q.ctr}%</td><td class="num">${q.position}</td></tr>`).join('');
   $('gsc').innerHTML=`<div class="tscroll"><table><thead><tr><th>Query</th><th style="text-align:right">Clicks</th><th style="text-align:right">Impr.</th><th style="text-align:right">CTR</th><th style="text-align:right">Pos</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+    +(st.opportunities.length===0?`<div class="note">No query is close enough to page 1 to be a cheap win — nothing sits at position ≤20 with meaningful impressions. The constraint here is ranking, not click-through.</div>`:'')
     +(st.opportunities.length?`<h3>Ranking but not winning the click</h3><div class="bars">${st.opportunities.map(q=>barRow(q.query,q.impressions,Math.max(...st.opportunities.map(x=>x.impressions),1),'sky',q.impressions+' impr · '+q.ctr+'%')).join('')}</div><div class="note">These rank on page 1–2 but almost nobody clicks. Rewriting the title and meta description of their landing pages is the cheapest SEO win available.</div>`:'');
 }else{
   $('gsccap').innerHTML='Not connected. Plausible <b>cannot</b> report search terms — Google strips the query from the referrer, so organic Google visits arrive with no term attached. Search Console is the only source.';

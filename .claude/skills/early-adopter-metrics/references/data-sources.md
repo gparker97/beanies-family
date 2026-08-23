@@ -142,10 +142,12 @@ and file-download events appear to suppress bounces, so treat bounce as unreliab
   other analytics tool. Google strips the query from the referrer, so an organic Google
   visit arrives as nothing but `source = Google`. Search Console is the only source.
 - **API:** `POST https://searchconsole.googleapis.com/webmasters/v3/sites/{site}/searchAnalytics/query`
-- **Property:** defaults to `sc-domain:beanies.family` (pass `https://beanies.family/`
-  instead if the property is URL-prefix rather than domain).
-- **Auth:** service-account key at `~/.config/beanies/gsc-service-account.json`
-  (or `GSC_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS`), or a pre-minted
+- **Property:** `sc-domain:beanies.family` — **verified working** as a Domain property
+  (2026-08-23). Pass `https://beanies.family/` only if it is ever changed to URL-prefix.
+- **Auth:** service-account key at `~/.config/beanies/gsc-service-account.json`, OR **any
+  service-account JSON dropped into `~/.config/beanies/`** (the script scans the dir for
+  a file with `type: "service_account"`, so Google's original download name works
+  unrenamed), OR `GSC_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` /
   `GSC_ACCESS_TOKEN`. Scope `webmasters.readonly`. `query_search_console.mjs` signs its
   own JWT — no `googleapis` dependency.
 - **Setup:** Google Cloud → enable the **Google Search Console API** → create a service
@@ -153,6 +155,12 @@ and file-download events appear to suppress bounces, so treat bounce as unreliab
   service-account email with **Restricted** access.
 - **Returns:** per `query` and per `page`, plus the `query × page` join — clicks,
   impressions, CTR, average position. Data lags ~2 days.
+
+**⚠️ Query rows are an anonymised SAMPLE, not the total.** Google omits rare queries
+from the `query` dimension entirely for privacy, so query-level sums understate badly
+(measured 2026-08-23: 151 impressions across all named queries vs **577** site-wide from
+the `page` dimension). `totals` is therefore computed from **pages**; the query sum is
+reported separately as `queryLevelTotals`. Never present the query total as site traffic.
 
 **⚠️ The hard limit on "highest-converting search terms":** Search Console knows
 **clicks, not conversions**, and shares no identifier with Plausible. No tool can say

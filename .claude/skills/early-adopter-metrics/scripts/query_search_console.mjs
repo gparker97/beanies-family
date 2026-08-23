@@ -39,7 +39,7 @@
  * the caller can degrade gracefully rather than failing the whole report.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createSign } from 'node:crypto';
@@ -51,8 +51,27 @@ const SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 function keyPath() {
   if (process.env.GSC_SERVICE_ACCOUNT_JSON) return process.env.GSC_SERVICE_ACCOUNT_JSON;
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) return process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  const p = join(homedir(), '.config', 'beanies', 'gsc-service-account.json');
-  return existsSync(p) ? p : null;
+  const dir = join(homedir(), '.config', 'beanies');
+  const canonical = join(dir, 'gsc-service-account.json');
+  if (existsSync(canonical)) return canonical;
+  // Google hands you a key named like "my-project-ebb2d97c30a1.json" and nobody
+  // renames it. Accept any service-account JSON sitting in the config dir so a
+  // straight drag-and-drop of the download just works.
+  try {
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith('.json')) continue;
+      const full = join(dir, name);
+      try {
+        const j = JSON.parse(readFileSync(full, 'utf8'));
+        if (j?.type === 'service_account' && j.client_email && j.private_key) return full;
+      } catch {
+        /* not JSON, or not a key — keep looking */
+      }
+    }
+  } catch {
+    /* config dir missing */
+  }
+  return null;
 }
 
 const b64url = (buf) => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -167,9 +186,19 @@ async function main() {
         site: SITE,
         days: DAYS,
         dateRange: { start: isoDaysAgo(DAYS), end: isoDaysAgo(0) },
+        // Google ANONYMIZES rare queries — they are omitted from the `query`
+        // dimension entirely. So query-level totals understate reality, often
+        // badly (observed: 151 query impressions vs 256 on the homepage alone).
+        // Page-level is the complete figure; report both and never present the
+        // query total as site traffic.
         totals: {
+          clicks: pages.reduce((a, r) => a + r.clicks, 0),
+          impressions: pages.reduce((a, r) => a + r.impressions, 0),
+        },
+        queryLevelTotals: {
           clicks: queries.reduce((a, r) => a + r.clicks, 0),
           impressions: queries.reduce((a, r) => a + r.impressions, 0),
+          note: 'query rows exclude anonymized rare queries — lower than page totals by design',
         },
         queries,
         pages,
