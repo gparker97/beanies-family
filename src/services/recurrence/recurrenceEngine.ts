@@ -28,8 +28,14 @@ import {
  */
 
 // A generous ceiling so an unbounded rule + unbounded caller can never spin
-// forever. Range/count-bounded callers stop far below this.
-const HARD_CAP = 5000;
+// forever. Range/count-bounded callers stop far below this. Sized past any
+// realistic horizon: 20 000 daily occurrences ≈ 54 years from the anchor, and a
+// #70 rule cannot yet be old (rules are new), so a far-from-anchor query never
+// truncates in practice. (Generation iterates from the anchor each call; callers
+// keep a recent cursor — `lastProcessedDate` / the visible month — so per-call
+// work stays small. A warm-start fast-forward is a future optimization, not a
+// correctness fix.)
+const HARD_CAP = 20000;
 
 function atMidnight(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -52,15 +58,6 @@ function weekSet(cadence: Cadence, anchor: Date): number[] {
   return [single];
 }
 
-/** The earliest date on/after `anchor` whose weekday is in `set`. */
-function firstWeekOccurrence(set: number[], anchor: Date): Date {
-  for (let d = 0; d < 7; d++) {
-    const cand = addDays(anchor, d);
-    if (set.includes(cand.getDay())) return cand;
-  }
-  return anchor; // unreachable: set is always non-empty
-}
-
 /**
  * Infinite ascending generator of occurrence dates for a cadence, starting at
  * the first occurrence on/after the anchor. Callers MUST bound it (by range,
@@ -80,13 +77,17 @@ function* generate(cadence: Cadence, anchor: Date): Generator<Date> {
     }
     case 'week': {
       const set = weekSet(cadence, a);
-      const first = firstWeekOccurrence(set, a);
-      const weekStart = addDays(first, -first.getDay()); // Sunday of first's week
+      // Anchor the N-week cycle to the ANCHOR's week (its Sunday), matching a
+      // Google RRULE's DTSTART-relative INTERVAL — so in-app occurrences and the
+      // exported RRULE land on the same alternating weeks even when the chosen
+      // weekday precedes the anchor's weekday. Occurrences before the anchor are
+      // filtered by the `occ >= a` guard.
+      const weekStart = addDays(a, -a.getDay());
       for (let c = 0; ; c++) {
         const base = addDays(weekStart, c * interval * 7);
         for (const wd of set) {
           const occ = addDays(base, wd);
-          if (occ >= first) yield new Date(occ);
+          if (occ >= a) yield new Date(occ);
         }
       }
     }
@@ -104,7 +105,13 @@ function* generate(cadence: Cadence, anchor: Date): Generator<Date> {
         let occ: Date;
         if (useWeekday) occ = nthWeekdayOfMonth(base, ordinal!, weekday!);
         else if (isLast) occ = new Date(y, mi, daysInMonth(y, mi));
-        else occ = new Date(y, mi, Math.min(day, daysInMonth(y, mi)));
+        else {
+          // A numeric day that a month lacks (e.g. the 31st in Feb/Apr) is
+          // SKIPPED, not clamped — matching the legacy transaction processor
+          // (addMonths overflow) so an edited 29–31 item keeps its exact months.
+          if (day > daysInMonth(y, mi)) continue;
+          occ = new Date(y, mi, day);
+        }
         if (occ >= a) yield new Date(occ);
       }
     }
@@ -273,7 +280,9 @@ export function isRuleComplete(rule: RecurrenceRule | null | undefined): rule is
   if (rule.unit === 'month') {
     if (rule.monthlyAnchor === 'date') {
       const d = rule.monthlyDay;
-      if (d !== 'last' && !(typeof d === 'number' && d >= 1 && d <= 28)) return false;
+      // 1–31 (the engine skips months lacking the day) or 'last'. The picker UI
+      // only offers 1–28 + last, but legacy 29–31 items round-trip through here.
+      if (d !== 'last' && !(typeof d === 'number' && d >= 1 && d <= 31)) return false;
     } else if (rule.monthlyAnchor !== 'weekday') {
       return false;
     }
