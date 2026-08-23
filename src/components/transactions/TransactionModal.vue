@@ -5,7 +5,10 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
-import FrequencyChips from '@/components/ui/FrequencyChips.vue';
+import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
+import { resolveRecurringItemRule, legacyShadowFromRule } from '@/services/recurrence/adapters';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
+import type { RecurrenceRule } from '@/types/recurrence';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
@@ -25,7 +28,6 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useFormModal } from '@/composables/useFormModal';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
@@ -36,10 +38,9 @@ import type {
   CreateTransactionInput,
   UpdateTransactionInput,
   CreateRecurringItemInput,
-  RecurringFrequency,
   Account,
 } from '@/types/models';
-import { toDateInputValue, formatNookDate } from '@/utils/date';
+import { toDateInputValue, formatNookDate, extractDatePart } from '@/utils/date';
 import { computeGoalAllocRaw, isLiabilityType } from '@/utils/finance';
 import {
   buildAccountOptionGroups,
@@ -82,10 +83,12 @@ const amount = ref<number | undefined>(undefined);
 const description = ref('');
 const category = ref('');
 const recurrenceMode = ref<'one-time' | 'recurring'>('recurring');
-const recurrenceFrequency = ref('monthly');
+// #70: the canonical recurrence rule drives the shared RecurrencePicker. null →
+// the picker shows its default (monthly). Legacy frequency/dayOfMonth/monthOfYear
+// are derived as an inert schema shadow at save time (legacyShadowFromRule).
+const rule = ref<RecurrenceRule | null>(null);
 const date = ref(todayStr());
 const startDate = ref(todayStr());
-const endDate = ref('');
 const accountId = ref('');
 const activityId = ref<string | undefined>(undefined);
 const linkType = ref<'' | 'activity' | 'loan'>('');
@@ -94,29 +97,10 @@ const goalId = ref<string | undefined>(undefined);
 const goalAllocMode = ref<'percentage' | 'fixed'>('percentage');
 const goalAllocValue = ref<number | undefined>(undefined);
 const currency = ref(settingsStore.displayCurrency);
-const dayOfMonth = ref(1);
-const monthOfYear = ref(1);
 const isActive = ref(true);
 
-// When the user edits startDate, auto-sync dayOfMonth so that
-// syncLinkedTransactions picks up the new day. Without this, changing
-// startDate alone leaves dayOfMonth (and thus materialized transaction
-// dates) unchanged — the root cause of the "date doesn't update" bug.
-let suppressDaySync = false;
-watch(
-  startDate,
-  (newVal) => {
-    if (suppressDaySync || !newVal) return;
-    const day = new Date(newVal + 'T00:00:00').getDate();
-    if (recurrenceFrequency.value === 'monthly') {
-      dayOfMonth.value = Math.min(day, 28);
-    } else if (recurrenceFrequency.value === 'yearly') {
-      dayOfMonth.value = Math.min(day, 28);
-      monthOfYear.value = new Date(newVal + 'T00:00:00').getMonth() + 1;
-    }
-  },
-  { flush: 'sync' }
-);
+// #70: the RecurrencePicker derives the monthly/yearly anchor from `startDate`
+// live, so the old startDate→dayOfMonth sync watch is no longer needed.
 
 function todayStr() {
   return toDateInputValue(new Date());
@@ -178,7 +162,6 @@ const { isEditing, isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit: (entity) => {
-      suppressDaySync = true;
       if (props.recurringItem) {
         // Editing a recurring item (never a transfer)
         const item = props.recurringItem;
@@ -189,11 +172,8 @@ const { isEditing, isSubmitting } = useFormModal(
         description.value = item.description;
         category.value = item.category;
         recurrenceMode.value = 'recurring';
-        recurrenceFrequency.value = item.frequency;
-        dayOfMonth.value = item.dayOfMonth || 1;
-        monthOfYear.value = item.monthOfYear || 1;
+        rule.value = resolveRecurringItemRule(item).rule;
         startDate.value = item.startDate ? item.startDate.substring(0, 10) : todayStr();
-        endDate.value = item.endDate ? item.endDate.substring(0, 10) : '';
         accountId.value = item.accountId;
         if (item.loanId) {
           linkType.value = 'loan';
@@ -228,7 +208,10 @@ const { isEditing, isSubmitting } = useFormModal(
         amount.value = transaction.amount;
         description.value = transaction.description;
         category.value = transaction.category;
-        recurrenceMode.value = transaction.recurring ? 'recurring' : 'one-time';
+        // #70: a materialized transaction is edited as a one-off; the recurring
+        // template lives on its RecurringItem (this preserves the prior behavior,
+        // since the removed Transaction.recurring field was never written).
+        recurrenceMode.value = 'one-time';
         date.value = transaction.date;
         accountId.value = transaction.accountId;
         activityId.value = transaction.activityId;
@@ -245,20 +228,13 @@ const { isEditing, isSubmitting } = useFormModal(
         goalAllocMode.value = transaction.goalAllocMode || 'percentage';
         goalAllocValue.value = transaction.goalAllocValue;
         currency.value = transaction.currency;
-        // Initialize recurring fields from the transaction date so that
-        // switching to recurring mode pre-fills sensible defaults
-        const txDate = new Date(transaction.date + 'T00:00:00');
-        dayOfMonth.value = txDate.getDate();
-        monthOfYear.value = txDate.getMonth() + 1;
+        // Recurring picker defaults (monthly) if the user switches to recurring.
+        rule.value = null;
         startDate.value = transaction.date.substring(0, 10);
-        endDate.value = '';
-        recurrenceFrequency.value = 'monthly';
       }
       linkPromptDismissed.value = false;
-      suppressDaySync = false;
     },
     onNew: () => {
-      suppressDaySync = true;
       const iv = props.initialValues;
       isTransfer.value = iv?.type === 'transfer';
       toAccountId.value = iv?.toAccountId;
@@ -269,7 +245,7 @@ const { isEditing, isSubmitting } = useFormModal(
       recurrenceMode.value = iv ? 'one-time' : 'recurring';
       date.value = iv?.date ?? todayStr();
       startDate.value = todayStr();
-      endDate.value = '';
+      rule.value = null;
       // No pre-selection — the user deliberately picks the account(s).
       accountId.value = iv?.accountId ?? '';
       activityId.value = undefined;
@@ -279,11 +255,8 @@ const { isEditing, isSubmitting } = useFormModal(
       goalAllocMode.value = 'percentage';
       goalAllocValue.value = undefined;
       currency.value = iv?.currency ?? settingsStore.displayCurrency;
-      dayOfMonth.value = new Date().getDate();
-      monthOfYear.value = new Date().getMonth() + 1;
       isActive.value = true;
       linkPromptDismissed.value = false;
-      suppressDaySync = false;
     },
   }
 );
@@ -322,15 +295,11 @@ const accountGroups = computed<AccountOptionGroup[]>(() =>
 
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
 
-const frequencyOptions = computed(() => [
-  { value: 'daily', label: t('form.frequency.daily') },
-  { value: 'monthly', label: t('form.frequency.monthly') },
-  { value: 'yearly', label: t('form.frequency.yearly') },
-]);
-
-// Recurrence scheduling: month-of-year + day-of-month (28 to stay valid in
-// every month). Shares the option builder with the DOB pickers (31-day).
-const { monthOptions, dayOptions: dayOfMonthOptions } = useCalendarSelectOptions(28);
+// #70: read-only recurrence summary for a locked (activity/loan fee-linked) item.
+const { describe } = useRecurrenceLabel();
+const lockedRecurrenceSummary = computed(() =>
+  rule.value ? describe(rule.value, extractDatePart(startDate.value)) : ''
+);
 
 const canSave = computed(() => {
   const hasAmount = amount.value !== undefined && amount.value > 0;
@@ -525,6 +494,20 @@ watch([loanId, activityId], () => {
   }
 });
 
+// The rule to persist: the picker's value, or its default (monthly on the start
+// date) when the user opened "recurring" and saved without touching the picker.
+function buildEffectiveRule(startYmd: string): RecurrenceRule {
+  if (rule.value) return rule.value;
+  const day = new Date(extractDatePart(startYmd) + 'T00:00:00').getDate();
+  return {
+    unit: 'month',
+    interval: 1,
+    monthlyAnchor: 'date',
+    monthlyDay: day <= 28 ? day : 'last',
+    end: { kind: 'never' },
+  };
+}
+
 function handleSave() {
   if (!canSave.value) return;
   isSubmitting.value = true;
@@ -554,6 +537,9 @@ function handleSave() {
 
     // Editing an existing recurring item
     if (isEditingRecurring.value) {
+      const start = startDate.value || toDateInputValue(new Date());
+      const effRule = buildEffectiveRule(start);
+      const shadow = legacyShadowFromRule(effRule, start);
       const recurringData: CreateRecurringItemInput = {
         accountId: accountId.value,
         type: effectiveType.value,
@@ -561,11 +547,12 @@ function handleSave() {
         currency: currency.value,
         category: category.value,
         description: description.value.trim(),
-        frequency: recurrenceFrequency.value as RecurringFrequency,
-        dayOfMonth: dayOfMonth.value,
-        monthOfYear: recurrenceFrequency.value === 'yearly' ? monthOfYear.value : undefined,
-        startDate: startDate.value || toDateInputValue(new Date()),
-        endDate: endDate.value || undefined,
+        frequency: shadow.frequency,
+        dayOfMonth: shadow.dayOfMonth,
+        monthOfYear: shadow.monthOfYear,
+        rule: effRule,
+        startDate: start,
+        endDate: effRule.end.kind === 'onDate' ? effRule.end.date : undefined,
         isActive: isActive.value,
         lastProcessedDate: props.recurringItem?.lastProcessedDate,
         ...(loanId.value ? { loanId: loanId.value } : {}),
@@ -581,6 +568,9 @@ function handleSave() {
     // Editing a one-time transaction → user switched to recurring (conversion)
     // OR creating a brand new recurring item
     if (recurrenceMode.value === 'recurring' && (!isEditing.value || !isEditingRecurring.value)) {
+      const start = startDate.value || toDateInputValue(new Date());
+      const effRule = buildEffectiveRule(start);
+      const shadow = legacyShadowFromRule(effRule, start);
       const recurringData: CreateRecurringItemInput = {
         accountId: accountId.value,
         type: effectiveType.value,
@@ -588,11 +578,12 @@ function handleSave() {
         currency: currency.value,
         category: category.value,
         description: description.value.trim(),
-        frequency: recurrenceFrequency.value as RecurringFrequency,
-        dayOfMonth: dayOfMonth.value,
-        monthOfYear: recurrenceFrequency.value === 'yearly' ? monthOfYear.value : undefined,
-        startDate: startDate.value || toDateInputValue(new Date()),
-        endDate: endDate.value || undefined,
+        frequency: shadow.frequency,
+        dayOfMonth: shadow.dayOfMonth,
+        monthOfYear: shadow.monthOfYear,
+        rule: effRule,
+        startDate: start,
+        endDate: effRule.end.kind === 'onDate' ? effRule.end.date : undefined,
         isActive: true,
         ...(loanId.value ? { loanId: loanId.value } : {}),
         ...(activityId.value ? { activityId: activityId.value } : {}),
@@ -956,52 +947,19 @@ function dismissLinkPrompt() {
     <!-- 7. Recurring details -->
     <ConditionalSection :show="recurrenceMode === 'recurring' || isEditingRecurring">
       <div class="space-y-4">
-        <FormFieldGroup :label="t('modal.howOften')">
-          <div v-if="hasActiveLink" class="flex items-center gap-2">
-            <span
-              class="font-outfit bg-secondary-500 inline-flex items-center rounded-[11px] px-4 py-2 text-xs font-semibold text-white shadow-sm dark:bg-slate-200 dark:text-slate-900"
+        <!-- Linked (activity/loan fee) items keep a locked, read-only schedule -->
+        <template v-if="hasActiveLink">
+          <FormFieldGroup :label="t('modal.howOften')">
+            <div
+              class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
             >
-              {{
-                frequencyOptions.find((o) => o.value === recurrenceFrequency)?.label ??
-                recurrenceFrequency
-              }}
-            </span>
-            <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
-            <InfoHintBadge :text="t('txLink.hintFrequency')" />
-          </div>
-          <FrequencyChips v-else v-model="recurrenceFrequency" :options="frequencyOptions" />
-        </FormFieldGroup>
-        <!-- Month select (yearly only) -->
-        <FormFieldGroup v-if="recurrenceFrequency === 'yearly'" :label="t('form.month')">
-          <div class="relative">
-            <select
-              :value="String(monthOfYear)"
-              class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
-              @change="monthOfYear = Number(($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in monthOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-              <svg
-                class="h-4 w-4 text-[var(--color-text)] opacity-35"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+              <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{
+                lockedRecurrenceSummary
+              }}</span>
+              <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+              <InfoHintBadge :text="t('txLink.hintFrequency')" />
             </div>
-          </div>
-        </FormFieldGroup>
-        <!-- Start date, day-of-month, end date in a row -->
-        <div v-if="hasActiveLink" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          </FormFieldGroup>
           <FormFieldGroup :label="t('form.startDate')">
             <div
               class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
@@ -1013,53 +971,14 @@ function dismissLinkPrompt() {
               <InfoHintBadge :text="t('txLink.hintSchedule')" />
             </div>
           </FormFieldGroup>
-          <FormFieldGroup v-if="endDate" :label="t('form.endDate')">
-            <div
-              class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
-            >
-              <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{
-                endDate
-              }}</span>
-              <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
-            </div>
-          </FormFieldGroup>
-        </div>
-        <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        </template>
+        <!-- Editable: start date + the unified recurrence picker (#70) -->
+        <template v-else>
           <BeanieDatePicker v-model="startDate" :label="t('form.startDate')" required />
-          <div v-if="recurrenceFrequency === 'monthly'" class="flex items-end">
-            <FormFieldGroup :label="t('transactions.dayOfMonth')">
-              <div class="relative">
-                <select
-                  :value="String(dayOfMonth)"
-                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-2 pr-6 pl-3 text-base font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
-                  @change="dayOfMonth = Number(($event.target as HTMLSelectElement).value)"
-                >
-                  <option v-for="opt in dayOfMonthOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
-                <div
-                  class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5"
-                >
-                  <svg
-                    class="h-2.5 w-2.5 text-[var(--color-text)] opacity-35"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </FormFieldGroup>
-          </div>
-          <BeanieDatePicker v-model="endDate" :label="`${t('form.endDate')} (optional)`" />
-        </div>
+          <FormFieldGroup :label="t('modal.howOften')">
+            <RecurrencePicker v-model="rule" :start-date="startDate" accent="orange" />
+          </FormFieldGroup>
+        </template>
       </div>
     </ConditionalSection>
 

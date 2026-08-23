@@ -27,11 +27,8 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { showToast } from '@/composables/useToast';
 import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { getCurrencyInfo } from '@/constants/currencies';
-import {
-  formatFrequency,
-  getDueDatesInRange,
-  processRecurringItems,
-} from '@/services/recurring/recurringProcessor';
+import { getDueDatesInRange, processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import { recurringToTransactionFields, recurringTemplateFields } from '@/utils/recurringItemFields';
 import { reportRecurringItemActionFailed } from '@/utils/actionFailure';
 import { logEvent } from '@/services/telemetry';
@@ -76,6 +73,7 @@ const recurringStore = useRecurringStore();
 const { getMemberNameByAccountId, getMemberColorByAccountId } = useMemberInfo();
 const { t } = useTranslation();
 const { categoryLabel } = useCategoryLabel();
+const { describeRecurringItem } = useRecurrenceLabel();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
@@ -439,7 +437,7 @@ function getRecurringFrequencyLabel(tx: DisplayTransaction): string {
   if (!tx.recurringItemId) return '';
   const item = recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
   if (!item) return t('transactions.typeRecurring');
-  return `${t('transactions.typeRecurring')} \u00B7 ${formatFrequency(item).toLowerCase()}`;
+  return `${t('transactions.typeRecurring')} \u00B7 ${describeRecurringItem(item)}`;
 }
 
 // ── Transaction CRUD ──────────────────────────────────────────────────────
@@ -734,7 +732,7 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
       date: data.startDate,
       type: data.type,
       category: data.category,
-      recurring: formatFrequency({
+      recurring: describeRecurringItem({
         ...data,
         id: '',
         createdAt: '',

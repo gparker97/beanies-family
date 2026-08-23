@@ -156,7 +156,10 @@ async function handleRemoveRecurring(itemId: string) {
   }
 }
 
-function formatFrequency(freq: RecurringFrequency): string {
+// Compact per-period suffix for the "$100/mo" meta line — distinct from the
+// recurrence description resolver (#70). Onboarding only offers the three legacy
+// cadences and creates rule-less items (handled by the legacy path).
+function perPeriodSuffix(freq: RecurringFrequency): string {
   if (freq === 'daily') return t('onboarding.perDaySuffix');
   if (freq === 'yearly') return t('onboarding.perYearSuffix');
   return t('onboarding.perMonthSuffix');
@@ -301,7 +304,7 @@ function formatFrequency(freq: RecurringFrequency): string {
           :key="item.id"
           :icon="item.icon"
           :title="item.description"
-          :meta="`$${item.amount.toLocaleString()}${formatFrequency(item.frequency)}`"
+          :meta="`$${item.amount.toLocaleString()}${perPeriodSuffix(item.frequency)}`"
           :tag="item.type"
           :tag-variant="item.type"
           removable
