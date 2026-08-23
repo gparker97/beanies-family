@@ -16,7 +16,7 @@ import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate } from '@/utils/date';
 import { useRecurringStore } from '@/stores/recurringStore';
-import { formatFrequency } from '@/services/recurring/recurringProcessor';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -43,6 +43,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { describeRecurringItem } = useRecurrenceLabel();
 const { categoryLabel } = useCategoryLabel();
 const { playWhoosh } = useSounds();
 const transactionsStore = useTransactionsStore();
@@ -335,7 +336,7 @@ async function handleDelete() {
               <span
                 class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
               >
-                {{ formatFrequency(linkedRecurringItem) }}
+                {{ describeRecurringItem(linkedRecurringItem) }}
               </span>
             </div>
             <div v-if="linkedRecurringItem.startDate" class="flex items-center gap-2">
