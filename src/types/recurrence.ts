@@ -43,7 +43,18 @@ export interface Cadence {
   weekdays?: number[];
   /** Month unit only. */
   monthlyAnchor?: MonthlyAnchor;
-  /** `monthlyAnchor === 'date'` only: 1..28, or 'last' (last day of month). */
+  /**
+   * `monthlyAnchor === 'date'` only: 1..31, or 'last' (last day of month).
+   *
+   * A month that lacks the day CLAMPS to that month's last day — it is never
+   * skipped (#70). "Monthly on the 31st" therefore means Jan 31, Feb 28,
+   * Mar 31, Apr 30…
+   *
+   * INVARIANT: `'last'` is a **label variant** of `monthlyDay: 31` — under the
+   * clamp the two are behaviourally identical. Label and serialization sites may
+   * branch on it (`RecurrencePicker.monthlyDateLabel`, `recurrenceRrule`,
+   * `describe.ts`); **no occurrence-generating path may.**
+   */
   monthlyDay?: number | 'last';
 }
 

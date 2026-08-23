@@ -2,8 +2,8 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
-import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
+import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
@@ -19,6 +19,8 @@ import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import TripShortcutCard from '@/components/planner/TripShortcutCard.vue';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { calculateMonthlyFee } from '@/utils/finance';
+import { resolveActivityRule, activityShadowFromRule } from '@/services/recurrence/adapters';
+import { monthlyFactor, occurrenceCount } from '@/services/recurrence/recurrenceEngine';
 import { diffPayload } from '@/utils/diffPayload';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -30,19 +32,25 @@ import { useFormModal } from '@/composables/useFormModal';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
-import { addHourToTime, formatNookDate } from '@/utils/date';
-import { buildRecurrenceOptions } from '@/utils/format';
+import {
+  addHourToTime,
+  formatNookDate,
+  extractDatePart,
+  parseLocalDate,
+  toDateInputValue,
+  addDays,
+} from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { ensureHttpUrl } from '@/utils/url';
 import type {
   FamilyActivity,
   ActivityCategory,
-  ActivityRecurrence,
   FeeSchedule,
   ReminderMinutes,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
 } from '@/types/models';
+import type { RecurrenceRule } from '@/types/recurrence';
 import type { FieldConfidence } from '@/services/ai/types';
 import {
   ACTIVITY_LEAD_OPTIONS,
@@ -105,15 +113,21 @@ const endDate = ref('');
 const isAllDay = ref(false);
 const startTime = ref('');
 const endTime = ref('');
-// Single source of truth for the activity's recurrence rule. The pill row
-// below presents all 5 options (One-time / Weekly / Every 2 weeks / Monthly
-// on the Nth / Monthly on the Nth weekday) directly — no separate mode
-// toggle. Auto-labelled via `buildRecurrenceOptions` so each pill spells
-// out what it means using the current start date.
-const recurrence = ref<ActivityRecurrence>('weekly');
-const daysOfWeek = ref<number[]>([]);
-const recurrenceEndDate = ref('');
-const isRecurring = computed(() => recurrence.value !== 'none');
+/**
+ * Recurrence is carried by exactly TWO pieces of state (#70):
+ *
+ *  - `mode` — the one bit a `RecurrenceRule` cannot express: does this recur at
+ *    all? Driven by the one-time/recurring cards at the top of the modal.
+ *  - `rule` — the canonical cadence, owned entirely by `RecurrencePicker`.
+ *
+ * The legacy `recurrence`/`daysOfWeek`/`recurrenceEndDate` enum trio is NOT
+ * kept alongside them: two independently-mutable representations of the same
+ * cadence is the desync class docs/lessons.md warns about. The legacy shadow is
+ * derived once, at the payload boundary, in `buildPayload`.
+ */
+const mode = ref<'one-off' | 'recurring'>('recurring');
+const rule = ref<RecurrenceRule | null>(null);
+const isRecurring = computed(() => mode.value === 'recurring');
 const category = ref<ActivityCategory>('' as ActivityCategory);
 const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
@@ -170,7 +184,18 @@ function applyPrefill(): void {
   // Photo-extracted events default to one-time, overriding onNew's 'weekly' (an invitation
   // is almost always a single occurrence). Forward-compatible: honours an explicit recurrence
   // if a prefill ever carries one (e.g. a detected repeating event).
-  recurrence.value = p.recurrence ?? 'none';
+  // A photo-extracted event is almost always a single occurrence; honour an
+  // explicit recurrence if a prefill ever carries one.
+  mode.value = (p.recurrence ?? 'none') === 'none' ? 'one-off' : 'recurring';
+  if (p.recurrence && p.recurrence !== 'none') {
+    rule.value =
+      resolveActivityRule({
+        recurrence: p.recurrence,
+        date: p.date ?? date.value,
+        daysOfWeek: p.daysOfWeek,
+        recurrenceEndDate: p.recurrenceEndDate,
+      })?.rule ?? null;
+  }
   if (p.title !== undefined) title.value = p.title;
   if (p.date) date.value = p.date;
   if (p.location !== undefined) location.value = p.location;
@@ -211,30 +236,20 @@ const titleLowConfidence = computed(
 // When the user has picked >1 day, the non-weekly chips are disabled with a
 // hint explaining why — keeps them discoverable rather than silently hiding,
 // and prevents silently losing extra day-of-week selections on a chip swap.
-const hasMultipleDaysOfWeek = computed(() => daysOfWeek.value.length > 1);
-const recurrenceOptions = computed(() => {
-  const base = buildRecurrenceOptions({ date: date.value, daysOfWeek: daysOfWeek.value }, t).filter(
-    (o) => o.value !== 'none'
-  );
-  if (!hasMultipleDaysOfWeek.value) return base;
-  const hint = t('planner.recurrence.multiDayWeeklyOnlyHint');
-  return base.map((o) => (o.value === 'weekly' ? o : { ...o, disabled: true, disabledHint: hint }));
-});
+// (#70) The chip option list and its "multi-day is weekly-only" disabled-hint
+// are gone: `RecurrencePicker`'s model makes that state unrepresentable
+// (multiple weekdays exist only for interval 1), so there is nothing to warn
+// about and no chip to disable.
 
 /**
  * The top-of-modal cards split "one-time" vs "recurring" — the first-order
- * decision. The user's frequency choice is preserved across toggles so a
- * recurring → one-time → recurring round-trip doesn't silently lose their
- * previous selection. We remember the last non-'none' recurrence value in
- * `lastRecurringKind` (default: 'weekly') and restore it on toggle-back.
+ * decision. Toggling only flips `mode`; `rule` is left untouched, so a
+ * recurring → one-time → recurring round-trip restores the user's WHOLE
+ * schedule (interval, weekdays, end), not just the coarse frequency kind the
+ * old `lastRecurringKind` remembered.
  */
-const lastRecurringKind = ref<ActivityRecurrence>('weekly');
-watch(recurrence, (next) => {
-  if (next !== 'none') lastRecurringKind.value = next;
-});
-
-function setRecurrenceMode(mode: 'recurring' | 'one-off'): void {
-  recurrence.value = mode === 'one-off' ? 'none' : lastRecurringKind.value;
+function setRecurrenceMode(next: 'recurring' | 'one-off'): void {
+  mode.value = next === 'one-off' ? 'one-off' : 'recurring';
 }
 
 // Check if any "more details" field has data (for auto-expand in edit mode)
@@ -280,9 +295,15 @@ const { isEditing, isSubmitting } = useFormModal(
       isAllDay.value = activity.isAllDay ?? false;
       startTime.value = activity.startTime ?? '';
       endTime.value = activity.endTime ?? '';
-      recurrence.value = activity.recurrence;
-      daysOfWeek.value = activity.daysOfWeek ?? [];
-      recurrenceEndDate.value = activity.recurrenceEndDate ?? '';
+      mode.value = activity.recurrence === 'none' ? 'one-off' : 'recurring';
+      // The SERIES start, which for a recurring activity differs from `date`
+      // (seeded from the opened occurrence).
+      seriesAnchor.value = extractDatePart(activity.date);
+      // Resolve through the shared adapter: `rule` when the series has one,
+      // else derived from the legacy fields. An untouched form therefore emits
+      // no `rule` at all (the diff below sees no change), so a legacy series
+      // stays on the legacy expansion path until deliberately edited.
+      rule.value = resolveActivityRule(activity)?.rule ?? null;
       category.value = activity.category;
       assigneeIds.value = normalizeAssignees(activity);
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
@@ -320,9 +341,9 @@ const { isEditing, isSubmitting } = useFormModal(
       isAllDay.value = false;
       startTime.value = props.defaultStartTime ?? '09:00';
       endTime.value = addHourToTime(startTime.value);
-      recurrence.value = 'weekly';
-      daysOfWeek.value = [];
-      recurrenceEndDate.value = '';
+      mode.value = 'recurring';
+      rule.value = null;
+      seriesAnchor.value = date.value;
       category.value = '' as ActivityCategory;
       assigneeIds.value = props.defaultAssigneeIds ?? [];
       dropoffMemberId.value = '';
@@ -361,33 +382,19 @@ watch(category, (newCategory) => {
   color.value = getActivityCategoryColor(newCategory);
 });
 
-// Keep the weekly day-of-week anchored to the start date's weekday while the
-// user hasn't customized the selection. Without this, opening the modal on a
-// Monday auto-fills `[Mon]`, and then picking a Tuesday start date would leave
-// the recurrence on Mondays — so the chosen start date (and every occurrence
-// before the next Monday) never renders on the calendar.
-//
-// "Untouched" = empty (initial), or still exactly the previous start date's
-// single weekday. A multi-day pick, or a single day the user switched to a
-// different weekday, counts as customized and is preserved across date edits.
-watch(date, (newDate, oldDate) => {
-  // Suppressed during edit population: re-seeding `date` from `occurrenceDate`
-  // would otherwise fire this and rewrite the SERIES' weekday set.
-  if (suppressDaysOfWeekSync) return;
-  if (!newDate || !isRecurring.value) return;
-  const newWeekday = new Date(newDate + 'T00:00:00').getDay();
-  const oldWeekday = oldDate ? new Date(oldDate + 'T00:00:00').getDay() : null;
-  const untouched =
-    daysOfWeek.value.length === 0 ||
-    (daysOfWeek.value.length === 1 && oldWeekday !== null && daysOfWeek.value[0] === oldWeekday);
-  if (untouched) {
-    daysOfWeek.value = [newWeekday];
-  }
-});
+// NOTE (#70): the weekday re-anchor watcher that lived here is GONE.
+// `RecurrencePicker` now owns re-anchoring — it re-derives an untouched weekday
+// set (and the monthly day) when its `start-date` changes, using the same
+// "untouched" heuristic. Keeping a second copy here is exactly how two
+// re-anchor rules drift apart. `suppressDaysOfWeekSync` went with it: it was a
+// modal-local flag and could never have suppressed a watcher inside the picker
+// anyway — the fix is that the picker is anchored on the SERIES start date
+// (`seriesAnchor`), not the occurrence-seeded `date`, so populating an edit
+// cannot re-anchor anything.
 
 // Sync endTime when startTime changes (skip during edit population)
 let suppressEndTimeSync = false;
-let suppressDaysOfWeekSync = false;
+
 /**
  * Baseline snapshot of the form payload, taken once per open in edit mode.
  *
@@ -414,15 +421,14 @@ watch(
   () => props.open,
   (open) => {
     if (open && props.activity) {
-      // Suppress the startTime + daysOfWeek watchers during edit population.
-      // Vue's default 'pre' watchers are queued, not synchronous: onEdit's field
-      // assignments queue those callbacks, and this watcher — registered later
-      // on the same `props.open` source — sets the flags before the queue flushes.
+      // Suppress the startTime watcher during edit population. Vue's default
+      // 'pre' watchers are queued, not synchronous: onEdit's field assignments
+      // queue those callbacks, and this watcher — registered later on the same
+      // `props.open` source — sets the flag before the queue flushes.
+      // (#70: the daysOfWeek flag is gone with the watcher it guarded.)
       suppressEndTimeSync = true;
-      suppressDaysOfWeekSync = true;
       nextTick(() => {
         suppressEndTimeSync = false;
-        suppressDaysOfWeekSync = false;
         // Taken AFTER the flags release so watcher-settled values are part of
         // the baseline rather than surfacing as phantom user changes.
         // Skipped for the AI update-existing flow — see the ref's docblock.
@@ -450,7 +456,46 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const allScheduleEnabled = computed(() => isRecurring.value && !!recurrenceEndDate.value);
+/**
+ * The date the recurrence rule is anchored to.
+ *
+ * CRITICAL (#70): this is the SERIES start, not `date`. For a recurring
+ * activity `date` is deliberately seeded from `props.occurrenceDate` (see the
+ * 2026-08-15 occurrence-edit work), so binding the picker to it would anchor
+ * the rule on whichever occurrence the user opened — e.g. opening the February
+ * occurrence of a clamped "31st" series would re-derive `monthlyDay = 28` and
+ * permanently reschedule the whole series on save.
+ */
+const seriesAnchor = ref('');
+
+/**
+ * Keep the series anchor in step with the user's date edits.
+ *
+ * `props.activity.date` alone is a CONSTANT while the modal is open, so binding
+ * the picker to it makes the picker's own re-anchor watcher unreachable in edit
+ * mode — and this modal's date watcher was removed on the grounds that the
+ * picker had taken that job over. Instead the anchor moves by the same DELTA the
+ * user applied to `date`, which is exactly what `useActivityScopeEdit.shiftAnchor`
+ * does to the stored template on save. The two therefore agree.
+ */
+watch(date, (newDate, oldDate) => {
+  if (!newDate || !seriesAnchor.value) return;
+  if (!oldDate) return;
+  const deltaDays = Math.round(
+    (parseLocalDate(newDate).getTime() - parseLocalDate(oldDate).getTime()) / 86_400_000
+  );
+  if (deltaDays === 0) return;
+  seriesAnchor.value = toDateInputValue(addDays(parseLocalDate(seriesAnchor.value), deltaDays));
+});
+
+/**
+ * "All sessions" pricing needs a finite session count, which exists only when
+ * the series actually ends — by date OR after a set number of times (#70; the
+ * latter is newly expressible via the picker).
+ */
+const allScheduleEnabled = computed(
+  () => isRecurring.value && !!rule.value && rule.value.end.kind !== 'never'
+);
 
 const feeScheduleChipOptions = computed(() => {
   const allChip = {
@@ -492,37 +537,31 @@ const isAllSchedule = computed(() => feeSchedule.value === 'all');
 
 const calculatedMonthly = computed(() => {
   if (!hasCost.value || feeSchedule.value === 'none' || isAllSchedule.value) return 0;
+  if (!isRecurring.value || !rule.value) return 0; // one-time — no monthly equivalent
   return calculateMonthlyFee({
     feeSchedule: feeSchedule.value,
     feeAmount: feeAmount.value ?? 0,
-    sessionsPerWeek: daysOfWeek.value.length || 1,
+    // The REAL occurrence rate, straight off the canonical rule — not "sessions
+    // per week", which was only ever correct for weekly activities (#70).
+    monthlyOccurrences: monthlyFactor(rule.value),
     feeCustomPeriod: feeCustomPeriod.value,
     feeCustomPeriodUnit: feeCustomPeriodUnit.value,
   });
 });
 
-// Estimated session count for 'all' schedule breakdown
+/**
+ * Session count for the "all sessions" fee breakdown.
+ *
+ * (#70) Was a hand-rolled walk that only handled `weekly` — daily, biweekly and
+ * yearly all fell into a MONTHS count, so a daily class was priced per month.
+ * Now the engine counts, which also means a count-bounded (`afterCount`) series
+ * works, which the old `recurrenceEndDate`-based version could not express.
+ * `occurrenceCount` returns null for an unbounded or uncountable series; 0 here
+ * makes `perSessionCost` return 0 rather than dividing by a wrong number.
+ */
 const totalSessions = computed(() => {
-  if (!isAllSchedule.value || !date.value || !recurrenceEndDate.value) return 0;
-  const start = new Date(date.value + 'T00:00:00');
-  const end = new Date(recurrenceEndDate.value + 'T00:00:00');
-  if (end < start) return 1;
-
-  if (recurrence.value === 'weekly') {
-    // Count exact matching days-of-week between start and end (inclusive)
-    const targetDays = daysOfWeek.value.length > 0 ? daysOfWeek.value : [start.getDay()];
-    let count = 0;
-    const cursor = new Date(start);
-    while (cursor <= end) {
-      if (targetDays.includes(cursor.getDay())) count++;
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return Math.max(count, 1);
-  }
-  // Monthly: count months from start to end (inclusive of both)
-  const months =
-    (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
-  return Math.max(months, 1);
+  if (!isAllSchedule.value || !rule.value) return 0;
+  return occurrenceCount(rule.value, seriesAnchor.value) ?? 0;
 });
 
 const perSessionCost = computed(() => {
@@ -575,13 +614,13 @@ function buildPayload(): CreateFamilyActivityInput {
     isAllDay: isAllDay.value || undefined,
     startTime: isAllDay.value ? undefined : startTime.value || undefined,
     endTime: isAllDay.value ? undefined : endTime.value || undefined,
-    recurrence: recurrence.value,
-    // `daysOfWeek` only persisted for weekly (multi-day picker). Other
-    // kinds (biweekly anchored single-day, monthly variants) derive their
-    // anchor from the activity's `date` per the recurrence-rule contract.
-    daysOfWeek: recurrence.value === 'weekly' ? [...daysOfWeek.value] : undefined,
-    recurrenceEndDate:
-      isRecurring.value && recurrenceEndDate.value ? recurrenceEndDate.value : undefined,
+    // #70: the canonical rule is authoritative; the legacy enum trio is derived
+    // HERE and nowhere else, so the two can never drift. A one-time activity
+    // carries no rule at all.
+    rule: isRecurring.value && rule.value ? rule.value : undefined,
+    ...(isRecurring.value && rule.value
+      ? activityShadowFromRule(rule.value)
+      : { recurrence: 'none' as const, daysOfWeek: undefined, recurrenceEndDate: undefined }),
     category: category.value,
     ...assigneePayload,
     dropoffMemberId: dropoffMemberId.value || undefined,
@@ -912,18 +951,14 @@ function handleSave() {
         </p>
       </FormFieldGroup>
 
-      <!-- 3. Schedule: frequency chips + (weekly only) day-of-week selector.
-           Chips are auto-labelled from the activity's `date` so each option
-           spells out what it means in the user's context — picking start
-           date 13 May 2026 renders "Monthly on the 13th" and "Monthly on
-           the 2nd Wed" so the difference between the two monthly variants
-           is self-evident. -->
+      <!-- 3. Schedule — the one shared recurrence control (#70). Same look and
+           behaviour as money and lists: simple cadences one tap, "every N"
+           behind Custom, context-sensitive sub-controls, and the ends selector
+           (never / on a date / after N times). Anchored on the SERIES start
+           date, never the opened occurrence. -->
       <template v-if="isRecurring">
         <FormFieldGroup :label="t('modal.schedule')">
-          <div class="space-y-3">
-            <FrequencyChips v-model="recurrence" :options="recurrenceOptions" />
-            <DayOfWeekSelector v-if="recurrence === 'weekly'" v-model="daysOfWeek" />
-          </div>
+          <RecurrencePicker v-model="rule" :start-date="seriesAnchor" />
         </FormFieldGroup>
       </template>
 
@@ -944,14 +979,12 @@ function handleSave() {
       <!-- 5. Date + Times -->
       <!-- Recurring: Start Date / End Date row, then Start Time / End Time row -->
       <template v-if="isRecurring">
-        <div class="grid grid-cols-2 gap-4">
-          <FormFieldGroup :label="t('planner.field.date')" required :error="errorDate">
-            <BeanieDatePicker v-model="date" required />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('planner.field.endDate')" optional>
-            <BeanieDatePicker v-model="recurrenceEndDate" :min="date" />
-          </FormFieldGroup>
-        </div>
+        <!-- (#70) The recurrence end moved into RecurrencePicker's "ends"
+             control, so this row is a single full-width start date rather than
+             a half-empty two-column grid. -->
+        <FormFieldGroup :label="t('planner.field.date')" required :error="errorDate">
+          <BeanieDatePicker v-model="date" required />
+        </FormFieldGroup>
         <div v-if="!isAllDay" class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('modal.startTime')">
             <TimePresetPicker v-model="startTime" />

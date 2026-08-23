@@ -8,6 +8,7 @@ import { convertToBaseCurrency } from '@/utils/currency';
 import { toDateInputValue, parseLocalDate, addDays } from '@/utils/date';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
+import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type {
   RecurringItem,
@@ -44,16 +45,13 @@ export const useRecurringStore = defineStore('recurring', () => {
   // derive the factor from the canonical rule (honors weekly/biweekly/every-N);
   // legacy items use the original per-frequency factors, unchanged.
   function normalizeToMonthly(item: RecurringItem): number {
-    if (item.rule) return item.amount * monthlyFactor(item.rule);
-    switch (item.frequency) {
-      case 'daily':
-        return item.amount * 30;
-      case 'yearly':
-        return item.amount / 12;
-      case 'monthly':
-      default:
-        return item.amount;
-    }
+    // #70: one path for both rule-bearing and legacy items. The old legacy
+    // switch defaulted an unknown frequency to MONTHLY while the adapter
+    // defaulted the same input to DAILY — a silent 30x disagreement on the same
+    // item. The resolver now reports an unmappable shape and returns null, and
+    // the raw amount is the honest answer for one.
+    const resolved = resolveTransactionRule(item);
+    return resolved ? item.amount * monthlyFactor(resolved.rule) : item.amount;
   }
 
   // Total monthly recurring income - converts each item to base currency first

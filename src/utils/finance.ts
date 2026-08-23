@@ -22,23 +22,24 @@ export function computeGoalAllocRaw(
 export function calculateMonthlyFee(opts: {
   feeSchedule: string;
   feeAmount: number;
-  sessionsPerWeek?: number;
+  /**
+   * How many times the activity actually happens per month — from
+   * `monthlyFactor(rule)` (#70). REQUIRED for `per_session`: it previously took
+   * a `sessionsPerWeek` that was only ever populated for weekly activities, so
+   * every other cadence silently billed as if it happened every week (a
+   * fortnightly class at 2x, a monthly one at 4.33x, a yearly one at 52x).
+   */
+  monthlyOccurrences: number;
   feeCustomPeriod?: number;
   feeCustomPeriodUnit?: 'weeks' | 'months';
 }): number {
-  const {
-    feeSchedule,
-    feeAmount,
-    sessionsPerWeek = 1,
-    feeCustomPeriod,
-    feeCustomPeriodUnit,
-  } = opts;
+  const { feeSchedule, feeAmount, monthlyOccurrences, feeCustomPeriod, feeCustomPeriodUnit } = opts;
   if (!feeAmount || feeAmount <= 0) return 0;
 
   let monthly: number;
   switch (feeSchedule) {
     case 'per_session':
-      monthly = (feeAmount * Math.max(sessionsPerWeek, 1) * 52) / 12;
+      monthly = feeAmount * Math.max(monthlyOccurrences, 0);
       break;
     case 'weekly':
       monthly = (feeAmount * 52) / 12;

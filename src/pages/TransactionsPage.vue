@@ -602,7 +602,19 @@ async function syncLinkedTransactions(recurringItemId: string, data: CreateRecur
     (tx) => tx.recurringItemId === recurringItemId && !tx.isReconciled
   );
   const fields = recurringToTransactionFields(data);
+  // #70: `dayOfMonth` is only meaningful for a MONTHLY item. For anything else
+  // it is the inert shadow placeholder (`min(startDate.getDate(), 28)`), so
+  // re-dating from it dragged every materialized transaction of a weekly item
+  // onto one day of the month. A non-monthly schedule has no "day of month" to
+  // re-apply — the amount/description/category still sync, the dates stay put.
+  const isMonthlyShaped = data.rule
+    ? data.rule.unit === 'month' && data.rule.interval === 1
+    : data.frequency === 'monthly';
   for (const tx of linked) {
+    if (!isMonthlyShaped) {
+      await transactionsStore.updateTransaction(tx.id, fields);
+      continue;
+    }
     // Recalculate date: keep the transaction's year/month, use new dayOfMonth
     const txDate = new Date(tx.date + 'T00:00:00');
     const daysInMonth = new Date(txDate.getFullYear(), txDate.getMonth() + 1, 0).getDate();

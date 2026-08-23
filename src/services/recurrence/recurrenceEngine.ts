@@ -77,10 +77,12 @@ function* generate(cadence: Cadence, anchor: Date): Generator<Date> {
     }
     case 'week': {
       const set = weekSet(cadence, a);
-      // Anchor the N-week cycle to the ANCHOR's week (its Sunday), matching a
-      // Google RRULE's DTSTART-relative INTERVAL — so in-app occurrences and the
-      // exported RRULE land on the same alternating weeks even when the chosen
-      // weekday precedes the anchor's weekday. Occurrences before the anchor are
+      // Anchor the N-week cycle to the ANCHOR's week, taking its SUNDAY as the
+      // week start. RFC 5545 defaults WKST to MONDAY, so this only agrees with
+      // the exported RRULE because `recurrenceRrule` explicitly emits `WKST=SU`
+      // for INTERVAL >= 2. If that is ever removed, in-app occurrences and the
+      // family's Google Calendar land 7 days apart whenever the chosen weekday
+      // precedes the anchor's weekday. Occurrences before the anchor are
       // filtered by the `occ >= a` guard.
       const weekStart = addDays(a, -a.getDay());
       for (let c = 0; ; c++) {
@@ -95,23 +97,31 @@ function* generate(cadence: Cadence, anchor: Date): Generator<Date> {
       const useWeekday = cadence.monthlyAnchor === 'weekday';
       const ordinal = useWeekday ? getWeekdayOrdinalInMonth(a) : null;
       const weekday = useWeekday ? a.getDay() : null;
-      const isLast = cadence.monthlyDay === 'last';
-      const day = typeof cadence.monthlyDay === 'number' ? cadence.monthlyDay : a.getDate();
+      // `'last'` is a LABEL VARIANT of day 31 — under the clamp below the two are
+      // behaviourally identical, so there is no separate branch for it here.
+      const day =
+        cadence.monthlyDay === 'last'
+          ? 31
+          : typeof cadence.monthlyDay === 'number'
+            ? cadence.monthlyDay
+            : a.getDate();
       const firstOfAnchorMonth = new Date(a.getFullYear(), a.getMonth(), 1);
       for (let m = 0; ; m++) {
         const base = addMonths(firstOfAnchorMonth, m * interval);
         const y = base.getFullYear();
         const mi = base.getMonth();
-        let occ: Date;
-        if (useWeekday) occ = nthWeekdayOfMonth(base, ordinal!, weekday!);
-        else if (isLast) occ = new Date(y, mi, daysInMonth(y, mi));
-        else {
-          // A numeric day that a month lacks (e.g. the 31st in Feb/Apr) is
-          // SKIPPED, not clamped — matching the legacy transaction processor
-          // (addMonths overflow) so an edited 29–31 item keeps its exact months.
-          if (day > daysInMonth(y, mi)) continue;
-          occ = new Date(y, mi, day);
-        }
+        // A numeric day a month lacks (e.g. the 31st in Feb/Apr) CLAMPS to that
+        // month's last day — never skipped. Matches legacy activity expansion
+        // (activityStore.expandMonthlyByDate), this engine's own yearly branch,
+        // and the RRULE serializer's BYSETPOS clamp. NOTE the legacy transaction
+        // processor is inconsistent: getFirstDueDate clamps, but getNextDueDate
+        // steps with addMonths (a bare setMonth, so Jan 31 -> Mar 3) and
+        // therefore SKIPS short months. That legacy path is deliberately left
+        // alone (no at-rest migration); rule-bearing items clamp uniformly.
+        // This is an intentional behaviour change, not parity. See #70.
+        const occ = useWeekday
+          ? nthWeekdayOfMonth(base, ordinal!, weekday!)
+          : new Date(y, mi, Math.min(day, daysInMonth(y, mi)));
         if (occ >= a) yield new Date(occ);
       }
     }
@@ -247,7 +257,7 @@ export function isResetDue(
   return parseLocalDate(todayYmd) >= parseLocalDate(next);
 }
 
-const WEEKS_PER_MONTH = 52 / 12; // ≈ 4.345
+const WEEKS_PER_MONTH = 52 / 12; // ≈ 4.3333
 
 /**
  * Average occurrences per month — for normalizing a recurring amount to a
@@ -261,7 +271,10 @@ export function monthlyFactor(cadence: Cadence): number {
     case 'day':
       return 30 / interval;
     case 'week': {
-      const days = cadence.interval === 1 ? Math.max(1, cadence.weekdays?.length ?? 1) : 1;
+      // Use the NORMALIZED interval, not the raw field — a synthesized cadence
+      // with `interval` absent/0 would otherwise collapse to a single weekday.
+      // (Defensive: `isRuleComplete` rejects interval < 1 for persisted rules.)
+      const days = interval === 1 ? Math.max(1, cadence.weekdays?.length ?? 1) : 1;
       return (WEEKS_PER_MONTH * days) / interval;
     }
     case 'month':
@@ -269,6 +282,32 @@ export function monthlyFactor(cadence: Cadence): number {
     case 'year':
       return 1 / (12 * interval);
   }
+}
+
+/**
+ * Total number of occurrences a BOUNDED rule produces from its anchor.
+ *
+ * Returns `null` when the series has no natural total — either `end.kind` is
+ * `'never'`, or generation hit `HARD_CAP` before terminating. Returning `null`
+ * rather than the truncated count is deliberate: this feeds the "all sessions"
+ * fee breakdown, where a silently under-reported count would DIVIDE a fee and
+ * quietly overstate the per-session price.
+ *
+ * One place knows how both end kinds terminate, so callers never reimplement it.
+ */
+export function occurrenceCount(rule: RecurrenceRule, anchorYmd: string): number | null {
+  if (rule.end.kind === 'never') return null;
+  const anchor = parseLocalDate(anchorYmd);
+  const endBound = endDateBound(rule);
+  let i = 0;
+  let produced = 0;
+  for (const occ of generate(rule, anchor)) {
+    if (++i > HARD_CAP) return null; // did not terminate — refuse to guess
+    if (rule.end.kind === 'afterCount' && produced >= rule.end.count) return produced;
+    if (endBound && occ > endBound) return produced;
+    produced++;
+  }
+  return produced;
 }
 
 /** Structural validity of a rule before it is persisted. */
@@ -280,8 +319,9 @@ export function isRuleComplete(rule: RecurrenceRule | null | undefined): rule is
   if (rule.unit === 'month') {
     if (rule.monthlyAnchor === 'date') {
       const d = rule.monthlyDay;
-      // 1–31 (the engine skips months lacking the day) or 'last'. The picker UI
-      // only offers 1–28 + last, but legacy 29–31 items round-trip through here.
+      // 1–31 (the engine CLAMPS months lacking the day to their last day) or
+      // 'last', which is a label variant of 31. Legacy 29–31 items and picker
+      // selections derived from a 29th–31st start date both round-trip here.
       if (d !== 'last' && !(typeof d === 'number' && d >= 1 && d <= 31)) return false;
     } else if (rule.monthlyAnchor !== 'weekday') {
       return false;

@@ -14,17 +14,20 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getListCategory } from '@/constants/listCategories';
 import { isRecurring } from '@/utils/listLifecycle';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { formatDateShort } from '@/utils/date';
+import { formatDateShort, extractDatePart } from '@/utils/date';
+import { resolveListRule, listShadowFromCadence } from '@/services/recurrence/adapters';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
-import FrequencyChips from '@/components/ui/FrequencyChips.vue';
+import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import ListItemRow from './ListItemRow.vue';
 import ListCategoryPills from './ListCategoryPills.vue';
-import type { FamilyListItem, ListCategory, ListFrequency, ListLifecycle } from '@/types/models';
+import type { FamilyListItem, ListCategory, ListLifecycle } from '@/types/models';
+import type { RecurrenceRule, Cadence } from '@/types/recurrence';
 
 const props = withDefaults(
   defineProps<{
@@ -37,6 +40,7 @@ const props = withDefaults(
 const emit = defineEmits<{ close: []; deleted: [id: string] }>();
 
 const { t } = useTranslation();
+const { describe } = useRecurrenceLabel();
 const listStore = useListStore();
 const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
@@ -150,13 +154,74 @@ function setLifecycle(value: string): void {
   // sets/clears recurrence fields) — see listStore.setLifecycle.
   if (list.value) void listStore.setLifecycle(list.value.id, value as ListLifecycle);
 }
-const freqOptions = computed(() => [
-  { value: 'daily', label: t('lists.detail.freq.daily') },
-  { value: 'weekly', label: t('lists.detail.freq.weekly') },
-  { value: 'monthly', label: t('lists.detail.freq.monthly') },
-]);
-function setFrequency(value: string): void {
-  if (list.value) void listStore.updateList(list.value.id, { frequency: value as ListFrequency });
+/**
+ * The reset cadence the picker is bound to (#70). Reads the canonical `cadence`
+ * when present, else the legacy `frequency`, via the one shared resolver — and
+ * anchors on the SAME date the reset engine uses, so the control and the
+ * behaviour can never derive from different days.
+ */
+const resetAnchor = computed(() => (list.value ? extractDatePart(list.value.createdAt) : ''));
+/**
+ * Locally-owned picker model.
+ *
+ * The picker must be driven by a ref it also writes back to (real `v-model`),
+ * NOT by a computed reading straight from the store. Two reasons, both bugs
+ * found in review:
+ *
+ *  - Its echo guard compares `JSON.stringify`, and a store round-trip
+ *    reconstructs the object with a different KEY ORDER (`{...cadence, end}`
+ *    vs the picker's `{unit, interval, end, weekdays}`). The guard never fired,
+ *    so `syncFromModel` re-ran on every write and snapped the UI out of Custom
+ *    mode under the user's finger.
+ *  - The picker emits on every keystroke of the interval stepper. Writing
+ *    straight through made walking 2 -> 12 weeks ten Automerge mutations, each
+ *    re-encrypting and re-queuing the `.beanpod` for Drive.
+ *
+ * So: hold the rule locally, and persist only when the CADENCE actually changed.
+ */
+const resetRule = ref<RecurrenceRule | null>(null);
+watch(
+  () => list.value?.id,
+  () => {
+    resetRule.value = list.value ? (resolveListRule(list.value)?.rule ?? null) : null;
+  },
+  { immediate: true }
+);
+
+function cadenceOf(rule: RecurrenceRule): Cadence {
+  const cadence: Cadence = { ...rule };
+  delete (cadence as { end?: unknown }).end;
+  return cadence;
+}
+
+function setCadence(rule: RecurrenceRule): void {
+  // We own the model, so keep the picker fed from our own ref (never from a
+  // freshly-reconstructed store read — see the docblock above).
+  resetRule.value = rule;
+  if (!list.value) return;
+  const cadence = cadenceOf(rule);
+  const current = resolveListRule(list.value)?.rule;
+  // Compare the CADENCE, field by field via a stable key order, so an
+  // equivalent object with different key order is not a write.
+  if (current && stableCadenceKey(cadenceOf(current)) === stableCadenceKey(cadence)) return;
+  void listStore.updateList(list.value.id, {
+    cadence,
+    // Legacy shadow for pre-#70 clients — deliberately `undefined` for any
+    // cadence the three-value enum can't express exactly, so an old client
+    // never resets (safe) rather than over-resetting (destroys ticks).
+    frequency: listShadowFromCadence(cadence),
+  });
+}
+
+/** Order-independent identity for a cadence. */
+function stableCadenceKey(c: Cadence): string {
+  return JSON.stringify([
+    c.unit,
+    c.interval,
+    [...(c.weekdays ?? [])].sort((a, b) => a - b),
+    c.monthlyAnchor ?? null,
+    c.monthlyDay ?? null,
+  ]);
 }
 function setDueDate(value: string): void {
   if (list.value) void listStore.updateList(list.value.id, { dueDate: value || undefined });
@@ -166,8 +231,10 @@ function setDueDate(value: string): void {
 const recurrenceText = computed(() => {
   const l = list.value;
   if (!l || !isRecurring(l)) return '';
-  const key = `lists.status.repeats.${l.frequency ?? 'weekly'}` as 'lists.status.repeats.weekly';
-  return t(key);
+  // #70: regenerate from the canonical cadence so "every 2 weeks" reads
+  // correctly instead of collapsing to the nearest legacy word.
+  const resolved = resolveListRule(l);
+  return resolved ? describe(resolved.rule, resolved.anchor) : '';
 });
 const dueText = computed(() => {
   const l = list.value;
@@ -405,17 +472,21 @@ async function handleDelete(): Promise<void> {
           :options="lifecycleOptions"
           @update:model-value="setLifecycle"
         />
+        <!-- (#70) The same control money and the planner use, in reset mode:
+             it says "Resets", hides the "ends" selector (a reset has no end),
+             and carries its own live summary — so the old static hint below it
+             is gone. The one-off/recurring toggle above is the LIFECYCLE and is
+             deliberately untouched. -->
         <template v-if="isRecurring(list)">
           <div class="mt-2">
-            <FrequencyChips
-              :model-value="list.frequency ?? 'weekly'"
-              :options="freqOptions"
-              @update:model-value="setFrequency"
+            <RecurrencePicker
+              :model-value="resetRule"
+              :start-date="resetAnchor"
+              mode="reset"
+              accent="purple"
+              @update:model-value="setCadence"
             />
           </div>
-          <p class="mt-2 text-xs text-[var(--color-text-muted)]">
-            {{ t('lists.detail.recurringHint') }}
-          </p>
         </template>
       </div>
 

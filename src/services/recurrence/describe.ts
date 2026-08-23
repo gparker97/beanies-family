@@ -43,6 +43,15 @@ function joinWeekdays(list: number[] | undefined, anchorYmd: string, t: T): stri
 export function describeRule(rule: RecurrenceRule, anchorYmd: string, t: T): string {
   const n = rule.interval;
   let core = '';
+  // A malformed anchor must never crash a render. `getWeekdayOrdinalInMonth`
+  // THROWS on an invalid Date, and this now runs inside list/card templates
+  // (`ActivityListCard`, `ListTile`) where an activity with a bad `date` — a
+  // state `expandRecurring` already reports-and-skips, so it exists in the wild
+  // — would tear the whole list down. The deleted `formatActivityRecurrence`
+  // guarded this explicitly; keep the guarantee.
+  if (Number.isNaN(parseLocalDate(anchorYmd).getTime())) {
+    return t('planner.recurrence.none');
+  }
 
   switch (rule.unit) {
     case 'day':

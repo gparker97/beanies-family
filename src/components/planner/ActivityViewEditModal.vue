@@ -16,7 +16,8 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
-import { formatActivityRecurrence } from '@/utils/format';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
+import { endSeriesPatch } from '@/utils/activitySeriesEnd';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import {
@@ -78,6 +79,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { describeActivity } = useRecurrenceLabel();
 const { categoryLabel } = useActivityCategoryLabel();
 const router = useRouter();
 
@@ -534,19 +536,13 @@ const resetLabel = computed(() =>
   movedFromLabel.value ? t('planner.reset.labelMoved') : t('planner.reset.label')
 );
 
-// Both the short label (chip-style) and the longer schedule summary now go
-// through the single shared formatter `formatActivityRecurrence`. Old per-
-// kind inline branching is gone — adding a new recurrence kind only requires
-// extending the formatter in one place, not every consumer.
-const recurrenceLabel = computed(() => {
-  if (!activity.value) return '';
-  return formatActivityRecurrence(activity.value, t);
-});
-
-const scheduleSummary = computed(() => {
-  if (!activity.value || activity.value.recurrence === 'none') return '';
-  return formatActivityRecurrence(activity.value, t);
-});
+// #70: one computed, not two — `recurrenceLabel` and `scheduleSummary` were the
+// same expression, differing only in returning '' for a one-time activity, and
+// the `v-if` at each render site is the right place for that. It now routes
+// through `describeActivity`, the one canonical label resolver: it reads the
+// entity's `rule` when present (so an every-3-weeks series reads correctly
+// rather than shadowing as "Weekly") and falls back to the legacy fields.
+const recurrenceLabel = computed(() => (activity.value ? describeActivity(activity.value) : ''));
 
 const endDateFormatted = computed(() => {
   if (!activity.value?.recurrenceEndDate) return null;
@@ -677,7 +673,8 @@ async function handleDelete() {
 
     if (scope === 'this-and-future') {
       const dayBefore = toDateInputValue(addDays(parseLocalDate(props.occurrenceDate), -1));
-      if (!(await activityStore.updateActivity(act.id, { recurrenceEndDate: dayBefore }))) {
+      // #70: end `rule.end` too — the shadow alone no longer truncates.
+      if (!(await activityStore.updateActivity(act.id, endSeriesPatch(act, dayBefore)))) {
         reportSessionActionFailed();
         return;
       }
@@ -1028,7 +1025,7 @@ async function confirmReschedule() {
               <span
                 class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
               >
-                {{ scheduleSummary }}
+                {{ recurrenceLabel }}
               </span>
             </div>
             <div v-if="endDateFormatted" class="flex items-center gap-2">
