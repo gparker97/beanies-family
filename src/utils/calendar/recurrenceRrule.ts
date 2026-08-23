@@ -11,7 +11,7 @@
 // `date.ts` anchor helpers (`getWeekdayOrdinalInMonth`). Consolidating the two is
 // tracked as follow-up.
 
-import type { ActivityRecurrence } from '@/types/models';
+import type { ActivityRecurrence, RecurrenceRule } from '@/types/models';
 import { getWeekdayOrdinalInMonth, parseLocalDate } from '@/utils/date';
 
 /** RRULE day codes indexed by JS weekday (0=Sun..6=Sat) — matches `daysOfWeek`. */
@@ -27,6 +27,8 @@ export interface RecurrenceInput {
   recurrenceEndDate?: string;
   /** All-day governs the UNTIL value-type (date vs UTC date-time). */
   isAllDay?: boolean;
+  /** #70: canonical rule. When present it is authoritative (the legacy fields are ignored). */
+  rule?: RecurrenceRule;
 }
 
 /** Parse the `YYYY-MM-DD` prefix into a LOCAL Date (no TZ shift), failing loud on a
@@ -61,7 +63,60 @@ function untilClause(recurrenceEndDate: string, isAllDay: boolean): string {
  * recurring activity is edited to a one-off (Google patch is a partial update, so
  * omitting the field would leave the old rule in place). See #32 review F2.
  */
+/**
+ * #70: serialize a canonical {@link RecurrenceRule} to an RRULE. Thin — the whole
+ * per-kind switch here exists because a rule can encode intervals + `afterCount`
+ * that the legacy `ActivityRecurrence` enum cannot. Fails loud on a bad date via
+ * `parseYmd` (shared with the legacy path).
+ */
+function ruleToRrule(rule: RecurrenceRule, start: Date, isAllDay: boolean): string[] {
+  const parts: string[] = [];
+  const interval = rule.interval;
+  switch (rule.unit) {
+    case 'day':
+      parts.push('FREQ=DAILY');
+      break;
+    case 'week': {
+      const days =
+        interval === 1
+          ? rule.weekdays && rule.weekdays.length
+            ? rule.weekdays
+            : [start.getDay()]
+          : [rule.weekdays?.[0] ?? start.getDay()];
+      const byday = days
+        .filter((d) => d >= 0 && d <= 6)
+        .map((d) => RRULE_DAYS[d])
+        .join(',');
+      parts.push('FREQ=WEEKLY');
+      parts.push(`BYDAY=${byday}`);
+      break;
+    }
+    case 'month':
+      parts.push('FREQ=MONTHLY');
+      if (rule.monthlyAnchor === 'weekday') {
+        parts.push(`BYDAY=${getWeekdayOrdinalInMonth(start)}${RRULE_DAYS[start.getDay()]}`);
+      } else {
+        parts.push(
+          `BYMONTHDAY=${rule.monthlyDay === 'last' ? -1 : (rule.monthlyDay ?? start.getDate())}`
+        );
+      }
+      break;
+    case 'year':
+      parts.push('FREQ=YEARLY');
+      break;
+  }
+  if (interval > 1) parts.splice(1, 0, `INTERVAL=${interval}`);
+  let tail = '';
+  if (rule.end.kind === 'onDate') tail = untilClause(rule.end.date, isAllDay);
+  else if (rule.end.kind === 'afterCount') tail = `;COUNT=${rule.end.count}`;
+  return [`RRULE:${parts.join(';')}${tail}`];
+}
+
 export function buildRecurrenceRule(input: RecurrenceInput): string[] {
+  // #70: rule-bearing activities serialize the canonical rule; legacy activities
+  // keep the exact switch below for byte-parity.
+  if (input.rule) return ruleToRrule(input.rule, parseYmd(input.date), input.isAllDay === true);
+
   const { recurrence } = input;
   if (recurrence === 'none') return [];
 

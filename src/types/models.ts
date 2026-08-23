@@ -736,6 +736,13 @@ export interface FamilyActivity {
   startTime?: string; // HH:mm
   endTime?: string; // HH:mm
   recurrence: ActivityRecurrence;
+  /**
+   * Canonical unified recurrence rule (#70). When present it is authoritative
+   * (occurrence expansion + RRULE read it first); when absent, the legacy
+   * `recurrence`/`daysOfWeek` fields drive generation unchanged. New/edited
+   * activities write this via the shared RecurrencePicker.
+   */
+  rule?: RecurrenceRule;
   daysOfWeek?: number[]; // Multi-day weekly recurrence (0=Sun..6=Sat)
   recurrenceEndDate?: ISODateString; // Optional end date for recurring activities
   parentActivityId?: UUID; // Links one-off override to its recurring parent
