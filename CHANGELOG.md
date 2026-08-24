@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Diagnostics no longer flood when a Google token expires with the app left open. The sync change-check re-probes every 10 seconds, and each failure was recorded separately — hundreds of identical entries a day for one family, enough to hit an internal rate limit and silently drop some, so the real number of failures could not be counted. It is now recorded once when the problem starts and once when it clears, with the number of attempts in between. No change to syncing, saving, or anything on screen.
 - **Repeating activity costs are now counted at their real frequency.** Paid activities that repeat less often than weekly (every two weeks, monthly, yearly) were added up as if they happened every week, so their cost showed too high; daily ones showed too low. Amounts self-correct the next time the activity is saved. Weekly activities were already correct and are unchanged.
 - **Monthly repeats on the 29th–31st now land on the last day of shorter months.** Editing one of these repeating items makes it include a payment in months like February (on the 28th/29th) that it may have skipped before.
 - **Update notes are easier to close.** The what's-new / announcement panel now leads its footer with a clear "Done" button that closes it; "see all updates" is now a quiet secondary link. Previously the only close control was the small icon in the top corner, and the prominent footer button took you out to the help site.
