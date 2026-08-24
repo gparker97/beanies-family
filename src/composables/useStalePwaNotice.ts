@@ -1,5 +1,6 @@
 import { ref, readonly } from 'vue';
 import { noticeFlag } from '@/utils/notice';
+import { track } from '@/services/analytics/plausible';
 
 const QUERY_PARAM = 'from-stale-pwa';
 const NOTICE_KEY = 'stalePwa';
@@ -35,7 +36,7 @@ export function useStalePwaNotice() {
         url.hash;
       window.history.replaceState({}, '', cleaned);
       // Detected automatically — see plausible.d.ts.
-      window.plausible?.('pwa_stale_detected', { interactive: false });
+      track('pwa_stale_detected');
     }
 
     const isStandalone =
@@ -49,11 +50,11 @@ export function useStalePwaNotice() {
   function dismiss() {
     flag.dismiss();
     shouldShow.value = false;
-    window.plausible?.('pwa_stale_dismissed');
+    track('pwa_stale_dismissed');
   }
 
   function trackInstallClicked() {
-    window.plausible?.('pwa_stale_install_clicked');
+    track('pwa_stale_install_clicked');
   }
 
   return {

@@ -10,6 +10,13 @@ async function importInit() {
 describe('services/analytics/plausible', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
+  // Scoped to this module's own output. `vi.resetModules()` re-imports the whole
+  // graph — including the Capacitor plugin registry, which warns about
+  // double-registration — so a bare "console.warn was never called" assertion
+  // measures unrelated module-loading noise rather than analytics behaviour.
+  const analyticsWarnings = () =>
+    warnSpy.mock.calls.filter((c: unknown[]) => String(c[0]).includes('[analytics]'));
+
   beforeEach(() => {
     vi.stubEnv('VITE_PLAUSIBLE_DOMAIN', '');
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -28,7 +35,7 @@ describe('services/analytics/plausible', () => {
 
     expect(window.plausible).toBeUndefined();
     expect(document.querySelector('script[src*="plausible.io"]')).toBeNull();
-    expect(warnSpy).not.toHaveBeenCalled();
+    expect(analyticsWarnings()).toHaveLength(0);
   });
 
   it('injects the script with the env-provided domain when set', async () => {
@@ -71,9 +78,9 @@ describe('services/analytics/plausible', () => {
     const initAnalytics = await importInit();
     initAnalytics();
 
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(String(warnSpy.mock.calls[0][0])).toContain('[analytics]');
-    expect(String(warnSpy.mock.calls[0][0])).toContain('failed to initialize');
+    const warnings = analyticsWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0][0])).toContain('failed to initialize');
     createElementSpy.mockRestore();
   });
 });
@@ -100,10 +107,11 @@ describe('withAnalyticsSuppressed', () => {
     await expect(withAnalyticsSuppressed(async () => 'seeded')).resolves.toBe('seeded');
   });
 
-  // The store binaries genuinely have no `window.plausible` (VITE_PLAUSIBLE_DOMAIN
-  // is exempted from both mobile release lanes), so restoring `undefined` by
-  // assignment would leave an installed no-op where there had been nothing —
-  // turning every `window.plausible?.()` short-circuit into a silent call.
+  // Self-host and dev builds genuinely have no `window.plausible`
+  // (VITE_PLAUSIBLE_DOMAIN unset), so restoring `undefined` by assignment would
+  // leave an installed no-op where there had been nothing — turning every
+  // `window.plausible?.()` short-circuit into a silent call. (#71 gave the
+  // mobile release lanes the domain, so they are no longer an example here.)
   it('restores absence as absence, not as an installed no-op', async () => {
     delete window.plausible;
 

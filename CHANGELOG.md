@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-24
+
+### Fixed
+
+- Analytics now reports from the iOS and Android apps, not just the web — native builds had been shipping with analytics silently switched off, so every app signup and every feature used in an app was invisible.
+- Bounce rate is measurable again. Four events the app fires by itself (install and community nudges being shown, a stale-app check, a storage-permission refusal) were being counted as visitor engagement, which pinned bounce rate near 1%.
+
+### Added
+
+- Signups are now split by platform — web, iOS, Android — on the founder metrics dashboard, with a single web-only conversion headline instead of two competing rates.
+- Feature adoption now covers all 16 features rather than the original four.
+
 ## 2026-08-23
 
 ### Fixed

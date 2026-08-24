@@ -8,6 +8,7 @@ import { openExternal } from './openExternal';
 import { MARKETING_URL } from './marketing';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
+import { track } from '@/services/analytics/plausible';
 
 export const DISCORD_URL = `${MARKETING_URL}/discord`;
 
@@ -36,5 +37,5 @@ export function openDiscord(surface: DiscordSurface): void {
       error: err,
     });
   }
-  window.plausible?.('discord_join_click', { props: { surface } });
+  track('discord_join_click', { props: { surface } });
 }

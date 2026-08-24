@@ -11,6 +11,7 @@ import { isTodoOverdue } from '@/utils/todo';
 import { isHint, dedupeHintsByKey } from '@/utils/helpfulHints';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput, FamilyMember } from '@/types/models';
 import { toISODateString } from '@/utils/date';
+import { trackFeature } from '@/services/analytics/plausible';
 
 // Sort comparators — newest-created first / most-recently-completed first.
 const byCreatedDesc = (a: TodoItem, b: TodoItem) => b.createdAt.localeCompare(a.createdAt);
@@ -129,7 +130,7 @@ export const useTodoStore = defineStore('todos', () => {
       },
       { action: 'todoStore:createTodo' }
     );
-    return result ?? null;
+    return trackFeature(result ?? null, 'todo');
   }
 
   async function updateTodo(id: string, input: UpdateTodoInput): Promise<TodoItem | null> {

@@ -14,6 +14,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { accountDetailTelemetry } from '@/utils/accountDetails';
 import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
+import { trackFeature } from '@/services/analytics/plausible';
 
 export const useAccountsStore = defineStore('accounts', () => {
   // State
@@ -172,7 +173,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       { action: 'accountsStore:createAccount' }
     );
     if (result) await syncLinkedRecurringPayment(result);
-    return result ?? null;
+    return trackFeature(result ?? null, 'account');
   }
 
   async function updateAccount(id: string, input: UpdateAccountInput): Promise<Account | null> {

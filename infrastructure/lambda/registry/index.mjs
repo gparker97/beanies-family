@@ -48,6 +48,19 @@ function response(statusCode, body, event) {
   return { statusCode, headers: getHeaders(event), body: JSON.stringify(body) };
 }
 
+/**
+ * The only accepted `signupPlatform` values — the `getPlatform()` vocabulary the
+ * client and Plausible both use (`src/services/sync/capabilities.ts`), NOT the
+ * coarse `'app' | 'pwa' | 'web'` bucket in `src/utils/platformLabel.ts`.
+ *
+ * Guarded because this field is client-supplied AND permanent: an unvalidated
+ * value is stamped once and then preserved forever by the write-once merge
+ * below, so no later write could correct it.
+ */
+const SIGNUP_PLATFORMS = new Set(['web', 'ios', 'android']);
+
+const validPlatform = (v) => (SIGNUP_PLATFORMS.has(v) ? v : null);
+
 export async function handler(event) {
   // API key check
   const key = event.headers?.['x-api-key'];
@@ -199,6 +212,17 @@ export async function handler(event) {
           typeof body.beanpodSizeKb === 'number' && body.beanpodSizeKb >= 0
             ? Math.round(body.beanpodSizeKb)
             : (existing.beanpodSizeKb ?? null),
+        // Which platform the family signed up ON — stamped at row CREATION and
+        // never moved. Keyed off `existingRaw` (row existence), NOT the usual
+        // `existing.x ?? body.x` idiom: the field is absent on every row created
+        // before this shipped, so that idiom would stamp each of those with
+        // whichever device happened to write next — relabelling a family created
+        // on iOS as `web` the first time its owner opened a browser. Absent means
+        // "unknown", and unknown is excluded from platform breakdowns rather than
+        // assumed web.
+        signupPlatform: existingRaw
+          ? (existing.signupPlatform ?? null)
+          : validPlatform(body.signupPlatform),
         updatedAt: now,
       };
       await client.send(

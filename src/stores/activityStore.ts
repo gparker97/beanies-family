@@ -27,6 +27,7 @@ import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
+import { trackFeature } from '@/services/analytics/plausible';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -847,7 +848,7 @@ export const useActivityStore = defineStore('activities', () => {
       { action: 'activityStore:createActivity' }
     );
     if (result) await safeSyncLinkedRecurringPayment(result);
-    return result ?? null;
+    return trackFeature(result ?? null, 'activity');
   }
 
   async function updateActivity(
