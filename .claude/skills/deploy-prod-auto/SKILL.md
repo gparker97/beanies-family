@@ -96,10 +96,11 @@ Every Vue deploy ships a brief user-facing release note (it becomes the in-app `
 **Read `scripts/deploy/mobile-release-guide.md`** for the options/defaults, then present how far behind each flagged platform is (the classifier's `N commit(s) behind`) and ask:
 
 - **iOS** — ask the **destination**: `testflight` (no review; internal testers — default for an unverified change) · `appstore-manual` (submit for review, hold for greg's Release click) · `appstore-automatic` (submit; auto-release once approved) · `appstore-phased` (submit; 7-day phased rollout), or **skip**. Options/defaults live in `mobile-release-guide.md` (already read above); record the chosen `destination`. Note App Store review still takes ~1-3 days — `automatic` only removes the final Release click, it does not ship instantly.
-  - **If the chosen destination is `appstore-*`, ALSO propose an App Store "What's New" line in the SAME gate message and get it approved.** Apple requires a per-version "What's New" note, and the lane fails loud without it. Generate a short (1-3 sentence), user-facing, App-Store-voice line (standard English, no em-dashes, `beanies.family` lowercase — NOT the lowercase-beanie overlay) from the change set: reuse Decision A's `en` summary if a release note was written, else synthesize one from the shipped commits (fall back to an honest "Bug fixes and performance improvements." only when there's genuinely nothing user-facing). Record the approved text; it is passed as `-f whats_new=...` in Step 9. (`testflight` needs no What's New.)
+  - **If the chosen destination is `appstore-*`, ALSO propose an App Store "What's New" line in the SAME gate message and get it approved.** Apple requires a per-version "What's New" note, and the lane fails loud without it. Generate a short (1-3 sentence), user-facing line in **all lowercase to match the beanie theme** (greg's standing preference for App Store copy; no em-dashes) from the change set: reuse Decision A's `en` summary if a release note was written (lowercased), else synthesize one from the shipped commits (fall back to an honest "bug fixes and performance improvements." only when there's genuinely nothing user-facing). Record the approved text; it is passed as `-f whats_new=...` in Step 9. (`testflight` needs no What's New.) The lane keys the note to the real **`en-US`** locale (the app's only App Store locale); if a new locale is ever added, `ios/App/fastlane/Fastfile` must add its key too, or the review submission fails with "missing attribute 'whatsNew'".
+  - **ALSO propose an App Store "promotional text" line in the SAME gate message (optional).** Promotional text (≤170 chars) shows above the description, needs **no review**, and is not tied to a build — so it can change any time. Propose a short lowercase line (reuse the current one if unchanged), get approval, and pass it as `-f promotional_text=...` in Step 9. **Leaving it blank keeps the current App Store value** — never blank it unintentionally. (`testflight` ignores it.)
 - **Android** — ask the **track**: `internal` (no review; test devices — default for an unverified change) · `alpha` (closed testing, review) · `beta` · `production`, or **skip**. Map "closed testing" → `alpha`; keep `upload_to_play=true`.
 
-Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS `destination` + the approved `whats_new` for `appstore-*`, or skip; Android track or skip) — Phase 2 consumes them without asking again.
+Skipping a platform is valid (the change still ships to web/PWA; the app catches up later). **Record the answers** (release note text + version; iOS `destination` + the approved `whats_new` AND the approved `promotional_text` for `appstore-*`, or skip; Android track or skip) — Phase 2 consumes them without asking again.
 
 ---
 
@@ -202,9 +203,9 @@ gh run list --workflow=mobile-android-release.yml --limit=1
 gh run watch <android-run-id> --exit-status
 ```
 
-**iOS**, only if greg chose a destination (pass the chosen `destination`; for any `appstore-*`, also pass the approved `whats_new` from Step 4):
+**iOS**, only if greg chose a destination (pass the chosen `destination`; for any `appstore-*`, also pass the approved `whats_new` and — if approved — `promotional_text` from Step 4):
 ```
-gh workflow run mobile-ios-release.yml --ref main -f destination=<testflight|appstore-manual|appstore-automatic|appstore-phased> -f whats_new="<approved What's New line>"
+gh workflow run mobile-ios-release.yml --ref main -f destination=<testflight|appstore-manual|appstore-automatic|appstore-phased> -f whats_new="<approved What's New line>" -f promotional_text="<approved promotional text, or omit to keep the current value>"
 ```
 ```
 sleep 10
