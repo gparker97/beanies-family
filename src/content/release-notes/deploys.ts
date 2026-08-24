@@ -17,6 +17,58 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.24',
+    date: '2026-08-24',
+    month: '24 august 2026',
+    spotlight: true,
+    summary: {
+      en: 'Set up anything that repeats with one friendly schedule picker, and repeating activity costs are now counted correctly.',
+      beanie:
+        'set up anything that repeats with one friendly schedule picker, and repeating activity costs are now counted correctly.',
+    },
+    features: [
+      {
+        title: {
+          en: 'A single, friendly way to set up anything that repeats',
+          beanie: 'a single, friendly way to set up anything that repeats',
+        },
+        icon: '🔁',
+        description: {
+          en: 'Setting up a repeating income, bill, activity or to-do now uses the same simple schedule picker everywhere. The common rhythms (daily, weekly, every two weeks, monthly, yearly) are one tap, and a "custom" option covers the rest: every few weeks or months, particular weekdays, "the last day of the month" or "the 4th Sunday", and an ending that can be never, a date, or after a set number of times. You only see the options that apply to what you picked, with a plain-language summary as you build it. Everything you already set up keeps working exactly as before.',
+          beanie:
+            'setting up a repeating income, bill, activity or to-do now uses the same simple schedule picker everywhere. the common rhythms (daily, weekly, every two weeks, monthly, yearly) are one tap, and a "custom" option covers the rest: every few weeks or months, particular weekdays, "the last day of the month" or "the 4th sunday", and an ending that can be never, a date, or after a set number of times. you only see the options that apply to what you picked, with a plain-language summary as you build it. everything you already set up keeps working exactly as before.',
+        },
+        cta: {
+          label: { en: 'Join us on Discord', beanie: 'join us on discord' },
+          href: 'https://discord.gg/NE4grWzjxV',
+        },
+      },
+    ],
+    fixes: [
+      {
+        text: {
+          en: 'Repeating activity costs are now counted at their real frequency. Some paid activities that repeat less often than weekly (for example every two weeks, monthly or yearly) were being added up as if they happened every week, so their cost showed too high; daily ones showed too low. Amounts correct themselves the next time you save the activity. Weekly activities were already right and are unchanged.',
+          beanie:
+            'repeating activity costs are now counted at their real frequency. some paid activities that repeat less often than weekly (for example every two weeks, monthly or yearly) were being added up as if they happened every week, so their cost showed too high; daily ones showed too low. amounts correct themselves the next time you save the activity. weekly activities were already right and are unchanged.',
+        },
+      },
+      {
+        text: {
+          en: 'Monthly repeats set to the 29th, 30th or 31st now land on the last day of shorter months. If you edit one of these, it will start including a payment in months like February (on the 28th or 29th) that it may have skipped before.',
+          beanie:
+            'monthly repeats set to the 29th, 30th or 31st now land on the last day of shorter months. if you edit one of these, it will start including a payment in months like february (on the 28th or 29th) that it may have skipped before.',
+        },
+      },
+      {
+        text: {
+          en: 'Dates written as year-month-day no longer read a day early if you live west of the UK.',
+          beanie:
+            'dates written as year-month-day no longer read a day early if you live west of the uk.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.08.20',
     date: '2026-08-20',
     month: '20 august 2026',

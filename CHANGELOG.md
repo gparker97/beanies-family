@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Repeating activity costs are now counted at their real frequency.** Paid activities that repeat less often than weekly (every two weeks, monthly, yearly) were added up as if they happened every week, so their cost showed too high; daily ones showed too low. Amounts self-correct the next time the activity is saved. Weekly activities were already correct and are unchanged.
+- **Monthly repeats on the 29th–31st now land on the last day of shorter months.** Editing one of these repeating items makes it include a payment in months like February (on the 28th/29th) that it may have skipped before.
 - Analytics now reports from the iOS and Android apps, not just the web — native builds had been shipping with analytics silently switched off, so every app signup and every feature used in an app was invisible.
 - Engagement stats for the app are measurable again. Four events the app fires by itself (install and community nudges being shown, a stale-app check, a storage-permission refusal) were counted as though the visitor had interacted, so anyone merely shown a nudge looked engaged.
 
