@@ -37,6 +37,10 @@ on:
         description: "App Store 'What's New' note (REQUIRED for appstore-* — Apple rejects an update without one; ignored for testflight)"
         type: string
         default: ''
+      promotional_text:
+        description: 'App Store promotional text (OPTIONAL, ≤170 chars; no review needed; leave blank to keep the current value; ignored for testflight)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -146,6 +150,10 @@ jobs:
           # The App Store "What's New" note. Required by the `release` lane for any
           # appstore-* destination (it fails loud if empty); unused by `beta`.
           WHATS_NEW: ${{ inputs.whats_new }}
+          # App Store promotional text (optional, ≤170 chars). The `release` lane
+          # refreshes it when set and leaves the current value untouched when empty;
+          # unused by `beta`. No review needed — it can change independent of a build.
+          PROMOTIONAL_TEXT: ${{ inputs.promotional_text }}
         run: |
           gem install fastlane --no-document
           # Routing rule (kept legible so control flow doesn't hide in the expression):
