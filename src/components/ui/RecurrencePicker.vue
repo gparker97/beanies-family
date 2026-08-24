@@ -32,8 +32,15 @@ const props = withDefaults(
     startDate: string;
     mode?: 'repeat' | 'reset';
     accent?: 'orange' | 'purple';
+    /**
+     * The cadence a NEW (model-less) entity starts on. Surfaces differ: money
+     * is usually monthly, a planner activity is usually weekly — and before
+     * this control existed each modal carried its own default. Making it a prop
+     * keeps those defaults intact instead of silently imposing one on both.
+     */
+    defaultCadence?: SimpleCadence;
   }>(),
-  { mode: 'repeat', accent: 'orange' }
+  { mode: 'repeat', accent: 'orange', defaultCadence: 'monthly' }
 );
 const emit = defineEmits<{ 'update:modelValue': [value: RecurrenceRule] }>();
 
@@ -165,7 +172,7 @@ function syncFromModel(rule: RecurrenceRule | null): void {
   const anchorDow = anchorDate.value.getDay();
   if (!rule) {
     s.uiMode = 'simple';
-    s.simple = 'monthly';
+    s.simple = props.defaultCadence;
     s.customN = 2;
     s.customUnit = 'weeks';
     s.weekdays = [anchorDow];
