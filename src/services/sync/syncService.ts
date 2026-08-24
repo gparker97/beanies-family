@@ -98,8 +98,13 @@ let remoteBaseline: RemoteBaseline | null = null;
 // a tab sits open would otherwise emit one identical warn PER TICK — hundreds a
 // day for a single family, and past the 50/surface/min client rate limit, which
 // silently truncates them and makes the true failure count unknowable. We log
-// the TRANSITION instead (the same discipline `syncStore` already applies to its
-// own passive-staleness event) and carry the attempt count on recovery.
+// the TRANSITION instead, and carry the attempt count on recovery.
+//
+// This is the SOLE firehose trace of a poll that cannot authorize Drive: the
+// read-freshness work that also logged it from `reloadIfFileChanged`
+// (`sync-read-freshness` / `poll-auth-stale`) was rolled back on 2026-08-24, and
+// that path now returns silently on any non-'changed' result. Do not thin this
+// pair further without replacing the coverage somewhere.
 let probeFailureReason: string | null = null;
 let probeFailureCount = 0;
 // UTF-8 byte length of the last .beanpod string we persisted or loaded. Used as

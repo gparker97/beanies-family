@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-23",
-    "translationCount": 4110
+    "lastUpdated": "2026-08-24",
+    "translationCount": 4111
   },
   "translations": {
     "app.name": {
@@ -20555,6 +20555,11 @@
       "translation": "找不到此计划的系列，因此未保存新日期。关闭并重新打开计划，然后重试。",
       "hash": "720p27",
       "lastUpdated": "2026-08-23"
+    },
+    "header.refreshAuthFailed": {
+      "translation": "无法刷新。您的登录已过期，因此您可能看不到最新信息。",
+      "hash": "jfsf5z",
+      "lastUpdated": "2026-08-24"
     }
   }
 }
