@@ -107,6 +107,15 @@ describe('WhatsNewBody — headline + detail blocks', () => {
     expect(push).toHaveBeenCalledWith('/activities');
   });
 
+  it('the primary Done button closes the panel', async () => {
+    getReleaseNote.mockReturnValue(single);
+    const w = mount(WhatsNewBody, { props: { notification: note } });
+    const done = w.find('.wn-done');
+    expect(done.exists()).toBe(true);
+    await done.trigger('click');
+    expect(close).toHaveBeenCalled();
+  });
+
   it('"see all updates" opens the marketing whats-new page externally', async () => {
     getReleaseNote.mockReturnValue(single);
     const w = mount(WhatsNewBody, { props: { notification: note } });

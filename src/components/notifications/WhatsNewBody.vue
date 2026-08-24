@@ -318,26 +318,22 @@ function handleSeeAll() {
   color: rgb(226 232 240 / 55%);
 }
 
+/* Quiet secondary link — "see all" is the rarer, app-leaving action, so it
+   sits beneath the primary Done as an understated text link, not a button. */
 .wn-seeall {
-  background: #fff;
-  border: 1.5px solid rgb(241 93 34 / 25%);
-  border-radius: 0.875rem;
+  background: none;
+  border: none;
   color: #f15d22;
   cursor: pointer;
   font-family: Outfit, sans-serif;
   font-size: 0.8125rem;
-  font-weight: 700;
-  padding: 0.6875rem 1.125rem;
-  transition: background 0.15s;
-  width: 100%;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  transition: color 0.15s;
 }
 
 .wn-seeall:hover {
-  background: var(--tint-orange-8, rgb(241 93 34 / 8%));
-}
-
-:global(.dark) .wn-seeall {
-  background: transparent;
+  color: #d14d1a;
 }
 
 .wn-tagline {
