@@ -468,9 +468,9 @@ if(D.direct){
   const d=D.direct, tot=(d.homepageVisitors||0)+(d.deepLinkVisitors||0);
   $('directcap').innerHTML=`<b>${num(d.visitors)}</b> visitors with no referrer. The entry page splits them into two very different groups.`;
   const homeW=tot?Math.round(d.homepageVisitors/tot*100):50;
-  const ret=(d.returning||[]).length
-    ? d.returning.map(r=>`<span class="chip">${esc(r['visit:is_returning']===true||r['visit:is_returning']==='true'?'returning':'new')} <b>${num(r.visitors)}</b></span>`).join('')
-    : `<span class="chip">${d.sessionsPerVisitor!=null?d.sessionsPerVisitor:'—'} <b>visits / visitor</b></span>`;
+  // Plausible is cookieless (visitor hash stable only within a day), so it has
+  // no new-vs-returning dimension at all — visits/visitor is the only proxy.
+  const ret=`<span class="chip">${d.sessionsPerVisitor!=null?d.sessionsPerVisitor:'—'} <b>visits / visitor</b></span>`;
   $('direct').innerHTML=`
     <div class="split">
       <span style="flex:${Math.max(d.homepageVisitors,1)};background:var(--slate-2)">${num(d.homepageVisitors)}</span>
@@ -489,7 +489,7 @@ if(D.direct){
       ${(d.countries||[]).slice(0,3).map(c=>`<span class="chip">${esc(c['visit:country'])} <b>${num(c.visitors)}</b></span>`).join('')}
       ${(d.devices||[]).slice(0,3).map(c=>`<span class="chip">${esc(c['visit:device'])} <b>${num(c.visitors)}</b></span>`).join('')}
     </div>
-    <div class="note">${(d.returning||[]).length?'New-vs-returning comes from Plausible directly.':'Plausible exposes no new-vs-returning dimension on this plan, so <b>visits per visitor</b> is the repeat-visit proxy: above ~1.3 means a meaningful share are coming back.'}</div>`;
+    <div class="note">Plausible is cookieless, so it exposes no new-vs-returning dimension — <b>visits per visitor</b> is the repeat-visit proxy: above ~1.3 means a meaningful share are coming back. For a true returning signal see the activation funnel, which tracks families by id.</div>`;
 }else{
   $('directcap').textContent='Direct-traffic detail unavailable this run.';
   $('direct').innerHTML=noData;

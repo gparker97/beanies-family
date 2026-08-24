@@ -25,7 +25,7 @@
  * The core queries (overview, sources, channels, pages, goals) are REQUIRED — if
  * one fails the run fails loudly, because a silently-empty dashboard is worse
  * than no dashboard. The enrichment queries (channel x source drill-down, the
- * Direct deep-dive, outbound links, new-vs-returning) go through `soft()`, which
+ * Direct deep-dive, outbound links) go through `soft()`, which
  * returns null on any API error. That is deliberate: Plausible's available
  * dimensions vary by plan and version, and an unsupported dimension must degrade
  * one panel, never the whole report. Every soft failure is recorded in
@@ -135,7 +135,7 @@ async function marketingBundle() {
   // ── Enrichment (all soft) ──────────────────────────────────────────────────
   const [
     channelSources, directEntry, directCountries, directDevices,
-    directOverview, goals, outbound, outboundToApp, returning,
+    directOverview, goals, outbound, outboundToApp,
   ] = await Promise.all([
     // THE channel->source drill-down: turns "Organic Social 120" into
     // "Organic Social: Reddit 90, Pinterest 30". Two dimensions in one query.
@@ -184,12 +184,6 @@ async function marketingBundle() {
         ['contains', 'event:props:url', ['app.beanies.family']],
       ],
     }),
-    // Not documented as universally available; probed tolerantly. If Plausible
-    // supports it we get a true new-vs-returning split, otherwise the dashboard
-    // falls back to the sessions-per-visitor proxy.
-    soft('new vs returning', site, {
-      metrics: ['visitors', 'visits'], dimensions: ['visit:is_returning'], pagination: { limit: 4 },
-    }),
   ]);
 
   return {
@@ -209,7 +203,6 @@ async function marketingBundle() {
     goals: rows(goals),
     outbound: rows(outbound),
     outboundToApp: rows(outboundToApp)?.[0] || null,
-    returning: rows(returning),
     direct: {
       overview: rows(directOverview)?.[0] || null,
       entryPages: rows(directEntry),

@@ -34,11 +34,16 @@ const TEMPLATE = join(dirname(dirname(fileURLToPath(import.meta.url))), 'assets'
 
 function load(name, optional = false) {
   const p = join(dir, name);
-  if (!existsSync(p)) {
+  // A collector that exits non-zero (e.g. query_search_console.mjs exiting 3
+  // with no credentials) still leaves a zero-byte file behind when it was
+  // invoked as `node ... > file`. Treat empty as absent, or the optional
+  // source crashes the whole build on JSON.parse instead of degrading.
+  const raw = existsSync(p) ? readFileSync(p, 'utf8').trim() : null;
+  if (!raw) {
     if (optional) return null;
-    throw new Error(`missing ${name} in ${dir}`);
+    throw new Error(`missing or empty ${name} in ${dir}`);
   }
-  return JSON.parse(readFileSync(p, 'utf8'));
+  return JSON.parse(raw);
 }
 function cwRows(doc) {
   return (doc?.results || []).map((r) => Object.fromEntries(r.map((c) => [c.field, c.value])));
@@ -446,16 +451,17 @@ if (pl?.marketing?.direct) {
     visits: ov?.visits ?? null,
     bounce: ov?.bounce_rate ?? null,
     duration: ov?.visit_duration ?? null,
-    // sessions per visitor — our only repeat-visit proxy unless Plausible
-    // exposes a true returning dimension (probed separately, often absent).
+    // sessions per visitor — the ONLY repeat-visit proxy available. Plausible
+    // is cookieless and its visitor hash is stable only within a single day, so
+    // the Stats API exposes no new-vs-returning dimension at all (verified
+    // against the live API and the v2 docs, 2026-08-24). For a real returning
+    // signal use the registry+CloudWatch cohort funnel, which has stable ids.
     sessionsPerVisitor: ov?.visitors ? Math.round((ov.visits / ov.visitors) * 100) / 100 : null,
     homepageVisitors: sum(home),
     deepLinkVisitors: sum(deep),
     entryPages: entries.slice(0, 8),
     countries: d.countries || null,
     devices: d.devices || null,
-    // A true new-vs-returning split if the API gave us one; null otherwise.
-    returning: pl.marketing.returning || null,
   };
 }
 

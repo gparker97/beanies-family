@@ -123,9 +123,15 @@ is recorded in `_degraded`, never breaking the run):
   **deduplicated** `contains` query for links to `app.beanies.family`. Use the deduped
   one for the hand-off number: summing per-URL rows double-counts a visitor who
   clicked both `/welcome` and `/login`.
-- `returning` — `visit:is_returning`. **Verified NOT available** (this query degrades
-  against the live API). `visits ÷ visitors` is the repeat-visit proxy; do not claim a
-  new-vs-returning split.
+- **New-vs-returning: not available, and not fixable.** Plausible is cookieless and its
+  visitor hash is stable only within a single day, so the Stats API v2 has no such
+  dimension, metric or filter — `visit:is_returning`, the `returning_visitors` metric and
+  an `is_returning` filter were all rejected as invalid against the live API, and the v2
+  docs list no equivalent (verified 2026-08-24). The probe was REMOVED rather than left to
+  degrade every run, because a permanently-impossible query in `_degraded` trains the
+  reader to ignore that banner when it names something real. Use `visits ÷ visitors` as the
+  repeat-visit proxy, and the registry+CloudWatch activation cohort (stable `family_id`s)
+  for a true returning signal. Do not re-add the probe.
 
 **Goal names are matched by substring**, so the live goals resolve as:
 `Family Create - Button Clicked (top of funnel)` ← `'Button Clicked'`;
