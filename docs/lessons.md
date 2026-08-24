@@ -480,3 +480,16 @@ The fix commit touched only `CHANGELOG.md`. Both `main-ci.yml` and `security.yml
 2. **After a sync, grep the built HTML for `<a href` and `<em>`/`<strong>` counts and reconcile against the Notion source** before calling it done — a plain-text parse passes the build cleanly, so the build is not the check.
 3. **The Notion MCP write API cannot set annotations** (`API-update-a-block`'s `richTextRequest` has no `annotations` field — it 400s). So a formatting fix that must live in Notion (golden source) has to be done by hand there; the skill can only fix the repo copy and must flag the one-click Notion toggle to keep them in sync.
 4. This is the blog-sync analogue of the beanie-mode/i18n discipline: the failure is a **silent** one, and silent content regressions are the ones that reach readers.
+
+## 18. A review finding below the ship-blocker cut is still a finding
+
+**Date:** 2026-08-24
+**Context:** The first `/code-review max` on #70 returned 15 findings plus a "cut for the cap" list. Greg picked the ship-blockers + correctness scope, so the cut list was left unactioned. One of those cut items was that `ActivityModal` had silently changed the default recurrence for new activities from weekly to monthly by adopting the shared `RecurrencePicker`. CI caught it as an E2E failure a commit later. The same pattern repeated within the session: several items "cut for the 15-item cap" on the #71 review turned out to include a real correctness bug (a template printing `factor-of-0.3` on a negative gap).
+
+**Pattern:** Scoping a review's _fixes_ is a legitimate call about effort. Skipping a review's _triage_ is not. The cap is a presentation limit — it says "these fifteen were the most severe," not "the rest are noise." Treating the cut list as out-of-scope means the reviewer's cheapest, already-paid-for work gets thrown away, and the defects surface later as red CI or, worse, as production behaviour nobody connects back.
+
+**Rule:**
+
+1. **Read the below-the-cap list every time, even when the agreed scope is narrower.** Classify each item: fix now, file explicitly, or discard with a reason. Never leave it unread.
+2. **Behaviour changes hidden inside a refactor are the highest-value items in that list** — a changed default, a dropped guard, an altered ordering. They pass type-check and unit tests precisely because nothing asserted the old behaviour except the code itself.
+3. **When a scope decision excludes a finding, say so in the summary** so it is a recorded decision rather than something that quietly evaporated.
