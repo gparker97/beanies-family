@@ -60,7 +60,20 @@ the App Store for review. **Ask which destination:**
 - **Every `appstore-*` submit needs a "What's New" note** (`whats_new` input) — Apple
   rejects an update version without one, and the lane fails loud if it's empty. Propose a
   short user-facing line at the gate and get it approved alongside the destination. The
-  lane sets only this note (via `release_notes`), leaving the approved listing untouched.
+  lane sets only this note (via `release_notes`, keyed to the app's only locale `en-US`),
+  leaving the approved listing untouched.
+- **App Store copy is all lowercase** to match the beanie theme (greg's standing
+  preference — the What's New note AND the promotional text). No em-dashes.
+- **Offer promotional text too** (`promotional_text` input, optional, ≤170 chars). It
+  shows above the description, needs **no review**, and is not tied to a build, so it can
+  change any time. Leaving the input blank keeps the current App Store value. **Canonical
+  default** (157 chars — reuse unless greg changes it):
+  > the calm, private, and secure home for your family's plans and money. shared calendar, to-dos, meals, budgets and goals, all in one place. every bean counts.
+- **Locale note:** `en-US` is the app's only App Store locale. Both `release_notes` and
+  `promotional_text` are keyed to `en-US` in `ios/App/fastlane/Fastfile`; keying deliver's
+  `"default"` pseudo-locale instead uploads the note but leaves the version localization
+  unpopulated, so `submit_for_review` fails with "missing attribute 'whatsNew'" (cost a
+  build on the 0.9.13 submit). If a locale is ever added, add its key in the Fastfile.
 
 ### Android — Google Play (`MOBILE_ANDROID: yes`)
 
