@@ -9,7 +9,7 @@
   telemetry firehose), update that table AND this manifest AND the store
   Data-Safety/App-Privacy answers AND web/src/pages/privacy.astro together.
 
-  What beanies collects (nothing for ads/tracking; no third-party analytics SDK):
+  What beanies collects (nothing for ads or tracking):
     - Email + Name: ONLY on the low-volume critical-error path to the maintainer's
       alerting channel (so we can contact the family about a data-at-risk failure).
     - Crash + Other Diagnostic Data: crash/error reports + a diagnostic firehose
@@ -22,9 +22,21 @@
       name or amount. Declared here under Other Diagnostic Data; no new
       NSPrivacyCollectedDataType is required.
     - User ID (family_id): a random per-family UUID used to correlate diagnostics.
-    - Product Interaction (last-login date + approx .beanpod size): a low-frequency
-      usage heartbeat sent to the family registry, used for analytics (gauge active
-      usage + data growth). Linked to family_id; never for ads or tracking.
+    - Product Interaction, from TWO surfaces, both analytics, neither ever for ads
+      or tracking:
+        (a) the family registry — last-login date, approx .beanpod size, and (2026-08,
+            #71) signupPlatform: the fixed enum web/ios/android, stamped write-once
+            when the row is created. Linked to family_id.
+        (b) Plausible Analytics (2026-08, #71) — the app now loads the same cookieless
+            plausible.io script the marketing site uses, reporting a fixed event name
+            (signup / login / feature_used / nudge shown+dismissed / …) plus the closed
+            props feature, method, action, surface, platform. No cookies, no stored or
+            derived identifier, no cross-app or cross-site linkage — so it is NOT
+            tracking under Apple's definition and NSPrivacyTracking correctly stays
+            false with no NSPrivacyTrackingDomains entry. Do not flip either.
+      Apple's manifest allows ONE entry per data type, so both surfaces are declared
+      by the single ProductInteraction entry below. It is marked Linked because (a) is
+      — the never-under-declare answer — even though (b) on its own is not.
   Family CONTENT (accounts, activities, documents) never leaves the device to us —
   it lives in the user's own encrypted .beanpod / their Google Drive.
 

@@ -29,6 +29,7 @@ import {
   extractDatePart,
 } from '@/utils/date';
 import { normalizeCategoryId } from '@/constants/categories';
+import { trackFeature } from '@/services/analytics/plausible';
 
 /**
  * Remove CRDT-duplicated recurring transactions from a list.
@@ -498,7 +499,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
       },
       { action: 'transactionsStore:createTransaction' }
     );
-    if (result) window.plausible?.('feature_used', { props: { feature: 'transaction' } });
+    trackFeature(result, 'transaction');
     return result ?? null;
   }
 

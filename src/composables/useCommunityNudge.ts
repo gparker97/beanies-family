@@ -22,6 +22,7 @@ import { reportError } from '@/utils/errorReporter';
 import { openDiscord } from '@/utils/discord';
 import { COMMUNITY_NUDGE_COUNT } from '@/content/communityNudges';
 import { createPerMemberStore } from '@/composables/perMemberStore';
+import { track } from '@/services/analytics/plausible';
 
 export interface ActiveNudge {
   messageIndex: number;
@@ -170,7 +171,7 @@ export function useCommunityNudge() {
         store.save(next);
       }
       // Shown by us, not clicked by them — see plausible.d.ts.
-      if (shown) window.plausible?.('community_nudge_shown', { interactive: false });
+      if (shown) track('community_nudge_shown');
     } catch (err) {
       reportError({
         surface: 'community-nudge-issuance',
@@ -196,7 +197,7 @@ export function useCommunityNudge() {
       { ...state.value, activeNudge: null, nextDueAt: Date.now() + randomIntervalMs() },
       "Couldn't update community settings"
     );
-    window.plausible?.('community_nudge_dismissed', { props: { action: 'snooze' } });
+    track('community_nudge_dismissed', { props: { action: 'snooze' } });
   }
 
   /** "I'm already there!" — already joined; stop nudging for good (this device). */
@@ -205,7 +206,7 @@ export function useCommunityNudge() {
       { ...state.value, joined: true, activeNudge: null },
       "Couldn't update community settings"
     );
-    window.plausible?.('community_nudge_dismissed', { props: { action: 'already_there' } });
+    track('community_nudge_dismissed', { props: { action: 'already_there' } });
   }
 
   return {

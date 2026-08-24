@@ -5,6 +5,7 @@ import { getBuildVersionLabel } from '@/utils/diagnosticContext';
 // REVIEW-DEMO: gates the app-review access affordance below.
 import { isReviewDemoAvailable } from '@/utils/reviewDemo';
 import LoginChoiceCard from './LoginChoiceCard.vue';
+import { track } from '@/services/analytics/plausible';
 
 const { t } = useTranslation();
 
@@ -35,7 +36,7 @@ const emit = defineEmits<{
  * reached by non-button redirect paths.
  */
 function onCreatePod() {
-  window.plausible?.('create_pod_click');
+  track('create_pod_click');
   emit('navigate', 'create');
 }
 

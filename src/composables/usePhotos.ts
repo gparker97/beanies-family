@@ -20,6 +20,7 @@ import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import type { PhotoAttachment, UUID } from '@/types/models';
 import type { QueuedPhotoUpload } from '@/services/sync/photoUploadQueue';
+import { track } from '@/services/analytics/plausible';
 
 export const MAX_PHOTOS_PER_SET = 4;
 const ACCEPTED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -182,6 +183,10 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     for (const file of accepted) {
       try {
         const result = await store.addPhoto(file, options.collection, entityId, createdBy);
+        // #71: adoption is counted HERE, at the user-initiated caller, rather
+        // than inside `photoStore.addPhoto` — the store action throws on failure
+        // and is reachable from non-user paths.
+        track('feature_used', { props: { feature: 'photo' } });
         if (result.status === 'completed') {
           completedIds.push(result.photoId);
         } else {

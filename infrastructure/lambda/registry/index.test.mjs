@@ -99,6 +99,50 @@ describe('registry PUT — lastLoginAt (server-stamped, login-gated)', () => {
   });
 });
 
+describe('registry PUT — signupPlatform (stamped at row creation, never moved)', () => {
+  it('stamps the platform on a first write (no prior row)', async () => {
+    const { res, item } = await put({ provider: 'local', signupPlatform: 'ios' });
+    expect(res.statusCode).toBe(200);
+    expect(item.signupPlatform).toBe('ios');
+  });
+
+  it('does NOT move when a later write comes from a different platform', async () => {
+    const { item } = await put(
+      { provider: 'local', signupPlatform: 'web' },
+      { createdAt: '2026-01-01T00:00:00.000Z', signupPlatform: 'ios' }
+    );
+    expect(item.signupPlatform).toBe('ios');
+  });
+
+  it('never stamps a PRE-EXISTING row retroactively', async () => {
+    // The regression this field's `existingRaw` keying exists to prevent: every
+    // row created before this shipped has no signupPlatform, and the ordinary
+    // `existing.x ?? body.x` write-once idiom would relabel each one with
+    // whichever device wrote next. Absent must stay absent (= unknown).
+    const { item } = await put(
+      { provider: 'local', signupPlatform: 'web' },
+      { createdAt: '2026-06-01T00:00:00.000Z', ownerEmail: 'a@b.com' }
+    );
+    expect(item.signupPlatform).toBeNull();
+  });
+
+  it('rejects a value outside the vocabulary (permanent field, so it is guarded)', async () => {
+    const { res, item } = await put({ provider: 'local', signupPlatform: 'windows-phone' });
+    expect(res.statusCode).toBe(200);
+    expect(item.signupPlatform).toBeNull();
+  });
+
+  it('rejects a non-string value', async () => {
+    const { item } = await put({ provider: 'local', signupPlatform: { evil: true } });
+    expect(item.signupPlatform).toBeNull();
+  });
+
+  it('yields null when an older client omits it entirely', async () => {
+    const { item } = await put({ provider: 'local' });
+    expect(item.signupPlatform).toBeNull();
+  });
+});
+
 describe('registry PUT — beanpodSizeKb (client value, preserve-on-omit, guarded)', () => {
   it('stores a rounded non-negative number', async () => {
     const { item } = await put({ provider: 'local', beanpodSizeKb: 34.7 });

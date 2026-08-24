@@ -6,6 +6,7 @@ import { convertToBaseCurrency } from '@/utils/currency';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { useAccountsStore } from './accountsStore';
+import { trackFeature } from '@/services/analytics/plausible';
 import type {
   Asset,
   CreateAssetInput,
@@ -194,7 +195,7 @@ export const useAssetsStore = defineStore('assets', () => {
       await syncLinkedLoanAccount(result);
       await syncLinkedRecurringPayment(result);
     }
-    return result ?? null;
+    return trackFeature(result ?? null, 'asset');
   }
 
   async function updateAsset(id: string, input: UpdateAssetInput): Promise<Asset | null> {

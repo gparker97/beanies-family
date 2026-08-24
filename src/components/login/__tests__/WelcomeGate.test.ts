@@ -65,7 +65,10 @@ describe('WelcomeGate', () => {
       try {
         const wrapper = mount(WelcomeGate);
         await wrapper.findAll('button')[0].trigger('click');
-        expect(plausible).toHaveBeenCalledWith('create_pod_click');
+        expect(plausible).toHaveBeenCalledWith('create_pod_click', {
+          props: { platform: 'web' },
+          interactive: true,
+        });
         // and still navigates
         expect(wrapper.emitted('navigate')?.[0]).toEqual(['create']);
       } finally {

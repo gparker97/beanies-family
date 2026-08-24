@@ -12,6 +12,7 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { generateUUID } from '@/utils/id';
+import { trackFeature } from '@/services/analytics/plausible';
 import type {
   FamilyList,
   FamilyListItem,
@@ -170,7 +171,7 @@ export const useListStore = defineStore('lists', () => {
       },
       { action: 'listStore:createList' }
     );
-    return result ?? null;
+    return trackFeature(result ?? null, 'list');
   }
 
   /**
@@ -219,7 +220,7 @@ export const useListStore = defineStore('lists', () => {
       },
       { action: 'listStore:updateList' }
     );
-    return result ?? null;
+    return trackFeature(result ?? null, 'list');
   }
 
   async function deleteList(id: string): Promise<boolean> {

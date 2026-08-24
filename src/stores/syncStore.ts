@@ -28,7 +28,7 @@ import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import { isLoaded as isProjectionLoaded } from '@/services/automerge/projection';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
-import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import { getSyncCapabilities, canAutoSync, getPlatform } from '@/services/sync/capabilities';
 import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
@@ -1477,29 +1477,69 @@ export const useSyncStore = defineStore('sync', () => {
    * resume-from-registry path). The public `registerCurrentFamily` keeps its
    * fire-and-forget contract for non-critical background syncs.
    */
+  /**
+   * The signup platform for a registry write, or `null` when detection fails.
+   *
+   * Deliberately NOT defaulting to `'web'` on failure: `null` means "unknown"
+   * and is excluded from platform breakdowns, whereas a `'web'` fallback would
+   * quietly inflate web signups — the exact distortion #71 exists to remove.
+   */
+  function registrySignupPlatform(): 'web' | 'ios' | 'android' | null {
+    try {
+      return getPlatform();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Build the registry write payload for the active family.
+   *
+   * Extracted (#71) because the two call sites below drifted apart field-by-field
+   * and a new field added to one silently missed the other. Returns the payload
+   * and NOTHING else: the callers also differ in `registerFamilyOrThrow` vs
+   * `registerFamily`, and that throw/no-throw choice carries the recovery-anchor
+   * invariant documented at `_registerCurrentFamilySync` — folding the call in
+   * here would demote that invariant to a boolean parameter.
+   */
+  function buildRegistryPayload(
+    overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
+    opts: { isLoginEvent?: boolean } = {}
+  ): registry.RegistryWritePayload {
+    const ctx = useFamilyContextStore();
+    const authStore = useAuthStore();
+    const provider = syncService.getProvider();
+    return {
+      provider: overrides.provider ?? storageProviderType.value ?? 'local',
+      fileId: overrides.fileId ?? provider?.getFileId() ?? null,
+      displayPath: overrides.displayPath ?? provider?.getDisplayName() ?? fileName.value ?? null,
+      familyName: ctx.activeFamilyName ?? null,
+      ownerEmail: authStore.currentUser?.email ?? null,
+      ownerMemberId: authStore.currentUser?.memberId ?? null,
+      subscribeNewsletter: authStore.newsletterOptIn ?? null,
+      country: useSettingsStore().country ?? null,
+      beanpodSizeKb: currentBeanpodSizeKb(),
+      // Sent on EVERY write; the Lambda stamps it only when it creates the row,
+      // so a later login from another platform cannot move it.
+      signupPlatform: registrySignupPlatform(),
+      isLoginEvent: opts.isLoginEvent === true,
+    };
+  }
+
   async function _registerCurrentFamilySync(): Promise<void> {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) {
       throw new Error('Cannot register family: no active family ID');
     }
-    const authStoreInst = useAuthStore();
-    const provider = syncService.getProvider();
     // `registerFamilyOrThrow` (not `registerFamily`) — the latter swallows
     // network failures by design (fire-and-forget for background syncs).
     // Pod creation NEEDS this write to surface as a failure so the recovery
     // anchor invariant holds: post-`markPodCreated`, the registry has fileId.
-    await registry.registerFamilyOrThrow(ctx.activeFamilyId, {
-      provider: storageProviderType.value ?? 'local',
-      fileId: provider?.getFileId() ?? null,
-      displayPath: provider?.getDisplayName() ?? fileName.value ?? null,
-      familyName: ctx.activeFamilyName,
-      ownerEmail: authStoreInst.currentUser?.email ?? null,
-      ownerMemberId: authStoreInst.currentUser?.memberId ?? null,
-      subscribeNewsletter: authStoreInst.newsletterOptIn ?? null,
-      country: useSettingsStore().country ?? null,
-      beanpodSizeKb: currentBeanpodSizeKb(),
-      isLoginEvent: true, // pod creation is the family's first login
-    });
+    await registry.registerFamilyOrThrow(
+      ctx.activeFamilyId,
+      // pod creation is the family's first login
+      buildRegistryPayload({}, { isLoginEvent: true })
+    );
   }
 
   /**
@@ -4023,21 +4063,9 @@ export const useSyncStore = defineStore('sync', () => {
   ): void {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) return;
-    const authStore = useAuthStore();
-    const provider = syncService.getProvider();
+    const payload = buildRegistryPayload(overrides, opts);
     registry
-      .registerFamily(ctx.activeFamilyId, {
-        provider: overrides.provider ?? storageProviderType.value ?? 'local',
-        fileId: overrides.fileId ?? provider?.getFileId() ?? null,
-        displayPath: overrides.displayPath ?? provider?.getDisplayName() ?? fileName.value ?? null,
-        familyName: ctx.activeFamilyName,
-        ownerEmail: authStore.currentUser?.email ?? null,
-        ownerMemberId: authStore.currentUser?.memberId ?? null,
-        subscribeNewsletter: authStore.newsletterOptIn ?? null,
-        country: useSettingsStore().country ?? null,
-        beanpodSizeKb: currentBeanpodSizeKb(),
-        isLoginEvent: opts.isLoginEvent === true,
-      })
+      .registerFamily(ctx.activeFamilyId, payload)
       .then((result) => {
         // The server refuses to move the canonical pointer for anyone but the
         // family's registered owner (see the guard in the registry Lambda). Two
@@ -4064,7 +4092,7 @@ export const useSyncStore = defineStore('sync', () => {
             context: {
               action: 'registry-pointer-write-refused',
               provider_type: storageProviderType.value ?? undefined,
-              file_id_tail: tail(overrides.fileId ?? provider?.getFileId() ?? null),
+              file_id_tail: tail(payload.fileId ?? null),
             },
           });
           return;

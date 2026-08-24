@@ -191,13 +191,81 @@ if (pl) {
     appArrivals,
   };
 
+  // ── Signups by platform (#71) ─────────────────────────────────────────────
+  //
+  // Two sources, and they are NOT known to be the same population: `completed`
+  // is a Plausible dashboard-configured GOAL matched by substring, while this
+  // breakdown queries the raw EVENT `signup`. The goal→event mapping is
+  // Plausible-side config this repo cannot see, and the sibling goal
+  // `Family Create - Button Clicked` has no matching event name at all — so
+  // assuming 1:1 and dividing one by the other would put a percentage next to a
+  // count computed off a different N.
+  //
+  // Reconciled instead of assumed: take the web SHARE from the breakdown and
+  // apply it to the goal count. When the two totals agree this is exactly the
+  // web row; when they disagree the headline stays consistent with the count
+  // displayed beside it. `platformTotalsAgree` records which case shipped.
+  //
+  // ABSENT ⇒ WEB, for PLAUSIBLE only. Every signup recorded before native
+  // analytics shipped is provably web, because native builds never loaded
+  // Plausible at all. Plausible returns those under the literal string
+  // `(none)`, folded into `web` here so it can never reach the template. (The
+  // registry's rule is the opposite — see `newWebInWindow` below.)
+  const platformRows = pl.app.signupPlatforms || [];
+  const byPlatform = new Map();
+  for (const r of platformRows) {
+    const raw = r['event:props:platform'];
+    const platform = !raw || raw === '(none)' ? 'web' : raw;
+    byPlatform.set(platform, (byPlatform.get(platform) || 0) + (r.visitors || 0));
+  }
+  const eventTotal = [...byPlatform.values()].reduce((a, b) => a + b, 0);
+  const webShare = eventTotal ? (byPlatform.get('web') || 0) / eventTotal : null;
+  // Rounded, so the volume rows always sum to the displayed `completed` total.
+  const completedWeb = webShare === null ? completed : Math.round(completed * webShare);
+
+  // Set to true ONLY once a TestFlight build has been confirmed to produce iOS
+  // pageviews in the app property. See `inAppPct` below for why it matters.
+  const IOS_PAGEVIEW_AUTOCAPTURE = false;
+  const iosSignups = byPlatform.get('ios') || 0;
+  const countedInAppSignups =
+    IOS_PAGEVIEW_AUTOCAPTURE || !eventTotal
+      ? completed
+      : Math.max(0, completed - Math.round(completed * (iosSignups / eventTotal)));
+
   conversion = {
     siteVisitors,
     appArrivals,
     started,
     completed,
-    overallPct: siteVisitors ? Math.round((completed / siteVisitors) * 1000) / 10 : null,
-    inAppPct: appArrivals ? Math.round((completed / appArrivals) * 1000) / 10 : null,
+    completedWeb,
+    // Volume, not a second rate — looped in the template so a new platform (or a
+    // `(none)` bucket) is never an HTML edit.
+    signupsByPlatform: [...byPlatform.entries()]
+      .map(([platform, visitors]) => ({ platform, visitors }))
+      .sort((a, b) => b.visitors - a.visitors),
+    // Whether the goal and the event agree on the total. Surfaced so the
+    // reconciliation above is verifiable from a dashboard run rather than taken
+    // on trust; null when the event query returned nothing at all.
+    platformTotalsAgree: eventTotal ? eventTotal === completed : null,
+    // THE headline, and the only like-for-like pairing on the page: web-only
+    // signups over marketing visitors, both of which exclude native entirely.
+    // Deliberately ONE percentage — a web-only/all-platform axis stacked on the
+    // existing cross-site/single-site axis is a 2x2 the reader must hold, and
+    // two rates invite "which one is real?".
+    overallPct: siteVisitors ? Math.round((completedWeb / siteVisitors) * 1000) / 10 : null,
+    // Numerator/denominator must cover the same platforms. `completed` is a
+    // CUSTOM EVENT (fires everywhere Plausible is loaded); `appArrivals` is a
+    // PAGEVIEW count (needs autocapture). On iOS the WebView origin is
+    // `capacitor://app.beanies.family` — `iosScheme: 'https'` is silently
+    // ignored by WKWebView (capacitor.config.ts) — so iOS pageviews are not
+    // confirmed to land. Until a TestFlight build proves they do, iOS signups
+    // are excluded from this numerator rather than inflating the one metric
+    // data-sources.md calls the one to optimise against. Flip the constant when
+    // verified; that is the whole change.
+    inAppPct: appArrivals
+      ? Math.round((countedInAppSignups / appArrivals) * 1000) / 10
+      : null,
+    inAppPctExcludesIos: !IOS_PAGEVIEW_AUTOCAPTURE && (byPlatform.get('ios') || 0) > 0,
     // Of those who *started* creating a family, how many finished? The single
     // most fixable number on the page — pure product friction, no traffic mix.
     finishPct: started ? Math.round((completed / started) * 1000) / 10 : null,
@@ -207,14 +275,21 @@ if (pl) {
 // Registry cross-check on the funnel's bottom step. The registry is ground truth
 // for "a family was actually created", so it validates (or contradicts) the
 // Plausible signup goal. A large gap means the goal is mis-fired or mis-configured.
-const newInWindow = fams.filter((f) => {
+// Share of in-window registry rows that must carry a platform before any
+// web-only registry comparison is meaningful. Below this, the comparison is
+// suppressed rather than shown wrong.
+const PLATFORM_COVERAGE_MIN = 0.8;
+const inWindow = fams.filter((f) => {
   if (!f.createdAt) return false;
   const t = new Date(f.createdAt).getTime() / 1000;
   return t >= NOW - WINDOW_DAYS * DAY && t <= NOW;
-}).length;
+});
+const newInWindow = inWindow.length;
 if (conversion) {
+  // Stays ALL-PLATFORM: this renders as "families actually created (registry)",
+  // a volume fact. Making it web-only would show 0 on every run before platform
+  // coverage builds up.
   conversion.actualNewFamilies = newInWindow;
-  conversion.goalVsRegistryGap = newInWindow - conversion.completed;
   // The HEADLINE is the same-source rate (Plausible signup goal / Plausible
   // marketing visitors). Both halves come from one tool with one definition, so
   // it is the defensible number even though the goal may under-fire.
@@ -224,12 +299,35 @@ if (conversion) {
   // app installs — while the denominator is marketing visitors only. Dividing
   // one by the other mixes populations and inflates the rate, so it is exposed
   // as a labelled upper bound, never as "the" conversion rate.
-  conversion.overallPctUpperBound = conversion.siteVisitors
-    ? Math.round((newInWindow / conversion.siteVisitors) * 1000) / 10
-    : null;
   // A large gap means one of two things, and both are worth knowing: the signup
   // goal is mis-firing, or most families never touch the marketing site.
-  conversion.gapIsMaterial = newInWindow > 0 && Math.abs(conversion.goalVsRegistryGap) >= Math.max(3, newInWindow * 0.34);
+  //
+  // Gated on platform COVERAGE (#71). REGISTRY absent ⇒ UNKNOWN, the opposite of
+  // the Plausible rule above: `signupPlatform` is stamped only on rows created
+  // after it shipped, and those older rows genuinely cannot be attributed —
+  // assuming web would re-introduce the very inflation this change removes. On
+  // the first post-deploy runs correctly NO in-window row carries a platform, so
+  // a web-only gap would be computed against ~0 and fire spuriously. Below the
+  // threshold the flag is null and the template renders nothing.
+  //
+  // The threshold is also raised. Restricting both sides to web-only roughly
+  // halves n, which would make the constant floor the binding term at realistic
+  // monthly volumes — i.e. it would fire on ordinary ad-blocker noise and become
+  // something to ignore, which is how a flag dies. See references/data-sources.md
+  // for the expected trigger rate.
+  const webInWindow = inWindow.filter((f) => f.signupPlatform === 'web');
+  const attributed = inWindow.filter((f) => f.signupPlatform).length;
+  const coverage = inWindow.length ? attributed / inWindow.length : 0;
+  conversion.platformCoverage = Math.round(coverage * 100);
+  if (coverage >= PLATFORM_COVERAGE_MIN && webInWindow.length > 0) {
+    conversion.newWebInWindow = webInWindow.length;
+    const webGap = webInWindow.length - conversion.completedWeb;
+    conversion.goalVsRegistryGap = webGap;
+    conversion.gapIsMaterial = Math.abs(webGap) >= Math.max(5, webInWindow.length * 0.34);
+  } else {
+    conversion.newWebInWindow = null;
+    conversion.gapIsMaterial = null;
+  }
 }
 
 // ── Channel -> source drill-down ────────────────────────────────────────────

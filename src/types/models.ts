@@ -1729,5 +1729,12 @@ export interface RegistryEntry {
   country?: CountryCode | null; // mirror of family Settings.country — denormalized for ops introspection
   lastLoginAt?: ISODateString | null; // date-only (YYYY-MM-DD), server-stamped on login/resume PUTs — usage signal
   beanpodSizeKb?: number | null; // approx .beanpod size in KB, client-rounded — coarse data-volume signal
+  // Platform the family signed up ON — server-stamped write-once at row creation
+  // (registry Lambda), so it never moves when the owner later opens a browser.
+  // Uses the `getPlatform()` vocabulary shared with Plausible, NOT the coarse
+  // `'app' | 'pwa' | 'web'` bucket in `src/utils/platformLabel.ts`. Absent on
+  // every row created before 2026-08-24, which reads as UNKNOWN — exclude those
+  // from platform breakdowns rather than assuming web.
+  signupPlatform?: 'web' | 'ios' | 'android' | null;
   updatedAt: ISODateString;
 }

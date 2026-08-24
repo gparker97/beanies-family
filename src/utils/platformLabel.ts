@@ -11,7 +11,14 @@
 
 import { getPlatform, isNative, isStandalone, isIosOrIpadOs } from '@/services/sync/capabilities';
 
-/** Coarse surface bucket for at-a-glance filtering. */
+/**
+ * Coarse surface bucket for at-a-glance filtering.
+ *
+ * This is a SLACK-ONLY vocabulary. The analytics + registry vocabulary is
+ * `getPlatform()`'s `'web' | 'ios' | 'android'` (see `track()` in
+ * `services/analytics/plausible.ts` and `RegistryEntry.signupPlatform`) — do not
+ * cross the two, and do not introduce a third.
+ */
 export type PlatformLabel = 'app' | 'pwa' | 'web';
 
 /**

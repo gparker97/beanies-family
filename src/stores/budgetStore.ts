@@ -16,6 +16,7 @@ import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { firstDueOnOrAfter } from '@/services/recurrence/recurrenceEngine';
 import { convertToBaseCurrency } from '@/utils/currency';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput, CurrencyCode } from '@/types/models';
+import { trackFeature } from '@/services/analytics/plausible';
 
 export type PaceStatus = 'great' | 'onTrack' | 'caution' | 'overBudget';
 export type CategoryBudgetStatus = 'ok' | 'warning' | 'over';
@@ -246,7 +247,7 @@ export const useBudgetStore = defineStore('budget', () => {
       budgets.value = [...budgets.value, budget];
       return budget;
     });
-    if (result) window.plausible?.('feature_used', { props: { feature: 'budget' } });
+    trackFeature(result, 'budget');
     return result ?? null;
   }
 

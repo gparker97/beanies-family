@@ -15,6 +15,7 @@ import {
 import { toISODateString, extractDatePart } from '@/utils/date';
 import { mergeExtractedIntoVacation } from '@/utils/segmentMerge';
 import { useToday } from '@/composables/useToday';
+import { trackFeature } from '@/services/analytics/plausible';
 import type {
   FamilyVacation,
   VacationTravelSegment,
@@ -173,7 +174,7 @@ export const useVacationStore = defineStore('vacations', () => {
       },
       { action: 'vacationStore:createVacation' }
     );
-    if (result) window.plausible?.('feature_used', { props: { feature: 'vacation' } });
+    trackFeature(result, 'vacation');
     return result ?? null;
   }
 

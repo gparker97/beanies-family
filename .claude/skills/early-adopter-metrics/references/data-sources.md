@@ -41,6 +41,7 @@ without the masking rules below.
 | `country` | CountryCode mirror | geography |
 | `lastLoginAt` | **date-only `YYYY-MM-DD`**, stamped only on explicit `isLoginEvent` | recency / engaged buckets |
 | `beanpodSizeKb` | client-rounded pod size (KB) | data-volume proxy |
+| `signupPlatform` | `web` \| `ios` \| `android`, **write-once at row creation**; absent on rows created before 2026-08-24 | web-only conversion maths — absent means UNKNOWN and is EXCLUDED, never assumed web |
 | `updatedAt` | ISO ts, every PUT | — |
 
 **Caveats:**
@@ -128,11 +129,72 @@ is recorded in `_degraded`, never breaking the run):
 `Family Member Joined` ← `'Member Joined'`. Renaming a goal in Plausible silently
 zeroes a funnel step — check here first if a step reads 0.
 
+**Platform split + the conversion numbers (#71, 2026-08-24).** `signupPlatforms` breaks
+the `signup` EVENT down by the `platform` prop (`web` / `ios` / `android`). Read these
+rules before quoting any conversion figure:
+
+- **The headline `overallPct` is WEB-ONLY on both sides** — `completedWeb` ÷ marketing
+  visitors. It is the only like-for-like pairing on the page. The platform split ships
+  as **volume** beside it, never as a second percentage; the old
+  `overallPctUpperBound` (registry ÷ visitors) was **retired** in #71 because it mixed
+  populations and readers could not tell which of the two rates was real.
+- **`completedWeb` is DERIVED, not read.** The headline count comes from the
+  dashboard-configured GOAL `Signup Completed`; the split comes from the raw EVENT
+  `signup`. The goal→event mapping is Plausible-side config this repo cannot see, and
+  the sibling goal `Family Create - Button Clicked` has no matching event name at all —
+  so the two are not assumed 1:1. The web SHARE from the breakdown is applied to the
+  goal count, keeping the rate consistent with the count displayed next to it.
+  `conversion.platformTotalsAgree` reports whether the totals actually matched on a
+  given run — if `false`, do not quote the split as exact.
+- **The absent-platform rule is PER-SOURCE. Getting this backwards ships a visibly
+  broken number.**
+  - **Plausible: absent ⇒ WEB.** Every signup before 2026-08-24 is *provably* web,
+    because native builds never loaded Plausible at all. Plausible returns those rows
+    under the literal string `(none)`, folded into `web` in `build_dashboard.mjs`.
+    Treating them as unknown would make the web-only headline read ≈0% for the first 30
+    days — indistinguishable from a regression.
+  - **Registry: absent ⇒ UNKNOWN, excluded.** `signupPlatform` is stamped write-once at
+    row creation, so pre-#71 rows genuinely cannot be attributed. Assuming web there
+    would re-introduce the exact inflation this change removes.
+- **`gapIsMaterial` is coverage-gated.** It is computed only once ≥80% of in-window
+  registry rows carry a platform (`conversion.platformCoverage`); below that it is
+  `null` and nothing renders — on the first post-deploy runs correctly no row carries
+  one. Its floor was also raised from 3 to 5: restricting both sides to web-only roughly
+  halves *n*, and at realistic monthly volumes (~15–25 new families) the constant floor
+  becomes the binding term. **Expected trigger rate: rare — a handful of times a year.**
+  If it starts firing most months, the floor is wrong again; ordinary ad-blocker loss
+  should not reach it.
+- **`inAppPct` excludes iOS while `conversion.inAppPctExcludesIos` is true.** Its
+  numerator (`completed`) is a custom EVENT and its denominator (`appArrivals`) is a
+  PAGEVIEW count. On iOS the WebView origin is `capacitor://app.beanies.family`
+  (`iosScheme: 'https'` is silently ignored by WKWebView), so iOS pageviews are not
+  confirmed to land — counting iOS signups against a denominator missing iOS arrivals
+  would inflate the one metric this document calls the one to optimise against. Flip
+  `IOS_PAGEVIEW_AUTOCAPTURE` in `build_dashboard.mjs` once a TestFlight build proves
+  otherwise.
+- **`actualNewFamilies` stays ALL-PLATFORM.** It is a volume fact ("families actually
+  created"), not a rate input. `newWebInWindow` is the web-only figure used for the gap.
+
+**2026-08-24 is a SERIES BREAK.** Native builds began loading Plausible on that date, and
+four app-fired events became non-interactive. Do not compare across it without saying so.
+It moves: the marketing site's bounce rate (it will RISE toward a real value — the old
+1–2% was passive events counting as engagement); the app property's arrivals, top pages
+and bounce; `inAppPct`; and `conversion.overallPct`.
+
+**Native has NO offline queue.** CloudWatch telemetry has `logQueue.ts`; Plausible does
+not, so an event fired with no connectivity is simply lost. Native therefore under-counts
+somewhat — far less than the 100% it under-counted before #71. Also note `plausible_ignore`
+is stored per-origin, so excluding yourself in a browser does not exclude you in an
+installed app (a separate origin).
+
 **Caveats:** Plausible is aggregate and privacy-first — **no `family_id`**, so it can't
 be joined per-family. Custom goals only count if the Plausible dashboard has them
 configured as goals (pageviews + any received custom event still show via `event:goal`).
-Observed `bounce_rate` on the marketing site is implausibly low (1–2%) — outbound-link
-and file-download events appear to suppress bounces, so treat bounce as unreliable here.
+The marketing site's `bounce_rate` was implausibly low (1–2%) before 2026-08-24 —
+outbound-link and file-download events suppress bounces, and until #71 four app-fired
+events were counted as engagement. Post-break bounce should be usable on the app
+property; on the marketing site outbound-link suppression remains, so still treat it with
+care.
 
 ---
 

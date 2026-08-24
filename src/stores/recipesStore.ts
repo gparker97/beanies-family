@@ -4,6 +4,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import * as repo from '@/services/automerge/repositories/recipeRepository';
 import type { Recipe, CookLogEntry } from '@/types/models';
+import { trackFeature } from '@/services/analytics/plausible';
 
 type RecipeCreate = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>;
 type RecipeUpdate = Partial<RecipeCreate>;
@@ -48,7 +49,7 @@ export const useRecipesStore = defineStore('recipes', () => {
       recipes.value = [...recipes.value, created];
       return created;
     });
-    return result ?? null;
+    return trackFeature(result ?? null, 'recipe');
   }
 
   async function updateRecipe(id: string, input: RecipeUpdate): Promise<Recipe | null> {

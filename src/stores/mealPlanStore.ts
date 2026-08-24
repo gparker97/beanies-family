@@ -9,6 +9,7 @@ import { generateUUID } from '@/utils/id';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
+import { trackFeature } from '@/services/analytics/plausible';
 import type {
   MealPlanEntry,
   CreateMealPlanInput,
@@ -148,7 +149,7 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
       },
       { action: 'mealPlanStore:createMeal' }
     );
-    return result ?? null;
+    return trackFeature(result ?? null, 'meal_plan');
   }
 
   /**

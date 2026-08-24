@@ -122,16 +122,29 @@ signal, not every field.
 4. **Conversion funnels** (`funnelAcq`, `funnelRet`) — two funnels:
    - **Acquisition** (Plausible: marketing site → hand-off → welcome gate → started
      creation → completed signup). Lead with `conversion.overallPct` — the
-     **same-source** rate (Plausible signup goal ÷ Plausible marketing visitors).
+     **same-source, web-only** rate (`completedWeb` ÷ Plausible marketing visitors).
      Report step conversion %. State that the marketing→app step is a *cross-site
      aggregate* (two Plausible sites, no shared visitor id), not per-visitor tracking.
-     - ⚠️ **Never lead with `conversion.overallPctUpperBound`** (registry families ÷
-       marketing visitors). Its numerator counts families created *anywhere* —
-       direct, invited, native app — against a marketing-only denominator, so it
-       mixes populations and inflates the rate. It is an upper bound, labelled as one.
+     - **There is ONE headline rate, deliberately.** Report the platform split
+       (`conversion.signupsByPlatform`) as VOLUME beside it — "17 signups: 11 web,
+       6 native" — never as a second percentage. The registry-÷-visitors "upper
+       bound" was retired in #71 because it mixed populations (families created
+       anywhere over a marketing-only denominator) and readers could not tell
+       which of the two rates was real.
+     - `completedWeb` is derived by applying the web SHARE from the `signup`
+       event's platform breakdown to the `Signup Completed` GOAL count, because
+       the goal→event mapping is Plausible-side config this repo cannot verify.
+       `conversion.platformTotalsAgree` records whether the two totals matched on
+       this run; if it is `false`, say so rather than quoting the split as exact.
+     - `conversion.inAppPctExcludesIos` means iOS signups were removed from that
+       funnel's numerator because iOS pageview autocapture is unconfirmed — label
+       the figure accordingly.
      - If `conversion.gapIsMaterial` is true, **say so prominently**: the registry
        and the Plausible signup goal disagree, so every conversion rate carries that
        uncertainty until it's resolved (under-firing goal vs. non-marketing arrivals).
+       If it is `null`, platform coverage is still below the gate
+       (`conversion.platformCoverage`%) — say the check is not yet possible rather
+       than reporting agreement.
    - **Activation/retention** (registry+CloudWatch cohort of families created ≥28d
      ago: signed up → used beyond day 0 → active at 1 week → at 4 weeks). This is
      the actionable one — a true per-family cohort. Note it's a floor (activity older

@@ -37,6 +37,8 @@ The anti-drift comments at `ALLOWED_CONTEXT_KEYS` and the telemetry `LogRecord` 
 > | Random `family_id` (UUID) | Slack + telemetry firehose | Identifiers → User ID | Device or other IDs | App functionality (correlate diagnostics) | Yes¹ | No |
 > | Last-login date (`lastLoginAt`, date-only, server-stamped) | Family registry PUT | Usage Data → Product Interaction | App activity → App interactions | Analytics (gauge active usage / retention) | Yes² | No |
 > | Approximate data size (`beanpodSizeKb`, encrypted-file size rounded to KB) | Family registry PUT | Usage Data → Product Interaction | App activity → App interactions | Analytics (gauge data growth) | Yes² | No |
+> | Signup platform (`signupPlatform`, the fixed enum `web`/`ios`/`android`, write-once at row creation) | Family registry PUT | Usage Data → Product Interaction | App activity → App interactions | Analytics (which platform families sign up on) | Yes² | No |
+> | Product-interaction events (Plausible, #71: a fixed event name — signup / login / feature_used / nudge shown+dismissed / etc. — plus the closed props `feature`, `method`, `action`, `surface`, `platform`) | Plausible Analytics (`plausible.io`) | Usage Data → Product Interaction | App activity → App interactions | Analytics (which features get used) | **No** (see ³) | No |
 
 ¹ The high-volume telemetry firehose is PII-free (correlated only by the random `family_id`, which is
 `crypto.randomUUID`, `familyContext.ts`). It's marked "Linked" because on the low-volume critical-error
@@ -57,8 +59,22 @@ timeline beyond the user-initiated `/delete-account` path.
 
 **NOT collected:** family content (accounts, transactions, activities, goals, to-dos, documents,
 member profiles) — it lives only in the user's encrypted `.beanpod` / their own Google Drive.
-No advertising, no third-party analytics SDK in the app, no cross-app tracking → **NSPrivacyTracking =
-false**, no ATT prompt, Google "data used to track users" = none.
+No advertising, no cross-app tracking, no device identifiers, no IDFA/AAID access.
+
+³ **The app DOES load a third-party analytics script — Plausible — as of 2026-08-24 (#71).** (This
+sentence previously read "no third-party analytics SDK in the app"; that became false when the native
+release lanes started shipping `VITE_PLAUSIBLE_DOMAIN`, and the declarations above were extended rather
+than the claim kept.) It is the same cookieless, privacy-first script the marketing site uses, loaded
+from `plausible.io`. It sets no cookies, stores no identifier of any kind, generates no persistent or
+probabilistic user id, and **cannot** link the person to data collected by other companies' apps or
+websites — which is precisely Apple's definition of tracking. So this data is **not linked to the user**
+and:
+
+**`NSPrivacyTracking` STAYS `false`.** Do not flip it. There is no ATT prompt to add and no
+`NSPrivacyTrackingDomains` entry needed, because `plausible.io` performs no tracking as Apple defines
+it. Google "data used to track users" likewise = **none**. If a future change introduces any
+cross-app/website linkage or a persistent identifier, that is the moment to revisit — nothing before
+it.
 
 > **Retention (decided 2026-07-08, greg):** there is no archival process or fixed deletion date for
 > the telemetry ingest / Slack alerting, and the data held is non-sensitive — so we do NOT set an

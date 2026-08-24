@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as repo from '@/services/automerge/repositories/sayingRepository';
 import type { SayingItem } from '@/types/models';
+import { trackFeature } from '@/services/analytics/plausible';
 
 type CreateInput = Omit<SayingItem, 'id' | 'createdAt' | 'updatedAt'>;
 type UpdateInput = Partial<CreateInput>;
@@ -34,7 +35,7 @@ export const useSayingsStore = defineStore('sayings', () => {
       sayings.value = [...sayings.value, created];
       return created;
     });
-    return result ?? null;
+    return trackFeature(result ?? null, 'saying');
   }
 
   async function updateSaying(id: string, input: UpdateInput): Promise<SayingItem | null> {

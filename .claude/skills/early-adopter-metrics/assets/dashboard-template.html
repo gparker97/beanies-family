@@ -447,17 +447,18 @@ if(D.funnelAcq){
 // The headline conversion readout — the number greg asked to see prominently
 if(C){
   const gap=C.gapIsMaterial;
+  // Volume, not a second rate — looped so a new platform is never an HTML edit.
+  const split=(C.signupsByPlatform||[]).map(p=>`${num(p.visitors)} ${p.platform}`).join(', ');
   $('convbox').innerHTML=`<div class="convbox">
     <div><div class="convbig">${C.overallPct!=null?C.overallPct+'%':'—'}<small>overall conversion</small></div></div>
     <div>
-      <div class="convnote"><b>${num(C.completed)} signups</b> from <b>${num(C.siteVisitors)}</b> marketing-site visitors. Both halves come from Plausible, so the definition is consistent — but this is a <b>cross-site ratio, not a tracked funnel</b>: no single visitor can be followed from the marketing site into the app.</div>
+      <div class="convnote"><b>${num(C.completedWeb)} web signups</b> from <b>${num(C.siteVisitors)}</b> marketing-site visitors. Web-only on both sides, so it is like-for-like — but this is a <b>cross-site ratio, not a tracked funnel</b>: no single visitor can be followed from the marketing site into the app.${split?` Across every platform: <b>${num(C.completed)}</b> signups — ${split}.`:''}</div>
       <div class="convrow">
-        <div class="cr"><b>${C.inAppPct!=null?C.inAppPct+'%':'—'}</b>app arrivals → signup <span style="color:var(--good)">(true funnel)</span></div>
+        <div class="cr"><b>${C.inAppPct!=null?C.inAppPct+'%':'—'}</b>app arrivals → signup <span style="color:var(--good)">(true funnel)</span>${C.inAppPctExcludesIos?` <span style="color:var(--ink-faint)">(excl. iOS)</span>`:''}</div>
         <div class="cr"><b>${C.finishPct!=null?C.finishPct+'%':'—'}</b>started → finished creating</div>
-        <div class="cr"><b>${num(C.actualNewFamilies)}</b>families actually created <span style="color:var(--ink-faint)">(registry)</span></div>
-        <div class="cr"><b>${C.overallPctUpperBound!=null?C.overallPctUpperBound+'%':'—'}</b>upper bound <span style="color:var(--ink-faint)">(registry ÷ visitors)</span></div>
+        <div class="cr"><b>${num(C.actualNewFamilies)}</b>families actually created <span style="color:var(--ink-faint)">(registry, all platforms)</span></div>
       </div>
-      ${gap?`<div class="missing" style="margin-top:12px">The registry recorded <b>${num(C.actualNewFamilies)}</b> new families but the Plausible signup goal fired <b>${num(C.completed)}</b> times. Either the goal is under-firing, or ${num(C.goalVsRegistryGap)} families arrived without passing through the marketing site (direct, invited, or native app). Worth resolving — it decides which of the two rates above is real.</div>`:''}
+      ${gap?`<div class="missing" style="margin-top:12px">The registry recorded <b>${num(C.newWebInWindow)}</b> new web families but the Plausible signup goal attributes <b>${num(C.completedWeb)}</b> to web. Either the goal is under-firing, or ${num(Math.abs(C.goalVsRegistryGap))} families arrived without passing through the marketing site (direct or invited). Worth resolving — it decides whether the rate above is real.</div>`:''}
     </div>
   </div>`;
 }else{$('convbox').innerHTML='';}
@@ -605,7 +606,7 @@ const co=[];
 const gapPct=pct(D.neverReallyEngaged,D.counts.realFamilies);
 co.push({c:'warn',h:'Activation is the #1 lever',p:`<b>${D.neverReallyEngaged} of ${D.counts.realFamilies} families</b> (${gapPct}%) created a pod but show essentially no activity. Median beanpod is just <b>${D.dataVolume.medianBeanpodSizeKb}KB</b> and ${D.dataVolume.emptyOrTinyUnder5Kb} pods are near-empty. First-session activation moves every downstream number.`});
 if(C&&C.gapIsMaterial){
-  co.push({c:'warn',h:'Signup instrumentation disagrees with the registry',p:`The registry created <b>${num(C.actualNewFamilies)}</b> families this window; the Plausible signup goal fired <b>${num(C.completed)}</b> times. Until that gap is explained — an under-firing goal, or families arriving outside the marketing site — every conversion rate on this page has a factor-of-${(C.actualNewFamilies/Math.max(C.completed,1)).toFixed(1)} uncertainty. This is the first thing to fix.`});
+  co.push({c:'warn',h:'Signup instrumentation disagrees with the registry',p:`The registry created <b>${num(C.newWebInWindow)}</b> web families this window; the Plausible signup goal attributes <b>${num(C.completedWeb)}</b> to web. Until that gap is explained — an under-firing goal, or families arriving outside the marketing site — the conversion rate on this page has a factor-of-${(C.newWebInWindow/Math.max(C.completedWeb,1)).toFixed(1)} uncertainty. This is the first thing to fix.`});
 }
 if(C&&C.finishPct!=null&&C.finishPct<80){
   co.push({c:'warn',h:'The create-family flow leaks',p:`Only <b>${C.finishPct}%</b> of families who started creating a pod finished. That is pure product friction — no traffic mix explains it, and it is the cheapest number on this page to move.`});

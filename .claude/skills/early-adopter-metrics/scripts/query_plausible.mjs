@@ -221,7 +221,8 @@ async function marketingBundle() {
 
 async function appBundle() {
   const site = SITES.app;
-  const [overview, goals, topPages, sources, features, loginMethods] = await Promise.all([
+  const [overview, goals, topPages, sources, features, loginMethods, signupPlatforms] =
+    await Promise.all([
     q(site, { metrics: TRAFFIC_METRICS }),
     q(site, { metrics: ['visitors', 'events'], dimensions: ['event:goal'], pagination: { limit: 40 } }),
     q(site, { metrics: ['visitors', 'pageviews'], dimensions: ['event:page'], pagination: { limit: 25 } }),
@@ -240,6 +241,18 @@ async function appBundle() {
       filters: [['is', 'event:name', ['login']]],
       pagination: { limit: 10 },
     }),
+    // Signups split by the platform prop (#71). Same shape as the two
+    // breakdowns above — no new machinery. Note this queries the EVENT
+    // `signup`, whereas the headline count comes from the dashboard-configured
+    // GOAL `Signup Completed`; build_dashboard reconciles the two rather than
+    // assuming they are the same population. Rows from before native analytics
+    // shipped carry no prop and come back under the literal string `(none)`.
+    q(site, {
+      metrics: ['visitors', 'events'],
+      dimensions: ['event:props:platform'],
+      filters: [['is', 'event:name', ['signup']]],
+      pagination: { limit: 10 },
+    }),
   ]);
   // Which channel do APP arrivals come from — lets us say how many app visitors
   // arrived from the marketing site vs direct (returning users signing in).
@@ -254,6 +267,7 @@ async function appBundle() {
     topSources: rows(sources),
     featureUsage: rows(features),
     loginMethods: rows(loginMethods),
+    signupPlatforms: rows(signupPlatforms),
     channels: rows(appChannels),
   };
 }

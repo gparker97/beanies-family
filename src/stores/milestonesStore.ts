@@ -5,6 +5,7 @@ import { reportError } from '@/utils/errorReporter';
 import * as repo from '@/services/automerge/repositories/milestoneRepository';
 import { isKnownMilestoneCategory } from '@/constants/milestoneCategories';
 import type { Milestone, MilestoneCategory } from '@/types/models';
+import { trackFeature } from '@/services/analytics/plausible';
 
 type CreateInput = Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>;
 type UpdateInput = Partial<CreateInput>;
@@ -90,7 +91,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
       },
       { action: 'milestonesStore:createMilestone' }
     );
-    return result ?? null;
+    return trackFeature(result ?? null, 'milestone');
   }
 
   async function updateMilestone(id: string, input: UpdateInput): Promise<Milestone | null> {

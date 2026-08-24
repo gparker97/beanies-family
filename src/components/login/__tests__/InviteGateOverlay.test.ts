@@ -49,7 +49,8 @@ describe('InviteGateOverlay — no-token affordances', () => {
     await wrapper.get('[data-testid="invite-gate-discord"]').trigger('click');
     expect(openDiscordMock).toHaveBeenCalledWith('invite-gate');
     expect(plausibleMock()).toHaveBeenCalledWith('invite_request_click', {
-      props: { method: 'discord' },
+      props: { method: 'discord', platform: 'web' },
+      interactive: true,
     });
   });
 
@@ -76,7 +77,8 @@ describe('InviteGateOverlay — no-token affordances', () => {
     expect(wrapper.text()).not.toContain('inviteGate.requestTitle');
     expect(openDiscordMock).toHaveBeenCalledWith('invite-gate');
     expect(plausibleMock()).toHaveBeenCalledWith('invite_request_click', {
-      props: { method: 'discord' },
+      props: { method: 'discord', platform: 'web' },
+      interactive: true,
     });
 
     vi.unstubAllEnvs();
@@ -100,7 +102,8 @@ describe('InviteGateOverlay — no-token affordances', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(plausibleMock()).toHaveBeenCalledWith('invite_request_click', {
-      props: { method: 'message' },
+      props: { method: 'message', platform: 'web' },
+      interactive: true,
     });
     expect(wrapper.text()).toContain('inviteGate.confirmedTitle');
 

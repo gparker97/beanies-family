@@ -82,7 +82,8 @@ describe('openDiscord', () => {
     expect(openExternalMock).toHaveBeenCalledWith(DISCORD_URL);
     const plausible = (window as unknown as { plausible: ReturnType<typeof vi.fn> }).plausible;
     expect(plausible).toHaveBeenCalledWith('discord_join_click', {
-      props: { surface: 'settings' },
+      props: { surface: 'settings', platform: 'web' },
+      interactive: true,
     });
   });
 

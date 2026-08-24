@@ -7,6 +7,7 @@ import { generateUUID } from '@/utils/id';
 import { parseIsoDateSafely } from '@/utils/safeDate';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import { mutate } from '@/services/automerge/worker/docClient';
+import { trackFeature } from '@/services/analytics/plausible';
 import type {
   Goal,
   GoalManualContribution,
@@ -126,7 +127,7 @@ export const useGoalsStore = defineStore('goals', () => {
       },
       { action: 'goalsStore:createGoal' }
     );
-    if (result) window.plausible?.('feature_used', { props: { feature: 'goal' } });
+    trackFeature(result, 'goal');
     return result ?? null;
   }
 
