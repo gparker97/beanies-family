@@ -20,6 +20,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Signups are now split by platform — web, iOS, Android — on the founder metrics dashboard, with a single web-only conversion headline instead of two competing rates.
 - Feature adoption now covers all 16 features rather than the original four.
 
+### Changed
+
+- The founder metrics dashboard now leads with a single web-only conversion rate and shows the platform split as a volume figure beside it, replacing two competing percentages that were computed over different populations.
+
+> Note: these analytics changes are not yet deployed. The registry service must be updated before the app is, or the earliest app signups lose their platform permanently.
+
 ## 2026-08-23
 
 ### Fixed
