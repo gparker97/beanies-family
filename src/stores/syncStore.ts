@@ -1472,12 +1472,6 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Awaited variant of `registerCurrentFamily` — used only by `createNewFile`,
-   * which treats registry write as critical (it's the recovery anchor for the
-   * resume-from-registry path). The public `registerCurrentFamily` keeps its
-   * fire-and-forget contract for non-critical background syncs.
-   */
-  /**
    * The signup platform for a registry write, or `null` when detection fails.
    *
    * Deliberately NOT defaulting to `'web'` on failure: `null` means "unknown"
@@ -1504,7 +1498,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function buildRegistryPayload(
     overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
-    opts: { isLoginEvent?: boolean } = {}
+    opts: { isLoginEvent?: boolean; isSignupEvent?: boolean } = {}
   ): registry.RegistryWritePayload {
     const ctx = useFamilyContextStore();
     const authStore = useAuthStore();
@@ -1519,13 +1513,22 @@ export const useSyncStore = defineStore('sync', () => {
       subscribeNewsletter: authStore.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
       beanpodSizeKb: currentBeanpodSizeKb(),
-      // Sent on EVERY write; the Lambda stamps it only when it creates the row,
-      // so a later login from another platform cannot move it.
+      // Sent on every write, but the Lambda stamps it ONLY alongside
+      // `isSignupEvent` and only when the field is still unset — so neither a
+      // later login from another platform nor a disconnect/reconnect (which
+      // DELETES and recreates the row) can move it.
       signupPlatform: registrySignupPlatform(),
       isLoginEvent: opts.isLoginEvent === true,
+      isSignupEvent: opts.isSignupEvent === true,
     };
   }
 
+  /**
+   * Awaited variant of `registerCurrentFamily` — used only by `createNewFile`,
+   * which treats registry write as critical (it's the recovery anchor for the
+   * resume-from-registry path). The public `registerCurrentFamily` keeps its
+   * fire-and-forget contract for non-critical background syncs.
+   */
   async function _registerCurrentFamilySync(): Promise<void> {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) {
@@ -1537,8 +1540,9 @@ export const useSyncStore = defineStore('sync', () => {
     // anchor invariant holds: post-`markPodCreated`, the registry has fileId.
     await registry.registerFamilyOrThrow(
       ctx.activeFamilyId,
-      // pod creation is the family's first login
-      buildRegistryPayload({}, { isLoginEvent: true })
+      // Pod creation is the family's first login — and the ONLY write allowed to
+      // stamp `signupPlatform`.
+      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true })
     );
   }
 

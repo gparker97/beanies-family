@@ -212,17 +212,35 @@ export async function handler(event) {
           typeof body.beanpodSizeKb === 'number' && body.beanpodSizeKb >= 0
             ? Math.round(body.beanpodSizeKb)
             : (existing.beanpodSizeKb ?? null),
-        // Which platform the family signed up ON — stamped at row CREATION and
-        // never moved. Keyed off `existingRaw` (row existence), NOT the usual
-        // `existing.x ?? body.x` idiom: the field is absent on every row created
-        // before this shipped, so that idiom would stamp each of those with
-        // whichever device happened to write next — relabelling a family created
-        // on iOS as `web` the first time its owner opened a browser. Absent means
-        // "unknown", and unknown is excluded from platform breakdowns rather than
-        // assumed web.
-        signupPlatform: existingRaw
-          ? (existing.signupPlatform ?? null)
-          : validPlatform(body.signupPlatform),
+        // Which platform the family signed up ON. Two independent conditions, and
+        // BOTH are load-bearing:
+        //
+        //   1. `existing.signupPlatform ??` — never move a value already stamped.
+        //      Note this is NOT the plain `existing.x ?? body.x` write-once idiom
+        //      by itself: that alone would stamp every row created before this
+        //      shipped with whichever device wrote next, relabelling a family
+        //      created on iOS as `web` the first time its owner opened a browser.
+        //   2. `body.isSignupEvent` — only a genuine family-creation write may
+        //      stamp at all. Row EXISTENCE is NOT a usable proxy for "this is a
+        //      signup": `syncStore.disconnect()` DELETES the row (an ordinary
+        //      Settings action, fire-and-forget), so an iOS family whose owner
+        //      later disconnects and reconnects from a browser would come back
+        //      through the create branch and be permanently relabelled `web`.
+        //
+        // Together: absent stays absent, and absent means UNKNOWN — excluded from
+        // platform breakdowns, never assumed web. A pod creation whose registry
+        // write fails (offline) simply leaves the field unknown rather than
+        // letting some later device's platform stand in for it.
+        //
+        // Residual, accepted: the Put is unconditioned (as are the other six merge
+        // idioms here), so two concurrent first writes could race. Only the single
+        // pod-creation call site sends `isSignupEvent`, which makes the window
+        // very small, and the cost of losing it is one coarse label. Adding a
+        // ConditionExpression means reworking every merge idiom in a component
+        // that deploys on its own cadence — deliberately not done here.
+        signupPlatform:
+          existing.signupPlatform ??
+          (body.isSignupEvent === true ? validPlatform(body.signupPlatform) : null),
         updatedAt: now,
       };
       await client.send(

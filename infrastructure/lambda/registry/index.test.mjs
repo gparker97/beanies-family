@@ -100,10 +100,30 @@ describe('registry PUT — lastLoginAt (server-stamped, login-gated)', () => {
 });
 
 describe('registry PUT — signupPlatform (stamped at row creation, never moved)', () => {
-  it('stamps the platform on a first write (no prior row)', async () => {
-    const { res, item } = await put({ provider: 'local', signupPlatform: 'ios' });
+  it('stamps the platform on a genuine signup write', async () => {
+    const { res, item } = await put({
+      provider: 'local',
+      signupPlatform: 'ios',
+      isSignupEvent: true,
+    });
     expect(res.statusCode).toBe(200);
     expect(item.signupPlatform).toBe('ios');
+  });
+
+  it('does NOT stamp a first write that is not a signup', async () => {
+    // The disconnect/reconnect hole: `syncStore.disconnect()` DELETES the row,
+    // so an ordinary reconnect arrives with no prior row. Row existence is
+    // therefore not a usable proxy for "this is a signup".
+    const { item } = await put({ provider: 'local', signupPlatform: 'web' });
+    expect(item.signupPlatform).toBeNull();
+  });
+
+  it('never relabels an iOS family that reconnects from a browser after a disconnect', async () => {
+    // Full sequence: created on iOS, row deleted by disconnect, reconnected from
+    // the web. Even if that reconnect claimed to be a signup, there is no stored
+    // value to preserve — so the honest outcome is UNKNOWN, never `web`.
+    const { item } = await put({ provider: 'google_drive', signupPlatform: 'web' });
+    expect(item.signupPlatform).toBeNull();
   });
 
   it('does NOT move when a later write comes from a different platform', async () => {
@@ -112,6 +132,14 @@ describe('registry PUT — signupPlatform (stamped at row creation, never moved)
       { createdAt: '2026-01-01T00:00:00.000Z', signupPlatform: 'ios' }
     );
     expect(item.signupPlatform).toBe('ios');
+  });
+
+  it('does NOT move even if a later write claims to be a signup', async () => {
+    const { item } = await put(
+      { provider: 'local', signupPlatform: 'web', isSignupEvent: true },
+      { createdAt: '2026-01-01T00:00:00.000Z', signupPlatform: 'android' }
+    );
+    expect(item.signupPlatform).toBe('android');
   });
 
   it('never stamps a PRE-EXISTING row retroactively', async () => {
@@ -127,19 +155,32 @@ describe('registry PUT — signupPlatform (stamped at row creation, never moved)
   });
 
   it('rejects a value outside the vocabulary (permanent field, so it is guarded)', async () => {
-    const { res, item } = await put({ provider: 'local', signupPlatform: 'windows-phone' });
+    const { res, item } = await put({
+      provider: 'local',
+      signupPlatform: 'windows-phone',
+      isSignupEvent: true,
+    });
     expect(res.statusCode).toBe(200);
     expect(item.signupPlatform).toBeNull();
   });
 
   it('rejects a non-string value', async () => {
-    const { item } = await put({ provider: 'local', signupPlatform: { evil: true } });
+    const { item } = await put({
+      provider: 'local',
+      signupPlatform: { evil: true },
+      isSignupEvent: true,
+    });
     expect(item.signupPlatform).toBeNull();
   });
 
   it('yields null when an older client omits it entirely', async () => {
-    const { item } = await put({ provider: 'local' });
+    const { item } = await put({ provider: 'local', isSignupEvent: true });
     expect(item.signupPlatform).toBeNull();
+  });
+
+  it('never persists the transient isSignupEvent flag', async () => {
+    const { item } = await put({ provider: 'local', signupPlatform: 'web', isSignupEvent: true });
+    expect(item).not.toHaveProperty('isSignupEvent');
   });
 });
 

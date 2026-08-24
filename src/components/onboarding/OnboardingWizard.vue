@@ -22,6 +22,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { claimInterruption } from '@/composables/useSessionInterruption';
 import { reportError } from '@/utils/errorReporter';
 import { ErrorSurfaces } from './errorSurfaces';
+import { withAppInitiatedWrites } from '@/services/analytics/plausible';
 
 const settingsStore = useSettingsStore();
 const budgetStore = useBudgetStore();
@@ -153,13 +154,19 @@ async function persistSavingsBudget() {
   if (budgetStore.activeBudget) return;
 
   const spendingPercent = 100 - savingsPercent.value;
-  await budgetStore.createBudget({
-    mode: 'percentage',
-    percentage: savingsPercent.value,
-    totalAmount: Math.round((monthlyIncome.value * spendingPercent) / 100),
-    currency: settingsStore.baseCurrency,
-    categories: [],
-    isActive: true,
+  // Created for EVERY family that finishes the wizard, whether or not they ever
+  // touched the savings slider — so reporting it would make `budget` read ≈100%
+  // adoption by construction and rank top of the features panel forever. Only a
+  // deliberate budget created later should count.
+  await withAppInitiatedWrites(async () => {
+    await budgetStore.createBudget({
+      mode: 'percentage',
+      percentage: savingsPercent.value,
+      totalAmount: Math.round((monthlyIncome.value * spendingPercent) / 100),
+      currency: settingsStore.baseCurrency,
+      categories: [],
+      isActive: true,
+    });
   });
 }
 

@@ -55,7 +55,7 @@ export const ANALYTICS_EVENTS = {
   install_nudge_shown: 'passive',
   pwa_stale_detected: 'passive',
   community_nudge_shown: 'passive',
-} as const;
+} as const satisfies Record<string, 'interactive' | 'passive'>;
 
 export type AnalyticsEvent = keyof typeof ANALYTICS_EVENTS;
 
@@ -93,6 +93,21 @@ type PublicPropKey = 'feature' | 'method' | 'action' | 'surface';
  * session, and never throws — analytics is non-critical and must not be able to
  * break a user action.
  */
+/**
+ * `getPlatform()` is a synchronous Capacitor property read and does not throw in
+ * practice, but analytics must never be the reason a user action fails — and
+ * this is also the fallback that decides an event's `platform` prop. Not
+ * memoized: a module-level cache saves nothing measurable while adding hidden
+ * mutable state that makes the per-platform tests unreliable.
+ */
+function safePlatform(): string {
+  try {
+    return getPlatform();
+  } catch {
+    return 'web';
+  }
+}
+
 export function track(
   event: AnalyticsEvent,
   opts?: { props?: Partial<Record<PublicPropKey, string>> }
@@ -107,14 +122,8 @@ export function track(
     // Not memoized: `Capacitor.getPlatform()` is a synchronous property read, so
     // a module-level cache saves nothing measurable while adding hidden mutable
     // state that makes the per-platform tests unreliable.
-    let platform = 'web';
-    try {
-      platform = getPlatform();
-    } catch {
-      // Detection must never break reporting — mirrors `platformLabel.ts`.
-    }
     window.plausible?.(event, {
-      props: { ...(opts?.props ?? {}), platform },
+      props: { ...(opts?.props ?? {}), platform: safePlatform() },
       interactive: ANALYTICS_EVENTS[event] === 'interactive',
     });
   } catch (err) {
@@ -140,8 +149,44 @@ export function track(
  * structurally impossible — every target create action returns `X | null`.
  */
 export function trackFeature<T>(result: T, feature: FeatureName): T {
+  if (appInitiatedDepth > 0) return result;
   if (result !== undefined && result !== null) track('feature_used', { props: { feature } });
   return result;
+}
+
+let appInitiatedDepth = 0;
+
+/**
+ * Run `fn` with `feature_used` reporting suppressed, for writes the APP makes on
+ * the user's behalf.
+ *
+ * `trackFeature` sits on the store CREATE actions, which are also re-entered by
+ * machinery no human triggered: the helpful-hints reconcile at boot, the
+ * loan-mirror account migration, a recurring-list reset on a midnight wake, the
+ * derived records a recurring-series edit writes, and the onboarding wizard's
+ * unconditional starter budget. Left unguarded those do two kinds of damage —
+ * `feature_used` is an INTERACTIVE event, so an app-fired one un-bounces a
+ * visitor who did nothing (the exact defect #71 exists to fix), and adoption
+ * counts rows no user created (the starter budget alone would read ≈100% budget
+ * adoption by construction).
+ *
+ * Narrower than `withAnalyticsSuppressed`: that swaps the global for a no-op and
+ * silences EVERYTHING, which is right for demo seeding but wrong here — a
+ * genuine `login` or nudge event firing during a background reconcile should
+ * still be reported. This suppresses only the adoption counter.
+ *
+ * Same async caveat as `withAnalyticsSuppressed`: it covers work awaited inside
+ * `fn`, so a user-initiated create racing a background reconcile would also be
+ * dropped. These paths run at boot or on a background wake, when there is no
+ * user action to lose.
+ */
+export async function withAppInitiatedWrites<T>(fn: () => Promise<T>): Promise<T> {
+  appInitiatedDepth++;
+  try {
+    return await fn();
+  } finally {
+    appInitiatedDepth--;
+  }
 }
 
 export function initAnalytics(): void {
@@ -152,17 +197,16 @@ export function initAnalytics(): void {
     // event that would have caught #71's signup gap (native builds silently
     // shipping with no analytics) in a day rather than a month; the platform
     // rides in `action` so it can actually answer that question.
-    let platform = 'web';
-    try {
-      platform = getPlatform();
-    } catch {
-      /* detection is best-effort */
-    }
     logEvent({
       level: 'warn',
       surface: 'analytics',
       message: 'analytics-init',
-      context: { action: `disabled-no-domain:${platform}` },
+      // Queryable fields, NOT a composite literal. The whole point of this event
+      // is the per-platform question "is a lane shipping without analytics?", and
+      // CloudWatch cannot group on an interpolated string — only exact-match it,
+      // which breaks the moment a fourth platform or a second reason appears.
+      // `os` is the established key for this (passkeyService, nativeBiometric).
+      context: { action: 'disabled', os: safePlatform(), error_code: 'no-domain' },
     });
     return;
   }

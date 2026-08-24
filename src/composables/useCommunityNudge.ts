@@ -170,7 +170,8 @@ export function useCommunityNudge() {
         state.value = next;
         store.save(next);
       }
-      // Shown by us, not clicked by them — see plausible.d.ts.
+      // Shown by us, not clicked by them — registered `'passive'` in
+      // ANALYTICS_EVENTS, which is what sends it `interactive: false`.
       if (shown) track('community_nudge_shown');
     } catch (err) {
       reportError({

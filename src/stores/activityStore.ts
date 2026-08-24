@@ -27,7 +27,7 @@ import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
-import { trackFeature } from '@/services/analytics/plausible';
+import { trackFeature, withAppInitiatedWrites } from '@/services/analytics/plausible';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -1086,19 +1086,28 @@ export const useActivityStore = defineStore('activities', () => {
     const splitRule = original.rule
       ? rebaseRuleForSplit(original.rule, extractDatePart(original.date), fromDate)
       : undefined;
-    const newTemplate = await createActivity({
-      ...payload,
-      ...(splitRule ? { rule: splitRule } : {}),
-      date: fromDate,
-      recurrenceEndDate: original.recurrenceEndDate,
-      // Fee ownership TRANSFERS to the new template: carrying the id means the
-      // existing item is updated in place rather than a second one minted.
-      ...(original.linkedRecurringItemId
-        ? { linkedRecurringItemId: original.linkedRecurringItemId }
-        : {}),
-      dropoffCompletions: completionsForDerived(original.dropoffCompletions, (d) => d >= fromDate),
-      pickupCompletions: completionsForDerived(original.pickupCompletions, (d) => d >= fromDate),
-    });
+    // A DERIVED record, not a new activity the user adopted: `splitSeries` runs
+    // when someone edits this-and-future on a series that already exists, so
+    // reporting it would count one edit as an adoption event (two, with the
+    // override below).
+    const newTemplate = await withAppInitiatedWrites(() =>
+      createActivity({
+        ...payload,
+        ...(splitRule ? { rule: splitRule } : {}),
+        date: fromDate,
+        recurrenceEndDate: original.recurrenceEndDate,
+        // Fee ownership TRANSFERS to the new template: carrying the id means the
+        // existing item is updated in place rather than a second one minted.
+        ...(original.linkedRecurringItemId
+          ? { linkedRecurringItemId: original.linkedRecurringItemId }
+          : {}),
+        dropoffCompletions: completionsForDerived(
+          original.dropoffCompletions,
+          (d) => d >= fromDate
+        ),
+        pickupCompletions: completionsForDerived(original.pickupCompletions, (d) => d >= fromDate),
+      })
+    );
     if (!newTemplate) return null;
 
     const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
@@ -1257,26 +1266,30 @@ export const useActivityStore = defineStore('activities', () => {
     const finalDate = patch.date || occurrenceDate;
     const isRescheduled = finalDate !== occurrenceDate;
 
-    const created = await createActivity({
-      ...payload,
-      ...patch,
-      date: finalDate,
-      recurrence: 'none',
-      parentActivityId: parentId,
-      // Carry only THIS occurrence's completions, re-dated if the session moved,
-      // so a duty the family already ticked is not silently un-ticked.
-      dropoffCompletions: completionsForDerived(
-        parent.dropoffCompletions,
-        (d) => d === occurrenceDate,
-        isRescheduled ? finalDate : undefined
-      ),
-      pickupCompletions: completionsForDerived(
-        parent.pickupCompletions,
-        (d) => d === occurrenceDate,
-        isRescheduled ? finalDate : undefined
-      ),
-      ...(isRescheduled ? { originalOccurrenceDate: occurrenceDate } : {}),
-    });
+    // Also derived. Reached from DELETING a single occurrence, rescheduling one,
+    // and scope-edits — so without this a delete would report as adoption.
+    const created = await withAppInitiatedWrites(() =>
+      createActivity({
+        ...payload,
+        ...patch,
+        date: finalDate,
+        recurrence: 'none',
+        parentActivityId: parentId,
+        // Carry only THIS occurrence's completions, re-dated if the session moved,
+        // so a duty the family already ticked is not silently un-ticked.
+        dropoffCompletions: completionsForDerived(
+          parent.dropoffCompletions,
+          (d) => d === occurrenceDate,
+          isRescheduled ? finalDate : undefined
+        ),
+        pickupCompletions: completionsForDerived(
+          parent.pickupCompletions,
+          (d) => d === occurrenceDate,
+          isRescheduled ? finalDate : undefined
+        ),
+        ...(isRescheduled ? { originalOccurrenceDate: occurrenceDate } : {}),
+      })
+    );
     logEvent({
       surface: 'activity-override',
       level: 'info',

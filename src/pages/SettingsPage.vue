@@ -640,11 +640,15 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     // 4. Auth teardown
     await authStore.signOutAndClearData();
 
-    // 5. Reset all Pinia stores
-    resetAllAppStores();
-
-    // 6. Track deletion
+    // 5. Track deletion — BEFORE the store reset, not after. `resetAllAppStores`
+    // calls `clearDemoSession()`, which sets `isDemoSession` false, so a call
+    // placed after it sails straight past `track()`'s demo guard: an App Store
+    // or Play reviewer exercising Delete Family in the demo pod would emit a
+    // real `family_deleted` into the production property.
     track('family_deleted');
+
+    // 6. Reset all Pinia stores
+    resetAllAppStores();
 
     // 7. Farewell
     await showAlert({
