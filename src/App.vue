@@ -905,7 +905,8 @@ onMounted(async () => {
             console.warn('[storage] Persistent storage granted');
           } else {
             console.warn('[storage] Persistent storage denied (eviction possible)');
-            // Fires on boot, not on a user action — see plausible.d.ts.
+            // Fires on boot, not on a user action — registered `'passive'` in
+            // ANALYTICS_EVENTS, which is what sends it `interactive: false`.
             track('storage_persist_denied');
           }
         })

@@ -6,7 +6,7 @@ import { convertToBaseCurrency } from '@/utils/currency';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { useAccountsStore } from './accountsStore';
-import { trackFeature } from '@/services/analytics/plausible';
+import { trackFeature, withAppInitiatedWrites } from '@/services/analytics/plausible';
 import type {
   Asset,
   CreateAssetInput,
@@ -163,16 +163,24 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   // One-time migration: create linked accounts for existing assets with loans
+  //
+  // Runs from `loadAssets`, so it fires on app open with no user involved. The
+  // mirror accounts it creates must not report `feature_used` — a family with
+  // three loan-bearing assets would otherwise emit three interactive events
+  // before touching anything, and `account` adoption would track loan ownership
+  // rather than account use.
   async function migrateLinkedLoanAccounts() {
     const accountsStore = useAccountsStore();
-    for (const asset of assets.value) {
-      if (asset.loan?.hasLoan && asset.loan.outstandingBalance) {
-        const hasLinked = accountsStore.accounts.some((a) => a.linkedAssetId === asset.id);
-        if (!hasLinked) {
-          await syncLinkedLoanAccount(asset);
+    await withAppInitiatedWrites(async () => {
+      for (const asset of assets.value) {
+        if (asset.loan?.hasLoan && asset.loan.outstandingBalance) {
+          const hasLinked = accountsStore.accounts.some((a) => a.linkedAssetId === asset.id);
+          if (!hasLinked) {
+            await syncLinkedLoanAccount(asset);
+          }
         }
       }
-    }
+    });
   }
 
   // Actions

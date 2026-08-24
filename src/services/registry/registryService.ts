@@ -26,6 +26,14 @@ export interface RegistryWriteResult {
  */
 export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'> & {
   isLoginEvent?: boolean;
+  /**
+   * Transient, like `isLoginEvent` — never stored. Marks the ONE write that
+   * accompanies family creation, which is the only write permitted to stamp
+   * `signupPlatform`. Row existence cannot stand in for this: `disconnect()`
+   * deletes the row, so a reconnect from another platform would otherwise
+   * relabel the family permanently.
+   */
+  isSignupEvent?: boolean;
 };
 
 const API_URL = import.meta.env.VITE_REGISTRY_API_URL;
