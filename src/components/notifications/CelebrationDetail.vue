@@ -8,14 +8,27 @@
  * scaffold (DRY).
  *
  * Slots: `kick` (the hero kicker line, inside `.wn-kick`), default (the content
- * region between the hero and the Pod), `footer` (inside the bordered `.wn-foot`).
+ * region between the hero and the Pod), `footer` (inside the bordered `.wn-foot`,
+ * BELOW the shared "Done" close button this shell always renders).
+ *
+ * The footer's primary action is a "Done" button that closes the panel — the
+ * common intent for a celebratory note. It lives here (not in each body) so
+ * every celebration detail gets a clear, thumb-reachable dismiss without relying
+ * on the side-panel's corner ✕; per-body footer actions (e.g. "see all updates")
+ * render beneath it as quiet secondary links.
  *
  * Layout note: it breaks out of `BaseSidePanel`'s `p-6` body via `-mx-6 -my-6`
  * (the house pattern, cf. BeanieFormModal) so the hero is full-bleed; the
  * `min-h-[calc(100%+3rem)]` reclaims that 3rem so the column fills the panel and
  * the footer pins to the bottom.
  */
+import { useNotificationsStore } from '@/stores/notificationsStore';
+import { useTranslation } from '@/composables/useTranslation';
+
 const CELEBRATING_MEDALLION = '/brand/beanies_celebrating_circle_transparent_400x400.png';
+
+const store = useNotificationsStore();
+const { t } = useTranslation();
 
 withDefaults(
   defineProps<{
@@ -54,7 +67,12 @@ withDefaults(
     </div>
 
     <!-- ===== FOOTER ===== -->
-    <div class="wn-foot"><slot name="footer" /></div>
+    <div class="wn-foot">
+      <button type="button" class="wn-done" @click="store.close()">
+        <span class="wn-done-spark" aria-hidden="true">✨</span>{{ t('action.done') }}
+      </button>
+      <slot name="footer" />
+    </div>
   </div>
 </template>
 
@@ -258,5 +276,41 @@ withDefaults(
 :global(.dark) .wn-foot {
   background: #1e293b;
   border-top-color: rgb(255 255 255 / 8%);
+}
+
+/* Primary close — the celebration CTA style (matches the announcement CTA) */
+.wn-done {
+  align-items: center;
+  background: linear-gradient(135deg, #f15d22, #e67e22);
+  border: none;
+  border-radius: 1rem;
+  box-shadow: 0 4px 14px rgb(241 93 34 / 28%);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  gap: 0.4375rem;
+  justify-content: center;
+  padding: 0.8125rem 1.125rem;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+  width: 100%;
+}
+
+.wn-done:hover {
+  box-shadow: 0 6px 18px rgb(241 93 34 / 36%);
+  transform: translateY(-1px);
+}
+
+.wn-done-spark {
+  font-size: 0.9375rem;
+}
+
+/* Any secondary footer action (slotted below Done) sits a little apart */
+.wn-foot :slotted(*) {
+  margin-top: 0.75rem;
 }
 </style>
