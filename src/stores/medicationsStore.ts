@@ -6,6 +6,7 @@ import * as logRepo from '@/services/automerge/repositories/medicationLogReposit
 import { toDateInputValue } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import type { Medication, MedicationLogEntry, CreateMedicationLogEntryInput } from '@/types/models';
+import { trackFeature } from '@/services/analytics/plausible';
 
 /**
  * A medication is "active" when it's either ongoing or `today` is within
@@ -111,7 +112,7 @@ export const useMedicationsStore = defineStore('medications', () => {
       medications.value = [...medications.value, created];
       return created;
     });
-    return result ?? null;
+    return trackFeature(result ?? null, 'medication');
   }
 
   async function updateMedication(id: string, input: UpdateInput): Promise<Medication | null> {

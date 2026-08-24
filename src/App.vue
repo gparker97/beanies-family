@@ -78,6 +78,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
+import { track } from '@/services/analytics/plausible';
 import { useActivityStore } from '@/stores/activityStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { useVacationStore } from '@/stores/vacationStore';
@@ -905,7 +906,7 @@ onMounted(async () => {
           } else {
             console.warn('[storage] Persistent storage denied (eviction possible)');
             // Fires on boot, not on a user action — see plausible.d.ts.
-            window.plausible?.('storage_persist_denied', { interactive: false });
+            track('storage_persist_denied');
           }
         })
         .catch((e) => {

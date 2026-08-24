@@ -26,6 +26,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from './translationStore';
+import { track } from '@/services/analytics/plausible';
 
 /**
  * Sentinel `passwordHash` for an owner created in deferred-password mode
@@ -623,7 +624,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Track last login timestamp
       const now = toISODateString(new Date());
       familyStore.updateMember(member.id, { lastLoginAt: now });
-      window.plausible?.('login', { props: { method: 'password' } });
+      track('login', { props: { method: 'password' } });
 
       return { success: true };
     } catch (e) {
@@ -867,8 +868,8 @@ export const useAuthStore = defineStore('auth', () => {
       // "ready for /nook".
       podCreated.value = false;
       persistPodCreated(false);
-      window.plausible?.('signup');
-      window.plausible?.('login', { props: { method: 'password' } });
+      track('signup');
+      track('login', { props: { method: 'password' } });
 
       return { success: true };
     } catch (e) {
@@ -996,7 +997,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!result.success) {
       return { success: false, error: result.error };
     }
-    window.plausible?.('admin_password_reset');
+    track('admin_password_reset');
     return { success: true };
   }
 
@@ -1074,8 +1075,8 @@ export const useAuthStore = defineStore('auth', () => {
       // Mark onboarding as completed
       const settingsStore = useSettingsStore();
       await settingsStore.setOnboardingCompleted(true);
-      window.plausible?.('member_joined');
-      window.plausible?.('login', { props: { method: 'password' } });
+      track('member_joined');
+      track('login', { props: { method: 'password' } });
 
       return { success: true };
     } catch (e) {
@@ -1135,7 +1136,7 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = true;
       freshSignIn.value = true;
       persistSession(user);
-      window.plausible?.('login', { props: { method: 'passkey' } });
+      track('login', { props: { method: 'passkey' } });
 
       return {
         success: true,
@@ -1171,7 +1172,7 @@ export const useAuthStore = defineStore('auth', () => {
       familyStore.setCurrentMember(member.id);
       familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
     }
-    window.plausible?.('login', { props: { method: 'cross_device' } });
+    track('login', { props: { method: 'cross_device' } });
   }
 
   /**

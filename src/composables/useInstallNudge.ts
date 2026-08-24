@@ -19,6 +19,7 @@ import { openExternal } from '@/utils/openExternal';
 import { MARKETING_URL } from '@/utils/marketing';
 import { reportError } from '@/utils/errorReporter';
 import { createPerMemberStore } from '@/composables/perMemberStore';
+import { track } from '@/services/analytics/plausible';
 
 type InstallNudgeStatus = 'pending' | 'dismissed' | 'installed';
 
@@ -106,7 +107,7 @@ export function useInstallNudge() {
       if (state.value.shownAt === null) {
         commit({ ...state.value, shownAt: Date.now() });
         // Shown by us, not clicked by them — see plausible.d.ts.
-        window.plausible?.('install_nudge_shown', { interactive: false });
+        track('install_nudge_shown');
       }
     } catch (err) {
       reportError({
@@ -122,19 +123,19 @@ export function useInstallNudge() {
   function showHow(): void {
     openExternal(HELP_URL);
     commit({ ...state.value, status: 'dismissed' });
-    window.plausible?.('install_nudge_dismissed', { props: { action: 'show_how' } });
+    track('install_nudge_dismissed', { props: { action: 'show_how' } });
   }
 
   /** "Not now" — retire the nudge (one-time). */
   function dismiss(): void {
     commit({ ...state.value, status: 'dismissed' });
-    window.plausible?.('install_nudge_dismissed', { props: { action: 'not_now' } });
+    track('install_nudge_dismissed', { props: { action: 'not_now' } });
   }
 
   /** "Already installed" — retire the nudge. */
   function markInstalled(): void {
     commit({ ...state.value, status: 'installed' });
-    window.plausible?.('install_nudge_dismissed', { props: { action: 'already_installed' } });
+    track('install_nudge_dismissed', { props: { action: 'already_installed' } });
   }
 
   return { nudge, ensureNudgeIssued, showHow, dismiss, markInstalled };

@@ -135,9 +135,7 @@ jobs:
           VITE_BEANIES_LOG_INGEST_API_KEY: ${{ secrets.BEANIES_LOG_INGEST_API_KEY }}
           VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}
           VITE_AI_EXTRACT_API_KEY: ${{ secrets.AI_EXTRACT_API_KEY }}
-          # NOTE: VITE_PLAUSIBLE_DOMAIN intentionally omitted — web analytics is a
-          # separate decision for the native app; add it here to enable Plausible
-          # in the shipped Android app.
+          VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
           VITE_BUILD_SHA: ${{ github.sha }}
 
       - name: Sync Capacitor (Android)

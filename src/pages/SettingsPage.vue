@@ -63,6 +63,7 @@ import { useHolidayStore } from '@/stores/holidayStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { resetAllAppStores } from '@/utils/resetStores';
 import type { CountryCode } from '@/types/models';
+import { track } from '@/services/analytics/plausible';
 
 const router = useRouter();
 const route = useRoute();
@@ -643,7 +644,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     resetAllAppStores();
 
     // 6. Track deletion
-    window.plausible?.('family_deleted');
+    track('family_deleted');
 
     // 7. Farewell
     await showAlert({

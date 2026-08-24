@@ -9,6 +9,7 @@ import { validateInviteToken } from '@/utils/inviteToken';
 import { isValidEmail } from '@/utils/email';
 import { openDiscord } from '@/utils/discord';
 import { MARKETING_URL } from '@/utils/marketing';
+import { track } from '@/services/analytics/plausible';
 
 const emit = defineEmits<{
   unlocked: [];
@@ -31,7 +32,7 @@ const hasInviteWebhook = Boolean(import.meta.env.VITE_INVITE_WEBHOOK_URL);
 /** The invite-gate conversion funnel event. One definition so the event name and the
  *  `method` prop shape can't drift between the two call sites (D6). */
 function recordInviteRequest(method: 'discord' | 'message') {
-  window.plausible?.('invite_request_click', { props: { method } });
+  track('invite_request_click', { props: { method } });
 }
 
 /**

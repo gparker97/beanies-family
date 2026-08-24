@@ -35,12 +35,11 @@ function viteVars(file: string): Set<string> {
  * decision on the record — not a place to silence a genuine gap.
  */
 const EXEMPT: Record<string, Record<string, string>> = {
-  'mobile-android-release.yml': {
-    VITE_PLAUSIBLE_DOMAIN: 'web analytics is a separate decision for the native app',
-  },
-  'mobile-ios-release.yml': {
-    VITE_PLAUSIBLE_DOMAIN: 'web analytics is a separate decision for the native app',
-  },
+  // Empty as of #71: the native lanes now carry VITE_PLAUSIBLE_DOMAIN, so the
+  // one standing exemption is retired. The MECHANISM stays — the next lane that
+  // legitimately omits a var records the reason here rather than silently
+  // diverging. An empty map means "every lane carries every var", which is the
+  // state we want CI to enforce.
 };
 
 describe('CI client-env parity', () => {
