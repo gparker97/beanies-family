@@ -384,12 +384,20 @@ describe('Telemetry Lambda handler', () => {
         'recovery_method',
         'recur_children_expected',
         'recur_children_removed',
+        // #70 recurrence unification — the canonical-rule shape. Low-cardinality
+        // enums/ints only: `recur_end` is the END DISCRIMINANT
+        // (never/onDate/afterCount), never the end date itself.
+        'recur_end',
+        'recur_interval',
         'recur_occurrence_ymd',
         'recur_outcome',
+        'recur_reason',
         'recur_rescheduled',
         'recur_resolved_ymd',
         'recur_scope',
         'recur_stripped_fields',
+        'recur_surface',
+        'recur_unit',
         'refresh_token_age_ms',
         'registry_had_file_id',
         'route_name',

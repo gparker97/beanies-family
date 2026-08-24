@@ -978,7 +978,7 @@ function handleSave() {
            date, never the opened occurrence. -->
       <template v-if="isRecurring">
         <FormFieldGroup :label="t('modal.schedule')">
-          <RecurrencePicker v-model="rule" :start-date="seriesAnchor" />
+          <RecurrencePicker v-model="rule" :start-date="seriesAnchor" default-cadence="weekly" />
         </FormFieldGroup>
       </template>
 

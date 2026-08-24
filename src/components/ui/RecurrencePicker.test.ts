@@ -130,3 +130,39 @@ describe('RecurrencePicker — start-date re-anchoring (#70)', () => {
     expect(on15.text()).not.toContain('recurrence.monthly.clampHint');
   });
 });
+
+describe('RecurrencePicker — defaultCadence (#70)', () => {
+  it('starts on the requested cadence for a NEW entity', async () => {
+    // REGRESSION: adopting this control in ActivityModal silently changed the
+    // default for a new activity from WEEKLY (its own long-standing default) to
+    // the picker's MONTHLY. E2E caught it — `planner.spec.ts` asserts a newly
+    // created activity has `recurrence: 'weekly'`, and a monthly series also has
+    // no second occurrence in the visible window, so two tests went red.
+    let model: RecurrenceRule | null = null;
+    mount(RecurrencePicker, {
+      props: {
+        modelValue: null,
+        startDate: ANCHOR,
+        defaultCadence: 'weekly',
+        'onUpdate:modelValue': (v: RecurrenceRule) => {
+          model = v;
+        },
+      },
+    });
+    expect(model).toMatchObject({ unit: 'week', interval: 1 });
+  });
+
+  it('still defaults to monthly when the prop is omitted (money surfaces)', () => {
+    let model: RecurrenceRule | null = null;
+    mount(RecurrencePicker, {
+      props: {
+        modelValue: null,
+        startDate: ANCHOR,
+        'onUpdate:modelValue': (v: RecurrenceRule) => {
+          model = v;
+        },
+      },
+    });
+    expect(model).toMatchObject({ unit: 'month', interval: 1 });
+  });
+});
