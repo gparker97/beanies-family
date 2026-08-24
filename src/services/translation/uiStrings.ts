@@ -2963,6 +2963,10 @@ const STRING_DEFS = {
   'header.settings': { en: 'Settings', beanie: 'settings' },
   'header.refreshAll': { en: 'Refresh All Data', beanie: 'refresh all beans' },
   'header.refreshSuccess': { en: 'Data refreshed', beanie: 'beans are fresh' },
+  'header.refreshAuthFailed': {
+    en: "Couldn't refresh. Your sign-in has expired, so you may not be seeing the latest.",
+    beanie: "couldn't refresh. your sign-in has expired, so you may not be seeing the latest.",
+  },
   'header.refreshNoSync': {
     en: 'No cloud sync configured',
     beanie: 'no cloud sync configured',

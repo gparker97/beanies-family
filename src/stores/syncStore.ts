@@ -138,6 +138,23 @@ export type MigrateStorageResult =
  */
 export type SaveStatus = 'saving' | 'critical' | 'degraded' | 'saved' | 'hidden';
 
+/** Classified cause of a failed background/manual Drive read. */
+export type BackgroundSyncErrorKind = 'auth-transient' | 'decrypt' | 'network' | null;
+
+/**
+ * The result of a `backgroundSyncFromFile` call — returned so a caller (the
+ * manual "Refresh All") can present the outcome, and logged by the store itself
+ * for manual calls (MVO: the store owns classification + telemetry; the view
+ * only maps this to a toast / reconnect surface).
+ *   refreshed         — a read completed (or the #61 skip confirmed unchanged)
+ *   auth-failed       — token expired/revoked, needs reconnect
+ *   network-failed    — offline / transient network error
+ *   decrypt-failed    — reached Drive but couldn't decrypt (password changed)
+ *   skipped-in-flight — a sync was already running; this call did nothing
+ */
+export type RefreshOutcome =
+  'refreshed' | 'auth-failed' | 'network-failed' | 'decrypt-failed' | 'skipped-in-flight';
+
 export const useSyncStore = defineStore('sync', () => {
   // State
   const isInitialized = ref(false);
@@ -514,7 +531,7 @@ export const useSyncStore = defineStore('sync', () => {
    * - `network`: anything else — transient Drive 5xx, network blip, etc.
    *   Surface to user.
    */
-  const backgroundSyncErrorKind = ref<'auth-transient' | 'decrypt' | 'network' | null>(null);
+  const backgroundSyncErrorKind = ref<BackgroundSyncErrorKind>(null);
 
   /**
    * Match the message shapes produced by `TokenExpiredError` (in
@@ -2214,6 +2231,11 @@ export const useSyncStore = defineStore('sync', () => {
     await syncService.disconnect();
     needsPermission.value = false;
     lastSync.value = null;
+    // Clear the read-error classification too: `setProvider` fires the state
+    // callback SYNCHRONOUSLY, so a surviving error from the previous family
+    // would otherwise leak into the next one before its first read starts.
+    backgroundSyncError.value = null;
+    backgroundSyncErrorKind.value = null;
     familyKey.value = null;
     clearEnvelope();
     storageProviderType.value = null;
@@ -2396,6 +2418,11 @@ export const useSyncStore = defineStore('sync', () => {
    *
    * Boundary: only fires for Google Drive (the only provider with token
    * expiry semantics) and only when the banner isn't already up.
+   *
+   * NOTE: this is the ONLY writer that raises `showGoogleReconnect` on the read
+   * path, and deliberately so — raising the banner from anywhere else (e.g. a
+   * manual-refresh handler) trips the guard below and silently suppresses the
+   * critical page, trading a real alerting signal for a faster banner.
    */
   function scheduleColdStartReconnectEscalation(lastErr: string | null): void {
     if (storageProviderType.value !== 'google_drive') return;
@@ -2463,20 +2490,29 @@ export const useSyncStore = defineStore('sync', () => {
    * Fetches fresh data from Drive, CRDT-merges into the live doc.
    * Non-blocking — UI remains interactive throughout.
    */
-  async function backgroundSyncFromFile(openToken?: OpenToken): Promise<void> {
+  async function backgroundSyncFromFile(
+    openToken?: OpenToken,
+    opts?: { manual?: boolean }
+  ): Promise<RefreshOutcome> {
     if (isBackgroundSyncing.value) {
       // A sync is already in flight. If an OPEN handed us its window, close it —
       // otherwise it stays open until the next `beginOpen` and is emitted as
       // `open-abandoned`. Callers without a token (header Refresh, deferred
       // config-heal) present none, so `endOpen` ignores them and the real open's
-      // window survives.
+      // window survives. This call did NOT run a read, so it must NOT report
+      // success (the false-success #69 targets) — the in-flight sync + progress
+      // bar are the user's feedback.
       endOpen('open-complete', openToken, { detailSuffix: 'sync-already-in-flight' });
-      return;
+      if (opts?.manual) logManualRefreshOutcome('skipped-in-flight');
+      return 'skipped-in-flight';
     }
     // Classified at each terminal below; `finally` emits it once.
     let openOutcome: OpenOutcome = 'open-complete';
     // #61: the guard's classified reason, ridden to CloudWatch as `error_code`.
     let openFailReason: string | undefined;
+    // The per-call refresh result, returned to the caller + logged for manual
+    // calls. Defaults to 'refreshed'; failure terminals reassign it.
+    let refreshResult: RefreshOutcome = 'refreshed';
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
@@ -2495,7 +2531,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (skip) {
         openOutcome = 'open-skip';
         await runPostLoadDriveHousekeeping(); // same terminus as the load path (Req 12)
-        return; // the `finally` starts polling + emits `open-skip`
+        return refreshResult; // 'refreshed' — the file is confirmed unchanged
       }
       // The guard fell open on UNCERTAINTY (not a clean `changed`/`no-baseline`) —
       // record it as `open-fail-open` on a successful read (C7), so a rising
@@ -2525,7 +2561,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (loadResult.success) {
         setupAutoSync();
         if (fellOpen) openOutcome = 'open-fail-open';
-        return;
+        return refreshResult;
       }
 
       if (loadResult.needsPassword) {
@@ -2537,7 +2573,7 @@ export const useSyncStore = defineStore('sync', () => {
             // loadFromFile's success terminus — so run the SAME housekeeping (incl.
             // markPodCreated + token-expiry wiring), not a bare setupAutoSync.
             await runPostLoadDriveHousekeeping();
-            return;
+            return refreshResult;
           } catch {
             // Family key doesn't work — try cached key
           }
@@ -2546,34 +2582,46 @@ export const useSyncStore = defineStore('sync', () => {
         const success = await tryDecryptWithCachedKey();
         if (success) {
           await runPostLoadDriveHousekeeping();
-          return;
+          return refreshResult;
         }
 
-        // Can't decrypt — stale cached data is still usable
+        // Can't decrypt — stale cached data is still usable. We reached Drive but
+        // the shown data is behind (newer bytes we can't read) → 'stale'.
         backgroundSyncError.value = 'Could not refresh data — password may have changed';
         backgroundSyncErrorKind.value = 'decrypt';
         pendingEncryptedFile.value = null;
         openOutcome = 'open-failed';
-        return;
+        refreshResult = 'decrypt-failed';
+        return refreshResult;
       }
 
       // Non-password failure (network, 404, auth-transient, etc.)
       const lastErr = syncService.getState().lastError;
       openOutcome = 'open-failed';
-      if (isAuthTransientSyncError(lastErr)) {
+      // Trust `loadFromFile`'s own classification FIRST: an auth-masked 404 (an
+      // expired token yields the same 404 as a missing file) carries
+      // `reason: 'auth'` but a `DriveApiError:404:…` message, which the
+      // `/silent refresh failed/i` string test cannot see. Without this the user
+      // gets no reconnect and BackgroundSyncBar fires the generic toast it exists
+      // to suppress on auth.
+      if (loadResult.reason === 'auth' || isAuthTransientSyncError(lastErr)) {
         backgroundSyncError.value = lastErr ?? 'Token expired';
         backgroundSyncErrorKind.value = 'auth-transient';
+        refreshResult = 'auth-failed';
         scheduleColdStartReconnectEscalation(lastErr);
       } else {
         backgroundSyncError.value = 'Could not refresh data from cloud';
         backgroundSyncErrorKind.value = 'network';
+        refreshResult = 'network-failed';
       }
+      return refreshResult;
     } catch (e) {
       openOutcome = 'open-failed';
       const msg = e instanceof Error ? e.message : 'Could not refresh data from cloud';
       backgroundSyncError.value = msg;
       const isAuth = isAuthTransientSyncError(msg);
       backgroundSyncErrorKind.value = isAuth ? 'auth-transient' : 'network';
+      refreshResult = isAuth ? 'auth-failed' : 'network-failed';
       if (isAuth) scheduleColdStartReconnectEscalation(msg);
     } finally {
       isBackgroundSyncing.value = false;
@@ -2588,7 +2636,23 @@ export const useSyncStore = defineStore('sync', () => {
       // Callers with no token (Refresh, config-heal) close nothing. The #61 guard
       // reason rides along as `error_code` (skip / fail-open / why it read).
       endOpen(openOutcome, openToken, { failOpenReason: openFailReason });
+      // MVO: the store owns manual-refresh telemetry (not the view). `refreshResult`
+      // is set before every return/at the catch, so it is accurate here.
+      if (opts?.manual) logManualRefreshOutcome(refreshResult);
     }
+    // Reached only when the try body fell through without returning (the
+    // non-password/auth/network failure path) or after the catch.
+    return refreshResult;
+  }
+
+  /** Emit the single manual-refresh outcome event (MVO: store-owned telemetry). */
+  function logManualRefreshOutcome(outcome: RefreshOutcome): void {
+    logEvent({
+      level: outcome === 'refreshed' || outcome === 'skipped-in-flight' ? 'info' : 'warn',
+      surface: 'manual-refresh',
+      message: 'refresh-outcome',
+      context: { action: outcome, provider_type: storageProviderType.value ?? undefined },
+    });
   }
 
   // Track the stop handle so we never register duplicate watchers
@@ -2775,6 +2839,11 @@ export const useSyncStore = defineStore('sync', () => {
     isSyncing.value = false;
     error.value = null;
     lastSync.value = null;
+    // Clear the read-error classification too: `setProvider` fires the state
+    // callback SYNCHRONOUSLY, so a surviving error from the previous family
+    // would otherwise leak into the next one before its first read starts.
+    backgroundSyncError.value = null;
+    backgroundSyncErrorKind.value = null;
     needsPermission.value = false;
     familyKey.value = null;
     clearEnvelope();

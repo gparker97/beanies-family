@@ -29,6 +29,7 @@ import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import { showToast } from '@/composables/useToast';
+import { presentRefreshOutcome } from '@/components/common/refreshOutcome';
 import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull } from '@/utils/date';
 import { MARKETING_URL } from '@/utils/marketing';
@@ -188,12 +189,14 @@ async function handleRefreshAll() {
       }
     }
 
-    // Refresh data from Drive
+    // Refresh data from Drive. The store classifies the outcome and owns the
+    // telemetry + every recovery surface (MVO); here we only say what happened.
+    // A failed refresh never reports success, and an in-flight tap reports
+    // nothing rather than a false "refreshed".
     if (syncStore.isConfigured && !syncStore.needsPermission) {
-      await syncStore.backgroundSyncFromFile();
-      if (!syncStore.backgroundSyncError) {
-        showToast('success', t('header.refreshSuccess'));
-      }
+      const outcome = await syncStore.backgroundSyncFromFile(undefined, { manual: true });
+      const { toast } = presentRefreshOutcome(outcome);
+      if (toast) showToast(toast.type, t(toast.key));
     } else {
       showToast('info', t('header.refreshNoSync'));
     }
