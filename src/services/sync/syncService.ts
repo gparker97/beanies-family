@@ -92,6 +92,16 @@ let noKeyWarnedOnce = false;
 // persisted row on open, so the 1-hour bound survives a reload). `reset()` nulls
 // it. Only `revision` + `checkedAt` are ever persisted (via the worker).
 let remoteBaseline: RemoteBaseline | null = null;
+
+// Change-probe degradation tracking (see `remoteChanged`). The 10s poll
+// (`syncStore.FILE_POLL_INTERVAL`) re-probes 6x/min, so a token that dies while
+// a tab sits open would otherwise emit one identical warn PER TICK — hundreds a
+// day for a single family, and past the 50/surface/min client rate limit, which
+// silently truncates them and makes the true failure count unknowable. We log
+// the TRANSITION instead (the same discipline `syncStore` already applies to its
+// own passive-staleness event) and carry the attempt count on recovery.
+let probeFailureReason: string | null = null;
+let probeFailureCount = 0;
 // UTF-8 byte length of the last .beanpod string we persisted or loaded. Used as
 // a coarse (KB-rounded, client-side) usage signal in the family registry. Not
 // content — the string is an encrypted envelope. Populated by recordPersistedBytes().
@@ -613,6 +623,8 @@ export function reset(): void {
   noKeyWarnedOnce = false;
   remoteBaseline = null;
   lastPersistedBytes = null;
+  probeFailureReason = null;
+  probeFailureCount = 0;
   resetSaveFailures();
   // Clear the durability banner on teardown, but SILENTLY — a logout / family-switch
   // is not a recovery; emitting "cache-persist recovered" here would corrupt the metric.
@@ -653,6 +665,25 @@ async function probeRemoteMarker(): Promise<RemoteMarker> {
 export async function remoteChanged(): Promise<ChangeResult> {
   try {
     const probe = await probeRemoteMarker();
+    // Recovery is an OUTCOME, and outcomes ship on the success path too (CLAUDE.md
+    // observability rule 6) — without this, a degradation has a start and no end,
+    // and its rate/duration can never be measured. Duration is the gap between
+    // this event and its warn twin; `consecutive_failures` is the exact attempt
+    // count, which is why neither needs a new (store-declared) context key.
+    if (probeFailureReason !== null) {
+      logEvent({
+        level: 'info',
+        surface: 'sync-change-detect',
+        message: 'remote change-probe recovered — change detection restored',
+        context: {
+          action: 'remote-changed-recovered',
+          error_code: probeFailureReason,
+          consecutive_failures: probeFailureCount,
+        },
+      });
+      probeFailureReason = null;
+      probeFailureCount = 0;
+    }
     return compareMarkers(remoteBaseline, probe);
   } catch (e) {
     // Distinguish a MISSING file (404) from an AUTH failure (401 / expired token):
@@ -673,13 +704,25 @@ export async function remoteChanged(): Promise<ChangeResult> {
     // Observability (MANDATORY): the poll callers early-return on 'unknown', so a
     // persistent probe failure would otherwise degrade change detection to unknown
     // with ZERO firehose trace. Emit it so the degradation is triageable + alertable.
-    logEvent({
-      level: 'warn',
-      surface: 'sync-change-detect',
-      message: `remote change-probe failed — change detection degraded to unknown (${reason})`,
-      error: e instanceof Error ? e : undefined,
-      context: { action: 'remote-changed-unknown', error_code: reason },
-    });
+    //
+    // Logged ONCE per degradation, not once per 10s tick: a repeated identical warn
+    // is not extra information, and at 6/min it both costs real CloudWatch spend per
+    // active family and trips the 50/surface/min rate limit, which drops events
+    // without telling you. A CHANGE of reason (auth -> provider-error) is a genuinely
+    // different failure and re-arms, so a reclassification is never hidden. The
+    // recovery event above closes every warn emitted here.
+    const isNewDegradation = probeFailureReason !== reason;
+    probeFailureReason = reason;
+    probeFailureCount = isNewDegradation ? 1 : probeFailureCount + 1;
+    if (isNewDegradation) {
+      logEvent({
+        level: 'warn',
+        surface: 'sync-change-detect',
+        message: `remote change-probe failed — change detection degraded to unknown (${reason})`,
+        error: e instanceof Error ? e : undefined,
+        context: { action: 'remote-changed-unknown', error_code: reason },
+      });
+    }
     return { status: 'unknown', basis: 'none', revision: null, modifiedTime: null, reason };
   }
 }
