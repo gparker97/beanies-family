@@ -142,9 +142,17 @@ signal, not every field.
      - If `conversion.gapIsMaterial` is true, **say so prominently**: the registry
        and the Plausible signup goal disagree, so every conversion rate carries that
        uncertainty until it's resolved (under-firing goal vs. non-marketing arrivals).
-       If it is `null`, platform coverage is still below the gate
-       (`conversion.platformCoverage`%) — say the check is not yet possible rather
-       than reporting agreement.
+       If it is `null`, `conversion.gapCheckBlockedBy` says WHY —
+       `'window-straddles-deploy'` (the window still includes days before
+       2026-08-24, when neither source could attribute a platform) or
+       `'low-coverage'` (only `conversion.platformCoverage`% of new families
+       carry one). Say the check is not yet possible and give the reason; never
+       report it as agreement.
+     - If `conversion.completedWeb` is `null`, the platform breakdown returned
+       nothing — the web-only rate could not be computed at all. Report it as
+       missing and flag it as a likely Plausible configuration problem (the `platform`
+       custom property not enabled, or the goal no longer matching the `signup`
+       event name). Do NOT substitute the all-platform count.
    - **Activation/retention** (registry+CloudWatch cohort of families created ≥28d
      ago: signed up → used beyond day 0 → active at 1 week → at 4 weeks). This is
      the actionable one — a true per-family cohort. Note it's a floor (activity older

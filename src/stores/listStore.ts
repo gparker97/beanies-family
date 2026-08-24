@@ -220,7 +220,13 @@ export const useListStore = defineStore('lists', () => {
       },
       { action: 'listStore:updateList' }
     );
-    return trackFeature(result ?? null, 'list');
+    // Deliberately NOT tracked. `feature_used` counts CREATION for all 16
+    // features; instrumenting this update path too would rank lists top as a
+    // pure measurement artifact (it is the store's shared write funnel — every
+    // item tick, rename and link-clear lands here). It also runs unattended from
+    // `reconcileRecurringLists` on a midnight/resume wake, and `feature_used` is
+    // an interactive event.
+    return result ?? null;
   }
 
   async function deleteList(id: string): Promise<boolean> {

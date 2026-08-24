@@ -35,7 +35,8 @@ export function useStalePwaNotice() {
         (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') +
         url.hash;
       window.history.replaceState({}, '', cleaned);
-      // Detected automatically — see plausible.d.ts.
+      // Detected automatically — registered `'passive'` in ANALYTICS_EVENTS,
+      // which is what sends it `interactive: false`.
       track('pwa_stale_detected');
     }
 

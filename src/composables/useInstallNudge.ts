@@ -106,7 +106,8 @@ export function useInstallNudge() {
       if (!isIosSafariNotInstalled()) return;
       if (state.value.shownAt === null) {
         commit({ ...state.value, shownAt: Date.now() });
-        // Shown by us, not clicked by them — see plausible.d.ts.
+        // Shown by us, not clicked by them — registered `'passive'` in
+        // ANALYTICS_EVENTS, which is what sends it `interactive: false`.
         track('install_nudge_shown');
       }
     } catch (err) {

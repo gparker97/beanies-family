@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { ref, nextTick } from 'vue';
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
@@ -252,6 +252,9 @@ describe('OnboardingWizard', () => {
     await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
     await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
     await wrapper.find('[data-testid="onboarding-finish"]').trigger('click');
+    // `handleFinish` awaits the starter-budget write, which is wrapped in
+    // `withAppInitiatedWrites` — one more microtask than `trigger` flushes.
+    await flushPromises();
 
     expect(mockSetOnboardingCompleted).toHaveBeenCalledWith(true);
     expect(mockCelebrate).not.toHaveBeenCalled();
@@ -357,6 +360,9 @@ describe('OnboardingWizard', () => {
     await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
     await wrapper.find('[data-testid="onboarding-next"]').trigger('click');
     await wrapper.find('[data-testid="onboarding-finish"]').trigger('click');
+    // `handleFinish` awaits the starter-budget write, which is wrapped in
+    // `withAppInitiatedWrites` — one more microtask than `trigger` flushes.
+    await flushPromises();
 
     // Onboarding still completes (dismissal not blocked)
     expect(mockSetOnboardingCompleted).toHaveBeenCalledWith(true);

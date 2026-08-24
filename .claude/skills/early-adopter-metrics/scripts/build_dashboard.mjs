@@ -177,20 +177,6 @@ if (pl) {
   // *widen*, which reads as nonsense. When we have a measured hand-off we use it
   // and keep appArrivals as context; without one, appArrivals is the best
   // available second step and the boundary is drawn there instead.
-  funnelAcq = {
-    steps: [
-      { label: 'Reached the marketing site', value: siteVisitors, site: 'marketing' },
-      ...(outboundToApp
-        ? [{ label: 'Clicked through to the app', value: outboundToApp, site: 'boundary', sub: 'measured outbound clicks' }]
-        : [{ label: 'Arrived at the app', value: appArrivals, site: 'app', boundary: true, sub: 'incl. returning sign-ins' }]),
-      { label: 'Reached the welcome gate', value: welcome, site: 'app' },
-      { label: 'Started creating a family', value: started, site: 'app' },
-      { label: 'Completed signup', value: completed, site: 'app' },
-    ],
-    hasMeasuredHandoff: !!outboundToApp,
-    appArrivals,
-  };
-
   // ── Signups by platform (#71) ─────────────────────────────────────────────
   //
   // Two sources, and they are NOT known to be the same population: `completed`
@@ -220,8 +206,15 @@ if (pl) {
   }
   const eventTotal = [...byPlatform.values()].reduce((a, b) => a + b, 0);
   const webShare = eventTotal ? (byPlatform.get('web') || 0) / eventTotal : null;
-  // Rounded, so the volume rows always sum to the displayed `completed` total.
-  const completedWeb = webShare === null ? completed : Math.round(completed * webShare);
+  // NO all-platform fallback. `webShare === null` means the breakdown returned
+  // nothing — a goal wired to a differently-named event, a stale plausible.json,
+  // or the `platform` custom property not enabled in Plausible site settings.
+  // Falling back to `completed` there would print the retired, inflated
+  // all-platform rate under the new "web signups" label, with nothing flagging
+  // it (`platformTotalsAgree` would be null, not false, and the split clause
+  // that would expose the contradiction is suppressed when the array is empty).
+  // A missing number the reader can see beats a wrong one they cannot.
+  const completedWeb = webShare === null ? null : Math.round(completed * webShare);
 
   // Set to true ONLY once a TestFlight build has been confirmed to produce iOS
   // pageviews in the app property. See `inAppPct` below for why it matters.
@@ -231,6 +224,32 @@ if (pl) {
     IOS_PAGEVIEW_AUTOCAPTURE || !eventTotal
       ? completed
       : Math.max(0, completed - Math.round(completed * (iosSignups / eventTotal)));
+  // `funnelAcq`'s bottom step must match the funnel it sits in — same
+  // numerator/denominator platform coverage as `inAppPct` above it.
+  const funnelCompleted = countedInAppSignups;
+
+  funnelAcq = {
+    steps: [
+      { label: 'Reached the marketing site', value: siteVisitors, site: 'marketing' },
+      ...(outboundToApp
+        ? [{ label: 'Clicked through to the app', value: outboundToApp, site: 'boundary', sub: 'measured outbound clicks' }]
+        : [{ label: 'Arrived at the app', value: appArrivals, site: 'app', boundary: true, sub: 'incl. returning sign-ins' }]),
+      { label: 'Reached the welcome gate', value: welcome, site: 'app' },
+      { label: 'Started creating a family', value: started, site: 'app' },
+      {
+        label: 'Completed signup',
+        value: funnelCompleted,
+        site: 'app',
+        // Matches `inAppPct` above: while iOS pageview autocapture is
+        // unconfirmed, iOS signups are excluded here too, or this step would
+        // count arrivals the steps above it never saw.
+        ...(funnelCompleted !== completed ? { sub: 'excl. iOS' } : {}),
+      },
+    ],
+    hasMeasuredHandoff: !!outboundToApp,
+    appArrivals,
+  };
+
 
   conversion = {
     siteVisitors,
@@ -240,19 +259,42 @@ if (pl) {
     completedWeb,
     // Volume, not a second rate — looped in the template so a new platform (or a
     // `(none)` bucket) is never an HTML edit.
-    signupsByPlatform: [...byPlatform.entries()]
-      .map(([platform, visitors]) => ({ platform, visitors }))
-      .sort((a, b) => b.visitors - a.visitors),
+    //
+    // Rescaled to the GOAL total by the same share the headline uses, for the
+    // same reason: Plausible counts `visitors` per prop-value row, and those
+    // rows do not sum to unique visitors. Reporting them verbatim beside a goal
+    // total printed one clause earlier gives the reader two different web
+    // figures in a single sentence and a split that does not sum to the stated
+    // total. Both numbers now come off one denominator.
+    signupsByPlatform:
+      eventTotal === 0
+        ? []
+        : [...byPlatform.entries()]
+            .map(([platform, visitors]) => ({
+              platform,
+              visitors: Math.round(completed * (visitors / eventTotal)),
+            }))
+            .sort((a, b) => b.visitors - a.visitors),
     // Whether the goal and the event agree on the total. Surfaced so the
     // reconciliation above is verifiable from a dashboard run rather than taken
     // on trust; null when the event query returned nothing at all.
+    //
+    // Expect `false` routinely on multi-platform windows — per-prop `visitors`
+    // rows double-count anyone who appears under two values, so `eventTotal`
+    // exceeding `completed` is normal, not a fault. It is a "do not quote the
+    // split as exact" marker, not an alarm; a LOWER eventTotal is the one worth
+    // investigating, since it means signup events the goal never saw.
     platformTotalsAgree: eventTotal ? eventTotal === completed : null,
+    signupEventTotal: eventTotal || null,
     // THE headline, and the only like-for-like pairing on the page: web-only
     // signups over marketing visitors, both of which exclude native entirely.
     // Deliberately ONE percentage — a web-only/all-platform axis stacked on the
     // existing cross-site/single-site axis is a 2x2 the reader must hold, and
     // two rates invite "which one is real?".
-    overallPct: siteVisitors ? Math.round((completedWeb / siteVisitors) * 1000) / 10 : null,
+    overallPct:
+      siteVisitors && completedWeb !== null
+        ? Math.round((completedWeb / siteVisitors) * 1000) / 10
+        : null,
     // Numerator/denominator must cover the same platforms. `completed` is a
     // CUSTOM EVENT (fires everywhere Plausible is loaded); `appArrivals` is a
     // PAGEVIEW count (needs autocapture). On iOS the WebView origin is
@@ -279,6 +321,9 @@ if (pl) {
 // web-only registry comparison is meaningful. Below this, the comparison is
 // suppressed rather than shown wrong.
 const PLATFORM_COVERAGE_MIN = 0.8;
+// The date native builds began loading Plausible AND the registry began stamping
+// `signupPlatform`. Before it, neither source can attribute a platform.
+const PLATFORM_DATA_FROM = '2026-08-24';
 const inWindow = fams.filter((f) => {
   if (!f.createdAt) return false;
   const t = new Date(f.createdAt).getTime() / 1000;
@@ -319,13 +364,39 @@ if (conversion) {
   const attributed = inWindow.filter((f) => f.signupPlatform).length;
   const coverage = inWindow.length ? attributed / inWindow.length : 0;
   conversion.platformCoverage = Math.round(coverage * 100);
-  if (coverage >= PLATFORM_COVERAGE_MIN && webInWindow.length > 0) {
+
+  // The two sides use OPPOSITE absent-platform rules (Plausible folds `(none)`
+  // into web; the registry excludes absent), which is correct per-source but
+  // makes them incomparable across any window that straddles the deploy. Every
+  // pre-deploy signup would land in `completedWeb` with no matching row in
+  // `newWebInWindow`, biasing the gap negative with no compensating term — at
+  // ~15-25 families/month a 4-6 day tail alone clears the floor, which is
+  // exactly the spurious fire the gate exists to prevent. So the comparison is
+  // suppressed until the whole window sits after the deploy. Self-resolving:
+  // WINDOW_DAYS after that date it opens on its own.
+  const windowStartsAfterDeploy =
+    new Date((NOW - WINDOW_DAYS * DAY) * 1000).toISOString().slice(0, 10) >= PLATFORM_DATA_FROM;
+
+  conversion.gapCheckBlockedBy = !windowStartsAfterDeploy
+    ? 'window-straddles-deploy'
+    : coverage < PLATFORM_COVERAGE_MIN
+      ? 'low-coverage'
+      : null;
+
+  if (conversion.gapCheckBlockedBy === null && conversion.completedWeb !== null) {
+    // NOT gated on `webInWindow.length > 0`. That short-circuit suppressed the
+    // flag precisely when disagreement was TOTAL — full coverage, every family
+    // native, Plausible still attributing signups to web — which is the loudest
+    // signal available, not a reason to stay quiet.
     conversion.newWebInWindow = webInWindow.length;
     const webGap = webInWindow.length - conversion.completedWeb;
     conversion.goalVsRegistryGap = webGap;
     conversion.gapIsMaterial = Math.abs(webGap) >= Math.max(5, webInWindow.length * 0.34);
   } else {
     conversion.newWebInWindow = null;
+    // Explicit null, not left undefined — JSON.stringify drops undefined, so the
+    // key would vanish from the payload rather than read as "not computed".
+    conversion.goalVsRegistryGap = null;
     conversion.gapIsMaterial = null;
   }
 }

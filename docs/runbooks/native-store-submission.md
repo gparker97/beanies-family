@@ -39,6 +39,7 @@ The anti-drift comments at `ALLOWED_CONTEXT_KEYS` and the telemetry `LogRecord` 
 > | Approximate data size (`beanpodSizeKb`, encrypted-file size rounded to KB) | Family registry PUT | Usage Data → Product Interaction | App activity → App interactions | Analytics (gauge data growth) | Yes² | No |
 > | Signup platform (`signupPlatform`, the fixed enum `web`/`ios`/`android`, write-once at row creation) | Family registry PUT | Usage Data → Product Interaction | App activity → App interactions | Analytics (which platform families sign up on) | Yes² | No |
 > | Product-interaction events (Plausible, #71: a fixed event name — signup / login / feature_used / nudge shown+dismissed / etc. — plus the closed props `feature`, `method`, `action`, `surface`, `platform`) | Plausible Analytics (`plausible.io`) | Usage Data → Product Interaction | App activity → App interactions | Analytics (which features get used) | **No** (see ³) | No |
+> | Screen views (Plausible autocapture, #71: the in-app route path, the referrer, and a UA-derived device / browser / OS. ⚠️ Some route paths CONTAIN a family member or recipe UUID — `/pod/:memberId`, `/pod/cookbook/:recipeId` — so a stable per-family identifier does reach plausible.io in `event:page`) | Plausible Analytics (`plausible.io`) | Usage Data → Product Interaction | App activity → App interactions, plus App info & performance → Other app performance data | Analytics (which screens get used; feeds the app-arrivals funnel) | **No** (see ³) | No |
 
 ¹ The high-volume telemetry firehose is PII-free (correlated only by the random `family_id`, which is
 `crypto.randomUUID`, `familyContext.ts`). It's marked "Linked" because on the low-volume critical-error
@@ -65,10 +66,18 @@ No advertising, no cross-app tracking, no device identifiers, no IDFA/AAID acces
 sentence previously read "no third-party analytics SDK in the app"; that became false when the native
 release lanes started shipping `VITE_PLAUSIBLE_DOMAIN`, and the declarations above were extended rather
 than the claim kept.) It is the same cookieless, privacy-first script the marketing site uses, loaded
-from `plausible.io`. It sets no cookies, stores no identifier of any kind, generates no persistent or
-probabilistic user id, and **cannot** link the person to data collected by other companies' apps or
-websites — which is precisely Apple's definition of tracking. So this data is **not linked to the user**
-and:
+from `plausible.io`. It sets no cookies, stores nothing on the device, and generates no persistent or
+probabilistic user id of its own.
+
+⚠️ **One nuance to declare honestly:** pageview autocapture sends the route path, and a few app routes
+embed a UUID (`/pod/:memberId`, `/pod/cookbook/:recipeId`). Those are random ids generated on-device
+and are never joined to a name, email, or any Plausible profile — but they ARE stable per family, so
+declare screen views as collected Product Interaction (done in the table above) rather than claiming
+the app sends no identifiers at all. If that becomes uncomfortable, the fix is a route mask in the
+Plausible init, not a softer declaration.
+
+Even so, none of this can link the person to data collected by OTHER companies' apps or websites —
+which is precisely Apple's definition of tracking. So:
 
 **`NSPrivacyTracking` STAYS `false`.** Do not flip it. There is no ATT prompt to add and no
 `NSPrivacyTrackingDomains` entry needed, because `plausible.io` performs no tracking as Apple defines
@@ -161,8 +170,12 @@ provision it automatically; if distribution signing rejects it, enable it manual
 
 ### 4a. Apple — App Store Connect
 
-- **App Privacy:** declare per §1 (Email, Name, Crash Data, Other Diagnostic Data, User ID). Data used
-  to track you = **none**. All "App Functionality". No ATT.
+- **App Privacy:** declare per §1 — Email, Name, Crash Data, Other Diagnostic Data, User ID **and
+  (added #71, 2026-08-24) Usage Data → Product Interaction**. Data used to track you = **none**; no ATT.
+  Purposes are NOT all "App Functionality" any more: the four registry/Plausible rows in §1 whose
+  Purpose column reads Analytics must be declared as **Analytics**, and the rest as App Functionality.
+  ⚠️ The app loads a third-party analytics script (Plausible) — see §1 note ³ before answering the
+  "third-party" questions; do not answer them from memory of the pre-2026-08-24 form.
 - **Export compliance:** already declared in `Info.plist` (`ITSAppUsesNonExemptEncryption = false`) —
   standard AES/HTTPS only, exempt. No annual self-classification report needed.
 - **Age rating:** questionnaire → 4+ (no objectionable content).
@@ -183,8 +196,11 @@ status-bar}` and `@capgo/capacitor-passkey` ship none — the app-level manifest
 
 ### 4b. Google — Play Console
 
-- **Data safety:** collection = **Yes** (per §1: Email, Name, Crash logs, Diagnostics, User ID/family_id).
-  Encrypted in transit = Yes. Data used to track users = none. Deletion available = Yes, with a URL.
+- **Data safety:** collection = **Yes** (per §1: Email, Name, Crash logs, Diagnostics, User ID/family_id,
+  **and (added #71, 2026-08-24) App activity → App interactions** covering both the registry usage
+  signals and the Plausible events + screen views). Purpose for those four rows is **Analytics**, not
+  App functionality. Encrypted in transit = Yes. Data used to track users = none. Deletion available =
+  Yes, with a URL.
 - **Account/data deletion URL:** `https://beanies.family/delete-account` (in-app path also exists:
   Settings → "Delete Family & All Data").
 - **Content rating (IARC):** truthful answers → Everyone / PEGI 3.

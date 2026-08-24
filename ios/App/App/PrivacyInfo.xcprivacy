@@ -30,10 +30,14 @@
         (b) Plausible Analytics (2026-08, #71) — the app now loads the same cookieless
             plausible.io script the marketing site uses, reporting a fixed event name
             (signup / login / feature_used / nudge shown+dismissed / …) plus the closed
-            props feature, method, action, surface, platform. No cookies, no stored or
-            derived identifier, no cross-app or cross-site linkage — so it is NOT
-            tracking under Apple's definition and NSPrivacyTracking correctly stays
-            false with no NSPrivacyTrackingDomains entry. Do not flip either.
+            props feature, method, action, surface, platform — PLUS autocaptured
+            screen views (the in-app route path, referrer, UA-derived device/OS).
+            Note a few route paths embed a random on-device UUID (/pod/:memberId,
+            /pod/cookbook/:recipeId), never joined to a name or email. No cookies
+            and nothing stored on the device; no cross-app or cross-site linkage —
+            so it is NOT tracking under Apple's definition and NSPrivacyTracking
+            correctly stays false with no NSPrivacyTrackingDomains entry. Do not
+            flip either. See docs/runbooks/native-store-submission.md note 3.
       Apple's manifest allows ONE entry per data type, so both surfaces are declared
       by the single ProductInteraction entry below. It is marked Linked because (a) is
       — the never-under-declare answer — even though (b) on its own is not.

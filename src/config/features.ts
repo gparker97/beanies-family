@@ -103,6 +103,17 @@ if (env.PROD && (features.drive || features.registry)) {
       'VITE_FEEDBACK_WEBHOOK_URL',
       'In-app feedback/NPS will be silently DISCARDED (it is stored nowhere else)',
     ],
+    [
+      // #71: the same failure shape as feedbackReporter above — wired into
+      // deploy.yml only and omitted from both mobile lanes, so every native
+      // build shipped with analytics silently off for months. The lanes now
+      // carry it and the parity test enforces that, but this is the
+      // zero-latency local detector: a bad build says so at boot rather than
+      // waiting for someone to notice a flat chart.
+      'analytics',
+      'VITE_PLAUSIBLE_DOMAIN',
+      'No usage analytics will be reported (signups, logins, feature adoption)',
+    ],
   ];
   for (const [key, envVar, impact] of operationalWebhooks) {
     if (!features[key]) {

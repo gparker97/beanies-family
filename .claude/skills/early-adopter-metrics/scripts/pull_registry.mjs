@@ -153,6 +153,9 @@ function enrich(row) {
     subscribeNewsletter: !!row.subscribeNewsletter,
     createdAt: row.createdAt || null,
     lastLoginAt: row.lastLoginAt || null,
+    // #71. `|| null` NOT `?? null`: an empty string is not a platform either.
+    // Absent means UNKNOWN and is EXCLUDED from platform maths, never web.
+    signupPlatform: row.signupPlatform || null,
     beanpodSizeKb: sizeKb,
     daysSinceLogin: dLogin,
     daysSinceCreated: dCreated,
@@ -276,6 +279,10 @@ async function main() {
       beanpodSizeKb: f.beanpodSizeKb,
       createdAt: f.createdAt,
       lastLoginAt: f.lastLoginAt,
+      // Consumed by build_dashboard's web-only conversion maths. Omitting it
+      // here silently pins platform coverage at 0 forever — the gap check then
+      // reads as "not yet possible" on every run rather than as broken.
+      signupPlatform: f.signupPlatform,
       daysSinceLogin: f.daysSinceLogin,
       lifespanDays: f.lifespanDays,
       bucket: f.bucket,
