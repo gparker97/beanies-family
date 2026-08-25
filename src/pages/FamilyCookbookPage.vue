@@ -162,23 +162,6 @@ function closeModal(): void {
   capture.discardPendingSource();
 }
 
-/**
- * The Add Recipe form's shortcut band produced a link.
- *
- * Close the form FIRST. The capture opens the very same form again with the prefill applied,
- * and leaving the blank one open would stack a second copy on top of it.
- */
-function handleStripLink(url: string): void {
-  closeModal();
-  void capture.processUrl(url);
-}
-
-/** Same, for the band's photo/PDF option. */
-function handleStripDocument(): void {
-  closeModal();
-  aiDocPicker.value?.pick();
-}
-
 /** Save completed — hand the id back so the source document can be attached. */
 async function handleSaved(id: string): Promise<void> {
   prefill.value = null;
@@ -275,6 +258,7 @@ async function handleSaved(id: string): Promise<void> {
       >
         <PolaroidImage
           :src="thumbFor(r)"
+          :loading="!thumbFor(r) && isPending(r.id)"
           :caption="
             thumbFor(r)
               ? undefined
@@ -345,8 +329,6 @@ async function handleSaved(id: string): Promise<void> {
       :prefill="prefill"
       @close="closeModal"
       @saved="handleSaved"
-      @capture-link="handleStripLink"
-      @capture-document="handleStripDocument"
     />
 
     <div

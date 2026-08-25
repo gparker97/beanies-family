@@ -15,6 +15,9 @@ import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import RecipeSourceStrip from './RecipeSourceStrip.vue';
+import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -56,12 +59,6 @@ const emit = defineEmits<{
    *  listen for this to auto-link the new recipe to whatever workflow
    *  opened the form. */
   saved: [id: UUID];
-  /** The shortcut band produced a link — the PARENT owns the capture, not this form.
-   *  Kept as an emit rather than calling `useRecipeCapture` here so the form stays a form:
-   *  it collects and validates, and never orchestrates fetches or persistence (MVO). */
-  captureLink: [url: string];
-  /** The shortcut band's photo/PDF option. Same reasoning. */
-  captureDocument: [];
 }>();
 
 const { t } = useTranslation();
@@ -84,7 +81,17 @@ const sourceUrl = ref('');
  * Seed the form from an AI prefill, or clear it when there is none. Passing `null` is the
  * blank-new-recipe case, so there is exactly one place that resets these refs.
  */
+/**
+ * A dish photo is queued and will attach itself on save.
+ *
+ * Set from the prefill rather than from the capture instance, because `applyPrefill` is the
+ * one funnel BOTH routes go through — the host page's capture and this form's own. Reading
+ * it off either capture instance would be right only half the time.
+ */
+const willAttachPhoto = ref(false);
+
 function applyPrefill(prefill: RecipePrefill | null): void {
+  willAttachPhoto.value = !!prefill?.dishImageUrl;
   const f = prefill?.fields;
   name.value = f?.name ?? '';
   subtitle.value = f?.subtitle ?? '';
@@ -141,6 +148,25 @@ const canSave = computed(() => name.value.trim().length > 0);
 const showSourceStrip = computed(
   () => !isEditing.value && !props.prefill && name.value.trim().length === 0
 );
+
+const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
+
+/**
+ * The form runs its OWN capture, and fills ITSELF in.
+ *
+ * The first version emitted `captureLink` upward and let the host page orchestrate. That
+ * worked on the cookbook and silently did nothing everywhere else — the meal planner's
+ * recipe rail, the meal editor, the favourite picker and the recipe detail page all open
+ * this same modal, and none of them had the wiring. The affordance was visible and dead in
+ * four places out of five, which is worse than not offering it.
+ *
+ * Owning it here means every caller gets it for free and no future caller can forget. The
+ * orchestration still lives in the composable — the form is a view USING an orchestrator,
+ * which is the MVO shape; it is only the delegation that was wrong.
+ */
+const capture = useRecipeCapture({
+  onRecipeReady: ({ prefill }) => applyPrefill(prefill),
+});
 
 const modalTitle = computed(() =>
   isEditing.value ? t('recipes.editTitle') : t('recipes.addTitle')
@@ -215,6 +241,9 @@ async function handleSave(): Promise<void> {
   try {
     const result = await eager.commit();
     if (!result) return; // store reported via wrapAsync; keep modal open for retry
+    // Attach whatever OUR capture is holding. A no-op when the host page did the capture
+    // instead — that instance holds the source and attaches it from `saved` below.
+    void capture.attachAfterSave(result.id);
     emit('saved', result.id);
     emit('close');
   } finally {
@@ -286,91 +315,123 @@ const LIST_TEXTAREA_CLASS =
     @save="handleSave"
     @delete="handleDelete"
   >
-    <RecipeSourceStrip
-      v-if="showSourceStrip"
-      @submit="(url) => emit('captureLink', url)"
-      @document="emit('captureDocument')"
-    />
+    <!-- `relative` so the reading overlay below anchors to the FORM BODY. The drawer and
+         modal containers differ in whether they establish a positioning context, and an
+         overlay that silently anchors to the viewport in one of them is the kind of bug
+         that only shows up on one variant. -->
+    <div class="relative">
+      <RecipeSourceStrip
+        v-if="showSourceStrip"
+        @submit="(url) => void capture.processUrl(url)"
+        @document="aiDocPicker?.pick()"
+      />
 
-    <FormFieldGroup :label="t('recipes.field.name')" required>
-      <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />
-    </FormFieldGroup>
+      <!-- Reading blocks the form: every field is about to be overwritten, so letting the
+           user type meanwhile would only throw their work away. -->
+      <div
+        v-if="capture.isProcessing.value"
+        class="absolute inset-0 z-10 grid place-items-center rounded-[var(--sq)] bg-white/85 backdrop-blur-sm dark:bg-slate-900/85"
+      >
+        <div class="flex flex-col items-center gap-3">
+          <BeanieSpinner size="lg" :halo="true" />
+          <p class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+            {{ t('ai.processing') }}
+          </p>
+        </div>
+      </div>
 
-    <FormFieldGroup :label="t('recipes.field.subtitle')" optional>
-      <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
-    </FormFieldGroup>
+      <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
 
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
-        <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
+      <FormFieldGroup :label="t('recipes.field.name')" required>
+        <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />
       </FormFieldGroup>
-      <FormFieldGroup :label="t('recipes.field.cookTime')" optional>
-        <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
+
+      <FormFieldGroup :label="t('recipes.field.subtitle')" optional>
+        <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
       </FormFieldGroup>
-      <FormFieldGroup :label="t('recipes.field.servings')" optional>
-        <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
+          <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('recipes.field.cookTime')" optional>
+          <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('recipes.field.servings')" optional>
+          <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
+        </FormFieldGroup>
+      </div>
+
+      <FormFieldGroup :label="t('recipes.field.ingredients')" optional>
+        <textarea
+          v-model="ingredientsText"
+          rows="6"
+          :class="LIST_TEXTAREA_CLASS"
+          :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
+        />
+        <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
+           error. Same idiom as ActivityModal's low-confidence hint. -->
+        <p v-if="inferredIngredients.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+          {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
+        </p>
+      </FormFieldGroup>
+
+      <FormFieldGroup :label="t('recipes.field.steps')" optional>
+        <textarea
+          v-model="stepsText"
+          rows="6"
+          :class="LIST_TEXTAREA_CLASS"
+          :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
+        />
+        <p v-if="inferredSteps.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+          {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
+        </p>
+      </FormFieldGroup>
+
+      <FormFieldGroup :label="t('recipes.field.notes')" optional>
+        <textarea
+          v-model="notes"
+          rows="3"
+          class="focus:border-primary-500 focus:ring-primary-500 font-caveat w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-lg leading-snug text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+          :placeholder="t('recipes.placeholder.notes')"
+        />
+      </FormFieldGroup>
+
+      <FormFieldGroup :label="t('recipes.field.photos')" optional>
+        <div v-if="eager.entityId.value">
+          <PhotoAttachments
+            ref="photoAttachmentsRef"
+            collection="recipes"
+            :entity-id="eager.entityId.value"
+            :photo-ids="binding.photoIds.value"
+            :current-member-id="currentMemberId"
+            :max="4"
+            @update:photo-ids="binding.updatePhotoIds"
+          />
+        </div>
+        <!-- When the reader found a photo of the dish, say so INSTEAD of offering an empty
+           "Add photo" box. Otherwise the user is invited to hunt for a picture that is
+           already on its way, and ends up with two. -->
+        <p
+          v-else-if="willAttachPhoto"
+          class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[rgb(230_126_34_/_35%)] bg-[var(--tint-orange-4)] py-5 text-xs font-semibold text-[var(--color-text-muted)]"
+        >
+          <span aria-hidden="true">✨</span>
+          <span>{{ t('recipes.photos.willAttach') }}</span>
+        </p>
+        <button
+          v-else
+          type="button"
+          class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="!canSave || eager.isCreating.value"
+          @click="handleAddFirstPhoto"
+        >
+          <BeanieIcon name="camera" size="md" />
+          <span class="font-outfit text-xs font-semibold">
+            {{ canSave ? t('photos.addPhoto') : t('recipes.photos.saveFirst') }}
+          </span>
+        </button>
       </FormFieldGroup>
     </div>
-
-    <FormFieldGroup :label="t('recipes.field.ingredients')" optional>
-      <textarea
-        v-model="ingredientsText"
-        rows="6"
-        :class="LIST_TEXTAREA_CLASS"
-        :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
-      />
-      <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
-           error. Same idiom as ActivityModal's low-confidence hint. -->
-      <p v-if="inferredIngredients.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
-        {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
-      </p>
-    </FormFieldGroup>
-
-    <FormFieldGroup :label="t('recipes.field.steps')" optional>
-      <textarea
-        v-model="stepsText"
-        rows="6"
-        :class="LIST_TEXTAREA_CLASS"
-        :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
-      />
-      <p v-if="inferredSteps.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
-        {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
-      </p>
-    </FormFieldGroup>
-
-    <FormFieldGroup :label="t('recipes.field.notes')" optional>
-      <textarea
-        v-model="notes"
-        rows="3"
-        class="focus:border-primary-500 focus:ring-primary-500 font-caveat w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-lg leading-snug text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
-        :placeholder="t('recipes.placeholder.notes')"
-      />
-    </FormFieldGroup>
-
-    <FormFieldGroup :label="t('recipes.field.photos')" optional>
-      <div v-if="eager.entityId.value">
-        <PhotoAttachments
-          ref="photoAttachmentsRef"
-          collection="recipes"
-          :entity-id="eager.entityId.value"
-          :photo-ids="binding.photoIds.value"
-          :current-member-id="currentMemberId"
-          :max="4"
-          @update:photo-ids="binding.updatePhotoIds"
-        />
-      </div>
-      <button
-        v-else
-        type="button"
-        class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="!canSave || eager.isCreating.value"
-        @click="handleAddFirstPhoto"
-      >
-        <BeanieIcon name="camera" size="md" />
-        <span class="font-outfit text-xs font-semibold">
-          {{ canSave ? t('photos.addPhoto') : t('recipes.photos.saveFirst') }}
-        </span>
-      </button>
-    </FormFieldGroup>
   </BeanieFormModal>
 </template>
