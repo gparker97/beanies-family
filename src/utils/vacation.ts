@@ -165,20 +165,27 @@ export function collectSegmentDates(v: {
   transportation?: VacationTransportation[];
 }): string[] {
   const dates: string[] = [];
+  // NORMALIZED with extractDatePart, exactly like computeVacationDates.
+  //
+  // These feed `extendTripDates`, which validates candidates against a strict YYYY-MM-DD and
+  // SKIPS anything else with a console.warn. The model can and does return full ISO
+  // timestamps, so a raw value was silently discarded: the trip never widened to cover that
+  // booking, and the "after your trip ends" hint then sat there permanently with no way for
+  // the user to resolve it. Each function passed its own tests; only the PAIR was broken.
   for (const seg of v.travelSegments ?? []) {
-    if (seg.departureDate) dates.push(seg.departureDate);
-    if (seg.arrivalDate) dates.push(seg.arrivalDate);
-    if (seg.embarkationDate) dates.push(seg.embarkationDate);
-    if (seg.disembarkationDate) dates.push(seg.disembarkationDate);
+    if (seg.departureDate) dates.push(extractDatePart(seg.departureDate));
+    if (seg.arrivalDate) dates.push(extractDatePart(seg.arrivalDate));
+    if (seg.embarkationDate) dates.push(extractDatePart(seg.embarkationDate));
+    if (seg.disembarkationDate) dates.push(extractDatePart(seg.disembarkationDate));
   }
   for (const acc of v.accommodations ?? []) {
-    if (acc.checkInDate) dates.push(acc.checkInDate);
-    if (acc.checkOutDate) dates.push(acc.checkOutDate);
+    if (acc.checkInDate) dates.push(extractDatePart(acc.checkInDate));
+    if (acc.checkOutDate) dates.push(extractDatePart(acc.checkOutDate));
   }
   for (const trans of v.transportation ?? []) {
-    if (trans.pickupDate) dates.push(trans.pickupDate);
-    if (trans.returnDate) dates.push(trans.returnDate);
-    if (trans.departureDate) dates.push(trans.departureDate);
+    if (trans.pickupDate) dates.push(extractDatePart(trans.pickupDate));
+    if (trans.returnDate) dates.push(extractDatePart(trans.returnDate));
+    if (trans.departureDate) dates.push(extractDatePart(trans.departureDate));
   }
   return dates;
 }
