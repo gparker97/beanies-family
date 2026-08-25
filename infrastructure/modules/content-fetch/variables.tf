@@ -64,3 +64,10 @@ variable "alert_email" {
   type        = string
   default     = ""
 }
+
+variable "slack_error_webhook_url" {
+  description = "Slack incoming-webhook for #beanies-errors. When set, CloudWatch alarms are forwarded there by a small Lambda, reusing the same webhook the telemetry Lambda posts client errors with. Empty = no forwarder is created at all (alarms still work, they just notify nobody)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

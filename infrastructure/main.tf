@@ -148,6 +148,8 @@ module "content_fetch" {
   api_domain_name           = module.registry.api_domain_name
   content_fetch_api_key     = var.content_fetch_api_key
   alert_email               = var.alert_email
+  # Same webhook the telemetry Lambda uses — alarms land in #beanies-errors.
+  slack_error_webhook_url = var.slack_error_webhook_url
 }
 
 module "ai_extract" {

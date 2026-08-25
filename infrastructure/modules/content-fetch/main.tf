@@ -178,6 +178,100 @@ resource "aws_sns_topic_subscription" "email" {
   # "PendingConfirmation" — and delivers nothing — until it is clicked.
 }
 
+# ── SNS → Slack forwarder ────────────────────────────────────────────────────
+# Alarms land in #beanies-errors, the channel client errors already go to, reusing the SAME
+# webhook the telemetry Lambda uses — no new secret to rotate.
+#
+# A Lambda rather than a direct SNS subscription because SNS cannot post to a Slack webhook:
+# an HTTPS subscription sends SNS's own envelope (Slack wants `{"text": …}`) and requires a
+# confirmation handshake a webhook will never perform. AWS Chatbot is the alternative but
+# needs a Slack OAuth workspace install — a second integration to maintain for a job this
+# does in forty lines.
+
+resource "aws_cloudwatch_log_group" "alarm_slack" {
+  count             = var.slack_error_webhook_url == "" ? 0 : 1
+  name              = "/aws/lambda/${var.app_name}-alarm-slack-${var.environment}"
+  retention_in_days = var.log_retention_days
+
+  tags = {
+    Name        = "${var.app_name}-alarm-slack-logs"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role" "alarm_slack" {
+  count = var.slack_error_webhook_url == "" ? 0 : 1
+  name  = "${var.app_name}-alarm-slack-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+
+  tags = {
+    Name        = "${var.app_name}-alarm-slack"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "alarm_slack_logs" {
+  count      = var.slack_error_webhook_url == "" ? 0 : 1
+  role       = aws_iam_role.alarm_slack[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+data "archive_file" "alarm_slack" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/alarm-slack"
+  output_path = "${path.module}/alarm-slack-lambda.zip"
+}
+
+resource "aws_lambda_function" "alarm_slack" {
+  count            = var.slack_error_webhook_url == "" ? 0 : 1
+  function_name    = "${var.app_name}-alarm-slack-${var.environment}"
+  runtime          = "nodejs20.x"
+  handler          = "index.handler"
+  role             = aws_iam_role.alarm_slack[0].arn
+  filename         = data.archive_file.alarm_slack.output_path
+  source_code_hash = data.archive_file.alarm_slack.output_base64sha256
+  timeout          = 10
+  memory_size      = 128
+
+  environment {
+    variables = {
+      # The same webhook the telemetry Lambda posts client errors with.
+      SLACK_ERROR_WEBHOOK_URL = var.slack_error_webhook_url
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.alarm_slack]
+
+  tags = {
+    Name        = "${var.app_name}-alarm-slack"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lambda_permission" "alarm_slack_sns" {
+  count         = var.slack_error_webhook_url == "" ? 0 : 1
+  statement_id  = "AllowSNSInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.alarm_slack[0].function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.alerts.arn
+}
+
+resource "aws_sns_topic_subscription" "slack" {
+  count     = var.slack_error_webhook_url == "" ? 0 : 1
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.alarm_slack[0].arn
+}
+
 # ── Alarms ───────────────────────────────────────────────────────────────────
 # Volume abuse of a semi-open proxy is a COST event, not an error event: every
 # request succeeds. So the alarm watches invocation VOLUME, which is the only
