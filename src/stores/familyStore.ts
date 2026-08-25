@@ -1,3 +1,4 @@
+import { dedupedAppend } from '@/utils/segmentTravellers';
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
@@ -247,6 +248,39 @@ export const useFamilyStore = defineStore('family', () => {
       return member;
     });
     return result ?? null;
+  }
+
+  /**
+   * Record confirmed document-name → member mappings so they auto-match next time.
+   *
+   * MOVED OUT OF THE VIEW, and the reason is the invariant rather than tidiness: the same
+   * member may appear several times in one confirmation (a passenger listed per leg), and a
+   * second sequential `updateMember` for that member would read the aliases from BEFORE the
+   * first write and clobber it. Grouping per member is therefore load-bearing, and it lived
+   * only as a comment inside a 123-line handler in TravelPlansPage — so any future caller
+   * that learned aliases from anywhere else would have re-broken it silently.
+   *
+   * Deliberately warn-not-throw at the call site's discretion: this returns how many members
+   * were written and swallows nothing, but a failure here must never undo the trip that was
+   * already saved.
+   */
+  async function learnAliases(pairs: Array<{ memberId: string; alias: string }>): Promise<number> {
+    if (!pairs.length) return 0;
+
+    const byMember = new Map<string, string[]>();
+    for (const { memberId, alias } of pairs) {
+      byMember.set(memberId, [...(byMember.get(memberId) ?? []), alias]);
+    }
+
+    let written = 0;
+    for (const [memberId, additions] of byMember) {
+      const member = members.value.find((m) => m.id === memberId);
+      // Skip a member who has vanished (removed on another device) rather than creating one.
+      if (!member) continue;
+      await updateMember(memberId, { aliases: dedupedAppend(member.aliases, additions) });
+      written += 1;
+    }
+    return written;
   }
 
   async function updateMember(
@@ -518,6 +552,7 @@ export const useFamilyStore = defineStore('family', () => {
     createMember,
     createMemberWithId,
     updateMember,
+    learnAliases,
     deleteMember,
     transferOwnership,
     setCurrentMember,

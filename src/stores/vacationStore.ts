@@ -1,3 +1,4 @@
+import { unionTravellerIds } from '@/utils/segmentTravellers';
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
@@ -343,6 +344,69 @@ export const useVacationStore = defineStore('vacations', () => {
   }
 
   /**
+   * Save an AI-extracted set of bookings, either as a NEW trip or merged into an existing one.
+   *
+   * This was 40 lines inside `onReviewSubmit` in TravelPlansPage — a cross-store transaction
+   * living in a view, which is what MVO exists to prevent. Two rules travelled with it and
+   * were enforced nowhere but that handler:
+   *
+   *  1. A NEW trip has no travellers to inherit, so they are seeded from the union of
+   *     everyone the document named, and that default is materialized onto segments the
+   *     model matched no names for — otherwise those read as "everyone" forever.
+   *  2. An EMPTY union must NOT be materialized. `[]` is a DEFINED value, and a defined
+   *     travellerIds is deliberately never re-resolved when the trip's travellers change —
+   *     so a document naming nobody (routine on hotel confirmations) pinned every segment to
+   *     "nobody", putting the flight on no one's calendar with no UI able to clear it.
+   *
+   * Returns the id-remap alongside the vacation because the caller must attach the source
+   * document to the SURVIVING segment ids: on the attach path a merged segment keeps the
+   * existing id, and linking to the dropped extracted id orphans the file.
+   */
+  async function saveExtractedTrip(
+    target:
+      | { kind: 'create'; tripName: string; tripType: FamilyVacation['tripType'] }
+      | { kind: 'attach'; vacationId: string },
+    buckets: ExtractedSegmentBuckets,
+    createdBy: string
+  ): Promise<{ vacationId: string; idRemap: Record<string, string> } | null> {
+    try {
+      if (target.kind === 'attach') {
+        const res = await addExtractedSegments(target.vacationId, buckets);
+        if (!res) return null;
+        return { vacationId: res.vacation.id, idRemap: res.idRemap };
+      }
+
+      const defaultTravellers = unionTravellerIds(buckets);
+      // Rule 2 above: only materialize a NON-empty default.
+      if (defaultTravellers.length) {
+        for (const seg of [
+          ...buckets.travelSegments,
+          ...buckets.accommodations,
+          ...buckets.transportation,
+        ] as Array<{ travellerIds?: string[] }>) {
+          if (!seg.travellerIds) seg.travellerIds = defaultTravellers;
+        }
+      }
+
+      const created = await createVacation({
+        name: target.tripName,
+        tripType: target.tripType,
+        assigneeIds: defaultTravellers,
+        ideas: [],
+        travelSegments: buckets.travelSegments,
+        accommodations: buckets.accommodations,
+        transportation: buckets.transportation,
+        createdBy,
+      } as Parameters<typeof createVacation>[0]);
+      // Identity remap on the create path: nothing merged, so every extracted id survives.
+      return created ? { vacationId: created.id, idRemap: {} } : null;
+    } catch (err) {
+      console.error('[vacation] saveExtractedTrip failed:', err);
+      return null;
+    }
+  }
+
+  /**
    * Patch ONE booking segment, addressed by id, merging onto its CURRENT value.
    *
    * Replaces the pattern the three edit drawers used: capture a positional array INDEX when
@@ -508,6 +572,7 @@ export const useVacationStore = defineStore('vacations', () => {
     updateVacation,
     deleteVacation,
     toggleIdeaVote,
+    saveExtractedTrip,
     updateSegment,
     deleteSegment,
     updateSegmentPhotoIds,
