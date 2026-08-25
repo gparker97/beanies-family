@@ -113,7 +113,7 @@ const tripAssigneeIds = computed(
   () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
 );
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isSubmitting } = useFormModal(
   () => props.segment,
   () => props.open,
   {
@@ -515,7 +515,7 @@ async function handleSave() {
     variant="drawer"
     size="full"
     :open="open"
-    :title="isEditing ? t('travel.editSegment') : t('travel.editSegment')"
+    :title="t('travel.editSegment')"
     icon="✈️"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"

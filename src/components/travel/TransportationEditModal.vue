@@ -41,7 +41,6 @@ const { showToast } = useToast();
 const vacationStore = useVacationStore();
 
 // Form fields
-const title = ref('');
 const status = ref<VacationSegmentStatus>('pending');
 const bookingReference = ref('');
 const pickupDate = ref('');
@@ -69,13 +68,12 @@ const tripAssigneeIds = computed(
   () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
 );
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isSubmitting } = useFormModal(
   () => props.transportation,
   () => props.open,
   {
     onEdit(trans) {
       validation.reset();
-      title.value = trans.title ?? '';
       status.value = trans.status ?? 'pending';
       bookingReference.value = trans.bookingReference ?? '';
       pickupDate.value = trans.pickupDate ?? '';
@@ -96,7 +94,6 @@ const { isEditing, isSubmitting } = useFormModal(
     },
     onNew() {
       validation.reset();
-      title.value = '';
       status.value = 'pending';
       bookingReference.value = '';
       pickupDate.value = '';
@@ -249,7 +246,7 @@ async function handleSave() {
     variant="drawer"
     size="full"
     :open="open"
-    :title="isEditing ? t('travel.editTransportation') : t('travel.editTransportation')"
+    :title="t('travel.editTransportation')"
     icon="🚗"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
