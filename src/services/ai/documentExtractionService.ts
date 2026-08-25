@@ -33,6 +33,7 @@ import {
   type ExtractionResultByTask,
   type ExtractionSource,
   type ExtractionTask,
+  type RecipeExtractionResult,
   type TravelExtractionResult,
 } from './types';
 
@@ -232,6 +233,17 @@ export function extractEventFromDocument(
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<ExtractionResult>> {
   return runExtraction(file, opts, 'event');
+}
+
+/**
+ * Extract a recipe from a single document (photo, screenshot or PDF) and return a typed
+ * result (#72). Always resolves (never rejects) with a classified outcome.
+ */
+export function extractRecipeFromDocument(
+  file: File,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<RecipeExtractionResult>> {
+  return runExtraction(file, opts, 'recipe');
 }
 
 /**

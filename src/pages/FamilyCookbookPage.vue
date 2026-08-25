@@ -16,12 +16,20 @@ import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
+import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
+import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
+import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
+import { useAiCapability } from '@/composables/useAiCapability';
+import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
+import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePhotoStore } from '@/stores/photoStore';
 import type { Recipe } from '@/types/models';
+import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
 
 const router = useRouter();
 const { t } = useTranslation();
@@ -31,6 +39,35 @@ const { canEditActivities } = usePermissions();
 
 const modalOpen = ref(false);
 const editing = ref<Recipe | null>(null);
+
+// ── Magic-beans recipe reader (#72) ──────────────────────────────────────────
+// Orchestration lives in useRecipeCapture, NOT here. This page only: opens the
+// consent gate, opens the picker, opens the form with the prefill, and forwards
+// the saved id back for the source attach.
+const { canReadRecipe } = useMagicReader();
+const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
+const { tier: aiTier } = useAiCapability();
+const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
+const prefill = ref<RecipePrefill | null>(null);
+
+const capture = useRecipeCapture({
+  onRecipeReady: (ready) => {
+    prefill.value = ready.prefill;
+    editing.value = null;
+    modalOpen.value = true;
+  },
+});
+
+/** 🍳 entry point. Consent runs BEFORE the picker; a decline is a silent no-op. */
+async function handleAddFromDocument(): Promise<void> {
+  const granted = await requestConsent();
+  if (!granted) return;
+  aiDocPicker.value?.pick();
+}
+
+// Cross-surface dispatch: the global FAB card sets `pendingMagic` and routes here;
+// without this the chip would navigate to the cookbook and then silently do nothing.
+useMagicReaderConsumer('recipe', handleAddFromDocument, canReadRecipe);
 
 const recipes = computed(() =>
   [...recipesStore.recipes].sort((a, b) => a.name.localeCompare(b.name))
@@ -83,6 +120,15 @@ function openRecipe(r: Recipe): void {
 function closeModal(): void {
   modalOpen.value = false;
   editing.value = null;
+  // Abandoning the form drops the held source, so it can never attach to a later recipe.
+  prefill.value = null;
+  capture.discardPendingSource();
+}
+
+/** Save completed — hand the id back so the source document can be attached. */
+async function handleSaved(id: string): Promise<void> {
+  prefill.value = null;
+  await capture.attachAfterSave(id);
 }
 </script>
 
@@ -145,12 +191,20 @@ function closeModal(): void {
           </span>
         </div>
 
-        <AddEntityButton
-          v-if="canEditActivities"
-          :label="t('cookbook.addRecipe')"
-          class="w-full sm:ml-auto sm:w-auto"
-          @click="openAdd"
-        />
+        <div class="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
+          <MagicReaderPill
+            v-if="canReadRecipe"
+            :label="t('recipeExtract.reader.label')"
+            :aria-label="t('recipeExtract.reader.aria')"
+            @click="handleAddFromDocument"
+          />
+          <AddEntityButton
+            v-if="canEditActivities"
+            :label="t('cookbook.addRecipe')"
+            class="w-full sm:w-auto"
+            @click="openAdd"
+          />
+        </div>
       </div>
     </header>
 
@@ -219,6 +273,20 @@ function closeModal(): void {
       />
     </div>
 
-    <RecipeFormModal :open="modalOpen" :recipe="editing" @close="closeModal" />
+    <RecipeFormModal
+      :open="modalOpen"
+      :recipe="editing"
+      :prefill="prefill"
+      @close="closeModal"
+      @saved="handleSaved"
+    />
+
+    <DocumentExtractConsentModal
+      :open="consentOpen"
+      :tier="aiTier"
+      @confirm="onConsentConfirm"
+      @cancel="resolveConsent(false)"
+    />
+    <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
   </div>
 </template>

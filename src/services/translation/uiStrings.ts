@@ -848,6 +848,7 @@ const STRING_DEFS = {
   'recipes.field.name': { en: 'Recipe name', beanie: 'recipe name' },
   'recipes.field.subtitle': { en: 'Subtitle', beanie: 'subtitle' },
   'recipes.field.prepTime': { en: 'Prep time', beanie: 'prep time' },
+  'recipes.field.cookTime': { en: 'Cook time', beanie: 'cook time' },
   'recipes.field.servings': { en: 'Servings', beanie: 'servings' },
   'recipes.field.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
   'recipes.field.steps': { en: 'Preparation steps', beanie: 'preparation steps' },
@@ -874,6 +875,7 @@ const STRING_DEFS = {
     beanie: 'e.g. passed down from mary, ~1972',
   },
   'recipes.placeholder.prepTime': { en: 'e.g. 4h', beanie: 'e.g. 4h' },
+  'recipes.placeholder.cookTime': { en: 'e.g. 45 min', beanie: 'e.g. 45 min' },
   'recipes.placeholder.servings': { en: 'e.g. serves 6', beanie: 'e.g. serves 6' },
   'recipes.placeholder.ingredients': {
     en: 'One per line — 500g ground beef\\n3 carrots\\n…',
@@ -8048,6 +8050,38 @@ const STRING_DEFS = {
   'ai.pdfTruncated.message': {
     en: 'We read the first few pages of this PDF. The full document is still attached.',
     beanie: 'we read the first few pages of this pdf. the full document is still attached.',
+  },
+  // ── Recipe capture (#72) — the third magic-beans reader ──
+  'recipeExtract.notRecipe.title': { en: 'No Recipe Found', beanie: 'no recipe found' },
+  'recipeExtract.notRecipe.message': {
+    en: "We couldn't find a recipe in that. Try a clearer photo of the page, or type it in.",
+    beanie: "we couldn't find a recipe in that. try a clearer photo of the page, or type it in.",
+  },
+  'recipeExtract.attachFailed.title': { en: 'Recipe Saved', beanie: 'recipe saved' },
+  'recipeExtract.attachFailed.message': {
+    en: "Your recipe is safe, but we couldn't attach the original. You can add it yourself from the recipe.",
+    beanie:
+      "your recipe is safe, but we couldn't attach the original. you can add it yourself from the recipe.",
+  },
+  // Shown above the ingredients / steps fields when the reader filled values in itself.
+  // Heritage Orange, never Alert Red — this is a routine "worth a look", not an error.
+  'recipeExtract.inferred.ingredients': {
+    en: 'We filled these in ourselves — worth checking against the original:',
+    beanie: 'we filled these in ourselves — worth checking against the original:',
+  },
+  'recipeExtract.inferred.steps': {
+    en: 'We filled these steps in ourselves — worth a look:',
+    beanie: 'we filled these steps in ourselves — worth a look:',
+  },
+  'recipeExtract.reader.label': { en: 'Read a Recipe', beanie: 'read a recipe' },
+  'recipeExtract.reader.aria': {
+    en: 'Read a recipe from a photo or PDF',
+    beanie: 'read a recipe from a photo or pdf',
+  },
+  'recipeExtract.chip.title': { en: 'Recipe', beanie: 'recipe' },
+  'recipeExtract.chip.subtitle': {
+    en: 'Snap a recipe, beanies will write it up',
+    beanie: 'snap a recipe, beanies will write it up',
   },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
   'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },

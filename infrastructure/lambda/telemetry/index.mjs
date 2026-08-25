@@ -81,6 +81,9 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'quick_add',
   'share_scope',
   'overwrote',
+  'extraction_path',
+  'inferred_count',
+  'ingredient_count',
   // Plan export (#67, surface 'plan-export'). PII-free fixed enums: `format`
   // (image|pdf), `stage` (render|rasterize|pdf|deliver).
   'format',

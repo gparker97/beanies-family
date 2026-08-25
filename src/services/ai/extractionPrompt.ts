@@ -13,6 +13,9 @@ import type {
   ExtractionResult,
   ExtractionSource,
   FieldConfidence,
+  RecipeExtractionResult,
+  RecipeFieldConfidence,
+  RecipeLine,
   TravelExtractionResult,
   TravelSegmentDraft,
 } from './types';
@@ -183,6 +186,7 @@ export const REQUIRED_KEYS = [
 export const MODEL_FIELD_MAX = 200; // short scalars (title, date, location, …)
 export const MODEL_TEXT_MAX = 4000; // free text (description, notes)
 export const MODEL_LIST_MAX = 100; // entries in any model-returned array
+export const MODEL_URL_MAX = 2000; // any model-returned URL, before it is screened
 
 /**
  * Coerce to string and BOUND it. Defaults to the generous free-text cap so a caller that
@@ -329,6 +333,148 @@ export const TRAVEL_REQUIRED_KEYS = ['isTravel', 'tripName', 'tripTypeHint', 'se
  * Per-task registry so callers select prompt + required keys by task without scattered
  * `if (task === …)` branches. Adding a task = one entry here (and in the spike/server copies).
  */
+// ── Recipe task (3rd AI wedge, #72) ─────────────────────────────────────────────
+// A recipe source (photo of a cookbook page, screenshot, PDF — and, once the fetch
+// path lands, reduced web-page text or a video transcript) yields ONE recipe.
+// Keep RECIPE_* byte-identical across the spike/client/server copies (drift guard).
+
+/**
+ * The structured shape we ask the model to return for a recipe.
+ *
+ * `inferred` per ingredient/step is the mitigation for the one failure mode that
+ * actually matters here: cooking sources are ambiguous ("a shake of salt"), and a model
+ * that smooths that into "1 tsp salt" produces a confidently WRONG recipe. Marking is
+ * how the user sees what to check before saving.
+ */
+export const RECIPE_JSON_SHAPE = {
+  isRecipe:
+    'boolean — true only if the source is a real recipe with at least a name and either ingredients or steps',
+  name: 'string — the dish name, concise (e.g. "Lemon Drizzle Cake"), or "" if absent',
+  subtitle: 'string — a one-line description of the dish, or ""',
+  prepTime: 'string — preparation time as written (e.g. "20 minutes"), or ""',
+  cookTime: 'string — cooking time as written (e.g. "1 hour 10 minutes"), or ""',
+  servings: 'string — yield as written (e.g. "Serves 4", "12 muffins"), or ""',
+  ingredients:
+    'array — one object per ingredient: { text: string (the full line, quantity included, e.g. "250g plain flour"), inferred: boolean }. Empty array if none.',
+  steps:
+    'array — one object per step, in order: { text: string (a single instruction), inferred: boolean }. Do not number them. Empty array if none.',
+  notes:
+    'string — every practical detail with no dedicated field above: substitutions, storage, equipment, make-ahead, allergen notes. One fact per line. "" if there is nothing.',
+  imageUrl:
+    'string — a URL to an existing, freely usable photograph of the finished dish, or "" if you do not have a real one. Never a Getty/Shutterstock/watermarked asset, never an AI-generated image, and never a URL you are unsure exists.',
+  confidence: 'object — a 0..1 number for each of: name, ingredients, steps',
+};
+
+/** Top-level keys the recipe model output must include. */
+export const RECIPE_REQUIRED_KEYS = [
+  'isRecipe',
+  'name',
+  'ingredients',
+  'steps',
+  'confidence',
+] as const;
+
+/**
+ * Build the system+user message array for a recipe extraction.
+ *
+ * The system prompt is a FIXED constant with no interpolation of source content — that is
+ * a security property, not a style choice. Untrusted page text and transcripts go through
+ * buildUserMessage's fence; see its header.
+ */
+export function buildRecipeExtractionMessages(
+  source: ExtractionSource,
+  // Unused: a recipe has no relative dates to resolve, unlike an invitation or a booking.
+  // The parameter stays for signature uniformity so the registry can call every builder
+  // the same way — which is what lets the drift guard iterate them generically.
+  _todayIso: string
+): ChatMessage[] {
+  const system = [
+    'You extract ONE structured recipe from the provided source — images of a cookbook page, a screenshot, a photographed recipe card, or the text of a web page or video transcript.',
+    'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
+    'Never output a quantity, temperature or time that is not actually supported by the source. An empty field is ALWAYS better than a guessed one.',
+    'Set inferred=true on any ingredient or step whose quantity or timing was NOT stated in the source and which you filled in from general culinary knowledge. Do not smooth over ambiguity: "a shake of salt" is {"text":"salt, to taste","inferred":false}, never {"text":"1 tsp salt","inferred":false}.',
+    "Write the recipe in your own words as a clean structured list. Do not reproduce the source's narration or prose verbatim.",
+    'Set isRecipe=false if the source is not a recipe. Do not invent one.',
+    'For "notes", write each distinct fact on its own line (one per line), never a single run-on paragraph.',
+    'The JSON object must have exactly these keys: ' +
+      Object.keys(RECIPE_JSON_SHAPE).join(', ') +
+      '.',
+    'Field meanings: ' + JSON.stringify(RECIPE_JSON_SHAPE) + '.',
+  ].join('\n');
+
+  return [
+    { role: 'system', content: system },
+    buildUserMessage('Extract the recipe from this source as the specified JSON object.', source),
+  ];
+}
+
+/**
+ * Coerce one raw model entry into a {@link RecipeLine}.
+ *
+ * Tolerates a BARE STRING as well as the documented object: an older cached client, a BYOK
+ * provider, or a model having an off day will return `["250g flour"]`, and losing the whole
+ * ingredient list over that would be a worse outcome than treating it as not-inferred.
+ * Returns null for anything with no usable text, so the caller drops it rather than
+ * persisting an empty row.
+ */
+function parseRecipeLine(raw: unknown): RecipeLine | null {
+  if (typeof raw === 'string') {
+    const text = asString(raw, MODEL_FIELD_MAX * 2).trim();
+    return text ? { text, inferred: false } : null;
+  }
+  if (typeof raw !== 'object' || raw === null) return null;
+  const obj = raw as Record<string, unknown>;
+  const text = asString(obj.text, MODEL_FIELD_MAX * 2).trim();
+  return text ? { text, inferred: asBool(obj.inferred) } : null;
+}
+
+/**
+ * Validate + coerce a parsed recipe model object into a typed {@link RecipeExtractionResult}.
+ * Throws (callers wrap as `malformed_output`) when required top-level keys are missing, so a
+ * garbled response never becomes a half-formed recipe. Individual malformed ingredient/step
+ * entries are DROPPED rather than kept — same posture as the travel parser's segments.
+ */
+export function parseRecipeExtractionResult(raw: unknown): RecipeExtractionResult {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Recipe extraction output is not a JSON object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const missing = RECIPE_REQUIRED_KEYS.filter((k) => !(k in obj));
+  if (missing.length) {
+    throw new Error(`Recipe extraction output missing keys: ${missing.join(', ')}`);
+  }
+
+  const rawConfidence =
+    typeof obj.confidence === 'object' && obj.confidence !== null
+      ? (obj.confidence as Record<string, unknown>)
+      : {};
+  const confidence: RecipeFieldConfidence = {
+    name: clamp01(rawConfidence.name),
+    ingredients: clamp01(rawConfidence.ingredients),
+    steps: clamp01(rawConfidence.steps),
+  };
+
+  const toLines = (v: unknown): RecipeLine[] =>
+    (Array.isArray(v) ? v.slice(0, MODEL_LIST_MAX) : [])
+      .map(parseRecipeLine)
+      .filter((l): l is RecipeLine => l !== null);
+
+  return {
+    isRecipe: asBool(obj.isRecipe),
+    name: asString(obj.name, MODEL_FIELD_MAX),
+    subtitle: asString(obj.subtitle, MODEL_FIELD_MAX),
+    prepTime: asString(obj.prepTime, MODEL_FIELD_MAX),
+    cookTime: asString(obj.cookTime, MODEL_FIELD_MAX),
+    servings: asString(obj.servings, MODEL_FIELD_MAX),
+    ingredients: toLines(obj.ingredients),
+    steps: toLines(obj.steps),
+    notes: asString(obj.notes),
+    // NOT screened here — see RecipeExtractionResult.imageUrl. The caller screens it.
+    imageUrl: asString(obj.imageUrl, MODEL_URL_MAX),
+    confidence,
+  };
+}
+
 export const EXTRACTION_TASKS = {
   event: {
     buildMessages: buildExtractionMessages,
@@ -342,6 +488,12 @@ export const EXTRACTION_TASKS = {
     jsonShape: TRAVEL_JSON_SHAPE,
     sources: ['images'],
   },
+  recipe: {
+    buildMessages: buildRecipeExtractionMessages,
+    requiredKeys: RECIPE_REQUIRED_KEYS,
+    jsonShape: RECIPE_JSON_SHAPE,
+    sources: ['images'],
+  },
 } as const;
 
 /**
@@ -352,6 +504,7 @@ export const EXTRACTION_TASKS = {
 export const EXTRACTION_PARSERS = {
   event: parseExtractionResult,
   travel: parseTravelExtractionResult,
+  recipe: parseRecipeExtractionResult,
 } as const;
 
 /** The per-kind objects the model nests its detail fields under (per TRAVEL_JSON_SHAPE). */

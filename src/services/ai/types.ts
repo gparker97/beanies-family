@@ -70,6 +70,7 @@ export interface ExtractionRequest {
 export interface ExtractionResultByTask {
   event: ExtractionResult;
   travel: TravelExtractionResult;
+  recipe: RecipeExtractionResult;
 }
 
 /** The extraction tasks the funnel supports (one prompt/schema/parser per task). */
@@ -160,6 +161,45 @@ export interface TravelExtractionResult extends AttestedResult {
   /** One of the 6 VacationTripType values, or `''` if unclear. */
   tripTypeHint: string;
   segments: TravelSegmentDraft[];
+}
+
+/** One ingredient or step, carrying whether the model INFERRED it rather than read it. */
+export interface RecipeLine {
+  text: string;
+  /**
+   * True when the model filled this in from culinary knowledge rather than reading it.
+   * Surfaced in the review step so the user knows what to check — this is the mitigation
+   * for the accepted gap that a video's on-screen-only quantities are never heard.
+   */
+  inferred: boolean;
+}
+
+/** Per-field 0..1 confidence for a recipe extraction. */
+export interface RecipeFieldConfidence {
+  name: number;
+  ingredients: number;
+  steps: number;
+}
+
+/** The structured recipe extracted from a source. Mirrors RECIPE_JSON_SHAPE (#72). */
+export interface RecipeExtractionResult extends AttestedResult {
+  /** False when the source is not a recipe — handled gracefully, never invented. */
+  isRecipe: boolean;
+  name: string;
+  subtitle: string;
+  prepTime: string;
+  cookTime: string;
+  servings: string;
+  ingredients: RecipeLine[];
+  steps: RecipeLine[];
+  notes: string;
+  /**
+   * A model-supplied URL to a photo of the finished dish, or ''. UNTRUSTED and NOT yet
+   * screened here — the caller must put it through `safeHttpsUrl` (and, on the fetch path,
+   * a same-domain check) before it is fetched or stored. Never bind it to an element.
+   */
+  imageUrl: string;
+  confidence: RecipeFieldConfidence;
 }
 
 /**
