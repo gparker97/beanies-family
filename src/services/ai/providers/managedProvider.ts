@@ -1,6 +1,10 @@
 // Managed-tier provider (beanies-managed, default tier). The single compressed document
-// is sent to OUR server-side proxy, which holds the Tinfoil API key, rate-limits per
-// family, and retains nothing. A browser PWA cannot safely hold the provider key, hence
+// is sent to OUR server-side proxy, which holds the Tinfoil API key, is throttled per
+// ROUTE, and retains nothing. (Corrected 2026-08-25: this comment previously claimed
+// per-FAMILY rate limiting. There is none, and never has been — the only limit is a
+// global API-Gateway route throttle on `POST /ai-extract`, burst 5 / rate 2, shared by
+// every caller. Do not restate the per-family claim; it is a privacy/abuse statement we
+// cannot support.) A browser PWA cannot safely hold the provider key, hence
 // the proxy. The proxy returns our typed JSON contract ({ ...ExtractionResult }), so this
 // provider validates that shape rather than parsing a raw chat completion.
 //
