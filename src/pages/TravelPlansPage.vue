@@ -1106,7 +1106,14 @@ async function addQuickIdea() {
               style="background: linear-gradient(180deg, #00b4d8, rgb(0 180 216 / 30%))"
             />
 
-            <template v-for="(entry, ei) in mergedTimeline" :key="ei">
+            <!-- Keyed by CONTENT, not by index. The timeline is re-sorted whenever a date
+                 changes, and an index key makes Vue reuse the DOM of whatever previously sat
+                 at that position — carrying over collapsed state and in-flight inline edits
+                 to a different booking. -->
+            <template
+              v-for="entry in mergedTimeline"
+              :key="entry.type === 'group' ? `g:${entry.data.date}` : `gap:${entry.date}`"
+            >
               <!-- ── Gap warning (inline at correct date) ── -->
               <template v-if="entry.type === 'gap'">
                 <!-- Date header suppressed when a date-group exists for the
@@ -1128,7 +1135,7 @@ async function addQuickIdea() {
                   <div
                     :class="[
                       'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
-                      classifyTripDay(entry.date) === 'past'
+                      classifyTripDay(entry.date, todayISO) === 'past'
                         ? 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]'
                         : 'border-dashed border-[var(--heritage-orange)]',
                     ]"
@@ -1178,21 +1185,21 @@ async function addQuickIdea() {
                     <div
                       :class="[
                         'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
-                        classifyTripDay(entry.data.date) === 'today'
+                        classifyTripDay(entry.data.date, todayISO) === 'today'
                           ? 'today-date-circle'
-                          : classifyTripDay(entry.data.date) === 'past'
+                          : classifyTripDay(entry.data.date, todayISO) === 'past'
                             ? 'border-[#9aa9b5] text-[#9aa9b5]'
                             : 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]',
                       ]"
                     >
                       <span aria-hidden="true">{{
-                        classifyTripDay(entry.data.date) === 'past' ? '✓' : '📅'
+                        classifyTripDay(entry.data.date, todayISO) === 'past' ? '✓' : '📅'
                       }}</span>
                     </div>
                     <span
                       class="font-outfit flex items-baseline gap-1.5 text-[0.8125rem] font-bold"
                       :class="
-                        classifyTripDay(entry.data.date) === 'past'
+                        classifyTripDay(entry.data.date, todayISO) === 'past'
                           ? 'text-[var(--color-text-muted)]'
                           : 'text-gray-900 dark:text-gray-100'
                       "
@@ -1210,7 +1217,7 @@ async function addQuickIdea() {
                       </span>
                       {{ entry.data.label }}
                       <span
-                        v-if="classifyTripDay(entry.data.date) === 'past'"
+                        v-if="classifyTripDay(entry.data.date, todayISO) === 'past'"
                         class="font-outfit ml-1 rounded-full bg-[var(--tint-success-10)] px-2 py-0.5 text-[0.625rem] font-semibold text-green-700 dark:text-green-400"
                       >
                         {{ t('travel.timeline.done') }}
@@ -1222,7 +1229,7 @@ async function addQuickIdea() {
                        sits above today's segments (or alone, on a free-rest
                        day with no segments). -->
                   <TodayTimelineMarker
-                    v-if="classifyTripDay(entry.data.date) === 'today' && todayMarkerInfo"
+                    v-if="classifyTripDay(entry.data.date, todayISO) === 'today' && todayMarkerInfo"
                     :date="entry.data.date"
                     :day-number="todayMarkerInfo.dayNumber"
                     :total-days="todayMarkerInfo.totalDays"
@@ -1236,7 +1243,8 @@ async function addQuickIdea() {
                     <div
                       class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full"
                       :class="
-                        classifyTripDay(entry.data.date) === 'today' || item.timing?.isOngoingSpan
+                        classifyTripDay(entry.data.date, todayISO) === 'today' ||
+                        item.timing?.isOngoingSpan
                           ? 'bg-[rgba(241,93,34,0.45)]'
                           : 'bg-[#00B4D8] opacity-25'
                       "
@@ -1244,7 +1252,8 @@ async function addQuickIdea() {
                     <div
                       class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px]"
                       :class="
-                        classifyTripDay(entry.data.date) === 'today' || item.timing?.isOngoingSpan
+                        classifyTripDay(entry.data.date, todayISO) === 'today' ||
+                        item.timing?.isOngoingSpan
                           ? 'bg-[rgba(241,93,34,0.20)]'
                           : 'bg-[rgba(0,180,216,0.12)]'
                       "
