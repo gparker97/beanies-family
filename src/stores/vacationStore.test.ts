@@ -1064,4 +1064,153 @@ describe('vacationStore', () => {
       expect(ids).toEqual(['s-a', 's-c']);
     });
   });
+
+  describe('saveExtractedTrip (the cross-store transaction moved out of the view)', () => {
+    function buckets(over?: Record<string, unknown>) {
+      return {
+        travelSegments: [],
+        accommodations: [],
+        transportation: [],
+        ...over,
+      } as never;
+    }
+
+    beforeEach(() => {
+      const createdActivity = makeActivity({ id: 'act-new' });
+      vi.mocked(activityRepo.createActivity).mockResolvedValue(createdActivity);
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(createdActivity);
+      vi.mocked(vacationRepo.createVacation).mockImplementation(
+        async (input) => ({ ...makeVacation(), ...input, id: 'vac-new' }) as never
+      );
+    });
+
+    it('seeds trip travellers from the union the document named', async () => {
+      const store = useVacationStore();
+      const res = await store.saveExtractedTrip(
+        { kind: 'create', tripName: 'Japan', tripType: 'fly_and_stay' },
+        buckets({
+          travelSegments: [
+            {
+              id: 's-1',
+              type: 'flight_outbound',
+              title: 'Out',
+              status: 'booked',
+              travellerIds: ['m-1'],
+            },
+            {
+              id: 's-2',
+              type: 'flight_return',
+              title: 'Back',
+              status: 'booked',
+              travellerIds: ['m-2'],
+            },
+          ],
+        }),
+        'm-1'
+      );
+
+      expect(res?.vacationId).toBe('vac-new');
+      const created = vi.mocked(vacationRepo.createVacation).mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      expect(created.assigneeIds).toEqual(['m-1', 'm-2']);
+    });
+
+    it('materializes that union onto a segment the model matched nobody for', async () => {
+      const store = useVacationStore();
+      await store.saveExtractedTrip(
+        { kind: 'create', tripName: 'Japan', tripType: 'fly_and_stay' },
+        buckets({
+          travelSegments: [
+            {
+              id: 's-1',
+              type: 'flight_outbound',
+              title: 'Out',
+              status: 'booked',
+              travellerIds: ['m-1'],
+            },
+            { id: 's-2', type: 'ferry', title: 'Ferry', status: 'booked' },
+          ],
+        }),
+        'm-1'
+      );
+      const created = vi.mocked(vacationRepo.createVacation).mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const segs = created.travelSegments as Array<{ id: string; travellerIds?: string[] }>;
+      expect(segs.find((x) => x.id === 's-2')!.travellerIds).toEqual(['m-1']);
+    });
+
+    it('does NOT materialize an EMPTY union — the segment must stay undefined', async () => {
+      // The rule that had no enforcement. `[]` is DEFINED, and a defined travellerIds is
+      // never re-resolved when the trip's travellers change — so a document naming nobody
+      // (routine on hotel confirmations) pinned every segment to "nobody" permanently: no
+      // avatars, and the flight on no one's calendar with no UI able to clear it.
+      const store = useVacationStore();
+      await store.saveExtractedTrip(
+        { kind: 'create', tripName: 'Japan', tripType: 'fly_and_stay' },
+        buckets({
+          accommodations: [{ id: 'a-1', type: 'hotel', title: 'Hotel', status: 'booked' }],
+        }),
+        'm-1'
+      );
+      const created = vi.mocked(vacationRepo.createVacation).mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const accs = created.accommodations as Array<{ travellerIds?: string[] }>;
+      expect(accs[0]!.travellerIds).toBeUndefined();
+    });
+
+    it('attaches to an existing trip and returns the id-remap', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        travelSegments: [
+          {
+            id: 's-existing',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'pending',
+            flightNumber: 'BA123',
+            departureDate: '2026-07-01',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+
+      const res = await store.saveExtractedTrip(
+        { kind: 'attach', vacationId: 'vac-1' },
+        buckets({
+          travelSegments: [
+            {
+              id: 's-extracted',
+              type: 'flight_outbound',
+              title: 'Out',
+              status: 'booked',
+              flightNumber: 'BA123',
+              departureDate: '2026-07-01',
+            },
+          ],
+        }),
+        'm-1'
+      );
+
+      expect(res?.vacationId).toBe('vac-1');
+      // The document must follow the SURVIVING id or its attachment is orphaned.
+      expect(res!.idRemap['s-extracted']).toBe('s-existing');
+    });
+
+    it('returns null rather than throwing when the attach target is gone', async () => {
+      const store = useVacationStore();
+      expect(
+        await store.saveExtractedTrip({ kind: 'attach', vacationId: 'nope' }, buckets(), 'm-1')
+      ).toBeNull();
+    });
+  });
 });
