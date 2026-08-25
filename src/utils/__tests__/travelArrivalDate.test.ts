@@ -41,9 +41,22 @@ describe('overnight arrival date', () => {
     };
     const dep = '2026-08-25';
     expect(addDaysYmd(dep, 1)).not.toBe(dep);
-    // Under a UTC+0-or-east TZ the broken form returns the departure date unchanged.
-    if (new Date(`${dep}T00:00:00`).getTimezoneOffset() <= 0) {
+
+    // The bug appears STRICTLY EAST of UTC — `getTimezoneOffset() < 0`, not `<= 0`.
+    //
+    // At exactly UTC the broken form is coincidentally CORRECT: local midnight *is* UTC
+    // midnight, so adding a day and reading the UTC date gives the right answer. My first
+    // guard used `<= 0`, which passed in Asia/Singapore and failed in CI, where runners are
+    // UTC. Measured: UTC and America/New_York → 2026-08-26 (correct); Europe/London and
+    // Asia/Singapore → 2026-08-25 (the bug).
+    //
+    // Worth keeping as a conditional rather than pinning a TZ: it documents exactly where
+    // the original defect does and does not bite, which is the thing that made it survive
+    // review — it looked fine from the timezones it was tested in.
+    if (new Date(`${dep}T00:00:00`).getTimezoneOffset() < 0) {
       expect(broken(dep)).toBe(dep);
+    } else {
+      expect(broken(dep)).not.toBe(dep);
     }
   });
 });
