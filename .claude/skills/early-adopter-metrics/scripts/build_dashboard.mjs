@@ -176,6 +176,37 @@ if (pl) {
   // double-count anyone who clicked both /welcome and /login.
   const outboundToApp = pl.marketing.outboundToApp?.visitors || null;
 
+  // ── CTA clicks: the step BETWEEN landing and handing off ──────────────────
+  //
+  // Until these events existed the store-badge path was completely dark: /ios,
+  // /android and /download are standalone pages carrying no Plausible at all, so
+  // there was not even a pageview between the homepage and the App Store. A
+  // visitor who came to install the app was indistinguishable from one who
+  // bounced.
+  //
+  // Kept as its own panel rather than forced into the acquisition funnel: the
+  // three CTAs lead to THREE different destinations (the web app, the App Store,
+  // Google Play), and only the first continues into the app funnel below. Stacking
+  // them as one step would imply a single path that does not exist.
+  const ctaRows = pl.marketing.ctaClicks || [];
+  const ctaTotal = ctaRows.reduce((n, r) => n + (r.visitors || 0), 0);
+  const ctaByName = (needle) => {
+    const r = ctaRows.find((x) => (x['event:name'] || '').includes(needle));
+    return r ? r.visitors : 0;
+  };
+  const cta = ctaRows.length
+    ? {
+        total: ctaTotal,
+        createPod: ctaByName('Create Pod'),
+        ios: ctaByName('iOS'),
+        android: ctaByName('Android'),
+        // Of everyone who reached the site, how many asked to start? The honest
+        // top-of-funnel intent signal, and the one to move.
+        pctOfVisitors: siteVisitors ? Math.round((ctaTotal / siteVisitors) * 1000) / 10 : null,
+        byPlacement: pl.marketing.ctaByPlacement || [],
+      }
+    : null;
+
   // Step choice matters. `appArrivals` is NOT a funnel step under the marketing
   // site: it also contains returning users signing in, who were never marketing
   // visitors this window — so placing it below the hand-off makes the funnel
@@ -262,6 +293,10 @@ if (pl) {
     started,
     completed,
     completedWeb,
+    // null when no CTA events have landed yet (e.g. before the marketing deploy
+    // that added them) — the template hides the panel rather than showing zeros
+    // that would read as "nobody clicked".
+    cta,
     // Volume, not a second rate — looped in the template so a new platform (or a
     // `(none)` bucket) is never an HTML edit.
     //

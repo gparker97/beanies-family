@@ -67,12 +67,37 @@ const PLAY_URL = 'https://play.google.com/store/apps/details?id=family.beanies.a
         font-size: 0.9rem;
       }
     </style>
+    <!-- Plausible + the CTA listener. This page is deliberately standalone (no BaseLayout),
+         which meant it carried NO analytics at all — so the two store buttons that are the
+         page's entire purpose were invisible. Same event names as the homepage badges, with a
+         different `location`, so the two placements can be compared. -->
+    <script is:inline async src="https://plausible.io/js/pa-3pxexgz2YF03NyMDucQKN.js"></script>
+    <script is:inline>
+      ((window.plausible =
+        window.plausible ||
+        function () {
+          (plausible.q = plausible.q || []).push(arguments);
+        }),
+        (plausible.init = plausible.init || function (i) { plausible.o = i || {}; }));
+      plausible.init();
+      document.addEventListener(
+        'click',
+        function (e) {
+          var el = e.target && e.target.closest && e.target.closest('[data-cta]');
+          if (!el) return;
+          window.plausible(el.getAttribute('data-cta'), {
+            props: { location: el.getAttribute('data-cta-loc') || 'unknown' },
+          });
+        },
+        true
+      );
+    </script>
   </head>
   <body>
     <h1>get <span>beanies.family</span> on your phone</h1>
     <div class="choices">
-      <a href="/ios" rel="noopener">📱 App Store — iPhone &amp; iPad</a>
-      <a href="/android" rel="noopener">🤖 Google Play — Android</a>
+      <a href="/ios" rel="noopener" data-cta="CTA: App Store (iOS)" data-cta-loc="download-page">📱 App Store — iPhone &amp; iPad</a>
+      <a href="/android" rel="noopener" data-cta="CTA: App Store (Android)" data-cta-loc="download-page">🤖 Google Play — Android</a>
     </div>
     <p class="muted">no phone handy? open <strong>app.beanies.family</strong> in your browser — it works there too.</p>
     <script is:inline define:vars={{ APP_STORE_URL, PLAY_URL }}>

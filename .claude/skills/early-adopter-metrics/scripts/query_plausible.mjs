@@ -135,7 +135,7 @@ async function marketingBundle() {
   // ── Enrichment (all soft) ──────────────────────────────────────────────────
   const [
     channelSources, directEntry, directCountries, directDevices,
-    directOverview, goals, outbound, outboundToApp,
+    directOverview, goals, ctaClicks, ctaByPlacement, outbound, outboundToApp,
   ] = await Promise.all([
     // THE channel->source drill-down: turns "Organic Social 120" into
     // "Organic Social: Reddit 90, Pinterest 30". Two dimensions in one query.
@@ -165,6 +165,28 @@ async function marketingBundle() {
       metrics: ['visitors', 'visits', 'pageviews', 'bounce_rate', 'visit_duration'], filters: DIRECT_FILTER,
     }),
     soft('marketing goals', site, { metrics: ['visitors', 'events'], dimensions: ['event:goal'], pagination: { limit: 30 } }),
+    // CTA clicks, broken down by PLACEMENT.
+    //
+    // Queried on event:name rather than event:goal deliberately: a custom event shows up
+    // here as soon as the site fires it, whereas event:goal returns only goals somebody has
+    // configured in the Plausible UI. That means this panel works immediately and keeps
+    // working even if a goal is renamed or never created.
+    //
+    // Until these were added, the store-badge clicks were entirely invisible: /ios, /android
+    // and /download are standalone pages that carried no Plausible at all, so there was not
+    // even a pageview between the homepage and the App Store.
+    soft('cta clicks', site, {
+      metrics: ['visitors', 'events'],
+      dimensions: ['event:name'],
+      filters: [['contains', 'event:name', ['CTA: ']]],
+      pagination: { limit: 20 },
+    }),
+    soft('cta clicks by placement', site, {
+      metrics: ['visitors', 'events'],
+      dimensions: ['event:name', 'event:props:location'],
+      filters: [['contains', 'event:name', ['CTA: ']]],
+      pagination: { limit: 40 },
+    }),
     // Outbound link clicks are the ONLY real marketing->app handoff signal we
     // have (the two sites share no visitor id). Requires Plausible's outbound
     // -links script extension on the marketing site; degrades if absent.
@@ -201,6 +223,8 @@ async function marketingBundle() {
     // enrichment (any may be null)
     channelSources: rows(channelSources),
     goals: rows(goals),
+    ctaClicks: rows(ctaClicks),
+    ctaByPlacement: rows(ctaByPlacement),
     outbound: rows(outbound),
     outboundToApp: rows(outboundToApp)?.[0] || null,
     direct: {

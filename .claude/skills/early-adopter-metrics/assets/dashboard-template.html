@@ -222,6 +222,13 @@
 
     <div class="kpis" id="kpisAcq"></div>
 
+    <div class="panel full" id="ctaPanel" style="margin-bottom:16px;display:none">
+      <h2>What they clicked — the three ways in</h2>
+      <p class="cap" id="ctacap"></p>
+      <div class="kpis" id="ctaKpis"></div>
+      <div id="ctaPlacements"></div>
+    </div>
+
     <div class="panel full" style="margin-bottom:16px">
       <h2>The journey — from channel to family</h2>
       <p class="cap" id="journeycap"></p>
@@ -431,6 +438,29 @@ function renderFunnel(elId,steps,opts){
       <div class="fpc ${i===0?'first':''}" style="${grew?'color:var(--warn)':''}">${i===0?'top':step+'%'}<span class="fof">${i===0?'of total':ofTop+'% of top'}</span></div>
     </div>`;
   }).join('');
+}
+
+// CTA clicks — kept OUT of the acquisition funnel on purpose: the three CTAs lead to three
+// different destinations (web app, App Store, Google Play) and only the first continues into
+// the funnel below, so stacking them as one step would imply a single path that isn't real.
+if(C && C.cta){
+  $('ctaPanel').style.display='';
+  $('ctacap').innerHTML=`<b>${num(C.cta.total)}</b> visitors clicked a call to action`+
+    (C.cta.pctOfVisitors!=null?` — <b>${C.cta.pctOfVisitors}%</b> of everyone who reached the site`:'')+
+    `. The two store buttons were invisible before these events existed: <code>/ios</code>, `+
+    `<code>/android</code> and <code>/download</code> are standalone pages that carried no `+
+    `analytics, so there wasn't even a pageview between the homepage and the App Store.`;
+  $('ctaKpis').innerHTML=[
+    ['Create a pod (web/PWA)',C.cta.createPod],
+    ['App Store (iOS)',C.cta.ios],
+    ['Google Play (Android)',C.cta.android],
+  ].map(([k,v])=>`<div class="kpi"><div class="kv">${num(v)}</div><div class="kk">${k}</div></div>`).join('');
+  const rows=(C.cta.byPlacement||[]).filter(r=>r.visitors>0);
+  $('ctaPlacements').innerHTML = rows.length
+    ? `<table class="tbl"><thead><tr><th>Call to action</th><th>Where on the site</th><th class="r">Visitors</th></tr></thead><tbody>`+
+      rows.map(r=>`<tr><td>${r['event:name']||'—'}</td><td>${r['event:props:location']||'—'}</td><td class="r">${num(r.visitors)}</td></tr>`).join('')+
+      `</tbody></table>`
+    : '';
 }
 
 if(D.funnelAcq){
