@@ -18,6 +18,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
+import RecipeLinkModal from '@/components/pod/RecipeLinkModal.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import { useAiCapability } from '@/composables/useAiCapability';
@@ -50,6 +51,7 @@ const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDoc
 const { tier: aiTier } = useAiCapability();
 const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 const prefill = ref<RecipePrefill | null>(null);
+const linkModalOpen = ref(false);
 
 const capture = useRecipeCapture({
   onRecipeReady: (ready) => {
@@ -58,6 +60,18 @@ const capture = useRecipeCapture({
     modalOpen.value = true;
   },
 });
+
+/** The picker's third option — recipes can come from a link, not just a photo. */
+const linkChoice = computed(() => ({
+  id: 'link',
+  icon: 'link',
+  label: t('recipeExtract.link.choice'),
+}));
+
+function handlePastedLink(url: string): void {
+  linkModalOpen.value = false;
+  void capture.processUrl(url);
+}
 
 /** 🍳 entry point. Consent runs BEFORE the picker; a decline is a silent no-op. */
 async function handleAddFromDocument(): Promise<void> {
@@ -314,6 +328,16 @@ async function handleSaved(id: string): Promise<void> {
       @confirm="onConsentConfirm"
       @cancel="resolveConsent(false)"
     />
-    <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
+    <AiDocumentPicker
+      ref="aiDocPicker"
+      :extra-choice="linkChoice"
+      @file="(f) => void capture.processFile(f)"
+      @extra="linkModalOpen = true"
+    />
+    <RecipeLinkModal
+      :open="linkModalOpen"
+      @close="linkModalOpen = false"
+      @submit="handlePastedLink"
+    />
   </div>
 </template>

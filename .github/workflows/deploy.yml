@@ -176,6 +176,11 @@ jobs:
           # cleanly reports "not available yet" (no broken UI).
           VITE_AI_EXTRACT_URL: ${{ vars.AI_EXTRACT_URL }}
           VITE_AI_EXTRACT_API_KEY: ${{ secrets.AI_EXTRACT_API_KEY }}
+          # Recipe content fetcher (#72). On EVERY lane: the parity test only enforces the
+          # two release lanes, so the debug lanes must be kept in step by hand or a native
+          # debug build silently loses the ability to capture a recipe from a link.
+          VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
+          VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
           # Plausible site script ID for app.beanies.family (the Vue PWA).
           # `src/services/analytics/plausible.ts` is gated on this var so a
           # vanilla self-host stays fully offline by default — only the
