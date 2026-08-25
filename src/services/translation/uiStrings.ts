@@ -2098,6 +2098,8 @@ const STRING_DEFS = {
   // Shown when a member without edit rights reaches a mutation another way — a quick-add
   // intent, the keyboard, or a view that went stale after their role changed. Info, not
   // error: nothing is broken and they have done nothing wrong.
+  'travel.jumpToIdeas': { en: 'Jump to trip ideas', beanie: 'jump to trip ideas' },
+  'travel.openTrip': { en: 'Open trip: {name}', beanie: 'open trip: {name}' },
   'travel.segmentGone.title': { en: 'That Booking Is Gone', beanie: 'that booking is gone' },
   'travel.segmentGone.message': {
     en: 'Someone removed this booking while you had it open, so there was nothing to save it to.',
