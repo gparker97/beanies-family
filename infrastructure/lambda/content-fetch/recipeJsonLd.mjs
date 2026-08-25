@@ -1,4 +1,5 @@
 import { asciiLower } from './asciiLower.mjs';
+import { decodeEntities } from './entities.mjs';
 /**
  * schema.org/Recipe extraction from a page's JSON-LD (#72).
  *
@@ -15,10 +16,22 @@ const MAX_ITEMS = 100;
 const MAX_LINE = 4000;
 const MAX_FIELD = 200;
 
+/**
+ * A JSON-LD scalar as clean display text.
+ *
+ * DECODES ENTITIES. JSON-LD is embedded IN an HTML document, and plenty of CMSes HTML-escape
+ * the values they emit into it — allrecipes returns `World&#39;s Best Lasagna` as the recipe
+ * name. Undecoded, that lands in the form at confidence 1 and then replicates into the
+ * `.beanpod` permanently. Found by probing the deployed endpoint against real sites, not by
+ * a test: every fixture in the suite used clean values.
+ *
+ * Decode BEFORE slicing, so the cap cannot cut an entity in half. `decodeEntities` is
+ * single-pass, so an escaped entity (`&amp;quot;`) stays escaped rather than unravelling.
+ */
 function text(v, max = MAX_FIELD) {
   if (typeof v === 'number') return String(v).slice(0, max);
   if (typeof v !== 'string') return '';
-  return v.trim().slice(0, max);
+  return decodeEntities(v.trim()).slice(0, max);
 }
 
 /** `@type` may be a string OR an array (`["Recipe","NewsArticle"]`). Both are legal. */
