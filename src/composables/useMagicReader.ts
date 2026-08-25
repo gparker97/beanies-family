@@ -32,12 +32,23 @@ import {
 } from '@/composables/useQuickAdd';
 
 /** Which AI reader an affordance asked to open. */
-export type MagicReader = 'photo' | 'document';
+export type MagicReader = 'photo' | 'document' | 'recipe';
 
-/** Where each reader's extraction flow lives. */
-const ROUTE_FOR_READER: Record<MagicReader, string> = {
-  photo: '/activities',
-  document: '/travel',
+/**
+ * One registry per reader, replacing what used to be four parallel structures (the union,
+ * a route map, a named opener, and a gating computed) that each needed an edit per reader.
+ * A fourth reader is now ONE entry here plus a one-line wrapper.
+ *
+ * `flag` is optional on purpose: the recipe reader ships UNGATED by explicit decision
+ * (greg, #72). Do not add a flag for it — feature gating in this project is by request only.
+ */
+const MAGIC_READERS: Record<
+  MagicReader,
+  { route: string; flag?: 'aiPhotoExtract' | 'aiTravelExtract' }
+> = {
+  photo: { route: '/activities', flag: 'aiPhotoExtract' },
+  document: { route: '/travel', flag: 'aiTravelExtract' },
+  recipe: { route: '/pod/cookbook' },
 };
 
 // --- Module singleton state ------------------------------------------------
@@ -72,7 +83,7 @@ export const pendingMagicReader = computed(() => pendingMagic.value);
  */
 function openReader(reader: MagicReader): void {
   pendingMagic.value = reader;
-  const path = ROUTE_FOR_READER[reader];
+  const path = MAGIC_READERS[reader].route;
   if (router.currentRoute.value.path === path) {
     closeQuickAdd();
     return;
@@ -91,6 +102,10 @@ export function openPhotoReader(): void {
 
 export function openDocumentReader(): void {
   openReader('document');
+}
+
+export function openRecipeReader(): void {
+  openReader('recipe');
 }
 
 /**
@@ -143,16 +158,29 @@ export function useMagicReaderConsumer(
  */
 export function useMagicReader() {
   const { canEditActivities } = usePermissions();
-  const canReadPhoto = computed(() => canEditActivities.value && isFlagEnabled('aiPhotoExtract'));
-  const canReadDocument = computed(
-    () => canEditActivities.value && isFlagEnabled('aiTravelExtract')
+  /** Permission × (flag, when the reader declares one). A flagless reader is permission-only. */
+  const gate = (reader: MagicReader) =>
+    computed(() => {
+      const { flag } = MAGIC_READERS[reader];
+      return canEditActivities.value && (flag === undefined || isFlagEnabled(flag));
+    });
+  const canReadPhoto = gate('photo');
+  const canReadDocument = gate('document');
+  // The cookbook gates its own add/edit affordances on canEditActivities (which is
+  // `isOwner || canManagePod || member.canEditActivities` — canManagePod is a strict
+  // SUBSET). Gating this reader on canManagePod would hide it from members who are
+  // allowed to edit the cookbook.
+  const canReadRecipe = gate('recipe');
+  const canReadAny = computed(
+    () => canReadPhoto.value || canReadDocument.value || canReadRecipe.value
   );
-  const canReadAny = computed(() => canReadPhoto.value || canReadDocument.value);
   return {
     canReadPhoto,
     canReadDocument,
+    canReadRecipe,
     canReadAny,
     openPhotoReader,
     openDocumentReader,
+    openRecipeReader,
   };
 }
