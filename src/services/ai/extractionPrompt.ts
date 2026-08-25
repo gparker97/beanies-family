@@ -478,14 +478,17 @@ export function parseRecipeExtractionResult(raw: unknown): RecipeExtractionResul
     steps: clamp01(rawConfidence.steps),
   };
 
-  // Filter BEFORE slicing: slicing first spends the budget on entries that are then
-  // dropped, so a response whose first MODEL_LIST_MAX entries are malformed would yield
-  // an empty list rather than the valid tail.
-  const toLines = (v: unknown): RecipeLine[] =>
-    (Array.isArray(v) ? v : [])
-      .map(parseRecipeLine)
-      .filter((l): l is RecipeLine => l !== null)
-      .slice(0, MODEL_LIST_MAX);
+  // Bounded collect — see the note in toStringList. Skips malformed leading entries
+  // without walking a hostile 5000-entry array in full.
+  const toLines = (v: unknown): RecipeLine[] => {
+    const out: RecipeLine[] = [];
+    for (const item of Array.isArray(v) ? v : []) {
+      if (out.length >= MODEL_LIST_MAX) break;
+      const line = parseRecipeLine(item);
+      if (line) out.push(line);
+    }
+    return out;
+  };
 
   return {
     isRecipe: asBool(obj.isRecipe),
@@ -562,14 +565,21 @@ const SEGMENT_STRUCTURAL_KEYS = new Set<string>([
 /** Coerce an unknown into a clean list of trimmed, non-empty strings (else []). */
 function toStringList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
-  // Filter BEFORE slicing — the same rule stated on toLines below. Slicing first spends
-  // the budget on entries that are then dropped, so `[null ×100, "Alice", "Bob"]` (a shape
-  // the parser explicitly tolerates elsewhere) would yield [] instead of the valid tail.
-  return raw
-    .filter((x): x is string => typeof x === 'string')
-    .map((s) => asString(s, MODEL_FIELD_MAX).trim())
-    .filter(Boolean)
-    .slice(0, MODEL_LIST_MAX);
+  // COLLECT until the budget is full, rather than filter-then-slice or slice-then-filter.
+  //
+  // Slice first and a leading run of junk empties the list (`[null ×100, "Alice", "Bob"]`
+  // → []), which is the bug this replaced. But filter first and a hostile response makes us
+  // walk EVERY entry — 5000 × 1MB strings — before throwing almost all of it away. That is
+  // not hypothetical: it turned the caps test from instant into 6s, and a bounded walk is
+  // the only shape that is both correct and cheap.
+  const out: string[] = [];
+  for (const item of raw) {
+    if (out.length >= MODEL_LIST_MAX) break;
+    if (typeof item !== 'string') continue;
+    const text = asString(item, MODEL_FIELD_MAX).trim();
+    if (text) out.push(text);
+  }
+  return out;
 }
 
 /** Copy a source object's scalar (string/number) entries into `target`, skipping `skip` keys. */
@@ -668,12 +678,15 @@ export function parseTravelExtractionResult(raw: unknown): TravelExtractionResul
   if (missing.length) {
     throw new Error(`Travel extraction output missing keys: ${missing.join(', ')}`);
   }
-  // Filter before slicing — see the note on toLines in the recipe parser.
+  // Bounded collect — see the note in toStringList. Parsing a segment is expensive
+  // (it sweeps every field), so walking 5000 of them to keep 100 is the costly case.
   const rawSegments = Array.isArray(obj.segments) ? obj.segments : [];
-  const segments = rawSegments
-    .map(parseTravelSegment)
-    .filter((s): s is TravelSegmentDraft => s !== null)
-    .slice(0, MODEL_LIST_MAX);
+  const segments: TravelSegmentDraft[] = [];
+  for (const raw of rawSegments) {
+    if (segments.length >= MODEL_LIST_MAX) break;
+    const seg = parseTravelSegment(raw);
+    if (seg) segments.push(seg);
+  }
 
   return {
     isTravel: asBool(obj.isTravel),

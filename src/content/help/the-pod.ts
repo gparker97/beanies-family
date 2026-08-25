@@ -504,14 +504,193 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: 'add-a-recipe-from-anywhere',
+    category: 'features',
+    title: 'Add a Recipe From Anywhere',
+    excerpt:
+      'Point beanies at a photo, a PDF, a recipe link or a cooking video, and it writes the recipe into your cookbook for you to check.',
+    icon: '🍳',
+    readTime: 5,
+    updatedDate: '2026-08-25',
+    popular: true,
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why this exists',
+        level: 2,
+        id: 'why',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Recipes turn up everywhere — a photo of Grandma’s index card, a screenshot from the family chat, a food blog, a YouTube video. Typing all of that in by hand is the reason most family cookbooks stay empty. Hand beanies whatever you have, and it fills in the ingredients, steps, times and servings for you to check before anything is saved.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You still get the final say. Nothing goes into your cookbook until you press <strong>Save</strong> — the form that opens is your chance to read it over and fix anything.',
+      },
+      {
+        type: 'heading',
+        content: 'Starting a recipe reading',
+        level: 2,
+        id: 'starting',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>The Pod 🌱 → Family Cookbook</strong>',
+          'Tap <strong>Read a Recipe</strong> at the top of the page (next to <strong>Add a recipe</strong>)',
+          'The first time, beanies asks your permission to send this one recipe to be read — have a look at what it says, then agree',
+          'Choose <strong>Take a photo</strong>, <strong>Choose a file</strong>, or <strong>Paste a Link</strong>',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'You can also start from the <strong>+</strong> button anywhere in the app — look for the <strong>Magic beans</strong> card and tap <strong>Recipe 🍳</strong>. It takes you to the cookbook and opens the reader.',
+        title: 'A shortcut from anywhere',
+        icon: '✨',
+      },
+      {
+        type: 'heading',
+        content: 'From a photo or a PDF',
+        level: 2,
+        id: 'photo',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Take a photo of a cookbook page or a recipe card, choose a screenshot from your phone, or pick a PDF. beanies reads it and opens the recipe form already filled in. Once you save, the original photo or PDF is attached to the recipe, so you always have the thing you started from.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Long PDFs are read a few pages at a time. If yours is longer, beanies tells you — and the whole file is still attached to the recipe, so nothing is lost.',
+        title: 'Long documents',
+        icon: '📄',
+      },
+      {
+        type: 'heading',
+        content: 'From a recipe website',
+        level: 2,
+        id: 'link',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Choose <strong>Paste a Link</strong> and drop in the address of a recipe page. Most recipe sites publish their ingredients and steps in a form beanies can read <em>exactly</em> — when that happens, the quantities come straight from the site rather than being worked out, so nothing can be misread. The link is saved with the recipe, so you can always get back to the original.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Some websites don’t allow apps to read their pages. If that happens beanies will tell you plainly rather than guessing — open the page yourself and paste the recipe text instead, or try the site’s “print” version.',
+        title: 'Not every site will let us in',
+        icon: '🚧',
+      },
+      {
+        type: 'heading',
+        content: 'From a YouTube video',
+        level: 2,
+        id: 'youtube',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Paste a video link and beanies tries the most reliable route first: many cooking channels put the full recipe on their own website and link it in the description, so if there’s a link there, beanies follows it and reads the real recipe. If there isn’t, it falls back to the video’s captions and description.',
+      },
+      {
+        type: 'callout',
+        content:
+          'If a video has no captions <em>and</em> no recipe link, beanies will say it can’t read that one rather than inventing a recipe from the title. That’s deliberate — a made-up quantity in a recipe is worse than no recipe at all.',
+        title: 'Some videos can’t be read',
+        icon: '🎬',
+      },
+      {
+        type: 'callout',
+        content:
+          'Cooks often show quantities on screen without saying them out loud — “add the flour” while <em>250g</em> sits in the corner. beanies listens to the words, so it can miss those. Check the amounts against the video before you cook.',
+        title: 'Watch the quantities on videos',
+        icon: '⚖️',
+      },
+      {
+        type: 'heading',
+        content: 'Checking before you save',
+        level: 2,
+        id: 'checking',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The recipe form opens with everything filled in. Read it over, fix anything that looks off, and add your own <strong>Family notes</strong>. Nothing is saved until you tap <strong>Save</strong>.',
+      },
+      {
+        type: 'callout',
+        content:
+          'If beanies had to fill in an amount or a timing itself — because the source didn’t say — it lists those lines in orange under <strong>Ingredients</strong> and <strong>Preparation steps</strong>. Those are the ones worth checking against the original before you cook.',
+        title: 'Anything we guessed is flagged',
+        icon: '🟠',
+      },
+      {
+        type: 'heading',
+        content: 'What about the photo?',
+        level: 2,
+        id: 'photo-of-dish',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When a recipe comes from a website, beanies saves a copy of that site’s own photo of the dish into your pod. It’s a real copy, not a link — so the picture keeps working even if the website changes, and viewing your recipe never reaches out to anyone else’s server. You can replace it with your own photo any time.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Photos need Google Drive turned on. Without it the recipe still saves perfectly — you just won’t get the picture or the attached original. See <strong>Adding Photos</strong>.',
+        title: 'Photos need cloud sync',
+        icon: '💡',
+      },
+      {
+        type: 'heading',
+        content: 'Where your recipe goes while it’s being read',
+        level: 2,
+        id: 'privacy',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The recipe you hand over is sent to be read through the same private path beanies uses for reading invitations and travel bookings — and only that one recipe. Your family’s data isn’t sent, nothing is kept after it’s read, and beanies asks your permission each time before anything leaves your device.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you’d rather not use it at all, simply don’t — typing a recipe in by hand works exactly as it always has.',
+      },
+      {
+        type: 'heading',
+        content: 'Related help',
+        level: 2,
+        id: 'related',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>The Family Cookbook</strong> — recipes, the cook log, and adding one by hand',
+          '<strong>Adding Photos</strong> — how photos and attachments work',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'the-family-cookbook',
     category: 'features',
     title: 'The Family Cookbook',
     excerpt:
       'Keep the recipes that get passed down — the story behind them, the photos, and a log of every time someone makes them.',
     icon: '🍜',
-    readTime: 4,
-    updatedDate: '2026-05-12',
+    readTime: 5,
+    updatedDate: '2026-08-25',
     sections: [
       {
         type: 'heading',
@@ -542,12 +721,23 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         id: 'adding',
       },
       {
+        type: 'callout',
+        content:
+          'Don’t fancy typing it all in? Tap <strong>Read a Recipe</strong> instead and hand beanies a photo, a PDF, a recipe link or a cooking video — it fills the whole thing in for you to check. See <strong>Add a Recipe From Anywhere</strong>.',
+        title: 'There’s a quicker way',
+        icon: '🍳',
+      },
+      {
+        type: 'paragraph',
+        content: 'To type one in yourself:',
+      },
+      {
         type: 'steps',
         content: '',
         items: [
           'Tap <strong>Add a recipe</strong>',
           'Give it a <strong>Recipe name</strong> (e.g. <em>“Grandma’s Bolognese”</em>) and, if you like, a <strong>Subtitle</strong> for the story behind it (<em>“passed down from Mary, ~1972”</em>)',
-          'Add the <strong>Prep time</strong> and <strong>Servings</strong>',
+          'Add the <strong>Prep time</strong>, <strong>Cook time</strong> and <strong>Servings</strong>',
           'List the <strong>Ingredients</strong> — one per line — and the <strong>Preparation steps</strong>, also one step per line',
           'Add any <strong>Family notes</strong> (the little things — <em>“Neil asks for this every Sunday”</em>) and <strong>Photos</strong>',
           'Tap <strong>Save</strong>',
@@ -570,6 +760,11 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Tap a recipe card to open its page. You’ll find the <strong>Ingredients</strong>, <strong>How to make it</strong> (the steps), the <strong>Family notes</strong>, and the <strong>Cook Log</strong>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If the recipe came from a website, you’ll also see a small 🔗 link back to where it came from — handy when you want the original’s photos or the writer’s notes.',
       },
       {
         type: 'heading',
@@ -604,6 +799,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
+          '<strong>Add a Recipe From Anywhere</strong> — read a recipe in from a photo, a link or a video',
           '<strong>Meet the Beans</strong> — link a recipe to a bean’s favourite food',
           '<strong>Adding Photos</strong> — attach pictures to recipes and cook-log entries',
         ],
