@@ -59,7 +59,11 @@ export function segmentIdentityKey(seg: AnySegment, kind: SegmentKind): string |
         case 'flight_other':
           return joinKey('flight', s.flightNumber, s.departureDate);
         case 'cruise':
-          return joinKey('cruise', s.shipName, s.embarkationDate);
+          // Two cabins on one sailing collide on (ship + embarkation) — see the
+          // accommodation note. The booking reference separates them when present.
+          return s.bookingReference
+            ? joinKey('cruise', s.shipName, s.bookingReference)
+            : joinKey('cruise', s.shipName, s.embarkationDate);
         case 'train':
         case 'ferry':
           return joinKey(s.type, s.operator, s.departureDate);
@@ -69,13 +73,27 @@ export function segmentIdentityKey(seg: AnySegment, kind: SegmentKind): string |
     }
     case 'accommodation': {
       const a = seg as VacationAccommodation;
+      // The CONFIRMATION NUMBER is the identity when the booking has one.
+      //
+      // Keying on (name + check-in) alone collides for the very ordinary case of two rooms
+      // at one hotel on one night: the second upload folded into the first, its confirmation
+      // number and room type overwrote the other's, and the second booking was never
+      // created. The family lost a confirmation number they need at check-in, silently.
+      //
+      // Two bookings can share a property and a date; they cannot share a confirmation
+      // number. Falling back to (name + check-in) keeps merge working for the common case
+      // where a re-upload has no reference to compare.
+      if (a.confirmationNumber) return joinKey('acc', a.name, a.confirmationNumber);
       return joinKey('acc', a.name, a.checkInDate);
     }
     case 'transportation': {
       const t = seg as VacationTransportation;
       switch (t.type) {
         case 'rental_car':
-          return joinKey('rental', t.agencyName, t.pickupDate);
+          // Two cars from one agency on one day — same collision.
+          return t.bookingReference
+            ? joinKey('rental', t.agencyName, t.bookingReference)
+            : joinKey('rental', t.agencyName, t.pickupDate);
         case 'bus':
           return joinKey('bus', t.operator, t.departureDate);
         default: // airport_shuttle, taxi_rideshare — weak identity

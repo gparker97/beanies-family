@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
-import { addHourToTime } from '@/utils/date';
+import { addHourToTime, addDaysYmd } from '@/utils/date';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
@@ -208,9 +208,10 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
     const seg = updated[index]!;
     if (seg.departureDate) {
       if (seg.arrivesNextDay) {
-        const d = new Date(seg.departureDate + 'T00:00:00');
-        d.setDate(d.getDate() + 1);
-        updated[index] = { ...updated[index]!, arrivalDate: d.toISOString().slice(0, 10) };
+        // See the note in TravelSegmentEditModal: a local Date read back via toISOString
+        // silently drops the +1 everywhere from UTC+0 eastward. Step 3 seeds the first
+        // hotel check-in from this value, so the error propagated into accommodation too.
+        updated[index] = { ...updated[index]!, arrivalDate: addDaysYmd(seg.departureDate, 1) };
       } else {
         updated[index] = { ...updated[index]!, arrivalDate: seg.departureDate };
       }

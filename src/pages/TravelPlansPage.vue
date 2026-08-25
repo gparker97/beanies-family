@@ -143,6 +143,16 @@ function allSegmentIds(ready: TravelReady): string[] {
  * for a NEW AI-created trip (an attach leaves them undefined so they resolve dynamically).
  */
 function materializeUnmatchedTravellers(buckets: SegmentBuckets, defaultIds: string[]): void {
+  // An EMPTY default must stay undefined, never be written as [].
+  //
+  // A document that named no passengers — very common on hotel confirmations — yields
+  // defaultIds = []. `[]` is truthy for the `!seg.travellerIds` test, so every segment got a
+  // DEFINED empty array, and a defined array is deliberately never re-resolved when the
+  // trip's travellers change (segmentTravellers.ts). The result: nobody on the segment card,
+  // an empty avatar stack, and `travellerIds: []` handed to the calendar — so the flight
+  // appeared on no one's calendar and its departure reminder fired for no one, permanently,
+  // with no UI anywhere to clear it.
+  if (!defaultIds.length) return;
   for (const seg of [
     ...buckets.travelSegments,
     ...buckets.accommodations,
@@ -578,6 +588,7 @@ function backToList() {
 }
 
 async function deleteTrip() {
+  if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const confirmed = await confirm({
     title: 'vacation.deleteTitle',
@@ -628,6 +639,26 @@ function handleAddTripIdea(vacationId: string | undefined): void {
   });
 }
 
+/**
+ * ONE permission gate for every mutation on this surface.
+ *
+ * `canEditActivities` was consulted exactly once in 1925 lines, while `:read-only` was
+ * hard-coded to `false` on both segment cards — so a view-only family member could rename a
+ * flight, delete a segment, delete the whole trip, add ideas and vote. FamilyPlannerPage
+ * binds `:read-only="!canEditActivities"` for the same component; this surface simply never
+ * did.
+ *
+ * A helper rather than an inline check per handler, because twelve copies of an invariant is
+ * how eleven of them end up correct. The template still hides the affordances — this is the
+ * backstop for the paths that do not go through a button (quick-add intents, keyboard, a
+ * stale view after a role change).
+ */
+function requireEdit(): boolean {
+  if (canEditActivities.value) return true;
+  showToast('info', t('permissions.readOnly.title'), t('permissions.readOnly.message'));
+  return false;
+}
+
 useQuickAddIntent((action, { vacationId }) => {
   if (!canEditActivities.value) return;
   switch (action) {
@@ -656,6 +687,7 @@ function addSegmentViaWizard(step: number) {
 }
 
 async function addActivitySegment() {
+  if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   showAddMenu.value = false;
   const id = selectedVacation.value.id;
@@ -697,6 +729,7 @@ const TRAVEL_DATE_FIELDS = new Set(['departureDate', 'embarkationDate']);
 
 /** Inline-edit a single field on a timeline item and save immediately */
 function saveInlineField(item: TimelineItem, field: string, value: string) {
+  if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const id = selectedVacation.value.id;
   if (item.kind === 'travel') {
@@ -720,11 +753,13 @@ function saveInlineField(item: TimelineItem, field: string, value: string) {
 }
 
 function openEditModal(item: TimelineItem) {
+  if (!requireEdit()) return;
   editingItemIndex.value = item.arrayIndex;
   editModalType.value = item.kind;
 }
 
 async function deleteTimelineItem(item: TimelineItem) {
+  if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const id = selectedVacation.value.id;
   if (item.kind === 'travel') {
@@ -775,11 +810,13 @@ const editingTransportation = computed(() => {
 // ── Ideas ────────────────────────────────────────────────────────────────────
 
 function handleVote(ideaId: string) {
+  if (!requireEdit()) return;
   if (!selectedVacation.value || !familyStore.currentMemberId) return;
   vacationStore.toggleIdeaVote(selectedVacation.value.id, ideaId, familyStore.currentMemberId);
 }
 
 function handleIdeaUpdate(updatedIdea: VacationIdea) {
+  if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const ideas = selectedVacation.value.ideas.map((i) =>
     i.id === updatedIdea.id ? updatedIdea : i
@@ -788,6 +825,7 @@ function handleIdeaUpdate(updatedIdea: VacationIdea) {
 }
 
 async function handleIdeaDelete(ideaId: string) {
+  if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const confirmed = await confirm({
     title: 'vacation.deleteSegmentTitle',
@@ -814,6 +852,7 @@ function closeIdeaEdit() {
 }
 
 function addQuickIdea() {
+  if (!requireEdit()) return;
   const text = quickIdeaText.value.trim();
   if (!text || !selectedVacation.value || !familyStore.currentMemberId) return;
   const newIdea: VacationIdea = {
@@ -1387,7 +1426,7 @@ function addQuickIdea() {
                             : '')
                       "
                       :collapsed="isCollapsed(item.id)"
-                      :read-only="false"
+                      :read-only="!canEditActivities"
                       show-edit
                       deletable
                       :hint="hintMap.get(item.id)?.message"
@@ -1621,7 +1660,7 @@ function addQuickIdea() {
               :status="item.status"
               :key-value="item.keyValue"
               :collapsed="isCollapsed(item.id)"
-              :read-only="false"
+              :read-only="!canEditActivities"
               show-edit
               deletable
               :attachment-count="item.photoIds?.length ?? 0"

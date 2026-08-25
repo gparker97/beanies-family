@@ -80,6 +80,21 @@ describe('matchTravellerIds', () => {
   it('matches a normalized surname-first / titled name', () => {
     expect(matchTravellerIds(['SMITH/MARY MRS'], roster)).toEqual(['m-mary']);
   });
+  it('drops a member claimed by TWO different surname-qualified names', () => {
+    // The family's Alex and a school friend, also Alex, on one booking. Both single-token
+    // match the roster's bare "Alex", each unambiguously, so the original guard never saw
+    // it and the friend's flight was assigned to the child — who then got the departure
+    // reminder. Two different surnames means we do not know which one; ask.
+    const r = [member('m-alex', 'Alex')];
+    expect(matchTravellerIds(['THOMPSON/ALEX', 'BENNETT/ALEX'], r)).toEqual([]);
+  });
+
+  it('still matches when the SAME person is written two ways', () => {
+    // The distinction that keeps the primary use case working: one surname, so no conflict.
+    const r = [member('m-alex', 'Alex')];
+    expect(matchTravellerIds(['Alex', 'THOMPSON/ALEX'], r)).toEqual(['m-alex']);
+  });
+
   it('drops an ambiguous name that resolves to two members (no silent guess)', () => {
     const r = [member('m-j1', 'John'), member('m-j2', 'John')];
     expect(matchTravellerIds(['John Smith'], r)).toEqual([]);

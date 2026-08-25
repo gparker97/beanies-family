@@ -78,6 +78,8 @@ const { isEditing } = useFormModal(
       link.value = idea.link ?? '';
       linkPreview.value = idea.linkPreview ?? null;
       notes.value = idea.notes ?? '';
+      // Baseline for the dirty check in handleClose.
+      openSnapshot.value = currentFormJson();
     },
     onNew() {
       title.value = '';
@@ -95,6 +97,8 @@ const { isEditing } = useFormModal(
       link.value = '';
       linkPreview.value = null;
       notes.value = '';
+      // Baseline for the dirty check in handleClose.
+      openSnapshot.value = currentFormJson();
     },
   }
 );
@@ -151,8 +155,53 @@ function normalizeLink(url: string): string {
 
 const normalizedLink = computed(() => normalizeLink(link.value));
 
+/**
+ * A snapshot of the form as it looked when the drawer opened, for the dirty check below.
+ * Serialized because the comparison is field-by-field equality, not identity.
+ */
+const openSnapshot = ref('');
+
+function currentFormJson(): string {
+  return JSON.stringify([
+    title.value,
+    description.value,
+    category.value,
+    location.value,
+    suggestedDate.value,
+    costType.value,
+    estimatedCost.value,
+    estimatedCostCurrency.value,
+    duration.value,
+    needsBooking.value,
+    isPlanned.value,
+  ]);
+}
+
+/**
+ * Closing must not write anything the user did not change.
+ *
+ * The drawer auto-saves on close — reasonable for an edit-in-place surface — but it did so
+ * UNCONDITIONALLY, from the snapshot taken when it opened, behind a button labelled
+ * "Close". So: device A opens an idea just to read it; device B rewrites the description,
+ * sets a budget and marks it planned; that merges to A; A taps Close and the stale snapshot
+ * reverts every one of B's edits. A user who deliberately chose not to save had silently
+ * undone another parent's work.
+ *
+ * The dirty check keeps the convenience and removes the harm: an untouched form writes
+ * nothing at all. `close` is emitted either way — it was declared but never emitted, so the
+ * page's `@close` handler was dead, and the `!props.idea` early return (an idea deleted
+ * elsewhere while open) left every dismissal path a no-op and the user trapped until reload.
+ */
+function handleClose() {
+  if (props.idea && currentFormJson() !== openSnapshot.value) handleSave();
+  emit('close');
+}
+
 function handleSave() {
-  if (!props.idea) return;
+  if (!props.idea) {
+    emit('close');
+    return;
+  }
   emit('save', {
     ...props.idea,
     title: title.value,
@@ -184,7 +233,7 @@ function handleSave() {
     save-gradient="teal"
     :save-label="t('action.close')"
     :show-delete="isEditing"
-    @close="handleSave"
+    @close="handleClose"
     @save="handleSave"
     @delete="$emit('delete')"
   >

@@ -10,6 +10,7 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
+import { useToast } from '@/composables/useToast';
 import { useFormModal } from '@/composables/useFormModal';
 import {
   useBookingValidation,
@@ -35,6 +36,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
+const { showToast } = useToast();
 const vacationStore = useVacationStore();
 
 // Form fields
@@ -139,13 +141,13 @@ const rules = computed<BookingValidationRules<AccommodationField>>(() => ({
 }));
 
 const validation = useBookingValidation<AccommodationField>(status, rules);
-const canSave = validation.canSave;
 
 // --- Booking-document attachments (images + PDFs) --------------------
 const segmentPhotoIds = computed<string[]>(
   () =>
-    vacationStore.getVacationById(props.vacationId)?.accommodations[props.accommodationIndex]
-      ?.photoIds ?? []
+    vacationStore
+      .getVacationById(props.vacationId)
+      ?.accommodations.find((x) => x.id === props.accommodation?.id)?.photoIds ?? []
 );
 const attachmentEntityId = computed(() =>
   vacationSegmentEntityId(props.vacationId, props.accommodation?.id ?? '')
@@ -163,8 +165,18 @@ async function handleSave() {
       const vacation = vacationStore.getVacationById(props.vacationId);
       if (!vacation) return;
       const accommodations = [...vacation.accommodations];
-      accommodations[props.accommodationIndex] = {
-        ...accommodations[props.accommodationIndex]!,
+      // Resolve BY ID, not by the index captured at open — a CRDT merge that shifts this
+      // array re-points the index at a different booking and this save overwrites the wrong
+      // one. See TravelSegmentEditModal for the full reasoning.
+      const targetId = props.accommodation?.id;
+      const idx = targetId ? accommodations.findIndex((x) => x.id === targetId) : -1;
+      if (idx < 0) {
+        showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
+        emit('close');
+        return;
+      }
+      accommodations[idx] = {
+        ...accommodations[idx]!,
         title: autoTitle.value,
         status: status.value,
         name: name.value,
@@ -177,7 +189,10 @@ async function handleSave() {
         breakfastIncluded: breakfastIncluded.value,
         link: link.value || undefined,
         notes: notes.value,
-        travellerIds: travellerIds.value.length ? travellerIds.value : tripAssigneeIds.value,
+        // undefined = "everyone on this trip", re-resolved whenever the roster changes.
+        // Materializing it here froze the list, so a family member added later was excluded
+        // from every previously-saved segment forever.
+        travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
       };
       await vacationStore.updateVacation(props.vacationId, { accommodations });
       emit('close');
@@ -197,7 +212,6 @@ async function handleSave() {
     icon="🏨"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
-    :save-disabled="!canSave"
     :is-submitting="isSubmitting"
     @close="$emit('close')"
     @save="handleSave"
