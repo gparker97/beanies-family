@@ -71,7 +71,7 @@ async function callOpenAiCompatible<T>(
       signal: buildSignal(request.signal),
     });
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
       throw new ExtractionProviderError('timeout', 'Extraction request timed out', err);
     }
     throw new ExtractionProviderError(

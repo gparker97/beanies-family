@@ -15,6 +15,10 @@ dist-ssr
 # Environment files
 .env
 .env.local
+# ...and any backup of it. A `.env.local.bak-<ts>` was left untracked and UNignored by an
+# editing script — one `git add .` from committing live secrets to a public repo.
+.env.local.*
+.env.*.bak*
 .env.*.local
 .env.production
 

@@ -28,7 +28,6 @@ import {
 import { resolveRecipeSource, type ExtractionPath } from '@/services/ai/recipeSourceResolver';
 import { routeUrl } from '@/utils/recipeSourceUrl';
 import { assertNever } from '@/utils/assertNever';
-import { safeHttpsUrl } from '@/utils/url';
 import {
   jsonLdToPrefill,
   recipeExtractionToPrefill,
@@ -69,6 +68,13 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const familyStore = useFamilyStore();
 
   const isProcessing = ref(false);
+  /**
+   * True while the source document and dish photo are being attached, AFTER the recipe has
+   * saved. Separate from `isProcessing` on purpose: the recipe is already safe on screen, so
+   * this must never block the UI — it exists only so the page can say "photo on its way"
+   * instead of showing a pictureless recipe for five silent seconds.
+   */
+  const isAttaching = ref(false);
   /** A screened dish-image URL held until the recipe is saved, then fetched and stored. */
   const pendingDishImageUrl = ref<string | null>(null);
   /** Held between a successful extraction and the save that follows it. */
@@ -213,7 +219,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           // The model is NEVER invoked here — quantities come straight from the site's own
           // structured data, so nothing can be hallucinated and nothing is inferred.
           const prefill = jsonLdToPrefill(resolved.recipe, resolved.sourceUrl);
-          pendingDishImageUrl.value = safeHttpsUrl(resolved.imageUrl);
+          // USE the mapper's bounded value. Re-deriving it with safeHttpsUrl alone throws
+          // away the same-domain check and leaves that control with no effective caller —
+          // a hostile page could then name any host as its image and we would fetch it.
+          pendingDishImageUrl.value = prefill.dishImageUrl;
           handOver(prefill, kind, resolved.path, null);
           return;
         }
@@ -249,7 +258,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             return;
           }
           prefill.fields.sourceUrl = resolved.sourceUrl;
-          pendingDishImageUrl.value = prefill.dishImageUrl ?? safeHttpsUrl(resolved.imageUrl);
+          // No `??` fallback: dishImageUrl is null EXACTLY when the domain check rejected
+          // the URL, so falling back to the raw page value would undo the rejection.
+          pendingDishImageUrl.value = prefill.dishImageUrl;
           handOver(prefill, kind, resolved.path, null);
           return;
         }
@@ -306,6 +317,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     pendingCompressed.value = null;
     pendingDishImageUrl.value = null;
     if (!file && !dishUrl) return; // manual save with no AI source — nothing to attach
+    isAttaching.value = true;
 
     const photos = usePhotos({
       collection: 'recipes',
@@ -419,6 +431,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         t('recipeExtract.attachFailed.title'),
         t('recipeExtract.attachFailed.message')
       );
+    } finally {
+      // Always clears, including on the warn-not-rollback path — a stuck "adding photo"
+      // hint would be worse than the missing photo it describes.
+      isAttaching.value = false;
     }
   }
 
@@ -429,5 +445,12 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     pendingDishImageUrl.value = null;
   }
 
-  return { isProcessing, processFile, processUrl, attachAfterSave, discardPendingSource };
+  return {
+    isProcessing,
+    isAttaching,
+    processFile,
+    processUrl,
+    attachAfterSave,
+    discardPendingSource,
+  };
 }

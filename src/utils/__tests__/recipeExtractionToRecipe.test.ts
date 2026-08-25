@@ -57,13 +57,25 @@ describe('recipeExtractionToPrefill', () => {
       expect(recipeExtractionToPrefill(result({ isRecipe: false }))).toBeNull();
     });
 
-    it('when there is no name AND no ingredients or steps', () => {
+    it('when there is nothing to cook — no ingredients AND no steps', () => {
       expect(
         recipeExtractionToPrefill(result({ name: '  ', ingredients: [], steps: [] }))
       ).toBeNull();
     });
 
+    it('when a NAME-ONLY result comes back (roundup and category pages)', () => {
+      // The bug this pins: `&&` only rejected the all-empty shape, so this opened a form
+      // containing nothing but a dish title — silently, and logged as a success.
+      expect(
+        recipeExtractionToPrefill(
+          result({ name: 'Lemon Drizzle Cake', ingredients: [], steps: [] })
+        )
+      ).toBeNull();
+    });
+
     it('but NOT when a name is missing yet ingredients exist', () => {
+      // Keeping this: the model found real ingredients, and the form makes the user supply a
+      // name before saving. Discarding the extraction here would lose genuine work.
       expect(recipeExtractionToPrefill(result({ name: '', steps: [] }))).not.toBeNull();
     });
   });

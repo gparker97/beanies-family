@@ -122,13 +122,21 @@ export async function fetchYoutube(url) {
   const player = extractPlayerResponse(html);
   if (!player) return { ok: false, code: 'not_readable' };
 
-  // A private, deleted or region-blocked video parses fine but carries no videoDetails.
-  // Returning ok:true with empty strings would send the user down the "no captions"
-  // refusal with the wrong explanation — it is not that we could not read the captions,
-  // it is that there is no video to read.
+  // Two very different failures look identical here, and telling them apart is the whole
+  // point of this block:
+  //
+  //  • playabilityStatus says ERROR/UNPLAYABLE → the video really is private, deleted or
+  //    region-blocked. `not_found` is the honest code.
+  //  • playabilityStatus is fine (or absent) but there are NO videoDetails → YouTube served
+  //    us a bot-check page. Verified: a video that reads perfectly from a home connection
+  //    returns this from AWS. Calling that `not_found` tells the user "the page may have
+  //    moved" about a video sitting right there in their browser — actively misleading.
   const playability = player.playabilityStatus?.status;
-  if (!player.videoDetails || (playability && playability !== 'OK')) {
+  if (playability && playability !== 'OK') {
     return { ok: false, code: 'not_found' };
+  }
+  if (!player.videoDetails) {
+    return { ok: false, code: 'video_blocked' };
   }
 
   const details = player.videoDetails ?? {};

@@ -219,6 +219,9 @@ export type ExtractionErrorCode =
   | 'fetch_blocked' // the SSRF guard refused the URL, or it was not fetchable at all (#72)
   | 'no_content' // fetched fine, but nothing readable came back: no JSON-LD, no usable
   // text, no captions (#72). Distinct from provider_error — the request SUCCEEDED.
+  | 'video_blocked' // YouTube would not serve the video's details to a server (#72). The
+  // video is fine in a browser; only our datacenter request is refused, so the copy must
+  // point at the workaround rather than implying the video is broken.
   | 'source_unreachable'; // the SITE refused us or the page is gone (404/410/403/429).
 // Deliberately separate from provider_error: nothing is wrong on our side, and telling the
 // user "something went wrong" would send them to us instead of to their link.

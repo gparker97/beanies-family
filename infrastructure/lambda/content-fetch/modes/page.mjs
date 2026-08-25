@@ -66,6 +66,40 @@ function dropTag(html, tag) {
   return out + html.slice(cursor);
 }
 
+/**
+ * Remove every `open…close` span. Linear, unlike `/<!--[\s\S]*?-->/g`, whose lazy tail
+ * re-scans from every opening position: `'<!--'.repeat(n)` measured 256KB → 13.8s.
+ */
+function stripBetween(text, open, close) {
+  let out = '';
+  let cursor = 0;
+  for (;;) {
+    const start = text.indexOf(open, cursor);
+    if (start === -1) return out + text.slice(cursor);
+    out += text.slice(cursor, start) + ' ';
+    const end = text.indexOf(close, start + open.length);
+    if (end === -1) return out; // unterminated — drop the rest, as the regex intended
+    cursor = end + close.length;
+  }
+}
+
+/**
+ * Strip every `<…>` tag. Linear, unlike `/<[^>]+>/g`, where `[^>]+` backtracks from every
+ * `<` when no `>` follows: `'<'.repeat(n)` measured 64KB → 4.1s, 128KB → 16.6s.
+ */
+function stripTags(text) {
+  let out = '';
+  let cursor = 0;
+  for (;;) {
+    const lt = text.indexOf('<', cursor);
+    if (lt === -1) return out + text.slice(cursor);
+    out += text.slice(cursor, lt) + ' ';
+    const gt = text.indexOf('>', lt);
+    if (gt === -1) return out; // unterminated tag — drop the rest
+    cursor = gt + 1;
+  }
+}
+
 /** Find one meta tag's content by property/name. Linear scan — see dropTag on why not regex. */
 function findMeta(html, key) {
   const lower = html.toLowerCase();
@@ -104,12 +138,12 @@ export function htmlToText(html) {
   for (const tag of ['script', 'style', 'noscript', 'nav', 'footer', 'header', 'svg', 'form']) {
     s = dropTag(s, tag);
   }
-  s = s.replace(/<!--[\s\S]*?-->/g, ' ');
+  s = stripBetween(s, '<!--', '-->');
   // Block-level boundaries become newlines BEFORE tags are stripped, so list items and
   // paragraphs stay on separate lines.
   s = s.replace(/<\/(p|div|li|tr|h[1-6]|section|article|br)\s*\/?>/gi, '\n');
   s = s.replace(/<br\s*\/?>/gi, '\n');
-  s = s.replace(/<[^>]+>/g, ' ');
+  s = stripTags(s);
   s = decodeEntities(s);
   s = s.replace(/[ \t\u00a0]+/g, ' '); // includes NBSP, written as an escape
   s = s.replace(/\n\s*\n\s*\n+/g, '\n\n');
@@ -153,8 +187,16 @@ function absolutize(raw, base) {
 }
 
 function pageTitle(html) {
-  const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
-  return m ? htmlToText(m[1]).slice(0, 200) : '';
+  // Linear — `/<title[^>]*>([\s\S]*?)<\/title>/i` measured 420KB → 9.25s on
+  // `'<title>'.repeat(n)` with no closing tag.
+  const lower = html.toLowerCase();
+  const open = lower.indexOf('<title');
+  if (open === -1) return '';
+  const openEnd = lower.indexOf('>', open);
+  if (openEnd === -1) return '';
+  const close = lower.indexOf('</title', openEnd);
+  if (close === -1) return '';
+  return htmlToText(html.slice(openEnd + 1, close)).slice(0, 200);
 }
 
 export async function fetchPage(url) {
@@ -163,7 +205,11 @@ export async function fetchPage(url) {
 
   // A PDF or image served at a "recipe URL" is not something this mode can read; say so
   // rather than handing the model a wall of binary noise.
-  if (res.contentType && !/text\/html|application\/xhtml|text\/plain/i.test(res.contentType)) {
+  // FAIL CLOSED. The old `res.contentType && …` short-circuited when the header was absent
+  // (trivial for an attacker, common from misconfigured CDNs), so a 2MB PDF or JPEG was
+  // decoded as UTF-8 and 24k chars of mojibake were billed to the inference call. image.mjs
+  // gets this right by testing the positive case; match it.
+  if (!/text\/html|application\/xhtml|text\/plain/i.test(res.contentType)) {
     return { ok: false, code: 'not_readable' };
   }
 

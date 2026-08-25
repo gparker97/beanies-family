@@ -80,7 +80,7 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
       signal: buildSignal(request.signal),
     });
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
       throw new ExtractionProviderError('timeout', 'Managed extraction timed out', err);
     }
     throw new ExtractionProviderError('provider_error', 'Network error calling managed proxy', err);
