@@ -48,7 +48,6 @@ import {
   bookingProgress,
   tripBadge,
   tripPhase,
-  computeAccommodationGaps,
   computeTimelineHints,
   classifyTripDay,
   tripDayNumber,
@@ -511,9 +510,6 @@ function vacationAssignees(v: FamilyVacation) {
  *  neither marked planned nor skipped. A per-trip planning stat only; the nav
  *  badge now counts unbooked bookings (`unbookedTravel`), which the per-trip
  *  "needs booking" indicator (`vacationProgress`) sums to instead. */
-function vacationOpenIdeas(v: FamilyVacation): number {
-  return v.ideas.filter((i) => !i.isPlanned && !i.isSkipped).length;
-}
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 
@@ -839,115 +835,13 @@ function addQuickIdea() {
         v-if="upcomingVacations.length > 0"
         class="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(320px,1fr))]"
       >
-        <div
+        <TripCard
           v-for="vacation in upcomingVacations"
           :key="vacation.id"
-          class="focus-visible:ring-primary-500 cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white shadow-[var(--card-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,180,216,0.2)] hover:shadow-[0_6px_24px_rgba(0,180,216,0.08)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-slate-800"
-          role="button"
-          tabindex="0"
-          :aria-label="fillTemplate(t('travel.openTrip'), { name: vacation.name })"
-          @click="selectTrip(vacation.id)"
-          @keydown.enter.prevent="selectTrip(vacation.id)"
-          @keydown.space.prevent="selectTrip(vacation.id)"
-        >
-          <!-- Hero gradient with floating emoji -->
-          <div
-            class="relative flex h-24 items-center justify-center overflow-hidden"
-            style="background: linear-gradient(135deg, rgb(0 180 216 / 8%), rgb(255 217 61 / 6%))"
-          >
-            <span class="relative z-10 animate-bounce text-5xl" style="animation-duration: 3s">
-              {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
-            </span>
-          </div>
-
-          <!-- Card body -->
-          <div class="p-4">
-            <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
-              {{ vacation.name }}
-            </h3>
-            <div
-              v-if="vacationDateRange(vacation)"
-              class="font-outfit mt-1 flex items-center gap-1.5 text-xs text-gray-400"
-            >
-              📅 {{ vacationDateRange(vacation) }}
-            </div>
-
-            <!-- Status badge + members. One badge, resolved once (see badgesById). -->
-            <div class="mt-2.5 flex flex-wrap items-center gap-2">
-              <TripBadgeChip :badge="badgesById.get(vacation.id) ?? null" variant="card" />
-            </div>
-
-            <!-- Member chips -->
-            <div v-if="vacationAssignees(vacation).length" class="mt-2 flex flex-wrap gap-1.5">
-              <span
-                v-for="member in vacationAssignees(vacation)"
-                :key="member.id"
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
-              >
-                <span
-                  class="flex h-[22px] w-[22px] items-center justify-center rounded-full text-xs font-bold text-white"
-                  :style="{ backgroundColor: member.color }"
-                >
-                  {{ member.name.charAt(0).toUpperCase() }}
-                </span>
-                {{ member.name }}
-              </span>
-            </div>
-
-            <!-- Progress bar -->
-            <div v-if="vacationProgress(vacation).total > 0" class="mt-3 flex items-center gap-2">
-              <div class="h-[5px] flex-1 overflow-hidden rounded-full bg-[var(--tint-slate-5)]">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6]"
-                  :style="{ width: vacationProgress(vacation).percent + '%' }"
-                />
-              </div>
-              <span
-                class="font-outfit text-[0.625rem] font-semibold whitespace-nowrap text-[#00B4D8]"
-              >
-                {{
-                  t('travel.bookedShort')
-                    .replace('{booked}', String(vacationProgress(vacation).booked))
-                    .replace('{total}', String(vacationProgress(vacation).total))
-                }}
-              </span>
-            </div>
-
-            <!-- Needs booking badge -->
-            <div
-              v-if="vacationProgress(vacation).total - vacationProgress(vacation).booked > 0"
-              class="mt-1.5"
-            >
-              <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgba(255,217,61,0.12)] px-2.5 py-0.5 text-xs font-semibold text-[#B8860B]"
-              >
-                ⏳
-                {{ vacationProgress(vacation).total - vacationProgress(vacation).booked }}
-                {{ t('travel.needsBooking').toLowerCase() }}
-              </span>
-            </div>
-
-            <!-- Open ideas badge — count of ideas still to decide on -->
-            <div v-if="vacationOpenIdeas(vacation) > 0" class="mt-1.5">
-              <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--vacation-teal-15)] px-2.5 py-0.5 text-xs font-semibold text-[var(--vacation-teal)]"
-              >
-                💡 {{ vacationOpenIdeas(vacation) }} {{ t('travel.openIdeas') }}
-              </span>
-            </div>
-
-            <!-- Accommodation gap warning -->
-            <div v-if="computeAccommodationGaps(vacation).length > 0" class="mt-1.5">
-              <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-xs font-semibold text-[var(--heritage-orange)]"
-              >
-                🏨 {{ computeAccommodationGaps(vacation).length }}
-                {{ computeAccommodationGaps(vacation).length === 1 ? 'night' : 'nights' }}
-                {{ t('travel.accommodationGap').toLowerCase() }}
-              </span>
-            </div>
-          </div>
-        </div>
+          :vacation="vacation"
+          :badge="badgesById.get(vacation.id) ?? null"
+          @open="selectTrip(vacation.id)"
+        />
       </div>
 
       <!-- Past trips (collapsible) -->
