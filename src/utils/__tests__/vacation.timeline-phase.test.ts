@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { segmentSpan, classifySegmentPhase, buildWhenBand } from '@/utils/vacation';
+import {
+  segmentSpan,
+  classifySegmentPhase,
+  buildWhenBand,
+  collectSegmentDates,
+  extendTripDates,
+} from '@/utils/vacation';
 import type {
   VacationTravelSegment,
   VacationAccommodation,
@@ -203,5 +209,35 @@ describe('buildWhenBand', () => {
   it('returns null when the segment has no date and no time', () => {
     const seg = { type: 'flight_outbound' } as VacationTravelSegment;
     expect(buildWhenBand('travel', seg)).toBeNull();
+  });
+});
+
+describe('collectSegmentDates → extendTripDates round-trip', () => {
+  // Each function passed its own tests; only the PAIR was broken. collectSegmentDates pushed
+  // RAW values while extendTripDates validates against a strict YYYY-MM-DD and skips anything
+  // else — so a model-supplied ISO TIMESTAMP was silently discarded, the trip never widened
+  // to cover that booking, and the "after your trip ends" hint sat there permanently.
+  it('extends the trip window from a timestamped segment date', () => {
+    const dates = collectSegmentDates({
+      travelSegments: [{ departureDate: '2026-07-15T10:30:00.000Z' }],
+      accommodations: [],
+      transportation: [],
+    } as never);
+
+    // Every collected value must already be a plain date part.
+    for (const d of dates) expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const range = extendTripDates({ start: '2026-07-01', end: '2026-07-10' }, ...dates);
+    expect(range.end).toBe('2026-07-15');
+  });
+
+  it('still extends from an already-plain date', () => {
+    const dates = collectSegmentDates({
+      travelSegments: [],
+      accommodations: [{ checkInDate: '2026-06-20', checkOutDate: '2026-06-25' }],
+      transportation: [],
+    } as never);
+    const range = extendTripDates({ start: '2026-07-01', end: '2026-07-10' }, ...dates);
+    expect(range.start).toBe('2026-06-20');
   });
 });
