@@ -1686,8 +1686,11 @@ Doing it would have meant a 20-dependency template move with no structural safet
 browser verification. Solve the harness problem first, or do that extraction with a browser
 open.
 
-**Owed:** browser verification of the travel changes. Nothing here has been seen in a
-browser; every defect this session was found by review or by a human, never by the suite.
+**Browser-verified by greg on 2026-08-26** — the travel changes were walked through in a
+browser and look correct. Worth noting what that does and does not cover: it exercised the
+paths greg happened to use, not the timezone fix (which needs an overnight flight entered
+from a UTC+0-or-east clock — though that is his default), nor the view-only permission gate
+(which needs a second member without edit rights).
 
 ### ⭐ #72 recipe capture — YouTube LIVE, needs a new production secret ⭐
 
