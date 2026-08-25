@@ -28,6 +28,8 @@ export const CONTENT_FETCH_CODES = [
   'not_readable',
   'no_captions',
   'not_image',
+  'not_found',
+  'site_refused',
 ] as const;
 export type ContentFetchCode = (typeof CONTENT_FETCH_CODES)[number];
 
@@ -49,6 +51,10 @@ export const CODE_TO_ERROR: Readonly<Record<ContentFetchCode, ExtractionErrorCod
     no_captions: 'no_content',
     not_image: 'no_content',
     too_large: 'no_content',
+    // The SITE said no — a dead link or a host refusing our user-agent. Not our fault and
+    // not our outage, so it gets its own code and its own honest copy.
+    not_found: 'source_unreachable',
+    site_refused: 'source_unreachable',
     // Transport-shaped failures reuse the existing inference codes, so the toast copy
     // already reads correctly for them.
     timeout: 'timeout',

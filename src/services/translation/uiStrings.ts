@@ -8079,6 +8079,15 @@ const STRING_DEFS = {
     beanie:
       'that link needs to be a secure (https) web address we can reach. try copying it again from your browser.',
   },
+  'recipeExtract.unreachable.title': {
+    en: "Couldn't Open That Link",
+    beanie: "couldn't open that link",
+  },
+  'recipeExtract.unreachable.message': {
+    en: 'The page may have moved, or the site may not allow apps to read it. Try opening it yourself and pasting the recipe text.',
+    beanie:
+      'the page may have moved, or the site may not allow apps to read it. try opening it yourself and pasting the recipe text.',
+  },
   'recipeExtract.noContent.title': { en: 'Nothing to Read', beanie: 'nothing to read' },
   'recipeExtract.noContent.message': {
     en: "We reached that page but couldn't find a recipe in it. Try the printable version, or paste the recipe text.",

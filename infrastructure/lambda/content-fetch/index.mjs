@@ -48,6 +48,8 @@ const STATUS_FOR_CODE = {
   blocked: 400,
   not_image: 422,
   not_readable: 422,
+  not_found: 404,
+  site_refused: 403,
   no_captions: 422,
   too_large: 413,
   timeout: 504,

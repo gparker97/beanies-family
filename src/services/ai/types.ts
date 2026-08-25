@@ -217,8 +217,11 @@ export type ExtractionErrorCode =
   | 'timeout' // the request was aborted / exceeded the deadline
   | 'malformed_output' // the model returned unparseable or wrong-shape JSON
   | 'fetch_blocked' // the SSRF guard refused the URL, or it was not fetchable at all (#72)
-  | 'no_content'; // fetched fine, but nothing readable came back: no JSON-LD, no usable
-// text, no captions (#72). Distinct from provider_error — the request SUCCEEDED.
+  | 'no_content' // fetched fine, but nothing readable came back: no JSON-LD, no usable
+  // text, no captions (#72). Distinct from provider_error — the request SUCCEEDED.
+  | 'source_unreachable'; // the SITE refused us or the page is gone (404/410/403/429).
+// Deliberately separate from provider_error: nothing is wrong on our side, and telling the
+// user "something went wrong" would send them to us instead of to their link.
 
 /**
  * Result of the extraction funnel. Per-service `{ success, … }` shape — matching
