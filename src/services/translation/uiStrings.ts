@@ -2098,6 +2098,11 @@ const STRING_DEFS = {
   // Shown when a member without edit rights reaches a mutation another way — a quick-add
   // intent, the keyboard, or a view that went stale after their role changed. Info, not
   // error: nothing is broken and they have done nothing wrong.
+  // Explicit .one/.other pair — the project's pluralization convention. This was a
+  // hardcoded English 'night'/'nights' ternary inside a template EXPRESSION, which the
+  // CI-blocking bare-string rule cannot see.
+  'travel.gapNights.one': { en: '{count} night', beanie: '{count} night' },
+  'travel.gapNights.other': { en: '{count} nights', beanie: '{count} nights' },
   'travel.jumpToIdeas': { en: 'Jump to trip ideas', beanie: 'jump to trip ideas' },
   'travel.openTrip': { en: 'Open trip: {name}', beanie: 'open trip: {name}' },
   'travel.segmentGone.title': { en: 'That Booking Is Gone', beanie: 'that booking is gone' },
