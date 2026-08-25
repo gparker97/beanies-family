@@ -46,10 +46,45 @@ describe('classifySegmentPhase', () => {
 
 // ── segmentSpan ────────────────────────────────────────────────────────────
 
+describe('an open-ended stay is ONGOING, not finished', () => {
+  // The wizard prefills check-out only on the FIRST accommodation, so every later stay is
+  // added with both dates blank — this was the common case, not an edge one. Collapsing
+  // `end ?? start` made a stay checked into days ago read as `past`: a grey rail circle, a
+  // ✓ "done" pill, and no "staying now" chip on the one place the family is actually in.
+  const T = '2026-08-25';
+
+  it('is `now` when it started before today and has no check-out yet', () => {
+    expect(classifySegmentPhase({ start: '2026-08-20', spanning: true }, T)).toBe('now');
+  });
+
+  it('is `now` on the day it starts', () => {
+    expect(classifySegmentPhase({ start: T, spanning: true }, T)).toBe('now');
+  });
+
+  it('is still `future` when it has not started', () => {
+    expect(classifySegmentPhase({ start: '2026-09-01', spanning: true }, T)).toBe('future');
+  });
+
+  it('a NON-spanning item with no end is unchanged — it really is one day', () => {
+    // A flight on the 20th is past on the 25th. Only spans are open-ended.
+    expect(classifySegmentPhase({ start: '2026-08-20' }, T)).toBe('past');
+  });
+
+  it('a closed stay still ends when its check-out passes', () => {
+    expect(
+      classifySegmentPhase({ start: '2026-08-10', end: '2026-08-15', spanning: true }, T)
+    ).toBe('past');
+  });
+});
+
 describe('segmentSpan', () => {
   it('accommodation returns check-in → check-out', () => {
     const acc = { checkInDate: '2026-08-03', checkOutDate: '2026-08-08' } as VacationAccommodation;
-    expect(segmentSpan('accommodation', acc)).toEqual({ start: '2026-08-03', end: '2026-08-08' });
+    expect(segmentSpan('accommodation', acc)).toEqual({
+      start: '2026-08-03',
+      end: '2026-08-08',
+      spanning: true,
+    });
   });
 
   it('flight is start-only even with an arrival date (not a multi-day span)', () => {
@@ -70,6 +105,7 @@ describe('segmentSpan', () => {
     expect(segmentSpan('transportation', rental)).toEqual({
       start: '2026-08-03',
       end: '2026-08-09',
+      spanning: true,
     });
 
     const taxi = {
