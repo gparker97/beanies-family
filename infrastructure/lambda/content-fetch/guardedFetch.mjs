@@ -230,7 +230,7 @@ async function resolvePublicAddress(hostname) {
 }
 
 /** Read a response body with a cap counted on DECODED bytes, aborting the moment it trips. */
-function readCapped(res, maxBytes) {
+function readCapped(res, maxBytes, budgetMs) {
   return new Promise((resolve) => {
     let settled = false;
     const done = (v) => {
@@ -238,6 +238,13 @@ function readCapped(res, maxBytes) {
       settled = true;
       res.destroy();
       resolve(v);
+    };
+
+    // Declared before the stream wiring so both error handlers can clear the body timer.
+    let clearBodyTimer = () => {};
+    const finishOnError = () => {
+      clearBodyTimer();
+      done({ ok: false, code: 'fetch_failed' });
     };
 
     const encoding = String(res.headers['content-encoding'] || 'identity').toLowerCase();
@@ -254,8 +261,22 @@ function readCapped(res, maxBytes) {
     // hostile `Content-Length: 100000` followed by 20 bytes and RST — emits 'error' on an
     // emitter with zero listeners, which is an UNCAUGHT exception that kills the whole
     // invocation and returns a CORS-less 502 outside the typed taxonomy.
-    res.on('error', () => done({ ok: false, code: 'fetch_failed' }));
-    if (stream !== res) stream.on('error', () => done({ ok: false, code: 'fetch_failed' }));
+    res.on('error', () => finishOnError());
+    if (stream !== res) stream.on('error', () => finishOnError());
+
+    // The body read is the phase a slowloris actually exploits: headers arrive in 50ms,
+    // then one byte every 7s. Nothing else bounds it — `end`/`error`/`maxBytes` never fire —
+    // so without this the invocation runs to the Lambda's ceiling and dies, returning a raw
+    // CORS-less 502 outside the typed taxonomy while pinning one of 5 concurrency slots.
+    const bodyKiller = setTimeout(
+      () => done({ ok: false, code: 'timeout' }),
+      Math.max(250, budgetMs)
+    );
+    clearBodyTimer = () => clearTimeout(bodyKiller);
+    const finish = (v) => {
+      clearBodyTimer();
+      done(v);
+    };
 
     const chunks = [];
     let total = 0;
@@ -263,10 +284,10 @@ function readCapped(res, maxBytes) {
       total += c.length;
       // Counted on DECODED output, so a gzip/brotli bomb is cut at the cap rather than
       // being allowed through because its TRANSFER size was small.
-      if (total > maxBytes) return done({ ok: false, code: 'too_large' });
+      if (total > maxBytes) return finish({ ok: false, code: 'too_large' });
       chunks.push(c);
     });
-    stream.on('end', () => done({ ok: true, body: Buffer.concat(chunks) }));
+    stream.on('end', () => finish({ ok: true, body: Buffer.concat(chunks) }));
   });
 }
 
@@ -382,7 +403,9 @@ export async function guardedFetch(
       return { ok: false, code: 'fetch_failed' };
     }
 
-    const read = await readCapped(res, maxBytes);
+    // Hand the READ whatever budget is left, so the deadline covers the whole fetch rather
+    // than expiring the moment headers land.
+    const read = await readCapped(res, maxBytes, deadline - Date.now());
     if (!read.ok) return read;
     return {
       ok: true,

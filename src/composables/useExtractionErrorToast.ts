@@ -55,6 +55,15 @@ export function useExtractionErrorToast() {
         // SSRF guard caught it). Info, not error: nothing is broken on our side.
         showToast('info', t('recipeExtract.badLink.title'), t('recipeExtract.badLink.message'));
         return;
+      case 'video_blocked':
+        // Actionable: the recipe link in the description almost always works, because that
+        // is an ordinary website rather than YouTube's bot-protected API.
+        showToast(
+          'info',
+          t('recipeExtract.videoBlocked.title'),
+          t('recipeExtract.videoBlocked.message')
+        );
+        return;
       case 'source_unreachable':
         // The link is dead, or the site blocks automated readers. Actionable by the user,
         // and nothing is broken here — so info, and never an error surface.

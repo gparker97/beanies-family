@@ -39,9 +39,16 @@ export function findRecipeNode(root, depth = 0) {
     return null;
   }
   if (typeMatches(root, 'recipe')) return root;
-  if (Array.isArray(root['@graph'])) {
-    const hit = findRecipeNode(root['@graph'], depth + 1);
-    if (hit) return hit;
+  // Descend ordinary object properties too, not just `@graph`. The very common and legal
+  // `{"@type":"WebPage","mainEntity":{"@type":"Recipe",…}}` was being missed entirely, so a
+  // site publishing EXACT quantities fell through to the model — the one outcome this file
+  // exists to avoid — and `extraction_path` logged `page_text`, making the miss read as
+  // "the site has no structured data".
+  for (const value of Object.values(root)) {
+    if (value && typeof value === 'object') {
+      const hit = findRecipeNode(value, depth + 1);
+      if (hit) return hit;
+    }
   }
   return null;
 }
@@ -67,13 +74,19 @@ export function humanizeDuration(raw) {
   // Seconds matter: without this, `PT10S` and `PT1M30S` render the RAW ISO string into the
   // form and then into the Automerge doc — precisely what this function exists to prevent.
   const sec = /([0-9]+)s/i.exec(timePart)?.[1] ?? '';
-  if (!d && !h && !mi && !sec) return s;
+  // Compare as NUMBERS. These are captured strings, so a zero component is the truthy '0'
+  // — and WP Recipe Maker, Tasty Recipes and Schema Pro all emit zero-padded durations, so
+  // `P0DT0H30M` rendered as "0 days 0 hours 30 mins" on the common path, then landed in the
+  // form asserting confidence 1 and replicated into the .beanpod.
+  const n = (v) => (v === '' ? 0 : Number.parseInt(v, 10));
+  const [dn, hn, mn, sn] = [n(d), n(h), n(mi), n(sec)];
+  if (!dn && !hn && !mn && !sn) return s;
   const parts = [];
-  if (d) parts.push(`${d} day${d === '1' ? '' : 's'}`);
-  if (h) parts.push(`${h} hour${h === '1' ? '' : 's'}`);
-  if (mi) parts.push(`${mi} min${mi === '1' ? '' : 's'}`);
+  if (dn) parts.push(`${dn} day${dn === 1 ? '' : 's'}`);
+  if (hn) parts.push(`${hn} hour${hn === 1 ? '' : 's'}`);
+  if (mn) parts.push(`${mn} min${mn === 1 ? '' : 's'}`);
   // Only show seconds when they are the whole story; "1 hour 30 mins 12 secs" is noise.
-  if (sec && !d && !h && !mi) parts.push(`${sec} sec${sec === '1' ? '' : 's'}`);
+  if (sn && !dn && !hn && !mn) parts.push(`${sn} sec${sn === 1 ? '' : 's'}`);
   return parts.join(' ') || s;
 }
 
@@ -171,13 +184,33 @@ export function normalizeRecipeNode(node) {
  * several, and one broken analytics blob should not cost us the recipe.
  */
 export function extractRecipeFromHtml(html) {
-  const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = re.exec(html)) !== null) {
+  // LINEAR SCAN, not a regex. `<script[^>]+…>[\s\S]*?</script>` is quadratic on
+  // attacker-controlled HTML: `'<script '.repeat(n)` with no `>` makes `[^>]+` backtrack
+  // from every start position. Measured against the real pattern: 211KB → 5.6s, and this
+  // is the FIRST thing run on a 2MB body, so ~4KB gzipped on the wire guarantees the 15s
+  // Lambda timeout — a raw CORS-less 502 that bypasses the whole typed taxonomy, while
+  // pinning one of only 5 concurrency slots. `dropTag` was rewritten for exactly this
+  // reason; the rewrite reached one function and not the class.
+  const lower = html.toLowerCase();
+  let cursor = 0;
+  for (;;) {
+    const open = lower.indexOf('<script', cursor);
+    if (open === -1) return null;
+    const openEnd = lower.indexOf('>', open);
+    if (openEnd === -1) return null;
+    const attrs = lower.slice(open, openEnd);
+    const close = lower.indexOf('</script', openEnd);
+    const bodyEnd = close === -1 ? html.length : close;
+    cursor = close === -1 ? html.length : close + 8;
+    if (!attrs.includes('application/ld+json')) {
+      if (close === -1) return null;
+      continue;
+    }
     let parsed;
     try {
-      parsed = JSON.parse(m[1].trim());
+      parsed = JSON.parse(html.slice(openEnd + 1, bodyEnd).trim());
     } catch {
+      if (close === -1) return null;
       continue;
     }
     const node = findRecipeNode(parsed);
@@ -185,6 +218,6 @@ export function extractRecipeFromHtml(html) {
       const normalized = normalizeRecipeNode(node);
       if (normalized) return normalized;
     }
+    if (close === -1) return null;
   }
-  return null;
 }

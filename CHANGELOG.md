@@ -16,8 +16,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Recipes now keep a cook time alongside prep time, and remember the link they came from.
 - Anything beanies filled in itself is listed under the ingredients and steps so you can check it against the original before you save.
 
+### Changed
+
+- Reading a recipe now opens straight to the link field, ready to paste. Reading from a photo or a PDF is still one tap away, just below it — the link is the everyday way in, so it no longer costs an extra tap and a second screen to reach.
+
 ### Fixed
 
+- Recipe photos: the cookbook now says "Adding the photo…" while the picture is fetched. The recipe saved immediately and the photo appeared several seconds later with nothing on screen to explain the gap.
+- A recipe page that only yields a dish name — common on roundup and category pages — now says so plainly instead of opening an otherwise empty form.
+- YouTube links that YouTube refuses to serve to an app now say exactly that, and point you at the recipe link in the video description, which almost always works.
+- Very long recipe pages no longer time out. Reading a large page took over 30 seconds and gave up; it now takes milliseconds.
 - Links saved anywhere in the app (activities, travel, bank details, trip ideas) are now checked before they become clickable. A malformed or unsafe link is shown as plain text instead of a working link.
 - Clearer messages when a recipe can't be read: a dead link, a site that doesn't allow apps to read it, and a video with no captions each now say what actually happened instead of "something went wrong".
 

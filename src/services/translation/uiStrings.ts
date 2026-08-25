@@ -8057,6 +8057,7 @@ const STRING_DEFS = {
     en: "We couldn't find a recipe in that. Try a clearer photo of the page, or type it in.",
     beanie: "we couldn't find a recipe in that. try a clearer photo of the page, or type it in.",
   },
+  'recipeExtract.attaching': { en: 'Adding the photo…', beanie: 'adding the photo…' },
   'recipeExtract.attachFailed.title': { en: 'Recipe Saved', beanie: 'recipe saved' },
   'recipeExtract.attachFailed.message': {
     en: "Your recipe is safe, but we couldn't attach the original. You can add it yourself from the recipe.",
@@ -8078,6 +8079,15 @@ const STRING_DEFS = {
     en: 'That link needs to be a secure (https) web address we can reach. Try copying it again from your browser.',
     beanie:
       'that link needs to be a secure (https) web address we can reach. try copying it again from your browser.',
+  },
+  'recipeExtract.videoBlocked.title': {
+    en: 'YouTube Wouldn’t Share That One',
+    beanie: 'youtube wouldn’t share that one',
+  },
+  'recipeExtract.videoBlocked.message': {
+    en: 'YouTube blocks apps from reading some videos. Open the video, look in its description for a link to the recipe, and paste that instead — it usually works, and gives exact quantities.',
+    beanie:
+      'youtube blocks apps from reading some videos. open the video, look in its description for a link to the recipe, and paste that instead — it usually works, and gives exact quantities.',
   },
   'recipeExtract.unreachable.title': {
     en: "Couldn't Open That Link",
@@ -8113,7 +8123,16 @@ const STRING_DEFS = {
     en: 'That needs to be a secure (https) web address.',
     beanie: 'that needs to be a secure (https) web address.',
   },
-  'recipeExtract.link.choice': { en: 'Paste a Link', beanie: 'paste a link' },
+  'recipeExtract.link.action': { en: 'Read It', beanie: 'read it' },
+  'recipeExtract.link.hint': {
+    en: 'Most recipe sites work. We read the ingredients and steps exactly as written.',
+    beanie: 'most recipe sites work. we read the ingredients and steps exactly as written.',
+  },
+  'recipeExtract.link.videoHint': {
+    en: 'We’ll look for a recipe link in the description first, then the captions.',
+    beanie: 'we’ll look for a recipe link in the description first, then the captions.',
+  },
+  'recipeExtract.link.orFrom': { en: 'or read from', beanie: 'or read from' },
   'recipeExtract.reader.label': { en: 'Read a Recipe', beanie: 'read a recipe' },
   'recipeExtract.reader.aria': {
     en: 'Read a recipe from a photo or PDF',

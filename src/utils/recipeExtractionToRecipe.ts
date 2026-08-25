@@ -49,9 +49,19 @@ export function recipeExtractionToPrefill(
 
   const ingredients = result.ingredients.map((l) => l.text);
   const steps = result.steps.map((l) => l.text);
-  // A "recipe" with a name but neither ingredients nor steps is not usable; treat it the
-  // same as isRecipe=false rather than opening an all-but-empty form.
-  if (!result.name.trim() && ingredients.length === 0 && steps.length === 0) return null;
+  // The test is SOMETHING TO COOK, not a name.
+  //
+  // The `&&` this replaced required the result to be entirely empty, so a name-only
+  // extraction — common on roundup and category pages — opened a form containing nothing but
+  // a dish title, with no "not a recipe" toast, logged as a successful capture. That made the
+  // failure class unmeasurable.
+  //
+  // But requiring a NAME as well (as the Lambda's `normalizeRecipeNode` does) over-corrects
+  // here: that guard exists to reject JSON-LD stub nodes, where a missing name signals a
+  // false positive. On this path the model has already said isRecipe and handed back real
+  // ingredients — throwing those away because it could not name the dish loses genuine work,
+  // and the form requires a name before saving anyway, so the user simply types one.
+  if (ingredients.length === 0 && steps.length === 0) return null;
 
   return {
     fields: {
