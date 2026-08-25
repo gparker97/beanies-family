@@ -75,6 +75,10 @@ const NEVER_A_RECIPE_LABELS = new Set([
 /** Whole hosts with no useful label (shorteners, and Amazon's one-letter domain). */
 const NEVER_A_RECIPE_HOSTS = new Set([
   'a.co',
+  // Its registrable label is `x`, which is too short and generic to put in the label set
+  // without catching real sites, so it is matched whole. Dropped by accident in the rewrite
+  // — exactly the regression the rewrite exists to prevent.
+  'x.com',
   'bit.ly',
   'tinyurl.com',
   't.co',

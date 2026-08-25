@@ -24,6 +24,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Recipes from Turkish and Azerbaijani sites (or any page containing an `İ`) now keep their exact ingredient amounts. They were silently falling back to an interpreted reading.
+- A roundup page ("25 best pasta recipes") no longer picks one dish at random and presents it as exact. It reads the page normally instead.
+- A recipe time the author left blank no longer shows as `PT0M`.
+- Editing a recipe no longer overwrites changes another family member made to a field you didn't touch.
+- Long pages with an unclosed comment or tag no longer lose everything after it — usually the method.
 - Recipe photos now show a spinner in the picture's own frame while they arrive — the same indicator as any other photo upload — on both the recipe card and the recipe page. The recipe saved immediately and its photo appeared several seconds later with nothing on screen to explain the gap.
 - While reviewing a recipe read from a link, the photo box says beanies already found a picture and will add it on save — and still lets you add your own alongside it.
 - Recipes with more than one photo now show a count on the photo, so it's clear there are others behind it. Tapping opens all of them with arrows to move between — that worked before, but nothing said so.
@@ -40,6 +45,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Reading a recipe from a video's **captions** has been withdrawn. It never worked: YouTube requires a token we don't have on the captions endpoint, and every request returned an empty result — including from an ordinary home connection. Videos are now read from their description and the recipe link in it, which gives exact quantities where captions would only ever have given a rough transcript.
 
 ### Security
+
+- The dish-photo fetch is bounded correctly under multi-label domains. The old rule treated every `.co.uk` (and `.com.au`, `.co.jp`, …) site as the same domain, so a hostile recipe page could point that fetch at any other site under the same suffix.
+- The Add Recipe form now asks permission before sending a photo or PDF to be read. It was possible to reach the reader from the meal planner without the permission step appearing.
+- Recipe alerts can no longer write the Slack webhook into diagnostic logs if it is misconfigured.
 
 - Every link the app opens is screened for its scheme before navigation, closing a stored cross-site-scripting vector where a `javascript:` link saved by one family member could run in another member's session.
 - AI responses are now size-bounded before they are stored, so a hostile document cannot bloat the family data file.

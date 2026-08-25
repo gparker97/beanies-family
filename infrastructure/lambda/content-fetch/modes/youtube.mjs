@@ -79,25 +79,35 @@ export function parseVideoId(raw) {
  * URL-encoded into the query because that is the only shape the endpoint accepts; it is a
  * browser-key-class secret, never logged, and the response is public data either way.
  */
-async function fetchDataApi(videoId) {
+async function fetchDataApi(videoId, budgetMs) {
   if (!YOUTUBE_API_KEY) return null;
 
   const url =
     'https://www.googleapis.com/youtube/v3/videos' +
     `?part=snippet&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(YOUTUBE_API_KEY)}`;
 
-  const res = await guardedFetch(url, { maxBytes: MAX_BYTES, totalBudgetMs: 6000 });
+  const res = await guardedFetch(url, { maxBytes: MAX_BYTES, totalBudgetMs: budgetMs });
   if (!res.ok) {
-    console.warn(`[youtube] data-api fetch failed code=${res.code}`);
-    return null;
+    // NOT the same as "no key configured", which is what returning null used to mean.
+    //
+    // The Data API is THE production path, so its own failure is the most likely real outage
+    // of this feature — and the day the free quota runs out, EVERY capture fails while
+    // CloudWatch shows `resolved=video_blocked via=innertube`, the exact line the header
+    // says to expect as normal. Nobody would ever find it. `site_refused` covers both 403
+    // (key revoked/restricted) and 429 (quota), so the log names the class explicitly and
+    // alerting has something to match on.
+    console.error(
+      `[youtube] data-api FAILED code=${res.code} — key invalid, quota exhausted or blocked`
+    );
+    return { apiFailed: true };
   }
 
   let parsed;
   try {
     parsed = JSON.parse(res.body.toString('utf8'));
   } catch {
-    console.warn('[youtube] data-api returned unparseable json');
-    return null;
+    console.error('[youtube] data-api returned unparseable json');
+    return { apiFailed: true };
   }
 
   const snippet = parsed?.items?.[0]?.snippet;
@@ -121,7 +131,7 @@ async function fetchDataApi(videoId) {
  * datacenter IPs that the watch page refuses. `contentCheckOk`/`racyCheckOk` stop it
  * withholding details behind an age-gate interstitial.
  */
-async function fetchInnertube(videoId) {
+async function fetchInnertube(videoId, budgetMs) {
   const body = JSON.stringify({
     videoId,
     contentCheckOk: true,
@@ -133,14 +143,20 @@ async function fetchInnertube(videoId) {
 
   const res = await guardedFetch('https://www.youtube.com/youtubei/v1/player', {
     maxBytes: MAX_BYTES,
-    totalBudgetMs: 6000,
+    totalBudgetMs: budgetMs,
     post: { body, headers: { 'content-type': 'application/json' } },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.warn(`[youtube] innertube fetch failed code=${res.code}`);
+    return null;
+  }
 
   try {
     return JSON.parse(res.body.toString('utf8'));
   } catch {
+    // Never silent: this is a DIFFERENT failure from "the request never landed", and
+    // conflating the two is what made the first YouTube outage need a local repro.
+    console.warn('[youtube] innertube returned unparseable json');
     return null;
   }
 }
@@ -159,7 +175,10 @@ export function readVideoDetails(player) {
   return {
     title: String(d.title).slice(0, 200),
     channel: String(d.author ?? '').slice(0, 200),
-    description: String(d.shortDescription ?? '').slice(0, MAX_DESCRIPTION),
+    // By code point, not UTF-16 unit: emoji are ubiquitous in video descriptions and a
+    // raw .slice() can cut one in half, leaving a lone surrogate that is invalid UTF-8 by
+    // the time it reaches the model or the log.
+    description: [...String(d.shortDescription ?? '')].slice(0, MAX_DESCRIPTION).join(''),
   };
 }
 
@@ -170,8 +189,19 @@ function classifyEmpty(player) {
   if (status === 'LOGIN_REQUIRED' || reason.includes('bot') || reason.includes('sign in')) {
     return 'video_blocked';
   }
-  // A real deletion or a private video says so with no details attached.
-  if (status === 'ERROR' || status === 'UNPLAYABLE') return 'not_found';
+  // Only a reason that NAMES the video's absence is a not_found. `UNPLAYABLE` on its own is
+  // what a region-locked or age-gated video reports — and what this file's own header
+  // documents as the shape a BLOCKED request comes back in — so mapping it to not_found told
+  // the user "the page may have moved" about a video that is sitting right there.
+  if (
+    reason.includes('unavailable') ||
+    reason.includes('removed') ||
+    reason.includes('private') ||
+    reason.includes('deleted') ||
+    reason.includes('terminated')
+  ) {
+    return 'not_found';
+  }
   return 'video_blocked';
 }
 
@@ -179,8 +209,19 @@ export async function fetchYoutube(url) {
   const videoId = parseVideoId(url);
   if (!videoId) return { ok: false, code: 'bad_url' };
 
+  // ONE deadline across both paths. Two independent 6s budgets can total 12s inside a 15s
+  // Lambda, and the invocation dies mid-flight as a raw CORS-less 502 outside the typed
+  // taxonomy — the failure the budgets exist to prevent.
+  const deadline = Date.now() + 10_000;
+  const left = () => Math.max(500, deadline - Date.now());
+
   // Path 1 — the official API, when configured.
-  const api = await fetchDataApi(videoId);
+  const api = await fetchDataApi(videoId, left());
+  if (api?.apiFailed) {
+    // Its own outage, not YouTube refusing this video. Do NOT fall through to InnerTube: it
+    // is blocked from AWS, so it would only relabel an API outage as a video problem.
+    return { ok: false, code: 'site_refused' };
+  }
   if (api?.missing) {
     console.warn(`[youtube] resolved=not_found via=data_api id_len=${videoId.length}`);
     return { ok: false, code: 'not_found' };
@@ -191,7 +232,7 @@ export async function fetchYoutube(url) {
   }
 
   // Path 2 — InnerTube. Expected to be blocked in production; see the header.
-  const player = await fetchInnertube(videoId);
+  const player = await fetchInnertube(videoId, left());
   if (!player) {
     // THE observability gap this closes: the old code returned `video_blocked` for both
     // "the request never landed" and "it landed but carried nothing", so a CloudWatch line
