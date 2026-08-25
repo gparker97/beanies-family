@@ -26,6 +26,7 @@ import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePhotoStore } from '@/stores/photoStore';
+import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import { usePermissions } from '@/composables/usePermissions';
 import type { CookLogEntry } from '@/types/models';
 import { getUrlDomain, safeExternalHref } from '@/utils/url';
@@ -36,6 +37,7 @@ const { t } = useTranslation();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
 const photoStore = usePhotoStore();
+const { isPending } = useRecipePhotoPending();
 const { canEditActivities } = usePermissions();
 
 const recipeId = computed(() => (route.params.recipeId as string) ?? '');
@@ -176,10 +178,15 @@ function onRecipeDeleted(): void {
             class="cursor-zoom-in transition-transform duration-200 group-hover:-translate-y-0.5 group-active:scale-[0.99]"
           />
         </button>
+        <!-- The photo is fetched AFTER the recipe saves, so for a few seconds a freshly
+             captured recipe has none. Saying so in the polaroid itself is the honest place:
+             it is exactly where the picture is about to appear. -->
         <PolaroidImage
           v-else
           :src="null"
-          :caption="t('cookbook.card.noPhoto')"
+          :caption="
+            isPending(recipe.id) ? t('recipeExtract.attaching') : t('cookbook.card.noPhoto')
+          "
           aspect-ratio="4 / 3"
         />
         <div class="flex flex-col">

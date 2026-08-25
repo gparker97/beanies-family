@@ -8113,6 +8113,19 @@ const STRING_DEFS = {
     beanie:
       "this video's description doesn't have a recipe or a link to one, so there's nothing for beanies to read. check the description yourself for a link to the cook's website, and paste that instead.",
   },
+  'recipeExtract.strip.title': {
+    en: 'Start From a Link',
+    beanie: 'start from a link',
+  },
+  'recipeExtract.strip.subtitle': {
+    en: 'Paste a recipe page or a YouTube link and beanies fills this in for you.',
+    beanie: 'paste a recipe page or a youtube link and beanies fills this in for you.',
+  },
+  'recipeExtract.strip.action': { en: 'Fill It In', beanie: 'fill it in' },
+  'recipeExtract.strip.document': {
+    en: 'or read a photo or PDF instead',
+    beanie: 'or read a photo or pdf instead',
+  },
   'recipeExtract.link.title': { en: 'Paste a Recipe Link', beanie: 'paste a recipe link' },
   'recipeExtract.link.label': { en: 'Recipe Link', beanie: 'recipe link' },
   'recipeExtract.link.placeholder': {
