@@ -7,18 +7,14 @@
 // so they are explicit, typed `not_available` seams to be filled in later — NOT silent
 // no-ops. The factory keeps the key out of `ExtractionRequest`, preserving interface purity.
 
-import {
-  callOpenAiCompatibleTravel,
-  callOpenAiCompatibleVision,
-  type OpenAiCompatibleConfig,
-} from './openaiCompatible';
+import { callOpenAiCompatibleTask, type OpenAiCompatibleConfig } from './openaiCompatible';
 import {
   ExtractionProviderError,
   type AiProviderId,
   type ExtractionProvider,
   type ExtractionRequest,
-  type ExtractionResult,
-  type TravelExtractionResult,
+  type ExtractionResultByTask,
+  type ExtractionTask,
 } from '../types';
 
 export interface ByokConfig {
@@ -75,11 +71,11 @@ export function createByokProvider(config: ByokConfig): ExtractionProvider {
 
   return {
     id: config.provider,
-    extract(request: ExtractionRequest): Promise<ExtractionResult> {
-      return callOpenAiCompatibleVision(openAiConfig(), request);
-    },
-    extractTravel(request: ExtractionRequest): Promise<TravelExtractionResult> {
-      return callOpenAiCompatibleTravel(openAiConfig(), request);
+    run<T extends ExtractionTask>(
+      task: T,
+      request: ExtractionRequest
+    ): Promise<ExtractionResultByTask[T]> {
+      return callOpenAiCompatibleTask(openAiConfig(), task, request);
     },
   };
 }

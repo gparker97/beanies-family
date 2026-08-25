@@ -17,14 +17,14 @@
 // typed `not_available` — an honest seam, not a fake success. The BYOK and on-device paths,
 // and the whole wedge UX, are exercisable without it.
 
-import { parseExtractionResult, parseTravelExtractionResult } from '../extractionPrompt';
+import { EXTRACTION_PARSERS } from '../extractionPrompt';
 import {
   ExtractionProviderError,
   type AttestationInfo,
   type ExtractionProvider,
   type ExtractionRequest,
-  type ExtractionResult,
-  type TravelExtractionResult,
+  type ExtractionResultByTask,
+  type ExtractionTask,
 } from '../types';
 
 /** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
@@ -48,10 +48,7 @@ interface ProxyBody {
  * envelope. Owns the shared transport + error classification (timeout / upstream_busy /
  * provider_error / malformed) so the event and travel paths don't duplicate it.
  */
-async function postToProxy(
-  request: ExtractionRequest,
-  task: 'event' | 'travel'
-): Promise<ProxyBody> {
+async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Promise<ProxyBody> {
   if (!PROXY_URL) {
     throw new ExtractionProviderError(
       'not_available',
@@ -70,8 +67,13 @@ async function postToProxy(
         'Content-Type': 'application/json',
         ...(PROXY_API_KEY ? { 'x-api-key': PROXY_API_KEY } : {}),
       },
+      // WIRE FORMAT IS FROZEN for the image path: the bundle and the Lambda deploy
+      // independently, so renaming these fields would 400 every extraction from a new
+      // bundle hitting a not-yet-applied Lambda. A text source adds a field, never renames.
       body: JSON.stringify({
-        imageDataUrls: request.imageDataUrls,
+        ...(request.source.kind === 'images'
+          ? { imageDataUrls: request.source.imageDataUrls }
+          : { text: request.source.text }),
         todayIso: request.todayIso,
         task,
       }),
@@ -122,30 +124,27 @@ async function postToProxy(
 
 export const managedProvider: ExtractionProvider = {
   id: 'tinfoil',
-  async extract(request: ExtractionRequest): Promise<ExtractionResult> {
-    const body = await postToProxy(request, 'event');
+  async run<T extends ExtractionTask>(
+    task: T,
+    request: ExtractionRequest
+  ): Promise<ExtractionResultByTask[T]> {
+    const body = await postToProxy(request, task);
+    let result: ExtractionResultByTask[T];
     try {
-      const result = parseExtractionResult(body.result);
-      // Attestation is managed-tier-only metadata (optional on ExtractionResult).
-      return body.attestation ? { ...result, attestation: body.attestation } : result;
+      const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
+      result = parse(body.result);
     } catch (err) {
       throw new ExtractionProviderError(
         'malformed_output',
-        'Managed proxy returned unparseable or wrong-shape JSON',
+        `Managed proxy returned unparseable or wrong-shape ${task} JSON`,
         err
       );
     }
-  },
-  async extractTravel(request: ExtractionRequest): Promise<TravelExtractionResult> {
-    const body = await postToProxy(request, 'travel');
-    try {
-      return parseTravelExtractionResult(body.result);
-    } catch (err) {
-      throw new ExtractionProviderError(
-        'malformed_output',
-        'Managed proxy returned unparseable or wrong-shape travel JSON',
-        err
-      );
-    }
+    // Attestation is managed-tier-only metadata declared once on AttestedResult, which
+    // every task's result extends. ASSIGNMENT, not a spread: `{ ...result, attestation }`
+    // depends on TS's generic-spread intersection behaviour and is where an implementer
+    // reaches for `as`. Assigning onto `T extends AttestedResult` is unambiguously typed.
+    if (body.attestation) result.attestation = body.attestation;
+    return result;
   },
 };

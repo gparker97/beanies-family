@@ -22,31 +22,58 @@ export type { AiTier } from '@/types/models';
 export type AiProviderId = 'tinfoil' | 'openai' | 'claude' | 'gemini' | 'on-device';
 
 /**
- * A single document to extract from. Data-minimization: this is one document's
- * already-compressed page image(s) — never the family dataset. Each image is a
- * base64 `data:` URL so the request travels as a self-contained payload.
+ * Managed-tier attestation rides on ANY task's result, so it is declared ONCE here rather
+ * than on each result type. That is what lets the generic `run` below fold attestation in
+ * with no cast and no per-task branch: `managedProvider` assigns onto a `T extends
+ * AttestedResult`. Declaring it per-result instead forces an `as` cast at that call site.
+ */
+export interface AttestedResult {
+  /** Managed tier only (see {@link AttestationInfo}); omitted by BYOK/on-device. */
+  attestation?: AttestationInfo;
+}
+
+/**
+ * What the model is given. Discriminated so a text-only task can never be handed images
+ * by mistake, and so adding a third input kind is a compile error at every switch rather
+ * than a silent fallthrough.
+ *
+ * `images`: `data:image/jpeg;base64,…` per client-compressed page of ONE document, in page
+ * order. Always ≥1 (a photo is the single-element case; a PDF contributes up to
+ * `MAX_EXTRACT_PAGES`). The model reads them as one document → one merged result.
+ *
+ * `text`: already-extracted plain text (a reduced web page, a video transcript). It is
+ * UNTRUSTED — see the fencing rules in the prompt builders.
+ */
+export type ExtractionSource =
+  { kind: 'images'; imageDataUrls: string[] } | { kind: 'text'; text: string };
+
+/**
+ * A single document to extract from. Data-minimization: this is one document, never the
+ * family dataset.
+ *
+ * NOTE: there is deliberately no `task` field. The task is `run`'s first argument, and
+ * carrying it in both places creates two sources of truth that can disagree.
  */
 export interface ExtractionRequest {
-  /**
-   * `data:image/jpeg;base64,…` for each client-compressed page of ONE document, in
-   * page order. Always ≥1 (a photo is the single-element case; a PDF contributes up
-   * to `MAX_EXTRACT_PAGES`). The model reads them as one document → one merged result.
-   */
-  imageDataUrls: string[];
+  source: ExtractionSource;
   /** Current date `YYYY-MM-DD`, so the model can resolve relative/partial dates. */
   todayIso: string;
   /** Optional cancel signal so the UI can abort a slow extraction. */
   signal?: AbortSignal;
-  /**
-   * Which extraction task to run. `event` (default) is the #133 invitation→activity
-   * wedge; `travel` is the #30 document→travel-segment wedge. The provider selects the
-   * task-appropriate prompt + parser; omitting it preserves the original event behavior.
-   */
-  task?: ExtractionTask;
+}
+
+/**
+ * Task → result type. This map is the SINGLE place the task union grows: adding an entry
+ * here gives you the task id, the provider's return type, and the registry key at once.
+ * `event` is the #133 invitation→activity wedge; `travel` is the #30 document→segment wedge.
+ */
+export interface ExtractionResultByTask {
+  event: ExtractionResult;
+  travel: TravelExtractionResult;
 }
 
 /** The extraction tasks the funnel supports (one prompt/schema/parser per task). */
-export type ExtractionTask = 'event' | 'travel';
+export type ExtractionTask = keyof ExtractionResultByTask;
 
 /** Per-field 0..1 confidence so the UI can flag low-confidence values for review. */
 export interface FieldConfidence {
@@ -70,7 +97,7 @@ export interface AttestationInfo {
 }
 
 /** The structured event fields extracted from a document. Mirrors EXTRACTION_JSON_SHAPE. */
-export interface ExtractionResult {
+export interface ExtractionResult extends AttestedResult {
   /** False when the image is not an event/invitation — handled gracefully, never invented. */
   isEvent: boolean;
   title: string;
@@ -98,8 +125,6 @@ export interface ExtractionResult {
    */
   category?: string;
   confidence: FieldConfidence;
-  /** Managed tier only (see AttestationInfo). */
-  attestation?: AttestationInfo;
 }
 
 /**
@@ -127,7 +152,7 @@ export interface TravelSegmentDraft {
 }
 
 /** The structured travel result extracted from a document. Mirrors TRAVEL_JSON_SHAPE. */
-export interface TravelExtractionResult {
+export interface TravelExtractionResult extends AttestedResult {
   /** False when the document is not a travel booking — handled gracefully, never invented. */
   isTravel: boolean;
   /** Suggested destination-based trip name, or `''`. */
@@ -187,10 +212,16 @@ export interface DocumentExtractionResult<T = ExtractionResult> {
  */
 export interface ExtractionProvider {
   readonly id: AiProviderId;
-  /** Event/invitation → activity extraction (#133). */
-  extract(request: ExtractionRequest): Promise<ExtractionResult>;
-  /** Travel document → travel-segment extraction (#30). */
-  extractTravel(request: ExtractionRequest): Promise<TravelExtractionResult>;
+  /**
+   * Run ONE extraction task. Deliberately generic rather than one method per task: the
+   * previous shape (`extract` + `extractTravel`) grew a near-identical member for every
+   * new task across all three providers. Adding a task to {@link ExtractionResultByTask}
+   * now requires NO provider change at all.
+   */
+  run<T extends ExtractionTask>(
+    task: T,
+    request: ExtractionRequest
+  ): Promise<ExtractionResultByTask[T]>;
 }
 
 /** Typed provider failure carrying a stable {@link ExtractionErrorCode}. */

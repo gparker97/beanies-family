@@ -22,6 +22,7 @@ import { isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
 import { createByokProvider, type ByokConfig } from './providers/byokProvider';
 import { managedProvider } from './providers/managedProvider';
 import { onDeviceProvider } from './providers/onDeviceProvider';
+import { assertNever as assertNeverSource } from '@/utils/assertNever';
 import {
   ExtractionProviderError,
   type AiTier,
@@ -29,6 +30,8 @@ import {
   type ExtractionProvider,
   type ExtractionRequest,
   type ExtractionResult,
+  type ExtractionResultByTask,
+  type ExtractionSource,
   type ExtractionTask,
   type TravelExtractionResult,
 } from './types';
@@ -135,16 +138,22 @@ async function prepareImageDataUrls(
  * the task-specific provider call → typed result. Always resolves (never rejects) with a
  * classified outcome; `run` selects the per-task provider method (`extract` / `extractTravel`).
  */
-async function runExtraction<T>(
-  file: File,
+async function runExtraction<T extends ExtractionTask>(
+  input: File | string,
   opts: ExtractOptions,
-  task: ExtractionTask,
-  run: (provider: ExtractionProvider, request: ExtractionRequest) => Promise<T>
-): Promise<DocumentExtractionResult<T>> {
+  task: T
+): Promise<DocumentExtractionResult<ExtractionResultByTask[T]>> {
+  // A text source has no file to rasterize or compress, so it skips preparation entirely
+  // (no compressedBlob, no truncation). Closed with assertNever so a third source kind is
+  // a BUILD error here rather than a silent fallthrough.
+  if (typeof input === 'string') {
+    return runWithSource({ kind: 'text', text: input }, opts, task, undefined, false);
+  }
   // 1) Resolve the document into its page image(s) and compress each client-side (a PDF
   //    rasterizes up to MAX_EXTRACT_PAGES pages; a photo is the single-image case). Keep
   //    page 1's compressed blob so a successful result can hand it back as the source
   //    thumbnail without a second compression pass, and carry `truncated` through.
+  const file = input;
   let prepared: PreparedImages;
   try {
     prepared = await prepareImageDataUrls(file, opts.compression ?? DEFAULT_COMPRESSION);
@@ -162,6 +171,26 @@ async function runExtraction<T>(
     return { success: false, errorCode: 'compression', error: detail };
   }
 
+  return runWithSource(
+    { kind: 'images', imageDataUrls: prepared.imageDataUrls },
+    opts,
+    task,
+    prepared.compressedBlob,
+    prepared.truncated
+  );
+}
+
+/** Tier dispatch + the provider call, shared by both source kinds. */
+async function runWithSource<T extends ExtractionTask>(
+  source: ExtractionSource,
+  opts: ExtractOptions,
+  task: T,
+  compressedBlob: Blob | undefined,
+  truncated: boolean
+): Promise<DocumentExtractionResult<ExtractionResultByTask[T]>> {
+  // Exhaustiveness anchor: adding a source kind must break the build somewhere concrete.
+  if (source.kind !== 'images' && source.kind !== 'text') assertNeverSource(source, 'sourceKind');
+
   // 2) Dispatch to the selected tier's provider.
   let provider: ExtractionProvider;
   try {
@@ -175,19 +204,13 @@ async function runExtraction<T>(
 
   // 3) Run extraction; classify any failure.
   const request: ExtractionRequest = {
-    imageDataUrls: prepared.imageDataUrls,
+    source,
     todayIso: opts.todayIso,
     signal: opts.signal,
-    task,
   };
   try {
-    const data = await run(provider, request);
-    return {
-      success: true,
-      data,
-      compressedBlob: prepared.compressedBlob,
-      truncated: prepared.truncated,
-    };
+    const data = await provider.run(task, request);
+    return { success: true, data, compressedBlob, truncated };
   } catch (err) {
     if (err instanceof ExtractionProviderError) {
       return { success: false, errorCode: err.code, error: err.message };
@@ -208,7 +231,7 @@ export function extractEventFromDocument(
   file: File,
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<ExtractionResult>> {
-  return runExtraction(file, opts, 'event', (provider, request) => provider.extract(request));
+  return runExtraction(file, opts, 'event');
 }
 
 /**
@@ -219,7 +242,5 @@ export function extractTravelFromDocument(
   file: File,
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<TravelExtractionResult>> {
-  return runExtraction(file, opts, 'travel', (provider, request) =>
-    provider.extractTravel(request)
-  );
+  return runExtraction(file, opts, 'travel');
 }
