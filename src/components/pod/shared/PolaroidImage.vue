@@ -14,7 +14,15 @@ defineProps<{
   alt?: string;
   /** Aspect ratio override — defaults to 4/3, photo-album shape. */
   aspectRatio?: string;
+  /**
+   * A photo is on its way into this frame. Renders the same spinner treatment the app
+   * already uses while a photo uploads, so "a picture is coming" looks the same wherever
+   * it happens — and so a user does not start adding one of their own on top.
+   */
+  loading?: boolean;
 }>();
+
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 </script>
 
 <template>
@@ -32,8 +40,20 @@ defineProps<{
       from the photo store (recipes, scrapbook), which means lh3 URLs
       under the hood. See BeanieAvatar.vue for the full rationale.
     -->
+    <!-- Spinner wins over both the image and the placeholder: while a photo is arriving,
+         that fact is the most useful thing the frame can say. -->
+    <div
+      v-if="loading"
+      class="relative grid w-full place-items-center overflow-hidden"
+      :style="{
+        aspectRatio: aspectRatio ?? '4 / 3',
+        background: 'linear-gradient(135deg, #f9e4c8 0%, #f5c99a 100%)',
+      }"
+    >
+      <BeanieSpinner size="md" />
+    </div>
     <img
-      v-if="src"
+      v-else-if="src"
       :src="src"
       :alt="alt ?? ''"
       class="block w-full bg-cover bg-center"

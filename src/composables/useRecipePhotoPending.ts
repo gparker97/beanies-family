@@ -16,6 +16,7 @@
  * lie about work nobody is doing.
  */
 import { computed, ref } from 'vue';
+import { usePhotoStore } from '@/stores/photoStore';
 import type { UUID } from '@/types/models';
 
 const pendingIds = ref<string[]>([]);
@@ -29,9 +30,19 @@ export function useRecipePhotoPending() {
     pendingIds.value = pendingIds.value.filter((x) => x !== id);
   }
 
-  /** Reactive per-id predicate for templates. */
+  /**
+   * Reactive per-id predicate for templates, covering the WHOLE wait — not just our half.
+   *
+   * A captured dish photo goes through two stages: we fetch the bytes from the web (this
+   * module's own state), then hand them to the photo store, which queues an upload
+   * (`pendingUploadsFor`). Reporting only the first stage would blink the spinner off
+   * halfway through, exactly when the store's own upload is still running — so the frame
+   * would go back to "no photo" and then suddenly have one. Both stages, one predicate.
+   */
   function isPending(id: string | undefined | null): boolean {
-    return !!id && pendingIds.value.includes(id);
+    if (!id) return false;
+    if (pendingIds.value.includes(id)) return true;
+    return usePhotoStore().pendingUploadsFor('recipes', id).length > 0;
   }
 
   return {
