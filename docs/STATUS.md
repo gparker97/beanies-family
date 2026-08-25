@@ -1647,6 +1647,38 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+### Travel plans — review fixed, decomposition PART DONE (2026-08-26)
+
+`/code-review max` over the whole travel surface (~5,900 lines) returned 15 findings plus a
+secondary list. **All the behavioural ones are fixed and pushed** (12 commits, `main`
+@ `d0127749`). Two findings were checked and REJECTED with reasons — see the commit bodies:
+`photoIdsFor` does not apply to nested segments, and first-token traveller matching is the
+primary use case, pinned by existing tests.
+
+**The decomposition is roughly half done.** TravelPlansPage 1925 → 1616 lines.
+
+Extracted so far:
+
+- `vacationStore.saveExtractedTrip` + `updateSegment`/`deleteSegment` (id-addressed)
+- `familyStore.learnAliases`
+- `TripCard.vue`
+- `TimelineSegmentCard.vue` — unified the two divergent copies
+
+Still to extract (from the review's plan): `TripIdeasPanel`, `TripTimeline`, `TripHeader`,
+`TripListView`, `useTravelExtractionFlow`, `useSegmentEditing`, `useTripSelection`,
+`useSegmentAttachments`, plus the shared modal units (`SegmentEditDrawer`,
+`useEntityFormFields`, `useSegmentSave`, `ChoicePillGroup`) — the review estimates ~450
+duplicated lines across the three edit drawers.
+
+**Read this before continuing the decomposition.** `src/pages/__tests__/TravelPlansPage.smoke.test.ts`
+exists because a template extraction introduced a nested `v-for` that would have rendered
+every booking N² times, and type-check, lint and 4906 unit tests were ALL green with it in
+place. Unit tests on extracted components cannot catch wiring bugs. Keep that smoke test
+passing, and extend it when you extract a region — it is currently shallow.
+
+**Owed:** browser verification of the travel changes. Nothing here has been seen in a
+browser; every defect this session was found by review or by a human, never by the suite.
+
 ### ⭐ #72 recipe capture — YouTube LIVE, needs a new production secret ⭐
 
 **State (2026-08-25):** phases 1-3 complete on `security/ai-input-output-hardening` (21+ commits, NOT pushed). The `content-fetch` Lambda is deployed to prod; the Vue client is not.
