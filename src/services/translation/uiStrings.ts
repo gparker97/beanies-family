@@ -8031,8 +8031,8 @@ const STRING_DEFS = {
   // AI document-extraction wedge (#133) — photo/invitation → prefilled activity.
   'ai.offline.title': { en: "You're Offline", beanie: "you're offline" },
   'ai.offline.message': {
-    en: 'Connect to the internet to read a photo into an activity.',
-    beanie: 'connect to the internet to read a photo into an activity.',
+    en: 'Connect to the internet and beanies can read this for you.',
+    beanie: 'connect to the internet and beanies can read this for you.',
   },
   'ai.notEvent.title': { en: 'No Event Found', beanie: 'no event found' },
   'ai.notEvent.message': {
@@ -8166,21 +8166,21 @@ const STRING_DEFS = {
   },
   'ai.unavailable.title': { en: 'Not Available Yet', beanie: 'not available yet' },
   'ai.unavailable.message': {
-    en: "Reading photos isn't set up yet. You can add the activity manually.",
-    beanie: "reading photos isn't set up yet. you can add the activity manually.",
+    en: "Magic beans isn't set up yet. You can still add this yourself.",
+    beanie: "magic beans isn't set up yet. you can still add this yourself.",
   },
-  'ai.error.title': { en: "Couldn't Read That Photo", beanie: "couldn't read that photo" },
+  'ai.error.title': { en: "Couldn't Read That", beanie: "couldn't read that" },
   'ai.error.timeout': {
     en: 'That took too long. Please try again.',
     beanie: 'that took too long. please try again.',
   },
   'ai.error.unreadable': {
-    en: "We couldn't make sense of that one. Try a clearer photo.",
-    beanie: "we couldn't make sense of that one. try a clearer photo.",
+    en: "We couldn't make sense of that one. Try a clearer photo or a sharper scan.",
+    beanie: "we couldn't make sense of that one. try a clearer photo or a sharper scan.",
   },
   'ai.error.generic': {
-    en: 'Something went wrong reading that photo. Please try again.',
-    beanie: 'something went wrong reading that photo. please try again.',
+    en: 'Something went wrong reading that. Please try again.',
+    beanie: 'something went wrong reading that. please try again.',
   },
   'ai.error.busy.title': { en: 'beanies AI Is Busy', beanie: 'beanies ai is busy' },
   'ai.error.busy.message': {
