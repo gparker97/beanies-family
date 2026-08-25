@@ -35,6 +35,20 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
+// Selection is driven through the deep-link composable — the page's real entry point for
+// "open this trip". Triggering the card's event is not an option: `shallow` leaves child
+// components unresolved, so there is no component there to emit.
+let deepLinkId: string | null = null;
+vi.mock('@/composables/useDeepLinkParam', () => ({
+  useDeepLinkParam: (opts: { open: (id: string) => boolean }) => {
+    if (deepLinkId) {
+      const id = deepLinkId;
+      // Next tick, so the page's own reactive state is set up before selection lands.
+      void Promise.resolve().then(() => opts.open(id));
+    }
+  },
+}));
+
 function trip(over?: Partial<FamilyVacation>): FamilyVacation {
   return {
     id: 'vac-1',
@@ -65,6 +79,7 @@ describe('TravelPlansPage — smoke', () => {
     // which happy-dom leaves hanging until the 5s timeout — and only when the whole suite
     // runs, so it passed in isolation and failed together. A test that depends on run order
     // is not a safety net.
+    deepLinkId = null;
     vi.stubGlobal(
       'fetch',
       vi
@@ -104,4 +119,14 @@ describe('TravelPlansPage — smoke', () => {
     // element count is what reflects the v-for, and the v-for is what this guards.
     expect(w.findAll('tripcard').length).toBe(2);
   }, 20_000);
+
+  // NOT COVERED, deliberately, and this is a limitation worth naming rather than papering
+  // over: the DETAIL view (timeline + ideas panel) has no smoke coverage. Selecting a trip
+  // needs a child component to emit, and `shallow` leaves children unresolved; driving it
+  // through the deep-link composable did not land either. Several attempts produced only a
+  // test that asserted 0 === 0, which is worse than no test.
+  //
+  // Consequence for whoever continues the decomposition: extracting TripTimeline (~330
+  // lines, the largest remaining unit) has NO structural safety net. Either solve this
+  // harness problem first, or verify that extraction in a browser.
 });
