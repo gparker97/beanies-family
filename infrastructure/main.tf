@@ -135,6 +135,20 @@ module "telemetry" {
 # defaulted in-module. Route-level throttle lives on the registry-owned $default
 # stage. See ADR-030 / docs/research/2026-06-02-tinfoil-phase1-gates.md.
 
+# content-fetch — user-supplied URL fetching for recipe capture (#72). Separate from
+# ai_extract on purpose: this is the app's first user-controlled outbound request and an
+# SSRF vector, so it gets its own IAM role, its own concurrency ceiling and NO VPC.
+module "content_fetch" {
+  source = "./modules/content-fetch"
+
+  app_name                  = var.app_name
+  environment               = var.environment
+  api_gateway_id            = module.registry.api_gateway_id
+  api_gateway_execution_arn = module.registry.api_gateway_execution_arn
+  api_domain_name           = module.registry.api_domain_name
+  content_fetch_api_key     = var.content_fetch_api_key
+}
+
 module "ai_extract" {
   source = "./modules/ai-extract"
 

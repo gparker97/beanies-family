@@ -21,9 +21,20 @@ import { useTranslation } from './useTranslation';
 import { usePhotos } from './usePhotos';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { extractRecipeFromDocument } from '@/services/ai/documentExtractionService';
-import { recipeExtractionToPrefill, type RecipePrefill } from '@/utils/recipeExtractionToRecipe';
+import {
+  extractRecipeFromDocument,
+  extractRecipeFromText,
+} from '@/services/ai/documentExtractionService';
+import { resolveRecipeSource, type ExtractionPath } from '@/services/ai/recipeSourceResolver';
+import { assertNever } from '@/utils/assertNever';
+import { safeHttpsUrl } from '@/utils/url';
+import {
+  jsonLdToPrefill,
+  recipeExtractionToPrefill,
+  type RecipePrefill,
+} from '@/utils/recipeExtractionToRecipe';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
 import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
@@ -32,8 +43,11 @@ const SURFACE = 'recipe-extract';
 
 export interface RecipeReady {
   prefill: RecipePrefill;
-  /** The ORIGINAL picked file (image or PDF), attached to the recipe after it saves. */
-  sourceFile: File;
+  /**
+   * The ORIGINAL picked file (image or PDF), attached after save. `null` for a URL
+   * capture — there is no document; provenance is the stored `sourceUrl` instead.
+   */
+  sourceFile: File | null;
 }
 
 export interface UseRecipeCaptureOptions {
@@ -54,6 +68,8 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const familyStore = useFamilyStore();
 
   const isProcessing = ref(false);
+  /** A screened dish-image URL held until the recipe is saved, then fetched and stored. */
+  const pendingDishImageUrl = ref<string | null>(null);
   /** Held between a successful extraction and the save that follows it. */
   const pendingSource = ref<File | null>(null);
   /**
@@ -122,19 +138,136 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
 
       pendingSource.value = file;
       pendingCompressed.value = result.compressedBlob ?? null;
+      handOver(prefill, 'document', 'document', file);
+    } finally {
+      isProcessing.value = false;
+    }
+  }
+
+  /**
+   * The one place a finished prefill reaches the caller, so the document and URL paths
+   * cannot drift in what they log or what they hand over.
+   */
+  function handOver(
+    prefill: RecipePrefill,
+    kind: 'document' | 'page' | 'youtube',
+    path: ExtractionPath,
+    sourceFile: File | null
+  ): void {
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'recipe ready for review',
+      context: {
+        action: 'ready',
+        kind,
+        // Which rung produced this. The field that makes "the recipe came out wrong"
+        // answerable — it says whether values were PARSED or INFERRED.
+        extraction_path: path,
+        inferred_count: prefill.inferredIngredients.length + prefill.inferredSteps.length,
+        ingredient_count: prefill.fields.ingredients.length,
+      },
+    });
+    options.onRecipeReady({ prefill, sourceFile });
+  }
+
+  /**
+   * Capture from a pasted URL — a recipe page or a YouTube video (#72 phases 2/3).
+   *
+   * The whole ladder lives in `resolveRecipeSource`; this is a flat switch over its four
+   * outcomes, closed with `assertNever` so a fifth variant fails the BUILD.
+   */
+  async function processUrl(rawUrl: string): Promise<void> {
+    if (isProcessing.value) return;
+    if (!isOnline.value) {
+      showToast('info', t('ai.offline.title'), t('ai.offline.message'));
+      return;
+    }
+
+    isProcessing.value = true;
+    try {
+      const resolved = await resolveRecipeSource(rawUrl);
+      const kind = resolved.kind === 'refusal' || resolved.kind === 'failed' ? 'page' : 'page';
       logEvent({
         level: 'info',
         surface: SURFACE,
-        message: 'recipe ready for review',
-        context: {
-          action: 'ready',
-          kind: 'document',
-          extraction_path: 'document',
-          inferred_count: prefill.inferredIngredients.length + prefill.inferredSteps.length,
-          ingredient_count: prefill.fields.ingredients.length,
-        },
+        message: 'capture started',
+        context: { action: 'start', kind },
       });
-      options.onRecipeReady({ prefill, sourceFile: file });
+
+      switch (resolved.kind) {
+        case 'jsonld': {
+          // The model is NEVER invoked here — quantities come straight from the site's own
+          // structured data, so nothing can be hallucinated and nothing is inferred.
+          const prefill = jsonLdToPrefill(resolved.recipe, resolved.sourceUrl);
+          pendingDishImageUrl.value = safeHttpsUrl(resolved.imageUrl);
+          handOver(prefill, 'page', resolved.path, null);
+          return;
+        }
+        case 'text': {
+          const result = await extractRecipeFromText(resolved.text, {
+            tier: tier.value,
+            todayIso: toDateInputValue(new Date()),
+            byok: byokConfig.value ?? undefined,
+          });
+          if (!result.success || !result.data) {
+            logEvent({
+              level: 'error',
+              surface: SURFACE,
+              message: 'extraction failed',
+              context: { action: 'failed', kind: 'page', error_code: result.errorCode },
+            });
+            reportExtractionFailure(result.errorCode);
+            return;
+          }
+          const prefill = recipeExtractionToPrefill(result.data);
+          if (!prefill) {
+            logEvent({
+              level: 'info',
+              surface: SURFACE,
+              message: 'source was not a recipe',
+              context: { action: 'not_recipe', kind: 'page', extraction_path: resolved.path },
+            });
+            showToast(
+              'info',
+              t('recipeExtract.notRecipe.title'),
+              t('recipeExtract.notRecipe.message')
+            );
+            return;
+          }
+          prefill.fields.sourceUrl = resolved.sourceUrl;
+          pendingDishImageUrl.value = prefill.dishImageUrl ?? safeHttpsUrl(resolved.imageUrl);
+          handOver(prefill, 'page', resolved.path, null);
+          return;
+        }
+        case 'refusal': {
+          logEvent({
+            level: 'warn',
+            surface: SURFACE,
+            message: 'refused to guess a recipe',
+            context: { action: 'refused', kind: 'page', error_code: resolved.reason },
+          });
+          const isVideo = resolved.reason === 'no_transcript_no_link';
+          showToast(
+            'info',
+            t(isVideo ? 'recipeExtract.noTranscript.title' : 'recipeExtract.badLink.title'),
+            t(isVideo ? 'recipeExtract.noTranscript.message' : 'recipeExtract.badLink.message')
+          );
+          return;
+        }
+        case 'failed': {
+          logEvent({
+            level: 'error',
+            surface: SURFACE,
+            message: 'content fetch failed',
+            context: { action: 'failed', kind: 'page', error_code: resolved.errorCode },
+          });
+          reportExtractionFailure(resolved.errorCode);
+          return;
+        }
+        default:
+          return assertNever(resolved, 'resolveRecipeSource');
+      }
     } finally {
       isProcessing.value = false;
     }
@@ -155,9 +288,11 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   async function attachAfterSave(recipeId: UUID): Promise<void> {
     const file = pendingSource.value;
     const compressed = pendingCompressed.value;
+    const dishUrl = pendingDishImageUrl.value;
     pendingSource.value = null;
     pendingCompressed.value = null;
-    if (!file) return; // manual save with no AI source — nothing to attach
+    pendingDishImageUrl.value = null;
+    if (!file && !dishUrl) return; // manual save with no AI source — nothing to attach
 
     const photos = usePhotos({
       collection: 'recipes',
@@ -170,6 +305,44 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       // The source may be a PDF (a scanned recipe card), so this surface must accept both.
       accept: 'imagesAndPdf',
     });
+
+    // FETCH AND STORE, never hot-link. A remote <img src> would fire a third-party request
+    // from every family device on every render — the opposite of the local-first posture —
+    // and would break when the site moves the file. The browser cannot do this itself
+    // (CORS), which is why it goes through content-fetch.
+    if (dishUrl) {
+      try {
+        const img = await recipeFetchService.fetchImage(dishUrl);
+        if (img.success && img.data) {
+          // Named from the SNIFFED mime, never from the URL: a filename taken from an
+          // attacker-supplied path is how an svg ends up called .jpg, and usePhotos'
+          // accept test ORs the extension.
+          const ext =
+            img.data.mime === 'image/png' ? 'png' : img.data.mime === 'image/webp' ? 'webp' : 'jpg';
+          const blob = await (await fetch(img.data.dataUrl)).blob();
+          await photos.add([new File([blob], `dish-${recipeId}.${ext}`, { type: img.data.mime })]);
+        } else {
+          logEvent({
+            level: 'info',
+            surface: SURFACE,
+            message: 'dish image not attached',
+            context: { action: 'attach_failed', kind: 'dish_image', error_code: img.errorCode },
+          });
+        }
+      } catch (err) {
+        // Never fatal: the recipe is saved and a missing photo is cosmetic. The user can
+        // add one themselves, and the recipe text — the part that matters — is intact.
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'dish image fetch threw',
+          context: { action: 'attach_failed', kind: 'dish_image' },
+          error: err,
+        });
+      }
+    }
+
+    if (!file) return;
 
     try {
       let added = await photos.add([file]);
@@ -236,10 +409,12 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     }
   }
 
-  /** Drop a held source when the user abandons the form without saving. */
+  /** Drop everything held when the user abandons the form without saving. */
   function discardPendingSource(): void {
     pendingSource.value = null;
+    pendingCompressed.value = null;
+    pendingDishImageUrl.value = null;
   }
 
-  return { isProcessing, processFile, attachAfterSave, discardPendingSource };
+  return { isProcessing, processFile, processUrl, attachAfterSave, discardPendingSource };
 }

@@ -92,3 +92,8 @@ output "ai_extract_url" {
   value       = module.ai_extract.extract_url
 }
 
+
+output "content_fetch_url" {
+  description = "content-fetch endpoint — set as the VITE_CONTENT_FETCH_URL GitHub repo VARIABLE"
+  value       = module.content_fetch.content_fetch_url
+}

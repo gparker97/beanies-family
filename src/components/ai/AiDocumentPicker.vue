@@ -15,7 +15,7 @@
  * processPhoto/processTravelDoc, which already own every offline/extraction
  * failure path — so this component adds no extraction error handling.
  */
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import ChoiceModal from '@/components/ui/ChoiceModal.vue';
 import { useFilePicker, type UseFilePickerReturn } from '@/composables/useFilePicker';
 import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
@@ -23,7 +23,18 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useToast } from '@/composables/useToast';
 import { AI_PICKER_ACCEPT } from '@/constants/aiDocumentPicker';
 
-const emit = defineEmits<{ (e: 'file', file: File): void }>();
+const props = withDefaults(
+  defineProps<{
+    /**
+     * An optional third choice beyond camera / file — used by the recipe reader for
+     * "paste a link". Existing callers pass nothing and are byte-identically unaffected.
+     */
+    extraChoice?: { id: string; icon: string; label: string } | null;
+  }>(),
+  { extraChoice: null }
+);
+
+const emit = defineEmits<{ (e: 'file', file: File): void; (e: 'extra'): void }>();
 
 const { t } = useTranslation();
 const { showToast } = useToast();
@@ -56,18 +67,37 @@ function openPicker(picker: UseFilePickerReturn): void {
   picker.open();
 }
 
-/** Entry point — the page calls this AFTER its consent gate resolves. */
+/** Base two choices plus the optional extra — ONE computed, not a template conditional. */
+const choices = computed(() => {
+  const base = [
+    { id: 'camera', icon: 'camera', label: t('ai.picker.takePhoto') },
+    { id: 'file', icon: 'image', label: t('ai.picker.chooseFile') },
+  ];
+  return props.extraChoice ? [...base, props.extraChoice] : base;
+});
+
+/**
+ * Entry point — the page calls this AFTER its consent gate resolves.
+ *
+ * The chooser opens whenever an EXTRA choice exists, not only on touch. Without that, the
+ * third option is invisible to every desktop user: on a non-touch device this used to open
+ * the file dialog directly, skipping the chooser entirely.
+ */
 function pick(): void {
-  if (isTouchPrimary.value) {
+  if (isTouchPrimary.value || props.extraChoice) {
     showChooser.value = true;
   } else {
     openPicker(filePicker);
   }
 }
 
+/** Explicit id dispatch. A nested ternary stops being readable at three branches. */
 function onChoose(id: string): void {
   showChooser.value = false;
-  openPicker(id === 'camera' ? cameraPicker : filePicker);
+  if (id === 'camera') return openPicker(cameraPicker);
+  if (id === 'file') return openPicker(filePicker);
+  if (props.extraChoice && id === props.extraChoice.id) return emit('extra');
+  console.error(`[AiDocumentPicker] unknown choice id "${id}" — nothing opened`);
 }
 
 defineExpose({ pick });
@@ -78,10 +108,7 @@ defineExpose({ pick });
   <ChoiceModal
     :open="showChooser"
     :title="t('ai.picker.title')"
-    :options="[
-      { id: 'camera', icon: 'camera', label: t('ai.picker.takePhoto') },
-      { id: 'file', icon: 'image', label: t('ai.picker.chooseFile') },
-    ]"
+    :options="choices"
     @select="onChoose"
     @close="showChooser = false"
   />

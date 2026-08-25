@@ -64,6 +64,12 @@ variable "site_verification_txt_records" {
   default     = []
 }
 
+variable "content_fetch_api_key" {
+  description = "Soft API key the client sends to the content-fetch proxy (x-api-key). Ships in the public bundle so it is not a true secret; set TF_VAR_content_fetch_api_key, and mirror it to the CONTENT_FETCH_API_KEY GitHub secret or the deployed client starts getting 401s."
+  type        = string
+  sensitive   = true
+}
+
 variable "slack_error_webhook_url" {
   description = "Slack incoming-webhook URL (#beanies-errors) used by the telemetry Lambda to escalate build-integrity events server-side. Set TF_VAR_slack_error_webhook_url; it is the same value as the BEANIES_ERROR_WEBHOOK_URL GitHub variable. Optional — unset means the Lambda logs the failure to CloudWatch and continues."
   type        = string

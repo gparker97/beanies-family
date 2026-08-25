@@ -12,6 +12,7 @@
 import { safeHttpsUrl } from '@/utils/url';
 import type { Recipe } from '@/types/models';
 import type { RecipeExtractionResult, RecipeFieldConfidence } from '@/services/ai/types';
+import type { JsonLdRecipe } from '@/services/ai/recipeFetchService';
 
 /** What the form is opened with. One object, because it always travels as a unit. */
 export interface RecipePrefill {
@@ -66,5 +67,34 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
     // element. The bytes are validated separately, wherever it is actually fetched.
     dishImageUrl: safeHttpsUrl(result.imageUrl),
     confidence: result.confidence,
+  };
+}
+
+/**
+ * Map a site's own schema.org/Recipe data straight to a prefill.
+ *
+ * The model is NEVER invoked on this path, which is the entire point: quantities, steps and
+ * times are PARSED from the page's structured data rather than inferred, so they cannot be
+ * hallucinated. That is also why `inferredIngredients`/`inferredSteps` are empty here by
+ * construction — nothing on this path was guessed, and marking it as such would be a lie.
+ */
+export function jsonLdToPrefill(recipe: JsonLdRecipe, sourceUrl: string): RecipePrefill {
+  return {
+    fields: {
+      name: recipe.name,
+      ...(recipe.subtitle ? { subtitle: recipe.subtitle } : {}),
+      ...(recipe.prepTime ? { prepTime: recipe.prepTime } : {}),
+      ...(recipe.cookTime ? { cookTime: recipe.cookTime } : {}),
+      ...(recipe.servings ? { servings: recipe.servings } : {}),
+      ingredients: recipe.ingredients,
+      steps: recipe.steps,
+      sourceUrl,
+    },
+    inferredIngredients: [],
+    inferredSteps: [],
+    dishImageUrl: safeHttpsUrl(recipe.imageUrl),
+    // Structured data is exact, so confidence is 1 across the board — not a guess we are
+    // dressing up, but the honest reading of "we read this from the publisher's own markup".
+    confidence: { name: 1, ingredients: 1, steps: 1 },
   };
 }

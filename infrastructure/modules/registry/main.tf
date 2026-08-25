@@ -179,6 +179,16 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_rate_limit  = 2
   }
 
+  # Per-route throttle for the recipe content fetcher (#72). Unlike ai-extract, every
+  # request here is CHEAP — which is exactly the problem: the soft key ships in the public
+  # bundle, so without a volume cap this is an open web proxy anyone can bill us for. The
+  # module's reserved_concurrent_executions caps parallelism; THIS caps volume.
+  route_settings {
+    route_key              = "POST /content-fetch"
+    throttling_burst_limit = 5
+    throttling_rate_limit  = 2
+  }
+
   tags = {
     Name        = "${var.app_name}-registry-default"
     Environment = var.environment

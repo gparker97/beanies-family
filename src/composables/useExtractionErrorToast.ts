@@ -50,6 +50,15 @@ export function useExtractionErrorToast() {
           surface: ERROR_SURFACE,
         });
         return;
+      case 'fetch_blocked':
+        // Not an outage — we refused the link on purpose (not https, unreachable, or the
+        // SSRF guard caught it). Info, not error: nothing is broken on our side.
+        showToast('info', t('recipeExtract.badLink.title'), t('recipeExtract.badLink.message'));
+        return;
+      case 'no_content':
+        // The fetch worked; the page/video just had nothing readable in it.
+        showToast('info', t('recipeExtract.noContent.title'), t('recipeExtract.noContent.message'));
+        return;
       case 'provider_error':
       default:
         showToast('error', t('ai.error.title'), t('ai.error.generic'), { surface: ERROR_SURFACE });

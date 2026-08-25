@@ -28,12 +28,12 @@ variable "cors_origins" {
   description = "Allowed CORS origins"
   type        = list(string)
   default = [
-    "https://beanies.family",     # apex (legacy / pre-cutover)
-    "https://app.beanies.family", # PWA subdomain (post-cutover primary)
+    "https://beanies.family",         # apex (legacy / pre-cutover)
+    "https://app.beanies.family",     # PWA subdomain (post-cutover primary)
     "capacitor://app.beanies.family", # Capacitor iOS native WebView — iosScheme stays `capacitor` (ADR-029; capacitor.config.ts)
-    "https://localhost",          # Capacitor Android native WebView (ADR-029)
-    "http://localhost:5173",      # Vite dev server
-    "http://localhost:4173",      # Vite preview server
+    "https://localhost",              # Capacitor Android native WebView (ADR-029)
+    "http://localhost:5173",          # Vite dev server
+    "http://localhost:4173",          # Vite preview server
   ]
 }
 
