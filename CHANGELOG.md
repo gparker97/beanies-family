@@ -18,12 +18,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Adding a recipe now offers the fast way first.** The Add Recipe form opens with a "Start from a link" band at the top — paste a recipe page or a YouTube link and everything below fills itself in, or read a photo or PDF instead. It appears only on a blank new recipe, and steps aside as soon as you start typing.
 - **YouTube recipe links now work.** Pasting a video link reads the video's description, follows the recipe link most cooking channels put there, and reads the exact ingredients from the cook's own website. Where the site publishes structured data, the quantities are read as written rather than interpreted.
 - Reading a recipe now opens straight to the link field, ready to paste. Reading from a photo or a PDF is still one tap away, just below it — the link is the everyday way in, so it no longer costs an extra tap and a second screen to reach.
 
 ### Fixed
 
-- Recipe photos: the cookbook now says "Adding the photo…" while the picture is fetched. The recipe saved immediately and the photo appeared several seconds later with nothing on screen to explain the gap.
+- Recipe photos: the recipe card and the recipe page now say "Adding the photo…" in the picture's own frame while it is fetched. The recipe saved immediately and its photo appeared several seconds later with nothing on screen to explain the gap.
 - A recipe page that only yields a dish name — common on roundup and category pages — now says so plainly instead of opening an otherwise empty form.
 - A video whose description has neither a recipe nor a link to one now says so and suggests where to look, instead of reporting a dead link.
 - Very long recipe pages no longer time out. Reading a large page took over 30 seconds and gave up; it now takes milliseconds.

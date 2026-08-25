@@ -16,6 +16,7 @@ import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import RecipeLinkModal from '@/components/pod/RecipeLinkModal.vue';
@@ -52,6 +53,7 @@ const { tier: aiTier } = useAiCapability();
 const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 const prefill = ref<RecipePrefill | null>(null);
 const linkModalOpen = ref(false);
+const { isPending } = useRecipePhotoPending();
 
 const capture = useRecipeCapture({
   onRecipeReady: (ready) => {
@@ -160,6 +162,23 @@ function closeModal(): void {
   capture.discardPendingSource();
 }
 
+/**
+ * The Add Recipe form's shortcut band produced a link.
+ *
+ * Close the form FIRST. The capture opens the very same form again with the prefill applied,
+ * and leaving the blank one open would stack a second copy on top of it.
+ */
+function handleStripLink(url: string): void {
+  closeModal();
+  void capture.processUrl(url);
+}
+
+/** Same, for the band's photo/PDF option. */
+function handleStripDocument(): void {
+  closeModal();
+  aiDocPicker.value?.pick();
+}
+
 /** Save completed — hand the id back so the source document can be attached. */
 async function handleSaved(id: string): Promise<void> {
   prefill.value = null;
@@ -256,7 +275,13 @@ async function handleSaved(id: string): Promise<void> {
       >
         <PolaroidImage
           :src="thumbFor(r)"
-          :caption="thumbFor(r) ? undefined : t('cookbook.card.noPhoto')"
+          :caption="
+            thumbFor(r)
+              ? undefined
+              : isPending(r.id)
+                ? t('recipeExtract.attaching')
+                : t('cookbook.card.noPhoto')
+          "
           aspect-ratio="16 / 10"
         />
         <div class="p-4">
@@ -320,26 +345,9 @@ async function handleSaved(id: string): Promise<void> {
       :prefill="prefill"
       @close="closeModal"
       @saved="handleSaved"
+      @capture-link="handleStripLink"
+      @capture-document="handleStripDocument"
     />
-
-    <!-- Post-save: the recipe is saved and on screen; only its photo is still arriving.
-         A corner hint, never the blocking overlay — nothing is waiting on this. -->
-    <Transition
-      enter-active-class="transition-opacity duration-200"
-      enter-from-class="opacity-0"
-      leave-active-class="transition-opacity duration-200"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="capture.isAttaching.value"
-        class="font-outfit fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold shadow-[var(--soft-shadow)] sm:bottom-6 dark:bg-slate-800"
-      >
-        <BeanieSpinner size="sm" />
-        <span class="text-[var(--color-text)] dark:text-gray-100">
-          {{ t('recipeExtract.attaching') }}
-        </span>
-      </div>
-    </Transition>
 
     <div
       v-if="capture.isProcessing.value"

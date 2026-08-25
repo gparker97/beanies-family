@@ -16,13 +16,13 @@
  * Validation is the SAME `routeUrl` the resolver uses, so what the user is told here and what
  * the fetcher will accept can never disagree.
  */
-import { computed, nextTick, ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { routeUrl } from '@/utils/recipeSourceUrl';
+import { useRecipeLinkInput } from '@/composables/useRecipeLinkInput';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{
@@ -36,24 +36,17 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
-const link = ref('');
-/** Only complain once the user has actually tried, so an empty field is never scolded. */
-const touched = ref(false);
 const inputWrap = ref<HTMLElement | null>(null);
 
-const route = computed(() => routeUrl(link.value));
-const isValid = computed(() => route.value.kind !== 'invalid');
-const showError = computed(() => touched.value && link.value.trim().length > 0 && !isValid.value);
-
-/** Tell the user we recognised a video, so the different behaviour is not a surprise. */
-const isVideo = computed(() => route.value.kind === 'youtube');
+// Validation, error timing and hint copy are shared with the Add Recipe form's shortcut band
+// so the two can never disagree about what a usable link is.
+const { link, touched, isValid, showError, hintKey, reset, trySubmit } = useRecipeLinkInput();
 
 watch(
   () => props.open,
   async (isOpen) => {
     if (!isOpen) return;
-    link.value = '';
-    touched.value = false;
+    reset();
     // Focus the field on open — the whole point of this layout is that you can paste
     // immediately. Guarded because BaseInput may not have mounted on the first tick.
     await nextTick();
@@ -62,9 +55,8 @@ watch(
 );
 
 function handleSave(): void {
-  touched.value = true;
-  if (!isValid.value) return;
-  emit('submit', link.value.trim());
+  const url = trySubmit();
+  if (url) emit('submit', url);
 }
 </script>
 
@@ -93,14 +85,11 @@ function handleSave(): void {
         />
       </div>
       <!-- Heritage Orange, never Alert Red: a mistyped link is routine, not a failure. -->
-      <p v-if="showError" class="font-outfit text-primary-500 mt-1.5 text-xs">
-        {{ t('recipeExtract.link.invalid') }}
-      </p>
-      <p v-else-if="isVideo" class="font-outfit text-secondary-500/70 mt-1.5 text-xs">
-        {{ t('recipeExtract.link.videoHint') }}
-      </p>
-      <p v-else class="font-outfit text-secondary-500/70 mt-1.5 text-xs">
-        {{ t('recipeExtract.link.hint') }}
+      <p
+        class="font-outfit mt-1.5 text-xs"
+        :class="showError ? 'text-primary-500' : 'text-secondary-500/70'"
+      >
+        {{ t(hintKey) }}
       </p>
     </FormFieldGroup>
 
