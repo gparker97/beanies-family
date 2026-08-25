@@ -20,7 +20,7 @@ import type {
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-07-01.1';
+export const PROMPT_VERSION = '2026-08-25.1';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -478,10 +478,14 @@ export function parseRecipeExtractionResult(raw: unknown): RecipeExtractionResul
     steps: clamp01(rawConfidence.steps),
   };
 
+  // Filter BEFORE slicing: slicing first spends the budget on entries that are then
+  // dropped, so a response whose first MODEL_LIST_MAX entries are malformed would yield
+  // an empty list rather than the valid tail.
   const toLines = (v: unknown): RecipeLine[] =>
-    (Array.isArray(v) ? v.slice(0, MODEL_LIST_MAX) : [])
+    (Array.isArray(v) ? v : [])
       .map(parseRecipeLine)
-      .filter((l): l is RecipeLine => l !== null);
+      .filter((l): l is RecipeLine => l !== null)
+      .slice(0, MODEL_LIST_MAX);
 
   return {
     isRecipe: asBool(obj.isRecipe),
@@ -642,10 +646,12 @@ export function parseTravelExtractionResult(raw: unknown): TravelExtractionResul
   if (missing.length) {
     throw new Error(`Travel extraction output missing keys: ${missing.join(', ')}`);
   }
-  const rawSegments = Array.isArray(obj.segments) ? obj.segments.slice(0, MODEL_LIST_MAX) : [];
+  // Filter before slicing — see the note on toLines in the recipe parser.
+  const rawSegments = Array.isArray(obj.segments) ? obj.segments : [];
   const segments = rawSegments
     .map(parseTravelSegment)
-    .filter((s): s is TravelSegmentDraft => s !== null);
+    .filter((s): s is TravelSegmentDraft => s !== null)
+    .slice(0, MODEL_LIST_MAX);
 
   return {
     isTravel: asBool(obj.isTravel),
