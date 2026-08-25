@@ -25,7 +25,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - Recipe photos now show a spinner in the picture's own frame while they arrive — the same indicator as any other photo upload — on both the recipe card and the recipe page. The recipe saved immediately and its photo appeared several seconds later with nothing on screen to explain the gap.
-- While reviewing a recipe that was read from a link, the photo box now says beanies already found a picture and will add it on save, instead of showing an empty "Add photo" box that invited you to hunt for one you were about to get anyway.
+- While reviewing a recipe read from a link, the photo box says beanies already found a picture and will add it on save — and still lets you add your own alongside it.
+- Recipes now show the link they came from on its own line, and it can be edited or removed from the edit form like any other field. A recipe read from a YouTube video keeps the video link, not the blog page beanies followed to get the ingredients.
+- Emptying a recipe's subtitle, times, servings, notes or link now actually clears it. Clearing one of these fields and saving silently kept the old value.
 - A recipe page that only yields a dish name — common on roundup and category pages — now says so plainly instead of opening an otherwise empty form.
 - A video whose description has neither a recipe nor a link to one now says so and suggests where to look, instead of reporting a dead link.
 - Very long recipe pages no longer time out. Reading a large page took over 30 seconds and gave up; it now takes milliseconds.

@@ -179,17 +179,36 @@ function splitLines(s: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+/**
+ * CLEARING A FIELD MUST ACTUALLY CLEAR IT.
+ *
+ * These optional fields used to be conditionally spread — omitted entirely when blank. On
+ * create that is equivalent, but on UPDATE the repository leaves keys that are not present
+ * untouched, so emptying a field in the edit form silently kept the old value. Deleting the
+ * link greg asked for was impossible, and the same was quietly true of the subtitle, times,
+ * servings and notes.
+ *
+ * Passing `undefined` is the repository's documented delete signal, and it is safe on both
+ * paths: `create` runs the input through `stripUndefined`, and `update` collects undefined
+ * keys and removes them from the doc.
+ */
+function orUndefined(v: string): string | undefined {
+  return v.trim() || undefined;
+}
+
 function buildPayload() {
   return {
     name: name.value.trim(),
-    ...(subtitle.value.trim() ? { subtitle: subtitle.value.trim() } : {}),
-    ...(prepTime.value.trim() ? { prepTime: prepTime.value.trim() } : {}),
-    ...(cookTime.value.trim() ? { cookTime: cookTime.value.trim() } : {}),
-    ...(servings.value.trim() ? { servings: servings.value.trim() } : {}),
-    ...(sourceUrl.value.trim() ? { sourceUrl: sourceUrl.value.trim() } : {}),
+    subtitle: orUndefined(subtitle.value),
+    prepTime: orUndefined(prepTime.value),
+    cookTime: orUndefined(cookTime.value),
+    servings: orUndefined(servings.value),
+    sourceUrl: orUndefined(sourceUrl.value),
     ingredients: splitLines(ingredientsText.value),
     steps: splitLines(stepsText.value),
-    ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
+    notes: orUndefined(notes.value),
+    // photoIds stays conditional: an empty array is a MEANINGFUL value here (the user
+    // removed every photo), not an absent one, and PhotoAttachments owns that state.
     ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
   };
 }
@@ -388,6 +407,17 @@ const LIST_TEXTAREA_CLASS =
         </p>
       </FormFieldGroup>
 
+      <!-- Where this came from, visible and editable — the same affordance activities have.
+           It is filled in automatically by the reader, but a hand-typed recipe can carry a
+           link too, and a captured one can be corrected. -->
+      <FormFieldGroup :label="t('recipes.field.sourceUrl')" optional>
+        <BaseInput
+          v-model="sourceUrl"
+          type="url"
+          :placeholder="t('recipes.placeholder.sourceUrl')"
+        />
+      </FormFieldGroup>
+
       <FormFieldGroup :label="t('recipes.field.notes')" optional>
         <textarea
           v-model="notes"
@@ -409,28 +439,37 @@ const LIST_TEXTAREA_CLASS =
             @update:photo-ids="binding.updatePhotoIds"
           />
         </div>
-        <!-- When the reader found a photo of the dish, say so INSTEAD of offering an empty
-           "Add photo" box. Otherwise the user is invited to hunt for a picture that is
-           already on its way, and ends up with two. -->
-        <p
-          v-else-if="willAttachPhoto"
-          class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[rgb(230_126_34_/_35%)] bg-[var(--tint-orange-4)] py-5 text-xs font-semibold text-[var(--color-text-muted)]"
-        >
-          <span aria-hidden="true">✨</span>
-          <span>{{ t('recipes.photos.willAttach') }}</span>
-        </p>
-        <button
-          v-else
-          type="button"
-          class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="!canSave || eager.isCreating.value"
-          @click="handleAddFirstPhoto"
-        >
-          <BeanieIcon name="camera" size="md" />
-          <span class="font-outfit text-xs font-semibold">
-            {{ canSave ? t('photos.addPhoto') : t('recipes.photos.saveFirst') }}
-          </span>
-        </button>
+        <template v-else>
+          <!-- Say a photo is coming, and STILL offer the add control.
+               The note removes the surprise, which was the actual problem — it is not a
+               reason to take the choice away. Adding your own plate alongside the original
+               is a normal thing to want, and the two cannot conflict: the captured photo is
+               appended after save, so whichever photo the user adds first stays the hero. -->
+          <p
+            v-if="willAttachPhoto"
+            class="font-outfit mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-[rgb(230_126_34_/_35%)] bg-[var(--tint-orange-4)] px-3 py-2.5 text-xs font-semibold text-[var(--color-text-muted)]"
+          >
+            <span aria-hidden="true">✨</span>
+            <span>{{ t('recipes.photos.willAttach') }}</span>
+          </p>
+          <button
+            type="button"
+            class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+            :disabled="!canSave || eager.isCreating.value"
+            @click="handleAddFirstPhoto"
+          >
+            <BeanieIcon name="camera" size="md" />
+            <span class="font-outfit text-xs font-semibold">
+              {{
+                canSave
+                  ? willAttachPhoto
+                    ? t('recipes.photos.addAnother')
+                    : t('photos.addPhoto')
+                  : t('recipes.photos.saveFirst')
+              }}
+            </span>
+          </button>
+        </template>
       </FormFieldGroup>
     </div>
   </BeanieFormModal>

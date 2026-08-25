@@ -8061,6 +8061,13 @@ const STRING_DEFS = {
     en: 'beanies found a photo of this dish and will add it when you save.',
     beanie: 'beanies found a photo of this dish and will add it when you save.',
   },
+  'recipes.detail.source': { en: 'From', beanie: 'from' },
+  'recipes.field.sourceUrl': { en: 'Link', beanie: 'link' },
+  'recipes.placeholder.sourceUrl': {
+    en: 'https://... the page or video this came from',
+    beanie: 'https://... the page or video this came from',
+  },
+  'recipes.photos.addAnother': { en: 'Add Your Own Photo Too', beanie: 'add your own photo too' },
   'recipeExtract.attaching': { en: 'Adding the photo…', beanie: 'adding the photo…' },
   'recipeExtract.attachFailed.title': { en: 'Recipe Saved', beanie: 'recipe saved' },
   'recipeExtract.attachFailed.message': {
