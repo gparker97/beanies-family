@@ -125,6 +125,37 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       plausible.init();
     </script>
 
+    <!-- CTA click tracking.
+         ONE delegated listener rather than a handler per button: CTAs live across the
+         homepage, the download page, guides, help and the beanstalk footer, and a per-call-site
+         handler is how three of them end up untracked after the next redesign. Any element
+         carrying data-cta fires; adding a CTA anywhere is a one-attribute change.
+
+         Distinct goal names (not one "CTA Click" with a prop) because Plausible funnels and
+         the goal list key on the event NAME — a single event with properties cannot be a
+         funnel step. `location` rides along as a property so the same CTA can be compared
+         across placements.
+
+         Uses closest(), so a click on the <img> inside a store badge still resolves to the
+         anchor that carries the attribute. -->
+    <script is:inline>
+      document.addEventListener(
+        'click',
+        function (e) {
+          var el = e.target && e.target.closest && e.target.closest('[data-cta]');
+          if (!el) return;
+          var name = el.getAttribute('data-cta');
+          if (!name) return;
+          window.plausible(name, {
+            props: { location: el.getAttribute('data-cta-loc') || 'unknown' },
+          });
+        },
+        // Capture phase: these anchors navigate away, and a bubble-phase listener can lose
+        // the race with the unload on a slow connection.
+        true
+      );
+    </script>
+
     <!-- Web Vitals RUM → Plausible custom events -->
     <script>
       import '../scripts/vitals';

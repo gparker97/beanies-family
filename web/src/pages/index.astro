@@ -77,7 +77,13 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       </div>
 
       <div class="hero__cta-group">
-        <a data-testid="homepage-get-started" class="btn-primary" href={`${APP_URL}/welcome`}>
+        <a
+          data-testid="homepage-get-started"
+          data-cta="CTA: Create Pod"
+          data-cta-loc="homepage-hero"
+          class="btn-primary"
+          href={`${APP_URL}/welcome`}
+        >
           start counting beans 🫘
         </a>
         <a class="hero__jump-link" href="#features" data-scroll-to="features">see what's inside ↓</a>
@@ -86,10 +92,10 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       <div class="hero__stores">
         <span class="hero__stores-label">or get the app</span>
         <div class="hero__stores-badges">
-          <a href="/ios" aria-label="Download beanies.family on the App Store">
+          <a href="/ios" data-cta="CTA: App Store (iOS)" data-cta-loc="homepage-hero" aria-label="Download beanies.family on the App Store">
             <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
           </a>
-          <a href="/android" aria-label="Get beanies.family on Google Play">
+          <a href="/android" data-cta="CTA: App Store (Android)" data-cta-loc="homepage-hero" aria-label="Get beanies.family on Google Play">
             <img src="/badges/google-play.svg" alt="Get it on Google Play" width="239" height="71" loading="lazy" decoding="async" />
           </a>
         </div>
