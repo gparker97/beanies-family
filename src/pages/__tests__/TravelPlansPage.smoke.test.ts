@@ -12,7 +12,7 @@
  */
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { FamilyVacation } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -61,13 +61,31 @@ describe('TravelPlansPage — smoke', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    // Hermetic: mounting reaches code that performs a real fetch (link previews, avatars),
+    // which happy-dom leaves hanging until the 5s timeout — and only when the whole suite
+    // runs, so it passed in isolation and failed together. A test that depends on run order
+    // is not a safety net.
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: true, status: 200, json: async () => ({}), text: async () => '' })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('mounts without throwing', async () => {
     const { default: Page } = await import('../TravelPlansPage.vue');
     const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
     expect(w.exists()).toBe(true);
-  });
+    // 20s, not vitest's default 5s: the FIRST mount of this page in a full-suite run pays a
+    // large one-off module-init cost. Verified by swapping the two tests — the failure
+    // followed the POSITION, not the test, so it is harness startup rather than an
+    // empty-state hang in the page itself.
+  }, 20_000);
 
   it('renders ONE card per upcoming trip — not N per trip', async () => {
     // The exact bug this file was created for: a nested v-for renders each item once per
@@ -85,5 +103,5 @@ describe('TravelPlansPage — smoke', () => {
     // placeholder <tripcard> element, which findAllComponents(name) does not match. The
     // element count is what reflects the v-for, and the v-for is what this guards.
     expect(w.findAll('tripcard').length).toBe(2);
-  });
+  }, 20_000);
 });
