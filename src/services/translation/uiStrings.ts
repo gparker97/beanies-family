@@ -2095,6 +2095,20 @@ const STRING_DEFS = {
     en: 'No family members yet.',
     beanie: 'your bean pod is empty — add your first beanie!',
   },
+  // Shown when a member without edit rights reaches a mutation another way — a quick-add
+  // intent, the keyboard, or a view that went stale after their role changed. Info, not
+  // error: nothing is broken and they have done nothing wrong.
+  'travel.segmentGone.title': { en: 'That Booking Is Gone', beanie: 'that booking is gone' },
+  'travel.segmentGone.message': {
+    en: 'Someone removed this booking while you had it open, so there was nothing to save it to.',
+    beanie:
+      'someone removed this booking while you had it open, so there was nothing to save it to.',
+  },
+  'permissions.readOnly.title': { en: 'View Only', beanie: 'view only' },
+  'permissions.readOnly.message': {
+    en: 'You can look around, but changes are down to the grown-ups who manage this pod.',
+    beanie: 'you can look around, but changes are down to the beanies who manage this pod.',
+  },
   'family.role.owner': { en: 'Owner', beanie: 'head beanie' },
   'family.role.admin': { en: 'Admin', beanie: 'admin beanie' },
   'family.role.member': { en: 'Member', beanie: 'beanie' },

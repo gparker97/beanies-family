@@ -183,3 +183,32 @@ describe('mergeExtractedIntoVacation', () => {
     expect(idRemap).toEqual({ IN: 'EX1' });
   });
 });
+
+describe('identity keys must not collide for two bookings at one place', () => {
+  // The very ordinary case this missed: a family books two rooms at one hotel for the same
+  // night. Keyed on (name + check-in) the second upload folded into the first, its
+  // confirmation number overwrote the other's, and the second booking was never created —
+  // so a reference the family needs at check-in was silently destroyed.
+  const acc = (over: Record<string, unknown>) =>
+    ({ id: 'a', type: 'hotel', name: 'Hilton Paris', checkInDate: '2026-07-14', ...over }) as never;
+
+  it('separates two rooms at the same hotel on the same day', () => {
+    const a = segmentIdentityKey(acc({ confirmationNumber: 'ABC123' }), 'accommodation');
+    const b = segmentIdentityKey(acc({ confirmationNumber: 'XYZ789' }), 'accommodation');
+    expect(a).not.toBe(b);
+    expect(a).toBeTruthy();
+  });
+
+  it('still merges a re-upload of the SAME booking', () => {
+    const a = segmentIdentityKey(acc({ confirmationNumber: 'ABC123' }), 'accommodation');
+    const b = segmentIdentityKey(acc({ confirmationNumber: 'ABC123' }), 'accommodation');
+    expect(a).toBe(b);
+  });
+
+  it('falls back to the date when no confirmation number is present', () => {
+    const a = segmentIdentityKey(acc({}), 'accommodation');
+    const b = segmentIdentityKey(acc({}), 'accommodation');
+    expect(a).toBe(b);
+    expect(a).toBeTruthy();
+  });
+});

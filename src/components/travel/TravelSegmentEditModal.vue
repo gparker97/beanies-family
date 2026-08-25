@@ -13,13 +13,14 @@ import TravelReminderHint from '@/components/travel/TravelReminderHint.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
+import { useToast } from '@/composables/useToast';
 import { useFormModal } from '@/composables/useFormModal';
 import {
   useBookingValidation,
   type BookingValidationRules,
 } from '@/composables/useBookingValidation';
 import { useVacationStore } from '@/stores/vacationStore';
-import { addHourToTime } from '@/utils/date';
+import { addHourToTime, addDaysYmd } from '@/utils/date';
 import {
   buildAirlineOptions,
   buildAirportOptions,
@@ -64,6 +65,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
+const { showToast } = useToast();
 const vacationStore = useVacationStore();
 
 // Form fields
@@ -322,21 +324,31 @@ const rules = computed<BookingValidationRules<SegmentField>>(() => {
 });
 
 const validation = useBookingValidation<SegmentField>(status, rules);
-const canSave = validation.canSave;
 
 // --- Booking-document attachments (images + PDFs) --------------------
-// Live photoIds read from the store (not the captured `props.segment`
-// snapshot, which can go stale after an attach). Add/remove persist
-// immediately via `updateSegmentPhotoIds`, independent of the Save button;
-// handleSave preserves them by spreading the freshly-read segment.
-const segmentPhotoIds = computed<string[]>(
-  () =>
-    vacationStore.getVacationById(props.vacationId)?.travelSegments[props.segmentIndex]?.photoIds ??
-    []
-);
 const attachmentEntityId = computed(() =>
   vacationSegmentEntityId(props.vacationId, props.segment?.id ?? '')
 );
+
+/**
+ * Live attachment ids for this segment, addressed BY ID.
+ *
+ * This previously indexed `travelSegments[props.segmentIndex]`, which is the same
+ * positional-addressing hazard as the save path: a CRDT merge that shifts the array makes
+ * it read a different booking's attachments.
+ *
+ * Reading from `vacationStore` (rather than photoStore.photoIdsFor, which addresses
+ * TOP-LEVEL entities) is correct here: a travel segment is nested inside the vacation
+ * document, and `onPhotoIds` persists through `updateSegmentPhotoIds` → `updateVacation`,
+ * which writes `vacations.value` back. So this array is refreshed on every attach.
+ */
+const segmentPhotoIds = computed<string[]>(() => {
+  const id = props.segment?.id;
+  if (!id) return [];
+  const v = vacationStore.getVacationById(props.vacationId);
+  return v?.travelSegments.find((seg) => seg.id === id)?.photoIds ?? [];
+});
+
 function onPhotoIds(ids: string[]): void {
   if (!props.segment?.id) return;
   void vacationStore.updateSegmentPhotoIds(props.vacationId, props.segment.id, ids);
@@ -354,9 +366,17 @@ function handleDepartureTimeChange(val: string | number) {
 const computedArrivalDate = computed(() => {
   if (!departureDate.value) return '';
   if (arrivesNextDay.value) {
-    const d = new Date(departureDate.value + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
+    // addDaysYmd, NOT a local Date read back through toISOString. That pattern builds the
+    // date in LOCAL time, adds a day, then reads the UTC calendar date — which cancels the
+    // +1 for every user at UTC+0 or east of it. Measured: Europe/London and Asia/Singapore
+    // both returned the DEPARTURE date, America/New_York returned the right one, so it looked
+    // correct in US-timezone testing and was silently wrong for most of the world.
+    //
+    // The damage is not cosmetic: the arrival occurrence and its reminder land on the wrong
+    // day, extendTripDates never widens to the real arrival, and computeAccommodationGaps
+    // needs arrival > departure to treat an overnight flight as covering that night — so the
+    // night the family is in the air was reported as an unbooked gap.
+    return addDaysYmd(departureDate.value, 1);
   }
   return departureDate.value;
 });
@@ -369,9 +389,23 @@ async function handleSave() {
       const vacation = vacationStore.getVacationById(props.vacationId);
       if (!vacation) return;
       const segments = [...vacation.travelSegments];
+      // RESOLVE BY ID, not by the index captured when the drawer opened.
+      //
+      // A CRDT merge that shifts this array — another parent deleting a cancelled flight —
+      // re-points the stored index at a DIFFERENT booking, and this save then overwrites
+      // ~35 fields of the wrong one. Out of range was worse: `{...undefined}` yields `{}`,
+      // appending a segment with no id and no type that breaks :key, the photo binding and
+      // the merge key. Refusing to write beats writing somewhere else.
+      const targetId = props.segment?.id;
+      const idx = targetId ? segments.findIndex((s) => s.id === targetId) : -1;
+      if (idx < 0) {
+        showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
+        emit('close');
+        return;
+      }
       const sortDate = departureDate.value || embarkationDate.value || '';
-      segments[props.segmentIndex] = {
-        ...segments[props.segmentIndex]!,
+      segments[idx] = {
+        ...segments[idx]!,
         title: effectiveTitle.value,
         status: status.value,
         airline: airline.value,
@@ -408,15 +442,19 @@ async function handleSave() {
         link: link.value || undefined,
         startTime: startTime.value || undefined,
         duration: activityDuration.value || undefined,
-        travellerIds: travellerIds.value.length ? travellerIds.value : tripAssigneeIds.value,
+        // undefined, NOT the materialized trip roster. `undefined` is the documented
+        // "everyone on this trip" sentinel (segmentTravellers.ts) and is re-resolved every
+        // time the trip's travellers change. Writing the roster in freezes it: add a family
+        // member later and every previously-saved segment excludes them forever.
+        travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
         sortDate,
       };
       // Auto-populate return flight from outbound flight data.
       // Find the nearest return flight after this outbound (they're created as adjacent pairs).
-      const currentSeg = segments[props.segmentIndex]!;
+      const currentSeg = segments[idx]!;
       if (currentSeg.type === 'flight_outbound') {
         let retIdx = -1;
-        for (let i = props.segmentIndex + 1; i < segments.length; i++) {
+        for (let i = idx + 1; i < segments.length; i++) {
           if (segments[i]!.type === 'flight_return') {
             retIdx = i;
             break;
@@ -424,7 +462,7 @@ async function handleSave() {
           if (segments[i]!.type === 'flight_outbound') break;
         }
         if (retIdx < 0) {
-          for (let i = props.segmentIndex - 1; i >= 0; i--) {
+          for (let i = idx - 1; i >= 0; i--) {
             if (segments[i]!.type === 'flight_return') {
               retIdx = i;
               break;
@@ -434,7 +472,7 @@ async function handleSave() {
         }
         if (retIdx >= 0) {
           const ret = segments[retIdx]!;
-          const prev = vacation.travelSegments[props.segmentIndex]!;
+          const prev = vacation.travelSegments.find((sg) => sg.id === targetId)!;
           if (!ret.departureAirport || ret.departureAirport === (prev.arrivalAirport ?? '')) {
             segments[retIdx] = { ...segments[retIdx]!, departureAirport: arrivalAirport.value };
           }
@@ -481,7 +519,6 @@ async function handleSave() {
     icon="✈️"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
-    :save-disabled="!canSave"
     :is-submitting="isSubmitting"
     @close="$emit('close')"
     @save="handleSave"

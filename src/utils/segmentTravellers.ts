@@ -90,14 +90,17 @@ function memberMatchKeys(member: FamilyMember): Set<string> {
  * shared canonical form. Resolves PER NAME: a name matches a member when the member's key set
  * contains the full normalized name, or — for a single-token name — that exact token.
  *
- * Ambiguity guard: if one name resolves to MORE than one member it is dropped (left for the
- * user to confirm) — never a silent wrong assignment. The asymmetry is deliberate: we match the
+ * Ambiguity guards, both of which drop rather than guess: one NAME resolving to more than one
+ * MEMBER, and (the converse, which used to slip through) several surname-qualified names
+ * resolving to the SAME member — two different Alexes on one booking. The asymmetry is deliberate: we match the
  * document name's first token against a member's keys, but never a member's first token against
  * the document name (which would let "Jonathan Smith" and "Jonathan Doe" both match "Jonathan").
  * Returns the de-duplicated union of confident (single-member) matches across all names.
  */
 export function matchTravellerIds(names: string[], roster: FamilyMember[]): UUID[] {
   const matched = new Set<UUID>();
+  /** Which document names claimed each member — for guard B below. */
+  const claimedBy = new Map<UUID, Set<string>>();
   for (const raw of names) {
     const n = normalizePersonName(raw).toLowerCase();
     if (!n) continue;
@@ -107,7 +110,30 @@ export function matchTravellerIds(names: string[], roster: FamilyMember[]): UUID
       const keys = memberMatchKeys(member);
       if (keys.has(n) || keys.has(firstToken)) hits.add(member.id);
     }
-    if (hits.size === 1) matched.add([...hits][0]!);
+    // Guard A (existing): one NAME resolving to several MEMBERS is ambiguous — drop it.
+    if (hits.size === 1) {
+      const id = [...hits][0]!;
+      matched.add(id);
+      (claimedBy.get(id) ?? claimedBy.set(id, new Set()).get(id)!).add(n);
+    }
+  }
+  // Guard B: several DIFFERENT people resolving to the SAME member is equally ambiguous, and
+  // the existing guard never saw it — it only checked one name against many members.
+  //
+  // Rosters normally hold first names, so a ticket listing "THOMPSON/ALEX" (the family's
+  // Alex) and "BENNETT/ALEX" (a school friend travelling with them) matched member Alex
+  // twice, each with hits.size === 1. The friend's booking was assigned to the child, and
+  // because `learnableAliases` skips names the matcher already resolved, a later correction
+  // recorded nothing and it repeated. travellerIds drive departure reminders, so the wrong
+  // person is notified.
+  //
+  // Distinguishing "the same person written twice" from "two different people": compare only
+  // the MULTI-TOKEN forms. "John" + "John Smith" contributes one ("john smith") and is kept;
+  // "Alex Thompson" + "Alex Bennett" contributes two that differ, so Alex is dropped for the
+  // user to confirm. Single-token names carry no surname to disagree about.
+  for (const [id, names_] of claimedBy) {
+    const qualified = new Set([...names_].filter((x) => x.includes(' ')));
+    if (qualified.size > 1) matched.delete(id);
   }
   return [...matched];
 }

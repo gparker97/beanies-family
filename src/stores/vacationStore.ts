@@ -343,6 +343,73 @@ export const useVacationStore = defineStore('vacations', () => {
   }
 
   /**
+   * Patch ONE booking segment, addressed by id, merging onto its CURRENT value.
+   *
+   * Replaces the pattern the three edit drawers used: capture a positional array INDEX when
+   * the drawer opens, then at save time write `segments[index] = {...full form payload}`.
+   * Two defects in one line:
+   *
+   *  • WRONG TARGET. A CRDT merge that shifts the array — another parent deleting a
+   *    cancelled flight — re-points that index at a different booking, and ~35 fields of the
+   *    ferry overwrite the return flight. Out of range is worse: `{...undefined}` yields
+   *    `{}`, appending a segment with no id and no type that then breaks `:key`, the photo
+   *    binding and the merge key.
+   *
+   *  • WRONG BASELINE. The payload came from an open-time snapshot, so a field another
+   *    device corrected while the drawer was open was written back to its old value. Callers
+   *    now send a DIFF (see `diffPayload`), and this merges it onto whatever the segment
+   *    looks like now — so untouched fields are never rewritten.
+   *
+   * Searches all three buckets, because a segment id is unique across them and the caller
+   * should not have to know which list its booking lives in.
+   */
+  async function updateSegment(
+    vacationId: string,
+    segmentId: string,
+    patch: Record<string, unknown>
+  ): Promise<boolean> {
+    const vacation = vacations.value.find((v) => v.id === vacationId);
+    if (!vacation) {
+      console.warn(`[vacation] updateSegment: no vacation "${vacationId}"`);
+      return false;
+    }
+    if (Object.keys(patch).length === 0) return true; // nothing changed — a save is a no-op
+
+    const keys = ['travelSegments', 'accommodations', 'transportation'] as const;
+    for (const key of keys) {
+      const arr = (vacation[key] ?? []) as Array<{ id: string }>;
+      const idx = arr.findIndex((seg) => seg.id === segmentId);
+      if (idx < 0) continue;
+      const nextArr = arr.map((seg, i) => (i === idx ? { ...seg, ...patch } : seg));
+      const saved = await updateVacation(vacationId, {
+        [key]: nextArr,
+      } as UpdateFamilyVacationInput);
+      return saved !== null;
+    }
+    // The segment is gone — deleted on another device while this drawer was open. Not an
+    // error the user caused, but they must not be told it saved.
+    console.warn(`[vacation] updateSegment: no segment "${segmentId}" in "${vacationId}"`);
+    return false;
+  }
+
+  /** Remove one booking segment by id, from whichever bucket holds it. */
+  async function deleteSegment(vacationId: string, segmentId: string): Promise<boolean> {
+    const vacation = vacations.value.find((v) => v.id === vacationId);
+    if (!vacation) return false;
+    const keys = ['travelSegments', 'accommodations', 'transportation'] as const;
+    for (const key of keys) {
+      const arr = (vacation[key] ?? []) as Array<{ id: string }>;
+      if (!arr.some((seg) => seg.id === segmentId)) continue;
+      const nextArr = arr.filter((seg) => seg.id !== segmentId);
+      const saved = await updateVacation(vacationId, {
+        [key]: nextArr,
+      } as UpdateFamilyVacationInput);
+      return saved !== null;
+    }
+    return false;
+  }
+
+  /**
    * Set the attached document/photo ids on one booking segment (travel,
    * accommodation, or transportation). Owns the find-by-id + index-merge so
    * the five UI callers (3 edit drawers + wizard steps) don't each hand-roll
@@ -441,6 +508,8 @@ export const useVacationStore = defineStore('vacations', () => {
     updateVacation,
     deleteVacation,
     toggleIdeaVote,
+    updateSegment,
+    deleteSegment,
     updateSegmentPhotoIds,
     addExtractedSegments,
     resetState,

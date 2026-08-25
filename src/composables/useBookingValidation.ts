@@ -111,13 +111,33 @@ export function useBookingValidation<Field extends string = string>(
   }
 
   /**
-   * Wrap your save handler. Flips `hasAttemptedSave` so error rings light
-   * up for any missing fields, then invokes `onValid` only if `canSave`
-   * is true. Returns whatever `onValid` returns (supports async).
+   * Wrap your save handler. Flips `hasAttemptedSave` so the error rings light up for any
+   * missing fields, then invokes `onValid` only if `canSave` is true.
+   *
+   * THE SAVE BUTTON MUST NOT BE DISABLED ON `!canSave`.
+   *
+   * All three travel drawers bound `:save-disabled="!canSave"`, which made this entire
+   * mechanism unreachable: when a field was missing the click never fired, so
+   * `hasAttemptedSave` never flipped and no ring ever appeared; and when nothing was missing
+   * there was nothing to show. Dead in both states.
+   *
+   * What the user actually met: an AI-extracted hotel comes back `status: 'booked'` with no
+   * address — routine, since confirmation emails often omit it. They open the drawer to add
+   * a note and find Save permanently greyed out, with no ring, no message and no way to
+   * learn that `address` is the blocker, on a segment the app created itself.
+   *
+   * So the button stays live and THIS is the gate. `onInvalid` lets the caller say out loud
+   * what a ring alone cannot on a long scrolling form.
    */
-  async function attemptSave<T>(onValid: () => T | Promise<T>): Promise<T | undefined> {
+  async function attemptSave<T>(
+    onValid: () => T | Promise<T>,
+    onInvalid?: (missingFields: Field[]) => void
+  ): Promise<T | undefined> {
     hasAttemptedSave.value = true;
-    if (!canSave.value) return undefined;
+    if (!canSave.value) {
+      onInvalid?.([...missing.value]);
+      return undefined;
+    }
     return await onValid();
   }
 
