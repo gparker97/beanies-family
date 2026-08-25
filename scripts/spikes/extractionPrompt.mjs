@@ -72,9 +72,23 @@ const UNTRUSTED_CLOSE = '<<<END_BEANIES_UNTRUSTED_SOURCE>>>';
  * splice untrusted content into its SYSTEM prompt. MIRROR of the client copy; keep byte-
  * identical (drift guard). See the client copy for the full security rationale.
  */
+/**
+ * Remove every fence marker, to a FIXPOINT. A single split/join pass is defeated by nesting:
+ * deleting the inner marker splices the flanks back into a live one, and everything after it
+ * reads as top-level instructions. MIRROR of the client copy; keep byte-identical.
+ */
+function stripFenceMarkers(text) {
+  let out = text;
+  for (;;) {
+    const next = out.split(UNTRUSTED_OPEN).join('').split(UNTRUSTED_CLOSE).join('');
+    if (next === out) return out;
+    out = next;
+  }
+}
+
 function buildUserMessage(instruction, source) {
   if (source.kind === 'text') {
-    const sanitized = source.text.split(UNTRUSTED_OPEN).join('').split(UNTRUSTED_CLOSE).join('');
+    const sanitized = stripFenceMarkers(source.text);
     return {
       role: 'user',
       content: [

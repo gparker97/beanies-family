@@ -63,6 +63,7 @@ import ExpandableText from '@/components/ui/ExpandableText.vue';
 import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
+import { safeExternalHref } from '@/utils/url';
 
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
@@ -1519,16 +1520,20 @@ function addQuickIdea() {
 
                           <!-- Clickable link -->
                           <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">
+                            <!-- segment.link is MODEL OUTPUT (travel extraction shape), so it is
+                                 attacker-influenceable. This read surface was missed in the first
+                                 hardening pass while the edit modals were fixed. Falls back to
+                                 plain text so a rejected link is still visible, not vanished. -->
                             <a
-                              :href="
-                                row.value.startsWith('http') ? row.value : `https://${row.value}`
-                              "
+                              v-if="safeExternalHref(row.value)"
+                              :href="safeExternalHref(row.value)!"
                               target="_blank"
                               rel="noopener noreferrer"
                               class="truncate text-sm text-[#00B4D8] hover:underline"
                             >
                               {{ row.value.replace(/^https?:\/\//, '') }}
                             </a>
+                            <span v-else class="truncate text-sm opacity-70">{{ row.value }}</span>
                             <span class="shrink-0 text-xs opacity-40">🔗</span>
                           </div>
 

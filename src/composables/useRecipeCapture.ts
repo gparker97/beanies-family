@@ -53,6 +53,17 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const isProcessing = ref(false);
   /** Held between a successful extraction and the save that follows it. */
   const pendingSource = ref<File | null>(null);
+  /**
+   * Page 1 of the source, already compressed to JPEG by the extraction service.
+   *
+   * Kept as a FALLBACK because the picker's accept list is wider than the photo store's:
+   * `AI_PICKER_ACCEPT` allows `image/*` + PDF, while `usePhotos.add` accepts only
+   * jpeg/png/webp/heic/heif or a PDF under 10 MB. So an AVIF/GIF/BMP/TIFF screenshot or a
+   * 15 MB scan extracts fine, the form opens fully populated, and then the attach is
+   * rejected seconds later and the source is lost with no retry. Attaching the compressed
+   * JPEG instead keeps the provenance the user can actually see.
+   */
+  const pendingCompressed = ref<Blob | null>(null);
 
   /** Run intake → extract → map for one document (consent already granted by the caller). */
   async function processFile(file: File): Promise<void> {
@@ -107,6 +118,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       }
 
       pendingSource.value = file;
+      pendingCompressed.value = result.compressedBlob ?? null;
       logEvent({
         level: 'info',
         surface: SURFACE,
@@ -139,7 +151,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    */
   async function attachAfterSave(recipeId: UUID): Promise<void> {
     const file = pendingSource.value;
+    const compressed = pendingCompressed.value;
     pendingSource.value = null;
+    pendingCompressed.value = null;
     if (!file) return; // manual save with no AI source — nothing to attach
 
     const photos = usePhotos({
@@ -152,7 +166,24 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     });
 
     try {
-      const added = await photos.add([file]);
+      let added = await photos.add([file]);
+      // The original was refused (unsupported image type, or a PDF over the size cap).
+      // Fall back to the compressed page-1 JPEG the service already produced, which is
+      // always an accepted type — losing fidelity beats losing the source entirely.
+      if (added.length === 0 && compressed) {
+        const fallback = new File([compressed], `recipe-source-${recipeId}.jpg`, {
+          type: 'image/jpeg',
+        });
+        added = await photos.add([fallback]);
+        if (added.length > 0) {
+          logEvent({
+            level: 'info',
+            surface: SURFACE,
+            message: 'source attached as compressed fallback',
+            context: { action: 'attach_fallback', kind: 'source' },
+          });
+        }
+      }
       if (added.length === 0) {
         // usePhotos already told the user why (cloud off, bad type, cap reached). Record it
         // so the RATE is measurable — a source silently not attaching is data the user
