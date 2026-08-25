@@ -306,6 +306,9 @@ export const EXTRACTION_TASKS = {
     buildMessages: buildRecipeExtractionMessages,
     requiredKeys: RECIPE_REQUIRED_KEYS,
     jsonShape: RECIPE_JSON_SHAPE,
-    sources: ['images'],
+    // Text verified against the live model on 2026-08-25 (step-0 spike): gemma4-31b
+    // accepts a text-only message array, returns well-formed JSON with exact quantities,
+    // and resisted an injection payload spliced into the page text.
+    sources: ['images', 'text'],
   },
 };

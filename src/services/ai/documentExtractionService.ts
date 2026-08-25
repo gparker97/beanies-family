@@ -246,6 +246,21 @@ export function extractRecipeFromDocument(
 }
 
 /**
+ * Extract a recipe from already-extracted TEXT — a reduced web page or a video transcript
+ * (#72 phases 2/3). Skips compression entirely; there is no file (#72).
+ *
+ * The text is UNTRUSTED (an arbitrary web page or someone's captions). It is fenced as data
+ * in the user message by the shared prompt builder, and every field of the reply is bounded
+ * and screened downstream. See buildUserMessage's header.
+ */
+export function extractRecipeFromText(
+  text: string,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<RecipeExtractionResult>> {
+  return runExtraction(text, opts, 'recipe');
+}
+
+/**
  * Extract travel booking(s) from a single document image and return a typed result (#30).
  * Always resolves (never rejects) with a classified outcome.
  */

@@ -215,7 +215,10 @@ export type ExtractionErrorCode =
   | 'provider_error' // upstream non-2xx or network failure (hard failure)
   | 'upstream_busy' // the inference provider is overloaded/down (5xx) — TRANSIENT, retryable
   | 'timeout' // the request was aborted / exceeded the deadline
-  | 'malformed_output'; // the model returned unparseable or wrong-shape JSON
+  | 'malformed_output' // the model returned unparseable or wrong-shape JSON
+  | 'fetch_blocked' // the SSRF guard refused the URL, or it was not fetchable at all (#72)
+  | 'no_content'; // fetched fine, but nothing readable came back: no JSON-LD, no usable
+// text, no captions (#72). Distinct from provider_error — the request SUCCEEDED.
 
 /**
  * Result of the extraction funnel. Per-service `{ success, … }` shape — matching

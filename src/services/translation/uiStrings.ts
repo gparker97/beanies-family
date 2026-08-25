@@ -8073,6 +8073,38 @@ const STRING_DEFS = {
     en: 'We filled these steps in ourselves — worth a look:',
     beanie: 'we filled these steps in ourselves — worth a look:',
   },
+  'recipeExtract.badLink.title': { en: "Can't Use That Link", beanie: "can't use that link" },
+  'recipeExtract.badLink.message': {
+    en: 'That link needs to be a secure (https) web address we can reach. Try copying it again from your browser.',
+    beanie:
+      'that link needs to be a secure (https) web address we can reach. try copying it again from your browser.',
+  },
+  'recipeExtract.noContent.title': { en: 'Nothing to Read', beanie: 'nothing to read' },
+  'recipeExtract.noContent.message': {
+    en: "We reached that page but couldn't find a recipe in it. Try the printable version, or paste the recipe text.",
+    beanie:
+      "we reached that page but couldn't find a recipe in it. try the printable version, or paste the recipe text.",
+  },
+  'recipeExtract.noTranscript.title': {
+    en: "Can't Read That Video",
+    beanie: "can't read that video",
+  },
+  'recipeExtract.noTranscript.message': {
+    en: "This video has no captions and no recipe link, so there's nothing for beanies to read. Try pasting the recipe text, or a link to it.",
+    beanie:
+      "this video has no captions and no recipe link, so there's nothing for beanies to read. try pasting the recipe text, or a link to it.",
+  },
+  'recipeExtract.link.title': { en: 'Paste a Recipe Link', beanie: 'paste a recipe link' },
+  'recipeExtract.link.label': { en: 'Recipe Link', beanie: 'recipe link' },
+  'recipeExtract.link.placeholder': {
+    en: 'https://... or a YouTube video',
+    beanie: 'https://... or a youtube video',
+  },
+  'recipeExtract.link.invalid': {
+    en: 'That needs to be a secure (https) web address.',
+    beanie: 'that needs to be a secure (https) web address.',
+  },
+  'recipeExtract.link.choice': { en: 'Paste a Link', beanie: 'paste a link' },
   'recipeExtract.reader.label': { en: 'Read a Recipe', beanie: 'read a recipe' },
   'recipeExtract.reader.aria': {
     en: 'Read a recipe from a photo or PDF',
