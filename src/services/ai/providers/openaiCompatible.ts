@@ -6,18 +6,12 @@
 // This module is the ONLY place OpenAI-wire concerns (chat/completions, `choices`,
 // message roles) are allowed — they must never leak into types.ts or the service.
 
-import {
-  buildExtractionMessages,
-  buildTravelExtractionMessages,
-  parseExtractionResult,
-  parseTravelExtractionResult,
-  type ChatMessage,
-} from '../extractionPrompt';
+import { EXTRACTION_PARSERS, EXTRACTION_TASKS, type ChatMessage } from '../extractionPrompt';
 import {
   ExtractionProviderError,
   type ExtractionRequest,
-  type ExtractionResult,
-  type TravelExtractionResult,
+  type ExtractionResultByTask,
+  type ExtractionTask,
 } from '../types';
 
 /** Hard ceiling on a single extraction call, so a hung upstream surfaces as a timeout. */
@@ -114,26 +108,18 @@ async function callOpenAiCompatible<T>(
   }
 }
 
-export function callOpenAiCompatibleVision(
+/**
+ * Run ONE task against an OpenAI-compatible endpoint. Replaces the previous
+ * `callOpenAiCompatibleVision` / `callOpenAiCompatibleTravel` pair, which differed only in
+ * which builder and which parser they passed — a shape that grew a new near-identical
+ * export per task. Adding a task now touches this file not at all.
+ */
+export function callOpenAiCompatibleTask<T extends ExtractionTask>(
   config: OpenAiCompatibleConfig,
+  task: T,
   request: ExtractionRequest
-): Promise<ExtractionResult> {
-  return callOpenAiCompatible(
-    config,
-    request,
-    buildExtractionMessages(request.imageDataUrls, request.todayIso),
-    parseExtractionResult
-  );
-}
-
-export function callOpenAiCompatibleTravel(
-  config: OpenAiCompatibleConfig,
-  request: ExtractionRequest
-): Promise<TravelExtractionResult> {
-  return callOpenAiCompatible(
-    config,
-    request,
-    buildTravelExtractionMessages(request.imageDataUrls, request.todayIso),
-    parseTravelExtractionResult
-  );
+): Promise<ExtractionResultByTask[T]> {
+  const messages = EXTRACTION_TASKS[task].buildMessages(request.source, request.todayIso);
+  const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
+  return callOpenAiCompatible(config, request, messages, parse);
 }

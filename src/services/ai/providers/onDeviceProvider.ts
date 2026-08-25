@@ -9,8 +9,8 @@ import {
   ExtractionProviderError,
   type ExtractionProvider,
   type ExtractionRequest,
-  type ExtractionResult,
-  type TravelExtractionResult,
+  type ExtractionResultByTask,
+  type ExtractionTask,
 } from '../types';
 
 const notAvailable = () =>
@@ -23,10 +23,10 @@ const notAvailable = () =>
 
 export const onDeviceProvider: ExtractionProvider = {
   id: 'on-device',
-  extract(_request: ExtractionRequest): Promise<ExtractionResult> {
-    return notAvailable();
-  },
-  extractTravel(_request: ExtractionRequest): Promise<TravelExtractionResult> {
+  run<T extends ExtractionTask>(
+    _task: T,
+    _request: ExtractionRequest
+  ): Promise<ExtractionResultByTask[T]> {
     return notAvailable();
   },
 };

@@ -7,13 +7,13 @@ vi.mock('@/services/photos/photoCompression', async (importActual) => {
   return { ...actual, compress: vi.fn() };
 });
 
-// Mock the providers so we control their extract() behaviour per test.
+// Mock the providers so we control their run() behaviour per test.
 vi.mock('../providers/managedProvider', () => ({
-  managedProvider: { id: 'tinfoil', extract: vi.fn(), extractTravel: vi.fn() },
+  managedProvider: { id: 'tinfoil', run: vi.fn() },
 }));
 vi.mock('../providers/byokProvider', () => ({ createByokProvider: vi.fn() }));
 vi.mock('../providers/onDeviceProvider', () => ({
-  onDeviceProvider: { id: 'on-device', extract: vi.fn(), extractTravel: vi.fn() },
+  onDeviceProvider: { id: 'on-device', run: vi.fn() },
 }));
 
 // Mock the PDF rasterizer (real one loads pdf.js + canvas, unavailable in happy-dom). isPdfFile
@@ -32,9 +32,9 @@ import { onDeviceProvider } from '../providers/onDeviceProvider';
 import { ExtractionProviderError, type ExtractionResult } from '../types';
 
 const mockCompress = vi.mocked(compress);
-const mockManagedExtract = vi.mocked(managedProvider.extract);
+const mockManagedExtract = vi.mocked(managedProvider.run);
 const mockCreateByok = vi.mocked(createByokProvider);
-const mockOnDeviceExtract = vi.mocked(onDeviceProvider.extract);
+const mockOnDeviceExtract = vi.mocked(onDeviceProvider.run);
 
 const SAMPLE: ExtractionResult = {
   isEvent: true,
@@ -95,13 +95,18 @@ describe('extractEventFromDocument — tier dispatch', () => {
 
     await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
 
-    const request = mockManagedExtract.mock.calls[0][0];
+    const [task, request] = mockManagedExtract.mock.calls[0];
+    expect(task).toBe('event');
     // A photo is the single-element case of the images array.
-    expect(request.imageDataUrls).toHaveLength(1);
-    expect(request.imageDataUrls[0]).toMatch(/^data:image\/jpeg;base64,/);
+    expect(request.source.kind).toBe('images');
+    const urls = request.source.kind === 'images' ? request.source.imageDataUrls : [];
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toMatch(/^data:image\/jpeg;base64,/);
     expect(request.todayIso).toBe('2026-06-03');
-    // No family-data fields are present on the request — only the document + date + signal + task.
-    expect(Object.keys(request).sort()).toEqual(['imageDataUrls', 'signal', 'task', 'todayIso']);
+    // No family-data fields are present on the request — only the document + date + signal.
+    // `task` is deliberately NO LONGER on the request: it is run()'s first argument, and
+    // carrying it in both places would be two sources of truth that can disagree.
+    expect(Object.keys(request).sort()).toEqual(['signal', 'source', 'todayIso']);
   });
 
   it('multi-page PDF: sends one compressed data URL per page and threads truncated', async () => {
@@ -116,9 +121,13 @@ describe('extractEventFromDocument — tier dispatch', () => {
       todayIso: '2026-06-03',
     });
 
-    const request = mockManagedExtract.mock.calls[0][0];
-    expect(request.imageDataUrls).toHaveLength(3);
-    expect(request.imageDataUrls.every((u) => u.startsWith('data:image/jpeg;base64,'))).toBe(true);
+    const [task, request] = mockManagedExtract.mock.calls[0];
+    expect(task).toBe('event');
+    // Images now ride the discriminated source rather than a bare field on the request.
+    expect(request.source.kind).toBe('images');
+    const urls = request.source.kind === 'images' ? request.source.imageDataUrls : [];
+    expect(urls).toHaveLength(3);
+    expect(urls.every((u: string) => u.startsWith('data:image/jpeg;base64,'))).toBe(true);
     // Page 1's compressed blob is handed back as the representative source thumbnail.
     expect(res.compressedBlob).toBeInstanceOf(Blob);
     // Truncation flag rides the envelope so the caller can notify the user.
@@ -153,8 +162,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('byok tier: constructs the BYOK provider from the supplied config', async () => {
     mockCreateByok.mockReturnValue({
       id: 'openai',
-      extract: vi.fn().mockResolvedValue(SAMPLE),
-      extractTravel: vi.fn(),
+      run: vi.fn().mockResolvedValue(SAMPLE),
     });
 
     const res = await extractEventFromDocument(file(), {
