@@ -128,8 +128,27 @@ export const REQUIRED_KEYS = [
   'confidence',
 ] as const;
 
-function asString(v: unknown): string {
-  return typeof v === 'string' ? v : '';
+/**
+ * Caps on EVERY model-returned value (#72 security pass).
+ *
+ * The model reads untrusted documents — and, once the recipe task lands, untrusted web
+ * pages and captions. A hostile source can make it emit a megabyte string or a
+ * ten-thousand-entry array, which would land in the Automerge doc and the `.beanpod`
+ * and be replicated to every family device forever. Truncating is deliberately NOT an
+ * error: an over-long response is a quality problem, not an outage, and throwing would
+ * turn a bloated field into a failed extraction the user cannot work around.
+ */
+export const MODEL_FIELD_MAX = 200; // short scalars (title, date, location, …)
+export const MODEL_TEXT_MAX = 4000; // free text (description, notes)
+export const MODEL_LIST_MAX = 100; // entries in any model-returned array
+
+/**
+ * Coerce to string and BOUND it. Defaults to the generous free-text cap so a caller that
+ * forgets to pass a limit still cannot be unbounded; short fields pass MODEL_FIELD_MAX.
+ */
+function asString(v: unknown, max: number = MODEL_TEXT_MAX): string {
+  if (typeof v !== 'string') return '';
+  return v.length > max ? v.slice(0, max) : v;
 }
 
 function asBool(v: unknown): boolean {
@@ -175,17 +194,17 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
   // REQUIRED_KEYS) so an older deployed proxy that predates either still parses. Include each
   // only when present + non-empty, so the parsed shape stays byte-identical to before for any
   // response that omits it. category is validated against the real taxonomy in the mapper.
-  const categoryHint = asString(obj.categoryHint);
-  const category = asString(obj.category);
+  const categoryHint = asString(obj.categoryHint, MODEL_FIELD_MAX);
+  const category = asString(obj.category, MODEL_FIELD_MAX);
 
   return {
     isEvent: asBool(obj.isEvent),
-    title: asString(obj.title),
-    date: asString(obj.date),
-    startTime: asString(obj.startTime),
-    endTime: asString(obj.endTime),
+    title: asString(obj.title, MODEL_FIELD_MAX),
+    date: asString(obj.date, MODEL_FIELD_MAX),
+    startTime: asString(obj.startTime, MODEL_FIELD_MAX),
+    endTime: asString(obj.endTime, MODEL_FIELD_MAX),
     isAllDay: asBool(obj.isAllDay),
-    location: asString(obj.location),
+    location: asString(obj.location, MODEL_FIELD_MAX),
     description: asString(obj.description),
     confidence,
     ...(categoryHint ? { categoryHint } : {}),
@@ -304,8 +323,9 @@ const SEGMENT_STRUCTURAL_KEYS = new Set<string>([
 function toStringList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw
+    .slice(0, MODEL_LIST_MAX)
     .filter((x): x is string => typeof x === 'string')
-    .map((s) => s.trim())
+    .map((s) => asString(s, MODEL_FIELD_MAX).trim())
     .filter(Boolean);
 }
 
@@ -317,7 +337,10 @@ function collectScalarFields(
 ): void {
   for (const [k, v] of Object.entries(source)) {
     if (skip?.has(k)) continue;
-    if (typeof v === 'string') target[k] = v;
+    // Bound the FIELD COUNT too: `fields` is a free-form record keyed by whatever the model
+    // returned, so an unbounded loop lets a hostile document choose how many keys we store.
+    if (Object.keys(target).length >= MODEL_LIST_MAX) break;
+    if (typeof v === 'string') target[k] = asString(v, MODEL_TEXT_MAX);
     else if (typeof v === 'number') target[k] = String(v);
   }
 }
@@ -352,10 +375,10 @@ function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
 
   return {
     kind,
-    type: asString(obj.type),
-    title: asString(obj.title),
-    status: asString(obj.status) === 'pending' ? 'pending' : 'booked',
-    bookingReference: asString(obj.bookingReference),
+    type: asString(obj.type, MODEL_FIELD_MAX),
+    title: asString(obj.title, MODEL_FIELD_MAX),
+    status: asString(obj.status, MODEL_FIELD_MAX) === 'pending' ? 'pending' : 'booked',
+    bookingReference: asString(obj.bookingReference, MODEL_FIELD_MAX),
     notes: asString(obj.notes),
     // These booleans live inside the nested *Fields object; fall back to top-level for a flat shape.
     arrivesNextDay: asBool(obj.arrivesNextDay) || asBool(nested.arrivesNextDay),
@@ -381,15 +404,15 @@ export function parseTravelExtractionResult(raw: unknown): TravelExtractionResul
   if (missing.length) {
     throw new Error(`Travel extraction output missing keys: ${missing.join(', ')}`);
   }
-  const rawSegments = Array.isArray(obj.segments) ? obj.segments : [];
+  const rawSegments = Array.isArray(obj.segments) ? obj.segments.slice(0, MODEL_LIST_MAX) : [];
   const segments = rawSegments
     .map(parseTravelSegment)
     .filter((s): s is TravelSegmentDraft => s !== null);
 
   return {
     isTravel: asBool(obj.isTravel),
-    tripName: asString(obj.tripName),
-    tripTypeHint: asString(obj.tripTypeHint),
+    tripName: asString(obj.tripName, MODEL_FIELD_MAX),
+    tripTypeHint: asString(obj.tripTypeHint, MODEL_FIELD_MAX),
     segments,
   };
 }

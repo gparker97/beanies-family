@@ -8,7 +8,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
 import { showToast } from '@/composables/useToast';
-import { getUrlDomain, ensureHttpUrl } from '@/utils/url';
+import { getUrlDomain, safeExternalHref } from '@/utils/url';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
   showsAccountNumber,
@@ -41,7 +41,8 @@ const creditLimit = computed(() =>
     : ''
 );
 
-const bankHref = computed(() => ensureHttpUrl(props.account.onlineBankingUrl ?? ''));
+// SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
+const bankHref = computed(() => safeExternalHref(props.account.onlineBankingUrl));
 
 async function copyAddress(address: string) {
   const ok = await copy(address);
@@ -173,12 +174,16 @@ async function copyAddress(address: string) {
         </dt>
         <dd class="text-right text-sm break-all">
           <a
+            v-if="bankHref"
             :href="bankHref"
             target="_blank"
             rel="noopener noreferrer"
             class="text-primary-500 font-semibold hover:underline"
             >{{ getUrlDomain(account.onlineBankingUrl) }} ↗</a
           >
+          <!-- Stored value failed the href screen (see safeExternalHref). Still shown, so the
+               user can see and correct what they saved, but deliberately not navigable. -->
+          <span v-else class="font-semibold">{{ getUrlDomain(account.onlineBankingUrl) }}</span>
         </dd>
       </div>
       <div

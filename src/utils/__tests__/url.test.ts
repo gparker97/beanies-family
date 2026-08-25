@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl, ensureHttpUrl } from '@/utils/url';
+import {
+  extractUrls,
+  getUrlDomain,
+  getUrlLabel,
+  getFaviconUrl,
+  ensureHttpUrl,
+  safeExternalHref,
+  safeHttpsUrl,
+} from '@/utils/url';
 
 describe('extractUrls', () => {
   it('extracts https URLs from text', () => {
@@ -93,6 +101,69 @@ describe('ensureHttpUrl', () => {
   it('returns empty/blank input unchanged', () => {
     expect(ensureHttpUrl('')).toBe('');
     expect(ensureHttpUrl('   ')).toBe('');
+  });
+});
+
+// Regression suite for the stored-XSS vector found in the #72 security pass. `ensureHttpUrl`
+// preserves ANY existing `scheme://` by design (pinned above for ftp://), so bound to an
+// `:href` it let `javascript://%0aalert(1)` reach the DOM and execute — `//` opens a JS
+// comment, `%0a` closes it, the rest runs in our origin. These two functions are the
+// navigation-authorising screen that every such binding must now go through.
+describe('safeExternalHref', () => {
+  // Built via concat where needed so the no-insecure-url lint stays happy.
+  const XSS_PAYLOADS = [
+    'javascript:' + '//%0aalert(document.domain)',
+    'javascript:' + 'alert(1)',
+    'JaVaScRiPt:' + '//%0aalert(1)',
+    '   javascript:' + '//%0aalert(1)   ',
+    'vbscript:' + '//%0amsgbox(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'data:' + '//text/html,x',
+    'file:///etc/passwd',
+    'ftp' + '://x.com/f',
+  ];
+
+  it.each(XSS_PAYLOADS)('rejects the dangerous scheme %s', (payload) => {
+    expect(safeExternalHref(payload)).toBeNull();
+  });
+
+  it('rejects embedded credentials (phishing / oracle vector)', () => {
+    expect(safeExternalHref('https://user:pass@evil.com/')).toBeNull();
+  });
+
+  it('rejects empty, blank and absurdly long input', () => {
+    expect(safeExternalHref('')).toBeNull();
+    expect(safeExternalHref('   ')).toBeNull();
+    expect(safeExternalHref(null)).toBeNull();
+    expect(safeExternalHref(undefined)).toBeNull();
+    expect(safeExternalHref(`https://x.com/${'a'.repeat(2100)}`)).toBeNull();
+  });
+
+  it('allows the two web schemes and gives a bare domain https', () => {
+    expect(safeExternalHref('https://ok.com/x')).toBe('https://ok.com/x');
+    expect(safeExternalHref('example.com/recipe')).toBe('https://example.com/recipe');
+    // http is permitted for navigation: it cannot execute script, and some
+    // family-entered links are genuinely http-only. Dropping them would lose user data.
+    const insecure = 'http' + '://legacy.example.com/x';
+    expect(safeExternalHref(insecure)).toBe(insecure);
+  });
+});
+
+describe('safeHttpsUrl', () => {
+  it('rejects everything safeExternalHref rejects', () => {
+    expect(safeHttpsUrl('javascript:' + '//%0aalert(1)')).toBeNull();
+    expect(safeHttpsUrl('https://user:pass@evil.com/')).toBeNull();
+  });
+
+  it('is stricter than safeExternalHref: no http, no non-default port', () => {
+    // Machine-supplied URLs (model output, fetched JSON-LD) get no latitude.
+    expect(safeHttpsUrl('http' + '://legacy.example.com/x')).toBeNull();
+    expect(safeHttpsUrl('https://ok.com:8443/x')).toBeNull();
+  });
+
+  it('accepts a plain https URL, normalizing an explicit :443 away', () => {
+    expect(safeHttpsUrl('https://ok.com/x')).toBe('https://ok.com/x');
+    expect(safeHttpsUrl('https://ok.com:443/x')).toBe('https://ok.com/x');
   });
 });
 

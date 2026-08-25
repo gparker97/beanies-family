@@ -48,7 +48,9 @@ import OverlapMark from '@/components/planner/OverlapMark.vue';
 import LinkedLists from '@/components/lists/LinkedLists.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import { openExternal } from '@/utils/openExternal';
-import { ensureHttpUrl } from '@/utils/url';
+import { safeExternalHref } from '@/utils/url';
+// SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
+const activityLinkHref = computed(() => safeExternalHref(props.activity?.link));
 import { MARKETING_URL } from '@/utils/marketing';
 import type { FamilyActivity, DutyCompletion, UpdateFamilyActivityInput } from '@/types/models';
 
@@ -1579,7 +1581,8 @@ async function confirmReschedule() {
             <template #view>
               <div class="flex min-w-0 items-center gap-1.5">
                 <a
-                  :href="ensureHttpUrl(activity.link)"
+                  v-if="activityLinkHref"
+                  :href="activityLinkHref"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="truncate text-sm text-[#00B4D8] hover:underline"

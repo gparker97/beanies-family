@@ -4,6 +4,7 @@ import type { VacationIdea, VacationIdeaCategory } from '@/types/models';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
+import { safeExternalHref } from '@/utils/url';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -29,6 +30,11 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 
 const hasVoted = computed(() => props.idea.votes.some((v) => v.memberId === props.currentMemberId));
+
+// SECURITY: the raw `:href="idea.link"` binding here was unguarded — IdeaEditModal's
+// normalizeLink is a local function in THAT file, so it never covered ideas arriving
+// from sync or created elsewhere.
+const ideaHref = computed(() => safeExternalHref(props.idea.link));
 
 const author = computed(() => familyStore.members.find((m) => m.id === props.idea.createdBy));
 
@@ -152,8 +158,8 @@ function patch(fields: Partial<VacationIdea>) {
             {{ t('vacation.ideas.skippedPill') }}
           </span>
           <a
-            v-if="idea.link"
-            :href="idea.link"
+            v-if="ideaHref"
+            :href="ideaHref"
             target="_blank"
             rel="noopener noreferrer"
             class="inline-flex items-center gap-0.5 rounded-full bg-[rgba(0,180,216,0.08)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"

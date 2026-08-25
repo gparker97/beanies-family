@@ -29,6 +29,7 @@ import {
   buildTravelSegmentTitle,
 } from '@/utils/vacation';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
+import { safeExternalHref } from '@/utils/url';
 import type { VacationTravelSegment, VacationSegmentStatus } from '@/types/models';
 
 type SegmentField =
@@ -97,6 +98,10 @@ const activityCategory = ref('');
 const description = ref('');
 const location = ref('');
 const link = ref('');
+// SECURITY: authorises the href. The old `link.startsWith('http')` test blocked
+// `javascript:` only by accident, and segment.link is MODEL OUTPUT (see the travel
+// extraction shape) — so it is attacker-influenced, not just user-typed.
+const linkHref = computed(() => safeExternalHref(link.value));
 const startTime = ref('');
 const activityDuration = ref('');
 const travellerIds = ref<string[]>([]);
@@ -934,8 +939,8 @@ async function handleSave() {
         <div class="flex items-center gap-2">
           <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
           <a
-            v-if="link"
-            :href="link.startsWith('http') ? link : `https://${link}`"
+            v-if="linkHref"
+            :href="linkHref"
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"

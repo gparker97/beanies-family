@@ -41,7 +41,9 @@ import {
   addDays,
 } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
-import { ensureHttpUrl } from '@/utils/url';
+import { safeExternalHref } from '@/utils/url';
+// SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
+const linkHref = computed(() => safeExternalHref(link.value));
 import type {
   FamilyActivity,
   ActivityCategory,
@@ -1272,8 +1274,8 @@ function handleSave() {
             <div class="flex items-center gap-2">
               <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
               <a
-                v-if="link"
-                :href="ensureHttpUrl(link)"
+                v-if="linkHref"
+                :href="linkHref"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--tint-slate-5)] text-sm transition-colors hover:bg-[var(--tint-slate-10)] dark:bg-slate-700"
