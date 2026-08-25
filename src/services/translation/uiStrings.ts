@@ -8157,14 +8157,18 @@ const STRING_DEFS = {
     beanie: 'most recipe sites work. we read the ingredients and steps exactly as written.',
   },
   'recipeExtract.link.videoHint': {
-    en: 'We’ll look for a recipe link in the description first, then the captions.',
-    beanie: 'we’ll look for a recipe link in the description first, then the captions.',
+    en: "That's a video — beanies reads its description and follows the recipe link most cooks put there.",
+    beanie:
+      "that's a video — beanies reads its description and follows the recipe link most cooks put there.",
   },
   'recipeExtract.link.orFrom': { en: 'or read from', beanie: 'or read from' },
   'recipeExtract.reader.label': { en: 'Read a Recipe', beanie: 'read a recipe' },
   'recipeExtract.reader.aria': {
-    en: 'Read a recipe from a photo or PDF',
-    beanie: 'read a recipe from a photo or pdf',
+    // The control now opens a LINK field it programmatically focuses. Describing it as
+    // "from a photo or PDF" told a screen-reader user the wrong thing about where focus was
+    // about to land (WCAG 2.5.3 / 4.1.2).
+    en: 'Read a recipe from a link, photo or PDF',
+    beanie: 'read a recipe from a link, photo or pdf',
   },
   'recipeExtract.chip.title': { en: 'Recipe', beanie: 'recipe' },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──

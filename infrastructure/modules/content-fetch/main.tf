@@ -231,6 +231,10 @@ data "archive_file" "alarm_slack" {
   type        = "zip"
   source_dir  = "${path.module}/../../lambda/alarm-slack"
   output_path = "${path.module}/alarm-slack-lambda.zip"
+  # Same reason as content_fetch above: tests would otherwise ship into the Lambda that holds
+  # the Slack webhook, and every test edit would change source_code_hash and show up as a
+  # spurious republish in the plan.
+  excludes = ["__tests__"]
 }
 
 resource "aws_lambda_function" "alarm_slack" {

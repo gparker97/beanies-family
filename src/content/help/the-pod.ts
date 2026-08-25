@@ -543,7 +543,8 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
           'Open <strong>The Pod 🌱 → Family Cookbook</strong>',
           'Tap <strong>Read a Recipe</strong> at the top of the page (next to <strong>Add a recipe</strong>)',
           'The first time, beanies asks your permission to send this one recipe to be read — have a look at what it says, then agree',
-          'Choose <strong>Take a photo</strong>, <strong>Choose a file</strong>, or <strong>Paste a Link</strong>',
+          'Paste your link straight into the box that opens, then tap <strong>Read It</strong>. Reading from a photo or a PDF instead? <strong>Take a photo</strong> and <strong>Choose a file</strong> are just underneath.',
+          'You can also start from a link inside <strong>Add a recipe</strong> itself — there’s a <strong>Start from a link</strong> box at the top of the blank form, and it works the same way from the meal planner.',
         ],
       },
       {
@@ -610,7 +611,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'Cooks often show quantities on screen without saying them out loud — “add the flour” while <em>250g</em> sits in the corner. beanies listens to the words, so it can miss those. Check the amounts against the video before you cook.',
+          'Cooks often keep the exact amounts in the video itself — spoken aloud, or on screen as “add the flour” while <em>250g</em> sits in the corner. beanies reads the description, not the video, so it can only pass on what the cook wrote down. When the description links the full recipe you get exact amounts; when it doesn’t, check them against the video before you cook.',
         title: 'Watch the quantities on videos',
         icon: '⚖️',
       },

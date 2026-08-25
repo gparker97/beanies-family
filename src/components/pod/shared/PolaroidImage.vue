@@ -41,16 +41,33 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
       under the hood. See BeanieAvatar.vue for the full rationale.
     -->
     <!-- Spinner wins over both the image and the placeholder: while a photo is arriving,
-         that fact is the most useful thing the frame can say. -->
+         that fact is the most useful thing the frame can say.
+
+         The caption is rendered HERE as well, not left to the branches below. It used to
+         live only inside the placeholder (which this replaces) and the with-image
+         figcaption, so a loading frame showed a bare gradient and the "adding the photo…"
+         copy was unreachable on every surface that passed it — the string was dead.
+
+         aria-live + aria-busy because a spinner alone says nothing to a screen reader: it
+         would be indistinguishable from an ordinary empty frame. -->
     <div
       v-if="loading"
       class="relative grid w-full place-items-center overflow-hidden"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
       :style="{
         aspectRatio: aspectRatio ?? '4 / 3',
         background: 'linear-gradient(135deg, #f9e4c8 0%, #f5c99a 100%)',
       }"
     >
       <BeanieSpinner size="md" />
+      <span
+        v-if="caption"
+        class="font-caveat absolute bottom-3.5 left-3.5 z-10 text-lg text-[#E67E22] opacity-75"
+      >
+        {{ caption }}
+      </span>
     </div>
     <img
       v-else-if="src"

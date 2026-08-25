@@ -7,6 +7,7 @@ import {
   ensureHttpUrl,
   safeExternalHref,
   safeHttpsUrl,
+  isSameRegistrableDomain,
 } from '@/utils/url';
 
 describe('extractUrls', () => {
@@ -218,5 +219,35 @@ describe('getFaviconUrl', () => {
 
   it('returns empty string for invalid URL', () => {
     expect(getFaviconUrl('not-valid')).toBe('');
+  });
+});
+
+describe('isSameRegistrableDomain — multi-label public suffixes', () => {
+  // This is the SOLE authorising control on the server-side dish-image fetch, and the old
+  // "last two labels" rule made every .co.uk host match every other, so a hostile page could
+  // aim our AWS egress at any host under a shared suffix.
+  it('rejects two different sites under a shared second-level suffix', () => {
+    expect(isSameRegistrableDomain('https://evil.co.uk/a.jpg', 'https://victim.co.uk/r')).toBe(
+      false
+    );
+    expect(isSameRegistrableDomain('https://evil.com.au/a.jpg', 'https://victim.com.au/r')).toBe(
+      false
+    );
+    expect(isSameRegistrableDomain('https://evil.co.jp/a.jpg', 'https://victim.co.jp/r')).toBe(
+      false
+    );
+  });
+
+  it('still accepts a subdomain of the same registrable domain', () => {
+    expect(isSameRegistrableDomain('https://cdn.bbc.co.uk/a.jpg', 'https://www.bbc.co.uk/r')).toBe(
+      true
+    );
+    expect(
+      isSameRegistrableDomain('https://img.example.com/a.jpg', 'https://www.example.com/r')
+    ).toBe(true);
+  });
+
+  it('still rejects unrelated flat-gTLD hosts', () => {
+    expect(isSameRegistrableDomain('https://evil.com/a.jpg', 'https://good.com/r')).toBe(false);
   });
 });

@@ -28,6 +28,7 @@ import {
 } from '@/services/ai/documentExtractionService';
 import { resolveRecipeSource, type ExtractionPath } from '@/services/ai/recipeSourceResolver';
 import { routeUrl } from '@/utils/recipeSourceUrl';
+import { isSameRegistrableDomain, safeHttpsUrl } from '@/utils/url';
 import { assertNever } from '@/utils/assertNever';
 import {
   jsonLdToPrefill,
@@ -150,6 +151,20 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       pendingSource.value = file;
       pendingCompressed.value = result.compressedBlob ?? null;
       handOver(prefill, 'document', 'document', file);
+    } catch (err) {
+      // NO SILENT FAILURES (docs/lessons.md). Every call site does `void capture.processX()`,
+      // so without this a throw is an unhandled rejection: the spinner vanishes, the form is
+      // blank, the user is told nothing and CloudWatch records nothing. Every other outcome
+      // in this function is logged; the throw path was the one gap, and it is the one that
+      // fires when the Lambda's response shape drifts (the client casts that JSON unchecked).
+      reportError({
+        surface: SURFACE,
+        message: 'recipe capture threw',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw' },
+      });
+      showToast('error', t('ai.error.title'), t('ai.error.generic'));
     } finally {
       isProcessing.value = false;
     }
@@ -216,6 +231,29 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
      */
     const provenanceUrl = (readUrl: string): string =>
       route.kind === 'youtube' ? route.url : readUrl;
+
+    /**
+     * Screen a page-supplied image URL the same way the mapper screens a model-supplied one.
+     *
+     * Both are attacker-authored — one by the page's markup, one by steering the model — and
+     * both are FETCHED server-side, so both get the same two checks: scheme/port, and the
+     * same registrable domain as the page we were asked to read. A rejection is logged
+     * rather than swallowed, because "recipes from this site never get photos" is otherwise
+     * indistinguishable from "this site has no photos".
+     */
+    const boundedImage = (imageUrl: string, pageUrl: string): string | null => {
+      if (!imageUrl) return null;
+      if (!isSameRegistrableDomain(imageUrl, pageUrl)) {
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'dish image rejected by domain bound',
+          context: { action: 'image_rejected', kind },
+        });
+        return null;
+      }
+      return safeHttpsUrl(imageUrl);
+    };
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -240,7 +278,8 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           // USE the mapper's bounded value. Re-deriving it with safeHttpsUrl alone throws
           // away the same-domain check and leaves that control with no effective caller —
           // a hostile page could then name any host as its image and we would fetch it.
-          pendingDishImageUrl.value = prefill.dishImageUrl;
+          pendingDishImageUrl.value =
+            prefill.dishImageUrl ?? boundedImage(resolved.imageUrl, resolved.sourceUrl);
           handOver(prefill, kind, resolved.path, null);
           return;
         }
@@ -276,9 +315,19 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             return;
           }
           prefill.fields.sourceUrl = provenanceUrl(resolved.sourceUrl);
-          // No `??` fallback: dishImageUrl is null EXACTLY when the domain check rejected
-          // the URL, so falling back to the raw page value would undo the rejection.
-          pendingDishImageUrl.value = prefill.dishImageUrl;
+          // The comment that used to sit here claimed dishImageUrl is null EXACTLY when the
+          // domain check rejected the URL. That was false, and it cost the feature: on this
+          // rung the model reads htmlToText output, which has every <img> stripped, and the
+          // prompt tells it to return '' when it has no real image. So the model's imageUrl
+          // is empty in the NORMAL case, dishImageUrl was always null, and no dish photo was
+          // ever attached from a page-text capture.
+          //
+          // The page's own og:image — which the Lambda already resolved against finalUrl —
+          // is the right source here. It is still attacker-authored, so it goes through the
+          // SAME bound rather than around it; that is what the old comment was protecting,
+          // and dropping the value entirely was never the way to protect it.
+          pendingDishImageUrl.value =
+            prefill.dishImageUrl ?? boundedImage(resolved.imageUrl, resolved.sourceUrl);
           handOver(prefill, kind, resolved.path, null);
           return;
         }
@@ -310,6 +359,20 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         default:
           return assertNever(resolved, 'resolveRecipeSource');
       }
+    } catch (err) {
+      // NO SILENT FAILURES (docs/lessons.md). Every call site does `void capture.processX()`,
+      // so without this a throw is an unhandled rejection: the spinner vanishes, the form is
+      // blank, the user is told nothing and CloudWatch records nothing. Every other outcome
+      // in this function is logged; the throw path was the one gap, and it is the one that
+      // fires when the Lambda's response shape drifts (the client casts that JSON unchecked).
+      reportError({
+        surface: SURFACE,
+        message: 'recipe capture threw',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw' },
+      });
+      showToast('error', t('ai.error.title'), t('ai.error.generic'));
     } finally {
       isProcessing.value = false;
     }

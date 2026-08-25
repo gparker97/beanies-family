@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 import { isBlockedAddress, screenUrl } from '../guardedFetch.mjs';
 import { decodeEntities } from '../entities.mjs';
+import { asciiLower } from '../asciiLower.mjs';
+import { pageTitle, findMeta } from '../modes/page.mjs';
 import {
   extractRecipeFromHtml,
   findRecipeNode,
@@ -314,6 +316,53 @@ describe('youtube harvesting', () => {
       videoDetails: { title: 't', shortDescription: 'a'.repeat(20_000) },
     });
     assert.equal(details.description.length, 8000);
+  });
+});
+
+describe('length-preserving scanning (İ desync)', () => {
+  // `toLowerCase()` is not length-preserving: U+0130 becomes TWO UTF-16 units, so every
+  // index found in the lowercased copy and applied to the original lands one short per
+  // occurrence. Four scanners had this, all silently.
+
+  test('asciiLower never changes the length', () => {
+    for (const s of ['İ', 'İİİ', 'AİB', 'ǅ', 'ß', 'Σ', 'İç Pilav']) {
+      assert.equal(asciiLower(s).length, s.length, `length changed for ${JSON.stringify(s)}`);
+    }
+    assert.notEqual('İ'.toLowerCase().length, 'İ'.length, 'premise check: toLowerCase DOES shift');
+  });
+
+  test('asciiLower still lowercases what the scanners look for', () => {
+    assert.equal(
+      asciiLower('<SCRIPT TYPE="application/LD+JSON">'),
+      '<script type="application/ld+json">'
+    );
+  });
+
+  test('JSON-LD survives a Turkish title', () => {
+    const recipe = JSON.stringify({
+      '@type': 'Recipe',
+      name: 'Test Pie',
+      recipeIngredient: ['1 crust'],
+      recipeInstructions: ['bake'],
+    });
+    const html = (title) =>
+      `<html><head><title>${title}</title></head><body>` +
+      `<script type="application/ld+json">${recipe}</script></body></html>`;
+    // The ASCII page is the control: both must behave identically.
+    assert.equal(extractRecipeFromHtml(html('Ic Pilav'))?.name, 'Test Pie');
+    assert.equal(extractRecipeFromHtml(html('İç Pilav'))?.name, 'Test Pie');
+  });
+
+  test('the title survives an İ in an earlier comment', () => {
+    assert.equal(
+      pageTitle('<html><!-- İ İ İ --><head><title>Best Pumpkin Pie</title></head>'),
+      'Best Pumpkin Pie'
+    );
+  });
+
+  test('meta lookup survives one too', () => {
+    const html = '<html><!-- İ --><meta property="og:image" content="https://x.test/a.jpg">';
+    assert.equal(findMeta(html, 'og:image'), 'https://x.test/a.jpg');
   });
 });
 

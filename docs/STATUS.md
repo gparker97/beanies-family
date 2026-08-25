@@ -1647,6 +1647,20 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+### ⭐ #72 recipe capture — YouTube LIVE, needs a new production secret ⭐
+
+**State (2026-08-25):** phases 1-3 complete on `security/ai-input-output-hardening` (21+ commits, NOT pushed). The `content-fetch` Lambda is deployed to prod; the Vue client is not.
+
+**New required production secret — `TF_VAR_youtube_api_key`.** YouTube blocks the Lambda's egress IP on BOTH the watch page and the InnerTube player endpoint (measured — the identical code returns the full description from a residential connection). Without this key every YouTube capture fails. Minted from the GCP console, YouTube Data API v3, restricted to that one API; `videos.list` costs 1 unit of a free 10,000/day. It is set in `~/.beanies-tf.env` on GREGMONSTER only — **no CI workflow sets it**, so a pipeline-driven apply would blank it.
+
+**Captions were withdrawn, not deferred.** The `timedtext` endpoint now needs a proof-of-origin token and returns HTTP 200 with zero bytes to everyone, including from a home connection. Do not re-propose a captions path without first proving a non-empty body. The replacement — description → the cook's own recipe link → schema.org JSON-LD — yields exact quantities with the model never invoked, which is strictly better.
+
+**Owed:**
+
+- Re-deploy the Lambda: the post-review fixes (İ desync, roundup ItemList ambiguity, DNS deadline, POST header allowlist, webhook redaction) are committed but NOT applied.
+- Decide the branch: 21+ commits is far past "short-lived and exceptional". Land on `main` and delete, per the project convention.
+- On-device/browser verification of the client changes — every defect this session was found by a human in a browser or by review, never by the suite.
+
 > **Validated 2026-08-20:** every entry below was re-checked against the repo before saving. **Four blocks removed as verifiably shipped:** (1) the **Google Play signing-key blocker** — resolved 2026-08-19, the android release run at 09:21Z succeeded to `production`; the missing piece was the _upload_ key, not just the Play-managed signing key. (2) the **family care & safety fix** — shipped as `e3175ffe` in `0.9.11`. (3) **#67 export engine** — shipped (`src/composables/useSheetExport.ts` + `src/components/export/ExportSheet.vue` both present). (4) **`scratch-shoot.mjs`** — no longer on disk. Also removed the **Maple-shutdown blog publish** item, done and deployed this session. #66 confirmed still unimplemented (no `weeklyAgenda` / `agendaShare` fingerprint in `src/`) and carried forward unchanged.
 
 > **Validated 2026-08-20 (session 2 — App Review demo mode):** no blocks removed. This session's work was net-new and orthogonal to every item below: a new feature plus its CI/doc plumbing, touching no surface any carried item describes. Spot-checked the two cheapest fingerprints and both are **still open**: #66 has no `weeklyAgenda`/`agendaShare` in `src/` (grep=0), and the iOS build-11 hardening is still unimplemented (`translateZ`/`resetOverlayStack` absent from `App.vue`, grep=0).
