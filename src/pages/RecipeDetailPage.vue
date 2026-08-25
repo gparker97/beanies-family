@@ -26,6 +26,7 @@ import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePhotoStore } from '@/stores/photoStore';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import { usePermissions } from '@/composables/usePermissions';
 import type { CookLogEntry } from '@/types/models';
@@ -87,6 +88,15 @@ function openEditCookLog(e: CookLogEntry): void {
   editingEntry.value = e;
   cookLogOpen.value = true;
 }
+
+/**
+ * How many photos are behind the hero.
+ *
+ * The lightbox has always shown ALL of them — prev/next chevrons, arrow keys, the lot — but
+ * the hero polaroid looks exactly the same whether it is the only photo or the first of
+ * four, so nobody knew to tap it. The photos were not missing, only invisible.
+ */
+const photoCount = computed(() => recipe.value?.photoIds?.length ?? 0);
 
 // Hero photo — public Drive URL (ADR-021). Sync, no fetch.
 const heroUrl = computed<string | null>(() => {
@@ -167,8 +177,12 @@ function onRecipeDeleted(): void {
         <button
           v-if="heroUrl"
           type="button"
-          class="group block rounded-[var(--sq)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbf3e3]"
-          :aria-label="t('recipes.detail.openPhoto')"
+          class="group relative block rounded-[var(--sq)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbf3e3]"
+          :aria-label="
+            photoCount > 1
+              ? fillTemplate(t('recipes.detail.openPhotos'), { count: String(photoCount) })
+              : t('recipes.detail.openPhoto')
+          "
           @click="openLightbox"
         >
           <PolaroidImage
@@ -177,6 +191,15 @@ function onRecipeDeleted(): void {
             aspect-ratio="4 / 3"
             class="cursor-zoom-in transition-transform duration-200 group-hover:-translate-y-0.5 group-active:scale-[0.99]"
           />
+          <!-- Only when there IS more to see. On a single-photo recipe this would be chrome
+               for its own sake, and the polaroid's restful geometry is the point. -->
+          <span
+            v-if="photoCount > 1"
+            class="font-outfit pointer-events-none absolute top-4 right-4 inline-flex items-center gap-1 rounded-full bg-[rgb(44_62_80_/_72%)] px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+          >
+            <span aria-hidden="true">📷</span>
+            <span>{{ photoCount }}</span>
+          </span>
         </button>
         <!-- The photo is fetched AFTER the recipe saves, so for a few seconds a freshly
              captured recipe has none. Saying so in the polaroid itself is the honest place:
