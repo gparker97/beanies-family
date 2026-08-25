@@ -80,8 +80,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // Recipe capture (#72, surfaces 'recipe-extract' / 'recipe-fetch'). Three keys only —
   // `action`, `kind` and `error_code` above are REUSED rather than duplicated per feature.
   // All PII-free: `extraction_path` is a fixed enum naming which rung of the capture ladder
-  // produced the recipe (document|jsonld|page_text|youtube_link_followed|youtube_captions),
-  // and the two counts are small integers. NEVER log the URL, the page text, the captions,
+  // produced the recipe (document|jsonld|page_text|youtube_link_followed|youtube_description),
+  // and the two counts are small integers. NEVER log the URL, the page text, the description,
   // the dish name or any recipe content. Same Diagnostics category already declared.
   'extraction_path',
   'inferred_count',

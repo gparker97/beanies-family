@@ -96,12 +96,14 @@ describe('the youtube ladder', () => {
       videoId: 'dQw4w9WgXcQ',
       title: 'Best Lemon Cake',
       channel: 'Nana Bakes',
-      description: 'Full recipe: https://nanabakes.example/lemon-drizzle',
-      captions: 'first cream the butter then add the eggs',
+      // Long enough to clear MIN_DESCRIPTION_CHARS, so tests exercise the rung they name
+      // rather than tripping the refusal threshold by accident.
+      description:
+        'Full recipe: https://nanabakes.example/lemon-drizzle\n' + 'ingredient. '.repeat(30),
       ...over,
     });
 
-  it('RUNG 2 wins: follows a recipe link in the description before touching captions', async () => {
+  it('RUNG 2 wins: follows a recipe link before falling back to the description', async () => {
     // The best outcome — exact quantities from the blog's markup, zero inference.
     const fetchPage = vi
       .fn()
@@ -115,35 +117,49 @@ describe('the youtube ladder', () => {
     expect(fetchPage).toHaveBeenCalledWith('https://nanabakes.example/lemon-drizzle', undefined);
   });
 
-  it('a DEAD link falls through to captions rather than aborting the capture', async () => {
+  it('a DEAD link falls through to the description rather than aborting the capture', async () => {
     const fetchService = svc({
       fetchYoutube: vi.fn().mockResolvedValue(video()),
       fetchPage: vi.fn().mockResolvedValue(fail('fetch_failed')),
     });
     const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
-    if (r.kind !== 'text') throw new Error('expected captions fallback');
-    expect(r.path).toBe('youtube_captions');
+    if (r.kind !== 'text') throw new Error('expected description fallback');
+    expect(r.path).toBe('youtube_description');
   });
 
-  it('RUNG 3: captions carry the harvested context, not just the transcript', async () => {
+  it('RUNG 3: the description carries the harvested context, not just the raw text', async () => {
     const fetchService = svc({
-      fetchYoutube: vi.fn().mockResolvedValue(video({ description: 'no links here' })),
+      fetchYoutube: vi
+        .fn()
+        .mockResolvedValue(
+          video({ description: 'no links here. ' + 'flour and sugar. '.repeat(20) })
+        ),
     });
     const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
     if (r.kind !== 'text') throw new Error('expected text');
+    expect(r.path).toBe('youtube_description');
     expect(r.text).toContain('Best Lemon Cake');
     expect(r.text).toContain('Nana Bakes');
     expect(r.text).toContain('no links here');
-    expect(r.text).toContain('first cream the butter');
   });
 
-  it('RUNG 4: REFUSES when there are no captions and no link — writes nothing', async () => {
+  it('RUNG 4: REFUSES on a boilerplate description with no link — writes nothing', async () => {
     // The headline behaviour greg asked for: never reconstruct a recipe from a title.
     const fetchService = svc({
-      fetchYoutube: vi.fn().mockResolvedValue(video({ captions: null, description: 'like & sub' })),
+      fetchYoutube: vi.fn().mockResolvedValue(video({ description: 'like & sub' })),
     });
     const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
-    expect(r).toEqual({ kind: 'refusal', reason: 'no_transcript_no_link' });
+    expect(r).toEqual({ kind: 'refusal', reason: 'no_text_no_link' });
+  });
+
+  it('a description too short to hold a recipe is refused, not sent to the model', async () => {
+    // Guards the threshold itself: 199 chars of prose must not become a model call whose
+    // only possible answer is "not a recipe".
+    const fetchService = svc({
+      fetchYoutube: vi.fn().mockResolvedValue(video({ description: 'a'.repeat(199) })),
+    });
+    const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
+    expect(r).toEqual({ kind: 'refusal', reason: 'no_text_no_link' });
   });
 
   it('ignores social/affiliate links so they cannot burn the fetch budget', async () => {
@@ -151,8 +167,9 @@ describe('the youtube ladder', () => {
     const fetchService = svc({
       fetchYoutube: vi.fn().mockResolvedValue(
         video({
-          description: 'https://instagram.com/nana https://amzn.to/xyz https://patreon.com/nana',
-          captions: 'transcript here',
+          description:
+            'https://instagram.com/nana https://amzn.to/xyz https://patreon.com/nana ' +
+            'and here is the actual method. '.repeat(10),
         })
       ),
       fetchPage,
