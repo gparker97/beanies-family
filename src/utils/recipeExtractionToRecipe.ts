@@ -9,7 +9,7 @@
  * user inserts or reorders a line, and would then point the "check this" hint at the wrong
  * row. Texts stay meaningful under editing.
  */
-import { safeHttpsUrl } from '@/utils/url';
+import { isSameRegistrableDomain, safeHttpsUrl } from '@/utils/url';
 import type { Recipe } from '@/types/models';
 import type { RecipeExtractionResult, RecipeFieldConfidence } from '@/services/ai/types';
 import type { JsonLdRecipe } from '@/services/ai/recipeFetchService';
@@ -40,7 +40,11 @@ export interface RecipePrefill {
  * carried nothing worth showing. Returning null (rather than an empty prefill) keeps the
  * "nothing is created, nothing is invented" guarantee at the type level.
  */
-export function recipeExtractionToPrefill(result: RecipeExtractionResult): RecipePrefill | null {
+export function recipeExtractionToPrefill(
+  result: RecipeExtractionResult,
+  /** The page this came from, when there is one. Used to bound the dish-image URL. */
+  sourceUrl?: string
+): RecipePrefill | null {
   if (!result.isRecipe) return null;
 
   const ingredients = result.ingredients.map((l) => l.text);
@@ -62,10 +66,18 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
     },
     inferredIngredients: result.ingredients.filter((l) => l.inferred).map((l) => l.text),
     inferredSteps: result.steps.filter((l) => l.inferred).map((l) => l.text),
-    // SECURITY: the model's imageUrl is untrusted — a hostile source can steer it. Screen
-    // the scheme here so a `javascript:`/`data:` value can never reach a fetch or an
-    // element. The bytes are validated separately, wherever it is actually fetched.
-    dishImageUrl: safeHttpsUrl(result.imageUrl),
+    // SECURITY: the model's imageUrl is untrusted — a hostile source can steer it, and it
+    // is FETCHED server-side. Two screens, both required:
+    //   1. scheme/port/length, so a `javascript:`/`data:` value can never reach a fetch;
+    //   2. same registrable domain as the page we were asked to read, so a hostile page
+    //      cannot aim our AWS egress at a host of its choosing (a beacon), nor plant
+    //      arbitrary bytes in the family's Drive as their dish photo.
+    // With no source page (a photo/PDF capture) there is nothing to bound it against, so
+    // the model's suggestion is dropped rather than trusted.
+    dishImageUrl:
+      sourceUrl && isSameRegistrableDomain(result.imageUrl, sourceUrl)
+        ? safeHttpsUrl(result.imageUrl)
+        : null,
     confidence: result.confidence,
   };
 }
@@ -92,7 +104,11 @@ export function jsonLdToPrefill(recipe: JsonLdRecipe, sourceUrl: string): Recipe
     },
     inferredIngredients: [],
     inferredSteps: [],
-    dishImageUrl: safeHttpsUrl(recipe.imageUrl),
+    // Same bound as the model path: a page's own JSON-LD `image` is no more trustworthy
+    // than a model's suggestion — it is attacker-authored either way.
+    dishImageUrl: isSameRegistrableDomain(recipe.imageUrl, sourceUrl)
+      ? safeHttpsUrl(recipe.imageUrl)
+      : null,
     // Structured data is exact, so confidence is 1 across the board — not a guess we are
     // dressing up, but the honest reading of "we read this from the publisher's own markup".
     confidence: { name: 1, ingredients: 1, steps: 1 },

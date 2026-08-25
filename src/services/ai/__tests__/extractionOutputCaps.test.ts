@@ -128,3 +128,57 @@ describe('travel extraction output caps', () => {
     ).not.toThrow();
   });
 });
+
+describe('cap ORDERING regressions (found by /code-review max)', () => {
+  it('toStringList filters BEFORE slicing — a leading run of junk must not empty the list', () => {
+    // The parser tolerates non-strings elsewhere, so a model returning
+    // [null ×100, "Alice", "Bob"] is a real shape. Slicing first yielded [] and the segment
+    // saved with no travellers and no warning.
+    const travellers = [...Array(100).fill(null), 'Alice', 'Bob'];
+    const r = parseTravelExtractionResult({
+      isTravel: true,
+      tripName: 'x',
+      tripTypeHint: 'x',
+      segments: [
+        {
+          kind: 'travel',
+          type: 'flight',
+          title: 't',
+          status: 'booked',
+          travellers,
+          confidence: {},
+        },
+      ],
+    });
+    expect(r.segments[0].travellers).toEqual(['Alice', 'Bob']);
+  });
+
+  it('the flat field sweep cannot starve the nested one', () => {
+    // `fields` is filled in two passes. With a shared budget, 100+ stray top-level scalars
+    // consumed it and every mapped detail field (checkIn, flightNumber…) was dropped, then
+    // rendered as junk in segment.notes.
+    const flood: Record<string, unknown> = {};
+    for (let i = 0; i < 150; i++) flood[`junk${i}`] = 'x';
+    const r = parseTravelExtractionResult({
+      isTravel: true,
+      tripName: 'x',
+      tripTypeHint: 'x',
+      segments: [
+        {
+          kind: 'accommodation',
+          type: 'hotel',
+          title: 't',
+          status: 'booked',
+          confidence: {},
+          ...flood,
+          accommodationFields: { checkInDate: '2026-09-01', confirmationNumber: 'ABC123' },
+        },
+      ],
+    });
+    const fields = r.segments[0].fields;
+    expect(fields.checkInDate, 'nested detail fields must survive a flat-field flood').toBe(
+      '2026-09-01'
+    );
+    expect(fields.confirmationNumber).toBe('ABC123');
+  });
+});
