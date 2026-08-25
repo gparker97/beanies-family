@@ -217,21 +217,6 @@ function onRecipeDeleted(): void {
                 recipe.servings
               }}</strong>
             </span>
-            <!-- Provenance for a captured recipe. safeExternalHref, never getFaviconUrl:
-                 a favicon call would fire a third-party request on every recipe view,
-                 which is exactly what fetch-and-store exists to avoid. -->
-            <a
-              v-if="recipeSourceHref"
-              :href="recipeSourceHref"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-primary-500 hover:underline"
-            >
-              🔗
-              <strong class="font-outfit font-semibold">{{
-                getUrlDomain(recipe.sourceUrl ?? '')
-              }}</strong>
-            </a>
             <span v-if="recipe.ingredients?.length">
               🌿
               <strong class="font-outfit text-secondary-500 font-semibold">
@@ -239,6 +224,25 @@ function onRecipeDeleted(): void {
               </strong>
             </span>
           </div>
+
+          <!-- Provenance on its own line. It reads as a destination rather than a statistic,
+               and among the times and servings it was easy to miss entirely. Quiet, but
+               unmissable once you look. safeExternalHref, never getFaviconUrl: a favicon
+               call would fire a third-party request on every recipe view, which is exactly
+               what fetch-and-store exists to avoid. -->
+          <a
+            v-if="recipeSourceHref"
+            :href="recipeSourceHref"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="font-inter text-secondary-500/70 hover:text-primary-500 mt-2 inline-flex w-fit items-center gap-1.5 text-xs transition-colors"
+          >
+            <span aria-hidden="true">🔗</span>
+            <span>{{ t('recipes.detail.source') }}</span>
+            <strong class="font-outfit text-primary-500 font-semibold underline underline-offset-2">
+              {{ getUrlDomain(recipe.sourceUrl ?? '') }}
+            </strong>
+          </a>
 
           <div v-if="canEditActivities" class="mt-auto flex flex-wrap gap-2 pt-4">
             <button
