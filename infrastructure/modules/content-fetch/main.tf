@@ -310,6 +310,62 @@ resource "aws_cloudwatch_metric_alarm" "high_invocations" {
   }
 }
 
+# ── YouTube Data API health ──────────────────────────────────────────────────
+# THE OUTAGE NOTHING WOULD HAVE CAUGHT.
+#
+# The Data API is the production path for every YouTube capture — YouTube blocks this
+# Lambda's egress IP on both the watch page and the InnerTube endpoint, so there is no
+# working fallback. When the key is revoked, restricted, or the free 10,000-unit daily quota
+# runs out, 100% of YouTube captures fail at once.
+#
+# Left alone, that failure is invisible. The user is told "YouTube blocks apps from reading
+# some videos — look in the description", the workaround usually works, so nobody reports it;
+# and the Invocations alarm above stays quiet because the Lambda is being invoked normally,
+# it is just failing. The only distinguishing signal is one log line, which is why the mode
+# logs it at ERROR with a fixed prefix rather than folding it into the generic block message.
+#
+# Metric filter + alarm turns that line into something that pages #beanies-errors through the
+# same SNS topic and forwarder as everything else.
+
+resource "aws_cloudwatch_log_metric_filter" "youtube_api_failed" {
+  name = "${var.app_name}-youtube-data-api-failed-${var.environment}"
+  # Matches the exact prefix emitted by modes/youtube.mjs. Kept as a literal rather than a
+  # pattern so a reword of the message breaks the filter loudly in review, instead of
+  # silently matching nothing forever.
+  pattern        = "[youtube] data-api FAILED"
+  log_group_name = aws_cloudwatch_log_group.content_fetch.name
+
+  metric_transformation {
+    name          = "YoutubeDataApiFailures"
+    namespace     = "beanies/content-fetch"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "youtube_api_failed" {
+  alarm_name          = "${var.app_name}-youtube-data-api-failed-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  # Two periods, not one: a single failure can be a transient googleapis blip, and paging on
+  # it would train the channel to be ignored. Two consecutive 5-minute windows with failures
+  # is a real outage — quota, key or block — and every capture is failing meanwhile.
+  evaluation_periods = 2
+  metric_name        = "YoutubeDataApiFailures"
+  namespace          = "beanies/content-fetch"
+  period             = 300
+  statistic          = "Sum"
+  threshold          = 0
+  alarm_description  = "YouTube Data API calls are failing — key revoked/restricted, daily quota exhausted, or googleapis unreachable. EVERY YouTube recipe capture is failing while this is firing, and the user-facing message blames YouTube, so nobody will report it. Check the quota in the GCP console first."
+  treat_missing_data = "notBreaching"
+  alarm_actions      = [aws_sns_topic.alerts.arn]
+  ok_actions         = [aws_sns_topic.alerts.arn]
+
+  tags = {
+    Name        = "${var.app_name}-youtube-data-api-failed"
+    Environment = var.environment
+  }
+}
+
 resource "aws_cloudwatch_metric_alarm" "throttles" {
   alarm_name          = "${var.app_name}-content-fetch-throttles-${var.environment}"
   comparison_operator = "GreaterThanThreshold"
