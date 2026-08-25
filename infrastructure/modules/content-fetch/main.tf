@@ -329,10 +329,14 @@ resource "aws_cloudwatch_metric_alarm" "high_invocations" {
 
 resource "aws_cloudwatch_log_metric_filter" "youtube_api_failed" {
   name = "${var.app_name}-youtube-data-api-failed-${var.environment}"
-  # Matches the exact prefix emitted by modes/youtube.mjs. Kept as a literal rather than a
-  # pattern so a reword of the message breaks the filter loudly in review, instead of
-  # silently matching nothing forever.
-  pattern        = "[youtube] data-api FAILED"
+  # QUOTED, and the quotes are load-bearing. CloudWatch filter patterns treat a bare `[` as
+  # the start of a space-delimited FIELD selector, so the unquoted form is not merely a
+  # non-match — it is rejected as an invalid pattern. Verified against the live log group:
+  # unquoted returns InvalidParameterException, quoted returns real events.
+  #
+  # A literal rather than a wildcard, so rewording the log message breaks this visibly in
+  # review instead of silently matching nothing forever.
+  pattern        = "\"[youtube] data-api FAILED\""
   log_group_name = aws_cloudwatch_log_group.content_fetch.name
 
   metric_transformation {
