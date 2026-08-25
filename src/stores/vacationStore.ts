@@ -1,3 +1,4 @@
+import { useTranslationStore } from '@/stores/translationStore';
 import { unionTravellerIds } from '@/utils/segmentTravellers';
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -269,8 +270,8 @@ export const useVacationStore = defineStore('vacations', () => {
           );
           showToast(
             'warning',
-            'Trip saved, but your calendar may be out of date',
-            'Try refreshing the page to re-sync.'
+            useTranslationStore().t('travel.calendarStale.title'),
+            useTranslationStore().t('travel.calendarStale.message')
           );
         }
 

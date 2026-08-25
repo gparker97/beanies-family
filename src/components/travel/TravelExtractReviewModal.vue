@@ -64,12 +64,38 @@ const nameToMemberId = ref<Record<string, string>>({});
 const autoMatches = ref<Record<string, string>>({});
 
 /** Current + upcoming trips (never past) the user can add these segments to. */
-const tripOptions = computed(() =>
-  vacationStore.upcomingVacations.map((v) => ({
+/**
+ * Trips this extraction can be attached to.
+ *
+ * Upcoming trips, PLUS the trip the resolver actually matched even when that trip is in the
+ * past. Listing only upcoming ones meant a document matching a past trip had no option to
+ * select: `hasTripsToJoin` could be false, the mode fell back to 'new', and the user got a
+ * SECOND copy of a trip they already had — or, with other upcoming trips present, a select
+ * whose bound value was not among its options.
+ *
+ * A past trip is an ordinary attach target: receipts, boarding passes and confirmations are
+ * routinely filed after the fact.
+ */
+const tripOptions = computed(() => {
+  const target = props.ready?.target;
+  const matchedId =
+    target?.kind === 'attach'
+      ? target.vacationId
+      : target?.kind === 'choose'
+        ? target.candidates[0]?.id
+        : undefined;
+
+  const list = [...vacationStore.upcomingVacations];
+  if (matchedId && !list.some((v) => v.id === matchedId)) {
+    const matched = vacationStore.vacations.find((v) => v.id === matchedId);
+    if (matched) list.unshift(matched);
+  }
+
+  return list.map((v) => ({
     value: v.id,
     label: v.startDate ? `${v.name} · ${formatDateShort(v.startDate)}` : v.name,
-  }))
-);
+  }));
+});
 const hasTripsToJoin = computed(() => tripOptions.value.length > 0);
 
 // Seed local state from the auto-determined target whenever a fresh extraction opens the modal —

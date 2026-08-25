@@ -2103,6 +2103,15 @@ const STRING_DEFS = {
   // CI-blocking bare-string rule cannot see.
   'travel.gapNights.one': { en: '{count} night', beanie: '{count} night' },
   'travel.gapNights.other': { en: '{count} nights', beanie: '{count} nights' },
+  'travel.addAPlan': { en: 'Add a Plan', beanie: 'add a plan' },
+  'travel.calendarStale.title': {
+    en: 'Trip Saved, Calendar May Lag',
+    beanie: 'trip saved, calendar may lag',
+  },
+  'travel.calendarStale.message': {
+    en: 'Your trip is safe. Refresh the page if the calendar looks out of date.',
+    beanie: 'your trip is safe. refresh the page if the calendar looks out of date.',
+  },
   'travel.jumpToIdeas': { en: 'Jump to trip ideas', beanie: 'jump to trip ideas' },
   'travel.openTrip': { en: 'Open trip: {name}', beanie: 'open trip: {name}' },
   'travel.segmentGone.title': { en: 'That Booking Is Gone', beanie: 'that booking is gone' },
