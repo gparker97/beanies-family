@@ -646,7 +646,15 @@ function setCollapsed(id: string, val: boolean) {
 const TRAVEL_DATE_FIELDS = new Set(['departureDate', 'embarkationDate']);
 
 /** Inline-edit a single field on a timeline item and save immediately */
-function saveInlineField(item: TimelineItem, field: string, value: string) {
+/**
+ * AWAITED, and the await is the point.
+ *
+ * These writes rebuild a whole array from `selectedVacation.value` and then persist it.
+ * Fire-and-forget meant a second edit a moment later still read the array from BEFORE the
+ * first write landed, so the first edit was silently overwritten — and the UI had already
+ * cleared, so it looked saved. Awaiting serialises them against the same snapshot.
+ */
+async function saveInlineField(item: TimelineItem, field: string, value: string) {
   if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const id = selectedVacation.value.id;
@@ -658,15 +666,15 @@ function saveInlineField(item: TimelineItem, field: string, value: string) {
       updated.sortDate = value;
     }
     travelSegments[item.arrayIndex] = updated;
-    vacationStore.updateVacation(id, { travelSegments });
+    await vacationStore.updateVacation(id, { travelSegments });
   } else if (item.kind === 'accommodation') {
     const accommodations = [...selectedVacation.value.accommodations];
     accommodations[item.arrayIndex] = { ...accommodations[item.arrayIndex]!, [field]: value };
-    vacationStore.updateVacation(id, { accommodations });
+    await vacationStore.updateVacation(id, { accommodations });
   } else if (item.kind === 'transportation') {
     const transportation = [...selectedVacation.value.transportation];
     transportation[item.arrayIndex] = { ...transportation[item.arrayIndex]!, [field]: value };
-    vacationStore.updateVacation(id, { transportation });
+    await vacationStore.updateVacation(id, { transportation });
   }
 }
 
@@ -733,13 +741,13 @@ function handleVote(ideaId: string) {
   vacationStore.toggleIdeaVote(selectedVacation.value.id, ideaId, familyStore.currentMemberId);
 }
 
-function handleIdeaUpdate(updatedIdea: VacationIdea) {
+async function handleIdeaUpdate(updatedIdea: VacationIdea) {
   if (!requireEdit()) return;
   if (!selectedVacation.value) return;
   const ideas = selectedVacation.value.ideas.map((i) =>
     i.id === updatedIdea.id ? updatedIdea : i
   );
-  vacationStore.updateVacation(selectedVacation.value.id, { ideas });
+  await vacationStore.updateVacation(selectedVacation.value.id, { ideas });
 }
 
 async function handleIdeaDelete(ideaId: string) {
@@ -752,7 +760,7 @@ async function handleIdeaDelete(ideaId: string) {
   });
   if (!confirmed) return;
   const ideas = selectedVacation.value.ideas.filter((i) => i.id !== ideaId);
-  vacationStore.updateVacation(selectedVacation.value.id, { ideas });
+  await vacationStore.updateVacation(selectedVacation.value.id, { ideas });
 }
 
 const editingIdea = computed(() =>
@@ -769,7 +777,13 @@ function closeIdeaEdit() {
   editingIdeaId.value = null;
 }
 
-function addQuickIdea() {
+/**
+ * THE CLEAREST CASE OF THE RACE. Type "snorkelling", Enter, then "beach day" a second later:
+ * the second call read the ideas array from BEFORE the first write landed and persisted
+ * [...oldIdeas, 'beach day'] — "snorkelling" gone. The input was cleared either way, so it
+ * looked saved. Awaited, and the input clears only once the write actually lands.
+ */
+async function addQuickIdea() {
   if (!requireEdit()) return;
   const text = quickIdeaText.value.trim();
   if (!text || !selectedVacation.value || !familyStore.currentMemberId) return;
@@ -781,8 +795,9 @@ function addQuickIdea() {
     createdAt: new Date().toISOString(),
   };
   const ideas = [...selectedVacation.value.ideas, newIdea];
-  vacationStore.updateVacation(selectedVacation.value.id, { ideas });
-  quickIdeaText.value = '';
+  const saved = await vacationStore.updateVacation(selectedVacation.value.id, { ideas });
+  // Keep what they typed if the write failed — clearing it would discard the idea silently.
+  if (saved) quickIdeaText.value = '';
 }
 </script>
 

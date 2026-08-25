@@ -8,6 +8,8 @@
 // Every outcome is explicit and non-silent: offline is guarded; PDF rasterization failures and
 // every extraction error code map to an informative toast (the shared mapping with #133).
 
+import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import { ref } from 'vue';
 import { useAiCapability } from './useAiCapability';
 import { useOnline } from './useOnline';
@@ -51,6 +53,9 @@ export interface UseDocumentToTravelOptions {
   onTravelReady: (ready: TravelReady) => void;
 }
 
+/** kebab-case and greppable: one CloudWatch filter isolates this feature. */
+const SURFACE = 'travel-extract';
+
 export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
   const { tier, byokConfig } = useAiCapability();
   const { isOnline } = useOnline();
@@ -71,6 +76,14 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
     }
 
     isProcessing.value = true;
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'travel capture started',
+      // The SUCCESS path is instrumented too, so a failure RATE is computable. An event that
+      // only fires on failure has no denominator.
+      context: { action: 'start' },
+    });
     try {
       // The service owns document preparation: a PDF is rasterized to its first pages (up
       // to MAX_EXTRACT_PAGES) and a photo is used as-is, then each page is compressed. The
@@ -108,6 +121,19 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
           ? tripsOverlappingRange(vacationStore.vacations, range, toDateInputValue(new Date()))
           : [];
 
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'travel document ready for review',
+          context: {
+            action: 'ready',
+            segment_count:
+              buckets.travelSegments.length +
+              buckets.accommodations.length +
+              buckets.transportation.length,
+            target_kind: resolveTripTarget(matches).kind,
+          },
+        });
         options.onTravelReady({
           buckets,
           travellerNamesBySegmentId,
@@ -120,7 +146,28 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
         return;
       }
 
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'travel extraction failed',
+        context: { action: 'failed', error_code: result.errorCode },
+      });
       reportExtractionFailure(result.errorCode);
+    } catch (err) {
+      // NO SILENT FAILURES (docs/lessons.md, CLAUDE.md § Observability). This was try/finally
+      // with NO catch, and the only caller does `void processTravelDoc(f)` — so any throw in
+      // travelExtractionToSegments, inferTripType or resolveTripTarget became an unhandled
+      // rejection: the spinner cleared, the review modal never opened, the user was told
+      // nothing, and CloudWatch recorded nothing. The whole travel surface emitted ZERO
+      // diagnostic events, against a rule the project calls mandatory.
+      reportError({
+        surface: SURFACE,
+        message: 'travel document processing threw',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw' },
+      });
+      showToast('error', t('ai.error.title'), t('ai.error.generic'));
     } finally {
       isProcessing.value = false;
     }

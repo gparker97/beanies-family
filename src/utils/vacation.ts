@@ -585,7 +585,7 @@ function readField(
 export function segmentSpan(
   kind: 'travel' | 'accommodation' | 'transportation',
   seg: TimingSegment
-): { start?: string; end?: string } {
+): { start?: string; end?: string; spanning?: boolean } {
   const rec = seg as unknown as Record<string, unknown>;
   const spec = SEGMENT_TIMING[resolveTimingKey(kind, seg.type)];
   if (!spec) return {};
@@ -594,6 +594,10 @@ export function segmentSpan(
   return {
     start: start ? extractDatePart(start) : undefined,
     end: end ? extractDatePart(end) : undefined,
+    // Reported separately from `end`, because a stay with NO check-out date yet is
+    // indistinguishable from a single-day item without it — and that ambiguity is what made
+    // an ongoing stay render as finished. See classifySegmentPhase.
+    spanning: spec.spanning,
   };
 }
 
@@ -604,9 +608,20 @@ export function segmentSpan(
  * injected, TOTAL: a missing/blank date never hides a segment (falls to `now`).
  */
 export function classifySegmentPhase(
-  span: { start?: string; end?: string },
+  span: { start?: string; end?: string; spanning?: boolean },
   today: string
 ): SegmentPhase {
+  // AN OPEN-ENDED STAY IS ONGOING, NOT FINISHED.
+  //
+  // `end ?? start` collapsed a stay with no check-out date into a single day, so an Airbnb
+  // checked into on the 20th with the check-out left blank read as `past` from the 21st
+  // onward: grey rail circle, a ✓ "done" pill, and no "staying now" chip. The one stay the
+  // family was physically in was the one the timeline called finished. The wizard only
+  // prefills check-out on the FIRST accommodation, so every later one is added with both
+  // dates blank — this was the common case, not an edge one.
+  if (span.spanning && span.start && !span.end) {
+    return span.start > today ? 'future' : 'now';
+  }
   const end = span.end ?? span.start;
   if (end && end < today) return 'past';
   if (span.start && span.start > today) return 'future';
