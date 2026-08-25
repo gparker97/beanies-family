@@ -43,6 +43,9 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024;
 // this only guards against a malformed/hostile request, it is not the product cap. Do not
 // "reconcile" the two to match.
 const MAX_IMAGES = 8;
+// Hard cap on a TEXT source. Sits comfortably above the client's ~24k page-text reduction
+// while keeping a single request's token cost (and therefore its bill) bounded.
+const MAX_TEXT_CHARS = 32_000;
 // Allowed document mime prefixes (JPEG/PNG only — data-minimization).
 const ALLOWED_DATA_URL = /^data:image\/(jpeg|png);base64,/;
 // Upstream call deadline (Lambda timeout is 29s; leave headroom to return a clean error).
@@ -104,7 +107,7 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
-  const { imageDataUrls, imageDataUrl, todayIso, task: rawTask } = parsed || {};
+  const { imageDataUrls, imageDataUrl, text, todayIso, task: rawTask } = parsed || {};
   // Task selects the prompt + required-keys. Default to 'event' so older clients (which
   // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
   const task = rawTask === undefined ? 'event' : rawTask;
@@ -112,23 +115,47 @@ export async function handler(event) {
   if (!taskConfig) {
     return response(400, { error: `Unknown task: ${String(task)}` }, event);
   }
+  // A TEXT source is accepted only for a task that declares it (`sources` on the registry
+  // entry). This is a real fence, not a formality: the soft x-api-key ships in the public
+  // bundle, so an unrestricted free-text field would turn this proxy into a general-purpose
+  // text-LLM endpoint anyone could bill us for. `event`/`travel` stay images-only.
+  if (typeof text === 'string') {
+    if (!taskConfig.sources.includes('text')) {
+      return response(400, { error: `Task "${task}" does not accept text input` }, event);
+    }
+    if (text.length === 0) {
+      return response(400, { error: 'Empty text source' }, event);
+    }
+    if (text.length > MAX_TEXT_CHARS) {
+      return response(413, { error: 'Text source too large' }, event);
+    }
+  }
+
   // Dual-accept: new clients send `imageDataUrls` (array, one per page); older cached clients
   // send a single `imageDataUrl` string — normalize both to an array so one code path handles
   // it. Validate BEFORE the billable upstream call (cheap belt-and-braces vs a malformed request).
+  //
+  // NOTE the wire format is deliberately UNCHANGED for the image path. The bundle and this
+  // Lambda deploy independently, so renaming these fields to a nested `source` object would
+  // 400 every event and travel extraction from a new bundle hitting an old Lambda.
   const images = Array.isArray(imageDataUrls)
     ? imageDataUrls
     : typeof imageDataUrl === 'string'
       ? [imageDataUrl]
       : null;
-  if (!images || images.length === 0) {
-    return response(400, { error: 'Expected one or more JPEG/PNG image data URLs' }, event);
+  const hasText = typeof text === 'string' && text.length > 0;
+  if (!hasText) {
+    if (!images || images.length === 0) {
+      return response(400, { error: 'Expected one or more JPEG/PNG image data URLs' }, event);
+    }
+    if (images.length > MAX_IMAGES) {
+      return response(400, { error: `Too many images (max ${MAX_IMAGES})` }, event);
+    }
+    if (!images.every((u) => typeof u === 'string' && ALLOWED_DATA_URL.test(u))) {
+      return response(400, { error: 'Expected JPEG/PNG image data URL(s)' }, event);
+    }
   }
-  if (images.length > MAX_IMAGES) {
-    return response(400, { error: `Too many images (max ${MAX_IMAGES})` }, event);
-  }
-  if (!images.every((u) => typeof u === 'string' && ALLOWED_DATA_URL.test(u))) {
-    return response(400, { error: 'Expected JPEG/PNG image data URL(s)' }, event);
-  }
+  const source = hasText ? { kind: 'text', text } : { kind: 'images', imageDataUrls: images };
   // Accept a date-only string (YYYY-MM-DD) or a full ISO timestamp; normalize to the
   // date part for the prompt so either client format works.
   if (typeof todayIso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(todayIso)) {
@@ -147,7 +174,7 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           model: TINFOIL_MODEL,
-          messages: taskConfig.buildMessages(images, todayDate),
+          messages: taskConfig.buildMessages(source, todayDate),
           temperature: 0,
         }),
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
