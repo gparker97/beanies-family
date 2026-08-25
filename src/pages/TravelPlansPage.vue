@@ -4,8 +4,7 @@ import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import TimelineSegmentCard from '@/components/travel/TimelineSegmentCard.vue';
-import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
-import LinkedLists from '@/components/lists/LinkedLists.vue';
+import TripIdeasPanel from '@/components/travel/TripIdeasPanel.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripBadgeChip from '@/components/vacation/TripBadgeChip.vue';
@@ -291,11 +290,12 @@ const linkedListId = ref<string | null>(null);
 // Ideas state
 const quickIdeaText = ref('');
 const editingIdeaId = ref<string | null>(null);
-const ideasPanelRef = ref<HTMLElement | null>(null);
-const quickIdeaInput = ref<HTMLInputElement | null>(null);
+// A COMPONENT ref now that the panel is extracted, so reach its root element through $el.
+// `scrollIntoView` on the component instance itself is not a function and would throw.
+const ideasPanelRef = ref<{ $el: HTMLElement; focusQuickAdd: () => void } | null>(null);
 
 function scrollToIdeas() {
-  ideasPanelRef.value?.scrollIntoView({ behavior: 'smooth' });
+  ideasPanelRef.value?.$el?.scrollIntoView({ behavior: 'smooth' });
 }
 
 // ── Query param: auto-select vacation from ?vacation=ID ──────────────────────
@@ -561,7 +561,7 @@ function handleAddTripIdea(vacationId: string | undefined): void {
   // it), then focus the quick-add input so the user can type immediately.
   void nextTick().then(() => {
     scrollToIdeas();
-    quickIdeaInput.value?.focus();
+    ideasPanelRef.value?.focusQuickAdd();
   });
 }
 
@@ -1350,107 +1350,18 @@ async function addQuickIdea() {
         </div>
 
         <!-- RIGHT: Ideas panel -->
-        <div
+        <TripIdeasPanel
           ref="ideasPanelRef"
-          class="mt-6 min-w-0 rounded-3xl border-t border-gray-100 p-5 lg:mt-0 lg:border-t-0 lg:border-l lg:border-gray-100 dark:border-slate-700"
-          style="background: linear-gradient(180deg, rgb(255 217 61 / 3%), rgb(0 180 216 / 2%))"
-        >
-          <!-- Ideas header -->
-          <div
-            class="-mx-5 -mt-5 flex items-center gap-3 rounded-t-3xl border-b-[1.5px] border-[rgba(255,217,61,0.12)] px-4 py-3.5"
-            style="background: linear-gradient(135deg, rgb(255 217 61 / 10%), rgb(0 180 216 / 6%))"
-          >
-            <div
-              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/70 text-[1.375rem] shadow-[0_2px_8px_rgba(44,62,80,0.06)]"
-            >
-              🌟
-            </div>
-            <div>
-              <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
-                {{ t('travel.ideas') }}
-              </h3>
-              <div class="text-[0.6875rem] text-gray-400">
-                {{
-                  t('travel.ideasCount').replace('{count}', String(selectedVacation.ideas.length))
-                }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Ideas section -->
-          <div
-            class="font-outfit mt-4 mb-2 text-[0.625rem] font-semibold tracking-[0.08em] text-gray-300 uppercase"
-          >
-            {{ t('travel.ideasAndWishes') }}
-          </div>
-
-          <div class="space-y-2">
-            <VacationIdeaCard
-              v-for="idea in unplannedIdeas"
-              :key="idea.id"
-              :idea="idea"
-              :current-member-id="familyStore.currentMemberId ?? ''"
-              :expanded="false"
-              @vote="handleVote(idea.id)"
-              @update:expanded="openIdeaEdit(idea.id)"
-              @delete="handleIdeaDelete(idea.id)"
-            />
-          </div>
-
-          <!-- Empty ideas -->
-          <div
-            v-if="unplannedIdeas.length === 0 && plannedIdeas.length === 0"
-            class="py-6 text-center text-sm text-gray-400"
-          >
-            {{ t('vacation.ideas.empty') }}
-          </div>
-
-          <!-- Planned section -->
-          <template v-if="plannedIdeas.length > 0">
-            <div
-              class="font-outfit mt-5 mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.08em] text-green-600 uppercase dark:text-green-400"
-            >
-              ✓ {{ t('vacation.ideas.plannedSection') }}
-            </div>
-            <div class="space-y-2">
-              <VacationIdeaCard
-                v-for="idea in plannedIdeas"
-                :key="idea.id"
-                :idea="idea"
-                :current-member-id="familyStore.currentMemberId ?? ''"
-                :expanded="false"
-                @vote="handleVote(idea.id)"
-                @update:expanded="openIdeaEdit(idea.id)"
-                @delete="handleIdeaDelete(idea.id)"
-              />
-            </div>
-          </template>
-
-          <!-- Quick-add input -->
-          <div class="mt-3 flex gap-1.5">
-            <input
-              ref="quickIdeaInput"
-              v-model="quickIdeaText"
-              type="text"
-              :placeholder="t('travel.quickAddIdea')"
-              class="flex-1 rounded-xl border-[1.5px] border-[var(--tint-slate-5)] bg-white px-3.5 py-2.5 text-base text-gray-900 transition-all outline-none focus:border-[#00B4D8] focus:shadow-[0_0_0_3px_rgba(0,180,216,0.08)] dark:bg-slate-800 dark:text-gray-100"
-              @keydown.enter="addQuickIdea"
-            />
-            <button
-              type="button"
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-lg text-white"
-              @click="addQuickIdea"
-            >
-              +
-            </button>
-          </div>
-
-          <!-- Beanie Lists linked to this trip (#33) — rendered like ideas -->
-          <LinkedLists
-            :vacation-id="selectedVacation.id"
-            @open="(id: string) => (linkedListId = id)"
-          />
-        </div>
+          v-model:quick-idea-text="quickIdeaText"
+          :vacation="selectedVacation"
+          :unplanned-ideas="unplannedIdeas"
+          :planned-ideas="plannedIdeas"
+          @add-idea="addQuickIdea"
+          @vote="handleVote"
+          @edit-idea="openIdeaEdit"
+          @delete-idea="handleIdeaDelete"
+          @open-list="(id: string) => (linkedListId = id)"
+        />
       </div>
     </template>
 
