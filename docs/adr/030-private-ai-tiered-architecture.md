@@ -69,7 +69,7 @@ The trust boundary — _who can read the document in transit_ — is what decide
 **Tinfoil (chosen).** Per its attestation-architecture docs and confirmed by live probing:
 
 - **TLS terminates _inside_ the enclave**, bound to the enclave's attested key — intermediaries can only forward TCP, not read plaintext.
-- **EHBP (Encrypted HTTP Body Protocol)** encrypts the request body so only the attested enclave can decrypt it; headers stay clear only for routing. **This lets our own proxy be a blind ciphertext forwarder** — it holds the key + rate-limits, but never sees the document. That answers the founding design question ("why does our Lambda see plaintext?") — with Tinfoil, it needn't.
+- **EHBP (Encrypted HTTP Body Protocol)** encrypts the request body so only the attested enclave can decrypt it; headers stay clear only for routing. **This lets our own proxy be a blind ciphertext forwarder** — it holds the key + applies a route throttle, but never sees the document. That answers the founding design question ("why does our Lambda see plaintext?") — with Tinfoil, it needn't.
 - **Client verifies attestation before sending** (AMD cert chain, code/runtime measurements, Sigstore signatures, TLS-key binding).
 - **Verified live:** responses carry `tinfoil-enclave: qwen3-vl-30b.inf10.tinfoil.sh` + SEV-SNP/TDX predicates; `GET /.well-known/tinfoil-attestation` returns a real SEV-SNP attestation. The claims held up — the opposite of RedPill.
 
@@ -95,7 +95,10 @@ If the DPA gate fails, the managed engine switches to **Gemini Flash-Lite (via V
 
 **Negative / costs**
 
-- Introduces a **server-side proxy** (a new, if thin, server component for a local-first app) to hold the managed key + rate-limit — justified by secret-custody. (With EHBP it sees only ciphertext.)
+- Introduces a **server-side proxy** (a new, if thin, server component for a local-first app) to hold the managed key + apply a route throttle — justified by secret-custody. (With EHBP it sees only ciphertext.)
+
+  > **Correction (2026-08-25, #72 security pass).** Earlier revisions of this ADR and of `managedProvider.ts` described the proxy as rate-limiting **per family**. It does not, and never did. The only limit is a **global API-Gateway route throttle** (`POST /ai-extract`, burst 5 / rate 2 — `infrastructure/modules/registry/main.tf`), shared across all callers, keyed on nothing. Any future claim of per-family limiting must be built before it is written down.
+
 - The managed tier is a billable third-party dependency (cost + rotation + abuse surface); Tinfoil's exact Qwen-VL $/M is likely a premium over RedPill/Gemini (still sub-cent/doc — confirm from dashboard).
 - The strong privacy claim depends on **integrating Tinfoil's verification SDK + EHBP** — until shipped + verified, claims stay scoped to "attested confidential compute + zero retention."
 - On-device multimodal is deferred; the wedge depends on the cloud tier until in-browser VLMs mature.
