@@ -28,6 +28,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { usePermissions } from '@/composables/usePermissions';
 import type { CookLogEntry } from '@/types/models';
+import { getUrlDomain, safeExternalHref } from '@/utils/url';
 
 const route = useRoute();
 const router = useRouter();
@@ -39,6 +40,11 @@ const { canEditActivities } = usePermissions();
 
 const recipeId = computed(() => (route.params.recipeId as string) ?? '');
 const recipe = computed(() => recipesStore.recipes.find((r) => r.id === recipeId.value));
+
+// Screened once here rather than twice in the template. Rejected values render no
+// anchor at all; the URL is not shown as plain text because, unlike a link the user
+// typed, a captured sourceUrl they cannot edit is noise rather than something to fix.
+const recipeSourceHref = computed(() => safeExternalHref(recipe.value?.sourceUrl));
 
 const cookLogs = computed(() =>
   recipe.value ? recipesStore.cookLogsByRecipe(recipe.value.id).value : []
@@ -192,12 +198,33 @@ function onRecipeDeleted(): void {
                 recipe.prepTime
               }}</strong>
             </span>
+            <span v-if="recipe.cookTime">
+              🔥
+              <strong class="font-outfit text-secondary-500 font-semibold">{{
+                recipe.cookTime
+              }}</strong>
+            </span>
             <span v-if="recipe.servings">
               🍽️
               <strong class="font-outfit text-secondary-500 font-semibold">{{
                 recipe.servings
               }}</strong>
             </span>
+            <!-- Provenance for a captured recipe. safeExternalHref, never getFaviconUrl:
+                 a favicon call would fire a third-party request on every recipe view,
+                 which is exactly what fetch-and-store exists to avoid. -->
+            <a
+              v-if="recipeSourceHref"
+              :href="recipeSourceHref"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-primary-500 hover:underline"
+            >
+              🔗
+              <strong class="font-outfit font-semibold">{{
+                getUrlDomain(recipe.sourceUrl ?? '')
+              }}</strong>
+            </a>
             <span v-if="recipe.ingredients?.length">
               🌿
               <strong class="font-outfit text-secondary-500 font-semibold">

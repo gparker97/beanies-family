@@ -20,9 +20,11 @@ import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { usePhotos } from './usePhotos';
 import { useRecipesStore } from '@/stores/recipesStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { extractRecipeFromDocument } from '@/services/ai/documentExtractionService';
 import { recipeExtractionToPrefill, type RecipePrefill } from '@/utils/recipeExtractionToRecipe';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
@@ -49,6 +51,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const { t } = useTranslation();
   const { reportExtractionFailure } = useExtractionErrorToast();
   const recipesStore = useRecipesStore();
+  const familyStore = useFamilyStore();
 
   const isProcessing = ref(false);
   /** Held between a successful extraction and the save that follows it. */
@@ -161,6 +164,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       entityId: recipeId,
       photoIds: computed(() => recipesStore.recipes.find((r) => r.id === recipeId)?.photoIds ?? []),
       updatePhotoIds: (ids) => void recipesStore.updateRecipe(recipeId, { photoIds: ids }),
+      // Without this the attached source lands with createdBy: undefined, unlike every
+      // other attachment in the app.
+      currentMemberId: familyStore.currentMemberId ?? undefined,
       // The source may be a PDF (a scanned recipe card), so this surface must accept both.
       accept: 'imagesAndPdf',
     });
@@ -185,15 +191,28 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         }
       }
       if (added.length === 0) {
-        // usePhotos already told the user why (cloud off, bad type, cap reached). Record it
-        // so the RATE is measurable — a source silently not attaching is data the user
-        // handed us and cannot see.
-        logEvent({
-          level: 'warn',
-          surface: SURFACE,
-          message: 'source document was not attached to the saved recipe',
-          context: { action: 'attach_failed', kind: 'source' },
-        });
+        // usePhotos already told the user why. How loudly we escalate depends on WHY:
+        //
+        //  • Cloud sync off  -> expected, user-configurable, and they were told. A Slack
+        //    page here would be pure noise for a setting working as designed.
+        //  • Cloud sync ON and it still failed -> the user handed us a document, we said
+        //    we read it, and it is now gone with no retry. That is data loss, and it is
+        //    the one outcome in this feature that warrants paging.
+        if (photos.canAdd.value) {
+          reportError({
+            surface: SURFACE,
+            message: 'recipe saved but its source document was lost',
+            severity: 'critical',
+            context: { action: 'attach_failed', kind: 'source' },
+          });
+        } else {
+          logEvent({
+            level: 'warn',
+            surface: SURFACE,
+            message: 'source not attached (photo storage unavailable)',
+            context: { action: 'attach_failed', kind: 'source' },
+          });
+        }
       }
     } catch (err) {
       logEvent({

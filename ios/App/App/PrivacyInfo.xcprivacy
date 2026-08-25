@@ -19,7 +19,9 @@
       Includes (2026-08) recurring-series occurrence dates: the calendar date of
       a repeating session being edited, the date it resolved to, the chosen edit
       scope, and counts — dates and closed enums only, never a title, member
-      name or amount. Declared here under Other Diagnostic Data; no new
+      name or amount. Recipe capture (#72) adds only a closed enum naming which
+      capture path was used plus two small counts — never a URL, page text,
+      transcript or recipe content. Declared here under Other Diagnostic Data; no new
       NSPrivacyCollectedDataType is required.
     - User ID (family_id): a random per-family UUID used to correlate diagnostics.
     - Product Interaction, from TWO surfaces, both analytics, neither ever for ads

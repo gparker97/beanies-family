@@ -22,7 +22,6 @@ import { isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
 import { createByokProvider, type ByokConfig } from './providers/byokProvider';
 import { managedProvider } from './providers/managedProvider';
 import { onDeviceProvider } from './providers/onDeviceProvider';
-import { assertNever as assertNeverSource } from '@/utils/assertNever';
 import {
   ExtractionProviderError,
   type AiTier,
@@ -190,7 +189,7 @@ async function runWithSource<T extends ExtractionTask>(
   truncated: boolean
 ): Promise<DocumentExtractionResult<ExtractionResultByTask[T]>> {
   // Exhaustiveness anchor: adding a source kind must break the build somewhere concrete.
-  if (source.kind !== 'images' && source.kind !== 'text') assertNeverSource(source, 'sourceKind');
+  if (source.kind !== 'images' && source.kind !== 'text') assertNever(source, 'sourceKind');
 
   // 2) Dispatch to the selected tier's provider.
   let provider: ExtractionProvider;

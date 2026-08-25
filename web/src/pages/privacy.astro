@@ -99,9 +99,13 @@ import LegalLayout from '../layouts/LegalLayout.astro';
         notification permission) helps us spot and reproduce issues. a few of these events include
         the calendar date of a repeating activity you edited and which option you chose (just this
         one, this and future, or all), so we can tell whether a session ended up on the right day.
+        when you use magic beans to read a recipe, it also records which method worked (a photo, a
+        web page, a video) and two counts &mdash; how many ingredients were found and how many
+        values beanies filled in itself &mdash; so we can tell how often the reader guesses. it
+        never records the link you gave us, the page or video it read, or anything from the recipe.
         this stream is PII-free: it carries dates, counts and yes/no answers, never the name or
-        content of an activity, reminder or payment, no family content at all, and is correlated
-        only by a random family id, not by your name or email
+        content of an activity, reminder, payment or recipe, no family content at all, and is
+        correlated only by a random family id, not by your name or email
       </li>
       <li>
         <strong>what we do with it:</strong> we use it solely to diagnose and fix problems and keep
