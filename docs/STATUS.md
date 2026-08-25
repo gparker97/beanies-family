@@ -1673,8 +1673,18 @@ duplicated lines across the three edit drawers.
 **Read this before continuing the decomposition.** `src/pages/__tests__/TravelPlansPage.smoke.test.ts`
 exists because a template extraction introduced a nested `v-for` that would have rendered
 every booking N² times, and type-check, lint and 4906 unit tests were ALL green with it in
-place. Unit tests on extracted components cannot catch wiring bugs. Keep that smoke test
-passing, and extend it when you extract a region — it is currently shallow.
+place. Unit tests on extracted components cannot catch wiring bugs.
+
+**It covers the LIST view only.** Several attempts to extend it to the detail view (timeline
+
+- ideas panel) failed: selecting a trip needs a child component to emit, `shallow` leaves
+  children unresolved, and driving it via the deep-link composable did not land either. Each
+  attempt produced a test that asserted `0 === 0`, which is worse than none.
+
+**That is why `TripTimeline` (~330 lines, the largest remaining unit) was NOT extracted.**
+Doing it would have meant a 20-dependency template move with no structural safety net and no
+browser verification. Solve the harness problem first, or do that extraction with a browser
+open.
 
 **Owed:** browser verification of the travel changes. Nothing here has been seen in a
 browser; every defect this session was found by review or by a human, never by the suite.
