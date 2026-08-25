@@ -51,6 +51,33 @@ export interface DetailRow {
   isLink?: boolean;
 }
 
+/**
+ * The time of day a booking happens, for same-day ordering.
+ *
+ * Without it the comparator sorted on the date part alone and Array.sort is stable, so
+ * same-day items kept the order their arrays were pushed in — travel, then accommodation,
+ * then transportation. A day with a 04:30 airport shuttle, a 07:15 flight and a 15:00 hotel
+ * check-in rendered flight → check-in → shuttle: the car taking the family to the airport
+ * listed below the hotel they reach eleven hours later.
+ *
+ * Best-effort across the three shapes; anything with no time sorts last within its day,
+ * which is the honest place for "sometime that day".
+ */
+function timeOfDay(seg: Record<string, unknown>): string {
+  for (const key of [
+    'departureTime',
+    'embarkationTime',
+    'leavingTime',
+    'startTime',
+    'pickupTime',
+    'checkInTime',
+  ]) {
+    const v = seg[key];
+    if (typeof v === 'string' && /^\d{1,2}:\d{2}/.test(v)) return v.padStart(5, '0');
+  }
+  return '';
+}
+
 export interface TimelineItem {
   id: string;
   kind: 'travel' | 'accommodation' | 'transportation';
@@ -59,6 +86,11 @@ export interface TimelineItem {
   keyValue: string;
   status: 'booked' | 'pending';
   sortDate: string;
+  /**
+   * Time of day within `sortDate`, `HH:MM`, for ordering items on the SAME day.
+   * '' when the booking carries no time — those sort last, after everything scheduled.
+   */
+  sortTime: string;
   /** Wizard step number for this kind: 2=travel, 3=accommodation, 4=transportation */
   stepNumber: number;
   detailRows: DetailRow[];
@@ -531,6 +563,7 @@ export function useVacationTimeline(
         keyValue: buildTravelKeyValue(seg),
         status: seg.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
+        sortTime: timeOfDay(seg as unknown as Record<string, unknown>),
         stepNumber: 2,
         detailRows,
         timing,
@@ -566,6 +599,7 @@ export function useVacationTimeline(
         keyValue: kvParts.join(' · '),
         status: acc.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
+        sortTime: timeOfDay(acc as unknown as Record<string, unknown>),
         stepNumber: 3,
         detailRows,
         timing,
@@ -621,6 +655,7 @@ export function useVacationTimeline(
         keyValue: kvParts.join(' · '),
         status: trans.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
+        sortTime: timeOfDay(trans as unknown as Record<string, unknown>),
         stepNumber: 4,
         detailRows,
         timing,
@@ -630,7 +665,16 @@ export function useVacationTimeline(
       });
     }
 
-    items.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+    items.sort((a, b) => {
+      const byDate = a.sortDate.localeCompare(b.sortDate);
+      if (byDate !== 0) return byDate;
+      // Same day: order by clock time, untimed last. Without this tiebreak the order was
+      // whichever array the item came from, which is not chronology.
+      if (a.sortTime === b.sortTime) return 0;
+      if (!a.sortTime) return 1;
+      if (!b.sortTime) return -1;
+      return a.sortTime.localeCompare(b.sortTime);
+    });
     return items;
   });
 

@@ -86,6 +86,14 @@ export function computeVacationDates(v: {
   for (const trans of v.transportation) {
     if (trans.pickupDate) dates.push(extractDatePart(trans.pickupDate));
     if (trans.returnDate) dates.push(extractDatePart(trans.returnDate));
+    // departureDate is what a BUS or COACH booking carries — it is in TRANSPORTATION_FIELDS
+    // and both sibling collectors (collectSegmentDates, segmentDateRange) already read it.
+    // Only this one drifted, and this one is the seed rule when createVacation gets no dates
+    // — i.e. exactly the AI-reader path. A coach itinerary produced a DATELESS trip, whose
+    // linked activity then fell back to today, putting next month's trip on today's calendar
+    // with no gap warnings and no way for a later upload to match it. Silent, because today
+    // is a real and plausible date.
+    if (trans.departureDate) dates.push(extractDatePart(trans.departureDate));
   }
 
   if (dates.length === 0) return {};
