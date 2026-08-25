@@ -1,3 +1,4 @@
+/* global process */
 /**
  * `youtube` mode — get a recipe out of a video link (#72 phase 3).
  *
@@ -28,16 +29,31 @@
  * audio) were REJECTED because they send user content outside the privacy boundary. Nothing
  * here revisits that — this path reads public text and hands it to the same managed model.
  *
- * WHY INNERTUBE RATHER THAN THE WATCH PAGE: YouTube serves a bot check to datacenter IPs, so
- * the watch page is unreadable from Lambda. The InnerTube player endpoint still answers, and
- * still returns `videoDetails` — title and full description — even when it reports
- * `UNPLAYABLE`. That last part is the crux: the old code checked `playabilityStatus` FIRST
- * and returned `not_found` on a payload that had the description sitting right there in it.
+ * TWO WAYS IN, IN ORDER — and the ordering is the product of a measurement, not a guess.
+ *
+ *  1. The official Data API (`videos.list`), when `YOUTUBE_API_KEY` is set. Keyed Google
+ *     endpoint, serves datacenter traffic by design, 1 quota unit per video against a free
+ *     10,000/day. This is the reliable path.
+ *  2. InnerTube's player endpoint, as the no-credential fallback.
+ *
+ * InnerTube was tried FIRST and demoted on evidence. It works perfectly from a residential
+ * connection — verified through this very `guardedFetch`, returning the full 992-character
+ * description — and returns `video_blocked` from Lambda. YouTube refuses the AWS egress IP
+ * for the player endpoint exactly as it does for the watch page. It stays as a fallback
+ * because it costs nothing and would keep working if the key were ever missing, but do not
+ * expect it to succeed in production.
+ *
+ * `playabilityStatus` is deliberately not a gate on either path: a blocked request reports
+ * `UNPLAYABLE` while STILL carrying the title and description, and the original code checked
+ * it FIRST and returned `not_found` on a payload that had everything we needed in it.
  */
 import { guardedFetch } from '../guardedFetch.mjs';
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_DESCRIPTION = 8000;
+
+/** Optional. Absent = InnerTube only, which in production means "blocked". */
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
 
 /** Accept every common YouTube URL shape; return the 11-char id or ''. */
 export function parseVideoId(raw) {
@@ -54,6 +70,48 @@ export function parseVideoId(raw) {
   if (u.pathname === '/watch') return id(u.searchParams.get('v') || '');
   const m = /^\/(?:embed|v|shorts|live)\/([^/?]+)/.exec(u.pathname);
   return m ? id(m[1]) : '';
+}
+
+/**
+ * Ask the official Data API for the video's snippet.
+ *
+ * `part=snippet` is all we need and is the cheapest useful call: 1 unit. The key is
+ * URL-encoded into the query because that is the only shape the endpoint accepts; it is a
+ * browser-key-class secret, never logged, and the response is public data either way.
+ */
+async function fetchDataApi(videoId) {
+  if (!YOUTUBE_API_KEY) return null;
+
+  const url =
+    'https://www.googleapis.com/youtube/v3/videos' +
+    `?part=snippet&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(YOUTUBE_API_KEY)}`;
+
+  const res = await guardedFetch(url, { maxBytes: MAX_BYTES, totalBudgetMs: 6000 });
+  if (!res.ok) {
+    console.warn(`[youtube] data-api fetch failed code=${res.code}`);
+    return null;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(res.body.toString('utf8'));
+  } catch {
+    console.warn('[youtube] data-api returned unparseable json');
+    return null;
+  }
+
+  const snippet = parsed?.items?.[0]?.snippet;
+  if (!snippet?.title) {
+    // An empty `items` means the id is genuinely gone — a real not_found, distinct from a
+    // block. Signalled by the empty object so the caller can tell the two apart.
+    console.warn(`[youtube] data-api no items (deleted or private) items=${parsed?.items?.length}`);
+    return { missing: true };
+  }
+  return {
+    title: String(snippet.title).slice(0, 200),
+    channel: String(snippet.channelTitle ?? '').slice(0, 200),
+    description: String(snippet.description ?? '').slice(0, MAX_DESCRIPTION),
+  };
 }
 
 /**
@@ -121,12 +179,39 @@ export async function fetchYoutube(url) {
   const videoId = parseVideoId(url);
   if (!videoId) return { ok: false, code: 'bad_url' };
 
+  // Path 1 — the official API, when configured.
+  const api = await fetchDataApi(videoId);
+  if (api?.missing) {
+    console.warn(`[youtube] resolved=not_found via=data_api id_len=${videoId.length}`);
+    return { ok: false, code: 'not_found' };
+  }
+  if (api) {
+    console.info(`[youtube] resolved=ok via=data_api desc_chars=${api.description.length}`);
+    return { ok: true, data: { videoId, ...api } };
+  }
+
+  // Path 2 — InnerTube. Expected to be blocked in production; see the header.
   const player = await fetchInnertube(videoId);
-  if (!player) return { ok: false, code: 'video_blocked' };
+  if (!player) {
+    // THE observability gap this closes: the old code returned `video_blocked` for both
+    // "the request never landed" and "it landed but carried nothing", so a CloudWatch line
+    // could not tell a network block from an empty payload — which is exactly the question
+    // that mattered when every YouTube capture started failing.
+    console.warn('[youtube] resolved=video_blocked via=innertube reason=fetch_failed');
+    return { ok: false, code: 'video_blocked' };
+  }
 
   const details = readVideoDetails(player);
-  if (!details) return { ok: false, code: classifyEmpty(player) };
+  if (!details) {
+    const code = classifyEmpty(player);
+    console.warn(
+      `[youtube] resolved=${code} via=innertube reason=no_details ` +
+        `playability=${player?.playabilityStatus?.status ?? 'none'}`
+    );
+    return { ok: false, code };
+  }
 
+  console.info(`[youtube] resolved=ok via=innertube desc_chars=${details.description.length}`);
   return {
     ok: true,
     data: {
