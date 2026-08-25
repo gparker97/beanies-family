@@ -8057,6 +8057,10 @@ const STRING_DEFS = {
     en: "We couldn't find a recipe in that. Try a clearer photo of the page, or type it in.",
     beanie: "we couldn't find a recipe in that. try a clearer photo of the page, or type it in.",
   },
+  'recipes.photos.willAttach': {
+    en: 'beanies found a photo of this dish and will add it when you save.',
+    beanie: 'beanies found a photo of this dish and will add it when you save.',
+  },
   'recipeExtract.attaching': { en: 'Adding the photo…', beanie: 'adding the photo…' },
   'recipeExtract.attachFailed.title': { en: 'Recipe Saved', beanie: 'recipe saved' },
   'recipeExtract.attachFailed.message': {
