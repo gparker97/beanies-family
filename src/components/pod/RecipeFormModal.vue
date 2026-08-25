@@ -18,6 +18,10 @@ import RecipeSourceStrip from './RecipeSourceStrip.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
+import { diffPayload } from '@/utils/diffPayload';
+import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
+import { useAiCapability } from '@/composables/useAiCapability';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -90,8 +94,22 @@ const sourceUrl = ref('');
  */
 const willAttachPhoto = ref(false);
 
+/**
+ * The model-inferred lists, from WHICHEVER route delivered the prefill.
+ *
+ * These were computed off `props.prefill`, which only the host page sets — so a capture
+ * started from this form's own shortcut band filled the fields but never rendered the
+ * "beanies filled this in, check it" hints, presenting an inferred quantity as if it had
+ * been read verbatim. Two visually identical entry points, different disclosure. Same trap
+ * `willAttachPhoto` hit; these were left behind when that one was fixed.
+ */
+const localInferredIngredients = ref<string[]>([]);
+const localInferredSteps = ref<string[]>([]);
+
 function applyPrefill(prefill: RecipePrefill | null): void {
   willAttachPhoto.value = !!prefill?.dishImageUrl;
+  localInferredIngredients.value = prefill?.inferredIngredients ?? [];
+  localInferredSteps.value = prefill?.inferredSteps ?? [];
   const f = prefill?.fields;
   name.value = f?.name ?? '';
   subtitle.value = f?.subtitle ?? '';
@@ -108,8 +126,10 @@ function applyPrefill(prefill: RecipePrefill | null): void {
  * Which lines the reader filled in itself. Derived from the PROP, never a `wasPrefilled`
  * ref — a ref would need clearing on close and would eventually be missed on one path.
  */
-const inferredIngredients = computed(() => props.prefill?.inferredIngredients ?? []);
-const inferredSteps = computed(() => props.prefill?.inferredSteps ?? []);
+// applyPrefill is the one funnel both routes pass through, so read from what it recorded
+// rather than from the prop only one of them sets.
+const inferredIngredients = computed(() => localInferredIngredients.value);
+const inferredSteps = computed(() => localInferredSteps.value);
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.recipe,
@@ -168,6 +188,30 @@ const capture = useRecipeCapture({
   onRecipeReady: ({ prefill }) => applyPrefill(prefill),
 });
 
+/**
+ * ADR-030 CONSENT GATE — the same one every other reader entry point runs.
+ *
+ * `useDocumentConsent`'s own header is explicit that this must run BEFORE a single document
+ * leaves the device, and FamilyCookbookPage, TravelPlansPage and FamilyPlannerPage all await
+ * it first. When this form took ownership of its own capture it inherited five mount points
+ * (the cookbook, the recipe page, the meal-planner rail, the meal editor and the favourite
+ * picker) and none of them gate anything — so a family that had actively DECLINED could pick
+ * a scan of a recipe card from the rail and have it sent to the managed model with the modal
+ * never shown. Owning the capture means owning the gate that goes with it.
+ */
+const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
+const { tier: aiTier } = useAiCapability();
+
+async function startLinkCapture(url: string): Promise<void> {
+  if (!(await requestConsent())) return;
+  await capture.processUrl(url);
+}
+
+async function startDocumentCapture(): Promise<void> {
+  if (!(await requestConsent())) return;
+  aiDocPicker.value?.pick();
+}
+
 const modalTitle = computed(() =>
   isEditing.value ? t('recipes.editTitle') : t('recipes.addTitle')
 );
@@ -180,20 +224,45 @@ function splitLines(s: string): string[] {
 }
 
 /**
- * CLEARING A FIELD MUST ACTUALLY CLEAR IT.
+ * CLEARING A FIELD MUST CLEAR IT — WITHOUT CLOBBERING ANOTHER DEVICE'S EDIT.
  *
- * These optional fields used to be conditionally spread — omitted entirely when blank. On
- * create that is equivalent, but on UPDATE the repository leaves keys that are not present
- * untouched, so emptying a field in the edit form silently kept the old value. Deleting the
- * link greg asked for was impossible, and the same was quietly true of the subtitle, times,
- * servings and notes.
+ * Two bugs, one line apart, and fixing the first naively caused the second.
  *
- * Passing `undefined` is the repository's documented delete signal, and it is safe on both
- * paths: `create` runs the input through `stripUndefined`, and `update` collects undefined
- * keys and removes them from the doc.
+ * These optional fields were originally conditionally spread — omitted when blank. On create
+ * that is equivalent, but on UPDATE the repository leaves absent keys untouched, so emptying
+ * a field silently kept the old value: deleting a recipe's link was impossible.
+ *
+ * Always sending `undefined` fixes that and breaks something worse. `undefined` is the
+ * repository's DELETE signal, so every save would then delete every blank field — including
+ * ones the user never touched. Edit only the name on a recipe whose subtitle is empty, while
+ * another family member adds a subtitle on their device, and your save wipes theirs. That is
+ * precisely the failure class `docs/plans/2026-08-15-recurring-occurrence-edit-data-loss.md`
+ * was written about, in a CRDT where the other device's edit is otherwise safe.
+ *
+ * `diffPayload` is the fix that already exists for it (ActivityModal and
+ * ActivityViewEditModal both use it): it emits `undefined` ONLY for a field that had a value
+ * and now does not, and omits everything untouched.
  */
 function orUndefined(v: string): string | undefined {
   return v.trim() || undefined;
+}
+
+/**
+ * The saved recipe as a payload, for diffing against. Captured from props rather than
+ * rebuilt from the refs, so it reflects what is STORED, not what is on screen.
+ */
+function baselinePayload(r: Recipe) {
+  return {
+    name: r.name,
+    subtitle: r.subtitle,
+    prepTime: r.prepTime,
+    cookTime: r.cookTime,
+    servings: r.servings,
+    sourceUrl: r.sourceUrl,
+    ingredients: r.ingredients ?? [],
+    steps: r.steps ?? [],
+    notes: r.notes,
+  };
 }
 
 function buildPayload() {
@@ -227,7 +296,17 @@ const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
   firstMissingField: () => (name.value.trim() ? null : 'name'),
   buildPayload,
   create: (payload) => recipesStore.createRecipe(payload),
-  update: (id, payload) => recipesStore.updateRecipe(id, payload),
+  // Send only what CHANGED. The baseline is read from the store rather than from
+  // `props.recipe`, so it is correct on the eager-create path too — there the entity was
+  // created by this very form and props.recipe is null, yet a second save must still diff
+  // against what is actually stored. See `baselinePayload` for why this matters.
+  update: (id, payload) => {
+    const stored = recipesStore.recipes.find((r) => r.id === id);
+    return recipesStore.updateRecipe(
+      id,
+      stored ? diffPayload(baselinePayload(stored), payload) : payload
+    );
+  },
 });
 
 const binding = usePhotoEntityBinding({
@@ -244,6 +323,21 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen && !props.recipe) eager.reset();
+    if (!isOpen) {
+      // ABANDONING THE FORM MUST DROP WHAT THE CAPTURE IS HOLDING.
+      //
+      // This component is long-lived (:open, not v-if), so a capture's pending dish image
+      // and source file outlive the modal closing — and handleSave calls attachAfterSave
+      // unconditionally. Paste a link, change your mind, cancel; later open the form to edit
+      // an unrelated recipe and save, and the abandoned photo is fetched and attached to
+      // THAT recipe, with its card spinning for a photo it never asked for. Every failure
+      // inside the attach is caught and logged at info, so it happens silently.
+      //
+      // FamilyCookbookPage carries exactly this guard for its own instance, with a comment
+      // saying why. This instance was given the hazard without the fix.
+      capture.discardPendingSource();
+      willAttachPhoto.value = false;
+    }
   }
 );
 
@@ -256,6 +350,11 @@ async function handleAddFirstPhoto(): Promise<void> {
 
 async function handleSave(): Promise<void> {
   if (!canSave.value) return;
+  // The footer sits OUTSIDE the slot the reading overlay covers, so Save stayed clickable
+  // while a capture was in flight. Committing then closing means the extraction resolves
+  // into a closed form, applyPrefill writes into nothing, and the next open wipes it —
+  // ingredients, steps and times gone with no toast and nothing logged.
+  if (capture.isProcessing.value) return;
   isSubmitting.value = true;
   try {
     const result = await eager.commit();
@@ -327,7 +426,7 @@ const LIST_TEXTAREA_CLASS =
     icon="🍝"
     icon-bg="var(--tint-orange-8)"
     size="default"
-    :save-disabled="!canSave"
+    :save-disabled="!canSave || capture.isProcessing.value"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="emit('close')"
@@ -341,8 +440,8 @@ const LIST_TEXTAREA_CLASS =
     <div class="relative">
       <RecipeSourceStrip
         v-if="showSourceStrip"
-        @submit="(url) => void capture.processUrl(url)"
-        @document="aiDocPicker?.pick()"
+        @submit="(url) => void startLinkCapture(url)"
+        @document="void startDocumentCapture()"
       />
 
       <!-- Reading blocks the form: every field is about to be overwritten, so letting the
@@ -360,6 +459,12 @@ const LIST_TEXTAREA_CLASS =
       </div>
 
       <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
+      <DocumentExtractConsentModal
+        :open="consentOpen"
+        :tier="aiTier"
+        @confirm="onConsentConfirm"
+        @cancel="resolveConsent(false)"
+      />
 
       <FormFieldGroup :label="t('recipes.field.name')" required>
         <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />

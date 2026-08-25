@@ -207,6 +207,7 @@ function onRecipeDeleted(): void {
         <PolaroidImage
           v-else
           :src="null"
+          :loading="isPending(recipe.id)"
           :caption="
             isPending(recipe.id) ? t('recipeExtract.attaching') : t('cookbook.card.noPhoto')
           "

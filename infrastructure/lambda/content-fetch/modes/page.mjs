@@ -7,6 +7,7 @@
  *
  * Returning `{ok:false, code}` rather than throwing keeps the dispatcher a pure mapping.
  */
+import { asciiLower } from '../asciiLower.mjs';
 import { guardedFetch } from '../guardedFetch.mjs';
 import { extractRecipeFromHtml } from '../recipeJsonLd.mjs';
 import { decodeEntities } from '../entities.mjs';
@@ -33,7 +34,7 @@ const MIN_USEFUL_CHARS = 200;
 function dropTag(html, tag) {
   const open = `<${tag}`;
   const close = `</${tag}`;
-  const lower = html.toLowerCase();
+  const lower = asciiLower(html);
   let out = '';
   let cursor = 0;
   for (;;) {
@@ -56,9 +57,15 @@ function dropTag(html, tag) {
     const end = lower.indexOf(close, start);
     out += html.slice(cursor, start) + ' ';
     if (end === -1) {
-      // Unclosed tag: drop the rest. Matches the regex's intent without its blow-up.
-      cursor = html.length;
-      break;
+      // Unclosed marker: SKIP THE OPENING TAG AND CARRY ON, do not drop the rest.
+      //
+      // The comment here used to claim this matched the regex's intent. It is the opposite:
+      // `/<script[\s\S]*?<\/script>/` finds no match on an unterminated tag and therefore
+      // removes NOTHING, leaving the document intact. Truncating instead means one stray
+      // `<!--` — or a legal HTML5 `<!-->` — silently deletes everything after it, which on a
+      // recipe page is usually the entire method section.
+      cursor = start + open.length;
+      continue;
     }
     const gt = html.indexOf('>', end);
     cursor = gt === -1 ? html.length : gt + 1;
@@ -101,8 +108,8 @@ function stripTags(text) {
 }
 
 /** Find one meta tag's content by property/name. Linear scan — see dropTag on why not regex. */
-function findMeta(html, key) {
-  const lower = html.toLowerCase();
+export function findMeta(html, key) {
+  const lower = asciiLower(html);
   const needle = `"${key}"`;
   const alt = `'${key}'`;
   let cursor = 0;
@@ -186,10 +193,10 @@ function absolutize(raw, base) {
   }
 }
 
-function pageTitle(html) {
+export function pageTitle(html) {
   // Linear — `/<title[^>]*>([\s\S]*?)<\/title>/i` measured 420KB → 9.25s on
   // `'<title>'.repeat(n)` with no closing tag.
-  const lower = html.toLowerCase();
+  const lower = asciiLower(html);
   const open = lower.indexOf('<title');
   if (open === -1) return '';
   const openEnd = lower.indexOf('>', open);

@@ -208,12 +208,30 @@ export function screenUrl(raw) {
   return { ok: true, url };
 }
 
-/** Resolve a hostname and refuse if ANY returned address is non-public. */
-async function resolvePublicAddress(hostname) {
+/**
+ * Resolve a hostname and refuse if ANY returned address is non-public.
+ *
+ * `budgetMs` is not optional in spirit: `getaddrinfo` has no cancellation, and against a
+ * blackholed NS it blocks for the resolver default (~5s for A, ~5s for AAAA) before a single
+ * packet is sent. Across hops that spends the whole 9s budget and then some, blowing the 15s
+ * Lambda ceiling — which returns a raw CORS-less 502 outside the typed taxonomy this module
+ * exists to preserve, while holding one of only five concurrency slots. The endpoint is
+ * publicly callable, so that is a cheap denial of service.
+ *
+ * The lookup itself cannot be cancelled, so we race it: the orphaned resolution completes
+ * into nothing and the invocation returns a typed `timeout` on schedule.
+ */
+async function resolvePublicAddress(hostname, budgetMs) {
   let answers;
   try {
-    answers = await lookupAll(hostname, { all: true });
-  } catch {
+    answers = await Promise.race([
+      lookupAll(hostname, { all: true }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('dns_timeout')), Math.max(250, budgetMs)).unref?.()
+      ),
+    ]);
+  } catch (err) {
+    if (err?.message === 'dns_timeout') return { ok: false, code: 'timeout' };
     return { ok: false, code: 'blocked', blockReason: 'dns' };
   }
   if (!Array.isArray(answers) || answers.length === 0) {
@@ -292,6 +310,47 @@ function readCapped(res, maxBytes, budgetMs) {
 }
 
 /** One request to a pinned address, bounded by the REMAINING wall-clock budget. */
+/**
+ * Headers for a POST — an ALLOWLIST, because this is the app's single hardened egress point.
+ *
+ * The previous `{...BROWSER_HEADERS, ...post.headers}` let a caller set anything. Three ways
+ * that goes wrong, in descending order of severity:
+ *
+ *  • `host` — the socket stays pinned to the IP validated for one hostname while the request
+ *    addresses a different vhost, which makes the DNS screen's hostname decorative.
+ *  • `cookie` / `authorization` — silently breaks this module's stated "we send no cookies or
+ *    credentials".
+ *  • `content-length` — taken as given and never checked against the bytes actually written,
+ *    so a short value leaves the remainder on the socket for an intermediary to read as a
+ *    pipelined request.
+ *
+ * Only `content-type` is a caller's business today. Everything else is derived here.
+ *
+ * Also drops the browser-NAVIGATION headers for a POST. `Sec-Fetch-Mode: navigate`,
+ * `Sec-Fetch-Dest: document`, `Accept: text/html…` and `Upgrade-Insecure-Requests` describe a
+ * page load, and no browser sends them on a JSON XHR — a shape that is itself a bot signal
+ * on the one endpoint we POST to.
+ */
+const POST_HEADER_ALLOWLIST = new Set(['content-type']);
+
+function postHeaders(post) {
+  const headers = {
+    // Title-Case keys, matching BROWSER_HEADERS — reading them back as lower-case returned
+    // undefined and would have sent a POST with NO user-agent at all.
+    'User-Agent': BROWSER_HEADERS['User-Agent'],
+    'Accept-Language': BROWSER_HEADERS['Accept-Language'],
+    Accept: 'application/json',
+    'Accept-Encoding': BROWSER_HEADERS['Accept-Encoding'],
+    // Set from the ACTUAL bytes, never from the caller. Node would otherwise fall back to
+    // chunked transfer-encoding, which some fronts answer with 411.
+    'Content-Length': String(Buffer.byteLength(post.body)),
+  };
+  for (const [k, v] of Object.entries(post.headers ?? {})) {
+    if (POST_HEADER_ALLOWLIST.has(k.toLowerCase())) headers[k] = v;
+  }
+  return headers;
+}
+
 function requestPinned(url, address, family, budgetMs, post) {
   return new Promise((resolve) => {
     let settled = false;
@@ -319,7 +378,7 @@ function requestPinned(url, address, family, budgetMs, post) {
         // passed, because none of them opens a real socket.
         lookup: (_hostname, opts, cb) =>
           opts && opts.all ? cb(null, [{ address, family }]) : cb(null, address, family),
-        headers: post ? { ...BROWSER_HEADERS, ...post.headers } : BROWSER_HEADERS,
+        headers: post ? postHeaders(post) : BROWSER_HEADERS,
       },
       (res) => finish({ ok: true, res })
     );
@@ -372,7 +431,7 @@ export async function guardedFetch(
 
     const screened = screenUrl(current);
     if (!screened.ok) return screened;
-    const resolved = await resolvePublicAddress(screened.url.hostname);
+    const resolved = await resolvePublicAddress(screened.url.hostname, deadline - Date.now());
     if (!resolved.ok) return resolved;
 
     const attempt = await requestPinned(

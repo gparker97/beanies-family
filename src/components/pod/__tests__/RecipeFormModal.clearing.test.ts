@@ -53,6 +53,7 @@ async function mountModal() {
         PhotoAttachments: true,
         AiDocumentPicker: true,
         RecipeSourceStrip: true,
+        DocumentExtractConsentModal: true,
       },
     },
   });
@@ -87,13 +88,55 @@ describe('RecipeFormModal — clearing optional fields', () => {
     expect(payload.sourceUrl).toBeUndefined();
   });
 
-  it('keeps the link when it is left alone', async () => {
+  it('OMITS an untouched field entirely, so a concurrent edit is not clobbered', async () => {
+    // The stronger contract, and the reason diffPayload is used here. Sending an untouched
+    // field back at its old value is not harmless in a CRDT: if another device changed it
+    // between load and save, the write lands on top of theirs. Absent means "leave it".
     const { wrapper, store } = await mountModal();
     wrapper.findComponent(BeanieFormModal).vm.$emit('save');
     await nextTick();
     await nextTick();
     const payload = vi.mocked(store.updateRecipe).mock.calls[0]![1] as Record<string, unknown>;
-    expect(payload.sourceUrl).toBe(EXISTING.sourceUrl);
+    expect('sourceUrl' in payload).toBe(false);
+    expect('subtitle' in payload).toBe(false);
+  });
+
+  it('never sends a DELETE for a field that was already empty', async () => {
+    // The regression this pins: always passing `undefined` meant every save deleted every
+    // blank field. Device A edits only the name on a recipe with no subtitle; device B adds
+    // a subtitle; A's save must not remove it.
+    const noSubtitle = { ...EXISTING, subtitle: undefined } as Recipe;
+    setActivePinia(createPinia());
+    const store = useRecipesStore();
+    store.recipes = [noSubtitle];
+    store.updateRecipe = vi.fn().mockResolvedValue(noSubtitle);
+    const wrapper = mount(RecipeFormModal, {
+      props: { open: false, recipe: noSubtitle },
+      global: {
+        stubs: {
+          BeanieFormModal: {
+            props: ['saveDisabled', 'isSubmitting', 'showDelete', 'title'],
+            template: '<div><slot /></div>',
+          },
+          PhotoAttachments: true,
+          AiDocumentPicker: true,
+          RecipeSourceStrip: true,
+          DocumentExtractConsentModal: true,
+        },
+      },
+    });
+    await wrapper.setProps({ open: true });
+    await nextTick();
+    await wrapper.findAll('input[type="text"]')[0]!.setValue('Renamed Pie');
+    await nextTick();
+    wrapper.findComponent(BeanieFormModal).vm.$emit('save');
+    await nextTick();
+    await nextTick();
+
+    const payload = vi.mocked(store.updateRecipe).mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.name).toBe('Renamed Pie');
+    // Present-with-undefined would DELETE it on the other device's value.
+    expect('subtitle' in payload).toBe(false);
   });
 
   it('does the same for the other optional fields', async () => {
@@ -110,7 +153,8 @@ describe('RecipeFormModal — clearing optional fields', () => {
 
     const payload = vi.mocked(store.updateRecipe).mock.calls[0]![1] as Record<string, unknown>;
     for (const key of ['subtitle', 'prepTime', 'cookTime', 'servings', 'notes']) {
-      // Presence AND undefined — an absent key means "leave it alone", which is the bug.
+      // These all HAD values on EXISTING and were emptied, so each must be present and
+      // undefined — the repository's delete signal. Absent would mean "leave it alone".
       expect({ key, present: key in payload }).toEqual({ key, present: true });
       expect(payload[key]).toBeUndefined();
     }

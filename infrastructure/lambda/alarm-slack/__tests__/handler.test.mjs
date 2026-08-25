@@ -1,24 +1,32 @@
 /* global process */
-import { test, describe } from 'node:test';
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.SLACK_ERROR_WEBHOOK_URL = 'https://hooks.slack.test/abc';
 const { handler } = await import('../index.mjs');
 
+/**
+ * The real fetch, captured once. Restoration is an afterEach rather than an inline
+ * `restore()` call, because inline restoration is skipped when an assertion throws — one
+ * failure then leaks a stubbed `globalThis.fetch` into every later test in the file, and the
+ * "never throws" case leaks a permanently-REJECTING one, failing the rest of the suite for a
+ * reason unrelated to them.
+ */
+const REAL_FETCH = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = REAL_FETCH;
+});
+
 /** Capture what would be posted to Slack instead of posting it. */
 function captureSlack() {
   const posts = [];
-  const real = globalThis.fetch;
   globalThis.fetch = async (_url, opts) => {
     posts.push(JSON.parse(opts.body));
     return { ok: true, status: 200 };
   };
-  return {
-    posts,
-    restore: () => {
-      globalThis.fetch = real;
-    },
-  };
+  // `restore` is kept so existing call sites read unchanged; the afterEach above is what
+  // actually guarantees it.
+  return { posts, restore: () => (globalThis.fetch = REAL_FETCH) };
 }
 
 const snsEvent = (message, subject = 'ALARM') => ({

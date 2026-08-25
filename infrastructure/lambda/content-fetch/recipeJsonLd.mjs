@@ -1,3 +1,4 @@
+import { asciiLower } from './asciiLower.mjs';
 /**
  * schema.org/Recipe extraction from a page's JSON-LD (#72).
  *
@@ -29,8 +30,10 @@ function typeMatches(node, wanted) {
 }
 
 /** Walk any JSON-LD shape — bare node, array, or `@graph` — for the first Recipe node. */
+/** How deep to walk a JSON-LD graph before giving up. */
+const MAX_NODE_DEPTH = 6;
 export function findRecipeNode(root, depth = 0) {
-  if (depth > 6 || root === null || typeof root !== 'object') return null;
+  if (depth > MAX_NODE_DEPTH || root === null || typeof root !== 'object') return null;
   if (Array.isArray(root)) {
     for (const item of root) {
       const hit = findRecipeNode(item, depth + 1);
@@ -44,13 +47,49 @@ export function findRecipeNode(root, depth = 0) {
   // site publishing EXACT quantities fell through to the model — the one outcome this file
   // exists to avoid — and `extraction_path` logged `page_text`, making the miss read as
   // "the site has no structured data".
-  for (const value of Object.values(root)) {
+  //
+  // But NOT into a list's items. `itemListElement` is where a roundup ("25 Best Pasta
+  // Recipes") hangs its twenty-five entries; descending there returns whichever Recipe came
+  // first in object key order and presents one arbitrary dish out of twenty as the recipe
+  // for the page — on the ONE path where the model is never consulted and confidence is
+  // hard-coded to 1. See `collectRecipeNodes` for the ambiguity check that backs this up.
+  for (const [key, value] of Object.entries(root)) {
+    if (key === 'itemListElement') continue;
     if (value && typeof value === 'object') {
       const hit = findRecipeNode(value, depth + 1);
       if (hit) return hit;
     }
   }
   return null;
+}
+
+/**
+ * Every distinct Recipe in the document, by name.
+ *
+ * A roundup page can nest its entries somewhere other than `itemListElement`, so skipping
+ * that key is necessary but not sufficient. If a document describes SEVERAL dishes we cannot
+ * know which one the user meant, and guessing is the worst option available here: this path
+ * reports confidence 1, so a guess is presented as exact. Better to fall through to the
+ * model, which marks what it inferred.
+ *
+ * Deduplicated by name because plenty of sites emit the same recipe twice (once in `@graph`,
+ * once standalone), and that is one recipe, not an ambiguity.
+ */
+function collectRecipeNodes(root, depth = 0, found = new Map()) {
+  if (!root || typeof root !== 'object' || depth > MAX_NODE_DEPTH) return found;
+  if (Array.isArray(root)) {
+    for (const item of root) collectRecipeNodes(item, depth + 1, found);
+    return found;
+  }
+  if (typeMatches(root, 'recipe')) {
+    const key = text(root.name).trim().toLowerCase() || `__unnamed_${found.size}`;
+    if (!found.has(key)) found.set(key, root);
+    return found;
+  }
+  for (const value of Object.values(root)) {
+    if (value && typeof value === 'object') collectRecipeNodes(value, depth + 1, found);
+  }
+  return found;
 }
 
 /**
@@ -80,14 +119,17 @@ export function humanizeDuration(raw) {
   // form asserting confidence 1 and replicated into the .beanpod.
   const n = (v) => (v === '' ? 0 : Number.parseInt(v, 10));
   const [dn, hn, mn, sn] = [n(d), n(h), n(mi), n(sec)];
-  if (!dn && !hn && !mn && !sn) return s;
+  // ALL ZERO = the author left the field blank (WP Recipe Maker emits a literal `PT0M`), so
+  // the honest answer is nothing at all. Returning `s` here put the raw `PT0M` into the form
+  // at confidence 1 and then into the .beanpod — this branch was the one still doing it.
+  if (!dn && !hn && !mn && !sn) return '';
   const parts = [];
   if (dn) parts.push(`${dn} day${dn === 1 ? '' : 's'}`);
   if (hn) parts.push(`${hn} hour${hn === 1 ? '' : 's'}`);
   if (mn) parts.push(`${mn} min${mn === 1 ? '' : 's'}`);
   // Only show seconds when they are the whole story; "1 hour 30 mins 12 secs" is noise.
   if (sn && !dn && !hn && !mn) parts.push(`${sn} sec${sn === 1 ? '' : 's'}`);
-  return parts.join(' ') || s;
+  return parts.join(' ');
 }
 
 /**
@@ -191,7 +233,7 @@ export function extractRecipeFromHtml(html) {
   // Lambda timeout — a raw CORS-less 502 that bypasses the whole typed taxonomy, while
   // pinning one of only 5 concurrency slots. `dropTag` was rewritten for exactly this
   // reason; the rewrite reached one function and not the class.
-  const lower = html.toLowerCase();
+  const lower = asciiLower(html);
   let cursor = 0;
   for (;;) {
     const open = lower.indexOf('<script', cursor);
@@ -210,6 +252,15 @@ export function extractRecipeFromHtml(html) {
     try {
       parsed = JSON.parse(html.slice(openEnd + 1, bodyEnd).trim());
     } catch {
+      if (close === -1) return null;
+      continue;
+    }
+    // AMBIGUITY CHECK. A roundup page describes many dishes; picking one and stamping it
+    // confidence 1 would present a guess as exact. Fall through to the model instead, which
+    // at least marks what it inferred.
+    const candidates = collectRecipeNodes(parsed);
+    if (candidates.size > 1) {
+      console.warn(`[recipe-jsonld] ambiguous: ${candidates.size} recipes in one document`);
       if (close === -1) return null;
       continue;
     }

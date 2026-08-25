@@ -19,13 +19,40 @@
 
 const SLACK_WEBHOOK_URL = process.env.SLACK_ERROR_WEBHOOK_URL;
 
+/**
+ * The webhook is a BEARER CREDENTIAL — anyone holding it can post into #beanies-errors — so
+ * it must never reach a log line. It nearly did: `fetch('hooks.slack.com/…')` (a hand-typed
+ * value missing its scheme, which is the ordinary way to get this wrong) rejects with
+ * `TypeError: Failed to parse URL from hooks.slack.com/services/T000/B000/SECRET`. The
+ * message IS the URL, and the catch below logged `err.message`, so the first alarm would
+ * have written the whole credential into CloudWatch for the full retention period.
+ *
+ * Validating up front means a malformed value fails once, loudly, and says nothing secret.
+ */
+function webhookIsUsable(url) {
+  if (!url) return false;
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** Strip anything that looks like the webhook out of text headed for a log. */
+function redact(text) {
+  const s = String(text ?? '');
+  return SLACK_WEBHOOK_URL ? s.split(SLACK_WEBHOOK_URL).join('[redacted-webhook]') : s;
+}
+
 /** ALARM is bad news; OK is the recovery. Both are worth seeing — a silent recovery is
  *  how you end up not trusting the alarm next time. */
 const EMOJI = { ALARM: '🚨', OK: '✅', INSUFFICIENT_DATA: '❓' };
 
 function formatAlarm(msg) {
   const state = msg.NewStateValue || 'ALARM';
-  const emoji = EMOJI[state] ?? '⚠️';
+  // Object.hasOwn, not `EMOJI[state] ?? …`: a payload with NewStateValue "toString" would
+  // otherwise resolve up the prototype chain and render a function body into the alert.
+  const emoji = Object.hasOwn(EMOJI, state) ? EMOJI[state] : '⚠️';
   const name = msg.AlarmName || '(unnamed alarm)';
   const reason = msg.NewStateReason || '';
   const desc = msg.AlarmDescription || '';
@@ -38,8 +65,13 @@ function formatAlarm(msg) {
 }
 
 export async function handler(event) {
-  if (!SLACK_WEBHOOK_URL) {
-    console.error('[alarm-slack] SLACK_ERROR_WEBHOOK_URL unset — cannot forward alarm');
+  if (!webhookIsUsable(SLACK_WEBHOOK_URL)) {
+    // Deliberately says WHICH problem it is without echoing the value.
+    console.error(
+      SLACK_WEBHOOK_URL
+        ? '[alarm-slack] SLACK_ERROR_WEBHOOK_URL is not a valid https URL — cannot forward alarm'
+        : '[alarm-slack] SLACK_ERROR_WEBHOOK_URL unset — cannot forward alarm'
+    );
     return { ok: false };
   }
 
@@ -71,7 +103,8 @@ export async function handler(event) {
       }
     } catch (err) {
       // Swallowed on purpose — see the header. The log line is the record.
-      console.error('[alarm-slack] failed to post to slack:', err?.message ?? err);
+      // Redacted: a URL-parse failure puts the whole webhook in `err.message`.
+      console.error('[alarm-slack] failed to post to slack:', redact(err?.message ?? err));
     }
   }
 
