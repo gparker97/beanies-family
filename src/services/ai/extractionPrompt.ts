@@ -103,9 +103,28 @@ const UNTRUSTED_CLOSE = '<<<END_BEANIES_UNTRUSTED_SOURCE>>>';
  *      model-supplied string is ever followed as a URL without its own screen.
  * Prompt wording is a mitigation, not a control. Never move source text into `system`.
  */
+/**
+ * Remove every fence marker, to a FIXPOINT.
+ *
+ * A single `split(marker).join('')` pass is not enough: nesting defeats it, because deleting
+ * the inner marker splices the flanks back together into a live one. e.g.
+ * `'<<<END_BEANIES_UNTRUSTED_' + '<<<END_BEANIES_UNTRUSTED_SOURCE>>>' + 'SOURCE>>>'`
+ * contains exactly one literal marker; removing it reassembles a working closing fence, and
+ * everything after it reads as top-level instructions — the precise attack the fence exists
+ * to stop. Looping until the string stops changing cannot be reassembled around.
+ */
+function stripFenceMarkers(text: string): string {
+  let out = text;
+  for (;;) {
+    const next = out.split(UNTRUSTED_OPEN).join('').split(UNTRUSTED_CLOSE).join('');
+    if (next === out) return out;
+    out = next;
+  }
+}
+
 function buildUserMessage(instruction: string, source: ExtractionSource): ChatMessage {
   if (source.kind === 'text') {
-    const sanitized = source.text.split(UNTRUSTED_OPEN).join('').split(UNTRUSTED_CLOSE).join('');
+    const sanitized = stripFenceMarkers(source.text);
     return {
       role: 'user',
       content: [
@@ -418,13 +437,18 @@ export function buildRecipeExtractionMessages(
  * persisting an empty row.
  */
 function parseRecipeLine(raw: unknown): RecipeLine | null {
+  // MODEL_TEXT_MAX, not a short-scalar cap: a cooking step is free text and routinely runs
+  // past 400 chars (temperatures, timings and doneness cues in one instruction). Truncating
+  // it mid-word would be invisible — no ellipsis, no flag, no event — and the truncated
+  // text is what the user reviews, saves and cooks from. `notes`/`description` get the same
+  // allowance for the same reason.
   if (typeof raw === 'string') {
-    const text = asString(raw, MODEL_FIELD_MAX * 2).trim();
+    const text = asString(raw, MODEL_TEXT_MAX).trim();
     return text ? { text, inferred: false } : null;
   }
   if (typeof raw !== 'object' || raw === null) return null;
   const obj = raw as Record<string, unknown>;
-  const text = asString(obj.text, MODEL_FIELD_MAX * 2).trim();
+  const text = asString(obj.text, MODEL_TEXT_MAX).trim();
   return text ? { text, inferred: asBool(obj.inferred) } : null;
 }
 
@@ -549,6 +573,11 @@ function collectScalarFields(
     // Bound the FIELD COUNT too: `fields` is a free-form record keyed by whatever the model
     // returned, so an unbounded loop lets a hostile document choose how many keys we store.
     if (Object.keys(target).length >= MODEL_LIST_MAX) break;
+    // Bound the KEY too. `travelExtractionToSegments` renders every unmapped key verbatim
+    // into `segment.notes`, so an unbounded model-chosen key reaches the Automerge doc and
+    // the .beanpod even though the VALUE is capped. Skip rather than truncate: a key long
+    // enough to trip this is not a real field name.
+    if (k.length > MODEL_FIELD_MAX) continue;
     if (typeof v === 'string') target[k] = asString(v, MODEL_TEXT_MAX);
     else if (typeof v === 'number') target[k] = String(v);
   }

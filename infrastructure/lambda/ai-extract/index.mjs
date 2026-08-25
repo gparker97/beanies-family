@@ -111,7 +111,13 @@ export async function handler(event) {
   // Task selects the prompt + required-keys. Default to 'event' so older clients (which
   // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
   const task = rawTask === undefined ? 'event' : rawTask;
-  const taskConfig = EXTRACTION_TASKS[task];
+  // Object.hasOwn, NOT a truthiness check: EXTRACTION_TASKS is a plain object literal, so
+  // `EXTRACTION_TASKS['constructor']` (or toString/valueOf/__proto__) resolves up the
+  // prototype chain to a truthy function whose `.sources` is undefined. That slipped past a
+  // `if (!taskConfig)` guard and then threw on the deref below — which sits BEFORE the
+  // handler's try/catch, so the caller got a raw API-Gateway 502 with no CORS headers
+  // instead of our classified error. Reachable by anyone: the x-api-key is in the bundle.
+  const taskConfig = Object.hasOwn(EXTRACTION_TASKS, task) ? EXTRACTION_TASKS[task] : undefined;
   if (!taskConfig) {
     return response(400, { error: `Unknown task: ${String(task)}` }, event);
   }

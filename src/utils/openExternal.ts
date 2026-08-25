@@ -19,6 +19,8 @@
  * caller's click handler) so the click isn't treated as programmatic and
  * blocked by the popup blocker.
  */
+import { safeExternalHref } from '@/utils/url';
+
 export function openExternal(url: string): void {
   if (typeof document === 'undefined') return;
   // Guard against an empty/unresolved href — an empty anchor href navigates to
@@ -28,8 +30,22 @@ export function openExternal(url: string): void {
     console.error('[openExternal] called with an empty url — link will no-op');
     return;
   }
+  // SECURITY: screen the scheme HERE, not only at every :href binding. This helper has the
+  // same semantics as an anchor — a `javascript://%0aalert(1)` value executes in our origin
+  // — and it is what the next developer will reach for when rendering something like
+  // `Recipe.sourceUrl`. Screening the shared helper closes the class, not the instances.
+  const href = safeExternalHref(url);
+  if (!href) {
+    console.error(
+      '[openExternal] refused a url whose scheme is not http(s) — nothing was opened. ' +
+        'Only https:/http: are navigable; javascript:, data:, vbscript: and file: are blocked. ' +
+        'If this is a legitimate link, it is malformed; if it came from a model or a web page, ' +
+        'this refusal is the guard working.'
+    );
+    return;
+  }
   const a = document.createElement('a');
-  a.href = url;
+  a.href = href;
   a.target = '_blank';
   a.rel = 'noopener noreferrer';
   // Some engines only treat the synthetic click as a real navigation when the

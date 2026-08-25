@@ -167,6 +167,12 @@ function patch(fields: Partial<VacationIdea>) {
           >
             🔗 {{ idea.linkPreview?.siteName || idea.linkPreview?.title || 'link' }}
           </a>
+          <!-- Rejected link: keep the value visible rather than dropping the pill silently. -->
+          <span
+            v-else-if="idea.link"
+            class="inline-flex items-center gap-0.5 rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.5625rem] font-semibold opacity-70"
+            >🔗 {{ idea.link }}</span
+          >
           <span
             v-if="author"
             class="inline-flex items-center gap-1 text-[0.625rem] text-[var(--color-text-muted)]"

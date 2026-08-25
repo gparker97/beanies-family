@@ -63,7 +63,11 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
     // Per SOURCE KIND, not just per task — a text-shaped prompt that drifted between the
     // copies would otherwise be invisible, which is exactly how the second builder this
     // design replaced would have escaped the guard.
-    for (const kind of (spike.EXTRACTION_TASKS as Record<string, TaskEntry>)[task].sources) {
+    // Deliberately ALL kinds, not just `entry.sources`. Every task declares only ['images']
+    // today, so keying off `sources` would never run the text fixture — leaving the shared,
+    // hand-mirrored `buildUserMessage` text branch (and its injection sanitizer) with ZERO
+    // cross-copy coverage. That is exactly how a fence bypass reached three copies unnoticed.
+    for (const kind of Object.keys(SOURCE_FIXTURES)) {
       it(`task "${task}" / source "${kind}": built messages match across all three`, () => {
         const fixture = SOURCE_FIXTURES[kind];
         const expected = tasks(spike.EXTRACTION_TASKS, task).buildMessages(fixture, todayIso);
