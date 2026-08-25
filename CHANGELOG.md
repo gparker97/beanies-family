@@ -8,6 +8,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-26
+
+### Fixed
+
+- **Overnight flights now record the right arrival date.** "Arrives next day" was silently doing nothing for anyone outside the Americas, so the arrival showed on the departure day — and the night you were in the air was reported as a missing hotel booking.
+- **A stay with no check-out date is no longer shown as finished.** An open-ended booking appeared greyed out with a "done" tick from the day after check-in, even while you were still there.
+- **Typing two trip ideas quickly no longer loses the first.** The second one overwrote it, and the box cleared either way so it looked saved.
+- **Filing a document against a past trip no longer creates a duplicate trip.** Past trips weren't offered as somewhere to file to, so the app made a second copy instead.
+- Two rooms booked at the same hotel for the same night are now kept as two bookings. The second one used to absorb the first and one confirmation number was lost.
+- Bookings on the same day are now listed in time order — the airport transfer no longer appears below the hotel it takes you to.
+- A coach or bus booking now sets the trip's dates, instead of leaving the trip dateless and putting it on today's calendar.
+- Two different people with the same first name on one booking are no longer both matched to the same family member.
+- A recipe or travel document naming nobody no longer leaves every booking assigned to nobody permanently.
+- Trip dates now extend correctly for bookings whose date came back with a time attached — previously the trip silently refused to grow and kept warning that the booking was outside it.
+- Editing a recipe or trip field no longer overwrites a change someone else made to a different field at the same time.
+
+### Changed
+
+- **Trip cards, bookings and forms are now reachable with a keyboard**, and every form field announces its own name to a screen reader. Previously the trip cards could only be opened with a mouse, which put the whole travel section out of reach.
+- Bookings with no date yet now show their documents, links and booking references like any other booking — they were quietly missing those.
+- Family members with view-only access can no longer rename or delete trips and bookings.
+- Trip cards render faster on families with many trips.
+
 ## 2026-08-25
 
 ### Added
