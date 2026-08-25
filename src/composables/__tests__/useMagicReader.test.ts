@@ -95,13 +95,28 @@ describe('useMagicReader — gating', () => {
     expect(r.canReadAny.value).toBe(true);
   });
 
-  it('canReadAny is false when both flags are off', () => {
+  // BEHAVIOUR CHANGE (#72): this used to assert canReadAny === false with both flags off.
+  // The recipe reader ships UNGATED by explicit decision, so it has no flag to turn off and
+  // canReadAny now tracks PERMISSION once the flagged readers are dark. Consequence worth
+  // knowing: clearing both AI flags is no longer a kill switch for the whole magic card —
+  // the recipe chip still shows. Killing recipe capture means removing it, not unflagging it.
+  it('with both flags off, the flagged readers are dark but the ungated recipe reader remains', () => {
     h.canEdit.value = true;
     h.flags.aiPhotoExtract = false;
     h.flags.aiTravelExtract = false;
     const r = useMagicReader();
     expect(r.canReadPhoto.value).toBe(false);
     expect(r.canReadDocument.value).toBe(false);
+    expect(r.canReadRecipe.value).toBe(true);
+    expect(r.canReadAny.value).toBe(true);
+  });
+
+  it('every reader — including the ungated recipe one — still requires edit permission', () => {
+    h.canEdit.value = false;
+    h.flags.aiPhotoExtract = true;
+    h.flags.aiTravelExtract = true;
+    const r = useMagicReader();
+    expect(r.canReadRecipe.value).toBe(false);
     expect(r.canReadAny.value).toBe(false);
   });
 });

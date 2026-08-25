@@ -28,6 +28,7 @@ import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { usePhotoStore } from '@/stores/photoStore';
 import type { Recipe, UUID } from '@/types/models';
+import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
 
 const props = withDefaults(
   defineProps<{
@@ -35,8 +36,15 @@ const props = withDefaults(
     recipe?: Recipe | null;
     /** Stack above another open drawer/modal (e.g. opened from the meal editor). */
     layer?: 'base' | 'overlay';
+    /**
+     * Seed values from the AI recipe reader (#72). One prop, not three — it always
+     * travels as a unit. Applied inside `useFormModal`'s `onNew`, never a second watcher
+     * (see applyPrefill). Nothing is persisted until the user presses Save; this form IS
+     * the review step.
+     */
+    prefill?: RecipePrefill | null;
   }>(),
-  { recipe: null, layer: 'base' }
+  { recipe: null, layer: 'base', prefill: null }
 );
 
 const emit = defineEmits<{
@@ -57,10 +65,37 @@ const familyStore = useFamilyStore();
 const name = ref('');
 const subtitle = ref('');
 const prepTime = ref('');
+const cookTime = ref('');
 const servings = ref('');
 const ingredientsText = ref('');
 const stepsText = ref('');
 const notes = ref('');
+
+const sourceUrl = ref('');
+
+/**
+ * Seed the form from an AI prefill, or clear it when there is none. Passing `null` is the
+ * blank-new-recipe case, so there is exactly one place that resets these refs.
+ */
+function applyPrefill(prefill: RecipePrefill | null): void {
+  const f = prefill?.fields;
+  name.value = f?.name ?? '';
+  subtitle.value = f?.subtitle ?? '';
+  prepTime.value = f?.prepTime ?? '';
+  cookTime.value = f?.cookTime ?? '';
+  servings.value = f?.servings ?? '';
+  ingredientsText.value = (f?.ingredients ?? []).join('\n');
+  stepsText.value = (f?.steps ?? []).join('\n');
+  notes.value = f?.notes ?? '';
+  sourceUrl.value = f?.sourceUrl ?? '';
+}
+
+/**
+ * Which lines the reader filled in itself. Derived from the PROP, never a `wasPrefilled`
+ * ref — a ref would need clearing on close and would eventually be missed on one path.
+ */
+const inferredIngredients = computed(() => props.prefill?.inferredIngredients ?? []);
+const inferredSteps = computed(() => props.prefill?.inferredSteps ?? []);
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.recipe,
@@ -70,20 +105,18 @@ const { isEditing, isSubmitting } = useFormModal(
       name.value = r.name;
       subtitle.value = r.subtitle ?? '';
       prepTime.value = r.prepTime ?? '';
+      cookTime.value = r.cookTime ?? '';
       servings.value = r.servings ?? '';
       ingredientsText.value = (r.ingredients ?? []).join('\n');
       stepsText.value = (r.steps ?? []).join('\n');
       notes.value = r.notes ?? '';
+      sourceUrl.value = r.sourceUrl ?? '';
     },
-    onNew: () => {
-      name.value = '';
-      subtitle.value = '';
-      prepTime.value = '';
-      servings.value = '';
-      ingredientsText.value = '';
-      stepsText.value = '';
-      notes.value = '';
-    },
+    // ONE reset path. A separate `watch(() => props.prefill)` would RACE this callback
+    // (useFormModal fires it when `open` flips), and the resulting "sometimes the form
+    // opens blank" bug is order-dependent and miserable to reproduce. applyPrefill(null)
+    // IS the blank reset.
+    onNew: () => applyPrefill(props.prefill),
   }
 );
 
@@ -105,7 +138,9 @@ function buildPayload() {
     name: name.value.trim(),
     ...(subtitle.value.trim() ? { subtitle: subtitle.value.trim() } : {}),
     ...(prepTime.value.trim() ? { prepTime: prepTime.value.trim() } : {}),
+    ...(cookTime.value.trim() ? { cookTime: cookTime.value.trim() } : {}),
     ...(servings.value.trim() ? { servings: servings.value.trim() } : {}),
+    ...(sourceUrl.value.trim() ? { sourceUrl: sourceUrl.value.trim() } : {}),
     ingredients: splitLines(ingredientsText.value),
     steps: splitLines(stepsText.value),
     ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
@@ -204,6 +239,15 @@ async function handleDelete(): Promise<void> {
 }
 
 const currentMemberId = computed(() => familyStore.currentMember?.id);
+
+/**
+ * Shared class for the two list textareas (ingredients / steps), hoisted so the inferred
+ * hints attach consistently. NOT migrated to BaseTextarea in this change: its styling
+ * differs deliberately (notes is font-caveat/text-lg, the lists are leading-relaxed), so a
+ * swap is a visual change needing design sign-off. One place for a future migration.
+ */
+const LIST_TEXTAREA_CLASS =
+  'focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100';
 </script>
 
 <template>
@@ -230,9 +274,12 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
         <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('recipes.field.cookTime')" optional>
+        <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
       </FormFieldGroup>
       <FormFieldGroup :label="t('recipes.field.servings')" optional>
         <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
@@ -243,18 +290,26 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <textarea
         v-model="ingredientsText"
         rows="6"
-        class="focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        :class="LIST_TEXTAREA_CLASS"
         :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
       />
+      <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
+           error. Same idiom as ActivityModal's low-confidence hint. -->
+      <p v-if="inferredIngredients.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+        {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
+      </p>
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('recipes.field.steps')" optional>
       <textarea
         v-model="stepsText"
         rows="6"
-        class="focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        :class="LIST_TEXTAREA_CLASS"
         :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
       />
+      <p v-if="inferredSteps.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+        {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
+      </p>
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('recipes.field.notes')" optional>

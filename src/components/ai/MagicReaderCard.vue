@@ -12,8 +12,15 @@ import { useMagicReader } from '@/composables/useMagicReader';
 import BetaBadge from '@/components/ui/BetaBadge.vue';
 
 const { t } = useTranslation();
-const { canReadPhoto, canReadDocument, canReadAny, openPhotoReader, openDocumentReader } =
-  useMagicReader();
+const {
+  canReadPhoto,
+  canReadDocument,
+  canReadRecipe,
+  canReadAny,
+  openPhotoReader,
+  openDocumentReader,
+  openRecipeReader,
+} = useMagicReader();
 </script>
 
 <template>
@@ -28,7 +35,7 @@ const { canReadPhoto, canReadDocument, canReadAny, openPhotoReader, openDocument
     </h2>
     <p class="mt-1.5 text-xs leading-snug opacity-90">{{ t('ai.magic.subtitle') }}</p>
 
-    <div class="relative z-[1] mt-3 flex gap-2.5">
+    <div class="relative z-[1] mt-3 flex flex-wrap gap-2.5">
       <button
         v-if="canReadPhoto"
         type="button"
@@ -46,6 +53,15 @@ const { canReadPhoto, canReadDocument, canReadAny, openPhotoReader, openDocument
       >
         <span aria-hidden="true">✈️</span>
         <span class="truncate">{{ t('ai.magic.travelBooking') }}</span>
+      </button>
+      <button
+        v-if="canReadRecipe"
+        type="button"
+        class="font-outfit text-primary-600 inline-flex h-[42px] min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-sm font-bold whitespace-nowrap shadow-[0_3px_8px_-3px_rgba(44,62,80,0.28)] transition-transform hover:scale-[1.02]"
+        @click="openRecipeReader"
+      >
+        <span aria-hidden="true">🍳</span>
+        <span class="truncate">{{ t('recipeExtract.chip.title') }}</span>
       </button>
     </div>
   </section>

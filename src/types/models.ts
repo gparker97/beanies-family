@@ -1425,6 +1425,19 @@ export interface Recipe {
   name: string;
   subtitle?: string;
   prepTime?: string;
+  /**
+   * Cooking time, separate from `prepTime` (#72). Additive and optional, so every existing
+   * recipe and call site is untouched. schema.org/Recipe distinguishes prepTime from
+   * cookTime, and folding them would silently discard one when a recipe is captured.
+   */
+  cookTime?: string;
+  /**
+   * Where this recipe came from, when it was captured from the web (#72). Mirrors
+   * `FamilyActivity.link`. Document-sourced recipes have none — their provenance is the
+   * attached source photo. ALWAYS render via `safeExternalHref`/`safeHttpsUrl`; never bind
+   * it to an href raw.
+   */
+  sourceUrl?: string;
   servings?: string;
   ingredients: string[];
   steps: string[];
