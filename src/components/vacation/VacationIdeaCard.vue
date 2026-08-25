@@ -170,7 +170,7 @@ function patch(fields: Partial<VacationIdea>) {
           <!-- Rejected link: keep the value visible rather than dropping the pill silently. -->
           <span
             v-else-if="idea.link"
-            class="inline-flex items-center gap-0.5 rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.5625rem] font-semibold opacity-70"
+            class="inline-flex items-center gap-0.5 rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold opacity-70"
             >🔗 {{ idea.link }}</span
           >
           <span

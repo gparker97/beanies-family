@@ -72,6 +72,10 @@ export function routeUrl(raw: string): RecipeUrlRoute {
   } catch {
     return { kind: 'invalid' };
   }
+  // A hostname with no dot is not a public site — `hello` would otherwise be normalized to
+  // `https://hello` and sent to the fetcher, which can only ever fail. Refusing here gives
+  // the user "that needs to be a web address" instead of a confusing network error.
+  if (!url.hostname.includes('.')) return { kind: 'invalid' };
   if (YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) {
     const videoId = parseYoutubeVideoId(url);
     // A YouTube URL with no readable video id (a channel or playlist page) is not

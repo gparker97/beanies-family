@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recipeExtractionToPrefill } from '@/utils/recipeExtractionToRecipe';
+import { jsonLdToPrefill, recipeExtractionToPrefill } from '@/utils/recipeExtractionToRecipe';
 import type { RecipeExtractionResult } from '@/services/ai/types';
 
 function result(over: Partial<RecipeExtractionResult> = {}): RecipeExtractionResult {
@@ -81,10 +81,73 @@ describe('recipeExtractionToPrefill', () => {
       expect(recipeExtractionToPrefill(result({ imageUrl: bad }))!.dishImageUrl).toBeNull();
     });
 
-    it('keeps a plain https URL', () => {
-      expect(recipeExtractionToPrefill(result())!.dishImageUrl).toBe(
-        'https://example.com/cake.jpg'
-      );
+    it('keeps a plain https URL when it is on the SOURCE domain', () => {
+      // Behaviour change: scheme screening alone is no longer enough. Without a source page
+      // to bound it against, a model-supplied URL is dropped (see the same-domain suite
+      // below) — so this now asserts the bounded form.
+      expect(
+        recipeExtractionToPrefill(result(), 'https://example.com/recipes/cake')!.dishImageUrl
+      ).toBe('https://example.com/cake.jpg');
     });
+  });
+});
+
+describe('dish image is bounded to the SOURCE DOMAIN (found by /code-review max)', () => {
+  // The type comment and the saved plan both claimed this control existed. It did not.
+  // Without it a hostile recipe page names any host as its og:image and we fetch it
+  // server-side: a per-victim ping from our AWS egress, and up to 1.5MB of attacker-chosen
+  // bytes written into the family's Drive as their dish photo. No prompt injection needed —
+  // the page's own og:image is copied straight through.
+  const SRC = 'https://nanabakes.example/recipes/lemon';
+
+  it('keeps an image on the same registrable domain, including subdomains', () => {
+    for (const img of [
+      'https://nanabakes.example/img/cake.jpg',
+      'https://cdn.nanabakes.example/img/cake.jpg',
+      'https://images.nanabakes.example/cake.jpg',
+    ]) {
+      expect(recipeExtractionToPrefill(result({ imageUrl: img }), SRC)!.dishImageUrl).toBe(img);
+    }
+  });
+
+  it('DROPS an image on any other domain', () => {
+    for (const img of [
+      'https://attacker.example/beacon.png',
+      'https://nanabakes.example.evil.test/cake.jpg',
+      'https://evil.test/cake.jpg',
+    ]) {
+      expect(recipeExtractionToPrefill(result({ imageUrl: img }), SRC)!.dishImageUrl).toBeNull();
+    }
+  });
+
+  it('drops the image entirely when there is no source page to bound it against', () => {
+    // A photo/PDF capture has no page, so a model-suggested URL is unbounded by definition.
+    expect(recipeExtractionToPrefill(result())!.dishImageUrl).toBeNull();
+  });
+});
+
+describe('jsonLdToPrefill applies the same bound', () => {
+  const RECIPE = {
+    name: 'Lemon Drizzle',
+    subtitle: '',
+    prepTime: '20 mins',
+    cookTime: '45 mins',
+    servings: 'Serves 8',
+    ingredients: ['225g butter'],
+    steps: ['Bake.'],
+    imageUrl: 'https://attacker.example/beacon.png',
+  };
+
+  it('drops a cross-domain image even from the page own JSON-LD', () => {
+    // A page's own markup is no more trustworthy than a model's suggestion — both are
+    // attacker-authored when the page is hostile.
+    const p = jsonLdToPrefill(RECIPE, 'https://nanabakes.example/r');
+    expect(p.dishImageUrl).toBeNull();
+  });
+
+  it('keeps a same-domain image', () => {
+    const img = 'https://cdn.nanabakes.example/cake.jpg';
+    const p = jsonLdToPrefill({ ...RECIPE, imageUrl: img }, 'https://nanabakes.example/r');
+    expect(p.dishImageUrl).toBe(img);
   });
 });

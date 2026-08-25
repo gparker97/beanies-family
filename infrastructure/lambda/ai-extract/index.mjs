@@ -236,6 +236,16 @@ export async function handler(event) {
       );
     }
 
+    // `k in result` throws on null/primitives, and JSON.parse('null') is legal — an
+    // unclassified TypeError here would escape as a raw 500 instead of model_shape.
+    if (typeof result !== 'object' || result === null) {
+      console.error('[ai-extract] model returned a non-object');
+      return response(
+        502,
+        { error: 'Model returned wrong-shape output', code: 'model_shape' },
+        event
+      );
+    }
     const missing = taskConfig.requiredKeys.filter((k) => !(k in result));
     if (missing.length) {
       console.error(`[ai-extract] model output missing keys: ${missing.join(',')}`);

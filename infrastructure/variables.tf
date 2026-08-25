@@ -64,6 +64,12 @@ variable "site_verification_txt_records" {
   default     = []
 }
 
+variable "alert_email" {
+  description = "Address notified when a content-fetch abuse/throttle alarm fires. Optional — empty creates the topic with no subscription, so alarms still function and can be subscribed later."
+  type        = string
+  default     = ""
+}
+
 variable "content_fetch_api_key" {
   description = "Soft API key the client sends to the content-fetch proxy (x-api-key). Ships in the public bundle so it is not a true secret; set TF_VAR_content_fetch_api_key, and mirror it to the CONTENT_FETCH_API_KEY GitHub secret or the deployed client starts getting 401s."
   type        = string

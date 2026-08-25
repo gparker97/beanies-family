@@ -26,6 +26,7 @@ import {
   extractRecipeFromText,
 } from '@/services/ai/documentExtractionService';
 import { resolveRecipeSource, type ExtractionPath } from '@/services/ai/recipeSourceResolver';
+import { routeUrl } from '@/utils/recipeSourceUrl';
 import { assertNever } from '@/utils/assertNever';
 import { safeHttpsUrl } from '@/utils/url';
 import {
@@ -92,6 +93,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       showToast('info', t('ai.offline.title'), t('ai.offline.message'));
       return;
     }
+
+    // Same reasoning as processUrl: drop anything held from a previous capture first.
+    discardPendingSource();
 
     isProcessing.value = true;
     logEvent({
@@ -184,16 +188,25 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       return;
     }
 
+    // The route is known BEFORE any network call. Both branches of the old ternary were
+    // 'page', so `handOver`'s 'youtube' kind was unreachable and CloudWatch could not tell a
+    // video capture from a page one. And `start` must be logged BEFORE the await, or a
+    // failure has no denominator — you cannot compute a rate from outcomes alone.
+    const kind = routeUrl(rawUrl).kind === 'youtube' ? 'youtube' : 'page';
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'capture started',
+      context: { action: 'start', kind },
+    });
+
+    // Clear every held artefact before starting. Without this a previous capture's source
+    // file or dish photo survives and is attached to whatever the user saves next.
+    discardPendingSource();
+
     isProcessing.value = true;
     try {
       const resolved = await resolveRecipeSource(rawUrl);
-      const kind = resolved.kind === 'refusal' || resolved.kind === 'failed' ? 'page' : 'page';
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'capture started',
-        context: { action: 'start', kind },
-      });
 
       switch (resolved.kind) {
         case 'jsonld': {
@@ -201,7 +214,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           // structured data, so nothing can be hallucinated and nothing is inferred.
           const prefill = jsonLdToPrefill(resolved.recipe, resolved.sourceUrl);
           pendingDishImageUrl.value = safeHttpsUrl(resolved.imageUrl);
-          handOver(prefill, 'page', resolved.path, null);
+          handOver(prefill, kind, resolved.path, null);
           return;
         }
         case 'text': {
@@ -215,18 +228,18 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
               level: 'error',
               surface: SURFACE,
               message: 'extraction failed',
-              context: { action: 'failed', kind: 'page', error_code: result.errorCode },
+              context: { action: 'failed', kind, error_code: result.errorCode },
             });
             reportExtractionFailure(result.errorCode);
             return;
           }
-          const prefill = recipeExtractionToPrefill(result.data);
+          const prefill = recipeExtractionToPrefill(result.data, resolved.sourceUrl);
           if (!prefill) {
             logEvent({
               level: 'info',
               surface: SURFACE,
               message: 'source was not a recipe',
-              context: { action: 'not_recipe', kind: 'page', extraction_path: resolved.path },
+              context: { action: 'not_recipe', kind, extraction_path: resolved.path },
             });
             showToast(
               'info',
@@ -237,7 +250,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           }
           prefill.fields.sourceUrl = resolved.sourceUrl;
           pendingDishImageUrl.value = prefill.dishImageUrl ?? safeHttpsUrl(resolved.imageUrl);
-          handOver(prefill, 'page', resolved.path, null);
+          handOver(prefill, kind, resolved.path, null);
           return;
         }
         case 'refusal': {
@@ -245,7 +258,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             level: 'warn',
             surface: SURFACE,
             message: 'refused to guess a recipe',
-            context: { action: 'refused', kind: 'page', error_code: resolved.reason },
+            context: { action: 'refused', kind, error_code: resolved.reason },
           });
           const isVideo = resolved.reason === 'no_transcript_no_link';
           showToast(
@@ -260,7 +273,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             level: 'error',
             surface: SURFACE,
             message: 'content fetch failed',
-            context: { action: 'failed', kind: 'page', error_code: resolved.errorCode },
+            context: { action: 'failed', kind, error_code: resolved.errorCode },
           });
           reportExtractionFailure(resolved.errorCode);
           return;

@@ -54,22 +54,26 @@ export function findRecipeNode(root, depth = 0) {
 export function humanizeDuration(raw) {
   const s = text(raw);
   if (!s) return '';
-  // Matched in parts rather than one nested-optional pattern: the combined regex nests
-  // quantifiers inside an optional group, which is a ReDoS shape the linter rightly flags.
-  if (!/^P[0-9DTHMS.]*$/i.test(s) || s.length < 3) return s;
-  const grab = (unit) => {
-    const m = new RegExp(`([0-9]+)${unit}`, 'i').exec(s);
-    return m ? m[1] : '';
-  };
-  const timePart = s.includes('T') || s.includes('t') ? s.slice(s.search(/t/i)) : '';
-  const d = grab('D');
-  const h = timePart ? (/([0-9]+)h/i.exec(timePart)?.[1] ?? '') : '';
-  const mi = timePart ? (/([0-9]+)m/i.exec(timePart)?.[1] ?? '') : '';
-  if (!d && !h && !mi) return s;
+  // Matched in parts with STATIC regexes: one combined pattern nests quantifiers inside an
+  // optional group (a ReDoS shape), and a `new RegExp(interpolated)` trips the security lint
+  // that gates CI. Static literals avoid both.
+  if (!/^P[0-9DTHMS.,]*$/i.test(s) || s.length < 3) return s;
+  const tIdx = s.search(/t/i);
+  const datePart = tIdx === -1 ? s : s.slice(0, tIdx);
+  const timePart = tIdx === -1 ? '' : s.slice(tIdx);
+  const d = /([0-9]+)d/i.exec(datePart)?.[1] ?? '';
+  const h = /([0-9]+)h/i.exec(timePart)?.[1] ?? '';
+  const mi = /([0-9]+)m/i.exec(timePart)?.[1] ?? '';
+  // Seconds matter: without this, `PT10S` and `PT1M30S` render the RAW ISO string into the
+  // form and then into the Automerge doc — precisely what this function exists to prevent.
+  const sec = /([0-9]+)s/i.exec(timePart)?.[1] ?? '';
+  if (!d && !h && !mi && !sec) return s;
   const parts = [];
   if (d) parts.push(`${d} day${d === '1' ? '' : 's'}`);
   if (h) parts.push(`${h} hour${h === '1' ? '' : 's'}`);
   if (mi) parts.push(`${mi} min${mi === '1' ? '' : 's'}`);
+  // Only show seconds when they are the whole story; "1 hour 30 mins 12 secs" is noise.
+  if (sec && !d && !h && !mi) parts.push(`${sec} sec${sec === '1' ? '' : 's'}`);
   return parts.join(' ') || s;
 }
 
@@ -135,17 +139,29 @@ export function normalizeRecipeNode(node) {
     .filter(Boolean)
     .slice(0, MAX_ITEMS);
   const name = text(node.name);
-  if (!name && ingredients.length === 0 && steps.length === 0) return null;
+  // A node needs a NAME **and** something to cook — not merely one non-empty field. A stub
+  // `{"@type":"Recipe","name":"Lemon Drizzle Cake","image":"…"}` is common on roundup and
+  // category pages and on mis-configured Yoast/WPRM graphs. Accepting it short-circuits the
+  // page-text fallback, so the model never sees the page that DOES hold the recipe — and the
+  // client cannot rescue it, because jsonLdToPrefill hard-codes confidence 1. The user would
+  // get an empty form asserting full confidence.
+  if (!name || (ingredients.length === 0 && steps.length === 0)) return null;
 
   return {
     name,
     subtitle: text(node.description),
     prepTime: humanizeDuration(node.prepTime),
-    cookTime: humanizeDuration(node.cookTime ?? node.totalTime),
+    // `||`, not `??`: the common bad value here is an EMPTY STRING, not null. A site
+    // emitting `"cookTime": ""` would otherwise suppress the totalTime fallback entirely
+    // and the recipe would lose its time.
+    cookTime: humanizeDuration(node.cookTime || node.totalTime),
     servings: pickYield(node.recipeYield),
     ingredients,
     steps,
-    imageUrl: text(firstImageUrl(node.image), MAX_LINE),
+    // Capped at the URL screen's own limit — MAX_LINE (4000) would pass through something
+    // both safeHttpsUrl and screenUrl reject at 2000, which reads as "the image was
+    // unreachable" rather than "we sent something too long to be a URL".
+    imageUrl: text(firstImageUrl(node.image), 2000),
   };
 }
 

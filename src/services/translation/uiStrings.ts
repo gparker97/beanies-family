@@ -8120,10 +8120,6 @@ const STRING_DEFS = {
     beanie: 'read a recipe from a photo or pdf',
   },
   'recipeExtract.chip.title': { en: 'Recipe', beanie: 'recipe' },
-  'recipeExtract.chip.subtitle': {
-    en: 'Snap a recipe, beanies will write it up',
-    beanie: 'snap a recipe, beanies will write it up',
-  },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
   'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },
   'ai.magic.subtitle': {

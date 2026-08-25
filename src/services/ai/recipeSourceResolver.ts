@@ -49,13 +49,15 @@ export interface ResolverDeps {
 }
 
 /**
- * Hard cap on outbound calls per capture: watch page + one followed link + one image.
+ * Hard cap on outbound calls made by THE RESOLVER: at most a watch page plus one followed
+ * link. The dish-image fetch is deliberately NOT counted here — it happens later, in
+ * `attachAfterSave`, after the user has chosen to save.
  *
- * Enforced by a counter rather than by convention, because "the ladder only makes three
- * calls" is a property of the code's shape today, not a guarantee — and this endpoint is a
- * semi-open proxy whose cost we are deliberately bounding.
+ * Set to exactly what the ladder needs rather than a comfortable margin: a budget that can
+ * never be reached is decoration, not a control, and would quietly stop bounding anything
+ * the moment a fifth rung was added.
  */
-const MAX_FETCHES_PER_CAPTURE = 3;
+const MAX_FETCHES_PER_CAPTURE = 2;
 
 function createFetchBudget(max: number = MAX_FETCHES_PER_CAPTURE): { take: () => boolean } {
   let used = 0;

@@ -112,6 +112,12 @@ function openAdd(): void {
   // useFormModal runs onNew on the open TRANSITION only, so the prefill would never apply
   // and the held source would attach to whatever the user typed instead.
   if (capture.isProcessing.value) return;
+  // `isProcessing` is only true once a file is actually being read — it is FALSE for the
+  // whole window between tapping 🍳 and choosing a file. Opening the blank form in that
+  // window and then letting the extraction finish would leave the prefill undelivered
+  // (useFormModal's watch does not fire on true→true) AND attach the extracted document to
+  // whatever the user typed instead. Dropping the held source is what makes that safe.
+  capture.discardPendingSource();
   editing.value = null;
   prefill.value = null;
   modalOpen.value = true;

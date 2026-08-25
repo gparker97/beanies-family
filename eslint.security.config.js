@@ -79,6 +79,11 @@ export default [
       '.github/**',
       '**/*.test.ts',
       '**/*.test.js',
+      // .mjs was missing: the Lambda suites are ESM, so this config had never scanned a
+      // lambda test file until #72 added one. Test files legitimately read fixture paths
+      // built from variables (detect-non-literal-fs-filename), which is not a finding here.
+      '**/*.test.mjs',
+      '**/*.spec.mjs',
       '**/*.spec.ts',
       '**/*.spec.js',
     ],

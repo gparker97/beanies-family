@@ -111,7 +111,11 @@ describe('SSRF: the guard is the only way out', () => {
         }
         if (!entry.endsWith('.mjs') || entry === 'guardedFetch.mjs') continue;
         const src = readFileSync(full, 'utf8');
-        if (/(^|[^.\w])fetch\s*\(/.test(src.replace(/guardedFetch\s*\(/g, ''))) {
+        // Strip the sanctioned call first, then look for ANY remaining fetch — including
+        // `globalThis.fetch(` and `global.fetch(`, which the old `[^.\w]` guard let through
+        // and which are the most natural way to bypass the very file this test protects.
+        const stripped = src.replace(/guardedFetch\s*\(/g, '');
+        if (/\bfetch\s*\(/.test(stripped)) {
           offenders.push(entry);
         }
       }
@@ -425,5 +429,42 @@ describe('guardedFetch against a REAL socket', () => {
     const r = await guardedFetch('https://example.com/', { maxBytes: 100 });
     assert.equal(r.ok, false);
     assert.equal(r.code, 'too_large');
+  });
+});
+
+describe('readCapped error handling (found by /code-review max)', () => {
+  // The bug: `stream = res.pipe(createGunzip())` with an 'error' listener bound ONLY to the
+  // gunzip. .pipe() does not forward source errors, and skips forwarding once the
+  // destination has its own listener — so a mid-body reset emitted 'error' on an emitter
+  // with zero listeners. That is an UNCAUGHT exception: it kills the whole Lambda
+  // invocation and returns a CORS-less 502 outside the entire typed taxonomy. Since
+  // 'Accept-Encoding: gzip, br' is always sent, nearly every real page took that path.
+  test('a source error during a gzip body does not throw uncaught', async () => {
+    const { Readable } = await import('node:stream');
+    const { createGunzip } = await import('node:zlib');
+
+    let uncaught = null;
+    const onUncaught = (e) => {
+      uncaught = e;
+    };
+    process.once('uncaughtException', onUncaught);
+
+    // Reproduce the exact shape: source → gunzip, error bound on BOTH (the fix).
+    const src = new Readable({ read() {} });
+    const gunzip = src.pipe(createGunzip());
+    let settled = false;
+    src.on('error', () => {
+      settled = true;
+    });
+    gunzip.on('error', () => {
+      settled = true;
+    });
+    src.destroy(new Error('aborted'));
+
+    await new Promise((r) => setTimeout(r, 50));
+    process.removeListener('uncaughtException', onUncaught);
+
+    assert.equal(uncaught, null, 'a source error must not escape as an uncaught exception');
+    assert.equal(settled, true, 'the error must be observed by a listener');
   });
 });

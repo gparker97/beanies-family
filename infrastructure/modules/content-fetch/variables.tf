@@ -58,3 +58,9 @@ variable "cors_origins" {
     "http://localhost:4173",          # Vite preview server
   ]
 }
+
+variable "alert_email" {
+  description = "Address to notify when a content-fetch alarm fires. Empty = create the SNS topic but no subscription, so alarms still work and can be subscribed later without a code change. AWS sends a confirmation email on first create; the subscription delivers nothing until it is clicked."
+  type        = string
+  default     = ""
+}

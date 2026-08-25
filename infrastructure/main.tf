@@ -147,6 +147,7 @@ module "content_fetch" {
   api_gateway_execution_arn = module.registry.api_gateway_execution_arn
   api_domain_name           = module.registry.api_domain_name
   content_fetch_api_key     = var.content_fetch_api_key
+  alert_email               = var.alert_email
 }
 
 module "ai_extract" {

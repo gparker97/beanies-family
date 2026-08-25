@@ -29,6 +29,8 @@ interface ImportMetaEnv {
   readonly VITE_AI_EXTRACT_URL: string | undefined;
   /** Soft API key sent to the AI extraction proxy (#133). Mirrors VITE_REGISTRY_API_KEY. */
   readonly VITE_AI_EXTRACT_API_KEY: string | undefined;
+  readonly VITE_CONTENT_FETCH_URL?: string;
+  readonly VITE_CONTENT_FETCH_API_KEY?: string;
   /** Set automatically by Vite at build time (CI). Not user-configurable. */
   readonly VITE_BUILD_SHA: string | undefined;
   /** ISO build timestamp, set by Vite at build time. Not user-configurable. */

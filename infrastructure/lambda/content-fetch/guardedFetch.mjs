@@ -1,3 +1,4 @@
+/* global Buffer */
 /**
  * The ONLY outbound request in the content-fetch Lambda (#72).
  *
@@ -22,19 +23,62 @@
  * Given that, the realistic worst case of a total bypass is "fetch a public URL" — which is
  * already the accepted semi-open-proxy risk documented in the module header.
  */
-/* global Buffer */
 import { request as httpsRequest } from 'node:https';
 import { lookup as dnsLookup } from 'node:dns';
 import { promisify } from 'node:util';
 import { createGunzip, createBrotliDecompress } from 'node:zlib';
+import { isIPv4, isIPv6 } from 'node:net';
 
 const lookupAll = promisify(dnsLookup);
 
 const MAX_REDIRECTS = 3;
 const MAX_URL_LENGTH = 2000;
+/**
+ * Wall-clock budget for a WHOLE fetch, redirects included.
+ *
+ * NOT a per-socket timeout. `https.request`'s `timeout` is an INACTIVITY timer that re-arms
+ * on every byte and on every redirect hop, so 4 hops × 8s = 32s worst case — more than
+ * double the Lambda's own 15s ceiling. A slowloris origin dripping one byte every 7s never
+ * trips an idle timer at all. When the Lambda dies mid-invocation the caller gets a raw
+ * gateway 502 with no CORS headers and no `code`, so the whole typed taxonomy is bypassed.
+ * A deadline computed once and spent down per hop is the only thing that actually bounds it.
+ */
+const DEFAULT_TOTAL_BUDGET_MS = 9000;
+/** Fail-CLOSED default. See the note on `maxBytes` in guardedFetch. */
+const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 
-/** Blocked IPv4 ranges, as [firstOctetTest, predicate] over the four octets. */
-function isBlockedIpv4(a, b) {
+/**
+ * Request headers.
+ *
+ * A plain "beanies.family recipe reader" User-Agent is refused with 403 by most large
+ * recipe sites (verified against allrecipes.com and seriouseats.com from AWS). Their bot
+ * protection reads the UA before anything else, so an honest one means the feature simply
+ * does not work on the sites people actually use.
+ *
+ * We therefore send a normal browser header set. This is a deliberate, documented choice,
+ * not an attempt to hide: we still identify beanies.family in the UA comment, we send no
+ * cookies or credentials, we fetch one page the USER explicitly asked for, and we store the
+ * result in their own private cookbook. What we do not do is claim to be something we are
+ * not while pretending otherwise in the code.
+ *
+ * Sites that block by IP range rather than UA will still refuse us, and that is correctly
+ * surfaced to the user as `site_refused` rather than hidden.
+ */
+const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+    'Chrome/126.0.0.0 Safari/537.36 beanies.family/1.0 (+https://beanies.family)',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-GB,en;q=0.9',
+  'Accept-Encoding': 'gzip, br',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+};
+
+/** Blocked IPv4 ranges, by first two octets. */
+function isBlockedIpv4Octets(a, b) {
   return (
     a === 0 || // 0.0.0.0/8 "this network"
     a === 10 || // RFC1918
@@ -49,31 +93,97 @@ function isBlockedIpv4(a, b) {
   );
 }
 
-/** True when an address must never be connected to. Handles IPv4, IPv6 and v4-in-v6. */
-export function isBlockedAddress(addr, family) {
-  if (typeof addr !== 'string' || addr.length === 0) return true;
-  if (family === 4) {
-    const o = addr.split('.').map(Number);
-    if (o.length !== 4 || o.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
-    return isBlockedIpv4(o[0], o[1]);
+/**
+ * Expand an IPv6 textual address to its 8 groups of 16 bits.
+ *
+ * String-matching IPv6 is a trap: `::1` and `0:0:0:0:0:0:0:1` are the SAME address, as are
+ * `::ffff:127.0.0.1` and `::ffff:7f00:1`. A screen that recognises only the compressed
+ * spellings depends on the resolver's text formatting rather than on the address value, and
+ * every other spelling walks straight through. Parsing to numbers removes the whole class.
+ *
+ * @returns {number[]|null} 8 groups, or null when unparseable.
+ */
+export function expandIpv6(addr) {
+  if (typeof addr !== 'string') return null;
+  let s = addr.trim().toLowerCase();
+  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
+  const zone = s.indexOf('%');
+  if (zone !== -1) s = s.slice(0, zone);
+
+  // A trailing dotted-quad (::ffff:127.0.0.1) becomes the last two groups.
+  let tailGroups = [];
+  const lastColon = s.lastIndexOf(':');
+  const tail = lastColon === -1 ? '' : s.slice(lastColon + 1);
+  if (tail.includes('.')) {
+    if (!isIPv4(tail)) return null;
+    const o = tail.split('.').map(Number);
+    tailGroups = [(o[0] << 8) | o[1], (o[2] << 8) | o[3]];
+    s = s.slice(0, lastColon + 1) + '0:0';
   }
-  const lower = addr.toLowerCase();
-  // IPv4-mapped / -compatible (::ffff:169.254.169.254) — screen the embedded v4.
-  // Done by string split rather than a regex: the obvious pattern nests quantifiers and
-  // trips the ReDoS lint, and this is both faster and easier to be sure of.
-  const tail = lower.slice(lower.lastIndexOf(':') + 1);
-  if (tail.includes('.')) return isBlockedAddress(tail, 4);
-  if (lower === '::' || lower === '::1') return true; // unspecified, loopback
-  const head = lower.split(':')[0];
-  if (
-    head.startsWith('fe8') ||
-    head.startsWith('fe9') ||
-    head.startsWith('fea') ||
-    head.startsWith('feb')
-  )
-    return true; // fe80::/10 link-local
-  if (head.startsWith('fc') || head.startsWith('fd')) return true; // fc00::/7 unique-local
-  if (head.startsWith('ff')) return true; // ff00::/8 multicast
+
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const parse = (part) =>
+    part === ''
+      ? []
+      : part.split(':').map((g) => {
+          if (!/^[0-9a-f]{1,4}$/.test(g)) return NaN;
+          return Number.parseInt(g, 16);
+        });
+  const head = parse(halves[0]);
+  const back = halves.length === 2 ? parse(halves[1]) : [];
+  if ([...head, ...back].some((n) => Number.isNaN(n))) return null;
+
+  let groups;
+  if (halves.length === 2) {
+    const fill = 8 - head.length - back.length;
+    if (fill < 0) return null;
+    groups = [...head, ...Array(fill).fill(0), ...back];
+  } else {
+    groups = head;
+  }
+  if (tailGroups.length) groups = [...groups.slice(0, 6), ...tailGroups];
+  return groups.length === 8 ? groups : null;
+}
+
+/**
+ * True when an address must never be connected to. Handles IPv4, IPv6 and v4-in-v6.
+ *
+ * `_family` is accepted but UNUSED: the family reported by the resolver is a hint, and
+ * trusting it would mean a v6-labelled dotted-quad skipped the v4 rules. The address text
+ * itself is authoritative, so it is classified with `isIPv4`/`isIPv6` here instead. The
+ * parameter stays because every caller has one to hand.
+ */
+export function isBlockedAddress(addr, _family) {
+  if (typeof addr !== 'string' || addr.length === 0) return true;
+
+  if (isIPv4(addr)) {
+    const o = addr.split('.').map(Number);
+    return isBlockedIpv4Octets(o[0], o[1]);
+  }
+  if (!isIPv6(addr)) return true; // not an address at all → refuse
+
+  const g = expandIpv6(addr);
+  if (!g) return true;
+
+  const allZero = g.every((x) => x === 0);
+  if (allZero) return true; // :: unspecified
+  const isLoopback = g.slice(0, 7).every((x) => x === 0) && g[7] === 1;
+  if (isLoopback) return true; // ::1 in ANY spelling
+
+  // IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible — screen the embedded v4 by VALUE.
+  const v4Mapped = g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff;
+  const v4Compat = g.slice(0, 6).every((x) => x === 0);
+  if (v4Mapped || v4Compat) {
+    return isBlockedIpv4Octets(g[6] >> 8, g[6] & 0xff);
+  }
+  // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) both embed a v4 address.
+  if (g[0] === 0x0064 && g[1] === 0xff9b) return isBlockedIpv4Octets(g[6] >> 8, g[6] & 0xff);
+  if (g[0] === 0x2002) return isBlockedIpv4Octets(g[1] >> 8, g[1] & 0xff);
+
+  if ((g[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
+  if ((g[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 unique-local
+  if ((g[0] & 0xff00) === 0xff00) return true; // ff00::/8 multicast
   return false;
 }
 
@@ -91,8 +201,9 @@ export function screenUrl(raw) {
     return { ok: false, code: 'bad_url' };
   }
   if (url.protocol !== 'https:') return { ok: false, code: 'blocked', blockReason: 'scheme' };
-  if (url.username || url.password)
+  if (url.username || url.password) {
     return { ok: false, code: 'blocked', blockReason: 'credentials' };
+  }
   if (url.port && url.port !== '443') return { ok: false, code: 'blocked', blockReason: 'port' };
   return { ok: true, url };
 }
@@ -121,17 +232,6 @@ async function resolvePublicAddress(hostname) {
 /** Read a response body with a cap counted on DECODED bytes, aborting the moment it trips. */
 function readCapped(res, maxBytes) {
   return new Promise((resolve) => {
-    const encoding = String(res.headers['content-encoding'] || 'identity').toLowerCase();
-    let stream = res;
-    if (encoding === 'gzip') stream = res.pipe(createGunzip());
-    else if (encoding === 'br') stream = res.pipe(createBrotliDecompress());
-    else if (encoding !== 'identity') {
-      res.destroy();
-      return resolve({ ok: false, code: 'blocked', blockReason: 'encoding' });
-    }
-
-    const chunks = [];
-    let total = 0;
     let settled = false;
     const done = (v) => {
       if (settled) return;
@@ -139,6 +239,26 @@ function readCapped(res, maxBytes) {
       res.destroy();
       resolve(v);
     };
+
+    const encoding = String(res.headers['content-encoding'] || 'identity').toLowerCase();
+    let stream = res;
+    if (encoding === 'gzip') stream = res.pipe(createGunzip());
+    else if (encoding === 'br') stream = res.pipe(createBrotliDecompress());
+    else if (encoding !== 'identity') {
+      return done({ ok: false, code: 'blocked', blockReason: 'encoding' });
+    }
+
+    // BIND 'error' ON THE SOURCE TOO. `.pipe()` does NOT forward source errors, and its
+    // internal handler skips forwarding once the destination has its own listener. With a
+    // listener only on the decompressor, a mid-body reset — ordinary CDN flakiness, or a
+    // hostile `Content-Length: 100000` followed by 20 bytes and RST — emits 'error' on an
+    // emitter with zero listeners, which is an UNCAUGHT exception that kills the whole
+    // invocation and returns a CORS-less 502 outside the typed taxonomy.
+    res.on('error', () => done({ ok: false, code: 'fetch_failed' }));
+    if (stream !== res) stream.on('error', () => done({ ok: false, code: 'fetch_failed' }));
+
+    const chunks = [];
+    let total = 0;
     stream.on('data', (c) => {
       total += c.length;
       // Counted on DECODED output, so a gzip/brotli bomb is cut at the cap rather than
@@ -147,13 +267,19 @@ function readCapped(res, maxBytes) {
       chunks.push(c);
     });
     stream.on('end', () => done({ ok: true, body: Buffer.concat(chunks) }));
-    stream.on('error', () => done({ ok: false, code: 'fetch_failed' }));
   });
 }
 
-/** One request to a pinned address. Returns the raw response for the caller to interpret. */
-function requestPinned(url, address, family, timeoutMs) {
+/** One request to a pinned address, bounded by the REMAINING wall-clock budget. */
+function requestPinned(url, address, family, budgetMs) {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (v) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+
     const req = httpsRequest(
       {
         protocol: url.protocol,
@@ -172,22 +298,26 @@ function requestPinned(url, address, family, timeoutMs) {
         // passed, because none of them opens a real socket.
         lookup: (_hostname, opts, cb) =>
           opts && opts.all ? cb(null, [{ address, family }]) : cb(null, address, family),
-        headers: {
-          // Identify honestly; some sites 403 an unknown agent, and we would rather be
-          // refused than pretend to be a browser.
-          'User-Agent': 'beanies.family recipe reader (+https://beanies.family)',
-          Accept: '*/*',
-          'Accept-Encoding': 'gzip, br',
-        },
-        timeout: timeoutMs,
+        headers: BROWSER_HEADERS,
       },
-      (res) => resolve({ ok: true, res })
+      (res) => finish({ ok: true, res })
     );
-    req.on('timeout', () => {
-      req.destroy();
-      resolve({ ok: false, code: 'timeout' });
+
+    // HARD wall-clock stop for this hop, independent of socket activity. A slowloris origin
+    // that dribbles bytes keeps an inactivity timer alive forever; this does not care.
+    const killer = setTimeout(
+      () => {
+        req.destroy();
+        finish({ ok: false, code: 'timeout' });
+      },
+      Math.max(250, budgetMs)
+    );
+    const clear = () => clearTimeout(killer);
+    req.on('response', clear);
+    req.on('error', () => {
+      clear();
+      finish({ ok: false, code: 'fetch_failed' });
     });
-    req.on('error', () => resolve({ ok: false, code: 'fetch_failed' }));
     req.end();
   });
 }
@@ -196,18 +326,35 @@ function requestPinned(url, address, family, timeoutMs) {
  * Fetch one URL under every guard. Follows up to MAX_REDIRECTS hops, RE-SCREENING each one
  * (a public host redirecting to 169.254.169.254 is the classic bypass).
  *
+ * `maxBytes` defaults rather than being required: an omitted option would make
+ * `total > undefined` a NaN comparison that is always false, silently removing the size cap
+ * in the one function whose entire job is failing closed.
+ *
  * @returns {{ok:true, body:Buffer, contentType:string, finalUrl:string}
  *          |{ok:false, code:string, blockReason?:string}}
  */
-export async function guardedFetch(rawUrl, { maxBytes, timeoutMs = 8000 } = {}) {
+export async function guardedFetch(
+  rawUrl,
+  { maxBytes = DEFAULT_MAX_BYTES, totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS } = {}
+) {
+  const deadline = Date.now() + totalBudgetMs;
   let current = rawUrl;
+
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return { ok: false, code: 'timeout' };
+
     const screened = screenUrl(current);
     if (!screened.ok) return screened;
     const resolved = await resolvePublicAddress(screened.url.hostname);
     if (!resolved.ok) return resolved;
 
-    const attempt = await requestPinned(screened.url, resolved.address, resolved.family, timeoutMs);
+    const attempt = await requestPinned(
+      screened.url,
+      resolved.address,
+      resolved.family,
+      deadline - Date.now()
+    );
     if (!attempt.ok) return attempt;
     const res = attempt.res;
 

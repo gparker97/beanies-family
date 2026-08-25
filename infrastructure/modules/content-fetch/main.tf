@@ -151,6 +151,33 @@ resource "aws_lambda_permission" "apigw" {
   source_arn    = "${var.api_gateway_execution_arn}/*/*"
 }
 
+# ── Alerting ─────────────────────────────────────────────────────────────────
+# An alarm with no `alarm_actions` changes colour in a console nobody opens. The module
+# header calls the invocation alarm the signal that distinguishes "a family captured some
+# recipes" from "someone found the endpoint" — that is only true if it reaches a person.
+#
+# These are the repo's first metric alarms, so there is no existing SNS topic to inherit.
+# The subscription is created only when an address is supplied, so a self-hoster without one
+# still gets working alarms (visible in CloudWatch) rather than a failed apply.
+
+resource "aws_sns_topic" "alerts" {
+  name = "${var.app_name}-content-fetch-alerts-${var.environment}"
+
+  tags = {
+    Name        = "${var.app_name}-content-fetch-alerts"
+    Environment = var.environment
+  }
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  count     = var.alert_email == "" ? 0 : 1
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+  # NOTE: AWS emails a confirmation link on first create; the subscription stays
+  # "PendingConfirmation" — and delivers nothing — until it is clicked.
+}
+
 # ── Alarms ───────────────────────────────────────────────────────────────────
 # Volume abuse of a semi-open proxy is a COST event, not an error event: every
 # request succeeds. So the alarm watches invocation VOLUME, which is the only
@@ -169,6 +196,8 @@ resource "aws_cloudwatch_metric_alarm" "high_invocations" {
   threshold           = var.invocation_alarm_threshold
   alarm_description   = "content-fetch invocations exceeded ${var.invocation_alarm_threshold}/hour — possible abuse of the semi-open proxy (its api key ships in the public bundle)."
   treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.content_fetch.function_name
@@ -191,6 +220,8 @@ resource "aws_cloudwatch_metric_alarm" "throttles" {
   threshold           = 10
   alarm_description   = "content-fetch is being throttled — either real demand outgrew the reservation, or abuse is hitting the ceiling. Both are worth a look."
   treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.content_fetch.function_name
