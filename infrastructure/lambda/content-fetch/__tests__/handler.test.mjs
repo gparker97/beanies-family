@@ -364,6 +364,34 @@ describe('length-preserving scanning (İ desync)', () => {
     const html = '<html><!-- İ --><meta property="og:image" content="https://x.test/a.jpg">';
     assert.equal(findMeta(html, 'og:image'), 'https://x.test/a.jpg');
   });
+
+  test('decodes HTML entities in JSON-LD values', () => {
+    // JSON-LD is embedded IN an HTML document and plenty of CMSes escape what they emit —
+    // allrecipes really does return `World&#39;s Best Lasagna`. Undecoded it lands in the
+    // form at confidence 1 and replicates into the .beanpod permanently. Every fixture in
+    // this suite used clean values, which is why only a live probe found it.
+    const recipe = JSON.stringify({
+      '@type': 'Recipe',
+      name: 'World&#39;s Best Lasagna',
+      recipeIngredient: ['1 tbsp salt &amp; pepper', 'a &quot;pinch&quot; of basil'],
+      recipeInstructions: ['Mix &amp; bake'],
+    });
+    const out = extractRecipeFromHtml(`<script type="application/ld+json">${recipe}</script>`);
+    assert.equal(out.name, "World's Best Lasagna");
+    assert.deepEqual(out.ingredients, ['1 tbsp salt & pepper', 'a "pinch" of basil']);
+    assert.deepEqual(out.steps, ['Mix & bake']);
+  });
+
+  test('does not double-decode a deliberately escaped entity', () => {
+    const recipe = JSON.stringify({
+      '@type': 'Recipe',
+      name: 'Use &amp;quot; to escape',
+      recipeIngredient: ['x'],
+      recipeInstructions: ['y'],
+    });
+    const out = extractRecipeFromHtml(`<script type="application/ld+json">${recipe}</script>`);
+    assert.equal(out.name, 'Use &quot; to escape');
+  });
 });
 
 describe('entity decoding', () => {
