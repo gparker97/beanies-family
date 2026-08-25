@@ -225,6 +225,13 @@ export async function guardedFetch(rawUrl, { maxBytes, timeoutMs = 8000 } = {}) 
     }
     if (status < 200 || status >= 300) {
       res.destroy();
+      // Distinguish what the SITE said from what the NETWORK did. A dead link and a site
+      // refusing our user-agent are both actionable for the user; a generic "something
+      // went wrong" is not, and would send them to us instead of to their link.
+      if (status === 404 || status === 410) return { ok: false, code: 'not_found' };
+      if (status === 401 || status === 403 || status === 429 || status === 451) {
+        return { ok: false, code: 'site_refused' };
+      }
       return { ok: false, code: 'fetch_failed' };
     }
 
