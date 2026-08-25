@@ -19,6 +19,7 @@ import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { usePhotos } from './usePhotos';
+import { useRecipePhotoPending } from './useRecipePhotoPending';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import {
@@ -74,7 +75,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    * this must never block the UI — it exists only so the page can say "photo on its way"
    * instead of showing a pictureless recipe for five silent seconds.
    */
-  const isAttaching = ref(false);
+  const { markPending, clearPending } = useRecipePhotoPending();
   /** A screened dish-image URL held until the recipe is saved, then fetched and stored. */
   const pendingDishImageUrl = ref<string | null>(null);
   /** Held between a successful extraction and the save that follows it. */
@@ -317,8 +318,30 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     pendingCompressed.value = null;
     pendingDishImageUrl.value = null;
     if (!file && !dishUrl) return; // manual save with no AI source — nothing to attach
-    isAttaching.value = true;
+    // Mark the RECIPE, not the page: the card and the detail hero both read this, so the
+    // waiting state reaches the user wherever they are looking. Only for a dish image —
+    // a source-file attach is invisible to the user and needs no hero placeholder.
+    if (dishUrl) markPending(recipeId);
+    try {
+      await runAttach(recipeId, file, compressed, dishUrl);
+    } finally {
+      // ONE exit point, wrapping the WHOLE attach.
+      //
+      // This used to be a `finally` on the inner source-file try, which the dish-image-only
+      // path never reached: a pasted link produces an image and NO file, so `if (!file)
+      // return` jumped clean over it and left the recipe marked pending forever. Pinned by
+      // "CLEARS pending on the dish-image-only path" in the tests.
+      clearPending(recipeId);
+    }
+  }
 
+  /** The attach itself. Split out so the flag above has exactly one place to be cleared. */
+  async function runAttach(
+    recipeId: UUID,
+    file: File | null,
+    compressed: Blob | null,
+    dishUrl: string | null
+  ): Promise<void> {
     const photos = usePhotos({
       collection: 'recipes',
       entityId: recipeId,
@@ -431,10 +454,6 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         t('recipeExtract.attachFailed.title'),
         t('recipeExtract.attachFailed.message')
       );
-    } finally {
-      // Always clears, including on the warn-not-rollback path — a stuck "adding photo"
-      // hint would be worse than the missing photo it describes.
-      isAttaching.value = false;
     }
   }
 
@@ -447,7 +466,6 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
 
   return {
     isProcessing,
-    isAttaching,
     processFile,
     processUrl,
     attachAfterSave,

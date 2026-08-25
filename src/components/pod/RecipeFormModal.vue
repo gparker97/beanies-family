@@ -14,6 +14,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import RecipeSourceStrip from './RecipeSourceStrip.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -55,6 +56,12 @@ const emit = defineEmits<{
    *  listen for this to auto-link the new recipe to whatever workflow
    *  opened the form. */
   saved: [id: UUID];
+  /** The shortcut band produced a link — the PARENT owns the capture, not this form.
+   *  Kept as an emit rather than calling `useRecipeCapture` here so the form stays a form:
+   *  it collects and validates, and never orchestrates fetches or persistence (MVO). */
+  captureLink: [url: string];
+  /** The shortcut band's photo/PDF option. Same reasoning. */
+  captureDocument: [];
 }>();
 
 const { t } = useTranslation();
@@ -121,6 +128,19 @@ const { isEditing, isSubmitting } = useFormModal(
 );
 
 const canSave = computed(() => name.value.trim().length > 0);
+
+/**
+ * The shortcut band shows only on a genuinely blank ADD.
+ *
+ * Not when editing — offering to refill an existing recipe from a link invites overwriting
+ * work the user already did. Not when a capture supplied the prefill — the shortcut has
+ * already done its job and repeating the offer would be noise. And not once the user has
+ * started typing, because at that point they have chosen the manual route and the band would
+ * be nagging rather than helping.
+ */
+const showSourceStrip = computed(
+  () => !isEditing.value && !props.prefill && name.value.trim().length === 0
+);
 
 const modalTitle = computed(() =>
   isEditing.value ? t('recipes.editTitle') : t('recipes.addTitle')
@@ -266,6 +286,12 @@ const LIST_TEXTAREA_CLASS =
     @save="handleSave"
     @delete="handleDelete"
   >
+    <RecipeSourceStrip
+      v-if="showSourceStrip"
+      @submit="(url) => emit('captureLink', url)"
+      @document="emit('captureDocument')"
+    />
+
     <FormFieldGroup :label="t('recipes.field.name')" required>
       <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />
     </FormFieldGroup>
