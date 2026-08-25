@@ -199,7 +199,23 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     // 'page', so `handOver`'s 'youtube' kind was unreachable and CloudWatch could not tell a
     // video capture from a page one. And `start` must be logged BEFORE the await, or a
     // failure has no denominator — you cannot compute a rate from outcomes alone.
-    const kind = routeUrl(rawUrl).kind === 'youtube' ? 'youtube' : 'page';
+    const route = routeUrl(rawUrl);
+    const kind = route.kind === 'youtube' ? 'youtube' : 'page';
+
+    /**
+     * What to record as "where this came from".
+     *
+     * For a video we store the VIDEO the user pasted, not the blog we followed out of its
+     * description. They chose the video, they recognise it, and it is the artefact they will
+     * want back — the cook's technique is in it, and its description links the blog anyway.
+     *
+     * SAFETY: this only ever runs AFTER the prefill has been mapped, because `sourceUrl` does
+     * double duty — it is also the same-registrable-domain bound on the dish image. Applying
+     * it earlier would compare the image against youtube.com and silently reject every
+     * legitimate photo. Mapping first, relabelling second, keeps the bound honest.
+     */
+    const provenanceUrl = (readUrl: string): string =>
+      route.kind === 'youtube' ? route.url : readUrl;
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -220,6 +236,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           // The model is NEVER invoked here — quantities come straight from the site's own
           // structured data, so nothing can be hallucinated and nothing is inferred.
           const prefill = jsonLdToPrefill(resolved.recipe, resolved.sourceUrl);
+          prefill.fields.sourceUrl = provenanceUrl(resolved.sourceUrl);
           // USE the mapper's bounded value. Re-deriving it with safeHttpsUrl alone throws
           // away the same-domain check and leaves that control with no effective caller —
           // a hostile page could then name any host as its image and we would fetch it.
@@ -258,7 +275,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             );
             return;
           }
-          prefill.fields.sourceUrl = resolved.sourceUrl;
+          prefill.fields.sourceUrl = provenanceUrl(resolved.sourceUrl);
           // No `??` fallback: dishImageUrl is null EXACTLY when the domain check rejected
           // the URL, so falling back to the raw page value would undo the rejection.
           pendingDishImageUrl.value = prefill.dishImageUrl;
