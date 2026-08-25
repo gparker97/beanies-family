@@ -109,8 +109,12 @@ export async function fetchYoutube(url) {
   const videoId = parseVideoId(url);
   if (!videoId) return { ok: false, code: 'bad_url' };
 
+  // Two sequential fetches here (watch page, then the caption track), so each gets HALF the
+  // budget — otherwise the pair can exceed the Lambda's own 15s ceiling and die mid-flight,
+  // returning a CORS-less 502 outside the typed taxonomy.
   const watch = await guardedFetch(`https://www.youtube.com/watch?v=${videoId}`, {
     maxBytes: MAX_BYTES,
+    totalBudgetMs: 6000,
   });
   if (!watch.ok) return watch;
 
@@ -135,7 +139,7 @@ export async function fetchYoutube(url) {
   let captions = null;
   const track = pickCaptionTrack(player);
   if (track?.baseUrl) {
-    const cap = await guardedFetch(track.baseUrl, { maxBytes: MAX_BYTES });
+    const cap = await guardedFetch(track.baseUrl, { maxBytes: MAX_BYTES, totalBudgetMs: 6000 });
     if (cap.ok) {
       const t = captionsXmlToText(cap.body.toString('utf8'));
       // null, never '' — "no captions" must be a distinct, testable state rather than

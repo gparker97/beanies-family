@@ -8,6 +8,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-25
+
+### Added
+
+- Read a recipe straight into the family cookbook — from a photo, a screenshot, a PDF, a recipe website link, or a YouTube video. Point magic beans at whatever you have and it fills in the ingredients, steps, times and servings for you to check before saving. Where a recipe site publishes structured data, the quantities are read exactly as written rather than interpreted.
+- Recipes now keep a cook time alongside prep time, and remember the link they came from.
+- Anything beanies filled in itself is listed under the ingredients and steps so you can check it against the original before you save.
+
+### Fixed
+
+- Links saved anywhere in the app (activities, travel, bank details, trip ideas) are now checked before they become clickable. A malformed or unsafe link is shown as plain text instead of a working link.
+- Clearer messages when a recipe can't be read: a dead link, a site that doesn't allow apps to read it, and a video with no captions each now say what actually happened instead of "something went wrong".
+
+### Security
+
+- Every link the app opens is screened for its scheme before navigation, closing a stored cross-site-scripting vector where a `javascript:` link saved by one family member could run in another member's session.
+- AI responses are now size-bounded before they are stored, so a hostile document cannot bloat the family data file.
+- The new recipe fetcher runs in its own isolated service with no network access to anything private, a capped request rate, and alerting if it is ever used more than a family plausibly would.
+
+---
+
 ## 2026-08-24
 
 ### Fixed

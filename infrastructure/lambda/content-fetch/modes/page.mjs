@@ -17,9 +17,80 @@ export const MAX_TEXT_CHARS = 24_000;
 /** Below this, the "page" is a cookie wall or a JS shell — refuse rather than prompt on noise. */
 const MIN_USEFUL_CHARS = 200;
 
-/** Strip a tag and its contents entirely (script/style/nav/etc). */
+/**
+ * Strip a tag and its contents entirely (script/style/nav/etc).
+ *
+ * Written as a LINEAR scan, not a regex, for two reasons that both matter:
+ *
+ *  1. DoS. `<tag\b[^>]*>[\s\S]*?</tag>` is O(n²) when the closing tag is missing: the lazy
+ *     quantifier re-scans the tail from every opening position. Measured: 64KB → 211ms,
+ *     512KB → 13.6s. `htmlToText` runs this seven times and the body cap is 2MB, so
+ *     `'<script>'.repeat(65536)` — about 2KB gzipped on the wire — burned the entire 15s
+ *     Lambda timeout on a publicly-callable endpoint. This scan is O(n) regardless.
+ *  2. `new RegExp(interpolated)` trips the security lint (rightly — it is how a caller's
+ *     string becomes a pattern), and the whole `security:full` gate is CI-blocking.
+ */
 function dropTag(html, tag) {
-  return html.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'gi'), ' ');
+  const open = `<${tag}`;
+  const close = `</${tag}`;
+  const lower = html.toLowerCase();
+  let out = '';
+  let cursor = 0;
+  for (;;) {
+    const start = lower.indexOf(open, cursor);
+    if (start === -1) break;
+    // Must be a real tag boundary: `<script` matches, `<scriptfoo` does not.
+    const after = lower[start + open.length];
+    if (
+      after !== undefined &&
+      after !== '>' &&
+      after !== ' ' &&
+      after !== '\t' &&
+      after !== '\n' &&
+      after !== '/'
+    ) {
+      out += html.slice(cursor, start + open.length);
+      cursor = start + open.length;
+      continue;
+    }
+    const end = lower.indexOf(close, start);
+    out += html.slice(cursor, start) + ' ';
+    if (end === -1) {
+      // Unclosed tag: drop the rest. Matches the regex's intent without its blow-up.
+      cursor = html.length;
+      break;
+    }
+    const gt = html.indexOf('>', end);
+    cursor = gt === -1 ? html.length : gt + 1;
+  }
+  return out + html.slice(cursor);
+}
+
+/** Find one meta tag's content by property/name. Linear scan — see dropTag on why not regex. */
+function findMeta(html, key) {
+  const lower = html.toLowerCase();
+  const needle = `"${key}"`;
+  const alt = `'${key}'`;
+  let cursor = 0;
+  for (;;) {
+    const at = lower.indexOf('<meta', cursor);
+    if (at === -1) return '';
+    const end = lower.indexOf('>', at);
+    if (end === -1) return '';
+    const tag = html.slice(at, end);
+    const tagLower = tag.toLowerCase();
+    if (tagLower.includes(needle) || tagLower.includes(alt)) {
+      const ci = tagLower.indexOf('content=');
+      if (ci !== -1) {
+        const q = tag[ci + 8];
+        if (q === '"' || q === "'") {
+          const close = tag.indexOf(q, ci + 9);
+          if (close !== -1) return tag.slice(ci + 9, close);
+        }
+      }
+    }
+    cursor = end + 1;
+  }
 }
 
 /**
@@ -50,20 +121,35 @@ export function htmlToText(html) {
   return s.slice(0, MAX_TEXT_CHARS);
 }
 
+/**
+ * Read a meta tag's content, DECODED.
+ *
+ * The decode is load-bearing, not tidiness: every escaping HTML generator (WordPress/Yoast,
+ * Next.js image URLs) writes `&amp;` in attribute values, so a CDN-resized og:image arrives
+ * as `...?url=%2Fdish.jpg&amp;w=1200`. Fetched literally, the CDN sees params named `amp;w`
+ * and returns a 404 or a non-image — so the dish photo silently never attaches, with only an
+ * `attach_failed` info log to show for it. This is the common case, not an exotic one.
+ */
 function metaContent(html, property) {
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*)["']`,
-    'i'
-  );
-  const m = re.exec(html);
-  if (m) return m[1].trim();
-  // Attribute order is not guaranteed — try content-first too.
-  const re2 = new RegExp(
-    `<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${property}["']`,
-    'i'
-  );
-  const m2 = re2.exec(html);
-  return m2 ? m2[1].trim() : '';
+  return decodeEntities(findMeta(html, property)).trim();
+}
+
+/**
+ * Resolve a possibly-relative URL against the page it came from.
+ *
+ * Root-relative `og:image` (`/images/dish.jpg`) is what most CMSes emit. Left unresolved it
+ * reaches `safeHttpsUrl`, which treats anything without `://` as a bare domain and FABRICATES
+ * `https://images/dish.jpg` — a screening function inventing a hostname it cannot vouch for
+ * and handing it to the SSRF fetcher. Resolving here means the screen sees a real URL or
+ * nothing at all.
+ */
+function absolutize(raw, base) {
+  if (!raw) return '';
+  try {
+    return new URL(raw, base).toString();
+  } catch {
+    return '';
+  }
 }
 
 function pageTitle(html) {
@@ -85,6 +171,8 @@ export async function fetchPage(url) {
 
   const jsonld = extractRecipeFromHtml(html);
   if (jsonld) {
+    // Structured-data `image` is relative just as often as og:image is.
+    jsonld.imageUrl = absolutize(jsonld.imageUrl, res.finalUrl);
     return { ok: true, data: { kind: 'jsonld', recipe: jsonld, finalUrl: res.finalUrl } };
   }
 
@@ -97,7 +185,7 @@ export async function fetchPage(url) {
       kind: 'text',
       text,
       title: pageTitle(html),
-      imageUrl: metaContent(html, 'og:image'),
+      imageUrl: absolutize(metaContent(html, 'og:image'), res.finalUrl),
       finalUrl: res.finalUrl,
     },
   };

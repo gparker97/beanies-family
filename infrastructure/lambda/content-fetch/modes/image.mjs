@@ -48,7 +48,9 @@ export async function fetchImage(url) {
 
   // BOTH checks. The header alone is attacker-controlled; the bytes alone would accept an
   // image served with a lying content-type from a host that only meant to serve HTML.
-  if (!/^image\/(jpeg|png|webp)\b/i.test(res.contentType)) {
+  // `image/jpg` is not the registered type but plenty of older hosts send it; rejecting on
+  // the header alone would drop valid JPEGs whose BYTES we are about to verify anyway.
+  if (!/^image\/(jpeg|jpg|png|webp)\b/i.test(res.contentType)) {
     return { ok: false, code: 'not_image' };
   }
   const sniffed = sniffImageType(res.body);

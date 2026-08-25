@@ -562,31 +562,48 @@ const SEGMENT_STRUCTURAL_KEYS = new Set<string>([
 /** Coerce an unknown into a clean list of trimmed, non-empty strings (else []). */
 function toStringList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
+  // Filter BEFORE slicing — the same rule stated on toLines below. Slicing first spends
+  // the budget on entries that are then dropped, so `[null ×100, "Alice", "Bob"]` (a shape
+  // the parser explicitly tolerates elsewhere) would yield [] instead of the valid tail.
   return raw
-    .slice(0, MODEL_LIST_MAX)
     .filter((x): x is string => typeof x === 'string')
     .map((s) => asString(s, MODEL_FIELD_MAX).trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, MODEL_LIST_MAX);
 }
 
 /** Copy a source object's scalar (string/number) entries into `target`, skipping `skip` keys. */
 function collectScalarFields(
   source: Record<string, unknown>,
   target: Record<string, string>,
-  skip?: Set<string>
+  skip?: Set<string>,
+  /**
+   * Cap for THIS sweep. `fields` is filled in two passes — a flat top-level sweep, then the
+   * nested travelFields/accommodationFields/transportationFields sweep where the real
+   * per-kind details live. A single shared budget lets a verbose document fill it with
+   * top-level junk and starve the nested pass of every mapped field (checkIn, flightNumber,
+   * departureTime…), which then renders verbatim into segment.notes. Each sweep gets its own.
+   */
+  budget: number = MODEL_LIST_MAX
 ): void {
+  let added = 0;
   for (const [k, v] of Object.entries(source)) {
     if (skip?.has(k)) continue;
     // Bound the FIELD COUNT too: `fields` is a free-form record keyed by whatever the model
     // returned, so an unbounded loop lets a hostile document choose how many keys we store.
-    if (Object.keys(target).length >= MODEL_LIST_MAX) break;
+    if (added >= budget) break;
     // Bound the KEY too. `travelExtractionToSegments` renders every unmapped key verbatim
     // into `segment.notes`, so an unbounded model-chosen key reaches the Automerge doc and
     // the .beanpod even though the VALUE is capped. Skip rather than truncate: a key long
     // enough to trip this is not a real field name.
     if (k.length > MODEL_FIELD_MAX) continue;
-    if (typeof v === 'string') target[k] = asString(v, MODEL_TEXT_MAX);
-    else if (typeof v === 'number') target[k] = String(v);
+    if (typeof v === 'string') {
+      target[k] = asString(v, MODEL_TEXT_MAX);
+      added += 1;
+    } else if (typeof v === 'number') {
+      target[k] = String(v);
+      added += 1;
+    }
   }
 }
 
@@ -603,12 +620,14 @@ function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
   // (stray top-level scalars) for BYOK/older responses — structural keys are excluded so
   // they never leak into fields (and from there into the notes overflow).
   const fields: Record<string, string> = {};
-  collectScalarFields(obj, fields, SEGMENT_STRUCTURAL_KEYS);
+  // Each sweep carries its OWN budget. Sharing one let a document with 100+ stray top-level
+  // scalars fill it before the nested sweep ran, dropping every mapped detail field.
+  collectScalarFields(obj, fields, SEGMENT_STRUCTURAL_KEYS, MODEL_LIST_MAX);
   const nested: Record<string, unknown> = {};
   for (const nk of NESTED_FIELD_KEYS) {
     const sub = obj[nk];
     if (typeof sub === 'object' && sub !== null) {
-      collectScalarFields(sub as Record<string, unknown>, fields);
+      collectScalarFields(sub as Record<string, unknown>, fields, undefined, MODEL_LIST_MAX);
       Object.assign(nested, sub);
     }
   }

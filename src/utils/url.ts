@@ -175,6 +175,45 @@ export function safeHttpsUrl(raw: string | null | undefined): string | null {
   return new URL(parsed).port === '' ? parsed : null;
 }
 
+/**
+ * Do two URLs share a registrable domain? (`cdn.site.com` vs `www.site.com` → yes.)
+ *
+ * SECURITY (#72). This is the control that narrows a MODEL-supplied or PAGE-supplied image
+ * URL down to the site the user actually asked us to read. Without it, a hostile recipe page
+ * can name any host it likes as its `og:image` and we will fetch it server-side — a per-victim
+ * confirmation ping from our AWS egress IP, an arbitrary-public-URL fetch on demand, and, if
+ * the bytes carry image magic numbers, up to 1.5 MB of attacker-chosen content written into
+ * the family's Drive and rendered as their dish photo. `guardedFetch` blocks PRIVATE
+ * addresses; nothing else narrows PUBLIC ones. No prompt injection is even required — the
+ * page's own og:image is copied straight through.
+ *
+ * Deliberately a suffix match on the last two labels, not a full public-suffix-list
+ * implementation: recipe sites serve images from `cdn.` / `images.` / `static.` subdomains
+ * constantly, so exact-host matching would drop most legitimate photos. The PSL edge case
+ * (`foo.github.io` vs `bar.github.io`) is accepted — the worst outcome there is fetching a
+ * public image from a sibling subdomain of a host the user already chose to visit.
+ */
+export function isSameRegistrableDomain(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  const host = (raw: string | null | undefined): string | null => {
+    const safe = safeHttpsUrl(raw);
+    if (!safe) return null;
+    try {
+      return new URL(safe).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  };
+  const ha = host(a);
+  const hb = host(b);
+  if (!ha || !hb) return false;
+  if (ha === hb) return true;
+  const tail = (h: string) => h.split('.').slice(-2).join('.');
+  return tail(ha) === tail(hb) && tail(ha).includes('.');
+}
+
 export function getUrlDomain(url: string): string {
   try {
     // Normalize first so a scheme-less input (e.g. "secure.chase.com/login")
