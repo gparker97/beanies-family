@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { safeExternalHref, safeHttpsUrl } from '@/utils/url';
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -146,14 +147,30 @@ async function handleLinkBlur() {
   linkPreviewLoading.value = false;
 }
 
+/**
+ * Add a scheme to a bare domain so `beanies.family` works as typed. SCREENING is a separate
+ * job and belongs to `safeExternalHref`, which the three sibling drawers already use — this
+ * one hand-rolled its own normalizer and then bound the result straight into an href,
+ * duplicating `ensureHttpUrl` and skipping the screen the others get.
+ */
 function normalizeLink(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
   return `https://${trimmed}`;
 }
 
-const normalizedLink = computed(() => normalizeLink(link.value));
+/** Screened before it can ever reach an href. Null when the link is not safely navigable. */
+const normalizedLink = computed(() => safeExternalHref(normalizeLink(link.value)));
+
+/**
+ * The preview image, screened before it reaches `<img :src>`.
+ *
+ * This came back from microlink — a third party — and was bound unscreened, so a hostile or
+ * simply odd preview could point the family's browser at any URL on render. Everywhere else
+ * in this codebase remote images are screened or fetched-and-stored rather than hot-linked.
+ */
+const previewImage = computed(() => safeHttpsUrl(linkPreview.value?.image ?? ''));
 
 /**
  * A snapshot of the form as it looked when the drawer opened, for the dirty check below.
@@ -315,8 +332,8 @@ function handleSave() {
           class="mt-2 flex overflow-hidden rounded-xl border border-gray-200/80 bg-white transition-all hover:border-[rgba(0,180,216,0.3)] hover:shadow-sm dark:border-slate-700 dark:bg-slate-800"
         >
           <img
-            v-if="linkPreview.image"
-            :src="linkPreview.image"
+            v-if="previewImage"
+            :src="previewImage"
             alt=""
             class="h-20 w-20 shrink-0 object-cover"
             @error="($event.target as HTMLImageElement).style.display = 'none'"
