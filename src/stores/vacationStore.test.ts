@@ -784,4 +784,284 @@ describe('vacationStore', () => {
       expect(store.allTravelSegmentOccurrences[0].segmentId).toBe('fresh-seg');
     });
   });
+
+  // ── Characterisation tests written BEFORE the decomposition ──
+  //
+  // These pin behaviour that had no coverage at all, so the refactor that follows can be
+  // proven behaviour-preserving rather than assumed to be. Each one was named by
+  // /code-review max as a place where a real bug could hide unnoticed.
+
+  describe('addExtractedSegments (was entirely untested)', () => {
+    function extracted(over?: Record<string, unknown>) {
+      return {
+        travelSegments: [],
+        accommodations: [],
+        transportation: [],
+        ...over,
+      } as never;
+    }
+
+    it('MERGES a re-upload of the same booking instead of duplicating it', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        travelSegments: [
+          {
+            id: 's-1',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'pending',
+            flightNumber: 'BA123',
+            departureDate: '2026-07-01',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      const res = await store.addExtractedSegments(
+        'vac-1',
+        extracted({
+          travelSegments: [
+            {
+              id: 's-new',
+              type: 'flight_outbound',
+              title: 'Out',
+              status: 'booked',
+              flightNumber: 'BA123',
+              departureDate: '2026-07-01',
+            },
+          ],
+        })
+      );
+
+      expect(res).not.toBeNull();
+      // One segment, not two — same flight number + date is the same booking.
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      expect((saved.travelSegments as unknown[]).length).toBe(1);
+      // The document must be re-pointed at the SURVIVING id, or its attachment is orphaned.
+      expect(res!.idRemap['s-new']).toBe('s-1');
+    });
+
+    it('APPENDS a genuinely different booking', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        travelSegments: [
+          {
+            id: 's-1',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'booked',
+            flightNumber: 'BA123',
+            departureDate: '2026-07-01',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      await store.addExtractedSegments(
+        'vac-1',
+        extracted({
+          travelSegments: [
+            {
+              id: 's-2',
+              type: 'flight_return',
+              title: 'Back',
+              status: 'booked',
+              flightNumber: 'BA999',
+              departureDate: '2026-07-10',
+            },
+          ],
+        })
+      );
+
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      expect((saved.travelSegments as unknown[]).length).toBe(2);
+    });
+
+    it('leaves the OTHER buckets untouched when only one is extracted', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        accommodations: [
+          {
+            id: 'a-1',
+            type: 'hotel',
+            title: 'Hotel',
+            status: 'booked',
+            checkInDate: '2026-07-01',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      await store.addExtractedSegments(
+        'vac-1',
+        extracted({
+          travelSegments: [{ id: 's-9', type: 'flight_outbound', title: 'Out', status: 'booked' }],
+        })
+      );
+
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      expect((saved.accommodations as unknown[]).length).toBe(1);
+    });
+
+    it('returns null for an unknown vacation rather than throwing', async () => {
+      const store = useVacationStore();
+      expect(await store.addExtractedSegments('nope', extracted())).toBeNull();
+    });
+  });
+
+  describe('createVacation date seeding (the branch the old test never reached)', () => {
+    it('seeds the trip window from a transportation departureDate', async () => {
+      // The old test passed empty arrays, so this branch never ran — and it is the AI-reader
+      // path, where onReviewSubmit supplies no startDate/endDate. A coach itinerary carries
+      // departureDate (not pickupDate), which computeVacationDates used to ignore entirely,
+      // producing a DATELESS trip whose activity fell back to today.
+      const store = useVacationStore();
+      const createdActivity = makeActivity({ id: 'act-new' });
+      vi.mocked(activityRepo.createActivity).mockResolvedValue(createdActivity);
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(createdActivity);
+      vi.mocked(vacationRepo.createVacation).mockImplementation(
+        async (input) => ({ ...makeVacation(), ...input, id: 'vac-new' }) as never
+      );
+
+      await store.createVacation({
+        name: 'Coach Trip',
+        tripType: 'road_trip' as const,
+        assigneeIds: ['m-1'],
+        travelSegments: [],
+        accommodations: [],
+        ideas: [],
+        createdBy: 'm-1',
+        transportation: [
+          {
+            id: 't-1',
+            type: 'bus',
+            title: 'Coach',
+            status: 'booked',
+            departureDate: '2026-09-14',
+          },
+        ],
+      } as never);
+
+      const created = vi.mocked(vacationRepo.createVacation).mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      expect(created.startDate).toBe('2026-09-14');
+      expect(created.endDate).toBe('2026-09-14');
+    });
+  });
+
+  describe('updateSegment / deleteSegment address by ID, never by index', () => {
+    function tripWithThree() {
+      return makeVacation({
+        travelSegments: [
+          { id: 's-a', type: 'flight_outbound', title: 'A', status: 'booked' },
+          { id: 's-b', type: 'ferry', title: 'B', status: 'booked' },
+          { id: 's-c', type: 'flight_return', title: 'C', status: 'booked' },
+        ],
+      });
+    }
+
+    it('patches the segment with the given id, whatever its position', async () => {
+      const store = useVacationStore();
+      const existing = tripWithThree();
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      expect(await store.updateSegment('vac-1', 's-b', { title: 'Renamed' })).toBe(true);
+
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      const segs = saved.travelSegments as Array<{ id: string; title: string }>;
+      expect(segs.find((x) => x.id === 's-b')!.title).toBe('Renamed');
+      // The neighbours must be untouched — the index-addressed version wrote the wrong one.
+      expect(segs.find((x) => x.id === 's-a')!.title).toBe('A');
+      expect(segs.find((x) => x.id === 's-c')!.title).toBe('C');
+    });
+
+    it('merges the patch onto the CURRENT value, so untouched fields survive', async () => {
+      const store = useVacationStore();
+      const existing = tripWithThree();
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      await store.updateSegment('vac-1', 's-b', { status: 'pending' });
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      const seg = (
+        saved.travelSegments as Array<{ id: string; title: string; status: string }>
+      ).find((x) => x.id === 's-b')!;
+      expect(seg.status).toBe('pending');
+      expect(seg.title).toBe('B'); // not blanked by a partial patch
+    });
+
+    it('refuses to write when the segment is gone, rather than writing elsewhere', async () => {
+      const store = useVacationStore();
+      store.vacations.push(tripWithThree());
+      expect(await store.updateSegment('vac-1', 's-deleted', { title: 'X' })).toBe(false);
+      expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
+    });
+
+    it('an empty patch is a no-op, not a full rewrite', async () => {
+      const store = useVacationStore();
+      store.vacations.push(tripWithThree());
+      expect(await store.updateSegment('vac-1', 's-b', {})).toBe(true);
+      expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
+    });
+
+    it('deleteSegment removes only the named segment', async () => {
+      const store = useVacationStore();
+      const existing = tripWithThree();
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      expect(await store.deleteSegment('vac-1', 's-b')).toBe(true);
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      const ids = (saved.travelSegments as Array<{ id: string }>).map((x) => x.id);
+      expect(ids).toEqual(['s-a', 's-c']);
+    });
+  });
 });
