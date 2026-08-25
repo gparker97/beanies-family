@@ -13,6 +13,13 @@ import type { ExtractionErrorCode } from '@/services/ai/types';
 
 const ERROR_SURFACE = 'ai-extract';
 
+// ⚠️ COPY RULE: every string below is shown by THREE readers now — activity (#133), travel
+// (#30) and recipe (#72) — so it must stay SURFACE-NEUTRAL. These were originally written
+// when only the activity reader existed and said "photo"/"activity"; the recipe reader
+// surfaced that ("reading photos isn't set up yet. you can add the activity manually",
+// shown on the cookbook). If a message needs to name the thing being created, it does not
+// belong here — put it on the calling composable, like `recipeExtract.notRecipe.*`.
+
 export function useExtractionErrorToast() {
   const { showToast } = useToast();
   const { t } = useTranslation();
