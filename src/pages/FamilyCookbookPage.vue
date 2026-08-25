@@ -239,6 +239,12 @@ async function handleSaved(id: string): Promise<void> {
             {{ r.subtitle }}
           </p>
           <div class="font-inter text-secondary-500/60 mt-3 flex flex-wrap gap-4 text-xs">
+            <span v-if="r.cookTime"
+              >🔥
+              <strong class="font-outfit text-secondary-500 font-semibold">{{
+                r.cookTime
+              }}</strong></span
+            >
             <span v-if="r.prepTime"
               >🕐
               <strong class="text-secondary-500 font-outfit font-semibold">{{
