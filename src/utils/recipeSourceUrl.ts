@@ -23,31 +23,74 @@ const YOUTUBE_HOSTS = new Set([
   'www.youtu.be',
 ]);
 
-/** Hosts that will never be a recipe page, so following them wastes the call budget. */
-const NEVER_A_RECIPE = new Set([
-  'youtube.com',
-  'www.youtube.com',
-  'youtu.be',
-  'instagram.com',
-  'www.instagram.com',
-  'facebook.com',
-  'www.facebook.com',
-  'twitter.com',
-  'x.com',
-  'tiktok.com',
-  'www.tiktok.com',
-  'pinterest.com',
-  'www.pinterest.com',
-  'patreon.com',
-  'www.patreon.com',
-  'amazon.com',
-  'www.amazon.com',
-  'amzn.to',
+/**
+ * Sites that will never hold a recipe, so following one wastes the capture's fetch budget.
+ *
+ * Matched on the SITE LABEL (`amazon` out of `www.amazon.co.uk`) rather than the exact
+ * hostname. The exact-host list this replaced blocked `amazon.com` but sailed straight past
+ * `amazon.co.uk`, `bookshop.org`, `barnesandnoble.com` and `a.co` — every one of which
+ * appears in the description of the very video used to test this. That only stayed invisible
+ * because the recipe link happened to be listed first; a creator who leads with their book
+ * would have burnt the whole budget on a shop page.
+ *
+ * A blocklist, not an allowlist, on purpose: an allowlist would have to enumerate every food
+ * blog on the internet and would silently fail on the long tail, which is most of them.
+ */
+const NEVER_A_RECIPE_LABELS = new Set([
+  // Video and social
+  'youtube',
+  'youtu',
+  'instagram',
+  'facebook',
+  'twitter',
+  'tiktok',
+  'pinterest',
+  'threads',
+  'reddit',
+  'linkedin',
+  'snapchat',
+  // Shops — where the cookbook lives, not the recipe
+  'amazon',
+  'amzn',
+  'bookshop',
+  'barnesandnoble',
+  'booksamillion',
+  'waterstones',
+  'target',
+  'walmart',
+  'ebay',
+  'etsy',
+  // Support and link aggregators
+  'patreon',
+  'paypal',
+  'venmo',
+  'ko-fi',
+  'buymeacoffee',
+  'linktr',
+  'beacons',
+  'discord',
+  'spotify',
+]);
+
+/** Whole hosts with no useful label (shorteners, and Amazon's one-letter domain). */
+const NEVER_A_RECIPE_HOSTS = new Set([
+  'a.co',
   'bit.ly',
   'tinyurl.com',
   't.co',
-  'linktr.ee',
+  'goo.gl',
+  'ow.ly',
+  'rb.gy',
+  'shorturl.at',
 ]);
+
+function isNeverARecipe(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^www\./, '');
+  if (NEVER_A_RECIPE_HOSTS.has(host)) return true;
+  // Every label, not just the registrable one: `amazon.co.uk` registers as `co`, so keying
+  // on the second-to-last label alone would let the biggest shop on the list through.
+  return host.split('.').some((label) => NEVER_A_RECIPE_LABELS.has(label));
+}
 
 export function parseYoutubeVideoId(url: URL): string {
   const host = url.hostname.toLowerCase();
@@ -108,8 +151,7 @@ export function pickRecipeLinks(text: string): string[] {
     } catch {
       continue;
     }
-    const host = url.hostname.toLowerCase();
-    if (NEVER_A_RECIPE.has(host)) continue;
+    if (isNeverARecipe(url.hostname)) continue;
     // A bare domain with no path is a homepage, not a recipe.
     if (url.pathname === '/' || url.pathname === '') continue;
     if (!out.includes(safe)) out.push(safe);

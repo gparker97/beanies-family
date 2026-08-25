@@ -8109,9 +8109,9 @@ const STRING_DEFS = {
     beanie: "can't read that video",
   },
   'recipeExtract.noTranscript.message': {
-    en: "This video has no captions and no recipe link, so there's nothing for beanies to read. Try pasting the recipe text, or a link to it.",
+    en: "This video's description doesn't have a recipe or a link to one, so there's nothing for beanies to read. Check the description yourself for a link to the cook's website, and paste that instead.",
     beanie:
-      "this video has no captions and no recipe link, so there's nothing for beanies to read. try pasting the recipe text, or a link to it.",
+      "this video's description doesn't have a recipe or a link to one, so there's nothing for beanies to read. check the description yourself for a link to the cook's website, and paste that instead.",
   },
   'recipeExtract.link.title': { en: 'Paste a Recipe Link', beanie: 'paste a recipe link' },
   'recipeExtract.link.label': { en: 'Recipe Link', beanie: 'recipe link' },

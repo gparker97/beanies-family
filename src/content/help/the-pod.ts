@@ -598,12 +598,12 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Paste a video link and beanies tries the most reliable route first: many cooking channels put the full recipe on their own website and link it in the description, so if there’s a link there, beanies follows it and reads the real recipe. If there isn’t, it falls back to the video’s captions and description.',
+          'Paste a video link and beanies tries the most reliable route first: many cooking channels put the full recipe on their own website and link it in the description, so if there’s a link there, beanies follows it and reads the real recipe — exact quantities and all. If there isn’t a link, beanies reads the video’s own description, which is where a lot of cooks paste the whole recipe.',
       },
       {
         type: 'callout',
         content:
-          'If a video has no captions <em>and</em> no recipe link, beanies will say it can’t read that one rather than inventing a recipe from the title. That’s deliberate — a made-up quantity in a recipe is worse than no recipe at all.',
+          'beanies reads what a video <em>writes</em> — its description and any recipe link — not what it says out loud. If a video keeps the recipe only in the narration or on screen, beanies will say it can’t read that one rather than inventing a recipe from the title. That’s deliberate — a made-up quantity in a recipe is worse than no recipe at all. If that happens, check the description for a link to the cook’s website and paste that instead.',
         title: 'Some videos can’t be read',
         icon: '🎬',
       },

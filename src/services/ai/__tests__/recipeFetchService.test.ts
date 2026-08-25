@@ -28,7 +28,6 @@ describe('content-fetch code mapping', () => {
     expect(CODE_TO_ERROR.blocked).toBe('fetch_blocked');
     expect(CODE_TO_ERROR.bad_url).toBe('fetch_blocked');
     expect(CODE_TO_ERROR.not_readable).toBe('no_content');
-    expect(CODE_TO_ERROR.no_captions).toBe('no_content');
     expect(CODE_TO_ERROR.not_image).toBe('no_content');
   });
 

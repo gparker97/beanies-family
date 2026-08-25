@@ -271,7 +271,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             message: 'refused to guess a recipe',
             context: { action: 'refused', kind, error_code: resolved.reason },
           });
-          const isVideo = resolved.reason === 'no_transcript_no_link';
+          const isVideo = resolved.reason === 'no_text_no_link';
           showToast(
             'info',
             t(isVideo ? 'recipeExtract.noTranscript.title' : 'recipeExtract.badLink.title'),

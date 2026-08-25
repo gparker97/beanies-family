@@ -26,7 +26,6 @@ export const CONTENT_FETCH_CODES = [
   'too_large',
   'timeout',
   'not_readable',
-  'no_captions',
   'not_image',
   'not_found',
   'site_refused',
@@ -49,7 +48,6 @@ export const CODE_TO_ERROR: Readonly<Record<ContentFetchCode, ExtractionErrorCod
     blocked: 'fetch_blocked',
     // Reached the host but got nothing usable back.
     not_readable: 'no_content',
-    no_captions: 'no_content',
     not_image: 'no_content',
     too_large: 'no_content',
     // The SITE said no — a dead link or a host refusing our user-agent. Not our fault and
@@ -86,8 +84,6 @@ export interface YoutubeFetchData {
   title: string;
   channel: string;
   description: string;
-  /** `null`, never `''` — "no captions" is a distinct state, not an empty one. */
-  captions: string | null;
 }
 
 export interface ImageFetchData {

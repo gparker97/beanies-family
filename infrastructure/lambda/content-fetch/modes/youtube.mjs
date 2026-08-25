@@ -1,27 +1,43 @@
 /**
- * `youtube` mode — harvest every scrap of TEXT about a video (#72 phase 3).
+ * `youtube` mode — get a recipe out of a video link (#72 phase 3).
  *
- * Greg's explicit direction: capture the full description, the title and channel, follow key
- * links, and give the model the highest possible chance — but stay inside the ADR-030
- * privacy boundary. Gemini (which can watch the video and read on-screen frames) and Whisper
- * (audio transcription) were both considered and REJECTED for exactly that reason. Do not
- * re-propose either; the boundary is the product, not an implementation detail.
+ * WHAT CHANGED, AND WHY IT MATTERS
  *
- * ACCEPTED GAP, recorded so nobody thinks it is an oversight: cooking channels routinely put
- * quantities on screen as text overlays and never say them aloud ("add the flour" while 250g
- * sits in the corner). A captions-only path misses those. That is the price of the boundary,
- * and it is why the model is told to MARK values it inferred rather than smooth them over.
+ * This mode originally tried to read the video's CAPTIONS. That approach is dead, and not
+ * only from AWS: measured from a residential connection, on a watch page with
+ * `playabilityStatus: OK`, across two videos and three caption formats, every `timedtext`
+ * fetch returns HTTP 200 with ZERO BYTES. YouTube now gates that endpoint behind a
+ * proof-of-origin token. The original local test checked that a caption track was LISTED,
+ * never that fetching it returned anything — so the feature shipped broken. Do not
+ * reintroduce a captions path without first proving a non-empty body.
  *
- * The pinned author comment is NOT fetched: YouTube loads comments through an async
- * continuation API, not the watch page, so it is unreachable without the Data API — a new
- * credential and a new cost line. Recorded as a future option, not attempted speculatively.
+ * The replacement is better than captions ever were. Recipe channels put the recipe on
+ * their OWN SITE and link it from the description, so a reliable DESCRIPTION is worth more
+ * than a transcript: the client's ladder follows that link and reads schema.org JSON-LD,
+ * getting exact quantities — "¾ cup packed light brown sugar ((165g))" — with the model
+ * never invoked. Captions at their theoretical best would have given an unpunctuated
+ * transcript in which the creator says "add the flour" while 250g sits in an on-screen
+ * overlay the audio never mentions. Structured data beats a transcript.
+ *
+ * SCOPE: this mode returns the video's TEXT and stops. Choosing what to do with it — follow
+ * a description link, fall back to the description itself, or refuse — belongs to
+ * `recipeSourceResolver` on the client, which already owns that ladder and its fetch budget.
+ * Do not re-implement link-following here; two blocklists would drift apart.
+ *
+ * ADR-030 is unchanged and unchallenged. Gemini (watches frames) and Whisper (transcribes
+ * audio) were REJECTED because they send user content outside the privacy boundary. Nothing
+ * here revisits that — this path reads public text and hands it to the same managed model.
+ *
+ * WHY INNERTUBE RATHER THAN THE WATCH PAGE: YouTube serves a bot check to datacenter IPs, so
+ * the watch page is unreadable from Lambda. The InnerTube player endpoint still answers, and
+ * still returns `videoDetails` — title and full description — even when it reports
+ * `UNPLAYABLE`. That last part is the crux: the old code checked `playabilityStatus` FIRST
+ * and returned `not_found` on a payload that had the description sitting right there in it.
  */
 import { guardedFetch } from '../guardedFetch.mjs';
-import { decodeEntities } from '../entities.mjs';
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_DESCRIPTION = 8000;
-const MAX_CAPTIONS = 20_000;
 
 /** Accept every common YouTube URL shape; return the 11-char id or ''. */
 export function parseVideoId(raw) {
@@ -41,123 +57,83 @@ export function parseVideoId(raw) {
 }
 
 /**
- * Pull `ytInitialPlayerResponse` out of the watch page.
+ * Ask InnerTube for the video's metadata.
  *
- * It is assigned as `var ytInitialPlayerResponse = {…};` inline. Brace-matching rather than
- * a greedy regex, because the object contains strings full of braces and a lazy `\{.*?\}`
- * truncates it mid-object on most videos.
+ * This is a plain public JSON endpoint — no credential, no quota, no cost line. It answers
+ * datacenter IPs that the watch page refuses. `contentCheckOk`/`racyCheckOk` stop it
+ * withholding details behind an age-gate interstitial.
  */
-export function extractPlayerResponse(html) {
-  const marker = 'ytInitialPlayerResponse';
-  const at = html.indexOf(marker);
-  if (at === -1) return null;
-  const start = html.indexOf('{', at);
-  if (start === -1) return null;
+async function fetchInnertube(videoId) {
+  const body = JSON.stringify({
+    videoId,
+    contentCheckOk: true,
+    racyCheckOk: true,
+    context: {
+      client: { clientName: 'WEB', clientVersion: '2.20240726.00.00', hl: 'en', gl: 'US' },
+    },
+  });
 
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = start; i < html.length; i++) {
-    const c = html[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (c === '\\') esc = true;
-      else if (c === '"') inStr = false;
-      continue;
-    }
-    if (c === '"') inStr = true;
-    else if (c === '{') depth++;
-    else if (c === '}') {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(html.slice(start, i + 1));
-        } catch {
-          return null;
-        }
-      }
-    }
+  const res = await guardedFetch('https://www.youtube.com/youtubei/v1/player', {
+    maxBytes: MAX_BYTES,
+    totalBudgetMs: 6000,
+    post: { body, headers: { 'content-type': 'application/json' } },
+  });
+  if (!res.ok) return null;
+
+  try {
+    return JSON.parse(res.body.toString('utf8'));
+  } catch {
+    return null;
   }
-  return null;
 }
 
-/** Prefer a creator-provided track; fall back to the auto-generated (`asr`) one. */
-export function pickCaptionTrack(player) {
-  const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-  if (!Array.isArray(tracks) || tracks.length === 0) return null;
-  const human = tracks.find((t) => t?.kind !== 'asr' && t?.baseUrl);
-  const auto = tracks.find((t) => t?.baseUrl);
-  return human ?? auto ?? null;
+/**
+ * Turn a player response into the fields we care about, or null when it carries none.
+ *
+ * `playabilityStatus` is deliberately NOT consulted. A blocked request reports UNPLAYABLE
+ * and still includes the full description; treating that as "video not found" was the bug
+ * that made every YouTube link fail with "the page may have moved" about a video sitting
+ * right there in the user's browser.
+ */
+export function readVideoDetails(player) {
+  const d = player?.videoDetails;
+  if (!d || !d.title) return null;
+  return {
+    title: String(d.title).slice(0, 200),
+    channel: String(d.author ?? '').slice(0, 200),
+    description: String(d.shortDescription ?? '').slice(0, MAX_DESCRIPTION),
+  };
 }
 
-/** YouTube's timedtext XML → plain text. */
-export function captionsXmlToText(xml) {
-  const out = [];
-  const re = /<text[^>]*>([\s\S]*?)<\/text>/gi;
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    // Strip markup BEFORE decoding, so a decoded `&lt;b&gt;` cannot become a live tag.
-    const line = decodeEntities(m[1].replace(/<[^>]+>/g, '')).trim();
-    if (line) out.push(line);
+/** Tell "YouTube refused us" apart from "this video is genuinely gone". */
+function classifyEmpty(player) {
+  const status = player?.playabilityStatus?.status ?? '';
+  const reason = String(player?.playabilityStatus?.reason ?? '').toLowerCase();
+  if (status === 'LOGIN_REQUIRED' || reason.includes('bot') || reason.includes('sign in')) {
+    return 'video_blocked';
   }
-  // Auto-captions carry no punctuation, so joining with spaces is the honest shape: the
-  // model gets a continuous transcript rather than fake sentence boundaries we invented.
-  return out.join(' ').slice(0, MAX_CAPTIONS);
+  // A real deletion or a private video says so with no details attached.
+  if (status === 'ERROR' || status === 'UNPLAYABLE') return 'not_found';
+  return 'video_blocked';
 }
 
 export async function fetchYoutube(url) {
   const videoId = parseVideoId(url);
   if (!videoId) return { ok: false, code: 'bad_url' };
 
-  // Two sequential fetches here (watch page, then the caption track), so each gets HALF the
-  // budget — otherwise the pair can exceed the Lambda's own 15s ceiling and die mid-flight,
-  // returning a CORS-less 502 outside the typed taxonomy.
-  const watch = await guardedFetch(`https://www.youtube.com/watch?v=${videoId}`, {
-    maxBytes: MAX_BYTES,
-    totalBudgetMs: 6000,
-  });
-  if (!watch.ok) return watch;
+  const player = await fetchInnertube(videoId);
+  if (!player) return { ok: false, code: 'video_blocked' };
 
-  const html = watch.body.toString('utf8');
-  const player = extractPlayerResponse(html);
-  if (!player) return { ok: false, code: 'not_readable' };
-
-  // Two very different failures look identical here, and telling them apart is the whole
-  // point of this block:
-  //
-  //  • playabilityStatus says ERROR/UNPLAYABLE → the video really is private, deleted or
-  //    region-blocked. `not_found` is the honest code.
-  //  • playabilityStatus is fine (or absent) but there are NO videoDetails → YouTube served
-  //    us a bot-check page. Verified: a video that reads perfectly from a home connection
-  //    returns this from AWS. Calling that `not_found` tells the user "the page may have
-  //    moved" about a video sitting right there in their browser — actively misleading.
-  const playability = player.playabilityStatus?.status;
-  if (playability && playability !== 'OK') {
-    return { ok: false, code: 'not_found' };
-  }
-  if (!player.videoDetails) {
-    return { ok: false, code: 'video_blocked' };
-  }
-
-  const details = player.videoDetails ?? {};
-  const title = String(details.title ?? '').slice(0, 200);
-  const channel = String(details.author ?? '').slice(0, 200);
-  const description = String(details.shortDescription ?? '').slice(0, MAX_DESCRIPTION);
-
-  let captions = null;
-  const track = pickCaptionTrack(player);
-  if (track?.baseUrl) {
-    const cap = await guardedFetch(track.baseUrl, { maxBytes: MAX_BYTES, totalBudgetMs: 6000 });
-    if (cap.ok) {
-      const t = captionsXmlToText(cap.body.toString('utf8'));
-      // null, never '' — "no captions" must be a distinct, testable state rather than
-      // something the client has to infer from an empty string.
-      captions = t.length > 0 ? t : null;
-    }
-  }
+  const details = readVideoDetails(player);
+  if (!details) return { ok: false, code: classifyEmpty(player) };
 
   return {
     ok: true,
-    data: { videoId, title, channel, description, captions },
+    data: {
+      videoId,
+      title: details.title,
+      channel: details.channel,
+      description: details.description,
+    },
   };
 }
