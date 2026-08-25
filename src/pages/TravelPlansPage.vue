@@ -40,8 +40,6 @@ import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
-import type { SegmentBuckets } from '@/utils/travelExtractionToSegments';
-import { unionTravellerIds, dedupedAppend } from '@/utils/segmentTravellers';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { formatDateShort, formatNookDate, extractDatePart } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
@@ -139,29 +137,6 @@ function allSegmentIds(ready: TravelReady): string[] {
  * document to the primary segment. A failed attach warns but never rolls back the saved trip
  * (mirrors updateVacation's activity-sync posture). Nothing fails silently.
  */
-/**
- * Pin the trip default onto every extracted segment the AI matched no travellers for. Used only
- * for a NEW AI-created trip (an attach leaves them undefined so they resolve dynamically).
- */
-function materializeUnmatchedTravellers(buckets: SegmentBuckets, defaultIds: string[]): void {
-  // An EMPTY default must stay undefined, never be written as [].
-  //
-  // A document that named no passengers — very common on hotel confirmations — yields
-  // defaultIds = []. `[]` is truthy for the `!seg.travellerIds` test, so every segment got a
-  // DEFINED empty array, and a defined array is deliberately never re-resolved when the
-  // trip's travellers change (segmentTravellers.ts). The result: nobody on the segment card,
-  // an empty avatar stack, and `travellerIds: []` handed to the calendar — so the flight
-  // appeared on no one's calendar and its departure reminder fired for no one, permanently,
-  // with no UI anywhere to clear it.
-  if (!defaultIds.length) return;
-  for (const seg of [
-    ...buckets.travelSegments,
-    ...buckets.accommodations,
-    ...buckets.transportation,
-  ]) {
-    if (!seg.travellerIds) seg.travellerIds = defaultIds;
-  }
-}
 
 /**
  * Resolve each segment's `travellerIds` from the user-confirmed name→member map (the segment id
@@ -200,55 +175,30 @@ async function onReviewSubmit(payload: {
 
   reviewSubmitting.value = true;
   try {
-    // Resolve segment travellers from the user-confirmed mapping FIRST, so the new-trip union +
-    // materialize logic below operates on resolved buckets (attach leaves unmapped undefined).
+    // Resolve segment travellers from the user-confirmed mapping FIRST, so the union +
+    // materialize logic inside the store operates on resolved buckets.
     resolveSegmentTravellersFromMap(ready, payload.travellerMap);
 
-    let vacationId: string | null = null;
-    // Maps each extracted segment id → its FINAL segment id in the saved trip. Identity for the
-    // create path; on attach, a segment merged into an existing one remaps to that existing id.
-    let idRemap: Record<string, string> = {};
-    try {
-      if (payload.target.kind === 'create') {
-        // A new trip has no travellers to inherit, so seed them from the union of everyone the
-        // document named across all segments, and materialize that default onto any segment the
-        // AI matched no names for (so they're not left "everyone" once the trip is concrete).
-        const defaultTravellers = unionTravellerIds(ready.buckets);
-        materializeUnmatchedTravellers(ready.buckets, defaultTravellers);
-        const created = await vacationStore.createVacation({
-          name: payload.tripName,
-          tripType: ready.tripType,
-          assigneeIds: defaultTravellers,
-          ideas: [],
-          travelSegments: ready.buckets.travelSegments,
-          accommodations: ready.buckets.accommodations,
-          transportation: ready.buckets.transportation,
-          createdBy,
-        });
-        vacationId = created?.id ?? null;
-      } else {
-        // Attach: merge into matching existing segments instead of duplicating; the remap tells
-        // us which final segment each extracted one landed on (for the document attachment).
-        const res = await vacationStore.addExtractedSegments(
-          payload.target.vacationId,
-          ready.buckets
-        );
-        vacationId = res?.vacation.id ?? null;
-        idRemap = res?.idRemap ?? {};
-      }
-    } catch (err) {
-      console.error('[travel-extract] failed to save extracted segments:', err);
-    }
+    // ONE call, and the cross-store transaction now lives in the store where the two
+    // traveller rules can be enforced structurally rather than by comment.
+    const saved = await vacationStore.saveExtractedTrip(
+      payload.target.kind === 'create'
+        ? { kind: 'create', tripName: payload.tripName, tripType: ready.tripType }
+        : { kind: 'attach', vacationId: payload.target.vacationId },
+      ready.buckets,
+      createdBy
+    );
 
-    if (!vacationId) {
+    if (!saved) {
       showToast('error', t('travelExtract.error.title'), t('travelExtract.error.saveFailed'));
       return;
     }
+    const { vacationId, idRemap } = saved;
 
-    // Attach the source document to EVERY final segment: store the file once, then link the same
-    // photoId to the rest (no duplicate storage). Remap through idRemap + de-dupe so a document
-    // attaches to the merged-into existing segment (not a dropped extracted id) and never double-
-    // links when two extracted segments merge into one. Warn-not-rollback.
+    // Attach the source document to EVERY final segment: store the file once, then link the
+    // same photoId to the rest (no duplicate storage). Remapped + de-duped so it lands on the
+    // merged-into existing segment rather than a dropped extracted id, and never double-links
+    // when two extracted segments merge into one. Warn-not-rollback.
     const segIds = [...new Set(allSegmentIds(ready).map((id) => idRemap[id] ?? id))];
     if (segIds.length) {
       try {
@@ -276,29 +226,17 @@ async function onReviewSubmit(payload: {
       }
     }
 
-    // Learn the confirmed legal-name → member mappings so they auto-match next time. Grouped per
-    // member (ONE write each — a second sequential write for the same member would read stale
-    // aliases and clobber the first). Warn-not-block: a failed write never undoes the saved trip.
-    if (payload.aliasesToLearn.length) {
-      try {
-        const byMember = new Map<string, string[]>();
-        for (const { memberId, alias } of payload.aliasesToLearn) {
-          byMember.set(memberId, [...(byMember.get(memberId) ?? []), alias]);
-        }
-        for (const [memberId, additions] of byMember) {
-          const member = familyStore.members.find((m) => m.id === memberId);
-          await familyStore.updateMember(memberId, {
-            aliases: dedupedAppend(member?.aliases, additions),
-          });
-        }
-      } catch (err) {
-        console.error('[travel-extract] alias learning failed:', err);
-        showToast(
-          'warning',
-          t('travelExtract.aliasLearnFailed.title'),
-          t('travelExtract.aliasLearnFailed.message')
-        );
-      }
+    // Learn the confirmed legal-name → member mappings so they auto-match next time. The
+    // one-write-per-member rule that makes this correct now lives in familyStore.learnAliases.
+    try {
+      await familyStore.learnAliases(payload.aliasesToLearn);
+    } catch (err) {
+      console.error('[travel-extract] alias learning failed:', err);
+      showToast(
+        'warning',
+        t('travelExtract.aliasLearnFailed.title'),
+        t('travelExtract.aliasLearnFailed.message')
+      );
     }
 
     reviewReady.value = null;
