@@ -24,6 +24,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useClipboard } from '@/composables/useClipboard';
 import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
@@ -903,8 +904,13 @@ function addQuickIdea() {
         <div
           v-for="vacation in upcomingVacations"
           :key="vacation.id"
-          class="cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white shadow-[var(--card-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,180,216,0.2)] hover:shadow-[0_6px_24px_rgba(0,180,216,0.08)] dark:bg-slate-800"
+          class="focus-visible:ring-primary-500 cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white shadow-[var(--card-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,180,216,0.2)] hover:shadow-[0_6px_24px_rgba(0,180,216,0.08)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-slate-800"
+          role="button"
+          tabindex="0"
+          :aria-label="fillTemplate(t('travel.openTrip'), { name: vacation.name })"
           @click="selectTrip(vacation.id)"
+          @keydown.enter.prevent="selectTrip(vacation.id)"
+          @keydown.space.prevent="selectTrip(vacation.id)"
         >
           <!-- Hero gradient with floating emoji -->
           <div
@@ -941,7 +947,7 @@ function addQuickIdea() {
                 class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
               >
                 <span
-                  class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
+                  class="flex h-[22px] w-[22px] items-center justify-center rounded-full text-xs font-bold text-white"
                   :style="{ backgroundColor: member.color }"
                 >
                   {{ member.name.charAt(0).toUpperCase() }}
@@ -975,7 +981,7 @@ function addQuickIdea() {
               class="mt-1.5"
             >
               <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgba(255,217,61,0.12)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[#B8860B]"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgba(255,217,61,0.12)] px-2.5 py-0.5 text-xs font-semibold text-[#B8860B]"
               >
                 ⏳
                 {{ vacationProgress(vacation).total - vacationProgress(vacation).booked }}
@@ -986,7 +992,7 @@ function addQuickIdea() {
             <!-- Open ideas badge — count of ideas still to decide on -->
             <div v-if="vacationOpenIdeas(vacation) > 0" class="mt-1.5">
               <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--vacation-teal-15)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[var(--vacation-teal)]"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--vacation-teal-15)] px-2.5 py-0.5 text-xs font-semibold text-[var(--vacation-teal)]"
               >
                 💡 {{ vacationOpenIdeas(vacation) }} {{ t('travel.openIdeas') }}
               </span>
@@ -995,7 +1001,7 @@ function addQuickIdea() {
             <!-- Accommodation gap warning -->
             <div v-if="computeAccommodationGaps(vacation).length > 0" class="mt-1.5">
               <span
-                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-[0.5625rem] font-semibold text-[var(--heritage-orange)]"
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-xs font-semibold text-[var(--heritage-orange)]"
               >
                 🏨 {{ computeAccommodationGaps(vacation).length }}
                 {{ computeAccommodationGaps(vacation).length === 1 ? 'night' : 'nights' }}
@@ -1026,8 +1032,13 @@ function addQuickIdea() {
           <div
             v-for="vacation in pastVacations"
             :key="vacation.id"
-            class="cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white opacity-50 shadow-[var(--card-shadow)] transition-all duration-200 hover:opacity-100 dark:bg-slate-800"
+            class="focus-visible:ring-primary-500 cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white opacity-50 shadow-[var(--card-shadow)] transition-all duration-200 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-slate-800"
+            role="button"
+            tabindex="0"
+            :aria-label="fillTemplate(t('travel.openTrip'), { name: vacation.name })"
             @click="selectTrip(vacation.id)"
+            @keydown.enter.prevent="selectTrip(vacation.id)"
+            @keydown.space.prevent="selectTrip(vacation.id)"
           >
             <div
               class="relative flex h-20 items-center justify-center overflow-hidden"
@@ -1163,7 +1174,7 @@ function addQuickIdea() {
                 class="font-outfit inline-flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-0.5 text-[0.6875rem] font-medium text-white/75"
               >
                 <span
-                  class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
+                  class="flex h-[22px] w-[22px] items-center justify-center rounded-full text-xs font-bold text-white"
                   :style="{ backgroundColor: member.color }"
                 >
                   {{ member.name.charAt(0).toUpperCase() }}
@@ -1231,9 +1242,14 @@ function addQuickIdea() {
           <!-- Ideas teaser (responsive: hidden on lg, visible on mobile/tablet) -->
           <div
             v-if="selectedVacation.ideas.length > 0"
-            class="mb-5 flex cursor-pointer items-center gap-3 rounded-2xl border-[1.5px] border-[rgba(255,217,61,0.12)] p-3 transition-all hover:shadow-[0_4px_14px_rgba(255,217,61,0.1)] lg:hidden"
+            class="focus-visible:ring-primary-500 mb-5 flex cursor-pointer items-center gap-3 rounded-2xl border-[1.5px] border-[rgba(255,217,61,0.12)] p-3 transition-all hover:shadow-[0_4px_14px_rgba(255,217,61,0.1)] focus-visible:ring-2 focus-visible:outline-none lg:hidden"
             style="background: linear-gradient(135deg, rgb(255 217 61 / 8%), rgb(0 180 216 / 6%))"
+            role="button"
+            tabindex="0"
+            :aria-label="t('travel.jumpToIdeas')"
             @click="scrollToIdeas"
+            @keydown.enter.prevent="scrollToIdeas"
+            @keydown.space.prevent="scrollToIdeas"
           >
             <span class="text-2xl">🌟</span>
             <div class="font-outfit flex-1 text-sm font-semibold text-gray-900 dark:text-gray-100">

@@ -478,7 +478,7 @@ function handleSave() {
             class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
           >
             <span
-              class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
+              class="flex h-[22px] w-[22px] items-center justify-center rounded-full text-xs font-bold text-white"
               :style="{ backgroundColor: voter!.color }"
             >
               {{ voter!.name.charAt(0).toUpperCase() }}
