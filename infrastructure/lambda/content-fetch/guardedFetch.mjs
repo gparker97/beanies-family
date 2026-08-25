@@ -163,7 +163,15 @@ function requestPinned(url, address, family, timeoutMs) {
         method: 'GET',
         // THE PIN. Hand the connection the address we already validated so the kernel
         // cannot re-resolve to a private one between the check and the connect.
-        lookup: (_hostname, _opts, cb) => cb(null, address, family),
+        //
+        // MUST honour `options.all`. Node 20 enables autoSelectFamily (Happy Eyeballs) by
+        // default, which calls this hook with `{ all: true }` and then expects an ARRAY of
+        // {address, family} back. Returning the three-argument form there yields
+        // `ERR_INVALID_IP_ADDRESS: Invalid IP address: undefined` and EVERY connection dies
+        // instantly — which is exactly what happened in production while all 57 unit tests
+        // passed, because none of them opens a real socket.
+        lookup: (_hostname, opts, cb) =>
+          opts && opts.all ? cb(null, [{ address, family }]) : cb(null, address, family),
         headers: {
           // Identify honestly; some sites 403 an unknown agent, and we would rather be
           // refused than pretend to be a browser.

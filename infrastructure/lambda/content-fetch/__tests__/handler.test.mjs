@@ -27,6 +27,11 @@ process.env.CONTENT_FETCH_API_KEY = 'test-key';
 process.env.CORS_ORIGINS = 'https://app.beanies.family';
 const { handler } = await import('../index.mjs');
 
+/** Is there real network here? The real-socket suite below is skipped when there is not. */
+const ONLINE = await fetch('https://example.com/', { method: 'HEAD' })
+  .then(() => true)
+  .catch(() => false);
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LAMBDA_DIR = join(HERE, '..');
 
@@ -386,5 +391,39 @@ describe('dispatcher', () => {
   test('every response carries CORS headers', async () => {
     const r = await handler(ev({ mode: 'nope', url: 'https://x.example' }));
     assert.equal(r.headers['Access-Control-Allow-Origin'], 'https://app.beanies.family');
+  });
+});
+
+describe('guardedFetch against a REAL socket', () => {
+  // These 3 tests exist because 57 passing unit tests shipped a guardedFetch that failed
+  // EVERY real request. The `lookup` pin returned the 3-arg form while Node 20's
+  // autoSelectFamily (Happy Eyeballs) calls it with `{all:true}` and expects an ARRAY, so
+  // every connection died with ERR_INVALID_IP_ADDRESS in ~20ms. Nothing that mocks the
+  // socket can catch that — only actually opening one can.
+  //
+  // Network-dependent by design. Skipped when offline so an offline dev is not blocked
+  // (ONLINE is resolved at module top level — `await` is not allowed in a describe body).
+
+  test('fetches a real https host through the address pin', { skip: !ONLINE }, async () => {
+    const { guardedFetch } = await import('../guardedFetch.mjs');
+    const r = await guardedFetch('https://example.com/', { maxBytes: 1024 * 1024 });
+    assert.equal(r.ok, true, `expected a successful fetch, got ${JSON.stringify(r)}`);
+    assert.ok(r.body.length > 0, 'body must not be empty');
+    assert.match(r.contentType, /text\/html/);
+  });
+
+  test('still refuses a private address on the real path', { skip: !ONLINE }, async () => {
+    const { guardedFetch } = await import('../guardedFetch.mjs');
+    const r = await guardedFetch('https://127.0.0.1/', { maxBytes: 1024 });
+    assert.equal(r.ok, false);
+    assert.equal(r.blockReason, 'private_ip');
+  });
+
+  test('enforces the size cap on a real body', { skip: !ONLINE }, async () => {
+    const { guardedFetch } = await import('../guardedFetch.mjs');
+    // example.com is ~1.2KB; a 100-byte cap must trip rather than silently truncating.
+    const r = await guardedFetch('https://example.com/', { maxBytes: 100 });
+    assert.equal(r.ok, false);
+    assert.equal(r.code, 'too_large');
   });
 });
