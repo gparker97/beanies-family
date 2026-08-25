@@ -8061,6 +8061,10 @@ const STRING_DEFS = {
     en: 'beanies found a photo of this dish and will add it when you save.',
     beanie: 'beanies found a photo of this dish and will add it when you save.',
   },
+  'recipes.detail.openPhotos': {
+    en: 'View all {count} photos',
+    beanie: 'view all {count} photos',
+  },
   'recipes.detail.source': { en: 'From', beanie: 'from' },
   'recipes.field.sourceUrl': { en: 'Link', beanie: 'link' },
   'recipes.placeholder.sourceUrl': {
