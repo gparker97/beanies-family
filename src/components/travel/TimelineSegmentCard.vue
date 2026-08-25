@@ -71,9 +71,9 @@ async function copy(value: string): Promise<void> {
     :key-value="
       item.keyValue +
       (hint?.nightFlight === 'early-morning'
-        ? ' · 🌙 early morning'
+        ? ` · 🌙 ${t('travel.flight.earlyMorning')}`
         : hint?.nightFlight === 'late-night'
-          ? ' · 🌙 late night'
+          ? ` · 🌙 ${t('travel.flight.lateNight')}`
           : '')
     "
     :collapsed="collapsed"
