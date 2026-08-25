@@ -82,3 +82,10 @@ variable "slack_error_webhook_url" {
   default     = ""
   sensitive   = true
 }
+
+variable "youtube_api_key" {
+  description = "YouTube Data API v3 key, passed to the content-fetch Lambda so recipe captures can read a video's title and description. Set TF_VAR_youtube_api_key. Optional — unset means YouTube links fail, since YouTube blocks the Lambda's egress IP on every unauthenticated route."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

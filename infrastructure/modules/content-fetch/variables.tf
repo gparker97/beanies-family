@@ -71,3 +71,10 @@ variable "slack_error_webhook_url" {
   default     = ""
   sensitive   = true
 }
+
+variable "youtube_api_key" {
+  description = "YouTube Data API v3 key. WHY THIS EXISTS: YouTube blocks the Lambda's egress IP for both the watch page and the InnerTube player endpoint, so a video's title and description are unreachable without it (measured — the same code returns the full description from a residential connection). `videos.list` costs 1 unit against a free 10,000/day quota, so a family-scale workload never approaches the limit. Optional — unset means YouTube captures fall back to InnerTube, which in production means they fail."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

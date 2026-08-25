@@ -117,6 +117,9 @@ resource "aws_lambda_function" "content_fetch" {
       # Soft key the client sends (mirrors registry/telemetry/ai-extract).
       CONTENT_FETCH_API_KEY = var.content_fetch_api_key
       CORS_ORIGINS          = join(",", var.cors_origins)
+      # Read-only, public-data, quota-limited: the weakest credential in the system, which is
+      # why it is tolerable in the environment of the one Lambda that talks to the internet.
+      YOUTUBE_API_KEY = var.youtube_api_key
     }
   }
 

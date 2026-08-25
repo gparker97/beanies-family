@@ -150,6 +150,7 @@ module "content_fetch" {
   alert_email               = var.alert_email
   # Same webhook the telemetry Lambda uses — alarms land in #beanies-errors.
   slack_error_webhook_url = var.slack_error_webhook_url
+  youtube_api_key         = var.youtube_api_key
 }
 
 module "ai_extract" {
