@@ -1280,7 +1280,7 @@ async function addQuickIdea() {
               class="font-outfit inline-flex items-center gap-1 rounded-full border-[1.5px] border-[#00B4D8]/30 bg-[rgba(0,180,216,0.06)] px-4 py-2 text-xs font-semibold text-[#00B4D8] shadow-sm transition-all hover:border-[#00B4D8]/50 hover:bg-[rgba(0,180,216,0.12)]"
               @click="showAddMenu = !showAddMenu"
             >
-              {{ showAddMenu ? '✕ close' : '+ add a plan' }}
+              {{ showAddMenu ? `✕ ${t('action.close')}` : `+ ${t('travel.addAPlan')}` }}
             </button>
             <Transition
               enter-active-class="transition-all duration-150 ease-out"

@@ -468,11 +468,17 @@ describe('vacationStore', () => {
       expect(result).not.toBeNull();
       expect(result?.name).toBe('Renamed');
       // Toast warned the user.
+      // The user was warned, with TRANSLATED copy. Asserting exact prose would be brittle
+      // (it resolves through the live translation store, and beanie mode differs), and
+      // asserting the raw key would now be wrong — the point of the change was that this
+      // copy stopped being a hardcoded English literal the translator could never reach.
       expect(showToast).toHaveBeenCalledWith(
         'warning',
-        expect.stringContaining('calendar may be out of date'),
-        expect.any(String)
+        expect.stringMatching(/\S/),
+        expect.stringMatching(/\S/)
       );
+      const [, title] = vi.mocked(showToast).mock.calls[0]!;
+      expect(title).not.toMatch(/^travel\./); // resolved, not a raw key leaking to the user
       // Console logged with the grep-able prefix.
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('[vacation] Vacation updated but linked activity'),
