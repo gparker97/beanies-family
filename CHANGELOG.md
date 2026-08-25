@@ -18,16 +18,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **YouTube recipe links now work.** Pasting a video link reads the video's description, follows the recipe link most cooking channels put there, and reads the exact ingredients from the cook's own website. Where the site publishes structured data, the quantities are read as written rather than interpreted.
 - Reading a recipe now opens straight to the link field, ready to paste. Reading from a photo or a PDF is still one tap away, just below it — the link is the everyday way in, so it no longer costs an extra tap and a second screen to reach.
 
 ### Fixed
 
 - Recipe photos: the cookbook now says "Adding the photo…" while the picture is fetched. The recipe saved immediately and the photo appeared several seconds later with nothing on screen to explain the gap.
 - A recipe page that only yields a dish name — common on roundup and category pages — now says so plainly instead of opening an otherwise empty form.
-- YouTube links that YouTube refuses to serve to an app now say exactly that, and point you at the recipe link in the video description, which almost always works.
+- A video whose description has neither a recipe nor a link to one now says so and suggests where to look, instead of reporting a dead link.
 - Very long recipe pages no longer time out. Reading a large page took over 30 seconds and gave up; it now takes milliseconds.
 - Links saved anywhere in the app (activities, travel, bank details, trip ideas) are now checked before they become clickable. A malformed or unsafe link is shown as plain text instead of a working link.
 - Clearer messages when a recipe can't be read: a dead link, a site that doesn't allow apps to read it, and a video with no captions each now say what actually happened instead of "something went wrong".
+
+### Removed
+
+- Reading a recipe from a video's **captions** has been withdrawn. It never worked: YouTube requires a token we don't have on the captions endpoint, and every request returned an empty result — including from an ordinary home connection. Videos are now read from their description and the recipe link in it, which gives exact quantities where captions would only ever have given a rough transcript.
 
 ### Security
 

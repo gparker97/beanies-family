@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isBlockedAddress, screenUrl } from '../guardedFetch.mjs';
+import { decodeEntities } from '../entities.mjs';
 import {
   extractRecipeFromHtml,
   findRecipeNode,
@@ -15,12 +16,7 @@ import {
 } from '../recipeJsonLd.mjs';
 import { htmlToText } from '../modes/page.mjs';
 import { sniffImageType } from '../modes/image.mjs';
-import {
-  parseVideoId,
-  extractPlayerResponse,
-  pickCaptionTrack,
-  captionsXmlToText,
-} from '../modes/youtube.mjs';
+import { parseVideoId, readVideoDetails } from '../modes/youtube.mjs';
 
 // Set BEFORE importing the handler: it reads the key into a module-level const.
 process.env.CONTENT_FETCH_API_KEY = 'test-key';
@@ -286,57 +282,68 @@ describe('youtube harvesting', () => {
     assert.equal(parseVideoId('nonsense'), '');
   });
 
-  test('brace-matches ytInitialPlayerResponse past nested braces in strings', () => {
-    // A lazy /\{.*?\}/ truncates here, which is why this is brace-matched.
-    const player = { videoDetails: { title: 'A {tricky} title', shortDescription: 'a}b{c' } };
-    const html = `<script>var ytInitialPlayerResponse = ${JSON.stringify(player)};</script>`;
-    const got = extractPlayerResponse(html);
-    assert.equal(got.videoDetails.title, 'A {tricky} title');
-    assert.equal(got.videoDetails.shortDescription, 'a}b{c');
-  });
+  // The caption tests that used to live here were deleted with the captions path. YouTube
+  // now gates `timedtext` behind a proof-of-origin token: measured from a residential IP on
+  // an OK watch page, across two videos and three formats, every fetch returned HTTP 200
+  // with zero bytes. The tests passed because they only checked that a track was LISTED.
+  // Entity decoding — the real value in that block — moved to its own describe below
+  // rather than being deleted with them.
 
-  test('prefers a creator track over the auto-generated one', () => {
-    const track = pickCaptionTrack({
-      captions: {
-        playerCaptionsTracklistRenderer: {
-          captionTracks: [{ kind: 'asr', baseUrl: 'https://auto' }, { baseUrl: 'https://human' }],
-        },
-      },
+  test('reads the description even when the video reports UNPLAYABLE', () => {
+    // THE REGRESSION THIS PINS. YouTube blocks datacenter IPs by setting playabilityStatus
+    // to a non-OK value while still returning the full videoDetails. The old code checked
+    // playabilityStatus FIRST and returned not_found on a payload with the description
+    // sitting right there in it, so every YouTube link failed with "the page may have moved"
+    // about a video the user could see in their browser.
+    const details = readVideoDetails({
+      playabilityStatus: { status: 'UNPLAYABLE', reason: 'Video unavailable' },
+      videoDetails: { title: 'Easy Pumpkin Pie', author: 'Preppy Kitchen', shortDescription: 'x' },
     });
-    assert.equal(track.baseUrl, 'https://human');
+    assert.equal(details.title, 'Easy Pumpkin Pie');
+    assert.equal(details.channel, 'Preppy Kitchen');
   });
 
-  test('falls back to the asr track when that is all there is', () => {
-    const track = pickCaptionTrack({
-      captions: {
-        playerCaptionsTracklistRenderer: {
-          captionTracks: [{ kind: 'asr', baseUrl: 'https://auto' }],
-        },
-      },
+  test('returns null when there really are no details to read', () => {
+    assert.equal(readVideoDetails({}), null);
+    assert.equal(readVideoDetails({ videoDetails: {} }), null);
+    assert.equal(readVideoDetails(null), null);
+  });
+
+  test('caps the description so a pathological one cannot blow the response', () => {
+    const details = readVideoDetails({
+      videoDetails: { title: 't', shortDescription: 'a'.repeat(20_000) },
     });
-    assert.equal(track.baseUrl, 'https://auto');
+    assert.equal(details.description.length, 8000);
   });
+});
 
-  test('returns null when captions are disabled', () => {
-    assert.equal(pickCaptionTrack({}), null);
-    assert.equal(
-      pickCaptionTrack({ captions: { playerCaptionsTracklistRenderer: { captionTracks: [] } } }),
-      null
-    );
-  });
+describe('entity decoding', () => {
+  // These moved here when the captions path was deleted. They guard a real shipped bug, so
+  // they outlive the feature that happened to exercise them first.
 
-  test('converts timedtext xml to plain text', () => {
-    const xml =
-      '<transcript><text start="0">add the &quot;flour&quot;</text><text start="2">then whisk</text></transcript>';
-    assert.equal(captionsXmlToText(xml), 'add the "flour" then whisk');
+  test('decodes the entities that actually appear in page text', () => {
+    assert.equal(decodeEntities('add the &quot;flour&quot;'), 'add the "flour"');
+    assert.equal(decodeEntities('salt &amp; pepper'), 'salt & pepper');
+    assert.equal(decodeEntities('&lt;b&gt;bold&lt;/b&gt;'), '<b>bold</b>');
+    assert.equal(decodeEntities('caf&#233;'), 'caf\u00e9');
   });
 
   test('does NOT double-decode — &amp;quot; stays literal', () => {
     // The naive chained-replace implementation turned &amp;quot; into a real quote, because
-    // each replacement fed the next. Text that escaped an entity would silently un-escape.
-    const xml =
-      '<transcript><text start="0">write &amp;quot; to escape a quote</text></transcript>';
-    assert.equal(captionsXmlToText(xml), 'write &quot; to escape a quote');
+    // each replacement fed the next: text that deliberately escaped an entity silently
+    // un-escaped. A single pass is the fix, and this is what proves it.
+    assert.equal(
+      decodeEntities('write &amp;quot; to escape a quote'),
+      'write &quot; to escape a quote'
+    );
+    assert.equal(decodeEntities('&amp;lt;script&amp;gt;'), '&lt;script&gt;');
+  });
+
+  test('leaves unknown entities untouched rather than guessing', () => {
+    // `&nbsp;` deliberately becomes an ORDINARY space, not U+00A0: this text is headed for
+    // an ingredient line, where a non-breaking space is an invisible character that breaks
+    // later matching and looks identical to a real one on screen.
+    assert.equal(decodeEntities('100&nbsp;&fake;g'), '100 &fake;g');
   });
 });
 

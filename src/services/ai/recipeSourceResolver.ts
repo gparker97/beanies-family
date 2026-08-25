@@ -26,7 +26,7 @@ import type { ExtractionErrorCode } from './types';
  * Lambda header so client and server logs join on the same vocabulary.
  */
 export type ExtractionPath =
-  'document' | 'jsonld' | 'page_text' | 'youtube_link_followed' | 'youtube_captions';
+  'document' | 'jsonld' | 'page_text' | 'youtube_link_followed' | 'youtube_description';
 
 export type ResolvedRecipeSource =
   /** Structured data straight from the page. The model is never invoked on this path. */
@@ -40,7 +40,7 @@ export type ResolvedRecipeSource =
   /** Text for the model to read. */
   | { kind: 'text'; text: string; path: ExtractionPath; sourceUrl: string; imageUrl: string }
   /** We can read nothing, and saying so is the correct outcome. */
-  | { kind: 'refusal'; reason: 'no_transcript_no_link' | 'not_a_recipe_url' }
+  | { kind: 'refusal'; reason: 'no_text_no_link' | 'not_a_recipe_url' }
   | { kind: 'failed'; errorCode: ExtractionErrorCode };
 
 export interface ResolverDeps {
@@ -58,6 +58,13 @@ export interface ResolverDeps {
  * the moment a fifth rung was added.
  */
 const MAX_FETCHES_PER_CAPTURE = 2;
+
+/**
+ * Below this, a description is channel boilerplate rather than a recipe. Measured against
+ * real cooking videos: a description carrying an ingredient list runs to hundreds of
+ * characters; "Subscribe for more!" runs to tens.
+ */
+const MIN_DESCRIPTION_CHARS = 200;
 
 function createFetchBudget(max: number = MAX_FETCHES_PER_CAPTURE): { take: () => boolean } {
   let used = 0;
@@ -102,7 +109,7 @@ function fromPage(
  *   2. FOLLOW KEY LINKS FIRST. Most food channels post the full recipe on their own blog,
  *      so a link in the description yields exact quantities with no inference at all. A
  *      failure here falls through rather than aborting.
- *   3. Otherwise hand the captions + harvested context to the model.
+ *   3. Otherwise hand the description + harvested context to the model.
  *   4. Otherwise REFUSE. Never reconstruct a recipe from a title.
  */
 export async function resolveRecipeSource(
@@ -130,7 +137,7 @@ export async function resolveRecipeSource(
   if (!video.success || !video.data) {
     return { kind: 'failed', errorCode: video.errorCode ?? 'provider_error' };
   }
-  const { title, channel, description, captions } = video.data;
+  const { title, channel, description } = video.data;
 
   // Rung 2 — follow the first plausible recipe link in the description.
   const links = pickRecipeLinks(description);
@@ -146,25 +153,30 @@ export async function resolveRecipeSource(
     // outcome is still recorded by the caller's telemetry via `extraction_path`.
   }
 
-  // Rung 3 — captions plus everything else we harvested.
-  if (captions) {
+  // Rung 3 — the description itself, plus the context we harvested around it.
+  //
+  // The threshold exists so "like and subscribe!" does not become a model call that can only
+  // ever come back "not a recipe". It is deliberately low: the model is the real filter, and
+  // a description long enough to hold an ingredient list is worth reading even if it is
+  // mostly prose. Refusing here is cheaper than a wrong recipe, but refusing too eagerly
+  // throws away the common case where the whole recipe is pasted below the video.
+  if (description.trim().length >= MIN_DESCRIPTION_CHARS) {
     const context = [
       title && `Video title: ${title}`,
       channel && `Channel: ${channel}`,
-      description && `Video description:\n${description}`,
-      `Transcript:\n${captions}`,
+      `Video description:\n${description}`,
     ]
       .filter(Boolean)
       .join('\n\n');
     return {
       kind: 'text',
       text: context,
-      path: 'youtube_captions',
+      path: 'youtube_description',
       sourceUrl: route.url,
       imageUrl: '',
     };
   }
 
   // Rung 4 — nothing readable. An explicit, user-visible refusal, never a silent no-op.
-  return { kind: 'refusal', reason: 'no_transcript_no_link' };
+  return { kind: 'refusal', reason: 'no_text_no_link' };
 }

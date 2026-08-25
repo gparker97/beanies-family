@@ -292,7 +292,7 @@ function readCapped(res, maxBytes, budgetMs) {
 }
 
 /** One request to a pinned address, bounded by the REMAINING wall-clock budget. */
-function requestPinned(url, address, family, budgetMs) {
+function requestPinned(url, address, family, budgetMs, post) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (v) => {
@@ -307,7 +307,7 @@ function requestPinned(url, address, family, budgetMs) {
         hostname: url.hostname,
         port: 443,
         path: `${url.pathname}${url.search}`,
-        method: 'GET',
+        method: post ? 'POST' : 'GET',
         // THE PIN. Hand the connection the address we already validated so the kernel
         // cannot re-resolve to a private one between the check and the connect.
         //
@@ -319,7 +319,7 @@ function requestPinned(url, address, family, budgetMs) {
         // passed, because none of them opens a real socket.
         lookup: (_hostname, opts, cb) =>
           opts && opts.all ? cb(null, [{ address, family }]) : cb(null, address, family),
-        headers: BROWSER_HEADERS,
+        headers: post ? { ...BROWSER_HEADERS, ...post.headers } : BROWSER_HEADERS,
       },
       (res) => finish({ ok: true, res })
     );
@@ -339,6 +339,7 @@ function requestPinned(url, address, family, budgetMs) {
       clear();
       finish({ ok: false, code: 'fetch_failed' });
     });
+    if (post) req.write(post.body);
     req.end();
   });
 }
@@ -346,6 +347,10 @@ function requestPinned(url, address, family, budgetMs) {
 /**
  * Fetch one URL under every guard. Follows up to MAX_REDIRECTS hops, RE-SCREENING each one
  * (a public host redirecting to 169.254.169.254 is the classic bypass).
+ *
+ * `post` (optional `{body, headers}`) switches the request to POST. Every guard still
+ * applies — screening, the DNS pin, the byte cap and the deadline are all method-agnostic —
+ * but redirects are refused outright, see below.
  *
  * `maxBytes` defaults rather than being required: an omitted option would make
  * `total > undefined` a NaN comparison that is always false, silently removing the size cap
@@ -356,7 +361,7 @@ function requestPinned(url, address, family, budgetMs) {
  */
 export async function guardedFetch(
   rawUrl,
-  { maxBytes = DEFAULT_MAX_BYTES, totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS } = {}
+  { maxBytes = DEFAULT_MAX_BYTES, totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS, post } = {}
 ) {
   const deadline = Date.now() + totalBudgetMs;
   let current = rawUrl;
@@ -374,7 +379,8 @@ export async function guardedFetch(
       screened.url,
       resolved.address,
       resolved.family,
-      deadline - Date.now()
+      deadline - Date.now(),
+      post
     );
     if (!attempt.ok) return attempt;
     const res = attempt.res;
@@ -382,6 +388,11 @@ export async function guardedFetch(
     const status = res.statusCode ?? 0;
     if (status >= 300 && status < 400 && res.headers.location) {
       res.destroy();
+      // SECURITY: never follow a redirect on a POST. Every hop is re-screened, but "public"
+      // is not the same as "trusted" — replaying the body would hand whatever we posted to
+      // a host the ORIGIN chose, and a 307/308 preserves the method by spec. The one caller
+      // that posts (YouTube's InnerTube) never redirects, so this costs nothing real.
+      if (post) return { ok: false, code: 'blocked', blockReason: 'post_redirect' };
       if (hop === MAX_REDIRECTS) return { ok: false, code: 'blocked', blockReason: 'redirects' };
       // Resolve relative Locations against the CURRENT url, then re-screen from the top.
       try {
