@@ -50,6 +50,7 @@ const STATUS_FOR_CODE = {
   not_readable: 422,
   not_found: 404,
   site_refused: 403,
+  video_blocked: 451,
   no_captions: 422,
   too_large: 413,
   timeout: 504,

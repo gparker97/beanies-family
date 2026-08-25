@@ -61,23 +61,31 @@ const capture = useRecipeCapture({
   },
 });
 
-/** The picker's third option — recipes can come from a link, not just a photo. */
-const linkChoice = computed(() => ({
-  id: 'link',
-  icon: 'link',
-  label: t('recipeExtract.link.choice'),
-}));
-
 function handlePastedLink(url: string): void {
   linkModalOpen.value = false;
   void capture.processUrl(url);
 }
 
-/** 🍳 entry point. Consent runs BEFORE the picker; a decline is a silent no-op. */
+/** Secondary sources, chosen from inside the link modal rather than a separate chooser. */
+function handleUseCamera(): void {
+  linkModalOpen.value = false;
+  aiDocPicker.value?.pickCamera();
+}
+function handleUseFile(): void {
+  linkModalOpen.value = false;
+  aiDocPicker.value?.pickFile();
+}
+
+/**
+ * 🍳 entry point. Consent runs BEFORE anything opens; a decline is a silent no-op.
+ *
+ * Opens the LINK modal directly. A link is the everyday source, so it gets the field
+ * focused and ready to paste; camera and file live inside that modal, one tap away.
+ */
 async function handleAddFromDocument(): Promise<void> {
   const granted = await requestConsent();
   if (!granted) return;
-  aiDocPicker.value?.pick();
+  linkModalOpen.value = true;
 }
 
 // Cross-surface dispatch: the global FAB card sets `pendingMagic` and routes here;
@@ -314,6 +322,25 @@ async function handleSaved(id: string): Promise<void> {
       @saved="handleSaved"
     />
 
+    <!-- Post-save: the recipe is saved and on screen; only its photo is still arriving.
+         A corner hint, never the blocking overlay — nothing is waiting on this. -->
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0"
+      leave-active-class="transition-opacity duration-200"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="capture.isAttaching.value"
+        class="font-outfit fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold shadow-[var(--soft-shadow)] sm:bottom-6 dark:bg-slate-800"
+      >
+        <BeanieSpinner size="sm" />
+        <span class="text-[var(--color-text)] dark:text-gray-100">
+          {{ t('recipeExtract.attaching') }}
+        </span>
+      </div>
+    </Transition>
+
     <div
       v-if="capture.isProcessing.value"
       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
@@ -334,16 +361,13 @@ async function handleSaved(id: string): Promise<void> {
       @confirm="onConsentConfirm"
       @cancel="resolveConsent(false)"
     />
-    <AiDocumentPicker
-      ref="aiDocPicker"
-      :extra-choice="linkChoice"
-      @file="(f) => void capture.processFile(f)"
-      @extra="linkModalOpen = true"
-    />
+    <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
     <RecipeLinkModal
       :open="linkModalOpen"
       @close="linkModalOpen = false"
       @submit="handlePastedLink"
+      @camera="handleUseCamera"
+      @file="handleUseFile"
     />
   </div>
 </template>

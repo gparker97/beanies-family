@@ -30,6 +30,7 @@ export const CONTENT_FETCH_CODES = [
   'not_image',
   'not_found',
   'site_refused',
+  'video_blocked',
 ] as const;
 export type ContentFetchCode = (typeof CONTENT_FETCH_CODES)[number];
 
@@ -55,6 +56,9 @@ export const CODE_TO_ERROR: Readonly<Record<ContentFetchCode, ExtractionErrorCod
     // not our outage, so it gets its own code and its own honest copy.
     not_found: 'source_unreachable',
     site_refused: 'source_unreachable',
+    // Distinct from source_unreachable: nothing is wrong with the video, YouTube just will
+    // not serve it to a server. The copy tells the user the one thing that DOES work.
+    video_blocked: 'video_blocked',
     // Transport-shaped failures reuse the existing inference codes, so the toast copy
     // already reads correctly for them.
     timeout: 'timeout',
@@ -123,7 +127,7 @@ async function post<T>(
       signal: buildSignal(signal),
     });
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
       return { success: false, errorCode: 'timeout', error: 'Content fetch timed out' };
     }
     return {
