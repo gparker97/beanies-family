@@ -3,16 +3,13 @@ import { ref, computed, nextTick } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
-import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import TimelineSegmentCard from '@/components/travel/TimelineSegmentCard.vue';
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
 import LinkedLists from '@/components/lists/LinkedLists.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripBadgeChip from '@/components/vacation/TripBadgeChip.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
-import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
 import AccommodationEditModal from '@/components/travel/AccommodationEditModal.vue';
 import TransportationEditModal from '@/components/travel/TransportationEditModal.vue';
@@ -40,7 +37,6 @@ import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
-import { useMemberInfo } from '@/composables/useMemberInfo';
 import { formatDateShort, formatNookDate, extractDatePart } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import {
@@ -55,20 +51,15 @@ import {
   overrideTripTarget,
 } from '@/utils/vacation';
 import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
-import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import StayingNowChip from '@/components/travel/StayingNowChip.vue';
-import ExpandableText from '@/components/ui/ExpandableText.vue';
-import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
-import { safeExternalHref } from '@/utils/url';
 
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
 const vacationStore = useVacationStore();
 const familyStore = useFamilyStore();
-const { getMemberName } = useMemberInfo();
-const { copied, copy } = useClipboard();
+const { copied } = useClipboard();
 const photoStore = usePhotoStore();
 
 // ── AI: add travel plans from a document (#30, flag-gated, prod-off) ───────────
@@ -640,14 +631,6 @@ async function addActivitySegment() {
 }
 
 // ── Collapsible cards ────────────────────────────────────────────────────────
-
-/** Comma-joined member names for a segment's travellers — used as the avatar-stack tooltip. */
-function travellerNames(ids: string[]): string {
-  return ids
-    .map((id) => getMemberName(id, ''))
-    .filter(Boolean)
-    .join(', ');
-}
 
 function isCollapsed(id: string): boolean {
   return collapsedCards.value[id] !== false;
@@ -1259,191 +1242,17 @@ function addQuickIdea() {
                       :end-date="item.timing.band.end.date"
                     />
 
-                    <VacationSegmentCard
-                      :icon="item.icon"
-                      :title="item.title"
-                      :status="item.status"
-                      :past="item.timing?.phase === 'past'"
-                      :data-segment-id="item.id"
-                      :key-value="
-                        item.keyValue +
-                        (hintMap.get(item.id)?.nightFlight === 'early-morning'
-                          ? ' · 🌙 early morning'
-                          : hintMap.get(item.id)?.nightFlight === 'late-night'
-                            ? ' · 🌙 late night'
-                            : '')
-                      "
+                    <TimelineSegmentCard
+                      :item="item"
                       :collapsed="isCollapsed(item.id)"
                       :read-only="!canEditActivities"
-                      show-edit
-                      deletable
-                      :hint="hintMap.get(item.id)?.message"
-                      :attachment-count="item.photoIds?.length ?? 0"
-                      @update:title="saveInlineField(item, 'title', $event)"
-                      @update:collapsed="setCollapsed(item.id, $event)"
-                      @edit="openEditModal(item)"
-                      @delete="deleteTimelineItem(item)"
-                    >
-                      <!-- Collapsed: a compact avatar stack, only when travellers are a subset -->
-                      <template v-if="item.showTravellers && isCollapsed(item.id)" #header-trailing>
-                        <div
-                          class="flex shrink-0 items-center pr-1"
-                          :title="travellerNames(item.travellers)"
-                          :aria-label="travellerNames(item.travellers)"
-                        >
-                          <MemberChip
-                            v-for="id in item.travellers"
-                            :key="id"
-                            :member-id="id"
-                            size="dot"
-                            class="-ml-1.5 first:ml-0"
-                          />
-                        </div>
-                      </template>
-
-                      <!-- "When" hero band — date/time leads, above the detail rows -->
-                      <SegmentWhenBand v-if="item.timing?.band" :band="item.timing.band" />
-
-                      <!-- Expanded: always list who's travelling -->
-                      <div class="divide-y divide-gray-100 dark:divide-slate-700/40">
-                        <div
-                          v-if="item.travellers.length"
-                          class="flex items-center gap-3 py-1 first:pt-0 last:pb-0"
-                        >
-                          <span
-                            class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
-                          >
-                            {{ t('vacation.field.travelling') }}
-                          </span>
-                          <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-                            <MemberChip
-                              v-for="id in item.travellers"
-                              :key="id"
-                              :member-id="id"
-                              size="sm"
-                            />
-                          </div>
-                        </div>
-                        <div
-                          v-for="row in item.detailRows"
-                          :key="row.label"
-                          class="flex items-center gap-3 py-1 first:pt-0 last:pb-0"
-                        >
-                          <!-- Label -->
-                          <span
-                            class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
-                          >
-                            {{ row.label }}
-                          </span>
-
-                          <!-- Copyable value (booking ref only) -->
-                          <button
-                            v-if="row.copyable"
-                            class="font-outfit inline-flex items-center gap-1.5 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2.5 py-0.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
-                            @click="copy(row.value)"
-                          >
-                            {{ row.value }}
-                            <span class="text-xs opacity-30">📋</span>
-                          </button>
-
-                          <!-- Inline-editable date/time — themed beanie pills. Night-flight
-                               hint renders alongside when a date field is a late-night or
-                               early-morning departure. -->
-                          <div
-                            v-else-if="row.field && row.inputType === 'date'"
-                            class="flex min-w-0 flex-wrap items-center gap-2"
-                          >
-                            <div class="max-w-[180px] min-w-0">
-                              <BeanieDatePicker
-                                :model-value="String(row.value ?? '')"
-                                @update:model-value="saveInlineField(item, row.field!, $event)"
-                              />
-                            </div>
-                            <span
-                              v-if="hintMap.get(item.id)?.nightFlight === 'early-morning'"
-                              class="font-outfit shrink-0 text-xs text-[var(--color-text-muted)]"
-                            >
-                              🌙 {{ t('travel.flight.earlyMorning') }}
-                            </span>
-                            <span
-                              v-else-if="hintMap.get(item.id)?.nightFlight === 'late-night'"
-                              class="font-outfit shrink-0 text-xs text-[var(--color-text-muted)]"
-                            >
-                              🌙 {{ t('travel.flight.lateNight') }}
-                            </span>
-                          </div>
-
-                          <div
-                            v-else-if="row.field && row.inputType === 'time'"
-                            class="max-w-[140px] min-w-0 shrink"
-                          >
-                            <BeanieTimeInput
-                              :model-value="String(row.value ?? '')"
-                              @update:model-value="saveInlineField(item, row.field!, $event)"
-                            />
-                          </div>
-
-                          <!-- Text / prose field — display-only with expand-to-read-more;
-                               edit via the ✏️ button on the card header -->
-                          <ExpandableText
-                            v-else-if="row.field"
-                            :text="String(row.value ?? '')"
-                            text-class="font-outfit text-sm font-medium text-gray-900 dark:text-gray-100"
-                          />
-
-                          <!-- Map link (entire row clickable) -->
-                          <a
-                            v-else-if="row.mapLink"
-                            :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="flex min-w-0 items-center gap-1.5"
-                          >
-                            <span class="truncate text-sm text-[#00B4D8] hover:underline">
-                              {{ row.value }}
-                            </span>
-                            <span class="shrink-0 text-xs opacity-40">📍</span>
-                          </a>
-
-                          <!-- Clickable link -->
-                          <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">
-                            <!-- segment.link is MODEL OUTPUT (travel extraction shape), so it is
-                                 attacker-influenceable. This read surface was missed in the first
-                                 hardening pass while the edit modals were fixed. Falls back to
-                                 plain text so a rejected link is still visible, not vanished. -->
-                            <a
-                              v-if="safeExternalHref(row.value)"
-                              :href="safeExternalHref(row.value)!"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="truncate text-sm text-[#00B4D8] hover:underline"
-                            >
-                              {{ row.value.replace(/^https?:\/\//, '') }}
-                            </a>
-                            <span v-else class="truncate text-sm opacity-70">{{ row.value }}</span>
-                            <span class="shrink-0 text-xs opacity-40">🔗</span>
-                          </div>
-
-                          <!-- Plain read-only value -->
-                          <span v-else class="text-sm text-gray-900 dark:text-gray-100">
-                            {{ row.value }}
-                          </span>
-                        </div>
-                      </div>
-
-                      <!-- Attached booking documents — thumbnail strip, opens the viewer -->
-                      <div
-                        v-if="item.photoIds && item.photoIds.length > 0"
-                        class="mt-3 flex items-center gap-2 overflow-x-auto pt-2"
-                      >
-                        <PhotoThumbnail
-                          v-for="pid in item.photoIds"
-                          :key="pid"
-                          :photo-id="pid"
-                          @open="openAttachmentViewer(item.id, item.photoIds ?? [], pid)"
-                        />
-                      </div>
-                    </VacationSegmentCard>
+                      :hint="hintMap.get(item.id)"
+                      @inline-save="saveInlineField"
+                      @edit="openEditModal"
+                      @delete="deleteTimelineItem"
+                      @update:collapsed="setCollapsed"
+                      @open-attachment="openAttachmentViewer"
+                    />
                   </div>
                 </div>
               </template>
@@ -1500,39 +1309,19 @@ function addQuickIdea() {
             >
               🤔 {{ t('vacation.stillDeciding' as any) }}
             </div>
-            <VacationSegmentCard
+            <TimelineSegmentCard
               v-for="item in undatedItems"
               :key="item.id"
-              :icon="item.icon"
-              :title="item.title"
-              :status="item.status"
-              :key-value="item.keyValue"
+              :item="item"
               :collapsed="isCollapsed(item.id)"
               :read-only="!canEditActivities"
-              show-edit
-              deletable
-              :attachment-count="item.photoIds?.length ?? 0"
-              @update:title="saveInlineField(item, 'title', $event)"
-              @update:collapsed="setCollapsed(item.id, $event)"
-              @edit="openEditModal(item)"
-              @delete="deleteTimelineItem(item)"
-            >
-              <template v-if="item.showTravellers && isCollapsed(item.id)" #header-trailing>
-                <div
-                  class="flex shrink-0 items-center pr-1"
-                  :title="travellerNames(item.travellers)"
-                  :aria-label="travellerNames(item.travellers)"
-                >
-                  <MemberChip
-                    v-for="id in item.travellers"
-                    :key="id"
-                    :member-id="id"
-                    size="dot"
-                    class="-ml-1.5 first:ml-0"
-                  />
-                </div>
-              </template>
-            </VacationSegmentCard>
+              :hint="hintMap.get(item.id)"
+              @inline-save="saveInlineField"
+              @edit="openEditModal"
+              @delete="deleteTimelineItem"
+              @update:collapsed="setCollapsed"
+              @open-attachment="openAttachmentViewer"
+            />
           </div>
         </div>
 
