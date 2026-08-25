@@ -118,6 +118,15 @@ export async function fetchYoutube(url) {
   const player = extractPlayerResponse(html);
   if (!player) return { ok: false, code: 'not_readable' };
 
+  // A private, deleted or region-blocked video parses fine but carries no videoDetails.
+  // Returning ok:true with empty strings would send the user down the "no captions"
+  // refusal with the wrong explanation — it is not that we could not read the captions,
+  // it is that there is no video to read.
+  const playability = player.playabilityStatus?.status;
+  if (!player.videoDetails || (playability && playability !== 'OK')) {
+    return { ok: false, code: 'not_found' };
+  }
+
   const details = player.videoDetails ?? {};
   const title = String(details.title ?? '').slice(0, 200);
   const channel = String(details.author ?? '').slice(0, 200);

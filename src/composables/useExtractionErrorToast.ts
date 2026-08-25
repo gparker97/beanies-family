@@ -55,6 +55,15 @@ export function useExtractionErrorToast() {
         // SSRF guard caught it). Info, not error: nothing is broken on our side.
         showToast('info', t('recipeExtract.badLink.title'), t('recipeExtract.badLink.message'));
         return;
+      case 'source_unreachable':
+        // The link is dead, or the site blocks automated readers. Actionable by the user,
+        // and nothing is broken here — so info, and never an error surface.
+        showToast(
+          'info',
+          t('recipeExtract.unreachable.title'),
+          t('recipeExtract.unreachable.message')
+        );
+        return;
       case 'no_content':
         // The fetch worked; the page/video just had nothing readable in it.
         showToast('info', t('recipeExtract.noContent.title'), t('recipeExtract.noContent.message'));
