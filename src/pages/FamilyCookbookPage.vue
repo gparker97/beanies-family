@@ -15,6 +15,7 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
@@ -92,7 +93,13 @@ function thumbFor(recipe: Recipe): string | null {
 }
 
 function openAdd(): void {
+  // The overlay blocks the button, but the `add-recipe` quick-add intent can fire
+  // programmatically. Opening the blank form here would strand the in-flight extraction:
+  // useFormModal runs onNew on the open TRANSITION only, so the prefill would never apply
+  // and the held source would attach to whatever the user typed instead.
+  if (capture.isProcessing.value) return;
   editing.value = null;
+  prefill.value = null;
   modalOpen.value = true;
 }
 
@@ -280,6 +287,20 @@ async function handleSaved(id: string): Promise<void> {
       @close="closeModal"
       @saved="handleSaved"
     />
+
+    <div
+      v-if="capture.isProcessing.value"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+    >
+      <div
+        class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
+      >
+        <BeanieSpinner size="lg" :halo="true" />
+        <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t('ai.processing') }}
+        </p>
+      </div>
+    </div>
 
     <DocumentExtractConsentModal
       :open="consentOpen"

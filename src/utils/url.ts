@@ -101,7 +101,12 @@ export function ensureHttpUrl(url: string): string {
  * Longest URL we will authorise. Well above any real link, low enough that a hostile
  * model response cannot push a megabyte string into an `href` or the Automerge doc.
  */
-const MAX_SAFE_URL_LENGTH = 2000;
+const MAX_SAFE_URL_LENGTH = 8192;
+/**
+ * Tighter cap for MACHINE-supplied URLs. A person may legitimately paste a long signed
+ * booking link; a model has no such excuse, and a huge URL from a model is a red flag.
+ */
+const MAX_MACHINE_URL_LENGTH = 2000;
 
 /**
  * Shared screen behind {@link safeExternalHref} and {@link safeHttpsUrl}.
@@ -110,13 +115,22 @@ const MAX_SAFE_URL_LENGTH = 2000;
  * carries no embedded credentials. A bare domain is given `https://`, but a string that
  * ALREADY declares a scheme is never re-schemed — screening that scheme is the whole job.
  */
-function parseSafeUrl(raw: string | null | undefined, allowed: readonly string[]): string | null {
+function parseSafeUrl(
+  raw: string | null | undefined,
+  allowed: readonly string[],
+  maxLength: number = MAX_SAFE_URL_LENGTH
+): string | null {
   if (!raw) return null;
   const trimmed = String(raw).trim();
-  if (!trimmed || trimmed.length > MAX_SAFE_URL_LENGTH) return null;
-  // NOTE: the test is `scheme:` not `scheme://` — `javascript:alert(1)` declares a scheme
-  // with no authority, and must be screened rather than turned into a bare domain.
-  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  if (!trimmed || trimmed.length > maxLength) return null;
+  // The probe requires `://`, NOT a bare `scheme:`. A bare-colon test looks safer but
+  // misreads `example.com:8080/path` and `nas.local:5000` as declaring the schemes
+  // "example.com:" / "nas.local:", so perfectly good stored links stop being clickable —
+  // a regression against the `ensureHttpUrl` this replaced at seven call sites.
+  // Requiring `://` is still safe: `javascript://%0aalert(1)` HAS `//`, so it is treated
+  // as schemed and rejected by the allowlist below, while `javascript:alert(1)` (no `//`)
+  // gets an `https://` prefix and then fails to parse. Both are covered by tests.
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   let url: URL;
   try {
     url = new URL(candidate);
@@ -155,7 +169,7 @@ export function safeExternalHref(raw: string | null | undefined): string | null 
  * or downgraded. Returns `null` to mean "drop it silently".
  */
 export function safeHttpsUrl(raw: string | null | undefined): string | null {
-  const parsed = parseSafeUrl(raw, ['https:']);
+  const parsed = parseSafeUrl(raw, ['https:'], MAX_MACHINE_URL_LENGTH);
   if (parsed === null) return null;
   // `new URL` normalizes away an explicit :443, so any surviving port is non-default.
   return new URL(parsed).port === '' ? parsed : null;

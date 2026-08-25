@@ -1590,6 +1590,9 @@ async function confirmReschedule() {
                 >
                   {{ activity.link.replace(/^https?:\/\//, '') }}
                 </a>
+                <!-- Rejected link: still shown, so the user can see and correct what they
+                     saved rather than the field collapsing to a bare 🔗 with no content. -->
+                <span v-else class="truncate text-sm opacity-70">{{ activity.link }}</span>
                 <span class="shrink-0 text-xs opacity-40" aria-hidden="true">🔗</span>
               </div>
             </template>

@@ -136,7 +136,24 @@ describe('safeExternalHref', () => {
     expect(safeExternalHref('   ')).toBeNull();
     expect(safeExternalHref(null)).toBeNull();
     expect(safeExternalHref(undefined)).toBeNull();
-    expect(safeExternalHref(`https://x.com/${'a'.repeat(2100)}`)).toBeNull();
+    expect(safeExternalHref(`https://x.com/${'a'.repeat(9000)}`)).toBeNull();
+  });
+
+  // REGRESSION (found by /code-review max): the first cut probed for a bare `scheme:`,
+  // which misreads `host:port` as a scheme and silently made working stored links
+  // unclickable — with no toast, no console warning and no telemetry, so a user report
+  // would read "my link disappeared" and nothing would explain it. The probe now requires
+  // `://`, which is still safe because every dangerous payload either carries `//`
+  // (rejected by the allowlist) or fails to parse once prefixed.
+  it('keeps scheme-less host:port links working', () => {
+    expect(safeExternalHref('example.com:8080/path')).toBe('https://example.com:8080/path');
+    expect(safeExternalHref('nas.local:5000')).toBe('https://nas.local:5000/');
+    expect(safeExternalHref('localhost:3000')).toBe('https://localhost:3000/');
+  });
+
+  it('allows a long-but-legitimate link (signed booking URLs are not abuse)', () => {
+    const long = `https://booking.example.com/confirm?sig=${'a'.repeat(3000)}`;
+    expect(safeExternalHref(long)).toBe(long);
   });
 
   it('allows the two web schemes and gives a bare domain https', () => {
@@ -153,6 +170,13 @@ describe('safeHttpsUrl', () => {
   it('rejects everything safeExternalHref rejects', () => {
     expect(safeHttpsUrl('javascript:' + '//%0aalert(1)')).toBeNull();
     expect(safeHttpsUrl('https://user:pass@evil.com/')).toBeNull();
+  });
+
+  it('caps machine URLs tighter than user-typed ones', () => {
+    // A person may paste a 3000-char signed link; a model has no such excuse.
+    const long = `https://x.example.com/${'a'.repeat(3000)}`;
+    expect(safeExternalHref(long)).not.toBeNull();
+    expect(safeHttpsUrl(long)).toBeNull();
   });
 
   it('is stricter than safeExternalHref: no http, no non-default port', () => {
