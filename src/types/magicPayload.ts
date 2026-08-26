@@ -76,6 +76,15 @@ export interface ResultEnvelope {
   truncated?: boolean;
   /** Present iff the share was a link. The ONE home for link provenance. */
   link?: ShareLink;
+  /**
+   * Where this capture entered from.
+   *
+   * `recipe-extract` pairs a `start` event with a `ready` one so a failure RATE is
+   * computable. The in-app paths log `start` themselves before their await; a SHARE has
+   * already done its reading elsewhere and arrives straight at delivery, so without this
+   * flag its `ready` had no denominator and the pair silently stopped balancing.
+   */
+  origin?: 'share';
 }
 
 /** A classified extraction result routed to the page that owns its review modal. */

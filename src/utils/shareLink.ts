@@ -7,6 +7,7 @@
 // unit tests instead of coverage-by-proxy through a 175-line function.
 
 import { isSameRegistrableDomain, safeHttpsUrl } from '@/utils/url';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type { ShareLink } from '@/types/magicPayload';
 import type { ExtractionPath } from '@/services/ai/recipeSourceResolver';
 
@@ -25,14 +26,28 @@ export function boundedDishImage(link: ShareLink, mapperImage: string | null): s
   if (mapperImage) return mapperImage;
   if (!link.imageUrl) return null;
 
+  // Both rejections below are LOGGED, not just returned. This is the sole authorising
+  // control on a server-side image fetch, and without the event "the bound rejected it" is
+  // indistinguishable from "the site has no photo" — which is exactly the state that made a
+  // whole capture rung look broken once before. `console.warn` never leaves the device.
   const safe = safeHttpsUrl(link.imageUrl);
-  if (!safe) return null;
+  if (!safe) {
+    logEvent({
+      level: 'info',
+      surface: 'recipe-extract',
+      message: 'dish image rejected: not a usable https URL',
+      context: { action: 'image_rejected', kind: link.kind, detail: 'scheme' },
+    });
+    return null;
+  }
   if (!isSameRegistrableDomain(safe, link.pageUrl)) {
-    console.warn(
-      '[share-link] dropped a page-supplied image from a different domain than the page ' +
-        'it came from — a page may only name its own images. page=%s',
-      link.pageUrl
-    );
+    logEvent({
+      level: 'info',
+      surface: 'recipe-extract',
+      message: 'dish image rejected by domain bound',
+      // Never the URL itself — a page-authored value. The enum says which check failed.
+      context: { action: 'image_rejected', kind: link.kind, detail: 'cross_domain' },
+    });
     return null;
   }
   return safe;
