@@ -134,8 +134,13 @@ const pendingMagic = ref<PendingMagic | null>(null);
 export const pendingMagicReader = computed(() => pendingMagic.value?.reader ?? null);
 
 /**
- * Drop any un-consumed request. The share orchestrator calls this on its failure paths so a
- * dead-ended share cannot pin a File in memory until the next navigation.
+ * Drop any un-consumed request.
+ *
+ * The share orchestrator deliberately does NOT call this: it only ever sets the ref by
+ * dispatching, so clearing on a failure path cancelled a magic-reader request the USER had
+ * just made from the FAB. Kept because a payload does hold a File until a page reads it, and
+ * a future caller that owns the request may legitimately need to drop it — but it must only
+ * ever be called by whoever set it.
  */
 export function clearPendingMagic(): void {
   pendingMagic.value = null;

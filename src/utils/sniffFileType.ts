@@ -39,3 +39,22 @@ export async function sniffFileType(file: File): Promise<SniffedType | null> {
   }
   return null;
 }
+
+/**
+ * Return a File whose declared `type` matches its actual bytes.
+ *
+ * Sniffing only to accept-or-reject leaves the two halves disagreeing: acceptance used the
+ * bytes while `isPdfFile` downstream still read `file.type`/the name, so a real PDF an
+ * Android provider declared as `application/octet-stream` was accepted and then handed to
+ * the image compressor. Re-stamping here means one answer is used everywhere.
+ *
+ * Returns the ORIGINAL file when the bytes are unrecognised (HEIC and friends), so the
+ * declared type still governs those.
+ */
+export async function withSniffedType(file: File): Promise<File> {
+  const sniffed = await sniffFileType(file).catch(() => null);
+  if (!sniffed || sniffed === file.type) return file;
+  const ext = sniffed === 'application/pdf' ? '.pdf' : `.${sniffed.split('/')[1]}`;
+  const base = file.name.replace(/\.[^.]*$/, '') || 'shared';
+  return new File([file], `${base}${ext}`, { type: sniffed });
+}
