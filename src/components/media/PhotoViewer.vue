@@ -178,6 +178,14 @@ function handleKeydown(e: KeyboardEvent): void {
   } else if (e.key === 'ArrowRight') {
     e.preventDefault();
     goNext();
+  } else if (e.key === 'Escape') {
+    // The floating X was the ONLY way out of this viewer — no backdrop close, and neither
+    // this component nor BaseModal handled Escape. That is an accessibility problem on its
+    // own (a modal must be dismissable from the keyboard), and it is what made the
+    // safe-area bug above so painful: with the X sitting under the status bar on native,
+    // there was no second way out at all.
+    e.preventDefault();
+    emit('close');
   }
 }
 
@@ -256,9 +264,19 @@ async function handleRemoveMissing(): Promise<void> {
         tactile cue without introducing brand color (which would
         compete with the photo).
       -->
+      <!--
+        The top offset carries the SAFE-AREA INSET, not a bare `top-4`.
+
+        On native the WebView deliberately draws under a transparent status bar
+        (`setDecorFitsSystemWindows(false)` in MainActivity, ADR-029), so 16px from the top of
+        the viewport puts this button behind the system clock — visible, but the OS takes the
+        taps. Reported from a device: the only way out of a photo was the back gesture.
+        `env(safe-area-inset-top)` is 0 on the web, so the web position is unchanged.
+      -->
       <button
         type="button"
-        class="absolute top-4 right-4 z-10 rounded-full bg-black/55 p-2.5 text-white shadow-lg backdrop-blur-sm transition-all duration-150 hover:scale-110 hover:bg-black/75 active:scale-95"
+        class="absolute right-4 z-10 rounded-full bg-black/55 p-2.5 text-white shadow-lg backdrop-blur-sm transition-all duration-150 hover:scale-110 hover:bg-black/75 active:scale-95"
+        style="top: calc(env(safe-area-inset-top, 0px) + 1rem)"
         :aria-label="t('photos.close')"
         @click="emit('close')"
       >
@@ -392,7 +410,8 @@ async function handleRemoveMissing(): Promise<void> {
       -->
       <div
         v-if="photoIds.length > 1"
-        class="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3 py-2 backdrop-blur-sm"
+        class="absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3 py-2 backdrop-blur-sm"
+        style="bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem)"
         aria-hidden="true"
       >
         <span

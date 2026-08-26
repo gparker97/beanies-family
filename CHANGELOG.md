@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The close button on a photo is reachable again on phones.** It sat under the system clock, which took the taps — and since the viewer had no other way out, the only escape was the back gesture. It now clears the status bar, and Escape closes it too.
 - **The footer's "sign in" link went to the sign-up page.** On every page, the footer's "sign in" sent you to `/welcome` instead of `/login` — the nav's equivalent link was always correct. It now goes where it says.
 - **Marketing-site CTA tracking now covers every call-to-action.** The three CTA goals were only wired to the homepage hero and the beanstalk footer, so the "create your bean pod" buttons in the nav (on every page), the one at the bottom of the homepage, and the inline links in the story section recorded nothing. All seven are now tracked, each tagged with its placement so the nav can be compared against the hero.
 
