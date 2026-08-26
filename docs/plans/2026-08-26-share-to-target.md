@@ -384,6 +384,46 @@ Written to be **independently verifiable** — each says what to observe, not wh
 - **Pass 3 (Sustainability / maintainability)**: removed the second page cap — files are the wrong unit (a shared PDF is many pages) and two caps drift, so `MAX_EXTRACT_PAGES` is enforced only inside `prepareImageDataUrls`, which now stops collecting at the cap so N files cost at most cap-many passes. Typed the dispatch payload as a discriminated `SharePayload` union in a standalone `src/types/magicPayload.ts` (no import cycle, `assertNever` at every consumer) instead of an untyped `{ data, … }` bag. Dropped the proposed `canRead` record — two ways to ask the same question — in favour of extracting ONE setup-free `isReaderEnabled(reader)` predicate that the existing computeds and the orchestrator both use, which also closes a real gap: availability is permission × flag, so a member without `canEditActivities` now gets an honest message. Kept `App.vue` (already 2056 lines) to a two-line diff by formalising a `ShareAdapter` interface + registry under `src/services/share/` driven by one `useShareTargets()` call, so a fourth platform is one file and no `if (platform === …)` chain exists. Specified consent-singleton concurrency (shared in-flight promise) and a single orchestrator re-entrancy guard that refuses audibly rather than the wedges' silent early return. Flagged that `deliverRecipe` is not a pure code move (it owns `pendingSource`/`pendingCompressed`/`discardPendingSource`) and pinned `ResultEnvelope.sourceFile` as non-optional so `TravelReady`'s existing contract is not loosened. Added a "no new review modals" requirement (the near-duplicate-modal failure mode), an explicit complexity budget with numbers, a mapping-totality test, and a 7-step independently-revertible sequencing plan that lands the three refactors before any share code.
 - **Pass 4 (Fresh-eyes final sweep)**: moved the ADR-030 gate out of the entry points and into the shared path — `requestConsent()` now mints an opaque branded `ConsentGrant` that `ExtractOptions` requires, so an ungated call to the AI pipeline is a compile error rather than a convention in a comment (this is the exact defect class the project shipped once already). Corrected the consent count from three mounts to FOUR (`RecipeFormModal.vue` was missed, and has two extra `requestConsent` call sites), made `DocumentExtractConsentModal` self-contained like `ConfirmModal` so `App.vue` needs no `useAiCapability` wiring, and flagged two refactor traps: `useSettingsStore()` must be called lazily or the singleton throws at boot, and the global mount must stack above `RecipeFormModal`. Added a readiness precondition (signed out / family still hydrating / AI unconfigured) — a cold-start share previously would have fired an AI call for an unloaded family behind a login redirect — with a `not_ready` event. Added a Security section for the newly-exported inbound surface (resolve MIME from content not the sender's claim, byte caps before base64, filename sanitisation before it reaches `new File()` and storage, no content in diagnostics). Flagged that the orchestrator must dispatch into the SAME `useRecipeCapture` instance that later runs `attachAfterSave`, with a dedicated integration test, and required the Android intent to be cleared so rotation cannot re-deliver a share. Made the multi-file provenance limit explicit (file 1 is the attachment) rather than implicit. Rewrote the acceptance criteria to be independently verifiable — grep counts, network-log observations, a `@ts-expect-error` negative test, a real CloudWatch event read — and added a red-first testing discipline, because green suites have twice hidden real defects here.
 
+## Outcome
+
+> Implemented 2026-08-26 across four commits (`dde4af26` → `d074f4e1`), pushed to `main`, **not deployed**.
+
+**Steps 1–5 and 7 shipped. Step 6 (iOS) is written but inert.**
+
+What changed against the plan as written:
+
+1. **`processFile` gained a parameter.** The plan said its signature would not change, but the
+   `ConsentGrant` has to reach `extract*`, and consent runs BEFORE the picker opens while the
+   extraction happens after a file is chosen. The alternatives were stashing the grant in
+   module state (invisible coupling) or moving consent after the picker (reversing the
+   privacy-correct order). Picker behaviour is unchanged.
+2. **The consumer became generic per reader.** The plan had each page's consumer narrow on
+   `payload.kind` and close with `assertNever`, but a page only ever handles ITS kind, so an
+   exhaustive switch would not type-check. Instead `useMagicReaderConsumer<R>` resolves the
+   payload to the one variant that reader can receive, and `consumePendingMagic` reports a
+   kind/reader mismatch rather than casting it away.
+3. **Android uses a first-party plugin.** Assumption 3 said to check `send-intent` first: it
+   peer-deps `@capacitor/core >=7` (this app is on 8.5) and had not been published in 18
+   months, so the plan's stated fallback applied.
+4. **The public extractors widened to `File | File[]`** rather than gaining an overload. Every
+   existing call site passes a single `File` and is unaffected.
+
+Two defects were caught by writing the tests rather than by review:
+
+- The orchestrator's `finally` cleared the dispatch channel unconditionally — including
+  immediately after a successful hand-off — so the page would have received nothing and the
+  whole feature would have silently done nothing.
+- The rasterizer mock replaced the whole module without re-exporting `MAX_EXTRACT_PAGES`,
+  which made the page arithmetic `NaN` and would have passed every cap assertion for the
+  wrong reason.
+
+**Owed before this can ship:**
+
+- The ai-extract Lambda deploys FIRST (the client requests `task: 'share'`).
+- The iOS Share Extension target, app-group entitlement and `ShareIntentPlugin.swift`.
+- The manual on-device matrix (§ Testing Plan items 12–14) — nothing native has been compiled.
+- Store data-collection declarations for `file_count` + `cold_start`.
+
 ## Prompt Log
 
 > No GitHub issue created — this plan was approved for direct implementation, so the full
