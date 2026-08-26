@@ -4,6 +4,7 @@ import android.content.ContentResolver;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Parcelable;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import com.getcapacitor.JSArray;
@@ -16,30 +17,34 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 /**
  * Receives ACTION_SEND / ACTION_SEND_MULTIPLE and hands the shared documents to the WebView
  * (#64), so beanies appears in the Android share sheet for photos, screenshots and PDFs.
  *
  * Written first-party rather than taking the `send-intent` dependency: that plugin's peer
- * range stops at Capacitor 7 (this app is on 8.5) and it had not been published in 18 months
- * at the time of writing. It also returns a raw URI string, leaving the content-resolution
- * and permission handling below to be written anyway.
+ * range stops at Capacitor 7 (this app is on 8.5) and it had not been published in 18 months.
  *
  * DELIVERY. `launchMode="singleTask"` means a WARM app receives the share through
  * `onNewIntent`, while a COLD launch already has it on `getIntent()`. Both are drained here:
- * the JS side calls `consume()` once it is listening, which returns whatever is pending, and
- * `onNewIntent` pushes to the same buffer and notifies. The consumed intent is CLEARED (both
- * the buffer and the Activity's intent) so a configuration change — rotation, a dark-mode
- * toggle — cannot re-deliver a share that has already been read.
+ * the JS side calls `consume()` once it is listening, and `onNewIntent` notifies it. The
+ * consumed intent is CLEARED so a configuration change cannot re-deliver a share.
+ *
+ * URIS ARE BUFFERED, BYTES ARE NOT. Only the `content://` URIs are captured on the intent
+ * thread; the reads and Base64 encoding happen in `consume()`, which Capacitor runs on its
+ * background HandlerThread. Doing the read at `load()` — which runs inside `onCreate`, before
+ * the WebView is even loaded — meant a 20 MB PDF from a network-backed provider blocked the
+ * UI thread through a binder read plus a full encode, which is an ANR at five seconds.
  *
  * SECURITY. This filter is EXPORTED: any app on the device can invoke it with content of its
- * choosing. Nothing here trusts the sender. The declared MIME is passed through for
- * information only and the JS side re-decides from the resolved bytes; the read is bounded by
- * MAX_BYTES so a hostile sender cannot exhaust memory; and a per-URI failure is reported to
- * JS rather than being dropped, so "nothing happened" is never the outcome.
+ * choosing, so nothing here trusts the sender.
+ *  - Unparcelling is wrapped: a hostile app can send an unknown-class Parcelable
+ *    (BadParcelableException) or a non-Uri one (ClassCastException), and on the warm path
+ *    there is NO framework catch above this — an uncaught throw there kills the process.
+ *  - The item count is capped, not just the per-item size: twenty 25 MB photos would
+ *    otherwise accumulate half a gigabyte of base64 before the JS side filters anything.
+ *  - Failures are COUNTED and reported across the bridge, so a partial share can be reported
+ *    as partial instead of looking like a small one.
  */
 @CapacitorPlugin(name = "ShareIntent")
 public class ShareIntentPlugin extends Plugin {
@@ -47,16 +52,27 @@ public class ShareIntentPlugin extends Plugin {
     /** Matches the JS-side per-file cap (AI_PICKER_MAX_BYTES). Bounds a hostile sender. */
     private static final long MAX_BYTES = 25L * 1024L * 1024L;
 
-    /** Documents received but not yet read by the WebView. */
-    private final List<JSObject> pending = new ArrayList<>();
+    /**
+     * Most documents read from one share. Matches MAX_EXTRACT_PAGES on the JS side: the
+     * extraction reads at most five pages, so decoding a sixth is provably wasted work.
+     */
+    private static final int MAX_ITEMS = 5;
+
+    /** URIs received but not yet read. Guarded by `lock` — see the threading note above. */
+    private final List<Uri> pending = new ArrayList<>();
+
+    private final Object lock = new Object();
 
     /** True when the pending batch arrived with the launch rather than while running. */
     private boolean pendingColdStart = false;
 
+    /** How many URIs the sender offered, including any dropped by MAX_ITEMS. */
+    private int pendingOffered = 0;
+
     @Override
     public void load() {
         // A cold launch: the share is already on the Activity's intent by the time the
-        // WebView boots. Buffer it now; `consume()` collects it once JS is listening.
+        // WebView boots. Capture the URIs only — the reads happen off this thread.
         Intent intent = getActivity().getIntent();
         if (isShareIntent(intent)) {
             buffer(intent, true);
@@ -78,17 +94,44 @@ public class ShareIntentPlugin extends Plugin {
         notifyListeners("shareReceived", new JSObject());
     }
 
-    /** Hand over everything buffered, then forget it. Safe to call when nothing is pending. */
+    /**
+     * Read everything buffered and hand it over, then forget it.
+     *
+     * Runs on Capacitor's background HandlerThread, which is why the reads live here and why
+     * the buffer is copied under the lock before any I/O — a share arriving mid-read would
+     * otherwise mutate the list being iterated.
+     */
     @PluginMethod
     public void consume(PluginCall call) {
-        JSObject result = new JSObject();
+        final List<Uri> batch;
+        final boolean coldStart;
+        final int offered;
+        synchronized (lock) {
+            batch = new ArrayList<>(pending);
+            coldStart = pendingColdStart;
+            offered = pendingOffered;
+            pending.clear();
+            pendingColdStart = false;
+            pendingOffered = 0;
+        }
+
         JSArray files = new JSArray();
-        for (JSObject file : pending) files.put(file);
+        int read = 0;
+        for (Uri uri : batch) {
+            JSObject file = readUri(uri);
+            if (file != null) {
+                files.put(file);
+                read += 1;
+            }
+        }
+
+        JSObject result = new JSObject();
         result.put("files", files);
-        result.put("coldStart", pendingColdStart);
-        // Cleared BEFORE resolving: a rotation mid-call must not re-deliver these.
-        pending.clear();
-        pendingColdStart = false;
+        result.put("coldStart", coldStart);
+        // The JS side compares these: `offered > read` means the share was partial, which
+        // must be said out loud rather than looking like a smaller share than it was.
+        result.put("offered", offered);
+        result.put("read", read);
         call.resolve(result);
     }
 
@@ -106,25 +149,40 @@ public class ShareIntentPlugin extends Plugin {
         getActivity().setIntent(new Intent(Intent.ACTION_MAIN));
     }
 
+    /** Capture the shared URIs. Never throws — see the unparcelling note in the header. */
     private void buffer(Intent intent, boolean coldStart) {
         List<Uri> uris = new ArrayList<>();
-        if (Intent.ACTION_SEND.equals(intent.getAction())) {
-            Uri single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-            if (single != null) uris.add(single);
-        } else {
-            ArrayList<Uri> many = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-            if (many != null) {
-                for (Uri uri : many) if (uri != null) uris.add(uri);
+        int offered = 0;
+        try {
+            if (Intent.ACTION_SEND.equals(intent.getAction())) {
+                Parcelable single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                offered = single == null ? 0 : 1;
+                if (single instanceof Uri) uris.add((Uri) single);
+            } else {
+                ArrayList<Parcelable> many =
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                if (many != null) {
+                    offered = many.size();
+                    for (Parcelable item : many) {
+                        if (uris.size() >= MAX_ITEMS) break;
+                        if (item instanceof Uri) uris.add((Uri) item);
+                    }
+                }
             }
+        } catch (Exception | Error e) {
+            // A hostile Parcelable must not take the process down. `Error` is caught too:
+            // an OutOfMemoryError on a huge parcel is not an Exception and would otherwise
+            // escape every handler between here and the top of the warm-delivery path.
+            android.util.Log.w("beanies-share", "could not read the shared intent", e);
+            return;
         }
 
-        for (Uri uri : uris) {
-            JSObject file = readUri(uri);
-            // A per-URI failure is REPORTED, not skipped: the JS side counts what it was
-            // given against what it could read, so a partial share is never silently partial.
-            if (file != null) pending.add(file);
+        synchronized (lock) {
+            pending.clear();
+            pending.addAll(uris.subList(0, Math.min(uris.size(), MAX_ITEMS)));
+            pendingOffered = offered;
+            pendingColdStart = coldStart;
         }
-        pendingColdStart = coldStart;
     }
 
     /** Resolve one content:// URI into a base64 payload, or null if it cannot be read. */
@@ -136,23 +194,25 @@ public class ShareIntentPlugin extends Plugin {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] chunk = new byte[8192];
             long total = 0;
-            int read;
-            while ((read = in.read(chunk)) != -1) {
-                total += read;
+            int count;
+            while ((count = in.read(chunk)) != -1) {
+                total += count;
                 // Stop reading rather than buffering an unbounded amount from another app.
                 if (total > MAX_BYTES) return null;
-                out.write(chunk, 0, read);
+                out.write(chunk, 0, count);
             }
+            if (total == 0) return null;
 
+            String declared = resolver.getType(uri);
             JSObject file = new JSObject();
             file.put("name", displayName(resolver, uri));
             // Informational only — the JS side decides the real type from the bytes.
-            file.put("type", resolver.getType(uri) == null ? "" : resolver.getType(uri));
+            file.put("type", declared == null ? "" : declared);
             file.put("data", Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP));
             return file;
-        } catch (Exception e) {
-            // Swallowing here would make the share vanish; returning null lets JS report
-            // "nothing usable" with a real message instead.
+        } catch (Exception | Error e) {
+            // Reported as a count via `read` vs `offered`, so it is never silently partial.
+            android.util.Log.w("beanies-share", "could not read a shared document", e);
             return null;
         }
     }

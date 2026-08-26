@@ -77,7 +77,31 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
    * Split out of `processFile` (#64) so a SHARED document can be delivered without a second
    * AI call. In-app behaviour is unchanged: `processFile` calls this.
    */
+  /**
+   * Wrap a delivery so a throw cannot vanish.
+   *
+   * `deliverX` is called from TWO places: `processFile`, which has a try/catch around it,
+   * and the magic-reader consumer, which is a Vue WATCH callback with no catch anywhere in
+   * the chain. Splitting the mapping out of `processFile` moved it out from under that catch
+   * — the same shape as the incident the catch was originally added for: the spinner clears,
+   * the modal never opens, the user is told nothing and CloudWatch records nothing.
+   */
   function deliverTravel(data: TravelExtractionResult, env: ResultEnvelope): void {
+    try {
+      deliverTravelInner(data, env);
+    } catch (err) {
+      reportError({
+        surface: SURFACE,
+        message: 'delivering an extracted travel document threw',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw' },
+      });
+      showToast('error', t('ai.error.title'), t('ai.error.generic'));
+    }
+  }
+
+  function deliverTravelInner(data: TravelExtractionResult, env: ResultEnvelope): void {
     // Loud-but-non-blocking notice FIRST — before the not-travel early return — so a >cap
     // document whose bookings sat on a dropped page still tells the user (never silent).
     if (env.truncated) {

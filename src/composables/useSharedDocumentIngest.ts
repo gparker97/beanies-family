@@ -18,12 +18,7 @@ import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { requestConsent } from './useDocumentConsent';
-import {
-  clearPendingMagic,
-  dispatchSharePayload,
-  isReaderEnabled,
-  readerForShareKind,
-} from './useMagicReader';
+import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
 import { isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
 import { extractShareFromDocuments } from '@/services/ai/documentExtractionService';
 import { useAuthStore } from '@/stores/authStore';
@@ -47,6 +42,12 @@ export interface ShareMeta {
   platform: 'android' | 'ios' | 'pwa';
   /** True when the share LAUNCHED the app rather than arriving while it ran. */
   coldStart: boolean;
+  /**
+   * How many documents the sender offered that the platform could NOT hand over. Non-zero
+   * means the share was partial, which has to be said out loud — otherwise it just looks
+   * like a smaller share than it was.
+   */
+  unreadable?: number;
 }
 
 /**
@@ -58,14 +59,32 @@ export interface ShareMeta {
  */
 let isIngesting = false;
 
-/** Wait for the session to finish restoring on a cold launch, bounded. */
-async function waitForAuthInit(): Promise<boolean> {
+/**
+ * Wait for the app to be genuinely usable on a cold launch, bounded.
+ *
+ * Waiting on `isInitialized` ALONE is not enough, and getting that wrong broke essentially
+ * every launch-by-share: `initializeAuth()` flips `isInitialized` long before
+ * `loadFamilyData()` populates `currentMember`, and the share drains within milliseconds of
+ * that. The result was a "still counting your beans" toast on almost every cold share —
+ * after the native side had already cleared the share, so there was nothing left to retry.
+ *
+ * So this waits for the state the ingest actually needs: auth settled AND, if the user is
+ * signed in, the family loaded. A signed-OUT result is final and returns immediately —
+ * there is no family coming.
+ */
+async function waitUntilReady(): Promise<void> {
   const authStore = useAuthStore();
+  const familyStore = useFamilyStore();
   const deadline = Date.now() + READY_TIMEOUT_MS;
-  while (!authStore.isInitialized && Date.now() < deadline) {
+
+  while (Date.now() < deadline) {
+    if (authStore.isInitialized) {
+      // Signed out is a settled answer, not something to keep waiting on.
+      if (!authStore.isAuthenticated) return;
+      if (familyStore.currentMember) return;
+    }
     await new Promise((r) => setTimeout(r, READY_POLL_MS));
   }
-  return authStore.isInitialized;
 }
 
 /** Tell the user why nothing happened, and record it. Never a silent return. */
@@ -117,17 +136,13 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
     return;
   }
   isIngesting = true;
-  // Whether a payload was handed to a page. On every other path the channel must be cleared,
-  // so a dead-ended share cannot pin a File in memory until the next navigation — but
-  // clearing it after a SUCCESSFUL dispatch would throw away the very thing we just sent.
-  let dispatched = false;
-
   try {
     // 1) Readiness. A share can launch a cold app that is signed out or still hydrating;
     //    without this we would fire an AI call for a family that is not loaded, behind a
     //    login redirect the router is about to perform.
-    if (!(await waitForAuthInit())) {
-      notReady('auth_timeout', 'shareTarget.signIn.title', 'shareTarget.signIn.message');
+    await waitUntilReady();
+    if (!useAuthStore().isInitialized) {
+      notReady('auth_timeout', 'shareTarget.notReady.title', 'shareTarget.notReady.message');
       return;
     }
     if (!useAuthStore().isAuthenticated) {
@@ -148,8 +163,10 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
       return;
     }
 
-    // 2) What can we actually read? Decided from the RESOLVED file, never the sender's claim.
-    const usable = files.filter(isAiPickerAcceptedFile);
+    // 2) What can we actually read? Decided from the file's own BYTES, never the sender's
+    //    claim — the declared type at this boundary comes from another app.
+    const verdicts = await Promise.all(files.map((f) => isAiPickerAcceptedFile(f)));
+    const usable = files.filter((_, i) => verdicts[i]);
     if (usable.length === 0) {
       logEvent({
         level: 'info',
@@ -160,6 +177,28 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
       });
       showToast('info', t('shareTarget.unsupported.title'), t('shareTarget.unsupported.message'));
       return;
+    }
+
+    // A share the platform could only partially hand over must SAY so — otherwise it just
+    // looks like a smaller share than the user actually sent.
+    if (meta.unreadable) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'share was partial',
+        context: { action: 'rejected_type', detail: 'unreadable', file_count: meta.unreadable },
+      });
+      showToast('info', t('shareTarget.partial.title'), t('shareTarget.partial.message'));
+    }
+
+    // Several files are read as ONE item, and only the first is attached. Below the page cap
+    // `truncated` stays false, so without this a 2-4 file share silently keeps one photo.
+    if (usable.length > 1) {
+      showToast(
+        'info',
+        t('shareTarget.firstAttached.title'),
+        t('shareTarget.firstAttached.message')
+      );
     }
 
     // 3) Offline. Reuses the shared mapper's own branch rather than a second guard.
@@ -236,7 +275,6 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
       truncated: result.truncated,
     };
     dispatchSharePayload(toPayload(result.data, env));
-    dispatched = true;
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -259,7 +297,6 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
     toast('error', translate('ai.error.title'), translate('ai.error.generic'));
   } finally {
     isIngesting = false;
-    if (!dispatched) clearPendingMagic();
   }
 }
 

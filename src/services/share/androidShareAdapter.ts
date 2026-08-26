@@ -5,28 +5,11 @@
 // plugin's `load()`, and a warm app gets a `shareReceived` event. The plugin clears what it
 // hands over, so rotating the device cannot re-deliver a share that was already read.
 
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { base64ToFile } from '@/utils/base64ToFile';
 import { reportError } from '@/utils/errorReporter';
+import { ShareIntent } from './shareIntentPlugin';
 import type { ShareAdapter } from './types';
-
-interface SharedNativeFile {
-  name: string;
-  /** The SENDER's claimed MIME. Informational only — the orchestrator re-decides. */
-  type: string;
-  /** base64, no wrapping. */
-  data: string;
-}
-
-interface ShareIntentPlugin {
-  consume(): Promise<{ files: SharedNativeFile[]; coldStart: boolean }>;
-  addListener(
-    event: 'shareReceived',
-    handler: () => void
-  ): Promise<{ remove: () => Promise<void> }>;
-}
-
-const ShareIntent = registerPlugin<ShareIntentPlugin>('ShareIntent');
 
 export const androidShareAdapter: ShareAdapter = {
   name: 'android',
@@ -38,11 +21,21 @@ export const androidShareAdapter: ShareAdapter = {
 
     const drain = async (): Promise<void> => {
       try {
-        const { files, coldStart } = await ShareIntent.consume();
-        if (disposed || files.length === 0) return;
+        const { files, coldStart, offered, read } = await ShareIntent.consume();
+        if (disposed) return;
+        // Nothing pending is the COMMON case — this runs on every launch — so it is not
+        // reported. But a share that offered documents and read NONE is a real failure, and
+        // returning early there would mean not even the `received` denominator event fires.
+        if (files.length === 0 && !(offered ?? 0)) return;
         onShare(
           files.map((f) => base64ToFile(f.data, f.name, f.type)),
-          { platform: 'android', coldStart }
+          {
+            platform: 'android',
+            coldStart: coldStart ?? false,
+            // Non-zero when the native side could not read everything the sender offered
+            // (unreadable provider, over the size cap, past the item cap).
+            unreadable: Math.max(0, (offered ?? files.length) - (read ?? files.length)),
+          }
         );
       } catch (err) {
         // A rejection inside a native listener escapes Vue's error handler entirely, so

@@ -91,8 +91,22 @@ export function readerForShareKind(kind: ShareKind): MagicReader {
  * Availability being permission × flag is also why a member without `canEditActivities` gets
  * an honest "that reader isn't available" message instead of a dead end.
  */
+/**
+ * `usePermissions()` registers a diagnostic `watch` every time it is called, so calling it
+ * per evaluation — which is what a computed getter does — creates a watcher on every
+ * invalidation, none of them owned by an effect scope and therefore none ever disposed.
+ * Resolved ONCE, lazily: the watch it registers is a whole-app diagnostic that should live
+ * for the app's lifetime anyway, and Pinia is not active at module import so it cannot be
+ * hoisted to module scope.
+ */
+let permissions: ReturnType<typeof usePermissions> | null = null;
+function sharedPermissions(): ReturnType<typeof usePermissions> {
+  permissions ??= usePermissions();
+  return permissions;
+}
+
 export function isReaderEnabled(reader: MagicReader): boolean {
-  const { canEditActivities } = usePermissions();
+  const { canEditActivities } = sharedPermissions();
   const { flag } = MAGIC_READERS[reader];
   return canEditActivities.value && (flag === undefined || isFlagEnabled(flag));
 }
@@ -198,9 +212,22 @@ export function consumePendingMagic<R extends MagicReader>(
   const pending = pendingMagic.value;
   if (pending?.reader !== surface) return;
   pendingMagic.value = null;
-  if (!gateOpen) return;
 
   const payload = pending.payload;
+  if (!gateOpen) {
+    // Dropping an OPENER here is correct and expected — the affordance is gated, so there is
+    // nothing to open. Dropping a PAYLOAD is not: the AI call has already been billed and
+    // consent already given, so it must not disappear without a trace.
+    if (payload) {
+      reportError({
+        surface: 'share-target-ingest',
+        message: 'extracted share dropped: destination reader closed on arrival',
+        severity: 'warning',
+        context: { action: 'reader_disabled', kind: payload.kind },
+      });
+    }
+    return;
+  }
   if (payload && payload.kind !== MAGIC_READERS[surface].shareKind) {
     // Unreachable while `dispatchSharePayload` routes via `readerForShareKind`, but a
     // mismatch must never be delivered: handing a travel result to the activity form would

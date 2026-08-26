@@ -1797,7 +1797,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Photos, screenshots and PDFs. Anything else \u2014 a text file, a link, a document from another app \u2014 will say it cannot be read, rather than quietly doing nothing.',
+          'Photos, screenshots and PDFs. beanies only appears in the share sheet for those, so if you are sharing something else \u2014 a link, a text file, a document from another app \u2014 you simply will not see beanies listed as a choice.',
       },
       {
         type: 'paragraph',

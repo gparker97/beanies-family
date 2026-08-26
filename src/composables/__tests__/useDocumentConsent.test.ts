@@ -2,7 +2,8 @@
  * The consent gate's own contract (#64). These cover the three things the singleton form
  * changed, each of which is a real failure mode rather than a coverage exercise:
  *
- *  - concurrency: two callers must share ONE modal and ONE promise, never stack resolvers;
+ *  - concurrency: overlapping requests are SERIALIZED, never merged — they are different
+ *    documents, and ADR-030 consent is per-document;
  *  - boot safety: `useSettingsStore()` must be called lazily, or every importer throws
  *    before Pinia is active;
  *  - the persist failure must still resolve, so a storage error cannot strand a caller.
@@ -34,42 +35,74 @@ import {
   useDocumentConsent,
 } from '@/composables/useDocumentConsent';
 
+/**
+ * Serialization makes opening ASYNCHRONOUS: `requestConsent()` waits for any prompt ahead of
+ * it before opening its own, so a caller that resolves synchronously would settle nothing.
+ * In the app the modal is always resolved by a user interaction, which is necessarily after
+ * render — this helper just gives the tests the same ordering.
+ */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
 describe('useDocumentConsent (singleton, #64)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
     skipPrompt = false;
     setSkip.mockReset().mockResolvedValue(undefined);
     reportError.mockReset();
+    // Settle anything a previous test left open, then let the serialization tail drain.
+    resolveConsent(false);
+    await flush();
     resolveConsent(false);
   });
 
-  it('opens the modal once for two concurrent requests and resolves both together', async () => {
+  it('asks SEPARATELY for a second document rather than reusing the first answer', async () => {
     const { consentOpen: open } = useDocumentConsent();
 
-    const a = requestConsent();
-    const b = requestConsent();
+    // The dangerous case this pins: the user opens the in-app photo reader, and while that
+    // prompt is up a third-party app pushes a share in behind it. Merging them meant the
+    // answer given for the user's OWN photo also sent the stranger's document, with no
+    // second prompt — and the branded grant could not detect it, because a real grant had
+    // genuinely been minted.
+    const first = requestConsent();
+    const second = requestConsent();
 
-    // ONE modal. If resolvers were stacked, the second request would have replaced the
-    // first's and the first caller would hang forever.
+    await flush();
     expect(open.value).toBe(true);
 
     resolveConsent(true);
+    expect(await first).not.toBeNull();
 
-    const [ra, rb] = await Promise.all([a, b]);
-    expect(ra).not.toBeNull();
-    expect(rb).not.toBeNull();
-    expect(ra).toBe(rb);
-    expect(open.value).toBe(false);
+    // The second request gets its OWN prompt.
+    await flush();
+    expect(open.value).toBe(true);
+
+    resolveConsent(false);
+    expect(await second).toBeNull();
+  });
+
+  it('a decline on the first document does not decline the second', async () => {
+    const first = requestConsent();
+    const second = requestConsent();
+
+    await flush();
+    resolveConsent(false);
+    expect(await first).toBeNull();
+
+    await flush();
+    resolveConsent(true);
+    expect(await second).not.toBeNull();
   });
 
   it('starts a fresh prompt after the previous one settled', async () => {
     const { consentOpen: open } = useDocumentConsent();
 
     const first = requestConsent();
+    await flush();
     resolveConsent(false);
     expect(await first).toBeNull();
 
     const second = requestConsent();
+    await flush();
     expect(open.value).toBe(true);
     resolveConsent(true);
     expect(await second).not.toBeNull();
@@ -88,6 +121,7 @@ describe('useDocumentConsent (singleton, #64)', () => {
 
   it('declining resolves null, so the caller can distinguish it from a grant', async () => {
     const pending = requestConsent();
+    await flush();
     resolveConsent(false);
     expect(await pending).toBeNull();
   });
@@ -95,6 +129,7 @@ describe('useDocumentConsent (singleton, #64)', () => {
   it('still resolves when persisting the remembered choice fails', async () => {
     setSkip.mockRejectedValue(new Error('quota'));
     const pending = requestConsent();
+    await flush();
 
     await onConsentConfirm(true);
 
