@@ -5,6 +5,13 @@
     - applinks:beanies.family → the OAuth return Universal Link
                                 (https://beanies.family/oauth/native), matched by
                                 web/public/.well-known/apple-app-site-association.
+  App Groups (#64): `group.family.beanies.app` is the ONLY channel between the Share
+  Extension and the app — they are separate processes that share nothing else. The
+  extension writes each shared document into this container; ShareIntentPlugin reads and
+  CLEARS it when the app becomes active. The SAME group must be declared on the
+  ShareExtension target's entitlements, and the identifier must be registered in the
+  Developer portal (Identifiers → App Groups) before signing can resolve it.
+
   The former webcredentials:app.beanies.family (passkey) association was retired with
   the native WebAuthn-PRF pivot to the hardware Keystore (ADR-029, 2026-07-14) — native
   biometric no longer uses WebAuthn. The AASA must carry the real Apple Team ID (it
@@ -16,6 +23,10 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:beanies.family</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.family.beanies.app</string>
 	</array>
 </dict>
 </plist>
