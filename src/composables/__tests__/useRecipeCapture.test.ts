@@ -6,6 +6,7 @@
  * the part with real branching — dish image only, source file only, both, neither — and it
  * owns the `isAttaching` flag the UI renders, so it is worth pinning properly.
  */
+import { __testConsentGrant } from '@/test/consentGrant';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { ref } from 'vue';
@@ -66,7 +67,7 @@ describe('attachAfterSave', () => {
       },
     });
     const c = make();
-    await c.processUrl('https://www.youtube.com/watch?v=PmuCEQTy-9E');
+    await c.processUrl('https://www.youtube.com/watch?v=PmuCEQTy-9E', __testConsentGrant);
     return c;
   }
 

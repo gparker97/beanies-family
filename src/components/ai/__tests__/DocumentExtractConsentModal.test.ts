@@ -1,15 +1,36 @@
 /**
- * Unit tests for the #133 consent modal's own logic: the optional "remember" checkbox,
- * the confirm payload, and the reset-on-open guarantee. BeanieFormModal is stubbed to a
+ * Unit tests for the #133 consent modal's own logic: the optional "remember" checkbox, the
+ * resolution payload, and the reset-on-open guarantee. BeanieFormModal is stubbed to a
  * minimal save/close emitter — we're testing THIS component's behaviour, not the shell.
+ *
+ * The modal became SELF-CONTAINED in #64: no props, no emits. It reads `consentOpen` from the
+ * `useDocumentConsent` singleton and the tier from `useAiCapability`, and settles the gate
+ * itself. The tests therefore drive it through the singleton — the same way the app does —
+ * and assert on what `requestConsent()` resolves to, which is the behaviour callers depend on.
  */
 import { mount } from '@vue/test-utils';
-import { describe, it, expect } from 'vitest';
-import { vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 import DocumentExtractConsentModal from '../DocumentExtractConsentModal.vue';
+import { requestConsent, resolveConsent } from '@/composables/useDocumentConsent';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock('@/composables/useAiCapability', () => ({
+  useAiCapability: () => ({ tier: { value: 'managed' } }),
+}));
+
+const setSkip = vi.fn().mockResolvedValue(undefined);
+let skipPrompt = false;
+vi.mock('@/stores/settingsStore', () => ({
+  useSettingsStore: () => ({
+    get skipDocumentConsentPrompt() {
+      return skipPrompt;
+    },
+    setSkipDocumentConsentPrompt: setSkip,
+  }),
 }));
 
 // Minimal stub: renders the slot (so the checkbox is in the DOM) + buttons that fire the
@@ -22,46 +43,79 @@ const BeanieFormModalStub = {
     '<div v-if="open"><slot /><button class="t-save" @click="$emit(\'save\')">save</button><button class="t-close" @click="$emit(\'close\')">close</button></div>',
 };
 
-function mountModal(open = true) {
+function mountModal() {
   return mount(DocumentExtractConsentModal, {
-    props: { open, tier: 'managed' as const },
     global: { stubs: { BeanieFormModal: BeanieFormModalStub } },
   });
 }
 
-describe('DocumentExtractConsentModal (#133)', () => {
-  it('confirm emits remember=false when the box is untouched', async () => {
-    const wrapper = mountModal();
-    await wrapper.find('button.t-save').trigger('click');
-    expect(wrapper.emitted('confirm')).toEqual([[false]]);
+describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    skipPrompt = false;
+    setSkip.mockClear();
+    // Settle anything a previous test left pending so state cannot leak between cases.
+    resolveConsent(false);
   });
 
-  it('confirm emits remember=true when the box is ticked', async () => {
+  it('grants consent and does not persist the skip when the box is untouched', async () => {
     const wrapper = mountModal();
+    const pending = requestConsent();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find('button.t-save').trigger('click');
+
+    expect(await pending).not.toBeNull();
+    expect(setSkip).not.toHaveBeenCalled();
+  });
+
+  it('persists the family-scoped skip when the box is ticked', async () => {
+    const wrapper = mountModal();
+    const pending = requestConsent();
+    await wrapper.vm.$nextTick();
+
     await wrapper.find('input[type="checkbox"]').setValue(true);
     await wrapper.find('button.t-save').trigger('click');
-    expect(wrapper.emitted('confirm')).toEqual([[true]]);
+
+    expect(await pending).not.toBeNull();
+    expect(setSkip).toHaveBeenCalledWith(true);
   });
 
   it('resets the tick on each open so it never carries across reopen', async () => {
-    const wrapper = mountModal(true);
+    const wrapper = mountModal();
+
+    const first = requestConsent();
+    await wrapper.vm.$nextTick();
     await wrapper.find('input[type="checkbox"]').setValue(true);
-    await wrapper.setProps({ open: false });
-    await wrapper.setProps({ open: true });
+    resolveConsent(false);
+    await first;
+    setSkip.mockClear();
+
+    const second = requestConsent();
+    await wrapper.vm.$nextTick();
     await wrapper.find('button.t-save').trigger('click');
-    expect(wrapper.emitted('confirm')).toEqual([[false]]);
+
+    expect(await second).not.toBeNull();
+    // The tick did not survive the reopen, so nothing was persisted.
+    expect(setSkip).not.toHaveBeenCalled();
   });
 
-  it('cancel emits on close', async () => {
+  it('declines on close', async () => {
     const wrapper = mountModal();
+    const pending = requestConsent();
+    await wrapper.vm.$nextTick();
+
     await wrapper.find('button.t-close').trigger('click');
-    expect(wrapper.emitted('cancel')).toBeTruthy();
+
+    expect(await pending).toBeNull();
   });
 
-  it('renders the consent label but NOT the privacy link until the help article is live', () => {
+  it('renders the consent label', async () => {
     const wrapper = mountModal();
+    void requestConsent();
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.text()).toContain('ai.consent.remember');
-    // PRIVACY_ARTICLE_LIVE is false → the link button is not rendered (no 404).
     expect(wrapper.text()).not.toContain('ai.consent.privacyLink');
   });
 });

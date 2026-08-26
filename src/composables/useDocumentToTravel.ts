@@ -25,6 +25,7 @@ import {
 } from '@/utils/travelExtractionToSegments';
 import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
+import type { ConsentGrant } from './useDocumentConsent';
 import { toDateInputValue } from '@/utils/date';
 import type { VacationTripType } from '@/types/models';
 
@@ -67,7 +68,7 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
   const isProcessing = ref(false);
 
   /** Run intake → (rasterize) → extract → map → resolve for one document (consent granted). */
-  async function processFile(file: File): Promise<void> {
+  async function processFile(file: File, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
 
     if (!isOnline.value) {
@@ -95,6 +96,7 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
         // date and the proxy's date validation passes.
         todayIso: toDateInputValue(new Date()),
         byok: byokConfig.value ?? undefined,
+        grant,
       });
 
       if (result.success && result.data) {

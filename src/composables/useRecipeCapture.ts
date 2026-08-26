@@ -38,6 +38,7 @@ import {
 import { logEvent } from '@/services/telemetry/logEvent';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
+import type { ConsentGrant } from './useDocumentConsent';
 import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
@@ -94,7 +95,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const pendingCompressed = ref<Blob | null>(null);
 
   /** Run intake → extract → map for one document (consent already granted by the caller). */
-  async function processFile(file: File): Promise<void> {
+  async function processFile(file: File, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
 
     if (!isOnline.value) {
@@ -117,6 +118,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         tier: tier.value,
         todayIso: toDateInputValue(new Date()),
         byok: byokConfig.value ?? undefined,
+        grant,
       });
 
       if (!result.success || !result.data) {
@@ -203,7 +205,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    * The whole ladder lives in `resolveRecipeSource`; this is a flat switch over its four
    * outcomes, closed with `assertNever` so a fifth variant fails the BUILD.
    */
-  async function processUrl(rawUrl: string): Promise<void> {
+  async function processUrl(rawUrl: string, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return;
     if (!isOnline.value) {
       showToast('info', t('ai.offline.title'), t('ai.offline.message'));
@@ -288,6 +290,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             tier: tier.value,
             todayIso: toDateInputValue(new Date()),
             byok: byokConfig.value ?? undefined,
+            grant,
           });
           if (!result.success || !result.data) {
             logEvent({

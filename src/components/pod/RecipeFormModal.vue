@@ -19,9 +19,7 @@ import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import { diffPayload } from '@/utils/diffPayload';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
-import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
-import { useAiCapability } from '@/composables/useAiCapability';
+import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -199,16 +197,21 @@ const capture = useRecipeCapture({
  * a scan of a recipe card from the rail and have it sent to the managed model with the modal
  * never shown. Owning the capture means owning the gate that goes with it.
  */
-const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
-const { tier: aiTier } = useAiCapability();
+const { requestConsent } = useDocumentConsent();
+// Held between the gate and the picker's file event: consent runs before the picker opens,
+// but the extraction call that needs the token happens once a file is chosen.
+let docGrant: ConsentGrant | null = null;
 
 async function startLinkCapture(url: string): Promise<void> {
-  if (!(await requestConsent())) return;
-  await capture.processUrl(url);
+  const granted = await requestConsent();
+  if (!granted) return;
+  await capture.processUrl(url, granted);
 }
 
 async function startDocumentCapture(): Promise<void> {
-  if (!(await requestConsent())) return;
+  const granted = await requestConsent();
+  if (!granted) return;
+  docGrant = granted;
   aiDocPicker.value?.pick();
 }
 
@@ -458,12 +461,11 @@ const LIST_TEXTAREA_CLASS =
         </div>
       </div>
 
-      <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
-      <DocumentExtractConsentModal
-        :open="consentOpen"
-        :tier="aiTier"
-        @confirm="onConsentConfirm"
-        @cancel="resolveConsent(false)"
+      <!-- The consent modal is mounted globally in App.vue (#64) and stacks above this
+           modal, so this form asks for consent without hosting the UI. -->
+      <AiDocumentPicker
+        ref="aiDocPicker"
+        @file="(f) => docGrant && void capture.processFile(f, docGrant)"
       />
 
       <FormFieldGroup :label="t('recipes.field.name')" required>
