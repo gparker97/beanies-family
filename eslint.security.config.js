@@ -64,6 +64,18 @@ export default [
   {
     ignores: [
       'dist/**',
+      // The Astro site's build output. Same category as `dist/**`, and missing until
+      // now — anyone who ran `npm run build:web` before `security:lint` crashed the
+      // ESLint formatter outright (RangeError on the results table) rather than seeing
+      // a lint result. CI never hit it only because it checks out clean.
+      'web/dist/**',
+      // The built Vue bundle, as `npx cap sync` copies it into the native projects.
+      // It is `dist/**` again under another name (both are git-ignored), and scanning
+      // it means linting minified vendor code: ~4.7k findings, enough to crash the
+      // ESLint formatter before it prints anything. Same clean-checkout reason CI
+      // never saw it.
+      'android/app/src/main/assets/public/**',
+      'ios/App/App/public/**',
       'node_modules/**',
       'public/**',
       '*.config.js',

@@ -51,12 +51,31 @@ const EXEMPT = [
   },
 ];
 
-/** An <a> whose href enters the app or a store. */
-const APP_LINK = /^(https:\/\/app\.beanies\.family(\/.*)?|\/(ios|android|download))$/;
+/**
+ * An <a> whose href enters the app or a store.
+ *
+ * Two patterns rather than one alternation: a single `(\/.*)?` inside a group nests a
+ * quantifier, which the unsafe-regex check flags (correctly, as a shape) even though this
+ * instance cannot backtrack. Splitting is both provably linear and easier to read.
+ */
+const APP_HREF = /^https:\/\/app\.beanies\.family(?:\/|$)/;
+const STORE_HREF = /^\/(?:ios|android|download)$/;
+const isAppLink = (href) => APP_HREF.test(href) || STORE_HREF.test(href);
 
+/**
+ * Every .html under `dir`, with its path relative to `base`.
+ *
+ * The fs calls take computed paths, so they trip `security/detect-non-literal-fs-filename`.
+ * Same justification as `rehype-image-dims.mjs` next door: this is a build-time Node
+ * module walking Astro's OWN output directory — the rule's threat model (untrusted input
+ * reaching the filesystem at runtime) does not apply. Disabled per call, not per file, so
+ * a future fs call here still has to argue for itself.
+ */
 function htmlFiles(dir, base = dir, out = []) {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     if (statSync(full).isDirectory()) htmlFiles(full, base, out);
     else if (entry.endsWith('.html')) out.push([full, relative(base, full)]);
   }
@@ -73,10 +92,12 @@ export default function assertCtaTagged() {
         let tagged = 0;
 
         for (const [file, page] of htmlFiles(root)) {
+          // Build output again — see the note on `htmlFiles`.
+          // eslint-disable-next-line security/detect-non-literal-fs-filename
           const html = readFileSync(file, 'utf8');
           for (const tag of html.match(/<a\b[^>]*>/g) ?? []) {
             const href = tag.match(/href="([^"]*)"/)?.[1];
-            if (!href || !APP_LINK.test(href)) continue;
+            if (!href || !isAppLink(href)) continue;
             if (tag.includes('data-cta=')) {
               tagged++;
               continue;
