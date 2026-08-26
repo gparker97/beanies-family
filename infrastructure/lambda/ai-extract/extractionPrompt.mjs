@@ -9,7 +9,7 @@
 // required keys, or the built messages diverge (src/services/ai/__tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
-export const PROMPT_VERSION = '2026-08-25.1';
+export const PROMPT_VERSION = '2026-08-26.1';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -292,6 +292,79 @@ export function buildRecipeExtractionMessages(source, _todayIso) {
   ];
 }
 
+/**
+ * The SHARE task (#64): classify a shared document AND extract it, in ONE call.
+ *
+ * A share arrives from another app with no indication of what it is, so something has to
+ * decide whether it is an invitation, a booking or a recipe. Doing that as a separate
+ * classify call would re-send the page images — and page images dominate the cost of every
+ * extraction — so classification and extraction share one call instead.
+ *
+ * The shape COMPOSES the three task shapes rather than restating them, so the field
+ * definitions cannot drift from the tasks they delegate to; there is exactly one definition
+ * of what an event, a trip or a recipe looks like. `kind: "none"` is the honest answer for a
+ * document that is none of the three — better than forcing a wrong item on the user.
+ */
+export const SHARE_JSON_SHAPE = {
+  kind: 'exactly one of "event", "travel", "recipe" or "none" — what this document actually is',
+  event: 'present ONLY when kind="event": an object with the event keys described below',
+  travel: 'present ONLY when kind="travel": an object with the travel keys described below',
+  recipe: 'present ONLY when kind="recipe": an object with the recipe keys described below',
+};
+
+/**
+ * Only `kind` is required. The nested object is validated by the delegated parser, so
+ * requiring it here as well would give two places an answer to the same question.
+ */
+export const SHARE_REQUIRED_KEYS = ['kind'];
+
+/**
+ * Build the messages for the SHARE task: one call that both classifies and extracts.
+ *
+ * The per-kind field meanings are the three exported shapes verbatim, so this prompt cannot
+ * describe an event differently from the event task does.
+ */
+export function buildShareExtractionMessages(source, todayIso) {
+  const system = [
+    'You are given one or more images — the pages of a SINGLE document that someone shared from another app. It may be an invitation or school notice, a travel booking, or a recipe.',
+    'First decide which ONE of these the document is, then extract it.',
+    'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
+    `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
+    'Set kind="none" if the document is none of the three. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
+    'Include ONLY the nested object matching your chosen kind. Omit the other two entirely.',
+    'Never output any value that is not actually supported by the images. An empty field is ALWAYS better than an invented one.',
+    'The JSON object must have exactly these keys: ' +
+      Object.keys(SHARE_JSON_SHAPE).join(', ') +
+      '.',
+    'Field meanings: ' + JSON.stringify(SHARE_JSON_SHAPE) + '.',
+    'When kind="event", the "event" object has exactly these keys: ' +
+      Object.keys(EXTRACTION_JSON_SHAPE).join(', ') +
+      '. Field meanings: ' +
+      JSON.stringify(EXTRACTION_JSON_SHAPE) +
+      '.',
+    'When kind="event", choose "category" from this list (one line per group, shown as id (Name)); use "" if none fits well:\n' +
+      CATEGORY_OPTIONS_TEXT,
+    'When kind="travel", the "travel" object has exactly these keys: ' +
+      Object.keys(TRAVEL_JSON_SHAPE).join(', ') +
+      '. Field meanings: ' +
+      JSON.stringify(TRAVEL_JSON_SHAPE) +
+      '.',
+    'When kind="recipe", the "recipe" object has exactly these keys: ' +
+      Object.keys(RECIPE_JSON_SHAPE).join(', ') +
+      '. Field meanings: ' +
+      JSON.stringify(RECIPE_JSON_SHAPE) +
+      '.',
+  ].join('\n');
+
+  return [
+    { role: 'system', content: system },
+    buildUserMessage(
+      'Work out what this shared document is, then extract it as the specified JSON object.',
+      source
+    ),
+  ];
+}
+
 export const EXTRACTION_TASKS = {
   event: {
     buildMessages: buildExtractionMessages,
@@ -303,6 +376,14 @@ export const EXTRACTION_TASKS = {
     buildMessages: buildTravelExtractionMessages,
     requiredKeys: TRAVEL_REQUIRED_KEYS,
     jsonShape: TRAVEL_JSON_SHAPE,
+    sources: ['images'],
+  },
+  share: {
+    buildMessages: buildShareExtractionMessages,
+    requiredKeys: SHARE_REQUIRED_KEYS,
+    jsonShape: SHARE_JSON_SHAPE,
+    // Images only. The share path never sends free text, and this `sources` fence is what
+    // stops this soft-keyed task becoming a general text endpoint.
     sources: ['images'],
   },
   recipe: {

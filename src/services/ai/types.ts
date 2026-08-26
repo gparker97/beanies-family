@@ -67,10 +67,27 @@ export interface ExtractionRequest {
  * here gives you the task id, the provider's return type, and the registry key at once.
  * `event` is the #133 invitation→activity wedge; `travel` is the #30 document→segment wedge.
  */
+/**
+ * What a SHARED document turned out to be (#64).
+ *
+ * A discriminated union, so a travel result can never be handed to the event delivery step.
+ * `none` is a first-class outcome — a shared document that is none of the three is a real,
+ * common case, and saying so is better than forcing a wrong item on the user.
+ */
+export type ShareExtractionResult = AttestedResult &
+  (
+    | { kind: 'event'; event: ExtractionResult }
+    | { kind: 'travel'; travel: TravelExtractionResult }
+    | { kind: 'recipe'; recipe: RecipeExtractionResult }
+    | { kind: 'none' }
+  );
+
 export interface ExtractionResultByTask {
   event: ExtractionResult;
   travel: TravelExtractionResult;
   recipe: RecipeExtractionResult;
+  /** One call that classifies AND extracts, for the mobile share target (#64). */
+  share: ShareExtractionResult;
 }
 
 /** The extraction tasks the funnel supports (one prompt/schema/parser per task). */
