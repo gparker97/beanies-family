@@ -22,7 +22,7 @@
     "astro": "^5.18.2",
     "astro-og-canvas": "^0.13.0",
     "astro-seo": "^0.8.4",
-    "canvaskit-wasm": "^0.39.1",
+    "canvaskit-wasm": "^0.42.0",
     "minisearch": "^7.1.2",
     "tailwindcss": "^4.3.3"
   },
