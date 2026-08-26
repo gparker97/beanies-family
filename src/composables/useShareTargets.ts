@@ -5,17 +5,23 @@
 // branching accumulating in the app shell.
 
 import { onMounted, onUnmounted } from 'vue';
+import { Capacitor } from '@capacitor/core';
 import { SHARE_ADAPTERS } from '@/services/share';
 import { ingestSharedContent } from './useSharedDocumentIngest';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 
 export function useShareTargets(): void {
   const teardowns: Array<() => void> = [];
 
   onMounted(() => {
+    const platform = Capacitor.getPlatform();
+    let started = 0;
+
     for (const adapter of SHARE_ADAPTERS) {
       try {
         if (!adapter.isSupported()) continue;
+        started++;
         teardowns.push(
           adapter.start((content, meta) => {
             void ingestSharedContent(content, meta);
@@ -32,6 +38,32 @@ export function useShareTargets(): void {
         });
       }
     }
+
+    // A NATIVE build with no share adapter is always a defect, never a device limitation:
+    // both native adapters are gated on their plugin being registered, and a plugin that
+    // fails to register answers `isPluginAvailable` with a plain false. That is silent at
+    // every layer — the Swift compiles, the app launches, and the share simply does nothing.
+    //
+    // It cost two releases to find exactly once. This is the line that would have named it
+    // in the first, so it is deliberately an ERROR rather than a warning.
+    if (started === 0 && Capacitor.isNativePlatform()) {
+      reportError({
+        surface: 'share-target-ingest',
+        message: `no share adapter is supported on ${platform} — is the ShareIntent plugin registered?`,
+        severity: 'error',
+        context: { action: 'no_url', os: platform },
+      });
+      return;
+    }
+
+    logEvent({
+      level: 'info',
+      surface: 'share-target-ingest',
+      message: 'share adapters started',
+      // The success-path counter, so the RATE of the failure above is measurable rather
+      // than only its absence being noticeable.
+      context: { action: 'start', os: platform, file_count: started },
+    });
   });
 
   onUnmounted(() => {

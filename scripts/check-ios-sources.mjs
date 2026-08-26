@@ -139,3 +139,63 @@ if (mismatches.length > 0) {
 console.log(
   `\u2713 the Share Extension and the app agree on all ${CROSS_TARGET_CONSTANTS.length} shared constants`
 );
+
+/**
+ * GUARD 3 — every app-target CAPPlugin must be REGISTERED, not merely compiled.
+ *
+ * Capacitor discovers plugins that ship inside npm packages on its own. A plugin defined in
+ * the APP target is not discovered: it has to be handed to the bridge explicitly, in
+ * `MainViewController.capacitorDidLoad`. Android has always done the equivalent in
+ * `MainActivity.onCreate`, and for two releases iOS did nothing at all.
+ *
+ * Nothing reports that. The Swift compiles, the app launches, `isPluginAvailable` answers a
+ * plain false, and the JS reasonably reads that as "this device cannot do it". Guard 1 above
+ * proves a file is COMPILED; being compiled is not the same as being reachable, which is
+ * exactly the gap that shipped #64's share target and #74's biometric unlock as no-ops.
+ */
+const PLUGIN_HOST = 'ios/App/App/MainViewController.swift';
+const APP_TARGET_DIR = join(ROOT, 'ios/App/App');
+
+const appTargetPlugins = readdirSync(APP_TARGET_DIR)
+  .filter((name) => name.endsWith('.swift'))
+  .map((name) => ({ name, text: readFileSync(join(APP_TARGET_DIR, name), 'utf8') }))
+  // A plugin is a CAPPlugin subclass. AppDelegate and the bridge controller are not.
+  .filter(({ text }) => /\bclass\s+(\w+)\s*:\s*CAPPlugin\b/.test(text))
+  .map(({ text }) => /\bclass\s+(\w+)\s*:\s*CAPPlugin\b/.exec(text)[1]);
+
+let hostText = '';
+try {
+  hostText = readFileSync(join(ROOT, PLUGIN_HOST), 'utf8');
+} catch {
+  if (appTargetPlugins.length > 0) {
+    console.error(
+      `\n\u2716 ${appTargetPlugins.length} plugin(s) live in the app target but ${PLUGIN_HOST}\n` +
+        '  does not exist, so NOTHING registers them and every one is invisible to JS:\n' +
+        appTargetPlugins.map((p) => `    ${p}`).join('\n') +
+        '\n'
+    );
+    process.exit(1);
+  }
+}
+
+const unregistered = appTargetPlugins.filter(
+  (plugin) => !hostText.includes(`registerPluginInstance(${plugin}(`)
+);
+
+if (unregistered.length > 0) {
+  console.error(
+    `\n\u2716 ${unregistered.length} app-target plugin(s) are compiled but NOT registered:\n` +
+      unregistered.map((p) => `    ${p}`).join('\n') +
+      `\n\nAdd \`bridge?.registerPluginInstance(<Plugin>())\` to capacitorDidLoad in\n` +
+      `    ${PLUGIN_HOST}\n` +
+      'and the matching registerPlugin(...) call in MainActivity.java.\n\n' +
+      'Unregistered is INVISIBLE, not broken: the Swift compiles, the app launches, and\n' +
+      'Capacitor.isPluginAvailable() answers false, which the JS reads as an unsupported\n' +
+      'device. That is how #64 and #74 both shipped as silent no-ops.\n'
+  );
+  process.exit(1);
+}
+
+console.log(
+  `\u2713 all ${appTargetPlugins.length} app-target plugin(s) are registered in ${PLUGIN_HOST.split('/').pop()}`
+);
