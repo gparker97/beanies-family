@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The extension and the app are separate processes and share NOTHING except this group.
+  It must match `App.entitlements` exactly and be registered in the Developer portal
+  (Identifiers → App Groups) or signing cannot resolve it. See ShareViewController.swift.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.family.beanies.app</string>
+	</array>
+</dict>
+</plist>
