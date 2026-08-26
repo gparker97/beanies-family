@@ -49,10 +49,22 @@ const consentOpen = ref(false);
  * So a second request WAITS for the first to settle and then opens its own prompt. Resolvers
  * are never stacked and never dropped, and the tail always settles — a rejected link in the
  * chain would strand every later caller, so the chain is built from a promise that cannot
- * reject.
+ * reject, and every wait is bounded (see WAIT_TIMEOUT_MS).
  */
 let consentResolver: ((grant: ConsentGrant | null) => void) | null = null;
 let tail: Promise<unknown> = Promise.resolve();
+
+/**
+ * How long a queued request will wait behind another before giving up.
+ *
+ * A backstop, not a feature. The tail only advances when `resolveConsent` fires, and every
+ * path to that is the globally-mounted modal — but if one prompt ever failed to settle
+ * (suppressed render, a route change that unmounts the host), every later `requestConsent()`
+ * would await forever with no error, no toast and no telemetry, and the AI readers would
+ * simply stop working with no clue why. Timing out declines, which is the safe direction:
+ * the caller sends nothing.
+ */
+const WAIT_TIMEOUT_MS = 60_000;
 
 /**
  * Await consent before any document leaves the device. Resolves to a `ConsentGrant` when the
@@ -67,7 +79,11 @@ let tail: Promise<unknown> = Promise.resolve();
 export function requestConsent(): Promise<ConsentGrant | null> {
   if (useSettingsStore().skipDocumentConsentPrompt) return Promise.resolve(GRANT);
 
-  const mine = tail.then(
+  const ahead = Promise.race([
+    tail,
+    new Promise((resolve) => setTimeout(resolve, WAIT_TIMEOUT_MS)),
+  ]);
+  const mine = ahead.then(
     () =>
       new Promise<ConsentGrant | null>((resolve) => {
         consentResolver = resolve;

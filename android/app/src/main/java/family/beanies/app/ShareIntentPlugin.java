@@ -69,6 +69,9 @@ public class ShareIntentPlugin extends Plugin {
     /** How many URIs the sender offered, including any dropped by MAX_ITEMS. */
     private int pendingOffered = 0;
 
+    /** Sentinel: the URI was read fine, the file was simply empty. Not a failure. */
+    private static final JSObject EMPTY_FILE = new JSObject();
+
     @Override
     public void load() {
         // A cold launch: the share is already on the Activity's intent by the time the
@@ -119,10 +122,9 @@ public class ShareIntentPlugin extends Plugin {
         int read = 0;
         for (Uri uri : batch) {
             JSObject file = readUri(uri);
-            if (file != null) {
-                files.put(file);
-                read += 1;
-            }
+            if (file == null) continue;
+            read += 1; // read successfully, even if the file turned out to be empty
+            if (file != EMPTY_FILE) files.put(file);
         }
 
         JSObject result = new JSObject();
@@ -178,10 +180,18 @@ public class ShareIntentPlugin extends Plugin {
         }
 
         synchronized (lock) {
-            pending.clear();
-            pending.addAll(uris.subList(0, Math.min(uris.size(), MAX_ITEMS)));
-            pendingOffered = offered;
-            pendingColdStart = coldStart;
+            // APPEND, never replace. A cold launch buffers at load(), and the JS side can
+            // then sit in its readiness wait for up to ten seconds — a share arriving in
+            // that window used to clear the first one, and clearActivityIntent() has already
+            // run, so it was unrecoverable. Still bounded by MAX_ITEMS overall.
+            for (Uri uri : uris) {
+                if (pending.size() >= MAX_ITEMS) break;
+                pending.add(uri);
+            }
+            pendingOffered += offered;
+            // A cold-start batch stays cold-start even if a warm one merges into it: the
+            // app was launched BY a share either way, which is what the flag reports.
+            pendingColdStart = pendingColdStart || coldStart;
         }
     }
 
@@ -201,7 +211,10 @@ public class ShareIntentPlugin extends Plugin {
                 if (total > MAX_BYTES) return null;
                 out.write(chunk, 0, count);
             }
-            if (total == 0) return null;
+            // An empty file is a legitimate read, not a provider failure. It is filtered
+            // on the JS side by size; counting it as unreadable here would make the
+            // partial-share counter lie.
+            if (total == 0) return EMPTY_FILE;
 
             String declared = resolver.getType(uri);
             JSObject file = new JSObject();

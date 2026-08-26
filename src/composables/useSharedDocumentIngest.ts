@@ -20,6 +20,7 @@ import { useTranslation } from './useTranslation';
 import { requestConsent } from './useDocumentConsent';
 import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
 import { isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
+import { withSniffedType } from '@/utils/sniffFileType';
 import { extractShareFromDocuments } from '@/services/ai/documentExtractionService';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -165,9 +166,31 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
 
     // 2) What can we actually read? Decided from the file's own BYTES, never the sender's
     //    claim — the declared type at this boundary comes from another app.
-    const verdicts = await Promise.all(files.map((f) => isAiPickerAcceptedFile(f)));
-    const usable = files.filter((_, i) => verdicts[i]);
+    // Re-stamp each file with the type its BYTES say it is, then filter. Accepting on the
+    // bytes but leaving the declared type in place made acceptance and processing disagree:
+    // downstream `isPdfFile` reads `file.type`, so a PDF declared `application/octet-stream`
+    // was accepted here and then compressed as an image.
+    const stamped = await Promise.all(files.map((f) => withSniffedType(f)));
+    const verdicts = await Promise.all(stamped.map((f) => isAiPickerAcceptedFile(f)));
+    const usable = stamped.filter((_, i) => verdicts[i]);
+
+    // Reported BEFORE the empty-batch return. Placed after it, a share where the platform
+    // could read NOTHING — the worst case — fell through to "beanies can't read that kind of
+    // file", which blames the user's file for a provider failure.
+    if (meta.unreadable) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'share was partial',
+        context: { action: 'rejected_type', detail: 'unreadable', file_count: meta.unreadable },
+      });
+      showToast('info', t('shareTarget.partial.title'), t('shareTarget.partial.message'));
+    }
+
     if (usable.length === 0) {
+      // Everything the platform DID hand over was unreadable by us; if it handed over
+      // nothing at all, the partial notice above has already explained why.
+      if (meta.unreadable && files.length === 0) return;
       logEvent({
         level: 'info',
         surface: SURFACE,
@@ -177,18 +200,6 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
       });
       showToast('info', t('shareTarget.unsupported.title'), t('shareTarget.unsupported.message'));
       return;
-    }
-
-    // A share the platform could only partially hand over must SAY so — otherwise it just
-    // looks like a smaller share than the user actually sent.
-    if (meta.unreadable) {
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'share was partial',
-        context: { action: 'rejected_type', detail: 'unreadable', file_count: meta.unreadable },
-      });
-      showToast('info', t('shareTarget.partial.title'), t('shareTarget.partial.message'));
     }
 
     // Several files are read as ONE item, and only the first is attached. Below the page cap
