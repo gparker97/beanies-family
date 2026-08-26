@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-26
 
+### Removed
+
+- Removed the five Core Web Vitals (`CWV *`) analytics events from the marketing site. Plausible can't average or percentile custom properties, so they only ever showed how many visitors fired each event — not whether the site was fast. Lighthouse and Search Console cover this properly.
+
 ### Fixed
 
 - **Overnight flights now record the right arrival date.** "Arrives next day" was silently doing nothing for anyone outside the Americas, so the arrival showed on the departure day — and the night you were in the air was reported as a missing hotel booking.

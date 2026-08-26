@@ -24,8 +24,7 @@
     "astro-seo": "^0.8.4",
     "canvaskit-wasm": "^0.39.1",
     "minisearch": "^7.1.2",
-    "tailwindcss": "^4.3.3",
-    "web-vitals": "^6.1.1"
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

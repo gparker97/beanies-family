@@ -195,9 +195,14 @@ install nudge counted as engagement), plus `inAppPct` and `conversion.overallPct
 properties — the app loads `pa-jvjpzIr6FM9tDKaS1gZaK` (`deploy.yml:187`), the marketing
 site loads `pa-3pxexgz2YF03NyMDucQKN` (`web/src/layouts/BaseLayout.astro:113`) — and none
 of the four events ever fired on marketing. Marketing's implausible 1–2% bounce has its own
-separate causes (the CWV RUM script firing on every page load, plus outbound-link and
-file-download events suppressing bounces) and is UNFIXED. When it still reads 1–2% next
-month, that is expected, not evidence the passive-event fix failed to ship.
+separate causes (outbound-link and file-download events suppressing bounces) and is only
+PARTLY fixed. When it still reads low next month, that is expected, not evidence the
+passive-event fix failed to ship.
+
+⚠️ **Second series break — marketing bounce, 2026-08-26.** The CWV RUM script was removed
+on this date (see the caveat below), eliminating one of the two suppressors. Marketing
+bounce may step UP across this date without any real behaviour change. Outbound-link and
+file-download events still suppress it, so it remains unreliable in absolute terms.
 
 **Native has NO offline queue.** CloudWatch telemetry has `logQueue.ts`; Plausible does
 not, so an event fired with no connectivity is simply lost. Native therefore under-counts
@@ -208,10 +213,20 @@ installed app (a separate origin).
 **Caveats:** Plausible is aggregate and privacy-first — **no `family_id`**, so it can't
 be joined per-family. Custom goals only count if the Plausible dashboard has them
 configured as goals (pageviews + any received custom event still show via `event:goal`).
-The marketing site's `bounce_rate` is implausibly low (1–2%) and remains so: the CWV RUM
-script fires on every page load, and outbound-link and file-download events suppress
-bounces. Treat marketing bounce as unreliable — #71 did not change it (see the series-break
-note above). The APP property's bounce is usable from 2026-08-24 onward.
+The marketing site's `bounce_rate` reads implausibly low because outbound-link and
+file-download events suppress bounces. Treat marketing bounce as unreliable — #71 did not
+change it, and the 2026-08-26 CWV removal only removed one of two causes (see both
+series-break notes above). The APP property's bounce is usable from 2026-08-24 onward.
+
+**No Core Web Vitals in Plausible (removed 2026-08-26).** Five `CWV *` custom events
+(LCP/INP/CLS/FCP/TTFB) were sent from a RUM script and their goals deleted. Plausible
+treats custom properties as *categorical dimensions* — it has no average, median or
+percentile — so the numeric `value` prop produced one row per distinct millisecond and
+aggregated into nothing, while the Goals view showed only how many visitors fired each
+event, which says nothing about performance. Google grades CWV on **p75**, which Plausible
+cannot compute. Use **Lighthouse** for lab data and **Search Console / CrUX** for field
+data (CrUX needs more traffic than beanies.family currently has). Do not re-add these to
+Plausible.
 
 ---
 
