@@ -16,11 +16,12 @@ import type {
   RecipeExtractionResult,
   RecipeFieldConfidence,
   RecipeLine,
+  ShareExtractionResult,
   TravelExtractionResult,
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-08-25.1';
+export const PROMPT_VERSION = '2026-08-26.1';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -506,6 +507,126 @@ export function parseRecipeExtractionResult(raw: unknown): RecipeExtractionResul
   };
 }
 
+/**
+ * The SHARE task (#64): classify a shared document AND extract it, in ONE call.
+ *
+ * A share arrives from another app with no indication of what it is, so something has to
+ * decide whether it is an invitation, a booking or a recipe. Doing that as a separate
+ * classify call would re-send the page images — and page images dominate the cost of every
+ * extraction — so classification and extraction share one call instead.
+ *
+ * The shape COMPOSES the three task shapes rather than restating them, so the field
+ * definitions cannot drift from the tasks they delegate to; there is exactly one definition
+ * of what an event, a trip or a recipe looks like. `kind: "none"` is the honest answer for a
+ * document that is none of the three — better than forcing a wrong item on the user.
+ */
+export const SHARE_JSON_SHAPE = {
+  kind: 'exactly one of "event", "travel", "recipe" or "none" — what this document actually is',
+  event: 'present ONLY when kind="event": an object with the event keys described below',
+  travel: 'present ONLY when kind="travel": an object with the travel keys described below',
+  recipe: 'present ONLY when kind="recipe": an object with the recipe keys described below',
+};
+
+/**
+ * Only `kind` is required. The nested object is validated by the delegated parser, so
+ * requiring it here as well would give two places an answer to the same question.
+ */
+export const SHARE_REQUIRED_KEYS = ['kind'] as const;
+
+/**
+ * Build the messages for the SHARE task: one call that both classifies and extracts.
+ *
+ * The per-kind field meanings are the three exported shapes verbatim, so this prompt cannot
+ * describe an event differently from the event task does.
+ */
+export function buildShareExtractionMessages(
+  source: ExtractionSource,
+  todayIso: string
+): ChatMessage[] {
+  const system = [
+    'You are given one or more images — the pages of a SINGLE document that someone shared from another app. It may be an invitation or school notice, a travel booking, or a recipe.',
+    'First decide which ONE of these the document is, then extract it.',
+    'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
+    `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
+    'Set kind="none" if the document is none of the three. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
+    'Include ONLY the nested object matching your chosen kind. Omit the other two entirely.',
+    'Never output any value that is not actually supported by the images. An empty field is ALWAYS better than an invented one.',
+    'The JSON object must have exactly these keys: ' +
+      Object.keys(SHARE_JSON_SHAPE).join(', ') +
+      '.',
+    'Field meanings: ' + JSON.stringify(SHARE_JSON_SHAPE) + '.',
+    'When kind="event", the "event" object has exactly these keys: ' +
+      Object.keys(EXTRACTION_JSON_SHAPE).join(', ') +
+      '. Field meanings: ' +
+      JSON.stringify(EXTRACTION_JSON_SHAPE) +
+      '.',
+    'When kind="event", choose "category" from this list (one line per group, shown as id (Name)); use "" if none fits well:\n' +
+      CATEGORY_OPTIONS_TEXT,
+    'When kind="travel", the "travel" object has exactly these keys: ' +
+      Object.keys(TRAVEL_JSON_SHAPE).join(', ') +
+      '. Field meanings: ' +
+      JSON.stringify(TRAVEL_JSON_SHAPE) +
+      '.',
+    'When kind="recipe", the "recipe" object has exactly these keys: ' +
+      Object.keys(RECIPE_JSON_SHAPE).join(', ') +
+      '. Field meanings: ' +
+      JSON.stringify(RECIPE_JSON_SHAPE) +
+      '.',
+  ].join('\n');
+
+  return [
+    { role: 'system', content: system },
+    buildUserMessage(
+      'Work out what this shared document is, then extract it as the specified JSON object.',
+      source
+    ),
+  ];
+}
+
+/**
+ * Parse the SHARE task's reply by DELEGATING to the parser for the kind the model chose.
+ *
+ * There is deliberately no fourth field-by-field parser here: no fourth set of caps, no
+ * fourth confidence coercion, no fourth place for the recipe screening rules to drift. This
+ * function's only job is to read `kind` and hand the nested object to the parser that already
+ * owns that shape.
+ *
+ * Throws on an unknown kind or a missing/unparseable payload, so the funnel classifies it as
+ * `malformed_output` and the shared toast mapper reports it — never a silent wrong item.
+ * `assertNever` closes the switch, so a fifth kind is a BUILD error.
+ */
+export function parseShareExtractionResult(raw: unknown): ShareExtractionResult {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Share extraction: expected an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const kind = obj.kind;
+
+  switch (kind) {
+    case 'none':
+      return { kind: 'none' };
+    case 'event':
+      return { kind: 'event', event: parseExtractionResult(requireNested(obj, 'event')) };
+    case 'travel':
+      return { kind: 'travel', travel: parseTravelExtractionResult(requireNested(obj, 'travel')) };
+    case 'recipe':
+      return { kind: 'recipe', recipe: parseRecipeExtractionResult(requireNested(obj, 'recipe')) };
+    default:
+      throw new Error(
+        `Share extraction: unknown kind ${JSON.stringify(kind)} (expected event, travel, recipe or none)`
+      );
+  }
+}
+
+/** The nested payload for the chosen kind must be present and object-shaped. */
+function requireNested(obj: Record<string, unknown>, key: string): unknown {
+  const nested = obj[key];
+  if (typeof nested !== 'object' || nested === null) {
+    throw new Error(`Share extraction: kind="${key}" but no "${key}" object was returned`);
+  }
+  return nested;
+}
+
 export const EXTRACTION_TASKS = {
   event: {
     buildMessages: buildExtractionMessages,
@@ -517,6 +638,14 @@ export const EXTRACTION_TASKS = {
     buildMessages: buildTravelExtractionMessages,
     requiredKeys: TRAVEL_REQUIRED_KEYS,
     jsonShape: TRAVEL_JSON_SHAPE,
+    sources: ['images'],
+  },
+  share: {
+    buildMessages: buildShareExtractionMessages,
+    requiredKeys: SHARE_REQUIRED_KEYS,
+    jsonShape: SHARE_JSON_SHAPE,
+    // Images only. The share path never sends free text, and the Lambda's `sources` fence
+    // is what stops this soft-keyed task becoming a general text endpoint.
     sources: ['images'],
   },
   recipe: {
@@ -539,6 +668,7 @@ export const EXTRACTION_PARSERS = {
   event: parseExtractionResult,
   travel: parseTravelExtractionResult,
   recipe: parseRecipeExtractionResult,
+  share: parseShareExtractionResult,
 } as const;
 
 /** The per-kind objects the model nests its detail fields under (per TRAVEL_JSON_SHAPE). */

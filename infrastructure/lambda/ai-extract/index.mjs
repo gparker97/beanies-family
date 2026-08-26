@@ -119,7 +119,12 @@ export async function handler(event) {
   // instead of our classified error. Reachable by anyone: the x-api-key is in the bundle.
   const taskConfig = Object.hasOwn(EXTRACTION_TASKS, task) ? EXTRACTION_TASKS[task] : undefined;
   if (!taskConfig) {
-    return response(400, { error: `Unknown task: ${String(task)}` }, event);
+    // `code` matters: DEPLOY ORDER is load-bearing here. This Lambda must ship a new task
+    // before any client that requests it, and without a machine-readable code the client
+    // falls through to a status-based branch and shows "something went wrong" — which
+    // reads as a broken feature rather than a not-yet-deployed one. `unknown_task` lets
+    // the client render the friendly "not set up yet" notice instead.
+    return response(400, { error: `Unknown task: ${String(task)}`, code: 'unknown_task' }, event);
   }
   // A TEXT source is accepted only for a task that declares it (`sources` on the registry
   // entry). This is a real fence, not a formality: the soft x-api-key ships in the public
