@@ -20,7 +20,9 @@ import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
+import { isReadingSharedDocument } from '@/composables/useSharedDocumentIngest';
 import { useShareTargets } from '@/composables/useShareTargets';
 import DoseLogConfirmModal from '@/components/pod/DoseLogConfirmModal.vue';
 import QuickAddFab from '@/components/common/QuickAddFab.vue';
@@ -1757,6 +1759,7 @@ watch(
     <CelebrationOverlay />
     <ConfirmModal />
     <DocumentExtractConsentModal />
+    <AiProcessingOverlay :open="isReadingSharedDocument" />
     <DoseLogConfirmModal />
     <RecurringEditScopeModal />
 

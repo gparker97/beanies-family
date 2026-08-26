@@ -60,7 +60,13 @@ vi.mock('@/stores/familyStore', () => ({
 }));
 
 const requestConsent = vi.fn();
-vi.mock('../useDocumentConsent', () => ({ requestConsent: () => requestConsent() }));
+// `vi.hoisted` because the mock factory is lifted above ordinary top-level consts, and the
+// module under test reads `consentOpen` at import time.
+const { consentOpen } = vi.hoisted(() => ({ consentOpen: { value: false } }));
+vi.mock('../useDocumentConsent', () => ({
+  requestConsent: () => requestConsent(),
+  consentOpen,
+}));
 
 const extractShareFromDocuments = vi.fn();
 vi.mock('@/services/ai/documentExtractionService', () => ({
@@ -77,7 +83,7 @@ vi.mock('../useMagicReader', () => ({
   readerForShareKind: (k: string) => ({ event: 'photo', travel: 'document', recipe: 'recipe' })[k],
 }));
 
-import { ingestSharedDocuments } from '../useSharedDocumentIngest';
+import { ingestSharedDocuments, isReadingSharedDocument } from '../useSharedDocumentIngest';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -102,7 +108,8 @@ beforeEach(() => {
   authenticated = true;
   currentMember = { id: 'm1' };
   readerEnabled = true;
-  requestConsent.mockResolvedValue({});
+  consentOpen.value = false;
+  requestConsent.mockReset().mockResolvedValue({});
   extractShareFromDocuments.mockResolvedValue(EVENT_RESULT);
 });
 
@@ -151,6 +158,46 @@ describe('share ingest — the happy path', () => {
       await ingestSharedDocuments([img()], meta);
       expect(dispatchSharePayload).toHaveBeenCalledWith(expect.objectContaining({ kind }));
     }
+  });
+});
+
+describe('share ingest — telling the user something is happening', () => {
+  it('shows the reading overlay for the whole extraction, then clears it', async () => {
+    // On a real device the app opened from a share and then sat there, visibly idle, for
+    // four or five seconds before a form appeared. The in-app readers get their spinner from
+    // the wedge's `isProcessing`, which `processFile` sets — and the share path bypasses
+    // `processFile` entirely, so nothing ever set it.
+    let release: (v: unknown) => void = () => undefined;
+    extractShareFromDocuments.mockReturnValue(new Promise((r) => (release = r)));
+
+    const pending = ingestSharedDocuments([img()], meta);
+    await Promise.resolve();
+    expect(isReadingSharedDocument.value).toBe(true);
+
+    release(EVENT_RESULT);
+    await pending;
+    expect(isReadingSharedDocument.value).toBe(false);
+  });
+
+  it('hides the overlay while the consent prompt is up', async () => {
+    // The consent modal IS the feedback at that moment, and the overlay sits above it.
+    let release: (v: unknown) => void = () => undefined;
+    requestConsent.mockReturnValue(new Promise((r) => (release = r)));
+
+    const pending = ingestSharedDocuments([img()], meta);
+    await Promise.resolve();
+    consentOpen.value = true;
+    expect(isReadingSharedDocument.value).toBe(false);
+
+    consentOpen.value = false;
+    release({});
+    await pending;
+  });
+
+  it('clears the overlay even when the share fails', async () => {
+    extractShareFromDocuments.mockRejectedValue(new Error('boom'));
+    await ingestSharedDocuments([img()], meta);
+    expect(isReadingSharedDocument.value).toBe(false);
   });
 });
 

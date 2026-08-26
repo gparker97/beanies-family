@@ -8,6 +8,7 @@
  * `PolaroidImage` placeholder illustration when no photo is set,
  * matching the mockup's kraft-paper style.
  */
+import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AddTile from '@/components/pod/shared/AddTile.vue';
@@ -15,7 +16,6 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
@@ -344,19 +344,7 @@ async function handleSaved(id: string): Promise<void> {
       @saved="handleSaved"
     />
 
-    <div
-      v-if="capture.isProcessing.value"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    >
-      <div
-        class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
-      >
-        <BeanieSpinner size="lg" :halo="true" />
-        <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
-          {{ t('ai.processing') }}
-        </p>
-      </div>
-    </div>
+    <AiProcessingOverlay :open="capture.isProcessing.value" />
 
     <AiDocumentPicker
       ref="aiDocPicker"
