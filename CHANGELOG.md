@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- Security Scanning had been failing on every push since the CTA build-guard landed, on four lint errors in the guard itself. The filesystem walk is build-time only and is now exempted per call with a reason; the regex it flagged was simplified rather than suppressed. Three git-ignored build outputs are also excluded from the scan - linting the app bundle that gets copied into the native projects produced thousands of findings from minified vendor code and crashed the linter outright.
 - The marketing site's contact-form webhook is now supplied by a GitHub repository _variable_ rather than a secret, matching the two sibling webhooks. The value is inlined into a client-side bundle at build time and is public either way, so a secret only added rotation friction. Also dropped a dead copy of the same variable from the Vue deploy, unused since the marketing site moved to Astro.
 
 ### Added
