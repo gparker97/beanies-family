@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-26
 
+### Added
+
+- **Share straight to beanies from any app (Android).** Send a photo, screenshot or PDF from wherever it already is — beanies reads it, works out whether it's an activity, a trip or a recipe, and opens the right form filled in. Several photos of one thing are read together as one item. Nothing is saved until you confirm. (iOS to follow.)
+
 ### Removed
 
 - Removed the five Core Web Vitals (`CWV *`) analytics events from the marketing site. Plausible can't average or percentile custom properties, so they only ever showed how many visitors fired each event — not whether the site was fast. Lighthouse and Search Console cover this properly.

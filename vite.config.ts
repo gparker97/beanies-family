@@ -180,6 +180,22 @@ export default defineConfig({
         theme_color: '#2C3E50',
         background_color: '#F8F9FA',
         display: 'standalone',
+        // Share target (#64): beanies appears in Android's share sheet once the PWA is
+        // installed. The POST is intercepted by public/share-target-sw.js (pulled in via
+        // workbox.importScripts below), which stashes the files and 303s to /share.
+        share_target: {
+          action: '/share',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [
+              {
+                name: 'documents',
+                accept: ['image/*', 'application/pdf'],
+              },
+            ],
+          },
+        },
         start_url: '/',
         scope: '/',
         // Portrait-locked: the app is designed phone-first and every layout is
@@ -215,6 +231,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The Web Share Target POST handler (#64). importScripts deliberately rather than
+        // switching to `injectManifest`: that switch would rewrite the tuned update flow
+        // (usePwaUpdater, no skipWaiting/clientsClaim — see the note below) for one route.
+        importScripts: ['/share-target-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json,wasm}'],
         // The per-country public-holiday dataset (~200 files, ~2 MB total) is
         // fetched on demand for the family's country only and cached in

@@ -21,6 +21,7 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
+import { useShareTargets } from '@/composables/useShareTargets';
 import DoseLogConfirmModal from '@/components/pod/DoseLogConfirmModal.vue';
 import QuickAddFab from '@/components/common/QuickAddFab.vue';
 import QuickAddSheet from '@/components/common/QuickAddSheet.vue';
@@ -1474,6 +1475,7 @@ useNotifications();
 // intent. Reactive + SPA-safe; instantiates the calendar store only when a
 // resume is actually pending (zero-cost when the feature is off). See ADR-032.
 useCalendarRedirectResume();
+useShareTargets();
 useUnifiedRedirectResume();
 
 // Reminder-notification tap → open the item. The tap listener (registered by

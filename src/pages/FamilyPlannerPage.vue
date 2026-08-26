@@ -287,7 +287,11 @@ async function onPhotoActivityReady(ready: PhotoActivityReady): Promise<void> {
   return update ? applyUpdateExisting(match, ready) : applyAddNew(ready);
 }
 
-const { isProcessing: isReadingPhoto, processFile: processPhoto } = useDocumentToActivity({
+const {
+  isProcessing: isReadingPhoto,
+  processFile: processPhoto,
+  deliverEvent,
+} = useDocumentToActivity({
   onActivityReady: onPhotoActivityReady,
 });
 
@@ -313,7 +317,16 @@ async function handleAddFromPhoto(): Promise<void> {
 
 // Photo-reader cross-surface dispatch: the global FAB card sets `pendingMagic`
 // and navigates here; pick it up (watch + onMounted) and run the same handler.
-useMagicReaderConsumer('photo', handleAddFromPhoto, canReadPhoto);
+// A share arrives already extracted (#64) and is DELIVERED rather than re-read; no payload
+// means the magic affordance asked to open the picker, which is the original behaviour.
+useMagicReaderConsumer(
+  'photo',
+  (payload) => {
+    if (payload) deliverEvent(payload.data, payload.env);
+    else void handleAddFromPhoto();
+  },
+  canReadPhoto
+);
 
 // Vacation wizard state
 const showVacationWizard = ref(false);

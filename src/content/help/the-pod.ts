@@ -555,6 +555,13 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         icon: '✨',
       },
       {
+        type: 'infoBox',
+        content:
+          'On a phone, you do not have to start in beanies at all. Wherever the recipe already is \u2014 a photo, a screenshot, a PDF \u2014 tap <strong>Share</strong> and choose <strong>beanies.family</strong>. See <strong>Share Something Straight to beanies</strong>.',
+        title: 'Straight from another app',
+        icon: '\u{1F4E4}',
+      },
+      {
         type: 'heading',
         content: 'From a photo or a PDF',
         level: 2,
