@@ -39,6 +39,16 @@ export interface ShareIntentPlugin {
     coldStart?: boolean;
     offered?: number;
     read?: number;
+    /**
+     * iOS only. Whether the Share Extension's request to open beanies was accepted:
+     * `'opened'` | `'declined'` | `'none'` (no marker — every build before the extension
+     * started opening the app, and any share that staged nothing).
+     *
+     * `NSExtensionContext.open` is not guaranteed for share extensions, and an extension has
+     * no WebView to log from, so this is the ONLY way the difference between "iOS refused to
+     * open us" and "nothing was ever written" reaches CloudWatch.
+     */
+    openOutcome?: 'opened' | 'declined' | 'none';
   }>;
   addListener(
     event: 'shareReceived',

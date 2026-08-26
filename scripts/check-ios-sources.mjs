@@ -21,7 +21,7 @@
  * Run by the iOS build and release workflows, before any archive.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { resolve, dirname, relative } from 'node:path';
+import { resolve, dirname, relative, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -78,3 +78,64 @@ if (missing.length > 0) {
 }
 
 console.log(`✓ all ${swiftFiles.length} Swift file(s) under ios/App/ are in Compile Sources`);
+
+/**
+ * GUARD 2 — the app group + marker names must MATCH across the two targets.
+ *
+ * The Share Extension and the app are separate processes that share nothing but the app
+ * group container, so these strings are necessarily duplicated: there is no shared module
+ * to hold them and no compiler check that they agree. A typo in either one does not fail
+ * the build, does not throw at runtime, and does not log — the extension writes into one
+ * container while the app reads another, and every share silently vanishes.
+ *
+ * That is precisely the failure mode this file already exists to catch for Compile Sources.
+ */
+const CROSS_TARGET_CONSTANTS = [
+  { name: 'appGroup', pattern: /private static let appGroup = "([^"]+)"/ },
+  { name: 'inboxName', pattern: /private static let inboxName = "([^"]+)"/ },
+  { name: 'openMarkerName', pattern: /private static let openMarkerName = "([^"]+)"/ },
+];
+
+const PAIRED_FILES = {
+  extension: 'ios/App/ShareExtension/ShareViewController.swift',
+  app: 'ios/App/App/ShareIntentPlugin.swift',
+};
+
+const sources = Object.fromEntries(
+  Object.entries(PAIRED_FILES).map(([role, rel]) => [role, readFileSync(join(ROOT, rel), 'utf8')])
+);
+
+const mismatches = [];
+for (const { name, pattern } of CROSS_TARGET_CONSTANTS) {
+  const found = Object.fromEntries(
+    Object.entries(sources).map(([role, text]) => [role, pattern.exec(text)?.[1]])
+  );
+  // A constant absent from BOTH is fine (it may not exist yet); absent from one, or present
+  // in both with different values, is the drift this guard is for.
+  const values = Object.values(found);
+  if (values.every((v) => v === undefined)) continue;
+  if (values.some((v) => v === undefined) || new Set(values).size > 1) {
+    mismatches.push(
+      `    ${name}: ` +
+        Object.entries(found)
+          .map(([role, v]) => `${role}=${v === undefined ? '(not found)' : `"${v}"`}`)
+          .join('  vs  ')
+    );
+  }
+}
+
+if (mismatches.length > 0) {
+  console.error(
+    `\n\u2716 the Share Extension and the app disagree on ${mismatches.length} shared constant(s):\n` +
+      mismatches.join('\n') +
+      '\n\nThese name the SAME app-group container from two separate targets. When they differ,\n' +
+      'the extension writes where the app never reads: every share vanishes with no error,\n' +
+      'on device and in the logs. Make them identical in both files:\n' +
+      `    ${PAIRED_FILES.extension}\n    ${PAIRED_FILES.app}\n`
+  );
+  process.exit(1);
+}
+
+console.log(
+  `\u2713 the Share Extension and the app agree on all ${CROSS_TARGET_CONSTANTS.length} shared constants`
+);
