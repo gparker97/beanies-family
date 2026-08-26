@@ -6,16 +6,19 @@
 // service NEVER throws to the caller and never reports/toasts (the composable owns
 // user-facing reporting, so it isn't double-fired). See docs/lessons.md (no silent failures).
 //
-// CONSENT is a precondition enforced by the CALLER (the wedge composable shows the
-// per-action consent modal before invoking this). By the time we're here, the user has
-// agreed to send this one document. Data-minimization: only the single compressed
-// document leaves the device — never the family dataset.
+// CONSENT is a precondition enforced by the TYPE SYSTEM (#64). `ExtractOptions.grant` is a
+// branded `ConsentGrant` that only `requestConsent()` can mint, so reaching this funnel
+// without having awaited the ADR-030 gate does not compile. It used to be a convention in
+// this comment, and a new entry point duly shipped without the gate. The service never
+// inspects the token — it only demands it. Data-minimization is unchanged: only the
+// compressed document leaves the device, never the family dataset.
 
 import {
   compress,
   CompressionError,
   type CompressOptions,
 } from '@/services/photos/photoCompression';
+import type { ConsentGrant } from '@/composables/useDocumentConsent';
 import { assertNever } from '@/utils/assertNever';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
@@ -55,6 +58,12 @@ export interface ExtractOptions {
   compression?: CompressOptions;
   /** Required when `tier === 'byok'`: which provider + key. Ignored otherwise. */
   byok?: ByokConfig;
+  /**
+   * Proof that the ADR-030 per-document consent gate ran for this action. Obtained by
+   * awaiting `requestConsent()`; it cannot be constructed any other way, which is what makes
+   * an ungated extraction a compile error rather than a review catch.
+   */
+  grant: ConsentGrant;
 }
 
 function selectProvider(opts: ExtractOptions): ExtractionProvider {

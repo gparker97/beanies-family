@@ -21,9 +21,7 @@ import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import RecipeLinkModal from '@/components/pod/RecipeLinkModal.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
-import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
-import { useAiCapability } from '@/composables/useAiCapability';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import { useTranslation } from '@/composables/useTranslation';
@@ -48,8 +46,10 @@ const editing = ref<Recipe | null>(null);
 // consent gate, opens the picker, opens the form with the prefill, and forwards
 // the saved id back for the source attach.
 const { canReadRecipe } = useMagicReader();
-const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
-const { tier: aiTier } = useAiCapability();
+// The consent modal is mounted ONCE in App.vue (#64); this page only asks. The grant is
+// held between the gate and the picker's file event — consent runs before the picker opens.
+const { requestConsent } = useDocumentConsent();
+let docGrant: ConsentGrant | null = null;
 const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 const prefill = ref<RecipePrefill | null>(null);
 const linkModalOpen = ref(false);
@@ -65,7 +65,7 @@ const capture = useRecipeCapture({
 
 function handlePastedLink(url: string): void {
   linkModalOpen.value = false;
-  void capture.processUrl(url);
+  if (docGrant) void capture.processUrl(url, docGrant);
 }
 
 /** Secondary sources, chosen from inside the link modal rather than a separate chooser. */
@@ -87,6 +87,7 @@ function handleUseFile(): void {
 async function handleAddFromDocument(): Promise<void> {
   const granted = await requestConsent();
   if (!granted) return;
+  docGrant = granted;
   linkModalOpen.value = true;
 }
 
@@ -345,13 +346,10 @@ async function handleSaved(id: string): Promise<void> {
       </div>
     </div>
 
-    <DocumentExtractConsentModal
-      :open="consentOpen"
-      :tier="aiTier"
-      @confirm="onConsentConfirm"
-      @cancel="resolveConsent(false)"
+    <AiDocumentPicker
+      ref="aiDocPicker"
+      @file="(f) => docGrant && void capture.processFile(f, docGrant)"
     />
-    <AiDocumentPicker ref="aiDocPicker" @file="(f) => void capture.processFile(f)" />
     <RecipeLinkModal
       :open="linkModalOpen"
       @close="linkModalOpen = false"

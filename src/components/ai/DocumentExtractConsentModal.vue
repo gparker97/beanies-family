@@ -8,9 +8,14 @@
  * the per-tier translated list. Info-styled and reassuring (no Alert Red — privacy is a
  * calm, deliberate choice, not an alarm).
  *
- * Confirm = @save (emits the optional "remember" choice), cancel/dismiss = @cancel. The
- * `remember` checkbox is OPTIONAL — confirming proceeds either way; ticking it asks the
- * parent to persist the family-scoped consent-skip so future extractions don't prompt.
+ * SELF-CONTAINED (#64). This reads its own open state from the `useDocumentConsent`
+ * singleton and its own tier from `useAiCapability`, exactly as `ConfirmModal` reads
+ * `useConfirm`. It takes NO props and is mounted ONCE, in `App.vue`. Consent can be requested
+ * from the app shell (a share arriving before any page exists) and from inside another modal
+ * (`RecipeFormModal`), neither of which can host a per-page mount.
+ *
+ * The `remember` checkbox is OPTIONAL — confirming proceeds either way; ticking it persists
+ * the family-scoped consent-skip so future extractions don't prompt.
  */
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -18,7 +23,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { openExternal } from '@/utils/openExternal';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import BetaBadge from '@/components/ui/BetaBadge.vue';
-import type { AiTier } from '@/services/ai/types';
+import { useAiCapability } from '@/composables/useAiCapability';
+import { useDocumentConsent } from '@/composables/useDocumentConsent';
 
 // The privacy article lives on the marketing site (deployed via deploy-web.yml). LIVE as of
 // the 2026-06-07 soft launch — this change ships alongside that web deploy, so the consent
@@ -27,28 +33,18 @@ const PRIVACY_ARTICLE_LIVE = true;
 const PRIVACY_ARTICLE_URL =
   'https://beanies.family/help/security/how-beanies-ai-handles-your-photos';
 
-const props = defineProps<{
-  open: boolean;
-  /** Selected tier — drives the "where it goes" line. */
-  tier: AiTier;
-}>();
-
-const emit = defineEmits<{
-  confirm: [remember: boolean];
-  cancel: [];
-}>();
-
 const { t } = useTranslation();
+const { consentOpen, resolveConsent, onConsentConfirm } = useDocumentConsent();
+// Tier drives the "where it goes" line, and is read here rather than passed in so the single
+// global mount needs no wiring in App.vue.
+const { tier } = useAiCapability();
 
 // The modal's only internal state. Reset on each open-prop edge so a stale tick never
 // carries across reopen.
 const remember = ref(false);
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) remember.value = false;
-  }
-);
+watch(consentOpen, (isOpen) => {
+  if (isOpen) remember.value = false;
+});
 
 // Split the intro sentence around the "secure, private" phrase so it can become
 // an inline link. Reuses the shared accent-splitter (same pattern as WelcomeGate /
@@ -63,13 +59,13 @@ const items = computed(() => [
   {
     icon: '🔒',
     label: t('ai.consent.whereLabel'),
-    value: props.tier === 'byok' ? t('ai.consent.whereByok') : t('ai.consent.whereManaged'),
+    value: tier.value === 'byok' ? t('ai.consent.whereByok') : t('ai.consent.whereManaged'),
   },
   { icon: '🗑️', label: t('ai.consent.afterLabel'), value: t('ai.consent.afterValue') },
 ]);
 
 function onConfirm(): void {
-  emit('confirm', remember.value);
+  void onConsentConfirm(remember.value);
 }
 </script>
 
@@ -77,12 +73,12 @@ function onConfirm(): void {
   <BeanieFormModal
     variant="modal"
     size="narrow"
-    :open="open"
+    :open="consentOpen"
     :title="t('ai.consent.title')"
     icon="✨"
     icon-bg="var(--tint-orange-8)"
     :save-label="t('ai.consent.confirm')"
-    @close="emit('cancel')"
+    @close="resolveConsent(false)"
     @save="onConfirm"
   >
     <!-- Beta: the AI document readers are an early release. -->

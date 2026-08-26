@@ -20,6 +20,7 @@ import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import DoseLogConfirmModal from '@/components/pod/DoseLogConfirmModal.vue';
 import QuickAddFab from '@/components/common/QuickAddFab.vue';
 import QuickAddSheet from '@/components/common/QuickAddSheet.vue';
@@ -1753,6 +1754,7 @@ watch(
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />
     <ConfirmModal />
+    <DocumentExtractConsentModal />
     <DoseLogConfirmModal />
     <RecurringEditScopeModal />
 

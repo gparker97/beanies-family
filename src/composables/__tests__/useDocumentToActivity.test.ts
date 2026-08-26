@@ -1,3 +1,4 @@
+import { __testConsentGrant } from '@/test/consentGrant';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 
@@ -69,7 +70,7 @@ describe('useDocumentToActivity', () => {
     isOnline.value = false;
     const { processFile } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith('info', 'ai.offline.title', 'ai.offline.message');
     expect(mockExtract).not.toHaveBeenCalled();
@@ -79,7 +80,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
     const { processFile, onActivityReady } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(onActivityReady).toHaveBeenCalledWith({
       // 'Birthday' title → inferred category rides along in the prefill.
@@ -101,7 +102,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE, compressedBlob: blob });
     const { processFile, onActivityReady } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     const arg = onActivityReady.mock.calls[0][0] as { sourcePhoto?: File };
     expect(arg.sourcePhoto).toBeInstanceOf(File);
@@ -115,7 +116,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
     const { processFile } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(mockExtract).toHaveBeenCalledWith(
       expect.any(File),
@@ -127,7 +128,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: true, data: { ...SAMPLE, isEvent: false } });
     const { processFile, onActivityReady } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith('info', 'ai.notEvent.title', 'ai.notEvent.message');
     expect(onActivityReady).toHaveBeenCalled();
@@ -137,7 +138,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'provider_error' });
     const { processFile, onActivityReady } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.generic', {
       surface: 'ai-extract',
@@ -149,7 +150,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'compression' });
     const { processFile } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith('warning', 'ai.error.title', 'photos.invalidType');
   });
@@ -158,7 +159,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'not_available' });
     const { processFile } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith(
       'info',
@@ -171,7 +172,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'upstream_busy' });
     const { processFile } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith(
       'warning',
@@ -186,7 +187,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: false, errorCode: 'malformed_output' });
     const { processFile } = setup();
 
-    await processFile(file());
+    await processFile(file(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.unreadable', {
       surface: 'ai-extract',
@@ -197,7 +198,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
     const { processFile, onActivityReady } = setup();
 
-    await processFile(pdf());
+    await processFile(pdf(), __testConsentGrant);
 
     const passed = mockExtract.mock.calls[0][0] as File;
     expect(passed.type).toBe('application/pdf'); // not a client-rasterized image
@@ -208,7 +209,7 @@ describe('useDocumentToActivity', () => {
     mockExtract.mockResolvedValue({ success: true, data: SAMPLE, truncated: true });
     const { processFile, onActivityReady } = setup();
 
-    await processFile(pdf());
+    await processFile(pdf(), __testConsentGrant);
 
     expect(showToast).toHaveBeenCalledWith(
       'info',
@@ -223,7 +224,7 @@ describe('useDocumentToActivity', () => {
     const { processFile, isProcessing } = setup();
 
     expect(isProcessing.value).toBe(false);
-    const p = processFile(file());
+    const p = processFile(file(), __testConsentGrant);
     // isProcessing flips true once extraction starts and back to false when it resolves.
     await p;
     expect(isProcessing.value).toBe(false);

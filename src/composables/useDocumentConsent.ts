@@ -1,57 +1,104 @@
 // Shared per-document AI consent gate (ADR-030, #133 + #30).
 //
-// Both document wedges must get the user's agreement before a single document leaves the
-// device. This composable owns the promise-based gate + the family-scoped "don't ask again"
-// (skipDocumentConsentPrompt) so each page doesn't re-declare the resolver lifecycle. The
-// gate runs BEFORE the file picker opens; a decline is a deliberate silent no-op.
+// Every path that sends a document off the device must get the user's agreement first. This
+// module owns the promise-based gate + the family-scoped "don't ask again"
+// (skipDocumentConsentPrompt) so no caller re-declares the resolver lifecycle. The gate runs
+// BEFORE the document leaves; a decline is a deliberate no-op for the caller.
+//
+// SINGLETON (#64). State is module-level and `DocumentExtractConsentModal` is mounted ONCE in
+// `App.vue`, exactly like `useConfirm`/`ConfirmModal`. Consent used to be instantiated per
+// page, which meant a new entry point had to remember to mount its own modal — and a share
+// arriving at the app shell has no page to mount one. One resolver, one modal, any caller.
+//
+// THE GRANT IS A TOKEN, NOT A CONVENTION (#64). `requestConsent()` returns an opaque
+// `ConsentGrant` that `ExtractOptions` requires, so reaching the AI pipeline without having
+// awaited this gate is a COMPILE ERROR rather than a comment somebody has to notice. This
+// project has already shipped one entry point that skipped the gate because the gate lived at
+// the old entry point; the type closes that class of defect rather than one instance of it.
 
 import { ref } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { reportError } from '@/utils/errorReporter';
 
-export function useDocumentConsent() {
-  const settingsStore = useSettingsStore();
+declare const consentBrand: unique symbol;
 
-  const consentOpen = ref(false);
-  let consentResolver: ((granted: boolean) => void) | null = null;
+/**
+ * Opaque proof that the ADR-030 per-document consent gate ran for this action.
+ *
+ * Minted ONLY by `requestConsent()` — the brand has no public constructor, so application
+ * code cannot forge one. Carried by `ExtractOptions`; the extraction service never inspects
+ * it, it only demands it. Tests mint one via `__testConsentGrant` in the test utils.
+ */
+export type ConsentGrant = { readonly [consentBrand]: 'document-consent' };
 
-  /**
-   * Await consent before any document leaves the device. If the family opted into "don't ask
-   * again" we resolve immediately WITHOUT touching the modal lifecycle (no resolver assignment
-   * → none can be left dangling).
-   */
-  function requestConsent(): Promise<boolean> {
-    if (settingsStore.skipDocumentConsentPrompt) return Promise.resolve(true);
-    return new Promise((resolve) => {
-      consentResolver = resolve;
-      consentOpen.value = true;
+const GRANT = {} as ConsentGrant;
+
+/** Whether the consent modal is showing. Read by the single global modal mount. */
+const consentOpen = ref(false);
+
+/**
+ * The resolver for the CURRENT prompt, and the promise every concurrent caller shares.
+ *
+ * Concurrency is specified, not left to chance: a `requestConsent()` while another is already
+ * pending returns the SAME in-flight promise, so two callers produce one modal and both are
+ * resolved together. Resolvers are never stacked and never dropped.
+ */
+let consentResolver: ((grant: ConsentGrant | null) => void) | null = null;
+let inFlight: Promise<ConsentGrant | null> | null = null;
+
+/**
+ * Await consent before any document leaves the device. Resolves to a `ConsentGrant` when the
+ * user agrees, or `null` when they decline.
+ *
+ * If the family opted into "don't ask again" this resolves immediately WITHOUT touching the
+ * modal lifecycle (no resolver assignment → none can be left dangling).
+ *
+ * `useSettingsStore()` is called HERE rather than at module scope on purpose: Pinia is not
+ * active at import time, so a module-scope call would throw at app boot for every importer.
+ */
+export function requestConsent(): Promise<ConsentGrant | null> {
+  if (useSettingsStore().skipDocumentConsentPrompt) return Promise.resolve(GRANT);
+  if (inFlight) return inFlight;
+
+  inFlight = new Promise<ConsentGrant | null>((resolve) => {
+    consentResolver = resolve;
+    consentOpen.value = true;
+  });
+  return inFlight;
+}
+
+/** Settle the current prompt. Safe to call when nothing is pending. */
+export function resolveConsent(granted: boolean): void {
+  consentOpen.value = false;
+  const resolver = consentResolver;
+  consentResolver = null;
+  inFlight = null;
+  resolver?.(granted ? GRANT : null);
+}
+
+/**
+ * Confirm handler for the consent modal. Proceeds for this document regardless; if the user
+ * ticked "remember", persist the family-scoped skip — but a persist failure must never strand
+ * the caller, so consent resolves in `finally`.
+ */
+export async function onConsentConfirm(remember: boolean): Promise<void> {
+  try {
+    if (remember) await useSettingsStore().setSkipDocumentConsentPrompt(true);
+  } catch (e) {
+    reportError({
+      surface: 'ai-consent',
+      message: 'Failed to save the AI consent preference',
+      error: e,
     });
+  } finally {
+    resolveConsent(true);
   }
+}
 
-  function resolveConsent(granted: boolean): void {
-    consentOpen.value = false;
-    consentResolver?.(granted);
-    consentResolver = null;
-  }
-
-  /**
-   * Confirm handler for the consent modal. Proceeds for this document regardless; if the user
-   * ticked "remember", persist the family-scoped skip — but a persist failure must never strand
-   * the wedge, so consent resolves in `finally`.
-   */
-  async function onConsentConfirm(remember: boolean): Promise<void> {
-    try {
-      if (remember) await settingsStore.setSkipDocumentConsentPrompt(true);
-    } catch (e) {
-      reportError({
-        surface: 'ai-consent',
-        message: 'Failed to save the AI consent preference',
-        error: e,
-      });
-    } finally {
-      resolveConsent(true);
-    }
-  }
-
+/**
+ * Consent gate accessors. Callers normally want `requestConsent` alone; the modal renderer
+ * additionally reads `consentOpen` and calls `onConsentConfirm` / `resolveConsent`.
+ */
+export function useDocumentConsent() {
   return { consentOpen, requestConsent, resolveConsent, onConsentConfirm };
 }

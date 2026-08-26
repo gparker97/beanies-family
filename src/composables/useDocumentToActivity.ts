@@ -1,8 +1,9 @@
 // Wedge orchestration (ADR-030, #133, Phase 3): photo/document → extraction → prefilled
 // activity. Kept deliberately THIN — file intake, the extraction call, and mapping to a
 // prefill. Consent is gated by the CALLER before the file picker even opens (see
-// FamilyPlannerPage.handleAddFromPhoto) — nothing here runs until the document is picked,
-// which only happens post-consent. The generic concerns (tier/availability) live in
+// FamilyPlannerPage.handleAddFromPhoto), and the resulting `ConsentGrant` is threaded in so
+// the extraction call type-checks — nothing here runs until the document is picked, which
+// only happens post-consent. The generic concerns (tier/availability) live in
 // useAiCapability; the only wedge-specific code is the pure mapper (extractionToActivity).
 //
 // Every outcome is explicit and non-silent (see docs/lessons.md): offline is guarded before
@@ -14,6 +15,7 @@ import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { useExtractionErrorToast } from './useExtractionErrorToast';
+import type { ConsentGrant } from './useDocumentConsent';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
 import type { FieldConfidence } from '@/services/ai/types';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
@@ -43,8 +45,8 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
 
   const isProcessing = ref(false);
 
-  /** Run the full intake → extract → prefill flow for one document (consent already granted). */
-  async function processFile(file: File): Promise<void> {
+  /** Run the full intake → extract → prefill flow for one document. */
+  async function processFile(file: File, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
 
     if (!isOnline.value) {
@@ -63,6 +65,7 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
         tier: tier.value,
         todayIso: toDateInputValue(new Date()),
         byok: byokConfig.value ?? undefined,
+        grant,
       });
 
       if (result.success && result.data) {
