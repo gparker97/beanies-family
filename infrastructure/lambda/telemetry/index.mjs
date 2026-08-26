@@ -134,6 +134,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'credential_source',
   'unwrap_ok',
   'detail',
+  // Share-target ingest counters (added 2026-08-26, #64). PII-free: a document count and a
+  // cold-start boolean. Mirror of src/utils/diagnosticContext.ts.
+  'file_count',
+  'cold_start',
   // Native hardware-Keystore biometric backing enum (added 2026-07-14, #52 pivot).
   'key_backing',
   // Silent data-connection config-heal booleans (added 2026-07-15, native data-

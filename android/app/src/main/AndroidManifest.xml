@@ -54,6 +54,28 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="family.beanies.app" android:host="oauth" />
             </intent-filter>
+
+            <!-- Share target (#64): beanies appears in the system share sheet for photos,
+                 screenshots and PDFs, handled by ShareIntentPlugin. EXPORTED is required
+                 for a share target and is a deliberate, reviewed decision — any app can
+                 invoke this, so nothing arriving through it is trusted: the type is
+                 re-decided from the resolved bytes, the read is size-capped natively, the
+                 filename is sanitised before storage, and nothing is saved until the user
+                 confirms it in a review modal. launchMode="singleTask" (above) delivers a
+                 share to the RUNNING instance via onNewIntent rather than starting a
+                 second copy of the app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
         </activity>
 
         <provider

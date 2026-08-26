@@ -93,7 +93,19 @@ async function handleAddFromDocument(): Promise<void> {
 
 // Cross-surface dispatch: the global FAB card sets `pendingMagic` and routes here;
 // without this the chip would navigate to the cookbook and then silently do nothing.
-useMagicReaderConsumer('recipe', handleAddFromDocument, canReadRecipe);
+// A share arrives already extracted (#64) and is DELIVERED rather than re-read.
+//
+// It MUST be delivered into THIS `useRecipeCapture()` instance: `deliverRecipe` sets the
+// pending source that `attachAfterSave` later consumes, and that state is composable-local.
+// A fresh instance would save the recipe with no photo attached — silently.
+useMagicReaderConsumer(
+  'recipe',
+  (payload) => {
+    if (payload) capture.deliverRecipe(payload.data, payload.env);
+    else void handleAddFromDocument();
+  },
+  canReadRecipe
+);
 
 const recipes = computed(() =>
   [...recipesStore.recipes].sort((a, b) => a.name.localeCompare(b.name))

@@ -1068,6 +1068,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         title: 'Nook and Planner integration',
         icon: '\u{1F3E0}',
       },
+      {
+        type: 'infoBox',
+        content:
+          'On a phone you can skip the app entirely: wherever the booking confirmation already is, tap <strong>Share</strong> and choose <strong>beanies.family</strong>. beanies reads it and opens this same form, filled in. See <strong>Share Something Straight to beanies</strong>.',
+        title: 'Straight from another app',
+        icon: '\u{1F4E4}',
+      },
     ],
   },
   {
@@ -1382,6 +1389,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Tap any activity to open its detail view. From there, you can edit most fields directly \u2014 title, time, location, assignee, transport, instructor, and notes \u2014 without opening the full edit form. Changes save automatically when you click away.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'On a phone you can skip the app entirely: wherever the invitation or notice already is, tap <strong>Share</strong> and choose <strong>beanies.family</strong>. beanies reads it and opens this same form, filled in. See <strong>Share Something Straight to beanies</strong>.',
+        title: 'Straight from another app',
+        icon: '\u{1F4E4}',
       },
     ],
   },
@@ -1721,6 +1735,119 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         icon: '\u{1F512}',
         content:
           'For your safety, beanies deliberately does <strong>not</strong> store your card’s CVV / security code, your PINs, your full card number, your online-banking password, or a crypto seed phrase or private key. Card details keep only the last 4 digits — just enough to recognise the card. A dedicated secure area for passwords is planned for a future update.',
+      },
+    ],
+  },
+  {
+    slug: 'share-to-beanies',
+    category: 'features',
+    title: 'Share Something Straight to beanies',
+    excerpt:
+      'Send a photo, screenshot or PDF from any app on your phone into beanies, and it works out whether it is an activity, a trip or a recipe.',
+    icon: '\u{1F4E4}',
+    readTime: 4,
+    updatedDate: '2026-08-26',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why this exists',
+        level: 2,
+        id: 'why',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The things worth putting into beanies almost never start in beanies. A party invitation arrives in a message, a flight confirmation lands in your email, a recipe turns up on a friend\u2019s feed. Until now, getting any of those in meant opening beanies, finding the right reader, and hunting for the file all over again.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Now you can send it straight across from wherever it already is. beanies reads it, works out what it is, and opens the right form with everything filled in for you to check.',
+      },
+      {
+        type: 'heading',
+        content: 'How to share something',
+        level: 2,
+        id: 'how',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'In whichever app the photo, screenshot or PDF is in, tap <strong>Share</strong>',
+          'Choose <strong>beanies.family</strong> from the list that appears',
+          'The first time, beanies asks your permission to send this one document to be read \u2014 have a look at what it says, then agree',
+          'beanies reads it and opens the matching form, already filled in',
+          'Check it over and tap <strong>Save</strong>',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'Nothing is saved until you press <strong>Save</strong>. If beanies reads something wrong \u2014 or you change your mind \u2014 just close the form and nothing is added.',
+        title: 'You always get the last word',
+        icon: '\u2713',
+      },
+      {
+        type: 'heading',
+        content: 'What beanies can read',
+        level: 2,
+        id: 'what',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Photos, screenshots and PDFs. Anything else \u2014 a text file, a link, a document from another app \u2014 will say it cannot be read, rather than quietly doing nothing.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'beanies decides for itself which of three things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), or a <strong>recipe</strong>. If it genuinely cannot tell, it says so instead of guessing \u2014 you can still add the item yourself.',
+      },
+      {
+        type: 'heading',
+        content: 'Sharing several photos at once',
+        level: 2,
+        id: 'several',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If one thing spreads across several photos \u2014 a two-page invitation, a recipe photographed from both sides of the card \u2014 select them all and share them together. beanies reads them as the pages of <strong>one</strong> item and gives you a single form, not one form per photo.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'beanies reads up to five pages at a time. Share more than that and it will tell you it only read the first few \u2014 it never drops pages quietly. The first photo is the one kept and attached to the saved item.',
+        title: 'How many at once',
+        icon: '\u{1F5BC}\uFE0F',
+      },
+      {
+        type: 'heading',
+        content: 'If nothing happens',
+        level: 2,
+        id: 'troubleshooting',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>\u201CSign in first\u201D</strong> \u2014 beanies needs you signed in before it can put anything in your pod. Open beanies, sign in, then share it again.',
+          '<strong>\u201CAlmost ready\u201D</strong> \u2014 beanies was still opening your family\u2019s data. Give it a moment and share it again.',
+          '<strong>\u201CStill reading\u201D</strong> \u2014 one document is already being read. Wait for that one to finish, then share the next.',
+          '<strong>\u201CReader unavailable\u201D</strong> \u2014 beanies worked out what it was, but that reader is switched off for your family, or your role does not include editing that part of the pod. An owner can check this in Settings.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'What happens to what you share',
+        level: 2,
+        id: 'privacy',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The same thing that happens with the readers inside the app: the document is sent to be read, and nothing else about your family goes with it. You are asked for permission the first time, and the details are in the note that appears \u2014 there is more in <strong>How beanies AI handles your photos</strong>.',
       },
     ],
   },

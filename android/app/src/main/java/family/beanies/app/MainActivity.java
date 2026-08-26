@@ -19,6 +19,10 @@ public class MainActivity extends BridgeActivity {
         // match the in-app theme; #52 BiometricKeystore does hardware biometric unlock.
         registerPlugin(WindowBackgroundPlugin.class);
         registerPlugin(BiometricKeystorePlugin.class);
+        // #64 ShareIntent receives ACTION_SEND / ACTION_SEND_MULTIPLE so beanies appears in
+        // the system share sheet. launchMode="singleTask" (manifest) means a warm app gets
+        // the intent via onNewIntent, which Capacitor routes to the plugin.
+        registerPlugin(ShareIntentPlugin.class);
         super.onCreate(savedInstanceState);
         // Edge-to-edge system bars, done natively. The @capacitor/status-bar plugin
         // only uses deprecated APIs (setSystemUiVisibility / setStatusBarColor) that

@@ -78,7 +78,11 @@ const reviewSubmitting = ref(false);
 // when launched from the list header (target auto-resolves by date).
 const pendingTripTarget = ref<string | null>(null);
 
-const { isProcessing: isReadingDoc, processFile: processTravelDoc } = useDocumentToTravel({
+const {
+  isProcessing: isReadingDoc,
+  processFile: processTravelDoc,
+  deliverTravel,
+} = useDocumentToTravel({
   onTravelReady: (ready) => {
     // If launched from a trip's detail page, default to that trip (modal still allows New/other).
     const target = overrideTripTarget(
@@ -114,7 +118,17 @@ async function handleAddFromDocument(tripId?: string): Promise<void> {
 
 // Document-reader cross-surface dispatch: the FAB card / new-trip-wizard banner
 // set `pendingMagic` and route here; pick it up (watch + onMounted) and run it.
-useMagicReaderConsumer('document', handleAddFromDocument, canReadDocument);
+// A share arrives already extracted (#64), so it is DELIVERED rather than re-read — the
+// alternative would be a second AI call for the same document. No payload means the magic
+// affordance asked to open the picker, which is the original behaviour.
+useMagicReaderConsumer(
+  'document',
+  (payload) => {
+    if (payload) deliverTravel(payload.data, payload.env);
+    else void handleAddFromDocument();
+  },
+  canReadDocument
+);
 
 /** Every created segment id across the buckets, in timeline order. */
 function allSegmentIds(ready: TravelReady): string[] {

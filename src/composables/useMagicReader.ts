@@ -30,9 +30,25 @@ import {
   closeSheetForNavigation,
   hasSheetHistoryMarker,
 } from '@/composables/useQuickAdd';
+import type { SharePayload, ShareKind } from '@/types/magicPayload';
+import { reportError } from '@/utils/errorReporter';
 
 /** Which AI reader an affordance asked to open. */
 export type MagicReader = 'photo' | 'document' | 'recipe';
+
+/**
+ * reader → the share kind it consumes, at the TYPE level, so a page's consumer receives
+ * exactly its own payload variant and cannot be handed another reader's. Kept in step with
+ * `MAGIC_READERS.shareKind` by the totality test.
+ */
+export interface ReaderShareKind {
+  photo: 'event';
+  document: 'travel';
+  recipe: 'recipe';
+}
+
+/** The one payload variant a given reader can ever receive. */
+export type PayloadFor<R extends MagicReader> = Extract<SharePayload, { kind: ReaderShareKind[R] }>;
 
 /**
  * One registry per reader, replacing what used to be four parallel structures (the union,
@@ -44,23 +60,72 @@ export type MagicReader = 'photo' | 'document' | 'recipe';
  */
 const MAGIC_READERS: Record<
   MagicReader,
-  { route: string; flag?: 'aiPhotoExtract' | 'aiTravelExtract' }
+  { route: string; flag?: 'aiPhotoExtract' | 'aiTravelExtract'; shareKind: ShareKind }
 > = {
-  photo: { route: '/activities', flag: 'aiPhotoExtract' },
-  document: { route: '/travel', flag: 'aiTravelExtract' },
-  recipe: { route: '/pod/cookbook' },
+  photo: { route: '/activities', flag: 'aiPhotoExtract', shareKind: 'event' },
+  document: { route: '/travel', flag: 'aiTravelExtract', shareKind: 'travel' },
+  recipe: { route: '/pod/cookbook', shareKind: 'recipe' },
 };
+
+/**
+ * kind → reader, so a shared document's detected kind resolves to a route + flag + permission
+ * through the ONE registry above rather than a second parallel map (#64). The mapping is
+ * asserted total and injective by a unit test, so a fourth reader cannot half-land.
+ */
+export function readerForShareKind(kind: ShareKind): MagicReader {
+  const entry = (Object.keys(MAGIC_READERS) as MagicReader[]).find(
+    (r) => MAGIC_READERS[r].shareKind === kind
+  );
+  // Unreachable while the totality test passes; throwing beats returning a wrong reader.
+  if (!entry) throw new Error(`No magic reader for share kind "${kind}"`);
+  return entry;
+}
+
+/**
+ * Is this reader available to this member, right now? Permission AND (when the reader
+ * declares one) its feature flag.
+ *
+ * Deliberately a PLAIN function, not a computed: the share orchestrator runs from a native
+ * listener, outside any `setup()`. The gating computeds below wrap this same function, so
+ * there is exactly one answer to "is this reader available" rather than two that can drift.
+ * Availability being permission × flag is also why a member without `canEditActivities` gets
+ * an honest "that reader isn't available" message instead of a dead end.
+ */
+export function isReaderEnabled(reader: MagicReader): boolean {
+  const { canEditActivities } = usePermissions();
+  const { flag } = MAGIC_READERS[reader];
+  return canEditActivities.value && (flag === undefined || isFlagEnabled(flag));
+}
 
 // --- Module singleton state ------------------------------------------------
 
-/** Set by a magic affordance, consumed once by the destination page. */
-const pendingMagic = ref<MagicReader | null>(null);
+/**
+ * Set by a magic affordance, consumed once by the destination page.
+ *
+ * Carries an optional PAYLOAD (#64): a share has already run the extraction, so it hands the
+ * typed result over rather than asking the page to open a picker. `openReader()` sets no
+ * payload, which is byte-identical to the previous "open the picker" behaviour.
+ */
+interface PendingMagic {
+  reader: MagicReader;
+  payload?: SharePayload;
+}
+
+const pendingMagic = ref<PendingMagic | null>(null);
 
 /**
  * Read-only view for host pages / tests to observe `pendingMagic`. Test-facing:
  * production reads go through `useMagicReaderConsumer`, not this export.
  */
-export const pendingMagicReader = computed(() => pendingMagic.value);
+export const pendingMagicReader = computed(() => pendingMagic.value?.reader ?? null);
+
+/**
+ * Drop any un-consumed request. The share orchestrator calls this on its failure paths so a
+ * dead-ended share cannot pin a File in memory until the next navigation.
+ */
+export function clearPendingMagic(): void {
+  pendingMagic.value = null;
+}
 
 /**
  * Open a reader. Records the request (so the destination page's consumer can run
@@ -81,8 +146,8 @@ export const pendingMagicReader = computed(() => pendingMagic.value);
  *     no competing navigation) and it tidily pops the marker.
  * Navigation errors (cancelled / duplicate) are expected — warn, never throw.
  */
-function openReader(reader: MagicReader): void {
-  pendingMagic.value = reader;
+function openReader(reader: MagicReader, payload?: SharePayload): void {
+  pendingMagic.value = { reader, payload };
   const path = MAGIC_READERS[reader].route;
   if (router.currentRoute.value.path === path) {
     closeQuickAdd();
@@ -109,19 +174,46 @@ export function openRecipeReader(): void {
 }
 
 /**
+ * Hand an already-extracted shared document to the page that owns its review modal (#64).
+ *
+ * Reuses the SAME channel and the same navigation discipline as the magic affordances —
+ * including the cold-start race the consumer already handles — rather than inventing a
+ * second dispatch mechanism.
+ */
+export function dispatchSharePayload(payload: SharePayload): void {
+  openReader(readerForShareKind(payload.kind), payload);
+}
+
+/**
  * Pick up a pending request for ONE surface. Idempotent: the ref is ALWAYS
  * cleared once it matches this surface — even when the gate is closed — so a
  * stale request can never get stuck or re-fire on the next navigation. Whichever
  * trigger (watch / onMounted) fires first runs the handler; the other no-ops.
  */
-export function consumePendingMagic(
-  surface: MagicReader,
-  handler: () => void,
+export function consumePendingMagic<R extends MagicReader>(
+  surface: R,
+  handler: (payload?: PayloadFor<R>) => void,
   gateOpen: boolean
 ): void {
-  if (pendingMagic.value !== surface) return;
+  const pending = pendingMagic.value;
+  if (pending?.reader !== surface) return;
   pendingMagic.value = null;
-  if (gateOpen) handler();
+  if (!gateOpen) return;
+
+  const payload = pending.payload;
+  if (payload && payload.kind !== MAGIC_READERS[surface].shareKind) {
+    // Unreachable while `dispatchSharePayload` routes via `readerForShareKind`, but a
+    // mismatch must never be delivered: handing a travel result to the activity form would
+    // corrupt the prefill silently. Drop it loudly instead of casting the problem away.
+    reportError({
+      surface: 'share-target-ingest',
+      message: 'share payload kind does not match the reader it reached',
+      severity: 'error',
+      context: { action: 'threw', kind: payload.kind },
+    });
+    return;
+  }
+  handler(payload as PayloadFor<R> | undefined);
 }
 
 /**
@@ -131,9 +223,9 @@ export function consumePendingMagic(
  * (catches arriving from another page, where the ref was set before this page
  * mounted) onto the single idempotent `consumePendingMagic`.
  */
-export function useMagicReaderConsumer(
-  surface: MagicReader,
-  handler: () => void,
+export function useMagicReaderConsumer<R extends MagicReader>(
+  surface: R,
+  handler: (payload?: PayloadFor<R>) => void,
   gateOpen: Ref<boolean> | (() => boolean)
 ): void {
   const isOpen = typeof gateOpen === 'function' ? computed(gateOpen) : gateOpen;
@@ -157,13 +249,8 @@ export function useMagicReaderConsumer(
  * components; pure, so unit-testable. Also re-exports the dispatchers.
  */
 export function useMagicReader() {
-  const { canEditActivities } = usePermissions();
-  /** Permission × (flag, when the reader declares one). A flagless reader is permission-only. */
-  const gate = (reader: MagicReader) =>
-    computed(() => {
-      const { flag } = MAGIC_READERS[reader];
-      return canEditActivities.value && (flag === undefined || isFlagEnabled(flag));
-    });
+  /** Permission × (flag, when the reader declares one) — one shared predicate, see above. */
+  const gate = (reader: MagicReader) => computed(() => isReaderEnabled(reader));
   const canReadPhoto = gate('photo');
   const canReadDocument = gate('document');
   // The cookbook gates its own add/edit affordances on canEditActivities (which is
