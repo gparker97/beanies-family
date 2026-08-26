@@ -156,10 +156,6 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       );
     </script>
 
-    <!-- Web Vitals RUM → Plausible custom events -->
-    <script>
-      import '../scripts/vitals';
-    </script>
     <!-- PWA-install escape hatch (#167): users who installed the Vue PWA
          pre-cutover have start_url: '/' baked into the install, so every
          launch lands here. Detect standalone display-mode and redirect
