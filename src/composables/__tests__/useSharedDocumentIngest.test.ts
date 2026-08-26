@@ -381,6 +381,34 @@ describe('share ingest — refusals and failures', () => {
     expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.partial.title', expect.anything());
   });
 
+  it('blames the PLATFORM, not the file, when nothing could be read at all', async () => {
+    // The worst case used to fall through to "beanies can't read that kind of file", which
+    // blames the user's perfectly good photo for a provider failure.
+    await ingestSharedDocuments([], { ...meta, unreadable: 3 });
+
+    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.partial.title', expect.anything());
+    expect(showToast).not.toHaveBeenCalledWith(
+      'info',
+      'shareTarget.unsupported.title',
+      expect.anything()
+    );
+  });
+
+  it('re-stamps a file with the type its BYTES say, so downstream agrees', async () => {
+    // A real PDF an Android provider declared as octet-stream: accepted on the bytes, then
+    // handed downstream where `isPdfFile` reads `file.type` — which used to still say
+    // octet-stream, so the PDF went into the image compressor and failed as a "photo".
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
+    await ingestSharedDocuments(
+      [new File([pdfBytes], 'booking', { type: 'application/octet-stream' })],
+      meta
+    );
+
+    const sent = extractShareFromDocuments.mock.calls[0][0][0] as File;
+    expect(sent.type).toBe('application/pdf');
+    expect(sent.name).toMatch(/\.pdf$/);
+  });
+
   it('says only the first document is attached when several are shared', async () => {
     // Below the page cap `truncated` is false, so without this a 2-4 file share silently
     // keeps just one photo.

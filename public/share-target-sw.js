@@ -19,13 +19,21 @@ self.addEventListener('fetch', (event) => {
   // Scoped deliberately: matching on the path alone would intercept ANY POST the app makes
   // to a `/share` path on any origin and consume its body, and `formData()` on a JSON body
   // throws — the caller would get a redirect to our error screen instead of its response.
-  // A share-target POST is always a same-origin navigation.
+  //
+  // `mode` is checked but NOT required. Every browser that implements Web Share Target today
+  // delivers this as a navigation, so a non-navigate POST to our own /share is much more
+  // likely to be app code than a share — but making `navigate` mandatory would mean a UA
+  // that labels it differently silently loses the share to a 405 from S3, with no telemetry.
+  // Content-type is the reliable discriminator: a share target is always multipart form data.
   if (
     event.request.method !== 'POST' ||
     url.origin !== self.location.origin ||
-    url.pathname !== SHARE_PATH ||
-    event.request.mode !== 'navigate'
+    url.pathname !== SHARE_PATH
   ) {
+    return;
+  }
+  const contentType = event.request.headers.get('content-type') || '';
+  if (event.request.mode !== 'navigate' && !contentType.startsWith('multipart/form-data')) {
     return;
   }
 

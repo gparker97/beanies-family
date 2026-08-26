@@ -38,9 +38,14 @@ const SKY = '#AED6F1';
 const dataUri = (rel) => {
   const path = resolve(ROOT, rel);
   const mime = path.endsWith('.webp') ? 'image/webp' : 'image/png';
+  // Build-time, developer-run script. Every argument is a repo-relative literal from the
+  // three constants below, resolved under ROOT — no user or network input reaches this path.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   return `data:${mime};base64,${readFileSync(path).toString('base64')}`;
 };
 
+// A long asset FILENAME, not a credential — the entropy heuristic cannot tell them apart.
+// eslint-disable-next-line no-secrets/no-secrets
 const ART = dataUri('web/public/brand/beanies_family_hugging_transparent_1024x1024.webp');
 const POD_RING = dataUri('public/brand/beanies_spinner_transparent_192x192.png');
 const BEAN = dataUri('web/public/brand/beanies_small_bean_favicon_512x512.webp');

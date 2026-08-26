@@ -47,7 +47,11 @@ export function sanitiseAttachmentBase(name: string): string {
     .replace(/\s{2,}/g, ' ')
     .replace(/^[-_\s]+|[-_\s]+$/g, '')
     .slice(0, MAX_BASE_LENGTH)
-    // Slicing can re-expose a trailing separator.
+    // Slicing counts UTF-16 units, so it can cut an astral character (CJK Ext-B, Adlam,
+    // Deseret — all `\p{L}`, all preserved above) in half and leave a lone surrogate that
+    // then reaches storage. Unreachable while the filter was ASCII-only; reachable now.
+    .replace(/[\uD800-\uDBFF]$/, '')
+    // Slicing can also re-expose a trailing separator.
     .replace(/[-_\s]+$/, '');
 
   return cleaned || FALLBACK_BASE;
