@@ -138,6 +138,17 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // cold-start boolean. Mirror of src/utils/diagnosticContext.ts.
   'file_count',
   'cold_start',
+  // Perf timings (surface `load-perf`, src/utils/perfTiming.ts). These were on the CLIENT
+  // allowlist but never here, so every sample's structured fields were stripped on ingest
+  // and only the free-text `message` survived — the durations reached CloudWatch as prose
+  // that cannot be filtered, averaged or alerted on. Found 2026-08-26 by the client-vs-
+  // Lambda drift guard (src/utils/__tests__/telemetryAllowlistDrift.test.ts), which is the
+  // comparison this file's header always claimed existed. PII-free: an op label plus
+  // numbers.
+  'perf_op',
+  'perf_duration_ms',
+  'perf_doc_bytes',
+  'perf_entity_count',
   // Native hardware-Keystore biometric backing enum (added 2026-07-14, #52 pivot).
   'key_backing',
   // Silent data-connection config-heal booleans (added 2026-07-15, native data-

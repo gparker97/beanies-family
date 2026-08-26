@@ -18,6 +18,7 @@ import { useExtractionErrorToast } from './useExtractionErrorToast';
 import type { ConsentGrant } from './useDocumentConsent';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
 import type { FieldConfidence } from '@/services/ai/types';
+import { reportError } from '@/utils/errorReporter';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
 import type { ResultEnvelope } from '@/types/magicPayload';
 import type { ExtractionResult } from '@/services/ai/types';
@@ -55,7 +56,31 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
    * AI call — the share path has already run the extraction, and re-entering `processFile`
    * would re-send the page images. In-app behaviour is unchanged: `processFile` calls this.
    */
+  /**
+   * Wrap a delivery so a throw cannot vanish.
+   *
+   * `deliverX` is called from TWO places: `processFile`, which has a try/catch around it,
+   * and the magic-reader consumer, which is a Vue WATCH callback with no catch anywhere in
+   * the chain. Splitting the mapping out of `processFile` moved it out from under that catch
+   * — the same shape as the incident the catch was originally added for: the spinner clears,
+   * the modal never opens, the user is told nothing and CloudWatch records nothing.
+   */
   function deliverEvent(data: ExtractionResult, env: ResultEnvelope): void {
+    try {
+      deliverEventInner(data, env);
+    } catch (err) {
+      reportError({
+        surface: 'ai-activity-capture',
+        message: 'delivering an extracted activity threw',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw' },
+      });
+      showToast('error', t('ai.error.title'), t('ai.error.generic'));
+    }
+  }
+
+  function deliverEventInner(data: ExtractionResult, env: ResultEnvelope): void {
     // Loud-but-non-blocking notice FIRST, so a >cap document whose recognisable content sat
     // on a dropped page still tells the user pages weren't read (never silent).
     if (env.truncated) {

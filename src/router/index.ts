@@ -317,12 +317,18 @@ const routes: RouteRecordRaw[] = [
   {
     // Web Share Target landing (#64). The service worker intercepts the POST and 303s here
     // with an id; this page reads the stash and hands it to the shared ingest orchestrator.
-    // `requiresAuth` like every other content route — a signed-out share gets the standard
-    // readiness message rather than a special case.
+    //
+    // requiresAuth is FALSE on purpose, and it is not a hole: this page persists nothing and
+    // reveals nothing — it reads a stash keyed by an id only this browser was just handed,
+    // and the orchestrator runs the same signed-out check every other entry point runs. With
+    // the guard on, a signed-out share was redirected BEFORE this page mounted, and since
+    // this page is the only code that deletes the stash, someone else's document stayed in
+    // Cache Storage indefinitely: nothing sweeps it, there is no TTL, and sign-out clears
+    // IndexedDB but not `caches`.
     path: '/share',
     name: 'ShareTarget',
     component: () => import('@/pages/ShareTargetPage.vue'),
-    meta: { requiresAuth: true, hideQuickAdd: true, noChrome: true },
+    meta: { requiresAuth: false, hideQuickAdd: true, noChrome: true },
   },
   {
     path: '/:pathMatch(.*)*',

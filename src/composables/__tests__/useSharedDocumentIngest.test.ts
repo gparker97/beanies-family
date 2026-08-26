@@ -132,9 +132,11 @@ describe('share ingest — the happy path', () => {
     expect(dispatchSharePayload.mock.calls[0][0].env.sourceFile).toBe(first);
   });
 
-  it('does NOT clear the dispatch channel after a successful hand-over', async () => {
-    // Clearing here would throw away the payload the page is about to read — i.e. the
-    // whole feature would silently do nothing.
+  it('never clears the dispatch channel', async () => {
+    // Two bugs in one assertion. Clearing after a successful hand-over would throw away the
+    // payload the page is about to read. Clearing on a FAILED share would cancel a
+    // magic-reader request the user had just made from the FAB — the orchestrator only ever
+    // sets that ref by dispatching, so on every other path there is nothing of ours to clear.
     await ingestSharedDocuments([img()], meta);
     expect(clearPendingMagic).not.toHaveBeenCalled();
   });
@@ -162,9 +164,33 @@ describe('share ingest — readiness', () => {
     expect(actions()).toEqual(['received', 'not_ready']);
   });
 
-  it('answers a share that arrives while the family is still loading', async () => {
+  it('WAITS for the family to finish loading rather than refusing immediately', async () => {
+    // The bug this replaces: readiness waited only on `isInitialized`, which flips long
+    // before `currentMember` exists — so almost every cold-start share was refused with
+    // "still counting your beans" AFTER the native side had already cleared it.
     currentMember = null;
-    await ingestSharedDocuments([img()], meta);
+    const pending = ingestSharedDocuments([img()], meta);
+
+    // Nothing refused yet: it is still waiting.
+    await Promise.resolve();
+    expect(showToast).not.toHaveBeenCalled();
+
+    currentMember = { id: 'm1' };
+    await pending;
+
+    expect(extractShareFromDocuments).toHaveBeenCalled();
+  });
+
+  it('gives up with a message if the family never arrives', async () => {
+    vi.useFakeTimers();
+    currentMember = null;
+    try {
+      const pending = ingestSharedDocuments([img()], meta);
+      await vi.advanceTimersByTimeAsync(11_000);
+      await pending;
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(extractShareFromDocuments).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.notReady.title', expect.anything());
@@ -207,6 +233,14 @@ describe('share ingest — what it will and will not read', () => {
       meta
     );
     expect(extractShareFromDocuments.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  it('accepts a file whose BYTES are a JPEG even when the sender declares nothing', async () => {
+    // Android reports whatever the sender's own provider says, including "". Rejecting on
+    // that alone would refuse perfectly good photos.
+    const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
+    await ingestSharedDocuments([new File([jpegBytes], 'photo', { type: '' })], meta);
+    expect(extractShareFromDocuments).toHaveBeenCalled();
   });
 
   it('answers an empty share rather than returning silently', async () => {
@@ -314,21 +348,19 @@ describe('share ingest — refusals and failures', () => {
     expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', expect.anything());
   });
 
-  it('clears the guard and the dispatch channel after a throw', async () => {
+  it('frees the guard after a throw, so one bad share does not wedge every later one', async () => {
     extractShareFromDocuments.mockRejectedValue(new Error('boom'));
     await ingestSharedDocuments([img()], meta);
 
-    // The channel is cleared so a dead-ended share cannot pin a File in memory…
-    expect(clearPendingMagic).toHaveBeenCalled();
-
-    // …and the guard is freed, so a throw does not wedge every future share.
     vi.clearAllMocks();
     extractShareFromDocuments.mockResolvedValue(EVENT_RESULT);
     await ingestSharedDocuments([img()], meta);
     expect(dispatchSharePayload).toHaveBeenCalled();
   });
 
-  it('clears the dispatch channel on every non-dispatching path', async () => {
+  it('leaves a pending magic-reader request alone when a share fails', async () => {
+    // The FAB sets `pendingMagic` and navigates; a share failing in that window must not
+    // cancel it, or the picker never opens and the user is told nothing.
     for (const setup of [
       () => (readerEnabled = false),
       () => (online = false),
@@ -340,7 +372,23 @@ describe('share ingest — refusals and failures', () => {
       readerEnabled = true;
       setup();
       await ingestSharedDocuments([img()], meta);
-      expect(clearPendingMagic).toHaveBeenCalled();
+      expect(clearPendingMagic).not.toHaveBeenCalled();
     }
+  });
+
+  it('says so when the platform could only hand over part of the share', async () => {
+    await ingestSharedDocuments([img()], { ...meta, unreadable: 2 });
+    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.partial.title', expect.anything());
+  });
+
+  it('says only the first document is attached when several are shared', async () => {
+    // Below the page cap `truncated` is false, so without this a 2-4 file share silently
+    // keeps just one photo.
+    await ingestSharedDocuments([img('a.jpg'), img('b.jpg')], meta);
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'shareTarget.firstAttached.title',
+      expect.anything()
+    );
   });
 });

@@ -49,18 +49,25 @@ function mountModal() {
   });
 }
 
+/** Opening is asynchronous: a request waits for any prompt ahead of it before opening. */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
 describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
     skipPrompt = false;
     setSkip.mockClear();
-    // Settle anything a previous test left pending so state cannot leak between cases.
+    // Settle anything a previous test left pending so state cannot leak between cases, then
+    // let the serialization tail drain (a request now waits for any prompt ahead of it).
+    resolveConsent(false);
+    await flush();
     resolveConsent(false);
   });
 
   it('grants consent and does not persist the skip when the box is untouched', async () => {
     const wrapper = mountModal();
     const pending = requestConsent();
+    await flush();
     await wrapper.vm.$nextTick();
 
     await wrapper.find('button.t-save').trigger('click');
@@ -72,6 +79,7 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
   it('persists the family-scoped skip when the box is ticked', async () => {
     const wrapper = mountModal();
     const pending = requestConsent();
+    await flush();
     await wrapper.vm.$nextTick();
 
     await wrapper.find('input[type="checkbox"]').setValue(true);
@@ -85,6 +93,7 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
     const wrapper = mountModal();
 
     const first = requestConsent();
+    await flush();
     await wrapper.vm.$nextTick();
     await wrapper.find('input[type="checkbox"]').setValue(true);
     resolveConsent(false);
@@ -92,6 +101,7 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
     setSkip.mockClear();
 
     const second = requestConsent();
+    await flush();
     await wrapper.vm.$nextTick();
     await wrapper.find('button.t-save').trigger('click');
 
@@ -103,6 +113,7 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
   it('declines on close', async () => {
     const wrapper = mountModal();
     const pending = requestConsent();
+    await flush();
     await wrapper.vm.$nextTick();
 
     await wrapper.find('button.t-close').trigger('click');
@@ -113,6 +124,7 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
   it('renders the consent label', async () => {
     const wrapper = mountModal();
     void requestConsent();
+    await flush();
     await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toContain('ai.consent.remember');

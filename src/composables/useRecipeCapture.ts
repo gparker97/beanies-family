@@ -107,7 +107,38 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    * SAME `useRecipeCapture()` instance that will later save the recipe, or the source photo
    * is silently lost. The cookbook page's consumer is that instance.
    */
+  /**
+   * Wrap a delivery so a throw cannot vanish.
+   *
+   * `deliverX` is called from TWO places: `processFile`, which has a try/catch around it,
+   * and the magic-reader consumer, which is a Vue WATCH callback with no catch anywhere in
+   * the chain. Splitting the mapping out of `processFile` moved it out from under that catch
+   * — the same shape as the incident the catch was originally added for: the spinner clears,
+   * the modal never opens, the user is told nothing and CloudWatch records nothing.
+   */
   function deliverRecipe(data: RecipeExtractionResult, env: ResultEnvelope): void {
+    try {
+      deliverRecipeInner(data, env);
+    } catch (err) {
+      reportError({
+        surface: SURFACE,
+        message: 'delivering an extracted recipe threw',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw' },
+      });
+      showToast('error', t('ai.error.title'), t('ai.error.generic'));
+    }
+  }
+
+  function deliverRecipeInner(data: RecipeExtractionResult, env: ResultEnvelope): void {
+    // Drop anything held from a previous capture BEFORE claiming the new source, exactly as
+    // `processFile` and `processUrl` do. Without it a shared recipe inherits the dish photo
+    // of whatever was captured before it — `pendingDishImageUrl` in particular is set by the
+    // URL path and read by `attachAfterSave`, so pasting a link and then receiving a share
+    // attached the link's hero image to the shared recipe.
+    discardPendingSource();
+
     // Loud-but-non-blocking FIRST — before the not-a-recipe return — so a >cap document whose
     // ingredients sat on a dropped page still tells the user. Never silent.
     if (env.truncated) {

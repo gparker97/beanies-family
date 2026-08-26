@@ -13,6 +13,22 @@ describe('sanitiseAttachmentBase (#64)', () => {
     expect(sanitiseAttachmentBase('Recipe Card 2.jpeg')).toBe('Recipe Card 2');
   });
 
+  it("preserves the user's own language", () => {
+    // This is shared with the IN-APP picker, so an ASCII-only rule silently wrecked ordinary
+    // names for anyone not writing in English — and the app ships zh.
+    expect(sanitiseAttachmentBase('学校通知.jpg')).toBe('学校通知');
+    expect(sanitiseAttachmentBase('Sofía cumpleaños.jpeg')).toBe('Sofía cumpleaños');
+    expect(sanitiseAttachmentBase('Fête décole.png')).toBe('Fête décole');
+    expect(sanitiseAttachmentBase('Приглашение.png')).toBe('Приглашение');
+  });
+
+  it('leaves no second extension for the caller to double up', () => {
+    // The caller appends `.jpg`, so returning `invoice.pdf` would store `invoice.pdf.jpg`.
+    expect(sanitiseAttachmentBase('invoice.pdf.jpg')).toBe('invoice pdf');
+    expect(sanitiseAttachmentBase('photo.tar.gz')).toBe('photo tar');
+    expect(sanitiseAttachmentBase('a.b.c.d.jpg')).not.toContain('.');
+  });
+
   it('strips POSIX and Windows path traversal', () => {
     expect(sanitiseAttachmentBase('../../etc/passwd')).toBe('passwd');
     expect(sanitiseAttachmentBase('/absolute/path/photo.jpg')).toBe('photo');

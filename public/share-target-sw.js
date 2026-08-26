@@ -16,7 +16,18 @@ const SHARE_PATH = '/share';
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'POST' || url.pathname !== SHARE_PATH) return;
+  // Scoped deliberately: matching on the path alone would intercept ANY POST the app makes
+  // to a `/share` path on any origin and consume its body, and `formData()` on a JSON body
+  // throws — the caller would get a redirect to our error screen instead of its response.
+  // A share-target POST is always a same-origin navigation.
+  if (
+    event.request.method !== 'POST' ||
+    url.origin !== self.location.origin ||
+    url.pathname !== SHARE_PATH ||
+    event.request.mode !== 'navigate'
+  ) {
+    return;
+  }
 
   event.respondWith(
     (async () => {
@@ -39,7 +50,6 @@ self.addEventListener('fetch', (event) => {
                 headers: {
                   'content-type': file.type || 'application/octet-stream',
                   'x-share-name': encodeURIComponent(file.name || 'shared'),
-                  'x-share-count': String(files.length),
                 },
               })
             )
