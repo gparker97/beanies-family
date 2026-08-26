@@ -309,9 +309,36 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(res.parsedBody.result.title, "Mia's Party");
     });
 
-    it('rejects an unknown task with 400', async () => {
+    it('rejects an unknown task with 400 AND a machine-readable code', async () => {
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'bogus' } }))
+      );
+      assert.equal(res.statusCode, 400);
+      // DEPLOY ORDER: this Lambda must ship a new task before any client that asks for it.
+      // Without the code the client falls through to a status-based branch and shows
+      // "something went wrong", which reads as a broken feature rather than one that is
+      // simply not deployed yet. The client maps this code to the friendly notice.
+      assert.equal(res.parsedBody.code, 'unknown_task');
+    });
+
+    it('accepts the share task (#64) — one call that classifies and extracts', async () => {
+      globalThis.fetch = async () =>
+        fakeUpstream({ content: JSON.stringify({ kind: 'event', event: VALID_EXTRACTION }) });
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'share' } }))
+      );
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.parsedBody.result.kind, 'event');
+    });
+
+    it('refuses TEXT for the share task, which is images-only', async () => {
+      // The soft x-api-key ships in the public bundle, so an unfenced free-text task would
+      // turn this proxy into a general text endpoint anyone could bill us for.
       const res = await handler(
-        makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'bogus' } })
+        makeEvent({
+          headers: keyHeader,
+          body: { task: 'share', text: 'hello', todayIso: '2026-06-03' },
+        })
       );
       assert.equal(res.statusCode, 400);
     });

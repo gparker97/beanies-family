@@ -105,6 +105,21 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
     if (code === 'upstream_timeout' || res.status === 504) {
       throw new ExtractionProviderError('timeout', 'Managed extraction timed out upstream');
     }
+    if (code === 'unknown_task') {
+      // The client is ahead of the proxy: this build asks for a task the deployed Lambda
+      // does not know yet. That is a DEPLOY-ORDER problem, not a user problem, so it maps
+      // to the existing `not_available` code — which the shared toast mapper already
+      // renders as the friendly "not set up yet" info toast. No new code, no new string.
+      console.error(
+        '[ai-extract] the deployed proxy does not know this extraction task. The ai-extract ' +
+          'Lambda must be deployed BEFORE a client that requests a new task. Deploy ' +
+          'infrastructure/lambda/ai-extract, then reload.'
+      );
+      throw new ExtractionProviderError(
+        'not_available',
+        'Managed proxy does not support this extraction task yet'
+      );
+    }
     throw new ExtractionProviderError(
       'provider_error',
       `Managed proxy returned HTTP ${res.status}`

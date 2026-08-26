@@ -36,6 +36,7 @@ import {
   type ExtractionSource,
   type ExtractionTask,
   type RecipeExtractionResult,
+  type ShareExtractionResult,
   type TravelExtractionResult,
 } from './types';
 
@@ -291,6 +292,22 @@ export function extractRecipeFromText(
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<RecipeExtractionResult>> {
   return runExtraction(text, opts, 'recipe');
+}
+
+/**
+ * Classify AND extract a SHARED document in ONE call (#64).
+ *
+ * Used by the mobile share target, where nothing indicates what the document is. Several
+ * documents are read as the pages of one item, so sharing three photos of one invitation
+ * produces one event. Always resolves (never rejects) with a classified outcome; the result
+ * is a discriminated union whose `kind` selects the review surface, and `kind: 'none'` is the
+ * honest answer for a document that is none of the three.
+ */
+export function extractShareFromDocuments(
+  files: File[],
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<ShareExtractionResult>> {
+  return runExtraction(files, opts, 'share');
 }
 
 /**
