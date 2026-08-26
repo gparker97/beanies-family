@@ -1,0 +1,23 @@
+# match storage configuration (#64 signing).
+#
+# The certificate and both App Store profiles live ENCRYPTED in a private git repo,
+# separate from this one. `MATCH_PASSWORD` is the encryption passphrase and is the only
+# thing standing between that repo and a usable signing identity - it is a GitHub secret
+# and is not recoverable if lost (match cannot decrypt without it; the recovery is to
+# nuke and regenerate).
+#
+# Everything here is env-driven so no repo URL or credential is committed:
+#   MATCH_GIT_URL                  the private certificates repo
+#   MATCH_PASSWORD                 encryption passphrase
+#   MATCH_GIT_BASIC_AUTHORIZATION  base64("<user>:<PAT>") for HTTPS access on CI
+#
+# The app identifiers and type are passed explicitly by the `match(...)` call in the
+# Fastfile rather than set here, so the Fastfile stays the single place that says which
+# targets get signed.
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+
+# The App Store lane is the only one that exists - beanies has no ad-hoc or enterprise
+# distribution, and development signing is deliberately unused on CI (it needs a
+# registered device and a non-cloud-managed certificate; see the Fastfile).
+type("appstore")

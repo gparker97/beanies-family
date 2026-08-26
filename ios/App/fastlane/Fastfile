@@ -5,19 +5,22 @@
 #   `release` → build the same signed IPA and SUBMIT it to the App Store for review,
 #               with a post-approval release mode from IOS_DESTINATION.
 #
-# Both lanes sign via an **App Store Connect API key** with Xcode cloud-managed
-# automatic signing (`-allowProvisioningUpdates`), so there is no manual
-# certificate/provisioning-profile juggling and no separate `match` repo — the right
-# trade-off for a solo publisher. If automatic signing is ever rejected for
-# distribution, switch to `match` (App Store) inside `build_ipa`; the rest is unchanged.
-# The API key needs the "App Manager" (or Admin) role, which it already has for
-# cloud-managed signing — the same role is what `upload_to_app_store` uses to create
-# the version and submit for review, so no new credential is needed.
+# Both lanes sign with MANUAL signing, using a distribution certificate and App Store
+# profiles held by `match` in a private repo. This replaced cloud-managed automatic
+# signing on 2026-08-27, and the reason is recorded in full above `build_ipa`: automatic
+# signing cannot sign an ARCHIVE for distribution, and an unsigned archive silently loses
+# every entitlement, which shipped three iOS builds that could not share at all.
+#
+# The App Store Connect API key is still used - for match (creating/downloading
+# certificates and profiles) and for the upload steps. It needs the Admin role, which it
+# already has.
 #
 # Env provided by .github/workflows/mobile-ios-release.yml:
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
 #   APP_STORE_CONNECT_API_KEY_PATH (decoded .p8 on disk), APPLE_TEAM_ID,
 #   BUILD_NUMBER (CI run number), MARKETING_VERSION, and (for `release`) IOS_DESTINATION.
+#   match: MATCH_GIT_URL, MATCH_PASSWORD, MATCH_GIT_BASIC_AUTHORIZATION, and
+#   MATCH_BOOTSTRAP (only for the very first run - see `build_ipa`).
 
 default_platform(:ios)
 
@@ -25,9 +28,6 @@ default_platform(:ios)
 # SEPARATE args, so we split this — never pass the combined string to either, or you
 # get build/build/beanies.ipa. Both upload steps pass the whole path as `ipa:`.
 IPA_PATH = "build/beanies.ipa"
-
-# The intermediate archive, produced by phase 1 of `build_ipa` and exported by phase 2.
-ARCHIVE_PATH = "build/beanies.xcarchive"
 
 platform :ios do
   # ── Shared building blocks ────────────────────────────────────────────────
@@ -45,94 +45,113 @@ platform :ios do
     )
   end
 
+  # The two bundle identifiers that must be signed. The extension is a SEPARATE,
+  # separately-signed target with its own App ID, its own profile and its own copy of the
+  # app-group entitlement - one side having it is no use, since the group is the only
+  # channel between the two processes.
+  APP_ID = "family.beanies.app"
+  EXTENSION_ID = "family.beanies.app.ShareExtension"
+
   # Build the signed Release IPA for App Store distribution. Identical for both lanes
   # (TestFlight and App Store both use the `app-store` export), so it lives here once.
+  #
+  # ── WHY MANUAL SIGNING VIA match, AND NOT AUTOMATIC ─────────────────────────────
+  #
+  # The archive MUST be signed, because entitlements are embedded BY the code signature
+  # rather than written alongside it. An unsigned archive cannot carry them at all, and
+  # `-exportArchive` derives its set from what the binary already has. This was measured,
+  # not assumed: builds 33-35 shipped with four entitlements and neither the app group nor
+  # associated-domains, while the profile granted both, and iPhone sharing was dead the
+  # whole time with nothing anywhere reporting it.
+  #
+  # Automatic signing cannot sign an archive for distribution - Xcode says so itself
+  # ("automatically signed for development, but a conflicting code signing identity ...
+  # has been manually specified"). It insists on a DEVELOPMENT profile, which needs a
+  # registered device, AND a development certificate, which - unlike distribution certs -
+  # is NOT cloud-managed and so is absent from every fresh runner. That is the whole
+  # reason `skip_codesigning: true` was reached for in the first place, on 2026-08-06.
+  #
+  # match solves both halves: it holds ONE distribution certificate and the App Store
+  # profiles for both bundle IDs, encrypted in a private repo, and installs them on the
+  # runner each build. No devices, no cloud-signing dependency, nothing to renew by hand.
   private_lane :build_ipa do
-    # TWO PHASES, deliberately split. gym reuses `xcargs` for the export invocation as
-    # well as the archive, so archive-only settings cannot be passed through it: telling
-    # the archive not to sign would tell the export not to sign either, and the IPA would
-    # come out unsigned. Driving the archive directly and handing the result to gym for
-    # export is what lets each phase have its own flags.
-    project = File.expand_path("../App.xcodeproj", __dir__)
-    archive = File.expand_path("../#{ARCHIVE_PATH}", __dir__)
-
-    # ── Phase 1: archive UNSIGNED, but WITH entitlements ────────────────────
-    #
-    # Unsigned because signing the archive needs a provisioning profile, and under
-    # automatic signing that means a DEVELOPMENT profile, which Apple will not mint for a
-    # team with no registered devices ("Your team has no devices..."). Forcing
-    # CODE_SIGN_IDENTITY=Apple Distribution instead is rejected as a conflict with
-    # CODE_SIGN_STYLE=Automatic. Both verified on CI; unsigned is the only way through.
-    #
-    # The flag combination matters in a way that is easy to get subtly wrong - three
-    # variants were measured on CI before this one:
-    #
-    #   1. `skip_codesigning: true`      -> blanks CODE_SIGN_ENTITLEMENTS. Archive has no
-    #                                        entitlements. Export infers a minimal set.
-    #   2. automatic signing, no override -> "Your team has no devices from which to
-    #                                        generate a provisioning profile."
-    #   3. CODE_SIGN_IDENTITY=Apple Distribution + automatic -> rejected as a conflicting
-    #                                        manual identity under automatic signing.
-    #   4. CODE_SIGNING_ALLOWED=NO / no identity -> archive STILL entitlement-free.
-    #
-    # (4) is the one that explains the rest. ENTITLEMENTS ARE EMBEDDED BY THE CODE
-    # SIGNATURE ITSELF, not written alongside it, so an unsigned binary cannot carry them
-    # at all - and `-exportArchive` derives its set from what the binary already has. No
-    # amount of not-blanking CODE_SIGN_ENTITLEMENTS helps while nothing signs.
-    #
-    #   5. ad-hoc (CODE_SIGN_IDENTITY="-")  -> "Ad Hoc code signing is not allowed with
-    #                                        SDK 'iOS 26.5'." Rejected for every target.
-    #
-    # (4) is the one that explains all of them. ENTITLEMENTS ARE EMBEDDED BY THE CODE
-    # SIGNATURE ITSELF, not written alongside it, so an unsigned binary cannot carry them
-    # at all - and `-exportArchive` derives its set from what the binary already has.
-    # Nothing about CODE_SIGN_ENTITLEMENTS helps while nothing signs.
-    #
-    # ⚠️  THE ARCHIVE THEREFORE HAS TO BE SIGNED WITH A REAL APPLE IDENTITY, and that
-    # needs a certificate + provisioning profile ON THE RUNNER. That is an infrastructure
-    # decision (store a distribution .p12 as a secret, adopt `match`, or register a device
-    # so automatic signing can mint a development profile), not something this lane can
-    # arrange for itself. Until it is done the archive stays unsigned, the shipped app
-    # lacks app-groups and associated-domains, and `verify_entitlements` says so loudly
-    # instead of letting another silent build reach TestFlight.
-    sh(
-      "xcodebuild -project '#{project}' -scheme App -configuration Release " \
-      "-destination 'generic/platform=iOS' -archivePath '#{archive}' archive " \
-      "CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO " \
-      "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='' " \
-      "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
-      "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
-      "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}"
-    )
-
-    # What the ARCHIVE ended up with, before export gets a chance to re-sign it. This is
-    # the measurement that separates "phase 1 never wrote the entitlements" from "export
-    # stripped them", and without it the two are indistinguishable from the IPA alone -
-    # which is how four different flag combinations were tried against the same symptom.
-    archived_app = Dir.glob("#{archive}/Products/Applications/*.app").first
-    if archived_app
-      sh("echo '── archive entitlements (pre-export) ──'; " \
-         "codesign -d --entitlements - --xml '#{archived_app}' 2>&1 | plutil -convert xml1 -o - - 2>&1 || " \
-         "echo '(the archived app carries NO entitlements)'")
-    else
-      UI.important("No .app found inside the archive at #{archive}")
+    # Fail on a missing credential with a sentence that says which one and where it goes.
+    # match's own error for an unset MATCH_PASSWORD is a decryption failure several steps
+    # later, which reads like a corrupt repo rather than an unset secret.
+    {
+      "MATCH_GIT_URL" => "repository variable MATCH_GIT_URL (the private certificates repo)",
+      "MATCH_PASSWORD" => "secret MATCH_PASSWORD (the match encryption passphrase)",
+      "MATCH_GIT_BASIC_AUTHORIZATION" => "secret MATCH_GIT_BASIC_AUTHORIZATION (base64 of \"<github-user>:<PAT>\")"
+    }.each do |var, where|
+      UI.user_error!(
+        "#{var} is not set. iOS signing needs it - add the #{where} on the beanies-family " \
+        "repo. See the match setup notes above `build_ipa`."
+      ) if ENV[var].to_s.strip.empty?
     end
 
-    # ── Phase 2: export + sign for App Store distribution ───────────────────
+    # A temporary, unlocked keychain for the imported certificate. Without this the
+    # import has nowhere to go and signing fails on a GitHub runner. No-op off CI.
+    setup_ci
+
+    # Install the certificate + both profiles.
     #
-    # An App Store profile needs no registered devices, so this phase signs happily where
-    # the archive could not. `-allowProvisioningUpdates` plus the App Store Connect API
-    # key lets Xcode resolve it headlessly. With `skip_build_archive` there is no archive
-    # phase here, so `export_xcargs` is unambiguous and the auth flags are passed once.
+    # READONLY unless explicitly bootstrapping. fastlane recommends readonly on CI, and
+    # here it is load-bearing: Apple caps distribution certificates at a small number, so
+    # a run that silently decided to mint a new one on every build would exhaust the
+    # account. Read-only fails loudly instead, which is the behaviour we want when a
+    # profile has been revoked or the repo is unreachable.
+    bootstrap = ENV["MATCH_BOOTSTRAP"].to_s == "true"
+    UI.important("MATCH_BOOTSTRAP is set - match may CREATE a certificate/profiles.") if bootstrap
+    match(
+      type: "appstore",
+      app_identifier: [APP_ID, EXTENSION_ID],
+      api_key: asc_api_key,
+      readonly: !bootstrap
+    )
+
+    # Point each target at its own profile and switch it off automatic signing.
+    #
+    # Done here rather than committed into project.pbxproj because the profile NAMES are
+    # match's to choose, and because xcargs cannot express this: build settings passed on
+    # the command line apply to every target at once, and these two targets need
+    # different profiles. match exports the names it installed as `sigh_<id>_<type>`.
+    [[APP_ID, "App"], [EXTENSION_ID, "ShareExtension"]].each do |identifier, target|
+      profile = ENV["sigh_#{identifier}_appstore_profile-name"] || ENV["sigh_#{identifier}_appstore"]
+      UI.user_error!(
+        "match did not report a profile for #{identifier}. Expected the env var " \
+        "sigh_#{identifier}_appstore_profile-name to be set. Check the match step above."
+      ) if profile.to_s.empty?
+
+      update_code_signing_settings(
+        path: "App.xcodeproj",
+        use_automatic_signing: false,
+        team_id: ENV["APPLE_TEAM_ID"],
+        targets: [target],
+        code_sign_identity: "Apple Distribution",
+        profile_name: profile,
+        bundle_identifier: identifier
+      )
+    end
+
     build_app(
-      skip_build_archive: true,
-      archive_path: archive,
+      project: "App.xcodeproj",
+      scheme: "App",
+      configuration: "Release",
       export_method: "app-store",
       export_team_id: ENV["APPLE_TEAM_ID"],
-      export_xcargs: "-allowProvisioningUpdates " \
-                     "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
-                     "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
-                     "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']}",
+      # Manual signing end to end now, so the export uses the same profiles the archive
+      # was signed against rather than re-resolving anything.
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: {
+          APP_ID => ENV["sigh_#{APP_ID}_appstore_profile-name"],
+          EXTENSION_ID => ENV["sigh_#{EXTENSION_ID}_appstore_profile-name"]
+        }
+      },
+      # Version stamping only. No `-allowProvisioningUpdates` and no auth flags: nothing
+      # here talks to Apple any more, because match already installed everything.
+      xcargs: "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
+              "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
       output_directory: File.dirname(IPA_PATH),
       output_name: File.basename(IPA_PATH)
     )
