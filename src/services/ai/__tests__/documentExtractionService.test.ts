@@ -1,3 +1,4 @@
+import { __testConsentGrant } from '@/test/consentGrant';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock compression (canvas-based — not available in happy-dom) but keep the REAL
@@ -80,7 +81,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('managed tier: returns the provider result on success', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    const res = await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
+    const res = await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     expect(res.success).toBe(true);
     expect(res.data).toEqual(SAMPLE);
@@ -93,7 +98,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('sends ONLY the single compressed document (data-minimization)', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
+    await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     const [task, request] = mockManagedExtract.mock.calls[0];
     expect(task).toBe('event');
@@ -119,6 +128,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     const res = await extractEventFromDocument(pdfFile(), {
       tier: 'managed',
       todayIso: '2026-06-03',
+      grant: __testConsentGrant,
     });
 
     const [task, request] = mockManagedExtract.mock.calls[0];
@@ -140,6 +150,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     const res = await extractEventFromDocument(pdfFile(), {
       tier: 'managed',
       todayIso: '2026-06-03',
+      grant: __testConsentGrant,
     });
 
     expect(res.errorCode).toBe('compression');
@@ -152,6 +163,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     const res = await extractEventFromDocument(pdfFile(), {
       tier: 'managed',
       todayIso: '2026-06-03',
+      grant: __testConsentGrant,
     });
 
     expect(res.success).toBe(false);
@@ -169,6 +181,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'byok',
       todayIso: '2026-06-03',
       byok: { provider: 'openai', apiKey: 'sk-test' },
+      grant: __testConsentGrant,
     });
 
     expect(res.success).toBe(true);
@@ -176,7 +189,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
   });
 
   it('byok tier without a key config → not_available, never builds a provider', async () => {
-    const res = await extractEventFromDocument(file(), { tier: 'byok', todayIso: '2026-06-03' });
+    const res = await extractEventFromDocument(file(), {
+      tier: 'byok',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     expect(res).toEqual({
       success: false,
@@ -197,6 +214,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     const res = await extractEventFromDocument(file(), {
       tier: 'on-device',
       todayIso: '2026-06-03',
+      grant: __testConsentGrant,
     });
 
     expect(res.success).toBe(false);
@@ -217,7 +235,11 @@ describe('extractEventFromDocument — failure classification', () => {
   it('compression failure → compression code, provider never called', async () => {
     mockCompress.mockRejectedValue(new CompressionError('HEIC only decodes in Safari'));
 
-    const res = await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
+    const res = await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     expect(res).toEqual({
       success: false,
@@ -232,7 +254,11 @@ describe('extractEventFromDocument — failure classification', () => {
       new ExtractionProviderError('malformed_output', 'Model returned unparseable JSON')
     );
 
-    const res = await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
+    const res = await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     expect(res.success).toBe(false);
     expect(res.errorCode).toBe('malformed_output');
@@ -241,7 +267,11 @@ describe('extractEventFromDocument — failure classification', () => {
   it('provider timeout is preserved', async () => {
     mockManagedExtract.mockRejectedValue(new ExtractionProviderError('timeout', 'timed out'));
 
-    const res = await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
+    const res = await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     expect(res.errorCode).toBe('timeout');
   });
@@ -249,7 +279,11 @@ describe('extractEventFromDocument — failure classification', () => {
   it('a non-typed provider throw is classified as provider_error (never leaks)', async () => {
     mockManagedExtract.mockRejectedValue(new Error('boom'));
 
-    const res = await extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' });
+    const res = await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
 
     expect(res.success).toBe(false);
     expect(res.errorCode).toBe('provider_error');
@@ -259,7 +293,11 @@ describe('extractEventFromDocument — failure classification', () => {
     mockManagedExtract.mockRejectedValue(new ExtractionProviderError('provider_error', 'HTTP 500'));
 
     await expect(
-      extractEventFromDocument(file(), { tier: 'managed', todayIso: '2026-06-03' })
+      extractEventFromDocument(file(), {
+        tier: 'managed',
+        todayIso: '2026-06-03',
+        grant: __testConsentGrant,
+      })
     ).resolves.toMatchObject({ success: false });
   });
 });

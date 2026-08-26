@@ -14,7 +14,6 @@ import AccommodationEditModal from '@/components/travel/AccommodationEditModal.v
 import TransportationEditModal from '@/components/travel/TransportationEditModal.vue';
 import IdeaEditModal from '@/components/travel/IdeaEditModal.vue';
 import TravelExtractReviewModal from '@/components/travel/TravelExtractReviewModal.vue';
-import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useVacationStore } from '@/stores/vacationStore';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -28,8 +27,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { showToast } from '@/composables/useToast';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
-import { useAiCapability } from '@/composables/useAiCapability';
+import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
@@ -62,10 +60,12 @@ const { copied } = useClipboard();
 const photoStore = usePhotoStore();
 
 // ── AI: add travel plans from a document (#30, flag-gated, prod-off) ───────────
-const { tier: aiTier } = useAiCapability();
 // Gating for the document→trip reader lives in useMagicReader now (single source).
 const { canReadDocument } = useMagicReader();
-const { consentOpen, requestConsent, resolveConsent, onConsentConfirm } = useDocumentConsent();
+// The consent modal is mounted ONCE in App.vue (#64); this page only asks. The grant is
+// held between the gate and the picker's file event — consent runs before the picker opens.
+const { requestConsent } = useDocumentConsent();
+let docGrant: ConsentGrant | null = null;
 
 // The extracted payload handed to the review modal (null when closed).
 const reviewReady = ref<TravelReady | null>(null);
@@ -108,6 +108,7 @@ async function handleAddFromDocument(tripId?: string): Promise<void> {
     pendingTripTarget.value = null;
     return;
   }
+  docGrant = granted;
   aiDocPicker.value?.pick();
 }
 
@@ -1438,14 +1439,12 @@ async function addQuickIdea() {
     <!-- Linked Beanie List drawer — opened from the embed, overlays the page (#33) -->
     <ListDetailModal :list-id="linkedListId" @close="linkedListId = null" />
 
-    <!-- Add travel plans from a document (#30): consent gate, picker, review modal, overlay -->
-    <DocumentExtractConsentModal
-      :open="consentOpen"
-      :tier="aiTier"
-      @confirm="onConsentConfirm"
-      @cancel="resolveConsent(false)"
+    <!-- Add travel plans from a document (#30): picker, review modal, overlay. The consent
+         modal is mounted globally in App.vue (#64). -->
+    <AiDocumentPicker
+      ref="aiDocPicker"
+      @file="(f) => docGrant && void processTravelDoc(f, docGrant)"
     />
-    <AiDocumentPicker ref="aiDocPicker" @file="(f) => void processTravelDoc(f)" />
     <TravelExtractReviewModal
       :open="reviewReady !== null"
       :ready="reviewReady"

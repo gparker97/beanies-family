@@ -46,11 +46,9 @@ import { findDuplicateActivity, mergeExtractionIntoActivity } from '@/utils/acti
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
-import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
-import { useAiCapability } from '@/composables/useAiCapability';
+import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { usePlannerTodayConsumer } from '@/composables/usePlannerToday';
@@ -213,15 +211,13 @@ const activityPrefill = ref<Partial<CreateFamilyActivityInput> | undefined>(unde
 const activityPrefillConfidence = ref<FieldConfidence | undefined>(undefined);
 // The compressed source document, attached to the activity ActivityModal creates (#133).
 const activitySourcePhoto = ref<File | undefined>(undefined);
-const { tier: aiTier } = useAiCapability();
 
-// Shared per-document consent gate (reused by the travel wedge on TravelPlansPage).
-const {
-  consentOpen,
-  requestConsent: requestPhotoConsent,
-  resolveConsent: resolvePhotoConsent,
-  onConsentConfirm,
-} = useDocumentConsent();
+// Shared per-document consent gate. The modal itself is mounted ONCE in App.vue (#64), so
+// this page only asks; it hosts no consent UI. The grant is held between the gate and the
+// picker's file event because consent runs BEFORE the picker opens (privacy-correct order)
+// while the extraction call that needs the token happens after a file is chosen.
+const { requestConsent: requestPhotoConsent } = useDocumentConsent();
+let photoGrant: ConsentGrant | null = null;
 
 type PhotoActivityReady = {
   prefill: Partial<CreateFamilyActivityInput>;
@@ -311,6 +307,7 @@ const aiPhotoPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 async function handleAddFromPhoto(): Promise<void> {
   const granted = await requestPhotoConsent();
   if (!granted) return;
+  photoGrant = granted;
   aiPhotoPicker.value?.pick();
 }
 
@@ -855,14 +852,12 @@ function handleActivitySwapped(newId: string) {
       @start-photo-reader="handleAddFromPhoto"
     />
 
-    <!-- Add from a photo (#133): consent gate, hidden picker input, and processing overlay -->
-    <DocumentExtractConsentModal
-      :open="consentOpen"
-      :tier="aiTier"
-      @confirm="onConsentConfirm"
-      @cancel="resolvePhotoConsent(false)"
+    <!-- Add from a photo (#133): hidden picker input and processing overlay. The consent
+         modal is mounted globally in App.vue (#64). -->
+    <AiDocumentPicker
+      ref="aiPhotoPicker"
+      @file="(f) => photoGrant && void processPhoto(f, photoGrant)"
     />
-    <AiDocumentPicker ref="aiPhotoPicker" @file="(f) => void processPhoto(f)" />
     <div
       v-if="isReadingPhoto"
       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
