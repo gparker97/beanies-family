@@ -27,7 +27,12 @@ const securityHref = isHome ? '#security' : '/#security';
       <a href="/guides">family library</a>
       <a href={`${APP_URL}/login`}>sign in</a>
     </div>
-    <a href={`${APP_URL}/welcome`} class="fnav__cta">create your bean pod</a>
+    <a
+      href={`${APP_URL}/welcome`}
+      class="fnav__cta"
+      data-cta="CTA: Create Pod"
+      data-cta-loc="nav-desktop">create your bean pod</a
+    >
   </div>
 
   <!-- Hamburger button — hidden on wide screens via CSS, revealed below
@@ -83,7 +88,13 @@ const securityHref = isHome ? '#security' : '/#security';
 
   <div class="fnav-drawer__foot">
     <a href={`${APP_URL}/login`} class="fnav-drawer__signin" data-close-drawer>sign in</a>
-    <a href={`${APP_URL}/welcome`} class="fnav-drawer__cta" data-close-drawer>create your bean pod</a>
+    <a
+      href={`${APP_URL}/welcome`}
+      class="fnav-drawer__cta"
+      data-close-drawer
+      data-cta="CTA: Create Pod"
+      data-cta-loc="nav-drawer">create your bean pod</a
+    >
   </div>
 </aside>
 

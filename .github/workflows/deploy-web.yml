@@ -34,7 +34,7 @@ jobs:
 
       - name: Build Astro site
         env:
-          PUBLIC_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
+          PUBLIC_CONTACT_WEBHOOK_URL: ${{ vars.CONTACT_WEBHOOK_URL }}
         run: npm --workspace=@beanies/web run build
 
       - name: Upload build artifact

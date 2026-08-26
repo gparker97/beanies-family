@@ -150,7 +150,6 @@ jobs:
           VITE_INVITE_GATE: ${{ vars.INVITE_GATE }}
           VITE_INVITE_BEAN_HASHES: ${{ secrets.INVITE_BEAN_HASHES }}
           VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
-          VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
           VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           # Error reporter — fires automatic Slack messages to #beanies-errors
           # whenever any error toast / Vue render error / unhandled rejection

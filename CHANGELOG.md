@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-26
 
+### Fixed
+
+- **Marketing-site CTA tracking now covers every call-to-action.** The three CTA goals were only wired to the homepage hero and the beanstalk footer, so the "create your bean pod" buttons in the nav (on every page), the one at the bottom of the homepage, and the inline links in the story section recorded nothing. All seven are now tracked, each tagged with its placement so the nav can be compared against the hero.
+
+### Changed
+
+- The marketing site's contact-form webhook is now supplied by a GitHub repository _variable_ rather than a secret, matching the two sibling webhooks. The value is inlined into a client-side bundle at build time and is public either way, so a secret only added rotation friction. Also dropped a dead copy of the same variable from the Vue deploy, unused since the marketing site moved to Astro.
+
 ### Added
 
 - **Share straight to beanies from any app (Android).** Send a photo, screenshot or PDF from wherever it already is — beanies reads it, works out whether it's an activity, a trip or a recipe, and opens the right form filled in. Several photos of one thing are read together as one item. Nothing is saved until you confirm. (iOS to follow.)
