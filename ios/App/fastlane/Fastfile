@@ -26,6 +26,9 @@ default_platform(:ios)
 # get build/build/beanies.ipa. Both upload steps pass the whole path as `ipa:`.
 IPA_PATH = "build/beanies.ipa"
 
+# The intermediate archive, produced by phase 1 of `build_ipa` and exported by phase 2.
+ARCHIVE_PATH = "build/beanies.xcarchive"
+
 platform :ios do
   # ── Shared building blocks ────────────────────────────────────────────────
 
@@ -45,58 +48,52 @@ platform :ios do
   # Build the signed Release IPA for App Store distribution. Identical for both lanes
   # (TestFlight and App Store both use the `app-store` export), so it lives here once.
   private_lane :build_ipa do
+    # TWO PHASES, deliberately split. gym reuses `xcargs` for the export invocation as
+    # well as the archive, so archive-only settings cannot be passed through it: telling
+    # the archive not to sign would tell the export not to sign either, and the IPA would
+    # come out unsigned. Driving the archive directly and handing the result to gym for
+    # export is what lets each phase have its own flags.
+    project = File.expand_path("../App.xcodeproj", __dir__)
+    archive = File.expand_path("../#{ARCHIVE_PATH}", __dir__)
+
+    # ── Phase 1: archive UNSIGNED, but WITH entitlements ────────────────────
+    #
+    # Unsigned because signing the archive needs a provisioning profile, and under
+    # automatic signing that means a DEVELOPMENT profile, which Apple will not mint for a
+    # team with no registered devices ("Your team has no devices..."). Forcing
+    # CODE_SIGN_IDENTITY=Apple Distribution instead is rejected as a conflict with
+    # CODE_SIGN_STYLE=Automatic. Both verified on CI; unsigned is the only way through.
+    #
+    # These are exactly the settings gym's `skip_codesigning: true` passes, MINUS
+    # CODE_SIGN_ENTITLEMENTS=''. That one omission is the entire point of this lane's
+    # shape: with it, the archived app requested no entitlements at all, `-exportArchive`
+    # signed it with the minimal set it could infer, and the shipped binary silently
+    # lacked both app-groups and associated-domains while the profile happily granted
+    # them. Sharing on iPhone was dead for three releases and nothing anywhere failed.
+    sh(
+      "xcodebuild -project '#{project}' -scheme App -configuration Release " \
+      "-destination 'generic/platform=iOS' -archivePath '#{archive}' archive " \
+      "CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' " \
+      "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
+      "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
+      "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}"
+    )
+
+    # ── Phase 2: export + sign for App Store distribution ───────────────────
+    #
+    # An App Store profile needs no registered devices, so this phase signs happily where
+    # the archive could not. `-allowProvisioningUpdates` plus the App Store Connect API
+    # key lets Xcode resolve it headlessly. With `skip_build_archive` there is no archive
+    # phase here, so `export_xcargs` is unambiguous and the auth flags are passed once.
     build_app(
-      project: "App.xcodeproj",
-      scheme: "App",
-      configuration: "Release",
+      skip_build_archive: true,
+      archive_path: archive,
       export_method: "app-store",
       export_team_id: ENV["APPLE_TEAM_ID"],
-      # SIGN THE ARCHIVE FOR DISTRIBUTION. Do not be tempted back to
-      # `skip_codesigning: true` here - it is what broke sharing on iPhone for three
-      # releases, and the failure is invisible.
-      #
-      # The original reasoning was sound as far as it went: the project sets
-      # CODE_SIGN_IDENTITY = "iPhone Developer", so a plain archive tries to mint a
-      # DEVELOPMENT profile and fails on CI with "your team has no devices". Skipping
-      # codesign sidestepped that - but gym implements it by passing
-      # CODE_SIGN_ENTITLEMENTS='' to the archive, so the archived app requested NO
-      # entitlements at all, and `-exportArchive` then signed it with the minimal set it
-      # could infer. The App Store profile granted app-groups and associated-domains;
-      # the shipped binary asked for neither. Verified from the IPA: four entitlements,
-      # none of them ours.
-      #
-      # Nothing failed. `containerURL(forSecurityApplicationGroupIdentifier:)` simply
-      # returned nil, so every share vanished, and Universal Links were dead too.
-      #
-      # Do NOT hand-specify CODE_SIGN_IDENTITY to force distribution: with
-      # CODE_SIGN_STYLE=Automatic, Xcode rejects it outright ("automatically signed for
-      # development, but a conflicting code signing identity ... has been manually
-      # specified") for both targets. Automatic signing owns the identity; the archive
-      # signs development-style and `export_method: app-store` re-signs for
-      # distribution, which is the normal flow and the one that keeps entitlements.
-      # `verify_entitlements` asserts the result on every run.
-      # Cloud-managed automatic signing via the App Store Connect API key. The
-      # version/build numbers are stamped here (rather than via agvtool) so the lane
-      # doesn't depend on the project's versioning system being configured.
-      #
-      # `-allowProvisioningUpdates` lets Xcode create/download the distribution
-      # profile, and the `-authenticationKey*` flags give xcodebuild the App Store
-      # Connect API-key credentials to do it headlessly (no signed-in Xcode account on
-      # the CI runner). DEVELOPMENT_TEAM + CODE_SIGN_STYLE=Automatic are injected from
-      # the APPLE_TEAM_ID var because the checked-in project has no team set (keeps the
-      # Team ID out of project.pbxproj). Same auth flags on export_xcargs so the export
-      # step can re-resolve signing too.
-      xcargs: "-allowProvisioningUpdates " \
-              "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
-              "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
-              "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']} " \
-              "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
-              "CODE_SIGN_STYLE=Automatic " \
-              "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
-              "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
-      # NB: no `export_xcargs` — gym applies `xcargs` to the export xcodebuild
-      # invocation too, so repeating the auth flags there passes
-      # `-authenticationKeyID` twice ("may only be provided once").
+      export_xcargs: "-allowProvisioningUpdates " \
+                     "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
+                     "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
+                     "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']}",
       output_directory: File.dirname(IPA_PATH),
       output_name: File.basename(IPA_PATH)
     )
