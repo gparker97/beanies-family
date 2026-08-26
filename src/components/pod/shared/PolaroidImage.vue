@@ -6,7 +6,7 @@
  * a soft terracotta kraft-paper illustration placeholder so
  * photo-less recipes still look intentional rather than empty.
  */
-defineProps<{
+const props = defineProps<{
   src?: string | null;
   /** Optional Caveat-styled caption shown inside the white border. */
   caption?: string;
@@ -22,7 +22,72 @@ defineProps<{
   loading?: boolean;
 }>();
 
+import { computed, ref, watch, onUnmounted } from 'vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+
+/**
+ * A JUST-UPLOADED photo is not immediately servable.
+ *
+ * Photo URLs here are `lh3.googleusercontent.com/d/<driveFileId>` built synchronously from
+ * the id the moment the upload completes — but Drive still has to publish the file and the
+ * CDN has to pick it up, which takes a few seconds. Open a freshly-captured recipe straight
+ * away and the image 404s.
+ *
+ * Without this, that failure was invisible and confusing: the `<img>` rendered as a blank
+ * box with the caption floating over it, which reads as "the photo saved wrong" rather than
+ * "the photo is still arriving". Retrying with backoff covers the propagation window, and
+ * the frame shows its normal "a photo is coming" treatment meanwhile — the same thing it
+ * shows before the upload starts, so the whole wait looks like one continuous state.
+ *
+ * Bounded: after the last attempt the frame settles into the empty placeholder rather than
+ * retrying forever, because a genuinely missing photo must not spin indefinitely.
+ */
+const RETRY_DELAYS_MS = [700, 1500, 3000];
+
+const attempt = ref(0);
+const retrying = ref(false);
+const failed = ref(false);
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+/** Show the arriving-photo treatment while the caller says so OR while we are retrying. */
+const showLoading = computed(() => props.loading === true || retrying.value);
+
+function clearTimer(): void {
+  if (timer !== undefined) clearTimeout(timer);
+  timer = undefined;
+}
+
+function onImageError(): void {
+  const delay = RETRY_DELAYS_MS[attempt.value];
+  if (delay === undefined) {
+    // Out of attempts. Fall back to the empty frame — honest, and it stops the caption
+    // hovering over a broken image.
+    failed.value = true;
+    retrying.value = false;
+    return;
+  }
+  retrying.value = true;
+  clearTimer();
+  timer = setTimeout(() => {
+    // Bumping `attempt` re-keys the <img>, so the browser issues a fresh request rather
+    // than serving its cached 404.
+    attempt.value += 1;
+    retrying.value = false;
+  }, delay);
+}
+
+// A new photo starts its own attempt budget.
+watch(
+  () => props.src,
+  () => {
+    clearTimer();
+    attempt.value = 0;
+    retrying.value = false;
+    failed.value = false;
+  }
+);
+
+onUnmounted(clearTimer);
 </script>
 
 <template>
@@ -51,7 +116,7 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
          aria-live + aria-busy because a spinner alone says nothing to a screen reader: it
          would be indistinguishable from an ordinary empty frame. -->
     <div
-      v-if="loading"
+      v-if="showLoading"
       class="relative grid w-full place-items-center overflow-hidden"
       role="status"
       aria-live="polite"
@@ -70,12 +135,14 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
       </span>
     </div>
     <img
-      v-else-if="src"
+      v-else-if="src && !failed"
+      :key="attempt"
       :src="src"
       :alt="alt ?? ''"
       class="block w-full bg-cover bg-center"
       :style="{ aspectRatio: aspectRatio ?? '4 / 3' }"
       referrerpolicy="no-referrer"
+      @error="onImageError"
     />
     <div
       v-else
@@ -122,7 +189,7 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
       </span>
     </div>
     <figcaption
-      v-if="caption && src"
+      v-if="caption && src && !failed && !showLoading"
       class="font-caveat text-secondary-500 absolute right-0 bottom-1 left-0 text-center text-base"
     >
       {{ caption }}
