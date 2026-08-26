@@ -87,6 +87,19 @@ platform :ios do
       "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}"
     )
 
+    # What the ARCHIVE ended up with, before export gets a chance to re-sign it. This is
+    # the measurement that separates "phase 1 never wrote the entitlements" from "export
+    # stripped them", and without it the two are indistinguishable from the IPA alone -
+    # which is how four different flag combinations were tried against the same symptom.
+    archived_app = Dir.glob("#{archive}/Products/Applications/*.app").first
+    if archived_app
+      sh("echo '── archive entitlements (pre-export) ──'; " \
+         "codesign -d --entitlements - --xml '#{archived_app}' 2>&1 | plutil -convert xml1 -o - - 2>&1 || " \
+         "echo '(the archived app carries NO entitlements)'")
+    else
+      UI.important("No .app found inside the archive at #{archive}")
+    end
+
     # ── Phase 2: export + sign for App Store distribution ───────────────────
     #
     # An App Store profile needs no registered devices, so this phase signs happily where
