@@ -34,7 +34,7 @@ export type ConsentGrant = { readonly [consentBrand]: 'document-consent' };
 const GRANT = {} as ConsentGrant;
 
 /** Whether the consent modal is showing. Read by the single global modal mount. */
-const consentOpen = ref(false);
+export const consentOpen = ref(false);
 
 /**
  * The resolver for the CURRENT prompt, and a tail that SERIALIZES overlapping requests.

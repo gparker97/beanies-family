@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import { ref, computed, nextTick } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -14,7 +15,6 @@ import AccommodationEditModal from '@/components/travel/AccommodationEditModal.v
 import TransportationEditModal from '@/components/travel/TransportationEditModal.vue';
 import IdeaEditModal from '@/components/travel/IdeaEditModal.vue';
 import TravelExtractReviewModal from '@/components/travel/TravelExtractReviewModal.vue';
-import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useVacationStore } from '@/stores/vacationStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -1466,19 +1466,7 @@ async function addQuickIdea() {
       @close="reviewReady = null"
       @submit="onReviewSubmit"
     />
-    <div
-      v-if="isReadingDoc"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    >
-      <div
-        class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
-      >
-        <BeanieSpinner size="lg" :halo="true" />
-        <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
-          {{ t('ai.processing') }}
-        </p>
-      </div>
-    </div>
+    <AiProcessingOverlay :open="isReadingDoc" />
 
     <!-- Copied toast -->
     <Transition

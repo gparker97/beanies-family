@@ -12,12 +12,13 @@
 // are capped before any decode, filenames are bounded before they reach storage, and nothing
 // is persisted without the user confirming it in a review modal.
 
+import { computed, ref } from 'vue';
 import { useAiCapability } from './useAiCapability';
 import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
-import { requestConsent } from './useDocumentConsent';
+import { consentOpen, requestConsent } from './useDocumentConsent';
 import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
 import { isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
 import { withSniffedType } from '@/utils/sniffFileType';
@@ -57,8 +58,23 @@ export interface ShareMeta {
  * Deliberately NOT the wedges' silent `if (isProcessing) return`: at the share boundary the
  * user has just left another app, so silence reads as "beanies lost it". A second share is
  * refused audibly.
+ *
+ * REACTIVE because it also drives the reading overlay. The in-app readers get their spinner
+ * from the wedge's `isProcessing`, which `processFile` sets — but the share path bypasses
+ * `processFile` (that is how it avoids a second AI call), and the extraction finishes BEFORE
+ * any page is navigated to. So on a real device the app opened from a share and then sat
+ * there doing nothing visible for four or five seconds. This is the state the global overlay
+ * in `App.vue` watches.
  */
-let isIngesting = false;
+const isIngesting = ref(false);
+
+/**
+ * Whether a shared document is being read right now, for the app-shell overlay.
+ *
+ * False while the consent prompt is up: that modal IS the feedback at that moment, and the
+ * overlay sits above it.
+ */
+export const isReadingSharedDocument = computed(() => isIngesting.value && !consentOpen.value);
 
 /**
  * Wait for the app to be genuinely usable on a cold launch, bounded.
@@ -126,7 +142,7 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
     },
   });
 
-  if (isIngesting) {
+  if (isIngesting.value) {
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -136,7 +152,7 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
     showToast('info', t('shareTarget.busy.title'), t('shareTarget.busy.message'));
     return;
   }
-  isIngesting = true;
+  isIngesting.value = true;
   try {
     // 1) Readiness. A share can launch a cold app that is signed out or still hydrating;
     //    without this we would fire an AI call for a family that is not loaded, behind a
@@ -307,7 +323,7 @@ export async function ingestSharedDocuments(files: File[], meta: ShareMeta): Pro
     const { t: translate } = useTranslation();
     toast('error', translate('ai.error.title'), translate('ai.error.generic'));
   } finally {
-    isIngesting = false;
+    isIngesting.value = false;
   }
 }
 
