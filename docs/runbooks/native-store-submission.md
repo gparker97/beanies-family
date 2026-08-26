@@ -453,6 +453,72 @@ removal surface. Then:
 
 ---
 
+## 6b. iOS Share Extension — one-time Xcode + portal setup (#64)
+
+The share target's JS, orchestrator and review surfaces all ship in the app bundle already.
+What follows is the one-time native wiring, and it is one-time: once the target exists and the
+`project.pbxproj` diff is committed, later changes are ordinary source edits.
+
+**Everything below except step 1 is in the Developer portal, NOT App Store Connect.** An
+extension ships INSIDE the app bundle and has no App Store Connect record of its own — there
+is nothing to create there, no separate version, and no separate review.
+
+### Portal (developer.apple.com → Certificates, Identifiers & Profiles)
+
+1. **Register the App Group.** Identifiers → `+` → **App Groups** → Continue.
+   - Description: `beanies.family shared container`
+   - Identifier: `group.family.beanies.app` (must match `App.entitlements`,
+     `ShareExtension.entitlements`, `ShareIntentPlugin.swift` and `ShareViewController.swift`
+     — all four hardcode it, deliberately, so a typo fails at build rather than at runtime)
+2. **Enable App Groups on the main App ID.** Identifiers → `family.beanies.app` → tick
+   **App Groups** → Edit → select the group → Save. This invalidates existing provisioning
+   profiles; the build lane regenerates them (`-allowProvisioningUpdates`), so no manual
+   profile work is needed.
+3. **Register the extension's App ID.** Identifiers → `+` → **App IDs** → App → Explicit,
+   Bundle ID `family.beanies.app.ShareExtension`, tick **App Groups**, assign the same group.
+   (Automatic signing can often create this itself, but doing it explicitly means a signing
+   failure names the missing identifier instead of a generic profile error.)
+
+### Xcode (one pass, on a Mac)
+
+4. **Create the target.** File → New → Target → **Share Extension**. Name it
+   `ShareExtension`, embed in `App`. Decline the "Activate scheme?" prompt.
+5. **Replace the generated files** with the ones committed here — Xcode's template writes a
+   `SLComposeServiceViewController` with a compose UI, which is the wrong shape (see
+   `ShareViewController.swift`'s header for why the extension is headless):
+   - `ios/App/ShareExtension/ShareViewController.swift`
+   - `ios/App/ShareExtension/Info.plist`
+   - `ios/App/ShareExtension/ShareExtension.entitlements`
+     Delete the generated `MainInterface.storyboard` — the extension has no UI, and the plist
+     declares `NSExtensionPrincipalClass` rather than a storyboard.
+6. **Set the extension's capability**: select the ShareExtension target → Signing &
+   Capabilities → `+` → App Groups → tick `group.family.beanies.app`.
+7. **Add the Swift files to the APP target's Compile Sources.** This is the step that is easy
+   to miss and silent when missed — see the warning below.
+   - `ios/App/App/ShareIntentPlugin.swift`
+   - `ios/App/App/BiometricKeystorePlugin.swift` ← **currently orphaned; see the warning**
+8. **Commit the `project.pbxproj` diff.** Without it the target exists only on one machine and
+   CI builds an app with no extension.
+
+> ⚠️ **A `.swift` file inside `ios/App/App/` is NOT compiled just because it is on disk.**
+> This project's `App` group lists its children explicitly (no file-system-synchronized
+> group), and CI does not regenerate the project, so a file that is not in Compile Sources is
+> silently absent from the binary. `BiometricKeystorePlugin.swift` was committed in `411ce778`
+> without a `project.pbxproj` change and is in exactly that state today: `nativeBiometric.ts`
+> calls it on every native platform, the call rejects "not implemented", the catch classifies
+> it as `no-hardware`, and iOS biometric unlock therefore looks like a device limitation
+> rather than a missing plugin. Verify BOTH plugins appear in Compile Sources before building.
+
+### Verify
+
+9. **Simulator build** (`Mobile — iOS simulator build`) proves it compiles and that the
+   `project.pbxproj` diff is complete.
+10. **TestFlight for the real test.** A Share Extension cannot be exercised properly against a
+    real app group in the simulator. On device, walk the matrix in the plan's Testing Plan
+    §13: one image, one PDF, three images, seven images (cap), a 20-page PDF (cap), an
+    oversized image, and a `.txt` (must not offer beanies at all); cold and warm; and a
+    deliberately unreadable item to confirm the container is cleared and the NEXT share works.
+
 ## 7. Notes
 
 - **Prereq to verify:** the Google **Web** OAuth client must already have
