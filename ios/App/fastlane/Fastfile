@@ -67,20 +67,28 @@ platform :ios do
     # The flag combination matters in a way that is easy to get subtly wrong - three
     # variants were measured on CI before this one:
     #
-    #   CODE_SIGNING_ALLOWED=NO  also skips ProcessProductPackaging, which is the step
-    #   that writes the entitlements into the archive. So it is not enough to merely stop
-    #   blanking CODE_SIGN_ENTITLEMENTS: with signing disallowed the archive comes out
-    #   entitlement-free anyway, and the export then signs the minimal set it can infer.
-    #   Measured: the exported binary still lacked app-groups.
+    #   1. `skip_codesigning: true`      -> blanks CODE_SIGN_ENTITLEMENTS. Archive has no
+    #                                        entitlements. Export infers a minimal set.
+    #   2. automatic signing, no override -> "Your team has no devices from which to
+    #                                        generate a provisioning profile."
+    #   3. CODE_SIGN_IDENTITY=Apple Distribution + automatic -> rejected as a conflicting
+    #                                        manual identity under automatic signing.
+    #   4. CODE_SIGNING_ALLOWED=NO / no identity -> archive STILL entitlement-free.
     #
-    # So packaging is ALLOWED to run (entitlements get written) while signing is merely
-    # not REQUIRED and no identity is given, and the style is Manual with no profile so
-    # nothing contacts Apple looking for one. That yields an archive that is unsigned but
-    # carries App/App.entitlements - which is exactly what phase 2 needs to sign against.
+    # (4) is the one that explains the rest. ENTITLEMENTS ARE EMBEDDED BY THE CODE
+    # SIGNATURE ITSELF, not written alongside it, so an unsigned binary cannot carry them
+    # at all - and `-exportArchive` derives its set from what the binary already has. No
+    # amount of not-blanking CODE_SIGN_ENTITLEMENTS helps while nothing signs.
+    #
+    # AD-HOC signing (CODE_SIGN_IDENTITY="-") is the way out. It is real signing, so the
+    # entitlements are embedded, but it needs no certificate, no provisioning profile and
+    # no communication with Apple - which is what kept every other signed variant from
+    # working on a runner for a team with no registered devices. Phase 2 then re-signs
+    # with the real distribution identity, and the entitlements survive.
     sh(
       "xcodebuild -project '#{project}' -scheme App -configuration Release " \
       "-destination 'generic/platform=iOS' -archivePath '#{archive}' archive " \
-      "CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' " \
+      "CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES " \
       "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='' " \
       "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
       "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
