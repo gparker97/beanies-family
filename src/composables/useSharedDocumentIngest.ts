@@ -22,10 +22,7 @@ import { consentOpen, requestConsent } from './useDocumentConsent';
 import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
 import { isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
 import { MAX_SHARE_TEXT_CHARS, type SharedContent } from '@/services/share/types';
-import { resolveRecipeSource } from '@/services/ai/recipeSourceResolver';
-import { routeUrl } from '@/utils/recipeSourceUrl';
 import { extractUrls } from '@/utils/url';
-import { toShareLink } from '@/utils/shareLink';
 import { withSniffedType } from '@/utils/sniffFileType';
 import {
   extractShareFromDocuments,
@@ -159,6 +156,35 @@ async function awaitReadiness(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Trailing sentence punctuation is not part of a URL.
+ *
+ * Brackets are deliberately NOT handled: `extractUrls` already stops at `)`, so a
+ * parenthesised path arrives truncated before this ever sees it. That is a pre-existing
+ * limitation of the shared extractor, not something to paper over here — fixing it belongs
+ * in `extractUrls`, where every caller would benefit.
+ */
+function trimUrlPunctuation(url: string): string {
+  return url.replace(/[.,;:!?'"]+$/, '');
+}
+
+/**
+ * State what the share turned out to BE, once triage knows.
+ *
+ * Separate from the `received` event because on iOS a link arrives as a `.txt` file, so the
+ * raw content cannot tell the two apart — and the Observability Coverage pins `detail` so
+ * the two funnels are separable. `file_count` is 0 for a link, so existing dashboards keep
+ * meaning what they mean.
+ */
+function logReceivedKind(detail: 'file' | 'link', fileCount: number): void {
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'share triaged',
+    context: { action: 'triaged', detail, file_count: fileCount },
+  });
+}
+
 /** What the share turned out to be, once triaged. Network-free to produce. */
 type ShareSource = { kind: 'documents'; files: File[] } | { kind: 'link'; url: string };
 
@@ -188,12 +214,18 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
   // `withSniffedType` returns the file untouched when the bytes match no signature, so a
   // real text file still declares `text/plain` at this point.
   let text = content.text;
+  // Whether `text` came from a shared `.txt` FILE rather than from a caption. The two are
+  // treated differently below: a .txt IS the share, a caption merely accompanies files.
+  let textFromFile = false;
   if (!usable.length && !text) {
     const textFile = stamped.find((f) => f.type === 'text/plain');
     // Bound the DECODE, not just its result: another app can hand over a 100 MB file
     // declaring itself text, and decoding it whole before slicing is the very OOM the cap
     // exists to prevent. 4 = the UTF-8 worst case per character.
-    if (textFile) text = await textFile.slice(0, MAX_SHARE_TEXT_CHARS * 4).text();
+    if (textFile) {
+      text = await textFile.slice(0, MAX_SHARE_TEXT_CHARS * 4).text();
+      textFromFile = true;
+    }
   }
 
   // A share the platform could only partially hand over must SAY so — before the empty-batch
@@ -220,7 +252,29 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
         t('shareTarget.firstAttached.message')
       );
     }
+    logReceivedKind('file', usable.length);
     return { kind: 'documents', files: usable };
+  }
+
+  // Files were offered but NONE survived triage (over the size cap, or a type we cannot
+  // read), and none of them yielded text either. That is a FILE problem and must be reported
+  // as one: falling through to the text branch would quietly read a caption's album link
+  // instead and never tell the user their photo was too big. Senders routinely set both
+  // extras — Google Photos attaches an album link beside the image.
+  //
+  // `!textFromFile` is load-bearing, and `!text` is NOT enough: a caption beside an
+  // unreadable photo also populates `text`, and reading the caption's link instead of
+  // reporting the photo is the exact silent substitution this branch exists to stop. A
+  // shared `.txt`, by contrast, IS the share and must reach the link branch.
+  if (content.files.length > 0 && !textFromFile) {
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'nothing usable in share',
+      context: { action: 'rejected_type', detail: 'unsupported' },
+    });
+    showToast('info', t('shareTarget.unsupported.title'), t('shareTarget.unsupported.message'));
+    return null;
   }
 
   if (text) {
@@ -231,8 +285,26 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
     // The SAME predicate the resolver applies moments later. A weaker one here would pick a
     // YouTube channel link sitting ahead of a good recipe URL and then die on it, with a
     // readable link two words away.
-    const url = extractUrls(capped).find((candidate) => routeUrl(candidate).kind !== 'invalid');
-    if (url) return { kind: 'link', url };
+    //
+    // Punctuation is trimmed first because sentence-punctuated prose is the NORMAL input
+    // here — "Watch this https://youtu.be/dQw4w9WgXcQ." is how people share. `extractUrls`
+    // strips it on its bare-domain pass but not on its protocol pass, and the trailing dot
+    // makes the video id 12 characters, which `routeUrl` rejects outright: a perfectly
+    // readable video became "No Link Found".
+    // Imported HERE rather than at module scope. `App.vue` statically imports
+    // `useShareTargets`, which imports this file — so a top-level import would drag the
+    // recipe link-reading graph (`recipeSourceUrl`, `recipeSourceResolver`,
+    // `recipeFetchService`, `shareLink` — ~22 KB) into the eager entry chunk, where none of
+    // it lived before. Until now it was reachable only from the lazily-routed cookbook.
+    // Every cold boot would pay for it; only a text share ever runs it.
+    const { routeUrl } = await import('@/utils/recipeSourceUrl');
+    const url = extractUrls(capped)
+      .map(trimUrlPunctuation)
+      .find((candidate) => routeUrl(candidate).kind !== 'invalid');
+    if (url) {
+      logReceivedKind('link', 0);
+      return { kind: 'link', url };
+    }
 
     // Deliberately a toast, NOT a `share`-task call on the bare text: that would turn any
     // app's share sheet into a general text→model endpoint on a soft-keyed proxy, and it is
@@ -302,12 +374,20 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
       sourceFile: source.files[0],
       compressedBlob: result.compressedBlob,
       truncated: result.truncated,
+      origin: 'share',
     });
   }
 
   // A LINK. `resolveRecipeSource` is reused verbatim — despite the name, its page route
   // carries no recipe policy (the blocklist only picks which link inside a YouTube
   // DESCRIPTION to follow), and its fetch budget is what bounds this path's cost.
+  // Dynamic for the same reason as in `prepare` — and free here, since this branch is about
+  // to make a multi-second network call anyway. Same pattern `pdfExtractionImages` documents.
+  const [{ resolveRecipeSource }, { routeUrl }, { toShareLink }] = await Promise.all([
+    import('@/services/ai/recipeSourceResolver'),
+    import('@/utils/recipeSourceUrl'),
+    import('@/utils/shareLink'),
+  ]);
   const resolved = await resolveRecipeSource(source.url);
   const route = routeUrl(source.url);
 
@@ -330,7 +410,7 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
         payload: {
           kind: 'recipe',
           source: { via: 'jsonld', recipe: resolved.recipe },
-          env: { sourceFile: null, link },
+          env: { sourceFile: null, link, origin: 'share' },
         },
       };
     }
@@ -353,16 +433,19 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
         reportExtractionFailure(result.errorCode);
         return null;
       }
-      return classify(result.data, { sourceFile: null, link });
+      return classify(result.data, { sourceFile: null, link, origin: 'share' });
     }
     case 'refusal': {
       // `not_a_recipe_url` is unreachable from here — the picker in `prepare` already used
       // `routeUrl` — but the switch stays exhaustive because the pasted-link path reaches it.
+      // `refused`, NOT `failed` — matching `processUrl`, which this parallels. A video with
+      // an empty description is a correct, expected outcome; folding it into `failed` would
+      // make a "failed / received" alarm page on a healthy week when people share Shorts.
       logEvent({
         level: 'warn',
         surface: SURFACE,
         message: 'refused to read the link',
-        context: { action: 'failed', error_code: resolved.reason },
+        context: { action: 'refused', error_code: resolved.reason },
       });
       const isVideo = resolved.reason === 'no_text_no_link';
       showToast(
@@ -403,21 +486,18 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
 export async function ingestSharedContent(content: SharedContent, meta: ShareMeta): Promise<void> {
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const isLink = content.files.length === 0 && Boolean(content.text);
 
   // Fires before anything can fail, so every later event has a denominator.
+  //
+  // `detail` is deliberately NOT decided here. On iOS — the one platform where a shared link
+  // ALWAYS arrives as a file — the extension writes the URL as a `.txt`, so judging from the
+  // raw content would label every iOS link share as a file and blind any funnel keyed on
+  // `detail='link'`. The verdict is known one function later, so `prepare` emits it.
   logEvent({
     level: 'info',
     surface: SURFACE,
     message: 'share received',
-    context: {
-      action: 'received',
-      os: meta.platform,
-      detail: isLink ? 'link' : 'file',
-      // Pinned at 0 for a link so existing dashboards keep meaning what they mean.
-      file_count: content.files.length,
-      cold_start: meta.coldStart,
-    },
+    context: { action: 'received', os: meta.platform, cold_start: meta.coldStart },
   });
 
   if (isIngesting.value) {

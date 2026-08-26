@@ -8077,8 +8077,8 @@ const STRING_DEFS = {
   },
   'shareTarget.unsupported.title': { en: "Can't Read That", beanie: "can't read that" },
   'shareTarget.unsupported.message': {
-    en: 'beanies can read photos, screenshots and PDFs.',
-    beanie: 'beanies can read photos, screenshots and pdfs.',
+    en: 'beanies can read photos, screenshots, PDFs and links.',
+    beanie: 'beanies can read photos, screenshots, pdfs and links.',
   },
   'shareTarget.unrecognised.title': {
     en: 'Not Sure What That Is',
@@ -8143,9 +8143,12 @@ const STRING_DEFS = {
   },
   // ── Recipe capture (#72) — the third magic-beans reader ──
   'recipeExtract.notRecipe.title': { en: 'No Recipe Found', beanie: 'no recipe found' },
+  // SHARED-SURFACE COPY — reached from the cookbook, from a pasted link, AND from a shared
+  // link (#64 links). It must not assume a photo: someone who shared a URL never took one.
   'recipeExtract.notRecipe.message': {
-    en: "We couldn't find a recipe in that. Try a clearer photo of the page, or type it in.",
-    beanie: "we couldn't find a recipe in that. try a clearer photo of the page, or type it in.",
+    en: "beanies couldn't find a recipe in that. Try a clearer photo of the page, or type it in.",
+    beanie:
+      "beanies couldn't find a recipe in that. try a clearer photo of the page, or type it in.",
   },
   'recipes.photos.willAttach': {
     en: 'beanies found a photo of this dish and will add it when you save.',
@@ -8191,9 +8194,9 @@ const STRING_DEFS = {
   },
   // SHARED-SURFACE COPY — see the note on `recipeExtract.noContent.message` (#64 links).
   'recipeExtract.videoBlocked.message': {
-    en: 'YouTube blocks apps from reading some videos. Open the video, look in its description for a link, and share that instead — it usually works.',
+    en: 'YouTube blocks apps from reading some videos. Open the video, look in its description for a link to the recipe, and use that instead — it usually works, and gives exact quantities.',
     beanie:
-      'youtube blocks apps from reading some videos. open the video, look in its description for a link, and share that instead — it usually works.',
+      'youtube blocks apps from reading some videos. open the video, look in its description for a link to the recipe, and use that instead — it usually works, and gives exact quantities.',
   },
   'recipeExtract.unreachable.title': {
     en: "Couldn't Open That Link",
@@ -8220,9 +8223,9 @@ const STRING_DEFS = {
   },
   // SHARED-SURFACE COPY — see the note on `recipeExtract.noContent.message` (#64 links).
   'recipeExtract.noTranscript.message': {
-    en: "That video's description has no text and no link to follow, so there's nothing for beanies to read. Check the description yourself for a link, and share that instead.",
+    en: "That video's description has no text and no link to follow, so there's nothing for beanies to read. Check the description yourself for a link, and use that instead.",
     beanie:
-      "that video's description has no text and no link to follow, so there's nothing for beanies to read. check the description yourself for a link, and share that instead.",
+      "that video's description has no text and no link to follow, so there's nothing for beanies to read. check the description yourself for a link, and use that instead.",
   },
   'recipeExtract.strip.title': {
     en: 'Start From a Link',
