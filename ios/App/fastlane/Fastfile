@@ -75,18 +75,33 @@ platform :ios do
   # profiles for both bundle IDs, encrypted in a private repo, and installs them on the
   # runner each build. No devices, no cloud-signing dependency, nothing to renew by hand.
   private_lane :build_ipa do
-    # Fail on a missing credential with a sentence that says which one and where it goes.
-    # match's own error for an unset MATCH_PASSWORD is a decryption failure several steps
-    # later, which reads like a corrupt repo rather than an unset secret.
+    # Fail on a missing OR PLACEHOLDER credential, with a sentence naming which one and
+    # where it goes. Two distinct failure modes, both otherwise confusing:
+    #
+    #   unset            -> match reports a decryption failure several steps later, which
+    #                       reads like a corrupt certificates repo rather than an unset
+    #                       secret.
+    #   still REPLACE_ME -> the secrets were created as placeholders so they could be
+    #                       filled in later. A placeholder is NOT empty, so an
+    #                       emptiness-only check would happily pass one through and fail
+    #                       identically to the above. Checking for it is the difference
+    #                       between "you have not set MATCH_PASSWORD yet" and half an hour
+    #                       of debugging git.
+    PLACEHOLDER = "REPLACE_ME"
     {
       "MATCH_GIT_URL" => "repository variable MATCH_GIT_URL (the private certificates repo)",
       "MATCH_PASSWORD" => "secret MATCH_PASSWORD (the match encryption passphrase)",
       "MATCH_GIT_BASIC_AUTHORIZATION" => "secret MATCH_GIT_BASIC_AUTHORIZATION (base64 of \"<github-user>:<PAT>\")"
     }.each do |var, where|
+      value = ENV[var].to_s.strip
       UI.user_error!(
         "#{var} is not set. iOS signing needs it - add the #{where} on the beanies-family " \
         "repo. See the match setup notes above `build_ipa`."
-      ) if ENV[var].to_s.strip.empty?
+      ) if value.empty?
+      UI.user_error!(
+        "#{var} is still the placeholder #{PLACEHOLDER}. Replace it with the real value - " \
+        "the #{where}."
+      ) if value == PLACEHOLDER
     end
 
     # A temporary, unlocked keychain for the imported certificate. Without this the
