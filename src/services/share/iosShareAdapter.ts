@@ -10,25 +10,11 @@
 // rather than throwing on every launch.
 
 import { App } from '@capacitor/app';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { base64ToFile } from '@/utils/base64ToFile';
 import { reportError } from '@/utils/errorReporter';
+import { ShareIntent } from './shareIntentPlugin';
 import type { ShareAdapter } from './types';
-
-interface SharedNativeFile {
-  name: string;
-  /** The SENDER's claimed MIME. Informational only — the orchestrator re-decides. */
-  type: string;
-  /** base64, no wrapping. */
-  data: string;
-}
-
-interface ShareIntentPlugin {
-  /** Read everything the extension left in the app group, then clear the container. */
-  consume(): Promise<{ files: SharedNativeFile[] }>;
-}
-
-const ShareIntent = registerPlugin<ShareIntentPlugin>('ShareIntent');
 
 export const iosShareAdapter: ShareAdapter = {
   name: 'ios',

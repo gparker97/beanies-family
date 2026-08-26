@@ -27,19 +27,29 @@ export async function readAndClearShareStash(id: string): Promise<File[]> {
   const files: File[] = [];
   try {
     for (const key of keys) {
-      const res = await cache.match(key);
-      if (!res) continue;
-      const blob = await res.blob();
-      const rawName = decodeURIComponent(res.headers.get('x-share-name') ?? 'shared');
-      const type = res.headers.get('content-type') ?? '';
-      const extension = rawName.includes('.') ? rawName.slice(rawName.lastIndexOf('.')) : '';
-      const safeExtension = /^\.[a-zA-Z0-9]{1,8}$/.test(extension) ? extension.toLowerCase() : '';
-      // The name comes from whichever app shared it — bound it before it reaches storage.
-      files.push(new File([blob], `${sanitiseAttachmentBase(rawName)}${safeExtension}`, { type }));
+      // PER ENTRY, not around the loop. With one shared try/catch, a single rejecting
+      // `blob()` aborted the loop while the `finally` still deleted every entry — so the
+      // readable files in that batch were destroyed along with the broken one, and the POST
+      // body they came from is long gone. Skip the bad one and keep the rest.
+      try {
+        const res = await cache.match(key);
+        if (!res) continue;
+        const blob = await res.blob();
+        const rawName = decodeURIComponent(res.headers.get('x-share-name') ?? 'shared');
+        const type = res.headers.get('content-type') ?? '';
+        const extension = rawName.includes('.') ? rawName.slice(rawName.lastIndexOf('.')) : '';
+        const safeExtension = /^\.[a-zA-Z0-9]{1,8}$/.test(extension) ? extension.toLowerCase() : '';
+        // The name comes from whichever app shared it — bound it before it reaches storage.
+        files.push(
+          new File([blob], `${sanitiseAttachmentBase(rawName)}${safeExtension}`, { type })
+        );
+      } catch (err) {
+        console.warn('[share] could not read one stashed document; skipping it', err);
+      }
     }
   } finally {
-    // Unconditional: read-then-delete, so one unreadable entry cannot strand the rest.
-    await Promise.all(keys.map((key) => cache.delete(key)));
+    // Unconditional: read-then-delete, so a poison entry cannot be retried forever.
+    await Promise.all(keys.map((key) => cache.delete(key).catch(() => undefined)));
   }
   return files;
 }

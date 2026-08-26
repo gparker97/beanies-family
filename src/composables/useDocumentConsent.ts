@@ -37,14 +37,22 @@ const GRANT = {} as ConsentGrant;
 const consentOpen = ref(false);
 
 /**
- * The resolver for the CURRENT prompt, and the promise every concurrent caller shares.
+ * The resolver for the CURRENT prompt, and a tail that SERIALIZES overlapping requests.
  *
- * Concurrency is specified, not left to chance: a `requestConsent()` while another is already
- * pending returns the SAME in-flight promise, so two callers produce one modal and both are
- * resolved together. Resolvers are never stacked and never dropped.
+ * These are DIFFERENT documents, so they must not share an answer. An earlier version
+ * returned the same in-flight promise to every caller, which meant the answer given for the
+ * in-app photo you chose also granted consent for a document a third-party app pushed in
+ * behind it — no second prompt, and the branded grant could not detect it because a real
+ * grant had genuinely been minted. ADR-030 is per-DOCUMENT consent; one prompt answers for
+ * exactly one document.
+ *
+ * So a second request WAITS for the first to settle and then opens its own prompt. Resolvers
+ * are never stacked and never dropped, and the tail always settles — a rejected link in the
+ * chain would strand every later caller, so the chain is built from a promise that cannot
+ * reject.
  */
 let consentResolver: ((grant: ConsentGrant | null) => void) | null = null;
-let inFlight: Promise<ConsentGrant | null> | null = null;
+let tail: Promise<unknown> = Promise.resolve();
 
 /**
  * Await consent before any document leaves the device. Resolves to a `ConsentGrant` when the
@@ -58,13 +66,17 @@ let inFlight: Promise<ConsentGrant | null> | null = null;
  */
 export function requestConsent(): Promise<ConsentGrant | null> {
   if (useSettingsStore().skipDocumentConsentPrompt) return Promise.resolve(GRANT);
-  if (inFlight) return inFlight;
 
-  inFlight = new Promise<ConsentGrant | null>((resolve) => {
-    consentResolver = resolve;
-    consentOpen.value = true;
-  });
-  return inFlight;
+  const mine = tail.then(
+    () =>
+      new Promise<ConsentGrant | null>((resolve) => {
+        consentResolver = resolve;
+        consentOpen.value = true;
+      })
+  );
+  // The tail must never carry a rejection, or one failure would strand every later request.
+  tail = mine.catch(() => undefined);
+  return mine;
 }
 
 /** Settle the current prompt. Safe to call when nothing is pending. */
@@ -72,7 +84,6 @@ export function resolveConsent(granted: boolean): void {
   consentOpen.value = false;
   const resolver = consentResolver;
   consentResolver = null;
-  inFlight = null;
   resolver?.(granted ? GRANT : null);
 }
 

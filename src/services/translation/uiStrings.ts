@@ -8095,6 +8095,16 @@ const STRING_DEFS = {
     beanie:
       "beanies worked out what that was, but that reader isn't switched on for your family, or isn't available to you.",
   },
+  'shareTarget.partial.title': { en: 'Some Were Skipped', beanie: 'some were skipped' },
+  'shareTarget.partial.message': {
+    en: 'beanies could not open everything you shared, so it read what it could.',
+    beanie: 'beanies could not open everything you shared, so it read what it could.',
+  },
+  'shareTarget.firstAttached.title': { en: 'Read Together', beanie: 'read together' },
+  'shareTarget.firstAttached.message': {
+    en: 'beanies read all of them as one item. The first one is kept as the attachment.',
+    beanie: 'beanies read all of them as one item. the first one is kept as the attachment.',
+  },
   'shareTarget.failed.title': { en: "Couldn't Open That", beanie: "couldn't open that" },
   'shareTarget.failed.message': {
     en: 'beanies could not read what was shared. Try sharing it again.',

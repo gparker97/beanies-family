@@ -1,4 +1,5 @@
 import { isPdfFile } from '@/utils/pdfExtractionImages';
+import { sniffFileType } from '@/utils/sniffFileType';
 
 /**
  * `accept` string for the AI document-reader file pickers (the consent-gated
@@ -41,11 +42,19 @@ export const AI_PICKER_MAX_BYTES = 25 * 1024 * 1024;
  * Lives beside `AI_PICKER_ACCEPT` deliberately: the picker's `accept` string and the share
  * target's filter are the same policy, and a second MIME list somewhere else would drift.
  *
- * Decides from the RESOLVED file, never from a sender's claim — on the share path the
- * declared type comes from another app. A `content://` URI advertised as `image/png` that
- * resolves to something else is rejected here.
+ * Decides from the file's own BYTES first, because at the share boundary the declared type
+ * comes from another app's ContentProvider and is not evidence of anything. The declared
+ * type is only consulted when the bytes are not one of the signatures we recognise — which
+ * is how HEIC/HEIF from an iOS share still gets through, since its container is shared with
+ * formats we do not accept and cannot be sniffed safely.
  */
-export function isAiPickerAcceptedFile(file: File): boolean {
+export async function isAiPickerAcceptedFile(file: File): Promise<boolean> {
   if (file.size === 0 || file.size > AI_PICKER_MAX_BYTES) return false;
+  try {
+    if (await sniffFileType(file)) return true;
+  } catch {
+    // An unreadable slice is itself a reason to distrust the file; fall through to the
+    // declared type rather than treating a read failure as acceptance.
+  }
   return file.type.startsWith('image/') || isPdfFile(file);
 }
