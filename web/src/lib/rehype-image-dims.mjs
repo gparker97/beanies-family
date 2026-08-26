@@ -37,7 +37,6 @@ async function getDims(src) {
   }
   try {
     // Same justification as existsSync above — build-time only, fixed-prefix path.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     const meta = await sharp(filePath).metadata();
     if (!meta.width || !meta.height) {
       console.warn(`[rehype-image-dims] no dimensions for ${src}`);
