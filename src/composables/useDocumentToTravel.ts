@@ -26,6 +26,8 @@ import {
 import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
 import type { ConsentGrant } from './useDocumentConsent';
+import type { ResultEnvelope } from '@/types/magicPayload';
+import type { TravelExtractionResult } from '@/services/ai/types';
 import { toDateInputValue } from '@/utils/date';
 import type { VacationTripType } from '@/types/models';
 
@@ -68,6 +70,59 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
   const isProcessing = ref(false);
 
   /** Run intake → (rasterize) → extract → map → resolve for one document (consent granted). */
+  /**
+   * The post-extraction half: notices, mapping, target resolution and the hand-off to the
+   * review modal.
+   *
+   * Split out of `processFile` (#64) so a SHARED document can be delivered without a second
+   * AI call. In-app behaviour is unchanged: `processFile` calls this.
+   */
+  function deliverTravel(data: TravelExtractionResult, env: ResultEnvelope): void {
+    // Loud-but-non-blocking notice FIRST — before the not-travel early return — so a >cap
+    // document whose bookings sat on a dropped page still tells the user (never silent).
+    if (env.truncated) {
+      showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
+    }
+    if (!data.isTravel || data.segments.length === 0) {
+      // Not recognised as a travel document — friendly info toast, nothing created.
+      showToast('info', t('ai.notTravel.title'), t('ai.notTravel.message'));
+      return;
+    }
+
+    // Map to segment buckets + carry the normalized per-segment traveller NAMES through to
+    // the review modal, where the user confirms each name→member mapping (identity matching
+    // is local; the roster is never sent to the model).
+    const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(data);
+    const distinctTravellerNames = [...new Set(Object.values(travellerNamesBySegmentId).flat())];
+    const range = segmentDateRange(buckets);
+    const matches = range
+      ? tripsOverlappingRange(vacationStore.vacations, range, toDateInputValue(new Date()))
+      : [];
+
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'travel document ready for review',
+      context: {
+        action: 'ready',
+        segment_count:
+          buckets.travelSegments.length +
+          buckets.accommodations.length +
+          buckets.transportation.length,
+        target_kind: resolveTripTarget(matches).kind,
+      },
+    });
+    options.onTravelReady({
+      buckets,
+      travellerNamesBySegmentId,
+      distinctTravellerNames,
+      tripType: inferTripType(data),
+      target: resolveTripTarget(matches),
+      suggestedTripName: data.tripName,
+      sourceFile: env.sourceFile, // attach the ORIGINAL (PDF stays a PDF)
+    });
+  }
+
   async function processFile(file: File, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
 
@@ -100,50 +155,10 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
       });
 
       if (result.success && result.data) {
-        // Loud-but-non-blocking notice FIRST — before the not-travel early return — so a
-        // >cap PDF whose bookings sat on a dropped page still tells the user (never silent).
-        if (result.truncated) {
-          showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
-        }
-        if (!result.data.isTravel || result.data.segments.length === 0) {
-          // Not recognised as a travel document — friendly info toast, nothing created.
-          showToast('info', t('ai.notTravel.title'), t('ai.notTravel.message'));
-          return;
-        }
-
-        // Map to segment buckets + carry the normalized per-segment traveller NAMES through to
-        // the review modal, where the user confirms each name→member mapping (identity matching
-        // is local; the roster is never sent to the model).
-        const { buckets, travellerNamesBySegmentId } = travelExtractionToSegments(result.data);
-        const distinctTravellerNames = [
-          ...new Set(Object.values(travellerNamesBySegmentId).flat()),
-        ];
-        const range = segmentDateRange(buckets);
-        const matches = range
-          ? tripsOverlappingRange(vacationStore.vacations, range, toDateInputValue(new Date()))
-          : [];
-
-        logEvent({
-          level: 'info',
-          surface: SURFACE,
-          message: 'travel document ready for review',
-          context: {
-            action: 'ready',
-            segment_count:
-              buckets.travelSegments.length +
-              buckets.accommodations.length +
-              buckets.transportation.length,
-            target_kind: resolveTripTarget(matches).kind,
-          },
-        });
-        options.onTravelReady({
-          buckets,
-          travellerNamesBySegmentId,
-          distinctTravellerNames,
-          tripType: inferTripType(result.data),
-          target: resolveTripTarget(matches),
-          suggestedTripName: result.data.tripName,
-          sourceFile: file, // attach the ORIGINAL (PDF stays a PDF)
+        deliverTravel(result.data, {
+          sourceFile: file,
+          compressedBlob: result.compressedBlob,
+          truncated: result.truncated,
         });
         return;
       }
@@ -175,5 +190,5 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
     }
   }
 
-  return { isProcessing, processFile };
+  return { isProcessing, processFile, deliverTravel };
 }

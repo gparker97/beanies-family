@@ -42,12 +42,20 @@ export interface ExtractionImages {
  * Rasterize up to MAX_EXTRACT_PAGES pages of a PDF into JPEG Files for extraction.
  * Delegates the pdf.js page loop to `renderPdfPages` (shared with the in-app viewer),
  * so the worker lifecycle + per-page cleanup live in exactly one place.
+ *
+ * `maxPages` lets a MULTI-document extraction (#64) ask for only the pages it can still
+ * use, so sharing five photos and a long PDF does not rasterize pages that would be thrown
+ * away. It is clamped to MAX_EXTRACT_PAGES — a caller can ask for fewer, never more, so the
+ * cap still lives here.
  */
-export async function pdfToExtractionImages(file: File): Promise<ExtractionImages> {
+export async function pdfToExtractionImages(
+  file: File,
+  maxPages: number = MAX_EXTRACT_PAGES
+): Promise<ExtractionImages> {
   const data = await file.arrayBuffer();
   const { blobs, truncated } = await renderPdfPages(data, {
     longEdge: EXTRACT_LONG_EDGE,
-    maxPages: MAX_EXTRACT_PAGES,
+    maxPages: Math.max(1, Math.min(maxPages, MAX_EXTRACT_PAGES)),
   });
   const baseName = file.name.replace(/\.pdf$/i, '');
   const files = blobs.map(
