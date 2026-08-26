@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import { ref, computed, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import CalendarCommandBar from '@/components/planner/CalendarCommandBar.vue';
@@ -46,7 +47,6 @@ import { findDuplicateActivity, mergeExtractionIntoActivity } from '@/utils/acti
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
-import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
 import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
@@ -871,19 +871,7 @@ function handleActivitySwapped(newId: string) {
       ref="aiPhotoPicker"
       @file="(f) => photoGrant && void processPhoto(f, photoGrant)"
     />
-    <div
-      v-if="isReadingPhoto"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    >
-      <div
-        class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
-      >
-        <BeanieSpinner size="lg" :halo="true" />
-        <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
-          {{ t('ai.processing') }}
-        </p>
-      </div>
-    </div>
+    <AiProcessingOverlay :open="isReadingPhoto" />
 
     <!-- Vacation wizard -->
     <VacationWizard
