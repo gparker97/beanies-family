@@ -41,6 +41,10 @@ on:
         description: 'App Store promotional text (OPTIONAL, ≤170 chars; no review needed; leave blank to keep the current value; ignored for testflight)'
         type: string
         default: ''
+      skip_entitlement_check:
+        description: 'Ship even though the build cannot share (app-group entitlement missing). ESCAPE HATCH for an unrelated urgent release — sharing and Universal Links will NOT work in it.'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -159,6 +163,9 @@ jobs:
           # The `release` lane strips the `appstore-` prefix to resolve the release
           # mode; the `beta` lane ignores it.
           IOS_DESTINATION: ${{ inputs.destination }}
+          # Deliberately opt-IN. The check exists because three builds shipped unable to
+          # share and nothing on the path noticed; defaulting it off would recreate that.
+          SKIP_ENTITLEMENT_CHECK: ${{ inputs.skip_entitlement_check }}
           # The App Store "What's New" note. Required by the `release` lane for any
           # appstore-* destination (it fails loud if empty); unused by `beta`.
           WHATS_NEW: ${{ inputs.whats_new }}
