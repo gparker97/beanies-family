@@ -106,6 +106,13 @@ jobs:
           VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
           VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
 
+      # A .swift file in ios/App/App/ is NOT compiled just because it is committed — the
+      # App group lists its children explicitly and nothing here regenerates the project.
+      # BiometricKeystorePlugin.swift was in exactly that state for months (#74), shipping a
+      # feature that could not run. Fail before the archive rather than after the release.
+      - name: Check every iOS Swift source is in Compile Sources
+        run: node scripts/check-ios-sources.mjs
+
       - name: Sync Capacitor (iOS)
         # Copies the freshly built dist/ into ios/App/App/public and updates the
         # native SPM dependencies.

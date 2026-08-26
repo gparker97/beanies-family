@@ -128,6 +128,13 @@ jobs:
           VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
           VITE_BUILD_SHA: ${{ github.sha }}
 
+      # A .swift file in ios/App/App/ is NOT compiled just because it is committed — the
+      # App group lists its children explicitly and nothing here regenerates the project.
+      # BiometricKeystorePlugin.swift was in exactly that state for months (#74), shipping a
+      # feature that could not run. Fail before the archive rather than after the release.
+      - name: Check every iOS Swift source is in Compile Sources
+        run: node scripts/check-ios-sources.mjs
+
       - name: Sync Capacitor (iOS)
         run: npx cap sync ios
 
