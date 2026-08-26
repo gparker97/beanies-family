@@ -8,6 +8,7 @@ import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
 import rehypeExternalLinks from './src/lib/rehype-external-links.mjs';
 import rehypeImageDims from './src/lib/rehype-image-dims.mjs';
 import rehypeTableWrap from './src/lib/rehype-table-wrap.mjs';
+import assertCtaTagged from './src/lib/assert-cta-tagged.mjs';
 
 export default defineConfig({
   site: 'https://beanies.family',
@@ -58,6 +59,9 @@ export default defineConfig({
       // surface that must never be indexed or surfaced to a human via search.
       filter: (page) => !page.includes('/og/') && !page.includes('/oauth/'),
     }),
+    // Fails the build if any link into the app lacks data-cta. See the file
+    // header for why this is checked on built HTML rather than in lint.
+    assertCtaTagged(),
   ],
   vite: {
     // Cast around Vite version skew between Astro-bundled Vite and the
