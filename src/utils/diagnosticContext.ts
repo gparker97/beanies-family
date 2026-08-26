@@ -183,6 +183,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'credential_source',
   'unwrap_ok',
   'detail',
+  // Share target (surface `share-target-ingest`, #64). `file_count` is how many documents
+  // another app handed over (a small integer) and `cold_start` is whether the share LAUNCHED
+  // the app. Both are PII-free by construction — no filename, no MIME string, no content ever
+  // rides this surface. Added 2026-08-26. MIRROR in the Lambda allowlist + test.
+  'file_count',
+  'cold_start',
   // Native hardware-Keystore biometric (surface `native-biometric`, see
   // services/auth/nativeBiometric.ts). `key_backing` is a bounded enum
   // (strongbox|tee|keychain|secureEnclave) reporting which OS key backing was used —

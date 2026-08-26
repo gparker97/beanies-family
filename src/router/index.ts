@@ -315,6 +315,16 @@ const routes: RouteRecordRaw[] = [
   externalRedirect('/beanstalk', 'BeanstalkBlogLegacyRedirect'),
   externalRedirect('/beanstalk/:slug', 'BeanstalkPostLegacyRedirect'),
   {
+    // Web Share Target landing (#64). The service worker intercepts the POST and 303s here
+    // with an id; this page reads the stash and hands it to the shared ingest orchestrator.
+    // `requiresAuth` like every other content route — a signed-out share gets the standard
+    // readiness message rather than a special case.
+    path: '/share',
+    name: 'ShareTarget',
+    component: () => import('@/pages/ShareTargetPage.vue'),
+    meta: { requiresAuth: true, hideQuickAdd: true, noChrome: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),

@@ -8059,6 +8059,48 @@ const STRING_DEFS = {
   'photos.document.tileNamed': { en: 'PDF: {name}', beanie: 'pdf: {name}' },
 
   // AI document-extraction wedge (#133) — photo/invitation → prefilled activity.
+  // Share target (#64) — beanies as a share destination for another app's photo or PDF.
+  'shareTarget.busy.title': { en: 'Still Reading', beanie: 'still reading' },
+  'shareTarget.busy.message': {
+    en: 'beanies is still reading the last thing you shared. Try again in a moment.',
+    beanie: 'beanies is still reading the last thing you shared. try again in a moment.',
+  },
+  'shareTarget.signIn.title': { en: 'Sign In First', beanie: 'sign in first' },
+  'shareTarget.signIn.message': {
+    en: 'Open beanies and sign in, then share it again.',
+    beanie: 'open beanies and sign in, then share it again.',
+  },
+  'shareTarget.notReady.title': { en: 'Almost Ready', beanie: 'almost ready' },
+  'shareTarget.notReady.message': {
+    en: 'beanies is still counting your beans. Try sharing it again in a moment.',
+    beanie: 'beanies is still counting your beans. try sharing it again in a moment.',
+  },
+  'shareTarget.unsupported.title': { en: "Can't Read That", beanie: "can't read that" },
+  'shareTarget.unsupported.message': {
+    en: 'beanies can read photos, screenshots and PDFs.',
+    beanie: 'beanies can read photos, screenshots and pdfs.',
+  },
+  'shareTarget.unrecognised.title': {
+    en: 'Not Sure What That Is',
+    beanie: 'not sure what that is',
+  },
+  'shareTarget.unrecognised.message': {
+    en: "beanies couldn't work out whether that was an activity, a trip or a recipe. You can still add it yourself.",
+    beanie:
+      "beanies couldn't work out whether that was an activity, a trip or a recipe. you can still add it yourself.",
+  },
+  'shareTarget.readerOff.title': { en: 'Reader Unavailable', beanie: 'reader unavailable' },
+  'shareTarget.readerOff.message': {
+    en: "beanies worked out what that was, but that reader isn't switched on for your family, or isn't available to you.",
+    beanie:
+      "beanies worked out what that was, but that reader isn't switched on for your family, or isn't available to you.",
+  },
+  'shareTarget.failed.title': { en: "Couldn't Open That", beanie: "couldn't open that" },
+  'shareTarget.failed.message': {
+    en: 'beanies could not read what was shared. Try sharing it again.',
+    beanie: 'beanies could not read what was shared. try sharing it again.',
+  },
+  'shareTarget.failed.action': { en: 'Go to the Nook', beanie: 'go to the nook' },
   'ai.offline.title': { en: "You're Offline", beanie: "you're offline" },
   'ai.offline.message': {
     en: 'Connect to the internet and beanies can read this for you.',
@@ -8076,10 +8118,12 @@ const STRING_DEFS = {
   },
   // Shown when a long PDF is read: only its first pages are sent to the reader. Number-free
   // on purpose (so the copy never drifts from MAX_EXTRACT_PAGES).
+  // Page-source-neutral (#64): this now covers a long PDF AND too many shared photos, and
+  // says which one is kept — on a multi-file share only the first is attached.
   'ai.pdfTruncated.title': { en: 'Long Document', beanie: 'long document' },
   'ai.pdfTruncated.message': {
-    en: 'We read the first few pages of this PDF. The full document is still attached.',
-    beanie: 'we read the first few pages of this pdf. the full document is still attached.',
+    en: 'We read the first few pages. The first document is attached.',
+    beanie: 'we read the first few pages. the first document is attached.',
   },
   // ── Recipe capture (#72) — the third magic-beans reader ──
   'recipeExtract.notRecipe.title': { en: 'No Recipe Found', beanie: 'no recipe found' },
