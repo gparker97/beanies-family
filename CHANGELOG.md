@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - **Share a link to beanies.** Send a YouTube video, a recipe page or an event page from any app and beanies opens the page, works out what it is, and fills in the form. A recipe site that publishes its recipe properly comes through with the exact quantities.
+- **Sharing to beanies on iPhone now opens the app.** The share sheet accepted the item but returned you straight to where you were, with no sign anything had happened - the item was waiting silently until you next opened beanies yourself. It now opens beanies the way it does on Android.
 - **A video that only says the recipe out loud now starts the recipe for you.** Cooking Shorts often show the method rather than writing it down, and those used to come back with nothing. beanies now saves the recipe under the video's own name with the video kept as its source link, so you can type the ingredients in while you watch. Nothing is guessed — only the title is filled in.
 - **A freshly captured recipe no longer shows a broken photo.** Opening a recipe within a few seconds of saving it could show an empty frame with the title floating over it, because the photo had not finished uploading. It now waits and retries, showing the same "photo coming" frame it shows before the upload starts.
 - **Deleting a recipe returns you to the cookbook** instead of leaving you on a "recipe not found" page for the recipe you just deleted.
