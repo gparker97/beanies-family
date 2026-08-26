@@ -21,8 +21,11 @@ vi.mock('../providers/onDeviceProvider', () => ({
 // stays real-ish so the non-PDF tests take the single-image path without any rasterization.
 const mockPdfToExtractionImages = vi.fn();
 vi.mock('@/utils/pdfExtractionImages', () => ({
+  // The service reads the cap from this module, so the mock MUST export it — otherwise the
+  // page arithmetic silently becomes NaN and every cap assertion passes for the wrong reason.
+  MAX_EXTRACT_PAGES: 5,
   isPdfFile: (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name),
-  pdfToExtractionImages: (f: File) => mockPdfToExtractionImages(f),
+  pdfToExtractionImages: (f: File, maxPages?: number) => mockPdfToExtractionImages(f, maxPages),
 }));
 
 import { extractEventFromDocument } from '../documentExtractionService';
@@ -299,5 +302,143 @@ describe('extractEventFromDocument — failure classification', () => {
         grant: __testConsentGrant,
       })
     ).resolves.toMatchObject({ success: false });
+  });
+});
+
+/**
+ * SEVERAL documents read as ONE item (#64).
+ *
+ * The unit that matters is PAGES, not files: one shared PDF is many pages, so a file count
+ * would be the wrong cap. These assert the cap bites at the page level, that `truncated` is
+ * always reported rather than pages being dropped silently, and — the efficiency claim the
+ * plan makes — that NO compression work happens past the cap.
+ */
+describe('multi-document extraction (#64)', () => {
+  it('reads several images as the pages of one request, in order', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+
+    const res = await extractEventFromDocument([imgFile('a'), imgFile('b'), imgFile('c')], {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.truncated).toBe(false);
+    // ONE provider call carrying three image parts — not three calls.
+    expect(mockManagedExtract).toHaveBeenCalledTimes(1);
+    const source = mockManagedExtract.mock.calls[0][1].source;
+    expect(source.kind).toBe('images');
+    expect(source.kind === 'images' && source.imageDataUrls).toHaveLength(3);
+    // Compressed in the order supplied.
+    expect(mockCompress.mock.calls.map((c) => (c[0] as File).name)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('concatenates a PDF s pages with images, in file order', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+    mockPdfToExtractionImages.mockResolvedValue({
+      files: [imgFile('p1'), imgFile('p2')],
+      truncated: false,
+    });
+
+    const res = await extractEventFromDocument([pdfFile(), imgFile('after')], {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.success).toBe(true);
+    expect(mockCompress.mock.calls.map((c) => (c[0] as File).name)).toEqual(['p1', 'p2', 'after']);
+  });
+
+  it('caps at MAX_EXTRACT_PAGES, reports it, and does NO work past the cap', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+    const seven = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(imgFile);
+
+    const res = await extractEventFromDocument(seven, {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.success).toBe(true);
+    // Told, never silently dropped.
+    expect(res.truncated).toBe(true);
+    const source = mockManagedExtract.mock.calls[0][1].source;
+    expect(source.kind === 'images' && source.imageDataUrls).toHaveLength(5);
+    // The efficiency claim: five compressions for seven inputs, not seven.
+    expect(mockCompress).toHaveBeenCalledTimes(5);
+  });
+
+  it('asks the rasterizer only for the pages it can still use', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+    mockPdfToExtractionImages.mockResolvedValue({ files: [imgFile('p1')], truncated: true });
+
+    await extractEventFromDocument([imgFile('a'), imgFile('b'), imgFile('c'), pdfFile()], {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    // Three images already collected, so at most two pages remain worth rendering.
+    expect(mockPdfToExtractionImages).toHaveBeenCalledWith(expect.any(File), 2);
+  });
+
+  it('propagates a PDF s own truncation', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+    mockPdfToExtractionImages.mockResolvedValue({
+      files: [imgFile('p1'), imgFile('p2')],
+      truncated: true,
+    });
+
+    const res = await extractEventFromDocument([pdfFile()], {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.truncated).toBe(true);
+  });
+
+  it('keeps page 1 as the representative thumbnail', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+    const first = new Blob(['first'], { type: 'image/jpeg' });
+    mockCompress
+      .mockResolvedValueOnce({ blob: first, width: 1, height: 1, mime: 'image/jpeg' })
+      .mockResolvedValue(compressedOk());
+
+    const res = await extractEventFromDocument([imgFile('a'), imgFile('b')], {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.compressedBlob).toBe(first);
+  });
+
+  it('a single File still behaves exactly as before', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+
+    const res = await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.truncated).toBe(false);
+    expect(mockCompress).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies an empty document list as a compression failure rather than sending nothing', async () => {
+    const res = await extractEventFromDocument([], {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.errorCode).toBe('compression');
+    expect(mockManagedExtract).not.toHaveBeenCalled();
   });
 });
