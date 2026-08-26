@@ -17,6 +17,91 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.26',
+    date: '2026-08-26',
+    month: '26 august 2026',
+    spotlight: true,
+    summary: {
+      en: 'Share anything to beanies - a photo, a PDF, a recipe page or a video - and it works out what it is and fills in the form.',
+      beanie:
+        'share anything to beanies - a photo, a pdf, a recipe page or a video - and it works out what it is and fills in the form.',
+    },
+    features: [
+      {
+        title: {
+          en: 'Share to beanies from any app',
+          beanie: 'share to beanies from any app',
+        },
+        icon: '\u{1F4E4}',
+        description: {
+          en: "beanies now appears in your phone's share menu. Send it the school letter, the party invite, the flight confirmation or a recipe you spotted, and beanies reads it, works out whether it is an activity, a trip or a recipe, and opens the right form already filled in. Several photos of the same thing are read together as one item. Nothing is saved until you check it and confirm.",
+          beanie:
+            "beanies now appears in your phone's share menu. send it the school letter, the party invite, the flight confirmation or a recipe you spotted, and beanies reads it, works out whether it is an activity, a trip or a recipe, and opens the right form already filled in. several photos of the same thing are read together as one item. nothing is saved until you check it and confirm.",
+        },
+      },
+      {
+        title: {
+          en: 'Recipes from a link or a video',
+          beanie: 'recipes from a link or a video',
+        },
+        icon: '\u{1F373}',
+        description: {
+          en: 'Share a recipe page and beanies fills in the ingredients and steps, with the exact quantities when the site publishes them properly. Share a cooking video and it reads the recipe from the description or the blog post it links to. If the video only says the recipe out loud, beanies still starts it for you: saved under the video\u2019s own name with the video kept as its source link, so you can type the rest in while you watch.',
+          beanie:
+            'share a recipe page and beanies fills in the ingredients and steps, with the exact quantities when the site publishes them properly. share a cooking video and it reads the recipe from the description or the blog post it links to. if the video only says the recipe out loud, beanies still starts it for you: saved under the video\u2019s own name with the video kept as its source link, so you can type the rest in while you watch.',
+        },
+      },
+      {
+        title: {
+          en: 'Face ID and fingerprint unlock now work on iPhone',
+          beanie: 'face id and fingerprint unlock now work on iphone',
+        },
+        icon: '\u{1F510}',
+        description: {
+          en: 'Unlocking with Face ID or your fingerprint was quietly unavailable on iPhone and looked like your device did not support it. It does, and it now works.',
+          beanie:
+            'unlocking with face id or your fingerprint was quietly unavailable on iphone and looked like your device did not support it. it does, and it now works.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://discord.gg/NE4grWzjxV',
+        },
+      },
+    ],
+    fixes: [
+      {
+        text: {
+          en: 'The close button on a photo is reachable again on phones. It sat under the system clock, which took the taps, and there was no other way out of the photo. Pressing Escape closes it too.',
+          beanie:
+            'the close button on a photo is reachable again on phones. it sat under the system clock, which took the taps, and there was no other way out of the photo. pressing escape closes it too.',
+        },
+      },
+      {
+        text: {
+          en: 'A recipe opened moments after saving no longer shows an empty frame with the title floating over it. The photo was still uploading; beanies now waits for it and shows the same "photo coming" frame in the meantime.',
+          beanie:
+            'a recipe opened moments after saving no longer shows an empty frame with the title floating over it. the photo was still uploading; beanies now waits for it and shows the same "photo coming" frame in the meantime.',
+        },
+      },
+      {
+        text: {
+          en: 'Deleting a recipe takes you back to the cookbook, instead of leaving you on a "recipe not found" page for the one you just deleted.',
+          beanie:
+            'deleting a recipe takes you back to the cookbook, instead of leaving you on a "recipe not found" page for the one you just deleted.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.08.24',
     date: '2026-08-24',
     month: '24 august 2026',
