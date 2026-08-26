@@ -12,7 +12,7 @@
  * opens CookLogFormModal for a new entry; clicking an existing entry
  * edits it.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
@@ -143,8 +143,27 @@ function memberName(id?: string): string {
 }
 
 function onRecipeDeleted(): void {
-  router.push('/pod/cookbook');
+  void router.replace('/pod/cookbook');
 }
+
+/**
+ * Leave when the recipe this page is showing stops existing.
+ *
+ * The `@deleted` handler alone was not enough, and could not be: `RecipeFormModal` is
+ * rendered INSIDE `v-if="recipe"`, so deleting the recipe unmounts the modal, and its
+ * `deleted` emit could not reach a listener that no longer existed. The user was left
+ * staring at "recipe not found" for a recipe they had just deleted on purpose.
+ *
+ * Watching the recipe itself is the right level anyway — it also covers a delete that
+ * arrives from ANOTHER device over sync, which no emit would ever have caught.
+ *
+ * Guarded on `had`: on first load the store may still be hydrating and `recipe` is briefly
+ * undefined, which must not bounce the user off a page they just opened. Only a
+ * present-then-absent transition means "it is gone".
+ */
+watch(recipe, (now, before) => {
+  if (before && !now) void router.replace('/pod/cookbook');
+});
 </script>
 
 <template>
