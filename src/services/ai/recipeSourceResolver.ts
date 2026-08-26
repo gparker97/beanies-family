@@ -1,11 +1,16 @@
 /**
  * The recipe-capture LADDER (#72 phases 2 & 3), as one function with one return type.
  *
+ * TWO callers now (#64 links): `useRecipeCapture.processUrl` for a link the user pastes in
+ * the app, and `useSharedDocumentIngest.read` for a link shared from another app. Both must
+ * handle EVERY member of `ResolvedRecipeSource` — adding a rung is a compile error at each
+ * of their switches, which is exactly the point. Keep the two behaviours the same.
+ *
  * Lives here rather than inside `useRecipeCapture` on purpose: the ladder is four rungs with
  * fall-through, and putting it in a Vue composable that ALSO owns `isProcessing`, toasts and
  * the extraction call would nest three deep and be untestable without a component harness.
  * Split this way, the decision is a pure-ish function with an injectable dependency, and the
- * composable becomes a flat switch over four outcomes.
+ * composable becomes a flat switch over the outcomes.
  *
  * It decides WHAT to extract from. It never extracts, never persists, never toasts.
  */
@@ -39,6 +44,20 @@ export type ResolvedRecipeSource =
     }
   /** Text for the model to read. */
   | { kind: 'text'; text: string; path: ExtractionPath; sourceUrl: string; imageUrl: string }
+  /**
+   * A video we could reach, whose recipe exists only in the audio and pictures.
+   *
+   * Its captions are unreachable — not because we have not tried, but because YouTube gates
+   * every caption route behind a proof-of-origin token and answers without one by returning
+   * HTTP 200 and an EMPTY BODY. Verified 2026-08-26 across the Data API (`captions.download`
+   * needs OAuth AND video ownership), the public `timedtext` endpoint, the signed URL the
+   * watch page itself hands out, InnerTube (`Precondition check failed`), manual as well as
+   * auto tracks, and from a residential IP as well as from AWS. Every one returned nothing.
+   *
+   * So the title and the link are genuinely all there is — and they are still most of the
+   * admin. Handing them over beats throwing the capture away.
+   */
+  | { kind: 'titleOnly'; title: string; sourceUrl: string; path: ExtractionPath }
   /** We can read nothing, and saying so is the correct outcome. */
   | { kind: 'refusal'; reason: 'no_text_no_link' | 'not_a_recipe_url' }
   | { kind: 'failed'; errorCode: ExtractionErrorCode };
@@ -177,6 +196,18 @@ export async function resolveRecipeSource(
     };
   }
 
-  // Rung 4 — nothing readable. An explicit, user-visible refusal, never a silent no-op.
+  // Rung 4 — no readable recipe text anywhere. If we at least know what the video is
+  // CALLED, hand that over rather than dropping the capture: the user chose this video on
+  // purpose, and a named recipe carrying its link is most of the work of saving it.
+  if (title.trim()) {
+    return {
+      kind: 'titleOnly',
+      title: title.trim(),
+      sourceUrl: route.url,
+      path: 'youtube_description',
+    };
+  }
+
+  // Rung 5 — not even a title. An explicit, user-visible refusal, never a silent no-op.
   return { kind: 'refusal', reason: 'no_text_no_link' };
 }

@@ -435,6 +435,35 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
       }
       return classify(result.data, { sourceFile: null, link, origin: 'share' });
     }
+    case 'titleOnly': {
+      // Same fallback the pasted-link path takes: a named, linked recipe the user finishes
+      // themselves, rather than losing a capture they chose deliberately.
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'link resolved to a title only',
+        context: { action: 'resolved', extraction_path: resolved.path, detail: 'title_only' },
+      });
+      showToast('info', t('recipeExtract.titleOnly.title'), t('recipeExtract.titleOnly.message'));
+      return {
+        kind: 'recipe',
+        payload: {
+          kind: 'recipe',
+          source: { via: 'titleOnly', title: resolved.title },
+          env: {
+            sourceFile: null,
+            origin: 'share',
+            link: {
+              pageUrl: resolved.sourceUrl,
+              provenanceUrl: resolved.sourceUrl,
+              imageUrl: '',
+              path: resolved.path,
+              kind: 'youtube',
+            },
+          },
+        },
+      };
+    }
     case 'refusal': {
       // `not_a_recipe_url` is unreachable from here — the picker in `prepare` already used
       // `routeUrl` — but the switch stays exhaustive because the pasted-link path reaches it.
