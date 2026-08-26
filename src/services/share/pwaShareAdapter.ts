@@ -11,8 +11,9 @@
 import { Capacitor } from '@capacitor/core';
 import type { ShareAdapter } from './types';
 import type { ShareMeta } from '@/composables/useSharedDocumentIngest';
+import type { SharedContent } from './types';
 
-type Sink = (files: File[], meta: ShareMeta) => void;
+type Sink = (content: SharedContent, meta: ShareMeta) => void;
 
 let sink: Sink | null = null;
 
@@ -22,10 +23,10 @@ let sink: Sink | null = null;
  * Returns false when no sink is registered — the app shell has not mounted, which the route
  * reports rather than dropping the share.
  */
-export function deliverPwaShare(files: File[]): boolean {
+export function deliverPwaShare(content: SharedContent): boolean {
   if (!sink) return false;
   // A Web Share Target POST always LAUNCHES the PWA at /share, so it is always a cold start.
-  sink(files, { platform: 'pwa', coldStart: true });
+  sink(content, { platform: 'pwa', coldStart: true });
   return true;
 }
 

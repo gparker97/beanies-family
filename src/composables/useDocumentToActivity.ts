@@ -94,9 +94,13 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
     // compression pass. `blob.type` carries the mime. The base name is sanitised because on
     // the share path it originates in another app and reaches storage from here.
     const sourcePhoto = env.compressedBlob
-      ? new File([env.compressedBlob], `${sanitiseAttachmentBase(env.sourceFile.name)}.jpg`, {
-          type: env.compressedBlob.type || 'image/jpeg',
-        })
+      ? new File(
+          [env.compressedBlob],
+          `${sanitiseAttachmentBase(env.sourceFile?.name ?? 'shared')}.jpg`,
+          {
+            type: env.compressedBlob.type || 'image/jpeg',
+          }
+        )
       : undefined;
     options.onActivityReady({
       prefill: extractionToActivityPrefill(data),

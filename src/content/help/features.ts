@@ -1797,12 +1797,39 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Photos, screenshots and PDFs. beanies only appears in the share sheet for those, so if you are sharing something else \u2014 a link, a text file, a document from another app \u2014 you simply will not see beanies listed as a choice.',
+          'Photos, screenshots, PDFs \u2014 and links. Share a recipe page, an event page or a YouTube video and beanies opens the page, reads it, and fills in the form. Anything else, like a spreadsheet or a zip file, simply will not list beanies as a choice.',
       },
       {
         type: 'paragraph',
         content:
           'beanies decides for itself which of three things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), or a <strong>recipe</strong>. If it genuinely cannot tell, it says so instead of guessing \u2014 you can still add the item yourself.',
+      },
+      {
+        type: 'heading',
+        content: 'Sharing a link',
+        level: 2,
+        id: 'links',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Share a link the same way you share a photo \u2014 from the browser, from YouTube, from wherever it is. beanies opens the page, reads it, and works out whether it is an activity, a trip or a recipe.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Recipe pages</strong> often carry their recipe in a form beanies can read exactly \u2014 when they do, you get the real quantities and times, with nothing guessed at all.',
+          '<strong>YouTube videos</strong> are read from the description, not the video. If the cook put a link to their recipe in the description, beanies follows it \u2014 which is usually where the exact quantities live.',
+          '<strong>Pages behind a login or a paywall</strong> cannot be read. beanies will say so rather than guessing.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Sharing a photo with a caption? beanies reads the <strong>photo</strong> and ignores the caption \u2014 one share is always one item.',
+        title: 'Photos win over captions',
+        icon: '\u{1F4CE}',
       },
       {
         type: 'heading',

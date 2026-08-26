@@ -101,7 +101,7 @@ async function handleAddFromDocument(): Promise<void> {
 useMagicReaderConsumer(
   'recipe',
   (payload) => {
-    if (payload) capture.deliverRecipe(payload.data, payload.env);
+    if (payload) capture.deliverRecipe(payload.source, payload.env);
     else void handleAddFromDocument();
   },
   canReadRecipe

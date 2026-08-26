@@ -28,7 +28,6 @@ import {
 } from '@/services/ai/documentExtractionService';
 import { resolveRecipeSource, type ExtractionPath } from '@/services/ai/recipeSourceResolver';
 import { routeUrl } from '@/utils/recipeSourceUrl';
-import { isSameRegistrableDomain, safeHttpsUrl } from '@/utils/url';
 import { assertNever } from '@/utils/assertNever';
 import {
   jsonLdToPrefill,
@@ -39,8 +38,8 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
 import type { ConsentGrant } from './useDocumentConsent';
-import type { ResultEnvelope } from '@/types/magicPayload';
-import type { RecipeExtractionResult } from '@/services/ai/types';
+import type { RecipeShareSource, ResultEnvelope } from '@/types/magicPayload';
+import { boundedDishImage, toShareLink } from '@/utils/shareLink';
 import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
@@ -116,9 +115,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    * — the same shape as the incident the catch was originally added for: the spinner clears,
    * the modal never opens, the user is told nothing and CloudWatch records nothing.
    */
-  function deliverRecipe(data: RecipeExtractionResult, env: ResultEnvelope): void {
+  function deliverRecipe(source: RecipeShareSource, env: ResultEnvelope): void {
     try {
-      deliverRecipeInner(data, env);
+      deliverRecipeInner(source, env);
     } catch (err) {
       reportError({
         surface: SURFACE,
@@ -131,7 +130,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     }
   }
 
-  function deliverRecipeInner(data: RecipeExtractionResult, env: ResultEnvelope): void {
+  function deliverRecipeInner(source: RecipeShareSource, env: ResultEnvelope): void {
     // Drop anything held from a previous capture BEFORE claiming the new source, exactly as
     // `processFile` and `processUrl` do. Without it a shared recipe inherits the dish photo
     // of whatever was captured before it — `pendingDishImageUrl` in particular is set by the
@@ -145,21 +144,62 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
     }
 
-    const prefill = recipeExtractionToPrefill(data);
+    const link = env.link ?? null;
+    // `kind` and `path` come off the envelope so no caller passes them separately.
+    const kind = link?.kind ?? 'document';
+    const path: ExtractionPath = link?.path ?? 'document';
+
+    // THE PAGE URL, never the provenance URL. This argument is the same-registrable-domain
+    // bound on the dish image, not decoration: passing `provenanceUrl` for a video capture
+    // compares the blog's photo against youtube.com and silently drops every dish photo.
+    // The relabel to `provenanceUrl` happens AFTER mapping, below.
+    let prefill: RecipePrefill | null;
+    switch (source.via) {
+      case 'jsonld':
+        if (!link) {
+          // Unreachable: `read` only ever constructs `via: 'jsonld'` alongside a link. Throw
+          // rather than store an unprovenanced recipe — the caller's catch reports it.
+          throw new Error('deliverRecipe: a jsonld recipe arrived with no link');
+        }
+        // The model is NEVER invoked here — quantities come straight from the site's own
+        // structured data, so nothing can be hallucinated and nothing is inferred.
+        prefill = jsonLdToPrefill(source.recipe, link.pageUrl);
+        break;
+      case 'extraction':
+        prefill = recipeExtractionToPrefill(source.data, link?.pageUrl);
+        break;
+      default:
+        return assertNever(source, 'recipeShareSource');
+    }
+
     if (!prefill) {
       logEvent({
         level: 'info',
         surface: SURFACE,
         message: 'source was not a recipe',
-        context: { action: 'not_recipe', kind: 'document' },
+        context: {
+          action: 'not_recipe',
+          kind,
+          ...(link ? { extraction_path: path } : {}),
+        },
       });
       showToast('info', t('recipeExtract.notRecipe.title'), t('recipeExtract.notRecipe.message'));
       return;
     }
 
+    if (link) {
+      // Relabel AFTER mapping — see the note above. For a video we store the VIDEO the user
+      // shared, not the blog the ladder followed out of its description: they chose the
+      // video, they recognise it, and its description links the blog anyway.
+      prefill.fields.sourceUrl = link.provenanceUrl;
+      // USE the mapper's bounded value when it has one; otherwise screen the page's own
+      // image through the SAME bound rather than around it.
+      pendingDishImageUrl.value = boundedDishImage(link, prefill.dishImageUrl ?? null);
+    }
+
     pendingSource.value = env.sourceFile;
     pendingCompressed.value = env.compressedBlob ?? null;
-    handOver(prefill, 'document', 'document', env.sourceFile);
+    handOver(prefill, kind, path, env.sourceFile);
   }
 
   async function processFile(file: File, grant: ConsentGrant): Promise<void> {
@@ -199,11 +239,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         return;
       }
 
-      deliverRecipe(result.data, {
-        sourceFile: file,
-        compressedBlob: result.compressedBlob,
-        truncated: result.truncated,
-      });
+      deliverRecipe(
+        { via: 'extraction', data: result.data },
+        { sourceFile: file, compressedBlob: result.compressedBlob, truncated: result.truncated }
+      );
     } catch (err) {
       // NO SILENT FAILURES (docs/lessons.md). Every call site does `void capture.processX()`,
       // so without this a throw is an unhandled rejection: the spinner vanishes, the form is
@@ -270,43 +309,6 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     const route = routeUrl(rawUrl);
     const kind = route.kind === 'youtube' ? 'youtube' : 'page';
 
-    /**
-     * What to record as "where this came from".
-     *
-     * For a video we store the VIDEO the user pasted, not the blog we followed out of its
-     * description. They chose the video, they recognise it, and it is the artefact they will
-     * want back — the cook's technique is in it, and its description links the blog anyway.
-     *
-     * SAFETY: this only ever runs AFTER the prefill has been mapped, because `sourceUrl` does
-     * double duty — it is also the same-registrable-domain bound on the dish image. Applying
-     * it earlier would compare the image against youtube.com and silently reject every
-     * legitimate photo. Mapping first, relabelling second, keeps the bound honest.
-     */
-    const provenanceUrl = (readUrl: string): string =>
-      route.kind === 'youtube' ? route.url : readUrl;
-
-    /**
-     * Screen a page-supplied image URL the same way the mapper screens a model-supplied one.
-     *
-     * Both are attacker-authored — one by the page's markup, one by steering the model — and
-     * both are FETCHED server-side, so both get the same two checks: scheme/port, and the
-     * same registrable domain as the page we were asked to read. A rejection is logged
-     * rather than swallowed, because "recipes from this site never get photos" is otherwise
-     * indistinguishable from "this site has no photos".
-     */
-    const boundedImage = (imageUrl: string, pageUrl: string): string | null => {
-      if (!imageUrl) return null;
-      if (!isSameRegistrableDomain(imageUrl, pageUrl)) {
-        logEvent({
-          level: 'info',
-          surface: SURFACE,
-          message: 'dish image rejected by domain bound',
-          context: { action: 'image_rejected', kind },
-        });
-        return null;
-      }
-      return safeHttpsUrl(imageUrl);
-    };
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -324,16 +326,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
 
       switch (resolved.kind) {
         case 'jsonld': {
-          // The model is NEVER invoked here — quantities come straight from the site's own
-          // structured data, so nothing can be hallucinated and nothing is inferred.
-          const prefill = jsonLdToPrefill(resolved.recipe, resolved.sourceUrl);
-          prefill.fields.sourceUrl = provenanceUrl(resolved.sourceUrl);
-          // USE the mapper's bounded value. Re-deriving it with safeHttpsUrl alone throws
-          // away the same-domain check and leaves that control with no effective caller —
-          // a hostile page could then name any host as its image and we would fetch it.
-          pendingDishImageUrl.value =
-            prefill.dishImageUrl ?? boundedImage(resolved.imageUrl, resolved.sourceUrl);
-          handOver(prefill, kind, resolved.path, null);
+          deliverRecipe(
+            { via: 'jsonld', recipe: resolved.recipe },
+            { sourceFile: null, link: toShareLink(resolved, route) }
+          );
           return;
         }
         case 'text': {
@@ -353,36 +349,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             reportExtractionFailure(result.errorCode);
             return;
           }
-          const prefill = recipeExtractionToPrefill(result.data, resolved.sourceUrl);
-          if (!prefill) {
-            logEvent({
-              level: 'info',
-              surface: SURFACE,
-              message: 'source was not a recipe',
-              context: { action: 'not_recipe', kind, extraction_path: resolved.path },
-            });
-            showToast(
-              'info',
-              t('recipeExtract.notRecipe.title'),
-              t('recipeExtract.notRecipe.message')
-            );
-            return;
-          }
-          prefill.fields.sourceUrl = provenanceUrl(resolved.sourceUrl);
-          // The comment that used to sit here claimed dishImageUrl is null EXACTLY when the
-          // domain check rejected the URL. That was false, and it cost the feature: on this
-          // rung the model reads htmlToText output, which has every <img> stripped, and the
-          // prompt tells it to return '' when it has no real image. So the model's imageUrl
-          // is empty in the NORMAL case, dishImageUrl was always null, and no dish photo was
-          // ever attached from a page-text capture.
-          //
-          // The page's own og:image — which the Lambda already resolved against finalUrl —
-          // is the right source here. It is still attacker-authored, so it goes through the
-          // SAME bound rather than around it; that is what the old comment was protecting,
-          // and dropping the value entirely was never the way to protect it.
-          pendingDishImageUrl.value =
-            prefill.dishImageUrl ?? boundedImage(resolved.imageUrl, resolved.sourceUrl);
-          handOver(prefill, kind, resolved.path, null);
+          deliverRecipe(
+            { via: 'extraction', data: result.data },
+            { sourceFile: null, link: toShareLink(resolved, route) }
+          );
           return;
         }
         case 'refusal': {

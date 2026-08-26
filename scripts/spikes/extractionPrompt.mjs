@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-08-26.1';
+export const PROMPT_VERSION = '2026-08-26.2';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -323,13 +323,13 @@ export const SHARE_REQUIRED_KEYS = ['kind'];
  */
 export function buildShareExtractionMessages(source, todayIso) {
   const system = [
-    'You are given one or more images — the pages of a SINGLE document that someone shared from another app. It may be an invitation or school notice, a travel booking, or a recipe.',
+    'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, or a recipe.',
     'First decide which ONE of these the document is, then extract it.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
     'Set kind="none" if the document is none of the three. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
     'Include ONLY the nested object matching your chosen kind. Omit the other two entirely.',
-    'Never output any value that is not actually supported by the images. An empty field is ALWAYS better than an invented one.',
+    'Never output any value that is not actually supported by the source. An empty field is ALWAYS better than an invented one.',
     'The JSON object must have exactly these keys: ' +
       Object.keys(SHARE_JSON_SHAPE).join(', ') +
       '.',
@@ -379,9 +379,11 @@ export const EXTRACTION_TASKS = {
     buildMessages: buildShareExtractionMessages,
     requiredKeys: SHARE_REQUIRED_KEYS,
     jsonShape: SHARE_JSON_SHAPE,
-    // Images only. The share path never sends free text, and this `sources` fence is what
-    // stops this soft-keyed task becoming a general text endpoint.
-    sources: ['images'],
+    // Images AND text. The text arm carries a page or video already fetched by
+    // content-fetch (behind its SSRF guard) — never raw user input, and never the bare URL.
+    // The `sources` fence still applies: `event` and `travel` stay images-only, so this is
+    // not a general text endpoint. Same fence the recipe task already sits behind.
+    sources: ['images', 'text'],
   },
   recipe: {
     buildMessages: buildRecipeExtractionMessages,

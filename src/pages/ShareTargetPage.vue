@@ -34,8 +34,8 @@ onMounted(async () => {
   }
 
   try {
-    const files = await readAndClearShareStash(id);
-    if (files.length === 0 || !deliverPwaShare(files)) {
+    const content = await readAndClearShareStash(id);
+    if ((content.files.length === 0 && !content.text) || !deliverPwaShare(content)) {
       failed.value = true;
       return;
     }

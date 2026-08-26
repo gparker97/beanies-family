@@ -331,16 +331,39 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(res.parsedBody.result.kind, 'event');
     });
 
-    it('refuses TEXT for the share task, which is images-only', async () => {
-      // The soft x-api-key ships in the public bundle, so an unfenced free-text task would
-      // turn this proxy into a general text endpoint anyone could bill us for.
-      const res = await handler(
-        makeEvent({
-          headers: keyHeader,
-          body: { task: 'share', text: 'hello', todayIso: '2026-06-03' },
-        })
+    it('accepts TEXT for the share task (#64 links)', async () => {
+      // Shared LINKS send the page content that content-fetch already retrieved — never the
+      // bare URL, and never raw user input.
+      globalThis.fetch = async () =>
+        fakeUpstream({ content: JSON.stringify({ kind: 'event', event: VALID_EXTRACTION }) });
+      const res = parseResponse(
+        await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: { task: 'share', text: 'a page about a school fair', todayIso: '2026-06-03' },
+          })
+        )
       );
-      assert.equal(res.statusCode, 400);
+      assert.equal(res.statusCode, 200);
+    });
+
+    it('still refuses TEXT for images-only tasks, with a machine-readable code', async () => {
+      // The fence is what stops the soft x-api-key — which ships in the public bundle —
+      // buying a general text endpoint. `event` and `travel` never accept text.
+      for (const task of ['event', 'travel']) {
+        const res = parseResponse(
+          await handler(
+            makeEvent({
+              headers: keyHeader,
+              body: { task, text: 'hello', todayIso: '2026-06-03' },
+            })
+          )
+        );
+        assert.equal(res.statusCode, 400, `${task} must refuse text`);
+        // Same code as the unknown-task rejection, so a client deployed ahead of this Lambda
+        // shows the friendly "not set up yet" notice rather than a generic error.
+        assert.equal(res.parsedBody.code, 'unknown_task', `${task} must carry the code`);
+      }
     });
 
     it('validates travel required-keys (502 on wrong shape for travel task)', async () => {

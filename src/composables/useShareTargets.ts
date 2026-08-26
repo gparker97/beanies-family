@@ -6,7 +6,7 @@
 
 import { onMounted, onUnmounted } from 'vue';
 import { SHARE_ADAPTERS } from '@/services/share';
-import { ingestSharedDocuments } from './useSharedDocumentIngest';
+import { ingestSharedContent } from './useSharedDocumentIngest';
 import { reportError } from '@/utils/errorReporter';
 
 export function useShareTargets(): void {
@@ -17,8 +17,8 @@ export function useShareTargets(): void {
       try {
         if (!adapter.isSupported()) continue;
         teardowns.push(
-          adapter.start((files, meta) => {
-            void ingestSharedDocuments(files, meta);
+          adapter.start((content, meta) => {
+            void ingestSharedContent(content, meta);
           })
         );
       } catch (err) {

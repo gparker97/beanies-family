@@ -69,6 +69,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
                 <data android:mimeType="application/pdf" />
+                <!-- Links (#64 links). YouTube, browsers and most apps share a URL as
+                     text/plain, not as a file. Declared on ACTION_SEND ONLY: a multi-item
+                     text share is not a thing anyone does, and every declared type is
+                     exported attack surface. -->
+                <data android:mimeType="text/plain" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />

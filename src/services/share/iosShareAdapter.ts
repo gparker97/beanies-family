@@ -36,9 +36,15 @@ export const iosShareAdapter: ShareAdapter = {
       try {
         const { files } = await ShareIntent.consume();
         if (disposed || files.length === 0) return;
+        // No text branch here on purpose: iOS hands a shared URL over as a `.txt` file, and
+        // the orchestrator normalises that once for every platform. `share/types.ts` asks
+        // adapters to make no decisions, and this is one.
         onShare(
-          files.map((f) => base64ToFile(f.data, f.name, f.type)),
-          { platform: 'ios', coldStart }
+          { files: files.map((f) => base64ToFile(f.data, f.name, f.type)) },
+          {
+            platform: 'ios',
+            coldStart,
+          }
         );
       } catch (err) {
         reportError({

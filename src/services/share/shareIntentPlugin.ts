@@ -34,6 +34,8 @@ export interface ShareIntentPlugin {
    */
   consume(): Promise<{
     files: SharedNativeFile[];
+    /** Sender-attached text (a link, or prose around one). Android only. */
+    text?: string;
     coldStart?: boolean;
     offered?: number;
     read?: number;
