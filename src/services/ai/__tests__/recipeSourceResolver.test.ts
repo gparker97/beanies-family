@@ -143,23 +143,39 @@ describe('the youtube ladder', () => {
     expect(r.text).toContain('no links here');
   });
 
-  it('RUNG 4: REFUSES on a boilerplate description with no link — writes nothing', async () => {
-    // The headline behaviour greg asked for: never reconstruct a recipe from a title.
+  it('RUNG 4: a boilerplate description falls back to the TITLE, and only the title', async () => {
+    // The original rule stands — never RECONSTRUCT a recipe from a title. This carries the
+    // title across as a name with the link, and nothing else: no ingredients, no steps, no
+    // guessing. The user finishes it while they watch, instead of losing the capture.
     const fetchService = svc({
       fetchYoutube: vi.fn().mockResolvedValue(video({ description: 'like & sub' })),
+    });
+    const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
+    expect(r).toEqual({
+      kind: 'titleOnly',
+      title: 'Best Lemon Cake',
+      sourceUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      path: 'youtube_description',
+    });
+  });
+
+  it('RUNG 5: with no title EITHER, it still refuses — the fallback invents nothing', async () => {
+    // The floor under rung 4. A blank title must not become a blank-named recipe.
+    const fetchService = svc({
+      fetchYoutube: vi.fn().mockResolvedValue(video({ title: '   ', description: 'like & sub' })),
     });
     const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
     expect(r).toEqual({ kind: 'refusal', reason: 'no_text_no_link' });
   });
 
-  it('a description too short to hold a recipe is refused, not sent to the model', async () => {
+  it('a description too short to hold a recipe is never sent to the model', async () => {
     // Guards the threshold itself: 199 chars of prose must not become a model call whose
-    // only possible answer is "not a recipe".
+    // only possible answer is "not a recipe". Falling back to the title costs no call.
     const fetchService = svc({
       fetchYoutube: vi.fn().mockResolvedValue(video({ description: 'a'.repeat(199) })),
     });
     const r = await resolveRecipeSource('https://youtu.be/dQw4w9WgXcQ', { fetchService });
-    expect(r).toEqual({ kind: 'refusal', reason: 'no_text_no_link' });
+    expect(r.kind).toBe('titleOnly');
   });
 
   it('ignores social/affiliate links so they cannot burn the fetch budget', async () => {

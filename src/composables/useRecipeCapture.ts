@@ -180,6 +180,20 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       case 'extraction':
         prefill = recipeExtractionToPrefill(source.data, link?.pageUrl);
         break;
+      case 'titleOnly':
+        // Deliberately the ONLY fabricated prefill in this file, and it fabricates nothing:
+        // the name is the video's own title and everything else is left empty for the user.
+        // Confidence is 1 on the name because it is quoted, not inferred, and 0 elsewhere
+        // because there is nothing there — the review form reads these to decide what to
+        // flag for checking.
+        prefill = {
+          fields: { name: source.title, ingredients: [], steps: [] },
+          inferredIngredients: [],
+          inferredSteps: [],
+          dishImageUrl: null,
+          confidence: { name: 1, ingredients: 0, steps: 0 },
+        };
+        break;
       default:
         return assertNever(source, 'recipeShareSource');
     }
@@ -364,6 +378,30 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           deliverRecipe(
             { via: 'extraction', data: result.data },
             { sourceFile: null, link: toShareLink(resolved, route) }
+          );
+          return;
+        }
+        case 'titleOnly': {
+          // The video's recipe is only spoken aloud. Hand over what we do know — the name
+          // and the link — and tell the user plainly why the rest is blank, so an empty
+          // form does not read as a failure.
+          showToast(
+            'info',
+            t('recipeExtract.titleOnly.title'),
+            t('recipeExtract.titleOnly.message')
+          );
+          deliverRecipe(
+            { via: 'titleOnly', title: resolved.title },
+            {
+              sourceFile: null,
+              link: {
+                pageUrl: resolved.sourceUrl,
+                provenanceUrl: resolved.sourceUrl,
+                imageUrl: '',
+                path: resolved.path,
+                kind: 'youtube',
+              },
+            }
           );
           return;
         }
