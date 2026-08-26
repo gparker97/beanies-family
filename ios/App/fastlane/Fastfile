@@ -64,16 +64,24 @@ platform :ios do
     # CODE_SIGN_IDENTITY=Apple Distribution instead is rejected as a conflict with
     # CODE_SIGN_STYLE=Automatic. Both verified on CI; unsigned is the only way through.
     #
-    # These are exactly the settings gym's `skip_codesigning: true` passes, MINUS
-    # CODE_SIGN_ENTITLEMENTS=''. That one omission is the entire point of this lane's
-    # shape: with it, the archived app requested no entitlements at all, `-exportArchive`
-    # signed it with the minimal set it could infer, and the shipped binary silently
-    # lacked both app-groups and associated-domains while the profile happily granted
-    # them. Sharing on iPhone was dead for three releases and nothing anywhere failed.
+    # The flag combination matters in a way that is easy to get subtly wrong - three
+    # variants were measured on CI before this one:
+    #
+    #   CODE_SIGNING_ALLOWED=NO  also skips ProcessProductPackaging, which is the step
+    #   that writes the entitlements into the archive. So it is not enough to merely stop
+    #   blanking CODE_SIGN_ENTITLEMENTS: with signing disallowed the archive comes out
+    #   entitlement-free anyway, and the export then signs the minimal set it can infer.
+    #   Measured: the exported binary still lacked app-groups.
+    #
+    # So packaging is ALLOWED to run (entitlements get written) while signing is merely
+    # not REQUIRED and no identity is given, and the style is Manual with no profile so
+    # nothing contacts Apple looking for one. That yields an archive that is unsigned but
+    # carries App/App.entitlements - which is exactly what phase 2 needs to sign against.
     sh(
       "xcodebuild -project '#{project}' -scheme App -configuration Release " \
       "-destination 'generic/platform=iOS' -archivePath '#{archive}' archive " \
-      "CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' " \
+      "CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' " \
+      "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='' " \
       "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
       "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
       "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}"
