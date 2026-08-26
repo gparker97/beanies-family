@@ -85,11 +85,32 @@ platform :ios do
     )
   end
 
+  # Assert the SHIPPED binaries still carry the app-group entitlement.
+  #
+  # Runs BEFORE either upload, so a build that cannot share never consumes a TestFlight
+  # build number and never costs a test cycle. It is here rather than as a workflow step
+  # because build and upload are one `fastlane` invocation — a step after it would only
+  # ever run once the broken build was already on TestFlight.
+  #
+  # This exists because the entitlement can be silently dropped between the .entitlements
+  # file and the user's phone (the archive is built with CODE_SIGN_ENTITLEMENTS='' and the
+  # profile is resolved at export), and nothing else on the path checks. See the script
+  # header — three builds shipped before CloudWatch caught it.
+  private_lane :verify_entitlements do
+    # ABSOLUTE paths, resolved from this file's own location: `sh` runs in the Fastfile's
+    # directory (ios/App/fastlane), which is three levels below the repo root, and a
+    # relative path that is wrong by one level fails the release for the wrong reason.
+    script = File.expand_path("../../../scripts/check-ios-entitlements.sh", __dir__)
+    ipa = File.expand_path("../#{IPA_PATH}", __dir__)
+    sh("bash '#{script}' '#{ipa}'")
+  end
+
   # ── Lanes ─────────────────────────────────────────────────────────────────
 
   desc "Build the Release IPA and upload it to TestFlight (internal testers)"
   lane :beta do
     build_ipa
+    verify_entitlements
     upload_to_testflight(
       api_key: asc_api_key,
       ipa: IPA_PATH,
@@ -142,6 +163,7 @@ platform :ios do
     promo_opts = promo_text.empty? ? {} : { promotional_text: { "en-US" => promo_text } }
 
     build_ipa
+    verify_entitlements
     upload_to_app_store(
       api_key: asc_api_key,
       ipa: IPA_PATH,
