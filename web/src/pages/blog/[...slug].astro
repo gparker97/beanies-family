@@ -116,6 +116,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   description={post.data.excerpt}
   canonicalPath={canonicalPath}
   ogImage={ogImageUrl}
+  ogImageAlt={`${post.data.title} — the beanstalk`}
   ogType="article"
   publishedTime={post.data.date.toISOString()}
   author={post.data.author}

@@ -28,7 +28,12 @@ interface Props {
   description: string;
   /** Canonical path starting with "/" (the site URL is prepended). Defaults to current pathname. */
   canonicalPath?: string;
+  /** Absolute URL of the social preview image. Must be 1200x630 and opaque —
+   *  a transparent PNG is flattened to black by Bluesky, and a square one is
+   *  centre-cropped. Defaults to the brand card. */
   ogImage?: string;
+  /** Alt text for the social preview image. */
+  ogImageAlt?: string;
   ogType?: 'website' | 'article';
   /** Article-specific OG fields (used on blog posts). */
   publishedTime?: string;
@@ -56,7 +61,8 @@ const {
   title,
   description,
   canonicalPath = Astro.url.pathname,
-  ogImage = `${SITE_URL}/brand/beanies-logo.png`,
+  ogImage = `${SITE_URL}/brand/og-default.png`,
+  ogImageAlt = 'the beanies family, hugging',
   ogType = 'website',
   publishedTime,
   modifiedTime,
@@ -89,6 +95,10 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       noindex={noindex}
       openGraph={{
         basic: { title, type: ogType, image: ogImage, url: canonical },
+        // Both the default card and the generated blog cards are 1200x630.
+        // Declaring the size lets a client lay the card out before the image
+        // has finished downloading.
+        image: { width: 1200, height: 630, alt: ogImageAlt },
         optional: { description, siteName: 'beanies.family', locale: 'en_US' },
         article:
           ogType === 'article'
@@ -105,6 +115,7 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
         title,
         description,
         image: ogImage,
+        imageAlt: ogImageAlt,
       }}
     />
     <JsonLd data={[...globalLd, ...extraLd]} />

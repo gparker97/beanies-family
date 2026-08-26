@@ -1,0 +1,140 @@
+<!-- Approved design: direction 1, "horizon". The shipped card is now rendered
+     by web/scripts/render-social-card.mjs, which is the source of truth for the
+     final layout; this file is the design record that led to it. Two details
+     changed after approval, both because they failed at real reply size: the
+     scattered faint beans read as smudges and were cut, and the horizon
+     hairline became a soft ground shadow. -->
+<title>Social Card Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--cloud:#F8F9FA;--silk-wash:#EDF6FC;--slate:#2C3E50;--orange:#F15D22;--terra:#E67E22;--sky:#AED6F1;
+--bg:#fff;--ink:#2C3E50;--muted:#5b6b7a;--line:#e3e8ed;--panel:#fbfcfd;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13171c;--ink:#e8edf2;--muted:#9fb0bf;--line:#29313a;--panel:#181d23;}}
+:root[data-theme="dark"]{--bg:#13171c;--ink:#e8edf2;--muted:#9fb0bf;--line:#29313a;--panel:#181d23;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:3rem 1.5rem 6rem}
+.wrap{max-width:1120px;margin:0 auto}
+h1{font-family:Outfit,sans-serif;font-weight:800;font-size:2.1rem;letter-spacing:-.025em;margin:0 0 .5rem}
+.lede{color:var(--muted);max-width:64ch;margin:0 0 1rem;font-size:1.02rem}
+h2{font-family:Outfit,sans-serif;font-weight:700;font-size:1.3rem;letter-spacing:-.015em;margin:0 0 .3rem}
+.eyebrow{font-family:Inter,sans-serif;font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin:0 0 .35rem}
+.note{color:var(--muted);font-size:.93rem;margin:0 0 1.2rem;max-width:72ch}
+section{margin:3.5rem 0 0;padding:2rem 0 0;border-top:1px solid var(--line)}
+.tag{display:inline-block;font-size:.68rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 .5rem}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frame{border:1px solid var(--line);border-radius:20px;overflow:hidden;width:max-content;max-width:100%;box-shadow:0 2px 14px rgba(44,62,80,.06)}
+.clip{overflow:hidden}
+.card{width:1200px;height:630px;position:relative;overflow:hidden;transform-origin:top left;background:var(--cloud);flex:none}
+.big{height:394px}.big .card{transform:scale(.6283)}
+.sm{height:289px}.sm .card{transform:scale(.4592)}
+
+/* card internals */
+.sky{position:absolute;inset:0;background:linear-gradient(180deg,#F8F9FA 0%,#EDF6FC 52%,#F8F9FA 100%)}
+.warm{position:absolute;width:900px;height:900px;left:-300px;bottom:-420px;border-radius:50%;
+background:radial-gradient(circle,rgba(241,93,34,.16) 0%,rgba(241,93,34,0) 70%)}
+.warm--soft{left:50%;bottom:-560px;transform:translateX(-50%);width:1100px;height:1100px;
+background:radial-gradient(circle,rgba(230,126,34,.13) 0%,rgba(230,126,34,0) 68%)}
+.glyph{position:absolute;opacity:.07;line-height:1}
+.art{position:absolute;display:block}
+.art--horizon{width:470px;right:96px;top:52%;transform:translateY(-50%);filter:drop-shadow(0 24px 44px rgba(44,62,80,.17))}
+.art--portrait{width:430px;left:50%;top:44%;transform:translate(-50%,-50%);filter:drop-shadow(0 24px 46px rgba(44,62,80,.16))}
+.horizon{position:absolute;left:88px;right:88px;bottom:150px;height:2px;
+background:linear-gradient(90deg,rgba(44,62,80,.14),rgba(44,62,80,.05) 62%,rgba(44,62,80,0))}
+.lockup{position:absolute}
+.lockup--left{left:88px;bottom:70px}
+.lockup--center{left:0;right:0;bottom:74px;text-align:center}
+.word{font-family:Outfit,sans-serif;font-weight:700;font-size:60px;letter-spacing:-.03em;line-height:1}
+.w1{color:var(--slate)}.w2{color:var(--orange)}
+.beans{display:flex;gap:11px;margin:0 0 20px}
+.beans--center{justify-content:center;margin:22px 0 0}
+.bean{width:26px;height:34px;border-radius:50% 50% 48% 48%/56% 56% 44% 44%;display:block}
+
+/* the broken current card */
+.broken{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center}
+.broken img{width:630px;height:630px;object-fit:cover;display:block}
+
+/* bluesky chrome */
+.bsky{width:552px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.bmeta{padding:11px 14px 12px}
+.bt{font-weight:700;font-size:.93rem;margin:0 0 3px}
+.bd{font-size:.83rem;color:var(--muted);margin:0 0 9px}
+.bu{font-size:.76rem;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;margin:0}
+.row{display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start}
+</style>
+<div class="wrap">
+<h1>social preview card &mdash; two directions</h1>
+<p class="lede">Both sit on the landing hero's exact gradient, both are opaque, and neither repeats the headline &mdash; the platform already prints the title and description beneath the image. Each is shown full size, then at the width it actually renders in a Bluesky reply, which is the only size that matters.</p>
+
+<section>
+<p class="eyebrow">today</p>
+<h2>what is shipping now</h2>
+<p class="note">A 400&times;400 transparent PNG. Bluesky flattens the transparency to black, centre-crops the square to 1.91:1 &mdash; taking the top and bottom off the beans &mdash; then upscales it 3&times;.</p>
+<div class="row"><div class="bsky"><div class="clip sm"><div class="card "><div class="broken"><img src="../../web/public/brand/beanies-logo.webp" alt=""></div></div></div>
+<div class="bmeta"><p class="bt">beanies.family - every bean counts</p>
+<p class="bd">one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense.</p>
+<p class="bu">&#9432; beanies.family</p></div></div></div>
+</section>
+
+<section>
+<p class="eyebrow">direction 1</p>
+<h2>horizon</h2>
+<p class="note">The family sits right of centre above a soft horizon line, with the lockup on a left baseline. Because the platform prints its title directly under the image, that title line reads as completing the composition rather than sitting under a finished poster. The four beans run in their mandated order &mdash; Slate, Terracotta, Orange, Sky Silk.</p>
+<span class="tag">1200 &times; 630</span>
+<div class="stage"><div class="frame clip big"><div class="card">
+<div class="sky"></div>
+<div class="glyph" style="left:7%;top:14%;font-size:44px;transform:rotate(-15deg)">&#129754;</div>
+<div class="glyph" style="right:9%;top:22%;font-size:32px;transform:rotate(20deg)">&#129754;</div>
+<div class="glyph" style="left:16%;top:56%;font-size:28px;transform:rotate(-28deg)">&#129754;</div>
+<div class="warm"></div>
+<img class="art art--horizon" src="../../web/public/brand/beanies_family_hugging_transparent_1024x1024.webp" alt="">
+<div class="horizon"></div>
+<div class="lockup lockup--left">
+  <div class="beans"><span class="bean" style="background:#2C3E50"></span><span class="bean" style="background:#E67E22"></span><span class="bean" style="background:#F15D22"></span><span class="bean" style="background:#AED6F1"></span></div>
+  <div class="word"><span class="w1">beanies</span><span class="w2">.family</span></div>
+</div></div></div></div>
+<span class="tag" style="display:block;margin-top:1.4rem">in a reply</span>
+<div class="row"><div class="bsky"><div class="clip sm"><div class="card ">
+<div class="sky"></div>
+<div class="glyph" style="left:7%;top:14%;font-size:44px;transform:rotate(-15deg)">&#129754;</div>
+<div class="glyph" style="right:9%;top:22%;font-size:32px;transform:rotate(20deg)">&#129754;</div>
+<div class="glyph" style="left:16%;top:56%;font-size:28px;transform:rotate(-28deg)">&#129754;</div>
+<div class="warm"></div>
+<img class="art art--horizon" src="../../web/public/brand/beanies_family_hugging_transparent_1024x1024.webp" alt="">
+<div class="horizon"></div>
+<div class="lockup lockup--left">
+  <div class="beans"><span class="bean" style="background:#2C3E50"></span><span class="bean" style="background:#E67E22"></span><span class="bean" style="background:#F15D22"></span><span class="bean" style="background:#AED6F1"></span></div>
+  <div class="word"><span class="w1">beanies</span><span class="w2">.family</span></div>
+</div></div></div>
+<div class="bmeta"><p class="bt">beanies.family - every bean counts</p>
+<p class="bd">one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense.</p>
+<p class="bu">&#9432; beanies.family</p></div></div></div>
+</section>
+
+<section>
+<p class="eyebrow">direction 2</p>
+<h2>portrait</h2>
+<p class="note">Centred and symmetrical: the family above, wordmark below, beans as a quiet rule beneath it. Calmer and more logo-like &mdash; the safer of the two, and the closest to the hero as it stands. No floating glyphs; the art carries it alone.</p>
+<span class="tag">1200 &times; 630</span>
+<div class="stage"><div class="frame clip big"><div class="card">
+<div class="sky"></div>
+<div class="warm warm--soft"></div>
+<img class="art art--portrait" src="../../web/public/brand/beanies_family_hugging_transparent_1024x1024.webp" alt="">
+<div class="lockup lockup--center">
+  <div class="word"><span class="w1">beanies</span><span class="w2">.family</span></div>
+  <div class="beans beans--center"><span class="bean" style="background:#2C3E50"></span><span class="bean" style="background:#E67E22"></span><span class="bean" style="background:#F15D22"></span><span class="bean" style="background:#AED6F1"></span></div>
+</div></div></div></div>
+<span class="tag" style="display:block;margin-top:1.4rem">in a reply</span>
+<div class="row"><div class="bsky"><div class="clip sm"><div class="card ">
+<div class="sky"></div>
+<div class="warm warm--soft"></div>
+<img class="art art--portrait" src="../../web/public/brand/beanies_family_hugging_transparent_1024x1024.webp" alt="">
+<div class="lockup lockup--center">
+  <div class="word"><span class="w1">beanies</span><span class="w2">.family</span></div>
+  <div class="beans beans--center"><span class="bean" style="background:#2C3E50"></span><span class="bean" style="background:#E67E22"></span><span class="bean" style="background:#F15D22"></span><span class="bean" style="background:#AED6F1"></span></div>
+</div></div></div>
+<div class="bmeta"><p class="bt">beanies.family - every bean counts</p>
+<p class="bd">one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense.</p>
+<p class="bu">&#9432; beanies.family</p></div></div></div>
+</section>
+</div>
