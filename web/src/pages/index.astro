@@ -304,7 +304,7 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
         </p>
 
         <p class="reveal">
-          Treat <a href={`${APP_URL}/create`} class="story__link">beanies.family</a> like a
+          Treat <a href={`${APP_URL}/create`} class="story__link" data-cta="CTA: Create Pod" data-cta-loc="story-inline">beanies.family</a> like a
           friend, and it will reward you in spades. Maybe it'll even buy you a beer the next time
           you can spare 22 minutes after work and have $7 saved from meticulously tracking your
           budget every month. (Is that how much beers cost nowadays? I wouldn't know.)
@@ -318,7 +318,7 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 
         <p class="reveal">
           If you want the cloud version so you can share it with your family (don't worry, your data
-          still stays with you), <a href={`${APP_URL}/create`} class="story__link">create your family's private beanpod</a>. You could also set
+          still stays with you), <a href={`${APP_URL}/create`} class="story__link" data-cta="CTA: Create Pod" data-cta-loc="story-inline">create your family's private beanpod</a>. You could also set
           up the infra by yourself (and pay for it), but that's a pain and you know it.
         </p>
 
@@ -336,11 +336,11 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 
         <p class="reveal">
           So there it is. If you're a techie nerd like me, run it locally. If you don't want to deal
-          with the bs, use <a href={`${APP_URL}/create`} class="story__link">beanies.family</a>.
+          with the bs, use <a href={`${APP_URL}/create`} class="story__link" data-cta="CTA: Create Pod" data-cta-loc="story-inline">beanies.family</a>.
         </p>
 
         <p class="reveal">
-          I'm using <a href={`${APP_URL}/create`} class="story__link">beanies</a> to track our
+          I'm using <a href={`${APP_URL}/create`} class="story__link" data-cta="CTA: Create Pod" data-cta-loc="story-inline">beanies</a> to track our
           money, our various (1) houses, our (0) boats, my wife's (currently missing) diamond ring
           (ask my wife where she lost hers.. unfortunately beanies can't tell you that), and more.
           I'll use it even more for their piano lessons, soccer practices, school plays that, as a
@@ -394,7 +394,12 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
           it's free. run it locally or login below. yes, it's really free. probably not forever.
         </p>
         <div style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center" class="reveal">
-          <a class="btn-primary" href={`${APP_URL}/welcome`}>create your bean pod 🫘</a>
+          <a
+            class="btn-primary"
+            href={`${APP_URL}/welcome`}
+            data-cta="CTA: Create Pod"
+            data-cta-loc="homepage-final">create your bean pod 🫘</a
+          >
           <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener" class="btn-secondary">view on GitHub</a>
         </div>
       </div>
@@ -440,7 +445,11 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 </BaseLayout>
 
 <script>
-  // NOTE: Set PUBLIC_CONTACT_WEBHOOK_URL at build time via .env or GitHub Actions secret.
+  // NOTE: Set PUBLIC_CONTACT_WEBHOOK_URL at build time via .env or the GitHub Actions
+  // repository VARIABLE `CONTACT_WEBHOOK_URL` (see .github/workflows/deploy-web.yml).
+  // It is a repo variable, not a secret: the value is inlined into this client-side
+  // bundle at build time and is therefore public either way — a secret only added
+  // rotation friction. Treat the webhook as public and rate-limited accordingly.
   const WEBHOOK_URL = import.meta.env.PUBLIC_CONTACT_WEBHOOK_URL as string | undefined;
 
   const backToTop = document.getElementById('back-to-top') as HTMLButtonElement | null;
