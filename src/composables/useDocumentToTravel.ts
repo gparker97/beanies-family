@@ -45,7 +45,7 @@ export interface TravelReady {
   /** Suggested destination-based name for the new-trip case (may be ''). */
   suggestedTripName: string;
   /** The ORIGINAL uploaded file (image or PDF), attached to the created segment(s). */
-  sourceFile: File;
+  sourceFile: File | null;
 }
 
 export interface UseDocumentToTravelOptions {

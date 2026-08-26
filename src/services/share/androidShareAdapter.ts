@@ -21,14 +21,19 @@ export const androidShareAdapter: ShareAdapter = {
 
     const drain = async (): Promise<void> => {
       try {
-        const { files, coldStart, offered, read } = await ShareIntent.consume();
+        const { files, text, coldStart, offered, read } = await ShareIntent.consume();
         if (disposed) return;
         // Nothing pending is the COMMON case — this runs on every launch — so it is not
         // reported. But a share that offered documents and read NONE is a real failure, and
         // returning early there would mean not even the `received` denominator event fires.
-        if (files.length === 0 && !(offered ?? 0)) return;
+        // A text-only share must NOT be mistaken for the "nothing pending" case this runs
+        // on at every cold start.
+        if (files.length === 0 && !text && !(offered ?? 0)) return;
         onShare(
-          files.map((f) => base64ToFile(f.data, f.name, f.type)),
+          {
+            files: files.map((f) => base64ToFile(f.data, f.name, f.type)),
+            text: text || undefined,
+          },
           {
             platform: 'android',
             coldStart: coldStart ?? false,

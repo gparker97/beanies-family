@@ -311,6 +311,20 @@ export function extractShareFromDocuments(
 }
 
 /**
+ * Classify AND extract a shared LINK's already-fetched text in ONE call (#64 links).
+ *
+ * The text comes from `content-fetch` (a reduced page, or a video's description) behind its
+ * SSRF guard — never a raw user string, and never the bare URL: the model cannot fetch, and
+ * `youtu.be/dQw4w9` tells it nothing. Always resolves with a classified outcome.
+ */
+export function extractShareFromText(
+  text: string,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<ShareExtractionResult>> {
+  return runExtraction(text, opts, 'share');
+}
+
+/**
  * Extract travel booking(s) from a document and return a typed result (#30). Accepts several
  * documents, read as the pages of one itinerary (#64).
  * Always resolves (never rejects) with a classified outcome.

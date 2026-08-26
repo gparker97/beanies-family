@@ -44,10 +44,28 @@ const recipePayload = {
 };
 
 describe('share task registry (#64)', () => {
-  it('is registered and accepts images only', () => {
-    // The `sources` fence is what stops this soft-keyed task becoming a general text
-    // endpoint — the API key ships in the public bundle.
-    expect(EXTRACTION_TASKS.share.sources).toEqual(['images']);
+  it('accepts images AND text', () => {
+    // Text was added for shared LINKS (#64 links): the model is given the page content
+    // content-fetch already retrieved, never the bare URL. The `sources` fence still does
+    // its job — `event` and `travel` remain images-only, so the soft-keyed proxy is not a
+    // general text endpoint. The recipe task already sat behind exactly this fence.
+    expect(EXTRACTION_TASKS.share.sources).toEqual(['images', 'text']);
+    expect(EXTRACTION_TASKS.event.sources).toEqual(['images']);
+    expect(EXTRACTION_TASKS.travel.sources).toEqual(['images']);
+  });
+
+  it('does not name its source as "images" now that it can be given text', () => {
+    // Fed text, a prompt that says "supported by the images" is a contradiction the model
+    // has to resolve. The recipe prompt is deliberately NOT shared with this one — it is
+    // tuned for a different job, and editing it to serve DRY would change a live feature
+    // with no test able to catch the regression.
+    const [system] = buildShareExtractionMessages(
+      { kind: 'text', text: 'some page text' },
+      '2026-06-03'
+    );
+    const content = system.content as string;
+    expect(content).not.toContain('supported by the images');
+    expect(content).toContain('supported by the source');
   });
 
   it('requires only `kind`, leaving payload validation to the delegated parser', () => {

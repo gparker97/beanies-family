@@ -57,8 +57,35 @@ class ShareViewController: UIViewController {
     private func write(_ provider: NSItemProvider, to inbox: URL) async {
         // Ask for the types we accept, most specific first. `loadFileRepresentation` gives a
         // temporary URL we must copy out of before returning.
-        for type in [UTType.image, UTType.pdf] {
+        // Ordered: a file representation is preferred, and `UTType.url` is last so a share
+        // carrying BOTH a file and a URL writes only the file. The `return` after a
+        // successful write is what guarantees one item per attachment.
+        for type in [UTType.image, UTType.pdf, UTType.url] {
             guard provider.hasItemConformingToTypeIdentifier(type.identifier) else { continue }
+
+            // A web URL has no file representation — load it as an item and write the
+            // absolute string as a .txt, which `ShareIntentPlugin` maps to text/plain.
+            if type == .url {
+                let wrote: Bool = await withCheckedContinuation { continuation in
+                    provider.loadItem(forTypeIdentifier: type.identifier) { item, _ in
+                        guard let url = item as? URL, let data = url.absoluteString.data(using: .utf8)
+                        else {
+                            continuation.resume(returning: false)
+                            return
+                        }
+                        let destination = inbox.appendingPathComponent("\(UUID().uuidString).txt")
+                        do {
+                            try data.write(to: destination)
+                            continuation.resume(returning: true)
+                        } catch {
+                            NSLog("[beanies-share] could not stage a shared link: \(error)")
+                            continuation.resume(returning: false)
+                        }
+                    }
+                }
+                if wrote { return }
+                continue
+            }
 
             let url: URL? = await withCheckedContinuation { continuation in
                 provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in

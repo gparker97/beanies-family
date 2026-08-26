@@ -44,6 +44,11 @@
 				<integer>5</integer>
 				<key>NSExtensionActivationSupportsAttachmentsWithMaxCount</key>
 				<integer>5</integer>
+				<!-- Links (#64 links). Safari and most apps share a page as a web URL; the
+				     extension writes it into the app group as a .txt item, and the
+				     orchestrator normalises that back to text for every platform. -->
+				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+				<integer>1</integer>
 			</dict>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
