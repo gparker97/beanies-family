@@ -64,6 +64,20 @@ function errorCode(err: unknown): BiometricKeystoreErrorCode {
   return 'unknown';
 }
 
+/**
+ * Is this a MISSING plugin rather than a device without biometric hardware?
+ *
+ * Capacitor rejects a call to an unregistered plugin with a recognisable message, and the two
+ * cases must not be collapsed: a build that shipped without the native plugin looks exactly
+ * like an old phone, so `no-hardware` was reported for months while the real cause was that
+ * `BiometricKeystorePlugin.swift` had never been added to the Xcode target (#74). One is a
+ * device fact and needs no action; the other is a broken build and needs a release.
+ */
+function isPluginMissing(err: unknown): boolean {
+  const message = (err as { message?: string } | undefined)?.message ?? '';
+  return /not implemented|unimplemented|not available|no such (?:plugin|module)/i.test(message);
+}
+
 /** Bounded diagnostic detail — never a raw object/PII. */
 function detailOf(err: unknown): string {
   return describeAuthError(err).slice(0, 200);
@@ -83,11 +97,19 @@ export async function nativeCanEnroll(): Promise<boolean> {
     return available;
   } catch (err) {
     // A plugin-bridge throw is not a user-facing failure — log and treat as "can't offer".
+    // A MISSING plugin is reported at `error`, and as its own action, because it means this
+    // build cannot do biometric at all: it is a release defect, not a device limitation, and
+    // reporting it as `no-hardware` is what hid #74.
+    const missing = isPluginMissing(err);
     logEvent({
-      level: 'warn',
+      level: missing ? 'error' : 'warn',
       surface: SURFACE,
-      message: 'availability',
-      context: { os: getPlatform(), action: 'no-hardware', detail: detailOf(err) },
+      message: missing ? 'native biometric plugin missing from this build' : 'availability',
+      context: {
+        os: getPlatform(),
+        action: missing ? 'plugin-missing' : 'no-hardware',
+        detail: detailOf(err),
+      },
     });
     return false;
   }
