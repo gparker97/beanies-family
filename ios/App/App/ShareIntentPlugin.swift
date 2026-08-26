@@ -34,6 +34,12 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
     /// Subdirectory the extension writes into, so nothing else in the group is touched.
     private static let inboxName = "ShareInbox"
 
+    /// Group-root marker the extension leaves recording whether iOS accepted its request to
+    /// open beanies (see `ShareViewController.markOpenOutcome`). Read + DELETED here, and
+    /// reported by the JS adapter — an extension has no WebView, so this is the only way
+    /// "the share appeared to do nothing" reaches the diagnostics firehose.
+    private static let openMarkerName = "share-open-outcome"
+
     /// Matches the JS-side per-file cap (`AI_PICKER_MAX_BYTES`). Bounds a hostile sender.
     private static let maxBytes = 25 * 1024 * 1024
 
@@ -60,13 +66,18 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let fm = FileManager.default
+        // Read BEFORE the early return below: a share whose items all failed to stage still
+        // leaves a marker, and that combination ("iOS opened us, but there is nothing here")
+        // is the single most diagnostic state there is.
+        let opened = Self.consumeOpenMarker()
+
         guard let entries = try? fm.contentsOfDirectory(
             at: inbox,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
             // No inbox yet simply means nothing has ever been shared.
-            call.resolve(["files": []])
+            call.resolve(["files": [], "openOutcome": opened ?? "none"])
             return
         }
 
@@ -97,7 +108,25 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
             ])
         }
 
-        call.resolve(["files": files])
+        call.resolve(["files": files, "openOutcome": opened ?? "none"])
+    }
+
+    /**
+     * Read and DELETE the open-outcome marker. Returns `"opened"` / `"declined"`, or nil
+     * when the extension left none (every share before this shipped, and any share that
+     * staged nothing).
+     *
+     * Deleted unconditionally, like the inbox items themselves: a marker left behind would
+     * be re-reported on every activation and the rate would be meaningless.
+     */
+    private static func consumeOpenMarker() -> String? {
+        guard let root = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        else { return nil }
+        let marker = root.appendingPathComponent(openMarkerName)
+        guard let data = try? Data(contentsOf: marker) else { return nil }
+        try? FileManager.default.removeItem(at: marker)
+        return data.first == 1 ? "opened" : "declined"
     }
 
     /// The extension preserves the real extension, so this only has to cover what it accepts.

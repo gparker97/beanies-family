@@ -12,6 +12,7 @@
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { base64ToFile } from '@/utils/base64ToFile';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { ShareIntent } from './shareIntentPlugin';
 import type { ShareAdapter } from './types';
@@ -34,7 +35,26 @@ export const iosShareAdapter: ShareAdapter = {
       const coldStart = cold;
       cold = false;
       try {
-        const { files } = await ShareIntent.consume();
+        const { files, openOutcome } = await ShareIntent.consume();
+
+        // Report the extension's own outcome BEFORE the empty-return below. The pair that
+        // matters is `declined` with zero files: it says the share staged nothing AND iOS
+        // refused to foreground us, which on device looks exactly like the app ignoring the
+        // share. Without this the two are indistinguishable in the logs.
+        if (openOutcome && openOutcome !== 'none') {
+          logEvent({
+            level: openOutcome === 'opened' ? 'info' : 'warn',
+            surface: 'share-target-ingest',
+            message: 'ios share extension open outcome',
+            context: {
+              action: 'resolved',
+              os: 'ios',
+              detail: openOutcome,
+              file_count: files.length,
+            },
+          });
+        }
+
         if (disposed || files.length === 0) return;
         // No text branch here on purpose: iOS hands a shared URL over as a `.txt` file, and
         // the orchestrator normalises that once for every platform. `share/types.ts` asks
