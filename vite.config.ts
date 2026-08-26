@@ -188,6 +188,12 @@ export default defineConfig({
           method: 'POST',
           enctype: 'multipart/form-data',
           params: {
+            // BOTH `url` and `text`: Chrome routes a shared link into whichever the sender
+            // marked, and a "title + URL" share fills both. The service worker joins them so
+            // no branch has to guess which was used.
+            title: 'title',
+            text: 'text',
+            url: 'url',
             files: [
               {
                 name: 'documents',

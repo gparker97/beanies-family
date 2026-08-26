@@ -204,7 +204,9 @@ async function onReviewSubmit(payload: {
     // merged-into existing segment rather than a dropped extracted id, and never double-links
     // when two extracted segments merge into one. Warn-not-rollback.
     const segIds = [...new Set(allSegmentIds(ready).map((id) => idRemap[id] ?? id))];
-    if (segIds.length) {
+    // A trip captured from a shared LINK has no file to attach. Deliberately NOT an early
+    // return — the trip itself must still save; only the photo step is skipped.
+    if (segIds.length && ready.sourceFile) {
       try {
         const [firstId, ...restIds] = segIds;
         const { photoId } = await photoStore.addPhoto(

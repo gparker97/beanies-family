@@ -69,6 +69,18 @@ public class ShareIntentPlugin extends Plugin {
     /** How many URIs the sender offered, including any dropped by MAX_ITEMS. */
     private int pendingOffered = 0;
 
+    /**
+     * Sender-attached text — a shared link, or prose around one (#64 links).
+     *
+     * Capped at MAX_TEXT_CHARS, which MIRRORS `MAX_SHARE_TEXT_CHARS` in
+     * `src/services/share/types.ts`. That JS-side cap is the real one, applied for every
+     * platform; this is defence-in-depth so an unbounded string never crosses the bridge.
+     */
+    private String pendingText = null;
+
+    /** Mirrors MAX_SHARE_TEXT_CHARS in src/services/share/types.ts. */
+    private static final int MAX_TEXT_CHARS = 4000;
+
     /** Sentinel: the URI was read fine, the file was simply empty. Not a failure. */
     private static final JSObject EMPTY_FILE = new JSObject();
 
@@ -109,13 +121,16 @@ public class ShareIntentPlugin extends Plugin {
         final List<Uri> batch;
         final boolean coldStart;
         final int offered;
+        final String text;
         synchronized (lock) {
             batch = new ArrayList<>(pending);
             coldStart = pendingColdStart;
             offered = pendingOffered;
+            text = pendingText;
             pending.clear();
             pendingColdStart = false;
             pendingOffered = 0;
+            pendingText = null;
         }
 
         JSArray files = new JSArray();
@@ -134,6 +149,7 @@ public class ShareIntentPlugin extends Plugin {
         // must be said out loud rather than looking like a smaller share than it was.
         result.put("offered", offered);
         result.put("read", read);
+        if (text != null) result.put("text", text);
         call.resolve(result);
     }
 
@@ -155,7 +171,13 @@ public class ShareIntentPlugin extends Plugin {
     private void buffer(Intent intent, boolean coldStart) {
         List<Uri> uris = new ArrayList<>();
         int offered = 0;
+        String text = null;
         try {
+            CharSequence shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+            if (shared != null) {
+                String value = shared.toString();
+                text = value.length() > MAX_TEXT_CHARS ? value.substring(0, MAX_TEXT_CHARS) : value;
+            }
             if (Intent.ACTION_SEND.equals(intent.getAction())) {
                 Parcelable single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
                 offered = single == null ? 0 : 1;
@@ -180,6 +202,9 @@ public class ShareIntentPlugin extends Plugin {
         }
 
         synchronized (lock) {
+            // Last text wins: unlike files, two shared links are two separate intents and
+            // merging them would produce a string that is neither.
+            if (text != null) pendingText = text;
             // APPEND, never replace. A cold launch buffers at load(), and the JS side can
             // then sit in its readiness wait for up to ten seconds — a share arriving in
             // that window used to clear the first one, and clearActivityIntent() has already

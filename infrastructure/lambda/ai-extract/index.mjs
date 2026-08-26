@@ -132,7 +132,16 @@ export async function handler(event) {
   // text-LLM endpoint anyone could bill us for. `event`/`travel` stay images-only.
   if (typeof text === 'string') {
     if (!taskConfig.sources.includes('text')) {
-      return response(400, { error: `Task "${task}" does not accept text input` }, event);
+      // Same `code` as the unknown-task rejection above, and for the same reason: a client
+      // deployed AHEAD of this Lambda asks for a source the deployed registry does not yet
+      // declare, and without a machine-readable code it falls through to a generic "something
+      // went wrong". `managedProvider` maps this to `not_available` → the friendly "not set
+      // up yet" notice. Keep the two together.
+      return response(
+        400,
+        { error: `Task "${task}" does not accept text input`, code: 'unknown_task' },
+        event
+      );
     }
     if (text.length === 0) {
       return response(400, { error: 'Empty text source' }, event);

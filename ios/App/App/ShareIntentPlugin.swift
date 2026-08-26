@@ -110,6 +110,8 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
         case "heic": return "image/heic"
         case "heif": return "image/heif"
         case "pdf": return "application/pdf"
+        // A shared LINK (#64 links): the extension writes the URL as a .txt item.
+        case "txt": return "text/plain"
         default: return ""
         }
     }

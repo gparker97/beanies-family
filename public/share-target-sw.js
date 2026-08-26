@@ -42,7 +42,16 @@ self.addEventListener('fetch', (event) => {
       try {
         const formData = await event.request.formData();
         const files = formData.getAll('documents').filter((v) => v instanceof File);
-        if (files.length === 0) {
+
+        // BOTH fields, joined. Chrome routes a shared link into `url` when the sender marks
+        // it as one and into `text` when it does not, and a "title + URL" share fills both.
+        // Joining means no branch has to guess which field was used — `extractUrls` finds
+        // the link wherever it landed.
+        const text = [formData.get('url'), formData.get('text')]
+          .filter((v) => typeof v === 'string' && v)
+          .join('\n');
+
+        if (files.length === 0 && !text) {
           return Response.redirect(`${SHARE_PATH}?error=empty`, 303);
         }
 
@@ -63,6 +72,12 @@ self.addEventListener('fetch', (event) => {
             )
           )
         );
+        if (text) {
+          await cache.put(
+            new Request(`/__share/${id}/text`),
+            new Response(text, { headers: { 'content-type': 'text/plain' } })
+          );
+        }
         return Response.redirect(`${SHARE_PATH}?id=${id}`, 303);
       } catch (err) {
         // Never leave the POST hanging or blank: redirect so the app can say what happened.

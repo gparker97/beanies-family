@@ -5,6 +5,7 @@
 // once, and a failed ingest must not leave someone else's document sitting in the cache.
 
 import { sanitiseAttachmentBase } from './sanitiseFilename';
+import type { SharedContent } from '@/services/share/types';
 
 const SHARE_CACHE = 'beanies-share-target';
 
@@ -14,19 +15,35 @@ const SHARE_CACHE = 'beanies-share-target';
  * Deletion happens even when a file fails to read, so a poison entry cannot wedge the cache.
  * Returns an empty array when the id is unknown (an expired or already-consumed share).
  */
-export async function readAndClearShareStash(id: string): Promise<File[]> {
-  if (!('caches' in globalThis)) return [];
+export async function readAndClearShareStash(id: string): Promise<SharedContent> {
+  if (!('caches' in globalThis)) return { files: [] };
 
   const cache = await caches.open(SHARE_CACHE);
   const keys = (await cache.keys()).filter((req) =>
     new URL(req.url).pathname.startsWith(`/__share/${id}/`)
   );
+
+  // PARTITION before sorting. `stashIndex` parses the last path segment as a number, so the
+  // `text` key yields NaN → 0, would sort in among the files, and would come back as a File
+  // named "shared" at index 0. The unconditional delete below still covers every key.
+  const textPath = `/__share/${id}/text`;
+  const textKey = keys.find((req) => new URL(req.url).pathname === textPath);
+  const fileKeys = keys.filter((req) => req !== textKey);
   // Restore the shared order: the SW keys entries by index.
-  keys.sort((a, b) => stashIndex(a.url) - stashIndex(b.url));
+  fileKeys.sort((a, b) => stashIndex(a.url) - stashIndex(b.url));
 
   const files: File[] = [];
+  let text: string | undefined;
   try {
-    for (const key of keys) {
+    if (textKey) {
+      try {
+        const res = await cache.match(textKey);
+        if (res) text = await res.text();
+      } catch (err) {
+        console.warn('[share] could not read the stashed text; continuing without it', err);
+      }
+    }
+    for (const key of fileKeys) {
       // PER ENTRY, not around the loop. With one shared try/catch, a single rejecting
       // `blob()` aborted the loop while the `finally` still deleted every entry — so the
       // readable files in that batch were destroyed along with the broken one, and the POST
@@ -51,7 +68,7 @@ export async function readAndClearShareStash(id: string): Promise<File[]> {
     // Unconditional: read-then-delete, so a poison entry cannot be retried forever.
     await Promise.all(keys.map((key) => cache.delete(key).catch(() => undefined)));
   }
-  return files;
+  return { files, text };
 }
 
 function stashIndex(url: string): number {

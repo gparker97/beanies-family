@@ -8105,6 +8105,12 @@ const STRING_DEFS = {
     en: 'beanies read all of them as one item. The first one is kept as the attachment.',
     beanie: 'beanies read all of them as one item. the first one is kept as the attachment.',
   },
+  'shareTarget.noLink.title': { en: 'No Link Found', beanie: 'no link found' },
+  'shareTarget.noLink.message': {
+    en: 'There was no link in what you shared. beanies reads links, photos, screenshots and PDFs.',
+    beanie:
+      'there was no link in what you shared. beanies reads links, photos, screenshots and pdfs.',
+  },
   'shareTarget.failed.title': { en: "Couldn't Open That", beanie: "couldn't open that" },
   'shareTarget.failed.message': {
     en: 'beanies could not read what was shared. Try sharing it again.',
@@ -8183,34 +8189,40 @@ const STRING_DEFS = {
     en: 'YouTube Wouldn’t Share That One',
     beanie: 'youtube wouldn’t share that one',
   },
+  // SHARED-SURFACE COPY — see the note on `recipeExtract.noContent.message` (#64 links).
   'recipeExtract.videoBlocked.message': {
-    en: 'YouTube blocks apps from reading some videos. Open the video, look in its description for a link to the recipe, and paste that instead — it usually works, and gives exact quantities.',
+    en: 'YouTube blocks apps from reading some videos. Open the video, look in its description for a link, and share that instead — it usually works.',
     beanie:
-      'youtube blocks apps from reading some videos. open the video, look in its description for a link to the recipe, and paste that instead — it usually works, and gives exact quantities.',
+      'youtube blocks apps from reading some videos. open the video, look in its description for a link, and share that instead — it usually works.',
   },
   'recipeExtract.unreachable.title': {
     en: "Couldn't Open That Link",
     beanie: "couldn't open that link",
   },
+  // SHARED-SURFACE COPY — see the note on `recipeExtract.noContent.message` (#64 links).
   'recipeExtract.unreachable.message': {
-    en: 'The page may have moved, or the site may not allow apps to read it. Try opening it yourself and pasting the recipe text.',
+    en: 'The page may have moved, or the site may not allow apps to read it. Try opening it yourself and pasting the text.',
     beanie:
-      'the page may have moved, or the site may not allow apps to read it. try opening it yourself and pasting the recipe text.',
+      'the page may have moved, or the site may not allow apps to read it. try opening it yourself and pasting the text.',
   },
   'recipeExtract.noContent.title': { en: 'Nothing to Read', beanie: 'nothing to read' },
+  // SHARED-SURFACE COPY — reachable from the cookbook AND from a shared link of any kind
+  // (#64 links). It must not name recipes: a shared event page that reads as nothing would
+  // otherwise be told to try the printable recipe. See `useExtractionErrorToast`'s copy rule.
   'recipeExtract.noContent.message': {
-    en: "We reached that page but couldn't find a recipe in it. Try the printable version, or paste the recipe text.",
+    en: 'beanies reached that page but found nothing it could read. Try the printable version, or open it yourself and paste the text.',
     beanie:
-      "we reached that page but couldn't find a recipe in it. try the printable version, or paste the recipe text.",
+      'beanies reached that page but found nothing it could read. try the printable version, or open it yourself and paste the text.',
   },
   'recipeExtract.noTranscript.title': {
     en: "Can't Read That Video",
     beanie: "can't read that video",
   },
+  // SHARED-SURFACE COPY — see the note on `recipeExtract.noContent.message` (#64 links).
   'recipeExtract.noTranscript.message': {
-    en: "This video's description doesn't have a recipe or a link to one, so there's nothing for beanies to read. Check the description yourself for a link to the cook's website, and paste that instead.",
+    en: "That video's description has no text and no link to follow, so there's nothing for beanies to read. Check the description yourself for a link, and share that instead.",
     beanie:
-      "this video's description doesn't have a recipe or a link to one, so there's nothing for beanies to read. check the description yourself for a link to the cook's website, and paste that instead.",
+      "that video's description has no text and no link to follow, so there's nothing for beanies to read. check the description yourself for a link, and share that instead.",
   },
   'recipeExtract.strip.title': {
     en: 'Start From a Link',
