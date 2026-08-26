@@ -16,6 +16,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Link previews now show the beanies family on the brand background.** Sharing beanies.family on Bluesky, Facebook or anywhere else showed a black box with the jumping beans cropped through the middle — the old preview was a transparent square that those platforms flatten to black and crop to a letterbox. The new card is a proper wide preview that matches the landing page.
+- The `/download` short link now has a social preview at all — previously it shared as a bare URL.
 - **Overnight flights now record the right arrival date.** "Arrives next day" was silently doing nothing for anyone outside the Americas, so the arrival showed on the departure day — and the night you were in the air was reported as a missing hotel booking.
 - **A stay with no check-out date is no longer shown as finished.** An open-ended booking appeared greyed out with a "done" tick from the day after check-in, even while you were still there.
 - **Typing two trip ideas quickly no longer loses the first.** The second one overwrote it, and the box cleared either way so it looked saved.
