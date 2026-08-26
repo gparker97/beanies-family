@@ -39,6 +39,8 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
 import type { ConsentGrant } from './useDocumentConsent';
+import type { ResultEnvelope } from '@/types/magicPayload';
+import type { RecipeExtractionResult } from '@/services/ai/types';
 import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
@@ -95,6 +97,40 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const pendingCompressed = ref<Blob | null>(null);
 
   /** Run intake → extract → map for one document (consent already granted by the caller). */
+  /**
+   * The post-extraction half of the document path: notices, mapping, and the hand-off.
+   *
+   * Split out of `processFile` (#64) so a SHARED document can be delivered without a second
+   * AI call. Unlike the other two wedges this is NOT a pure code move — it also owns the
+   * pending-source lifecycle (`pendingSource` / `pendingCompressed`, later consumed by
+   * `attachAfterSave`). That state is composable-LOCAL, so a share must be delivered into the
+   * SAME `useRecipeCapture()` instance that will later save the recipe, or the source photo
+   * is silently lost. The cookbook page's consumer is that instance.
+   */
+  function deliverRecipe(data: RecipeExtractionResult, env: ResultEnvelope): void {
+    // Loud-but-non-blocking FIRST — before the not-a-recipe return — so a >cap document whose
+    // ingredients sat on a dropped page still tells the user. Never silent.
+    if (env.truncated) {
+      showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
+    }
+
+    const prefill = recipeExtractionToPrefill(data);
+    if (!prefill) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'source was not a recipe',
+        context: { action: 'not_recipe', kind: 'document' },
+      });
+      showToast('info', t('recipeExtract.notRecipe.title'), t('recipeExtract.notRecipe.message'));
+      return;
+    }
+
+    pendingSource.value = env.sourceFile;
+    pendingCompressed.value = env.compressedBlob ?? null;
+    handOver(prefill, 'document', 'document', env.sourceFile);
+  }
+
   async function processFile(file: File, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
 
@@ -132,27 +168,11 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         return;
       }
 
-      // Loud-but-non-blocking FIRST — before the not-a-recipe return — so a >cap PDF whose
-      // ingredients sat on a dropped page still tells the user. Never silent.
-      if (result.truncated) {
-        showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
-      }
-
-      const prefill = recipeExtractionToPrefill(result.data);
-      if (!prefill) {
-        logEvent({
-          level: 'info',
-          surface: SURFACE,
-          message: 'source was not a recipe',
-          context: { action: 'not_recipe', kind: 'document' },
-        });
-        showToast('info', t('recipeExtract.notRecipe.title'), t('recipeExtract.notRecipe.message'));
-        return;
-      }
-
-      pendingSource.value = file;
-      pendingCompressed.value = result.compressedBlob ?? null;
-      handOver(prefill, 'document', 'document', file);
+      deliverRecipe(result.data, {
+        sourceFile: file,
+        compressedBlob: result.compressedBlob,
+        truncated: result.truncated,
+      });
     } catch (err) {
       // NO SILENT FAILURES (docs/lessons.md). Every call site does `void capture.processX()`,
       // so without this a throw is an unhandled rejection: the spinner vanishes, the form is
@@ -551,6 +571,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     isProcessing,
     processFile,
     processUrl,
+    deliverRecipe,
     attachAfterSave,
     discardPendingSource,
   };

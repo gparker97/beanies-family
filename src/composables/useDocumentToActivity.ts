@@ -19,6 +19,9 @@ import type { ConsentGrant } from './useDocumentConsent';
 import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
 import type { FieldConfidence } from '@/services/ai/types';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
+import type { ResultEnvelope } from '@/types/magicPayload';
+import type { ExtractionResult } from '@/services/ai/types';
+import { sanitiseAttachmentBase } from '@/utils/sanitiseFilename';
 import { toDateInputValue } from '@/utils/date';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
@@ -45,6 +48,38 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
 
   const isProcessing = ref(false);
 
+  /**
+   * The post-extraction half: notices, mapping, and the hand-off to the review modal.
+   *
+   * Split out of `processFile` (#64) so a SHARED document can be delivered without a second
+   * AI call — the share path has already run the extraction, and re-entering `processFile`
+   * would re-send the page images. In-app behaviour is unchanged: `processFile` calls this.
+   */
+  function deliverEvent(data: ExtractionResult, env: ResultEnvelope): void {
+    // Loud-but-non-blocking notice FIRST, so a >cap document whose recognisable content sat
+    // on a dropped page still tells the user pages weren't read (never silent).
+    if (env.truncated) {
+      showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
+    }
+    if (!data.isEvent) {
+      // Not recognised as an event — still open the form so nothing is silently dropped.
+      showToast('info', t('ai.notEvent.title'), t('ai.notEvent.message'));
+    }
+    // Reuse the already-compressed image (a JPEG) as the source photo to attach — no second
+    // compression pass. `blob.type` carries the mime. The base name is sanitised because on
+    // the share path it originates in another app and reaches storage from here.
+    const sourcePhoto = env.compressedBlob
+      ? new File([env.compressedBlob], `${sanitiseAttachmentBase(env.sourceFile.name)}.jpg`, {
+          type: env.compressedBlob.type || 'image/jpeg',
+        })
+      : undefined;
+    options.onActivityReady({
+      prefill: extractionToActivityPrefill(data),
+      confidence: data.confidence,
+      sourcePhoto,
+    });
+  }
+
   /** Run the full intake → extract → prefill flow for one document. */
   async function processFile(file: File, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return; // ignore a second pick while one is in flight
@@ -69,26 +104,10 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
       });
 
       if (result.success && result.data) {
-        // Loud-but-non-blocking notice FIRST, so a >cap PDF whose recognisable content sat
-        // on a dropped page still tells the user pages weren't read (never silent).
-        if (result.truncated) {
-          showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
-        }
-        if (!result.data.isEvent) {
-          // Not recognised as an event — still open the form so nothing is silently dropped.
-          showToast('info', t('ai.notEvent.title'), t('ai.notEvent.message'));
-        }
-        // Reuse the already-compressed image (a JPEG) as the source photo to attach —
-        // no second compression pass. `blob.type` carries the mime.
-        const sourcePhoto = result.compressedBlob
-          ? new File([result.compressedBlob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, {
-              type: result.compressedBlob.type || 'image/jpeg',
-            })
-          : undefined;
-        options.onActivityReady({
-          prefill: extractionToActivityPrefill(result.data),
-          confidence: result.data.confidence,
-          sourcePhoto,
+        deliverEvent(result.data, {
+          sourceFile: file,
+          compressedBlob: result.compressedBlob,
+          truncated: result.truncated,
         });
         return;
       }
@@ -99,5 +118,5 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
     }
   }
 
-  return { isProcessing, processFile };
+  return { isProcessing, processFile, deliverEvent };
 }

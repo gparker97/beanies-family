@@ -21,7 +21,7 @@ import {
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
 import { assertNever } from '@/utils/assertNever';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
-import { isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
+import { MAX_EXTRACT_PAGES, isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
 import { createByokProvider, type ByokConfig } from './providers/byokProvider';
 import { managedProvider } from './providers/managedProvider';
 import { onDeviceProvider } from './providers/onDeviceProvider';
@@ -103,9 +103,18 @@ interface PreparedImages {
 }
 
 /**
- * Resolve the input `File` into one-or-more client-compressed page images.
- * - PDF → rasterize up to `MAX_EXTRACT_PAGES` pages (`pdfToExtractionImages`), then compress each.
- * - Any other image → the single-image case (`truncated: false`).
+ * Resolve the input document(s) into client-compressed page images.
+ * - PDF → rasterize its pages (`pdfToExtractionImages`), then compress each.
+ * - Any other image → used as a single page.
+ *
+ * SEVERAL documents are read as the PAGES OF ONE ITEM (#64), in the order given — sharing
+ * three photos of one recipe produces one extraction, not three. Collection stops the moment
+ * `MAX_EXTRACT_PAGES` pages exist, so N inputs cost at most cap-many rasterize+compress
+ * passes rather than N, and nothing past the cap is even read. `truncated` is set whenever
+ * the cap bit, so the caller can say so — pages are never dropped silently.
+ *
+ * THE PAGE CAP LIVES HERE (and in the rasterizer it delegates to) and nowhere else. Counting
+ * FILES would be the wrong unit: one shared PDF is many pages.
  *
  * Compresses sequentially: canvas work is main-thread, so sequential bounds peak memory
  * and is simpler than `Promise.all`. Throws `CompressionError` on any failure so the single
@@ -113,19 +122,31 @@ interface PreparedImages {
  * as the representative thumbnail.
  */
 async function prepareImageDataUrls(
-  file: File,
+  input: File | File[],
   compression: CompressOptions
 ): Promise<PreparedImages> {
-  let sourceFiles: File[];
-  let truncated: boolean;
-  if (isPdfFile(file)) {
-    const rasterized = await pdfToExtractionImages(file);
-    sourceFiles = rasterized.files;
-    truncated = rasterized.truncated;
-  } else {
-    sourceFiles = [file];
-    truncated = false;
+  const inputs = Array.isArray(input) ? input : [input];
+  const sourceFiles: File[] = [];
+  let truncated = false;
+
+  for (const file of inputs) {
+    const remaining = MAX_EXTRACT_PAGES - sourceFiles.length;
+    if (remaining <= 0) {
+      // There were more documents than we can read. Not silent: the caller shows a notice.
+      truncated = true;
+      break;
+    }
+    if (isPdfFile(file)) {
+      // Ask for only the pages we can still use, so a long PDF behind several photos does
+      // not rasterize pages that would be discarded.
+      const rasterized = await pdfToExtractionImages(file, remaining);
+      sourceFiles.push(...rasterized.files);
+      if (rasterized.truncated) truncated = true;
+    } else {
+      sourceFiles.push(file);
+    }
   }
+
   // Defensive: an empty / unrenderable PDF would otherwise leave nothing to send.
   if (sourceFiles.length === 0) {
     throw new CompressionError('Document produced no readable pages');
@@ -148,7 +169,7 @@ async function prepareImageDataUrls(
  * classified outcome; `run` selects the per-task provider method (`extract` / `extractTravel`).
  */
 async function runExtraction<T extends ExtractionTask>(
-  input: File | string,
+  input: File | File[] | string,
   opts: ExtractOptions,
   task: T
 ): Promise<DocumentExtractionResult<ExtractionResultByTask[T]>> {
@@ -162,10 +183,9 @@ async function runExtraction<T extends ExtractionTask>(
   //    rasterizes up to MAX_EXTRACT_PAGES pages; a photo is the single-image case). Keep
   //    page 1's compressed blob so a successful result can hand it back as the source
   //    thumbnail without a second compression pass, and carry `truncated` through.
-  const file = input;
   let prepared: PreparedImages;
   try {
-    prepared = await prepareImageDataUrls(file, opts.compression ?? DEFAULT_COMPRESSION);
+    prepared = await prepareImageDataUrls(input, opts.compression ?? DEFAULT_COMPRESSION);
   } catch (err) {
     // Rasterize + compress live here now, so their dev-guidance log lives here too.
     console.error(
@@ -173,7 +193,7 @@ async function runExtraction<T extends ExtractionTask>(
         'password-protected PDF, a browser-undecodable image (e.g. HEIC on Chromium), or ' +
         'an out-of-memory canvas render can cause this. Reported to the user as a ' +
         'compression error.',
-      file.name,
+      Array.isArray(input) ? `${input.length} documents` : input.name,
       err
     );
     const detail = err instanceof CompressionError ? err.message : 'Failed to prepare image';
@@ -233,22 +253,26 @@ async function runWithSource<T extends ExtractionTask>(
 }
 
 /**
- * Extract event details from a single document image and return a typed result (#133).
+ * Extract event details from a document and return a typed result (#133).
+ *
+ * Accepts SEVERAL documents (#64), which are read as the pages of one item — sharing three
+ * photos of one invite produces one event, not three. Passing a single `File` is unchanged.
  * Always resolves (never rejects) with a classified outcome.
  */
 export function extractEventFromDocument(
-  file: File,
+  file: File | File[],
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<ExtractionResult>> {
   return runExtraction(file, opts, 'event');
 }
 
 /**
- * Extract a recipe from a single document (photo, screenshot or PDF) and return a typed
- * result (#72). Always resolves (never rejects) with a classified outcome.
+ * Extract a recipe from a document (photo, screenshot or PDF) and return a typed result
+ * (#72). Accepts several documents, read as the pages of one recipe (#64).
+ * Always resolves (never rejects) with a classified outcome.
  */
 export function extractRecipeFromDocument(
-  file: File,
+  file: File | File[],
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<RecipeExtractionResult>> {
   return runExtraction(file, opts, 'recipe');
@@ -270,11 +294,12 @@ export function extractRecipeFromText(
 }
 
 /**
- * Extract travel booking(s) from a single document image and return a typed result (#30).
+ * Extract travel booking(s) from a document and return a typed result (#30). Accepts several
+ * documents, read as the pages of one itinerary (#64).
  * Always resolves (never rejects) with a classified outcome.
  */
 export function extractTravelFromDocument(
-  file: File,
+  file: File | File[],
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<TravelExtractionResult>> {
   return runExtraction(file, opts, 'travel');
