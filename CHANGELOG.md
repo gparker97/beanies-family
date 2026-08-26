@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The footer's "sign in" link went to the sign-up page.** On every page, the footer's "sign in" sent you to `/welcome` instead of `/login` — the nav's equivalent link was always correct. It now goes where it says.
 - **Marketing-site CTA tracking now covers every call-to-action.** The three CTA goals were only wired to the homepage hero and the beanstalk footer, so the "create your bean pod" buttons in the nav (on every page), the one at the bottom of the homepage, and the inline links in the story section recorded nothing. All seven are now tracked, each tagged with its placement so the nav can be compared against the hero.
 
 ### Changed
@@ -20,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- The marketing site's build now fails if a link into the app is missing its CTA tracking attribute, so a redesign cannot silently stop recording conversions the way it just did. Links that genuinely are not calls to action (sign-in, help-article prose) are exempted by name, with a reason.
 - **Share straight to beanies from any app (Android).** Send a photo, screenshot or PDF from wherever it already is — beanies reads it, works out whether it's an activity, a trip or a recipe, and opens the right form filled in. Several photos of one thing are read together as one item. Nothing is saved until you confirm. (iOS to follow.)
 
 ### Removed
