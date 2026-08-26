@@ -68,10 +68,12 @@ platform :ios do
       # Nothing failed. `containerURL(forSecurityApplicationGroupIdentifier:)` simply
       # returned nil, so every share vanished, and Universal Links were dead too.
       #
-      # Overriding the identity to "Apple Distribution" (in xcargs below, so it reaches
-      # the export invocation too) fixes the actual problem rather than routing around
-      # it: an App Store profile needs no registered devices, so the archive signs on
-      # CI, and the entitlements file is processed normally.
+      # Do NOT hand-specify CODE_SIGN_IDENTITY to force distribution: with
+      # CODE_SIGN_STYLE=Automatic, Xcode rejects it outright ("automatically signed for
+      # development, but a conflicting code signing identity ... has been manually
+      # specified") for both targets. Automatic signing owns the identity; the archive
+      # signs development-style and `export_method: app-store` re-signs for
+      # distribution, which is the normal flow and the one that keeps entitlements.
       # `verify_entitlements` asserts the result on every run.
       # Cloud-managed automatic signing via the App Store Connect API key. The
       # version/build numbers are stamped here (rather than via agvtool) so the lane
@@ -84,17 +86,12 @@ platform :ios do
       # the APPLE_TEAM_ID var because the checked-in project has no team set (keeps the
       # Team ID out of project.pbxproj). Same auth flags on export_xcargs so the export
       # step can re-resolve signing too.
-      #
-      # CODE_SIGN_IDENTITY overrides the project's "iPhone Developer" default for BOTH
-      # the archive and the export (gym reuses xcargs for each); without it the archive
-      # resolves a development profile and fails for want of a registered device.
       xcargs: "-allowProvisioningUpdates " \
               "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} " \
               "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} " \
               "-authenticationKeyPath #{ENV['APP_STORE_CONNECT_API_KEY_PATH']} " \
               "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} " \
               "CODE_SIGN_STYLE=Automatic " \
-              "CODE_SIGN_IDENTITY=Apple\\ Distribution " \
               "CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} " \
               "MARKETING_VERSION=#{ENV['MARKETING_VERSION']}",
       # NB: no `export_xcargs` — gym applies `xcargs` to the export xcodebuild
