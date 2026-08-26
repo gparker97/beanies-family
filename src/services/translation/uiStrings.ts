@@ -8227,6 +8227,18 @@ const STRING_DEFS = {
     beanie:
       "that video's description has no text and no link to follow, so there's nothing for beanies to read. check the description yourself for a link, and use that instead.",
   },
+  // The title-plus-link fallback: the video names a dish but its method is only spoken
+  // aloud, so the form arrives mostly empty ON PURPOSE. Say why, or an empty form reads as
+  // a failure. SHARED SURFACE — shown from both the pasted-link and shared-link paths.
+  'recipeExtract.titleOnly.title': {
+    en: 'Started It For You',
+    beanie: 'started it for you',
+  },
+  'recipeExtract.titleOnly.message': {
+    en: "That video's recipe is only spoken aloud, so beanies couldn't read the ingredients or steps. The name and the video link are saved — type in the rest while you watch.",
+    beanie:
+      "that video's recipe is only spoken aloud, so beanies couldn't read the ingredients or steps. the name and the video link are saved — type in the rest while you watch.",
+  },
   'recipeExtract.strip.title': {
     en: 'Start From a Link',
     beanie: 'start from a link',

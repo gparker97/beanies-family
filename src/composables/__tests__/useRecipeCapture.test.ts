@@ -131,3 +131,39 @@ describe('attachAfterSave', () => {
     expect(fetchImage).not.toHaveBeenCalled();
   });
 });
+
+describe('processUrl — the title-only fallback', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('hands over a NAMED, LINKED recipe with nothing invented in it', async () => {
+    // A video whose method is only spoken aloud. The title is quoted verbatim as the name
+    // and the video becomes the source link; ingredients and steps stay EMPTY for the user
+    // to type. Filling either of them here would be reconstructing a recipe from a title,
+    // which is the one thing this path must never do.
+    resolveRecipeSource.mockResolvedValue({
+      kind: 'titleOnly',
+      title: 'Pumpkin Pie',
+      sourceUrl: 'https://youtu.be/PmuCEQTy-9E',
+      path: 'youtube_description',
+    });
+    const onRecipeReady = vi.fn();
+    const c = useRecipeCapture({ onRecipeReady });
+
+    await c.processUrl('https://youtu.be/PmuCEQTy-9E', __testConsentGrant);
+
+    expect(onRecipeReady).toHaveBeenCalledTimes(1);
+    const { prefill, sourceFile } = onRecipeReady.mock.calls[0][0];
+    // A link has no file to attach — only the name and the URL.
+    expect(sourceFile).toBeNull();
+    expect(prefill.fields.name).toBe('Pumpkin Pie');
+    expect(prefill.fields.ingredients).toEqual([]);
+    expect(prefill.fields.steps).toEqual([]);
+    expect(prefill.fields.sourceUrl).toBe('https://youtu.be/PmuCEQTy-9E');
+    // Nothing was inferred, so nothing may be flagged as inferred.
+    expect(prefill.inferredIngredients).toEqual([]);
+    expect(prefill.inferredSteps).toEqual([]);
+  });
+});

@@ -312,6 +312,34 @@ describe('share ingest — links', () => {
     expect(dispatchSharePayload).not.toHaveBeenCalled();
   });
 
+  it('a video with only a title still delivers a NAMED, LINKED recipe — no AI call', async () => {
+    // The whole point of the fallback: the capture the user deliberately made is not lost.
+    // The title becomes the name; the ingredients and steps stay empty for them to fill.
+    resolveRecipeSource.mockResolvedValue({
+      kind: 'titleOnly',
+      title: 'Pumpkin Pie',
+      sourceUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      path: 'youtube_description',
+    });
+
+    await link('https://youtu.be/dQw4w9WgXcQ');
+
+    expect(extractShareFromText).not.toHaveBeenCalled();
+    const payload = dispatchSharePayload.mock.calls[0][0];
+    expect(payload.kind).toBe('recipe');
+    expect(payload.source).toEqual({ via: 'titleOnly', title: 'Pumpkin Pie' });
+    // The video itself is the provenance, and the origin flag keeps the start/ready pair
+    // balanced for the share path.
+    expect(payload.env.link.provenanceUrl).toBe('https://youtu.be/dQw4w9WgXcQ');
+    expect(payload.env.origin).toBe('share');
+    // A mostly-empty form must arrive WITH its explanation, or it reads as a failure.
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'recipeExtract.titleOnly.title',
+      expect.anything()
+    );
+  });
+
   it('tells the user when a video has nothing to read', async () => {
     resolveRecipeSource.mockResolvedValue({ kind: 'refusal', reason: 'no_text_no_link' });
     await link('https://youtu.be/dQw4w9WgXcQ');

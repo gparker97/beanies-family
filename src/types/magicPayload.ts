@@ -41,7 +41,7 @@ export interface ShareLink {
 }
 
 /**
- * Which of two shapes a recipe arrived in.
+ * Which shape a recipe arrived in.
  *
  * A JSON-LD hit is NOT converted into a fake `RecipeExtractionResult`: doing so would mean
  * inventing confidence scores and `inferred` flags for the one path that cannot hallucinate.
@@ -49,7 +49,14 @@ export interface ShareLink {
  * resolves to text arrives as `via: 'extraction'` and needs it just as much.
  */
 export type RecipeShareSource =
-  { via: 'extraction'; data: RecipeExtractionResult } | { via: 'jsonld'; recipe: JsonLdRecipe };
+  | { via: 'extraction'; data: RecipeExtractionResult }
+  | { via: 'jsonld'; recipe: JsonLdRecipe }
+  /**
+   * A video whose recipe is only spoken aloud. All we have is its title — see the
+   * `titleOnly` note on `ResolvedRecipeSource` for why the captions are out of reach — and
+   * a named, linked recipe the user finishes themselves beats losing the capture.
+   */
+  | { via: 'titleOnly'; title: string };
 
 /**
  * What the extraction produced ALONGSIDE the parsed data — the provenance artefacts each
