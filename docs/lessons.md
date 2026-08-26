@@ -493,3 +493,17 @@ The fix commit touched only `CHANGELOG.md`. Both `main-ci.yml` and `security.yml
 1. **Read the below-the-cap list every time, even when the agreed scope is narrower.** Classify each item: fix now, file explicitly, or discard with a reason. Never leave it unread.
 2. **Behaviour changes hidden inside a refactor are the highest-value items in that list** — a changed default, a dropped guard, an altered ordering. They pass type-check and unit tests precisely because nothing asserted the old behaviour except the code itself.
 3. **When a scope decision excludes a finding, say so in the summary** so it is a recorded decision rather than something that quietly evaporated.
+
+## 19. "I searched and found nothing" is worthless until you know the tree is current
+
+**Date:** 2026-08-26
+**Context:** Greg asked why his three new Plausible CTA goals were empty. I searched `web/` exhaustively — grep for `plausible-event`, `data-cta`, `cta_click`, `git log --all -S` across every branch, a clean `git status`, "only branch is `main`" — and concluded, with a lot of supporting evidence, that the tracking had never been implemented and that a previous session had claimed otherwise in error. Every one of those searches was sound. The checkout was **53 commits behind `origin/main`**. The feature was implemented, correct, and already deployed. Only Greg's "can you just check once more" caught it, and the thing that actually settled it was fetching the live production HTML, which had the attributes my source tree did not.
+
+**Pattern:** A negative result is a claim about the search space, not about reality. I treated "clean working tree, one local branch" as proof the tree was current — but both are true of an arbitrarily stale checkout, and `git log --all` only spans refs that have been fetched. The confidence was manufactured by breadth: many independent searches agreeing with each other, all reading the same stale bytes. Worse, the wrong conclusion was actively expensive — it told Greg a colleague's work did not exist and would have led to rebuilding a feature that was already live.
+
+**Rule:**
+
+1. **`git fetch` before concluding that code is absent.** Any answer of the form "X was never implemented" / "that code does not exist" / "nothing does Y" requires a current tree first. Cheap, and the only thing that makes the negative meaningful.
+2. **Check `git log HEAD..origin/main` when a user contradicts a code-based finding.** Being behind is a top-three explanation for "the user says it exists and I cannot find it," alongside a wrong search term and a different repo — check it before defending the conclusion.
+3. **Prefer the deployed artifact when the question is "is this live?"** Fetching production HTML answers directly what source-grepping only answers by inference, and it is immune to checkout staleness. Confirming a claim about production against a source tree is one hop too many.
+4. **Breadth of search is not freshness of search.** Ten greps over stale bytes agree with each other perfectly. When many searches converge suspiciously cleanly against a user's direct recollection, suspect the corpus, not the user.
