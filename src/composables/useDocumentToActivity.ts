@@ -102,8 +102,20 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
           }
         )
       : undefined;
+    const prefill = extractionToActivityPrefill(data);
+    // A shared LINK has no file to attach, so without this an activity from a shared event
+    // page keeps NO record of where it came from — unlike the recipe path, which has a
+    // `sourceUrl` field. An activity has no such field, so the URL goes on its own line in
+    // the notes. A URL needs no translation, so this adds no string.
+    if (env.link) {
+      // `notes`, not `description`: ActivityModal renders and edits `notes`, and the mapper
+      // routes the model's free text there for exactly that reason. Putting it on
+      // `description` would hide the provenance from the user entirely.
+      const existing = prefill.notes?.trim();
+      prefill.notes = existing ? `${existing}\n${env.link.provenanceUrl}` : env.link.provenanceUrl;
+    }
     options.onActivityReady({
-      prefill: extractionToActivityPrefill(data),
+      prefill,
       confidence: data.confidence,
       sourcePhoto,
     });

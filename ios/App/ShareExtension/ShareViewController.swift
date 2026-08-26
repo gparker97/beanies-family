@@ -68,7 +68,18 @@ class ShareViewController: UIViewController {
             if type == .url {
                 let wrote: Bool = await withCheckedContinuation { continuation in
                     provider.loadItem(forTypeIdentifier: type.identifier) { item, _ in
-                        guard let url = item as? URL, let data = url.absoluteString.data(using: .utf8)
+                        // `public.url` is a SUPERTYPE of `public.file-url`, so any attachment
+                        // that is neither image nor PDF — a .docx or .zip from Files — also
+                        // matches here. Without this guard its sandbox PATH was written as
+                        // the shared "link", and the app then reported "No Link Found" for
+                        // what is really an unsupported-file problem. Only a WEB url is a
+                        // link; a file URL falls through to the unsupported path, where it
+                        // belongs.
+                        guard let url = item as? URL,
+                              !url.isFileURL,
+                              let scheme = url.scheme?.lowercased(),
+                              scheme == "https" || scheme == "http",
+                              let data = url.absoluteString.data(using: .utf8)
                         else {
                             continuation.resume(returning: false)
                             return

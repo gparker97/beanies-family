@@ -202,13 +202,27 @@ public class ShareIntentPlugin extends Plugin {
         }
 
         synchronized (lock) {
-            // Last text wins: unlike files, two shared links are two separate intents and
-            // merging them would produce a string that is neither.
-            if (text != null) pendingText = text;
+            // A SHARE IS ATOMIC: its text and its files arrive in ONE intent.
+            //
+            // URIs append across intents so a cold-start batch is not lost when a warm share
+            // lands before the WebView drains it. Text could not simply do the same: a link
+            // buffered from share A would then be handed over beside share B's photo, and
+            // `prepare`'s files-win rule would drop the link silently — unrecoverably, since
+            // `clearActivityIntent()` has already run.
+            //
+            // So text presence marks a share boundary. If THIS intent carries text, or if
+            // text from an earlier one is still pending, the buffer belongs to a different
+            // share and is reset. Two file-only shares still append, which is the case the
+            // appending was added for; a captioned photo keeps both, because they arrive in
+            // the same call.
+            if (text != null || pendingText != null) {
+                pending.clear();
+                pendingOffered = 0;
+            }
+            pendingText = text;
             // APPEND, never replace. A cold launch buffers at load(), and the JS side can
             // then sit in its readiness wait for up to ten seconds — a share arriving in
-            // that window used to clear the first one, and clearActivityIntent() has already
-            // run, so it was unrecoverable. Still bounded by MAX_ITEMS overall.
+            // that window used to clear the first one. Still bounded by MAX_ITEMS overall.
             for (Uri uri : uris) {
                 if (pending.size() >= MAX_ITEMS) break;
                 pending.add(uri);

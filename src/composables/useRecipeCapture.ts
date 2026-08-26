@@ -144,6 +144,18 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
     }
 
+    // A share did its reading in the orchestrator, so it never passed through the `start`
+    // that `processFile`/`processUrl` log before their await. Log it here instead, so this
+    // surface's start/ready pair still balances and a delivery regression stays visible.
+    if (env.origin === 'share') {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'capture started',
+        context: { action: 'start', kind: env.link?.kind ?? 'document', detail: 'share' },
+      });
+    }
+
     const link = env.link ?? null;
     // `kind` and `path` come off the envelope so no caller passes them separately.
     const kind = link?.kind ?? 'document';

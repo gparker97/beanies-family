@@ -138,7 +138,7 @@ describe('share ingest — the happy path', () => {
     expect(dispatchSharePayload).toHaveBeenCalledWith(expect.objectContaining({ kind: 'event' }));
     // `received` gives every later event a denominator; `ready` is the success signal that
     // makes a failure RATE computable.
-    expect(actions()).toEqual(['received', 'classified', 'ready']);
+    expect(actions()).toEqual(['received', 'triaged', 'classified', 'ready']);
   });
 
   it('reads SEVERAL documents as ONE item, in one call', async () => {
@@ -255,6 +255,20 @@ describe('share ingest — links', () => {
     expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.noLink.title', expect.anything());
   });
 
+  it('finds a link at the END of a sentence', async () => {
+    // Sentence-punctuated prose is the NORMAL input here. The trailing dot used to make the
+    // video id 12 characters, which `routeUrl` rejects — so a perfectly readable video was
+    // reported as "No Link Found".
+    await link('Watch this https://youtu.be/dQw4w9WgXcQ.');
+    expect(resolveRecipeSource).toHaveBeenCalledWith('https://youtu.be/dQw4w9WgXcQ');
+  });
+
+  it('does not carry sentence punctuation into the fetched URL', async () => {
+    await link('Great one https://example.com/cake!');
+    // With the `!` left on, the fetch 404s and the user is told the link is dead.
+    expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+  });
+
   it('says so when the shared text carries no link at all', async () => {
     await link('just some words I copied');
 
@@ -314,6 +328,26 @@ describe('share ingest — links', () => {
     await link('https://example.com/cake');
 
     expect(resolveRecipeSource).not.toHaveBeenCalled();
+  });
+
+  it('reports an UNREADABLE file as a file problem, not as a missing link', async () => {
+    // Senders routinely set both extras — Google Photos attaches an album link beside the
+    // image. Falling through to the text branch would quietly read the album page instead
+    // and never tell the user their photo was too big.
+    await ingestSharedContent(
+      {
+        files: [new File(['PK'], 'huge.zip', { type: 'application/zip' })],
+        text: 'https://photos.example.com/album/123',
+      },
+      meta
+    );
+
+    expect(resolveRecipeSource).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'shareTarget.unsupported.title',
+      expect.anything()
+    );
   });
 
   it('FILES WIN over a caption, so one share is one item', async () => {
@@ -492,7 +526,7 @@ describe('share ingest — refusals and failures', () => {
     await ingestSharedContent({ files: [img()] }, meta);
 
     expect(extractShareFromDocuments).not.toHaveBeenCalled();
-    expect(actions()).toEqual(['received', 'consent_declined']);
+    expect(actions()).toEqual(['received', 'triaged', 'consent_declined']);
   });
 
   it('reports an extraction failure through the shared mapper', async () => {
@@ -516,7 +550,7 @@ describe('share ingest — refusals and failures', () => {
       'shareTarget.unrecognised.title',
       expect.anything()
     );
-    expect(actions()).toEqual(['received', 'classified']);
+    expect(actions()).toEqual(['received', 'triaged', 'classified']);
   });
 
   it('says so when the destination reader is off or unavailable to this member', async () => {
