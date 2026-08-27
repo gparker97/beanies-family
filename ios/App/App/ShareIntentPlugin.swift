@@ -34,11 +34,12 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
     /// Subdirectory the extension writes into, so nothing else in the group is touched.
     private static let inboxName = "ShareInbox"
 
-    /// Group-root marker the extension leaves recording whether iOS accepted its request to
-    /// open beanies (see `ShareViewController.markOpenOutcome`). Read + DELETED here, and
-    /// reported by the JS adapter — an extension has no WebView, so this is the only way
-    /// "the share appeared to do nothing" reaches the diagnostics firehose.
-    private static let openMarkerName = "share-open-outcome"
+    /// Group-root file the extension leaves recording what its run did — the stage it
+    /// reached, how many items it was offered, their TYPE IDENTIFIERS, and how many it
+    /// staged (see `ShareViewController.trace`). Read + DELETED here and reported by the JS
+    /// adapter: an extension has no WebView, so this is the only way "the share appeared to
+    /// do nothing" reaches the diagnostics firehose.
+    private static let traceName = "share-open-outcome"
 
     /// Matches the JS-side per-file cap (`AI_PICKER_MAX_BYTES`). Bounds a hostile sender.
     private static let maxBytes = 25 * 1024 * 1024
@@ -112,9 +113,9 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /**
-     * Read and DELETE the open-outcome marker. Returns `"opened"` / `"declined"`, or nil
-     * when the extension left none (every share before this shipped, and any share that
-     * staged nothing).
+     * Read and DELETE the extension's run trace. Returns its compact `k=v;` line, or nil
+     * when the extension left none — which now means only that it could not reach the
+     * container at all, since every other exit writes one.
      *
      * Deleted unconditionally, like the inbox items themselves: a marker left behind would
      * be re-reported on every activation and the rate would be meaningless.
@@ -123,10 +124,13 @@ public class ShareIntentPlugin: CAPPlugin, CAPBridgedPlugin {
         guard let root = FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: appGroup)
         else { return nil }
-        let marker = root.appendingPathComponent(openMarkerName)
-        guard let data = try? Data(contentsOf: marker) else { return nil }
+        let marker = root.appendingPathComponent(traceName)
+        guard let data = try? Data(contentsOf: marker),
+              let line = String(data: data, encoding: .utf8),
+              !line.isEmpty
+        else { return nil }
         try? FileManager.default.removeItem(at: marker)
-        return data.first == 1 ? "opened" : "declined"
+        return line
     }
 
     /// The extension preserves the real extension, so this only has to cover what it accepts.
