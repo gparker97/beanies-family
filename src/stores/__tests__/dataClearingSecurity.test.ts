@@ -499,6 +499,24 @@ describe('Sensitive Data Clearing Security', () => {
       expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123');
     });
 
+    it('clears the CACHED FAMILY KEY, not just the cache it decrypts', async () => {
+      // The key is stored unencrypted in the registry DB. Deleting the encrypted
+      // family cache while leaving the key behind is the wrong half: on a shared
+      // device the next person's auto-decrypt would open the pod with it, having
+      // proved nothing at all.
+      const { auth, settings } = populateAllStores();
+      expect(settings.isTrustedDevice).toBe(false);
+      // `{ force: true }` is how the key actually gets here: syncStore caches it on
+      // every successful password decrypt regardless of the trusted-device flag, so an
+      // untrusted device really does hold one.
+      await settings.cacheFamilyKey('my-encryption-key', 'family-123', { force: true });
+      expect(settings.getCachedFamilyKey('family-123')).toBe('my-encryption-key');
+
+      await auth.signOut();
+
+      expect(settings.getCachedFamilyKey('family-123')).toBeNull();
+    });
+
     it('clears auth session state', async () => {
       const { auth } = populateAllStores();
 
@@ -559,6 +577,19 @@ describe('Sensitive Data Clearing Security', () => {
       await auth.signOut();
 
       expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+    });
+
+    it('KEEPS the cached family key when trusted — the point of the setting', async () => {
+      // The companion to the untrusted case above. Clearing it here would defeat
+      // "this is my own device, keep me signed in fast", so the two tests together
+      // pin both halves of the decision rather than just the safe-looking one.
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+      await settings.cacheFamilyKey('my-encryption-key', 'family-123');
+
+      await auth.signOut();
+
+      expect(settings.getCachedFamilyKey('family-123')).toBe('my-encryption-key');
     });
 
     // Cross-family data-integrity regression (2026-07-06): even though the cache DB
