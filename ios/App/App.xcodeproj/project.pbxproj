@@ -12,6 +12,7 @@
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		BE1A0000000000000000CC04 /* ShareIntentPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000CC03 /* ShareIntentPlugin.swift */; };
+		BE1A0000000000000000CC08 /* BeaniesFamily.png in Resources */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000CC07 /* BeaniesFamily.png */; };
 		BE1A0000000000000000CC06 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000CC05 /* MainViewController.swift */; };
 		BE1A0000000000000000CC02 /* BiometricKeystorePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000CC01 /* BiometricKeystorePlugin.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -53,6 +54,7 @@
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BE1A0000000000000000CC03 /* ShareIntentPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareIntentPlugin.swift; sourceTree = "<group>"; };
+		BE1A0000000000000000CC07 /* BeaniesFamily.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BeaniesFamily.png; sourceTree = "<group>"; };
 		BE1A0000000000000000CC05 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		BE1A0000000000000000CC01 /* BiometricKeystorePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricKeystorePlugin.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -102,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				BE1A0000000000000000DD03 /* ShareViewController.swift */,
+				BE1A0000000000000000CC07 /* BeaniesFamily.png */,
 				BE1A0000000000000000DD05 /* Info.plist */,
 				BE1A0000000000000000DD06 /* ShareExtension.entitlements */,
 			);
@@ -240,6 +243,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BE1A0000000000000000CC08 /* BeaniesFamily.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

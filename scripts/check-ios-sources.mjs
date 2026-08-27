@@ -199,3 +199,46 @@ if (unregistered.length > 0) {
 console.log(
   `\u2713 all ${appTargetPlugins.length} app-target plugin(s) are registered in ${PLUGIN_HOST.split('/').pop()}`
 );
+
+/**
+ * GUARD 4 — a resource the extension loads at runtime must be in its Resources phase.
+ *
+ * Third instance of one failure class. A file committed under ios/App/ does not ship just
+ * because it exists: Swift needs Compile Sources (guard 1), a plugin needs registering
+ * (guard 3), and an image needs Resources. All three fail the same way - the build is
+ * green, the app launches, and the feature is quietly absent. `UIImage(named:)` returns nil
+ * and the sheet renders a hole where the brand mark should be.
+ */
+const EXTENSION_ASSETS = readdirSync(join(ROOT, 'ios/App/ShareExtension')).filter((name) =>
+  name.endsWith('.png')
+);
+
+// Search ONLY inside Resources build phases. A naive `project.includes(...)` also matches
+// the PBXBuildFile DECLARATION line, which carries the same "<name> in Resources" comment
+// and exists whether or not any phase references it - so the check passed with the asset
+// removed from the phase. Guard 1 had this identical bug once; do not reintroduce it.
+const resourcePhases = [
+  ...project.matchAll(/isa = PBXResourcesBuildPhase;[\s\S]*?files = \(([\s\S]*?)\);/g),
+]
+  .map((m) => m[1])
+  .join('\n');
+
+const unbundled = EXTENSION_ASSETS.filter(
+  (asset) => !resourcePhases.includes(`${asset} in Resources`)
+);
+
+if (unbundled.length > 0) {
+  console.error(
+    `\n\u2716 ${unbundled.length} ShareExtension asset(s) are committed but NOT in a Resources build phase:\n` +
+      unbundled.map((a) => `    ${a}`).join('\n') +
+      '\n\nThey will not be inside the .appex, so UIImage(named:) returns nil at runtime and\n' +
+      'the sheet renders without them. Nothing else reports this - the build stays green.\n'
+  );
+  process.exit(1);
+}
+
+if (EXTENSION_ASSETS.length > 0) {
+  console.log(
+    `\u2713 all ${EXTENSION_ASSETS.length} ShareExtension asset(s) are in a Resources build phase`
+  );
+}
