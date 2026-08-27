@@ -10,6 +10,7 @@ relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
   - made-a-wish-to-become-a-real-boy
+  - the-apps-are-here
   - have-your-cake-and-eat-it-too
 tags:
   - local-first
