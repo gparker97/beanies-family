@@ -462,7 +462,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     category: 'security',
     title: 'Unlock With Biometrics (Face ID, Fingerprint, Device PIN)',
     excerpt:
-      'Sign back in with a tap using your device biometrics — in the app and the browser. A convenience layer over your family password, never a replacement.',
+      'Sign back in with a tap using your device biometrics — in the app and the browser. It opens your pod and signs you in as you, and your password always still works.',
     icon: '\u{1F441}️',
     readTime: 4,
     updatedDate: '2026-05-23',
@@ -476,12 +476,17 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Biometric unlock lets you reopen your pod with <strong>Face ID, a fingerprint, or your device PIN</strong> instead of typing your family password every time. It uses <strong>passkeys</strong> (WebAuthn) — the same passwordless standard your bank and Google use — and works in the installed app and in your browser.',
+          'Biometric unlock lets you reopen your pod with <strong>Face ID, a fingerprint, or your device PIN</strong> instead of typing a password every time. It uses <strong>passkeys</strong> (WebAuthn) — the same passwordless standard your bank and Google use — and works in the installed app and in your browser.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once it is set up, it does <strong>both</strong> jobs your password does: it opens your family pod <em>and</em> signs you in as you. So on a device you have already set up, a single tap takes you all the way into the app — you should not be asked for a password afterwards. If you ever are, something needs re-setting up, and the fix is in <strong>Settings → Security</strong>.',
       },
       {
         type: 'callout',
         content:
-          'Biometric unlock is a convenience layer <em>over</em> your family password — not a replacement for it. Your password always works, and losing or replacing your device never locks you out of your pod. Keep your password somewhere safe.',
+          'Biometric unlock sits <em>alongside</em> your password — never instead of it. Your password always works, and losing or replacing your device never locks you out of your pod. Keep your password somewhere safe.',
         title: 'Your password is still the master key',
         icon: '\u{1F511}',
       },
@@ -499,6 +504,24 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
           'Under <strong>Biometric login</strong>, tap <strong>Set up</strong> and confirm with your device biometrics.',
           "That's it — next time you sign in on that device, you'll be offered a one-tap biometric unlock.",
         ],
+      },
+      {
+        type: 'heading',
+        content: 'Sharing a device with someone else',
+        level: 2,
+        id: 'shared-devices',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Two people in your family can each set up biometric unlock on the <strong>same</strong> tablet or phone. When more than one of you has, beanies asks which of you is signing in before it unlocks, so you each land in your own account.',
+      },
+      {
+        type: 'callout',
+        content:
+          'One thing worth knowing: your device\u2019s Face ID or fingerprint check cannot tell family members apart. If two of you are set up on the <em>device itself</em> \u2014 both faces in Face ID, say \u2014 then either of you can pass the check and open whichever account is offered. That is how the phone works, not something beanies can change. This is why there is always a <strong>\u201cNot you? Switch account\u201d</strong> link before you land in an account \u2014 use it if the wrong bean comes up. On a device other people use, a password is the safer choice.',
+        title: 'Biometrics identify the device, not the person',
+        icon: '\u{1F441}\u{FE0F}',
       },
       {
         type: 'heading',

@@ -30,6 +30,8 @@ import {
   clearBiometricSuppression,
   describeAuthError,
   guessAuthenticatorLabel,
+  MEMBER_MISMATCH,
+  WRONG_FAMILY_CREDENTIAL,
   tr,
 } from './biometricShared';
 
@@ -37,6 +39,10 @@ import {
 // `biometricShared` module (so the native Keystore path can reuse it without an
 // import cycle), but existing callers import it from here.
 export { guessAuthenticatorLabel };
+
+// The auth sentinels are defined in the leaf so both mechanisms can produce them;
+// re-exported here because the views that branch on them import from this module.
+export { MEMBER_MISMATCH, WRONG_FAMILY_CREDENTIAL };
 
 const RP_NAME = 'beanies.family';
 
@@ -259,6 +265,7 @@ export async function registerPasskeyForMember(
     transports: response.getTransports?.() ?? [],
     prfSupported: true,
     label: params.label || guessAuthenticatorLabel(),
+    memberName,
     createdAt: toISODateString(new Date()),
   };
   await passkeyRepo.savePasskeyRegistration(registration);
@@ -397,6 +404,22 @@ function biometricUnavailableMessage(): string {
 
 export interface AuthenticatePasskeyParams {
   familyId: string;
+  /**
+   * Which member the caller expects to sign in. The two platforms honour this
+   * DIFFERENTLY, and the asymmetry is deliberate:
+   *
+   * - NATIVE: a selector. The keystore item is addressed per member, so this picks
+   *   which key to prompt for — and a member with no key here returns MEMBER_MISMATCH
+   *   without prompting at all.
+   * - WEB: an expectation, checked AFTER the assertion returns. WebAuthn runs in
+   *   discoverable-credential mode (`allowCredentials` is deliberately omitted, which
+   *   is what makes cross-device sign-in work), so the platform — not us — decides
+   *   which credential the user offers. We can only compare afterwards.
+   *
+   * Do not "fix" the web path by adding `allowCredentials`: that breaks sign-in on a
+   * device that has never registered a credential of its own.
+   */
+  memberId: string;
   passkeySecrets?: PasskeySecret[];
 }
 
@@ -419,9 +442,25 @@ export async function authenticateWithPasskey(
   params: AuthenticatePasskeyParams
 ): Promise<AuthenticatePasskeyResult> {
   // Native (installed app): the hardware Keystore path. `passkeySecrets` is unused on
-  // native (device-local blob, no envelope). Delegate before the WebAuthn gate.
-  if (isNative()) return nativeBiometric.nativeUnlock(params.familyId);
+  // native (device-local blob, no envelope). Delegate before the WebAuthn gate. Native
+  // enforces `memberId` as a selector, so it cannot return the wrong member.
+  if (isNative()) return nativeBiometric.nativeUnlock(params.familyId, params.memberId);
 
+  const result = await authenticateWithPasskeyWeb(params);
+
+  // THE one place web decides "right family, wrong member". Doing it here rather than at
+  // each of the six success returns below — or in each consuming view, which is how it
+  // was drifting — means the comparison exists once. See `AuthenticatePasskeyParams.memberId`
+  // for why web can only check this after the assertion.
+  if (result.success && result.memberId && result.memberId !== params.memberId) {
+    return { success: false, error: MEMBER_MISMATCH };
+  }
+  return result;
+}
+
+async function authenticateWithPasskeyWeb(
+  params: AuthenticatePasskeyParams
+): Promise<AuthenticatePasskeyResult> {
   if (!isWebAuthnSupported()) {
     return { success: false, error: 'WebAuthn is not supported' };
   }
@@ -532,7 +571,7 @@ export async function authenticateWithPasskey(
       }
     }
     // Neither credential ID nor userHandle matches this family's registrations
-    return { success: false, error: 'WRONG_FAMILY_CREDENTIAL' };
+    return { success: false, error: WRONG_FAMILY_CREDENTIAL };
   }
 
   // Update last used timestamp
@@ -648,26 +687,87 @@ export async function listRegisteredPasskeys(memberId?: string): Promise<Passkey
   return passkeyRepo.getAllPasskeys();
 }
 
-export async function hasRegisteredPasskeys(familyId: string): Promise<boolean> {
+/**
+ * WHICH members can this device sign in for `familyId`? Registry-only — no biometric
+ * prompt — because it runs on every family selection and every member-picker render.
+ *
+ * This is the SINGLE answer to "is biometric available here?" and to "which members?".
+ * There is deliberately no boolean sibling: every caller needs to know WHOSE key it is
+ * (to select the right keystore item, to label a chooser, to decide whether to offer the
+ * button to THIS member), and a family-level boolean is what let three call sites offer
+ * biometric to members who had never enrolled on the device.
+ *
+ * Returns `PasskeyRegistration[]` deliberately: both branches already produce that type,
+ * and it carries `mechanism`, which a narrower projection would drop.
+ */
+export async function resolveDeviceKeys(familyId: string): Promise<PasskeyRegistration[]> {
   // Native: only a `native-keystore` record counts (and stale WebAuthn records are
-  // cleaned up here so they neither drive an unlock nor suppress the enroll offer).
-  if (isNative()) return nativeBiometric.nativeHasRegistered(familyId);
-  const passkeys = await passkeyRepo.getPasskeysByFamily(familyId);
-  return passkeys.length > 0;
+  // cleaned up there so they neither drive an unlock nor suppress the enroll offer).
+  if (isNative()) return nativeBiometric.nativeResolveDeviceKeys(familyId);
+
+  let records: PasskeyRegistration[];
+  try {
+    records = await passkeyRepo.getPasskeysByFamily(familyId);
+  } catch (err) {
+    // The native branch already degrades to "no keys" on a broken registry; the web branch
+    // used to THROW instead, straight out of the `onMounted` of three login views — which
+    // left a spinner up forever with no message. Same input, same outcome, on both
+    // platforms; and it is logged, so "registry broken" stays distinguishable from
+    // "nothing enrolled".
+    logEvent({
+      level: 'warn',
+      surface: 'passkey-prf',
+      message: 'registry_read_failed',
+      context: { action: 'registry_read_failed', detail: describeAuthError(err).slice(0, 200) },
+    });
+    return [];
+  }
+
+  // De-duplicate by member: `registerSyncedCredential` writes an EXTRA record for the same
+  // member when an iCloud/Google-synced passkey is first used on this browser. Without
+  // this, one person shows up twice in the "who's signing in?" chooser.
+  const seen = new Set<string>();
+  return records.filter((r) => (seen.has(r.memberId) ? false : (seen.add(r.memberId), true)));
+}
+
+/**
+ * Reclaim every keystore blob this device holds for a family — per-member and legacy.
+ * Delegated so the `isNative()` guard stays in one place and no other module has to
+ * know how a keystore account is addressed.
+ */
+export async function reclaimFamilyKeystore(familyId: string): Promise<void> {
+  if (!isNative()) return;
+  await nativeBiometric.nativeReclaimFamilyKeystore(familyId);
 }
 
 export async function removePasskey(credentialId: string): Promise<void> {
   const record = await passkeyRepo.getPasskeyByCredentialId(credentialId);
   if (record?.mechanism === 'native-keystore') {
-    await nativeBiometric.nativeDisable(record.familyId, credentialId);
+    await nativeBiometric.nativeDisable(record.familyId, record.memberId);
     return;
   }
   await passkeyRepo.removePasskeyRegistration(credentialId);
   await signalCredentialsRemoved([credentialId]);
 }
 
+/**
+ * Retire every credential a member holds ON THIS DEVICE — used when they are removed
+ * from the family. Routes each through `removePasskey` so there is ONE implementation of
+ * "retire a credential": native deletes the OS blob, web signals the platform
+ * authenticator so the credential stops being offered in iCloud Keychain / Windows Hello.
+ *
+ * Previously this only cleared the IndexedDB rows, leaving the OS blob live — and it had
+ * no callers at all, so nothing invalidated anything.
+ *
+ * NOTE the device-local limit: the `passkeys` store is per device, so this reaches only
+ * credentials enrolled here. Revoking a removed member's access on THEIR devices is
+ * tracker #77, not this function.
+ */
 export async function removeAllPasskeysForMember(memberId: string): Promise<void> {
-  await passkeyRepo.removeAllPasskeysByMember(memberId);
+  const records = await listRegisteredPasskeys(memberId);
+  for (const r of records) {
+    await removePasskey(r.credentialId);
+  }
 }
 
 /**

@@ -4,10 +4,12 @@ import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
 import {
   registerPasskeyForMember,
   authenticateWithPasskey,
-  hasRegisteredPasskeys,
+  resolveDeviceKeys,
+  MEMBER_MISMATCH,
+  WRONG_FAMILY_CREDENTIAL,
   type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
-import type { PasskeySecret } from '@/types/models';
+import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
@@ -1092,10 +1094,16 @@ export const useAuthStore = defineStore('auth', () => {
    * Sign in using a registered passkey (biometric).
    * Returns familyKey for file decryption if available via PRF or trusted device cache.
    */
-  async function signInWithPasskey(
-    familyId: string,
-    passkeySecrets?: PasskeySecret[]
-  ): Promise<{
+  /**
+   * Takes a params object rather than positionals: `memberId` is now required, and a
+   * third positional argument on an auth entry point is how
+   * `signInWithPasskey(familyId, undefined, memberId)` eventually gets written.
+   */
+  async function signInWithPasskey(params: {
+    familyId: string;
+    memberId: string;
+    passkeySecrets?: PasskeySecret[];
+  }): Promise<{
     success: boolean;
     cancelled?: boolean;
     memberId?: string;
@@ -1103,17 +1111,23 @@ export const useAuthStore = defineStore('auth', () => {
     credentialId?: string;
     error?: string;
   }> {
+    const { familyId, memberId, passkeySecrets } = params;
     isLoading.value = true;
     error.value = null;
 
     try {
-      const result = await authenticateWithPasskey({ familyId, passkeySecrets });
+      const result = await authenticateWithPasskey({ familyId, memberId, passkeySecrets });
       if (!result.success || !result.memberId) {
         // Don't pollute `error.value` with a user-cancellation — keeps
         // any reactive UI bound to authStore.error from rendering an
         // error state for a deliberate dismiss gesture.
         if (!result.cancelled) {
-          error.value = result.error ?? 'Passkey authentication failed';
+          // MEMBER_MISMATCH / WRONG_FAMILY_CREDENTIAL are SENTINELS the caller branches
+          // on, not copy. Assigning one to the store's user-facing `error` would put
+          // untranslated machine text in a display field; the views map them to strings.
+          const isSentinel =
+            result.error === MEMBER_MISMATCH || result.error === WRONG_FAMILY_CREDENTIAL;
+          error.value = isSentinel ? null : (result.error ?? 'Passkey authentication failed');
         }
         return {
           success: false,
@@ -1242,10 +1256,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Check if any passkeys are registered for a given family.
+   * WHICH members this device can sign in for a family — the store-level seam the views
+   * use, so no view imports the passkey service directly (MVO) and tests have one place
+   * to stub. Replaces the old `checkHasRegisteredPasskeys` boolean: every caller of that
+   * needed the list, not the count.
    */
-  async function checkHasRegisteredPasskeys(familyId: string): Promise<boolean> {
-    return hasRegisteredPasskeys(familyId);
+  async function resolveDeviceKeysForFamily(familyId: string): Promise<PasskeyRegistration[]> {
+    return resolveDeviceKeys(familyId);
   }
 
   /**
@@ -1374,6 +1391,22 @@ export const useAuthStore = defineStore('auth', () => {
         await deleteFamilyDatabase(familyId);
       } catch (e) {
         console.warn('Failed to delete family database on sign-out:', e);
+      }
+      // ...and the cached FAMILY KEY with it. Deleting the encrypted cache while
+      // leaving the key that decrypts it behind is the wrong half: the key is stored
+      // unencrypted in the registry DB, so on a shared device it let the next person
+      // auto-decrypt the pod (`tryAutoDecrypt`) without proving anything at all.
+      // Trusted devices keep it — that is exactly what "this is my own device" buys.
+      try {
+        await settingsStore.clearCachedFamilyKey(familyId);
+      } catch (e) {
+        reportError({
+          surface: 'auth-signout',
+          message: 'failed to clear the cached family key on an untrusted sign-out',
+          error: e,
+          severity: 'warning',
+          context: { action: 'clear_cached_key' },
+        });
       }
     }
 
@@ -1545,7 +1578,7 @@ export const useAuthStore = defineStore('auth', () => {
     updateSessionWithMemberData,
     updateCurrentUserRole,
     registerPasskeyForCurrentUser,
-    checkHasRegisteredPasskeys,
+    resolveDeviceKeysForFamily,
     signUp,
     setPassword,
     changePassword,

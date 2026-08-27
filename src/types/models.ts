@@ -83,7 +83,32 @@ export interface PasskeyRegistration {
    * such records set publicKey='' and prfSupported=false. See ADR-029 (2026-07-14).
    */
   mechanism?: 'webauthn-prf' | 'native-keystore';
-  label: string; // e.g. "MacBook Touch ID"
+  label: string; // e.g. "MacBook Touch ID" — describes the DEVICE, not the member
+  /**
+   * The member's display name AT ENROL TIME, kept so the cold-start chooser can tell two
+   * beans apart on a shared device — before the pod is decrypted there is no roster to
+   * look a name up in, and `label` is a device descriptor that is identical for everyone
+   * who enrolled on this phone.
+   *
+   * Local registry only: never synced, never logged, never sent to telemetry. It is a
+   * display hint and is deliberately NOT reconciled — rename a bean and the chooser shows
+   * the old name until they re-enrol, which costs one confusing tap at most and saves a
+   * background reconciliation job for a two-keys-on-one-device edge case.
+   */
+  memberName?: string;
+  /**
+   * WHERE this member's biometric blob lives in the OS keystore.
+   *
+   * `'per-member'` — the `${familyId}:${memberId}` address, used by everything enrolled
+   * since #76. **Absent means the legacy address** (the bare `familyId`), which is how
+   * every pre-#76 enrolment was stored, one per family.
+   *
+   * Recorded rather than inferred because inferring it is genuinely unsafe: counting the
+   * family's records to guess who owns the legacy blob breaks the moment a second member
+   * enrols, and probing addresses cannot distinguish "not mine" from "keystore hiccup".
+   * A device-local, non-indexed field costs nothing and makes the question exact.
+   */
+  keystoreScheme?: 'per-member';
   createdAt: ISODateString;
   lastUsedAt?: ISODateString;
 }

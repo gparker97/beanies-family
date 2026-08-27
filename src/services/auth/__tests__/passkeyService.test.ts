@@ -11,7 +11,7 @@ vi.mock('@/services/indexeddb/repositories/passkeyRepository', () => ({
   getPasskeysByMember: vi.fn(async () => []),
   getAllPasskeys: vi.fn(async () => []),
   removePasskeyRegistration: vi.fn(async () => {}),
-  removeAllPasskeysByMember: vi.fn(async () => {}),
+  getPasskeyByCredentialId: vi.fn(async () => null),
 }));
 
 // --- Mock passkeyCrypto ---
@@ -61,7 +61,8 @@ const { nativeMocks } = vi.hoisted(() => ({
     nativeUnlock: vi.fn(async () => ({ success: true, memberId: 'member-1' })),
     nativeCanEnroll: vi.fn(async () => true),
     nativeCanOffer: vi.fn(async () => true),
-    nativeHasRegistered: vi.fn(async () => false),
+    nativeResolveDeviceKeys: vi.fn(async (): Promise<unknown[]> => []),
+    nativeReclaimFamilyKeystore: vi.fn(async () => {}),
     nativeDisable: vi.fn(async () => {}),
   },
 }));
@@ -84,9 +85,11 @@ import {
   authenticateWithPasskey,
   registerPasskeyForMember,
   getRpId,
-  hasRegisteredPasskeys,
+  resolveDeviceKeys,
   canOfferBiometric,
   canEnrollBiometric,
+  removePasskey,
+  MEMBER_MISMATCH,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 
@@ -170,19 +173,69 @@ describe('native delegation — passkeyService routes to the Keystore path on na
       credentials: { create: vi.fn(), get: getMock },
       userAgent: navigator.userAgent,
     });
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
-    expect(nativeMocks.nativeUnlock).toHaveBeenCalledWith('family-1');
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
+    expect(nativeMocks.nativeUnlock).toHaveBeenCalledWith('family-1', 'member-1');
     expect(getMock).not.toHaveBeenCalled();
     expect(result.memberId).toBe('member-1');
   });
 
-  it('canEnrollBiometric / canOfferBiometric / hasRegisteredPasskeys delegate to the native helpers', async () => {
+  it('canEnrollBiometric / canOfferBiometric / resolveDeviceKeys delegate to the native helpers', async () => {
     await canEnrollBiometric();
     await canOfferBiometric();
-    await hasRegisteredPasskeys('family-1');
+    await resolveDeviceKeys('family-1');
     expect(nativeMocks.nativeCanEnroll).toHaveBeenCalled();
     expect(nativeMocks.nativeCanOffer).toHaveBeenCalled();
-    expect(nativeMocks.nativeHasRegistered).toHaveBeenCalledWith('family-1');
+    expect(nativeMocks.nativeResolveDeviceKeys).toHaveBeenCalledWith('family-1');
+  });
+
+  it('de-duplicates by member so one person never appears twice in the chooser', async () => {
+    // A synced iCloud/Google passkey adds a SECOND record for the same member the first
+    // time it is used on this browser, which would otherwise render two identical buttons
+    // under "who's signing in?".
+    isNativeMock.mockReturnValue(false);
+    vi.mocked(passkeyRepo.getPasskeysByFamily).mockResolvedValueOnce([
+      makeRegistration({ credentialId: 'a', memberId: 'member-1' }),
+      makeRegistration({ credentialId: 'b', memberId: 'member-1', label: 'iPhone (synced)' }),
+      makeRegistration({ credentialId: 'c', memberId: 'member-2' }),
+    ]);
+
+    const keys = await resolveDeviceKeys('family-1');
+
+    expect(keys.map((k) => k.memberId)).toEqual(['member-1', 'member-2']);
+    isNativeMock.mockReturnValue(true);
+  });
+
+  it('a broken registry degrades to "no keys" on web, as it already did on native', async () => {
+    // It used to THROW out of three views' onMounted, leaving a spinner up forever.
+    isNativeMock.mockReturnValue(false);
+    vi.mocked(passkeyRepo.getPasskeysByFamily).mockRejectedValueOnce(new Error('db blocked'));
+
+    expect(await resolveDeviceKeys('family-1')).toEqual([]);
+    isNativeMock.mockReturnValue(true);
+  });
+
+  it('returns MEMBER_MISMATCH when native reports the member has no key on this device', async () => {
+    nativeMocks.nativeUnlock.mockResolvedValueOnce({
+      success: false,
+      error: MEMBER_MISMATCH,
+    } as never);
+    const result = await authenticateWithPasskey({
+      familyId: 'family-1',
+      memberId: 'member-2',
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(MEMBER_MISMATCH);
+  });
+
+  it('removePasskey passes (familyId, memberId) to nativeDisable — not a credentialId', async () => {
+    vi.mocked(passkeyRepo.getPasskeyByCredentialId).mockResolvedValueOnce(
+      makeRegistration({
+        credentialId: 'native:family-1:member-1',
+        mechanism: 'native-keystore',
+      })
+    );
+    await removePasskey('native:family-1:member-1');
+    expect(nativeMocks.nativeDisable).toHaveBeenCalledWith('family-1', 'member-1');
   });
 });
 
@@ -458,7 +511,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    await authenticateWithPasskey({ familyId: 'family-1' });
+    await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
 
     expect(getMock).toHaveBeenCalledTimes(1);
     const callArgs = getMock.mock.calls[0] as unknown as [
@@ -483,7 +536,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(true);
     expect(result.memberId).toBe('member-1');
     // No PRF, no cache → no familyKey, but credentialId returned for password fallback
@@ -511,7 +564,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(true);
     expect(result.familyKey).toBe(mockImportedFamilyKey);
   });
@@ -538,7 +591,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(true);
     expect(result.memberId).toBe('member-1');
     expect(result.familyKey).toBe(mockImportedFamilyKey);
@@ -575,7 +628,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     // V4: returns success with memberId but no familyKey — caller prompts for password
     expect(result.success).toBe(true);
     expect(result.memberId).toBe('member-1');
@@ -600,7 +653,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(false);
     expect(result.error).toBe('WRONG_FAMILY_CREDENTIAL');
   });
@@ -622,7 +675,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(false);
     expect(result.error).toBe('WRONG_FAMILY_CREDENTIAL');
   });
@@ -642,7 +695,7 @@ describe('authenticateWithPasskey', () => {
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(false);
     expect(result.cancelled).toBe(true);
     expect(result.error).toBe('Authentication was cancelled');
@@ -752,7 +805,7 @@ describe('formatCredentialManagerError — friendly copy, never the raw string (
       userAgent: navigator.userAgent,
     });
 
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    const result = await authenticateWithPasskey({ familyId: 'family-1', memberId: 'member-1' });
     expect(result.success).toBe(false);
     // Friendly copy (the tr() fallback), never the raw platform string.
     expect(result.error).not.toContain('NoCreateCredentialException');

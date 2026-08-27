@@ -3710,6 +3710,13 @@ const STRING_DEFS = {
     en: 'This biometric does not belong to the current family. Please try again.',
     beanie: 'this biometric does not belong to the current family. please try again.',
   },
+  // Right family, different bean. Deliberately NOT the re-enrol copy: this bean simply
+  // has no biometric on this device, which is the normal case for everyone else in the
+  // family — telling them their biometrics changed would be both wrong and alarming.
+  'passkey.wrongMemberError': {
+    en: 'That biometric belongs to a different bean. Use your password to sign in.',
+    beanie: 'that biometric belongs to a different bean. use your password to sign in.',
+  },
   'passkey.dekStale': {
     en: 'Your encryption key has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
     beanie:
@@ -3974,6 +3981,8 @@ const STRING_DEFS = {
 
   // Fast login (single-family auto-select)
   'fastLogin.notYou': { en: 'Not you? Switch account', beanie: 'not you? switch account' },
+  // Shown only when two or more beans have enrolled biometric on the same device.
+  'fastLogin.whoIsSigningIn': { en: "Who's signing in?", beanie: 'which bean is this?' },
   'fastLogin.welcomeBack': { en: 'Welcome back', beanie: 'welcome back' },
   'fastLogin.welcomeBackName': { en: 'Welcome back, {name}!', beanie: 'welcome back, {name}!' },
   'fastLogin.loadErrorLocal': {

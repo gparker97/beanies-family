@@ -879,6 +879,57 @@ member removal impossible for cache-only families.
 - _Scope_: confirmed requirements 1-10 are delivered, recommended cutting `memberName`, and made
   the case for the split.
 
+## Implementation Outcome (2026-08-27)
+
+Implemented and reviewed. Type-check clean, lint clean, 5077 tests pass (22 net-new), iOS
+source guards green, and `${familyId}:${memberId}` appears in exactly one source file.
+
+**Four reviewers went over auth/login/biometrics afterwards — new code and old — and found
+three defects in the implementation itself.** Each is worth recording, because each is a
+different way for a change to look finished and not be:
+
+1. **The biometric button did nothing on cold start.** Three routes reach the biometric
+   view; only one set `biometricDeviceKeys`, and the view drives itself off that prop. So
+   on the commonest path of all, the button rendered and silently no-opped — no prompt, no
+   error, no telemetry. Fixed by making `enterBiometricView` the single entry point that
+   sets all four pieces of state together, and pinned by a test that fails on the old code.
+2. **The read-repair migration was removed entirely.** Its central claim — "`setKey` needs
+   no authentication, so re-homing the key costs zero extra prompts" — is true on iOS and
+   false on Android, where `setKey` fires a second `BiometricPrompt` immediately after the
+   unlock the user just satisfied, and dismissing it would repeat that forever. Replaced by
+   a `keystoreScheme` field on the record: legacy enrolments keep working at the legacy
+   address, and a re-enrol moves them. Simpler, and it also fixed a data-loss bug where the
+   first bean to open the app after an update destroyed the other bean's enrolment.
+3. **The chooser could not tell two beans apart.** `PasskeyRegistration.label` is a DEVICE
+   descriptor ("Face ID · Safari, iOS"), identical for everyone enrolled on the same phone,
+   so "Who's signing in?" rendered two identical buttons. `memberName` — dropped earlier as
+   unnecessary complexity — turned out to be exactly what the feature needed, and is now
+   captured at enrol time.
+
+Also fixed from the review: `notEnrolled` no longer wipes the whole family's enrolments (on
+Android it can mean a momentarily busy sensor); a thrown keystore presence check no longer
+deletes a good enrolment; `ReauthChallenge` and `LoadPodView` gate per member rather than
+per family, so neither offers a button that cannot work; the web registry read degrades like
+the native one instead of throwing out of three views' `onMounted`; synced passkeys are
+de-duplicated by member; the cross-device banner no longer permanently masks later errors;
+and `hasRegisteredPasskeys` was deleted once its last caller went, leaving `resolveDeviceKeys`
+as the single question.
+
+### Known gaps, deliberately not fixed here
+
+- **A member can sign in as a different member on a shared device.** The OS prompt accepts
+  any enrolled biometric, and every member's blob holds the same family key, so a child
+  whose fingerprint is enrolled on the family tablet can pick a parent's bean and pass.
+  Per-member addressing labels identity; it does not separate keys. Needs its own decision.
+- `settingsStore.cachedFamilyKeys` stores the family key **unencrypted** in IndexedDB and
+  `signOut` never clears it (only `signOutAndClearData` does).
+- `setPassword` has no authorization check, so any unclaimed member can be claimed from the
+  login screen.
+- iOS keychain items survive app uninstall, but the registry that enumerates them does not —
+  so per-member blobs can be orphaned beyond any code path's reach.
+- The `'loading'` view has no escape, and `onMounted`'s unbounded awaits can leave a spinner
+  with no way out.
+
 ## Prompt Log
 
 <details>

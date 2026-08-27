@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
+import type { PasskeyRegistration } from '@/types/models';
 
 const { t } = useTranslation();
 const familyContextStore = useFamilyContextStore();
@@ -18,7 +19,7 @@ const emit = defineEmits<{
     payload: {
       id: string;
       name: string;
-      hasPasskeys: boolean;
+      deviceKeys: PasskeyRegistration[];
       providerConfig: PersistedProviderConfig | null;
     },
   ];
@@ -28,7 +29,12 @@ const emit = defineEmits<{
 interface FamilyEntry {
   id: string;
   name: string;
-  hasPasskeys: boolean;
+  /**
+   * Which members this device can sign in for this family. Carried as the list rather
+   * than a boolean so the selection doesn't have to re-read the registry downstream —
+   * one read per family here answers both "offer biometric?" and "which keys?".
+   */
+  deviceKeys: PasskeyRegistration[];
   providerConfig: PersistedProviderConfig | null;
 }
 
@@ -45,14 +51,14 @@ async function loadFamilies() {
   const entries: FamilyEntry[] = [];
 
   for (const family of allFamilies) {
-    const [hasPasskeys, providerConfig] = await Promise.all([
-      authStore.checkHasRegisteredPasskeys(family.id),
+    const [deviceKeys, providerConfig] = await Promise.all([
+      authStore.resolveDeviceKeysForFamily(family.id),
       getProviderConfig(family.id),
     ]);
     entries.push({
       id: family.id,
       name: family.name ?? 'My Family',
-      hasPasskeys,
+      deviceKeys,
       providerConfig,
     });
   }
@@ -76,7 +82,7 @@ function selectFamily(family: FamilyEntry) {
   emit('family-selected', {
     id: family.id,
     name: family.name,
-    hasPasskeys: family.hasPasskeys,
+    deviceKeys: family.deviceKeys,
     providerConfig: family.providerConfig,
   });
 }

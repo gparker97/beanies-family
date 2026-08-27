@@ -15,6 +15,23 @@
 // their import path.
 export { tr } from '@/services/translation/tr';
 
+/**
+ * Authentication sentinels — machine-readable `error` values that a caller branches on
+ * rather than shows. They live here, in the leaf, because BOTH the web and native paths
+ * produce them and three views consume them; a bare string literal at each site is how
+ * the same comparison ends up written four slightly different ways.
+ *
+ * `WRONG_FAMILY_CREDENTIAL` — the credential resolved to a different FAMILY.
+ * `MEMBER_MISMATCH` — right family, wrong MEMBER. On native this is returned with no
+ *   prompt at all (the member simply has no key on this device); on web it is decided
+ *   after the assertion returns, because discoverable-credential mode cannot select a
+ *   member up front. Deliberately distinct from the re-enrol path: telling a healthy
+ *   user their biometrics changed, when they merely picked a different bean, is worse
+ *   than saying nothing.
+ */
+export const WRONG_FAMILY_CREDENTIAL = 'WRONG_FAMILY_CREDENTIAL';
+export const MEMBER_MISMATCH = 'MEMBER_MISMATCH';
+
 // Per-device, self-healing suppression of the PROACTIVE biometric offer (the
 // App.vue post-sign-in nag) after a decline/failure. Stored as an expiry timestamp
 // (ms) in localStorage — NOT synced, and it can only HIDE the proactive nag (never

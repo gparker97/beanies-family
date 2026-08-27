@@ -9,7 +9,9 @@ import { registerPlugin } from '@capacitor/core';
  * The wrapped blob is DEVICE-LOCAL and never synced. This replaces the retired
  * native WebAuthn-PRF path; web/PWA keeps WebAuthn-PRF (see passkeyService.ts).
  *
- * `account` is the family id — one biometric-gated blob per family per device.
+ * `account` addresses ONE blob on this device. Since #76 it is `${familyId}:${memberId}`
+ * (pre-#76 records still use the bare familyId). `nativeBiometric.ts` is the only module
+ * allowed to build either form — do not construct an account string here or anywhere else.
  * `keyB64` is STANDARD base64 (not base64url) — must match `Base64.NO_WRAP`
  * (Android) / `.base64EncodedString()` (iOS) on the native side.
  *

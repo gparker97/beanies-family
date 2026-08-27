@@ -1,18 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed } from 'vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
-import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { raceTimeout } from '@/utils/timing';
+import { useBiometricSignIn } from '@/composables/useBiometricSignIn';
+import { ref } from 'vue';
+import type { PasskeyRegistration } from '@/types/models';
 
 const props = defineProps<{
   familyId: string;
   familyName?: string;
-  showNotYouLink?: boolean;
+  /**
+   * The keys this device holds for this family, resolved once by LoginPage. Passing them
+   * in rather than re-querying keeps one registry read per family selection, and lets the
+   * cold-start chooser label each key before the pod (and therefore the member roster)
+   * has been decrypted.
+   */
+  deviceKeys: PasskeyRegistration[];
 }>();
 
 const emit = defineEmits<{
@@ -22,93 +28,55 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const authStore = useAuthStore();
 const syncStore = useSyncStore();
-const familyStore = useFamilyStore();
+const { isAuthenticating, signIn } = useBiometricSignIn();
 
-const isAuthenticating = ref(false);
 const errorMessage = ref<string | null>(null);
+/**
+ * WHICH chooser button is mid-prompt. `isAuthenticating` is a single shared flag, so using
+ * it directly would spin every button at once and hide all the names — leaving the user
+ * unable to see who they just tapped.
+ */
+const pendingMemberId = ref<string | null>(null);
 const crossDeviceContext = ref<{
   crossDevice: true;
   memberId: string;
   credentialId?: string;
 } | null>(null);
 
-async function handleBiometricLogin() {
-  isAuthenticating.value = true;
+/** More than one bean has enrolled on this device, so the user must say which is them. */
+const needsChooser = computed(() => props.deviceKeys.length > 1);
+
+async function handleBiometricLogin(memberId: string) {
   errorMessage.value = null;
-
+  // Cleared per attempt: the cross-device banner outranks the error block in the
+  // template, so leaving it set would silently swallow every subsequent message.
+  crossDeviceContext.value = null;
+  pendingMemberId.value = memberId;
+  let result;
   try {
-    const result = await authStore.signInWithPasskey(
-      props.familyId,
-      syncStore.effectivePasskeySecrets
-    );
-
-    if (!result.success) {
-      // User dismissed the platform-authenticator prompt — silent exit
-      // so they can pick another sign-in method without an error
-      // message accusing them of failure.
-      if (result.cancelled) {
-        console.warn('[passkey] authentication cancelled by user');
-        return;
-      }
-      if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
-        errorMessage.value = t('passkey.wrongFamilyError');
-      } else {
-        errorMessage.value = result.error ?? t('passkey.signInError');
-      }
-      return;
-    }
-
-    // Decrypt with family key if available, otherwise fall back to password prompt
-    let decryptSuccess = false;
-
-    if (result.familyKey) {
-      const fkResult = await syncStore.decryptPendingFileWithKey(result.familyKey);
-      decryptSuccess = fkResult.success;
-      if (!decryptSuccess) {
-        console.warn('[BiometricLoginView] decryptPendingFileWithKey failed:', fkResult.error);
-        if (fkResult.error?.includes('No pending')) {
-          errorMessage.value = t('passkey.fileLoadError');
-        } else {
-          errorMessage.value = t('passkey.signInError');
-        }
-      }
-    } else {
-      // Passkey verified member but no family key — cross-device or no PRF.
-      // Show informative message and fall back to password with context.
-      errorMessage.value = t('passkey.crossDeviceNoCache');
-      crossDeviceContext.value = {
-        crossDevice: true,
-        memberId: result.memberId!,
-        credentialId: result.credentialId,
-      };
-      return;
-    }
-
-    if (decryptSuccess) {
-      // Update session with full member data now that file is decrypted
-      authStore.updateSessionWithMemberData();
-
-      // Set current member
-      const member = familyStore.members.find((m) => m.id === authStore.currentUser?.memberId);
-      if (member) {
-        familyStore.setCurrentMember(member.id);
-      }
-
-      syncStore.setupAutoSync();
-      // Best-effort Drive push — never hang the "verifying" spinner on it. A slow/
-      // offline/token-rejected save would otherwise freeze the button indefinitely
-      // (the biometric unlock has already succeeded and the doc is decrypted in
-      // memory + cache; the push rides the next auto-sync). Mirrors register. (2026-07-14)
-      await raceTimeout(syncStore.syncNow(true), 5000);
-      emit('signed-in', '/nook');
-    }
-  } catch (err) {
-    errorMessage.value = err instanceof Error ? err.message : t('passkey.signInError');
+    result = await signIn(props.familyId, memberId);
   } finally {
-    isAuthenticating.value = false;
+    pendingMemberId.value = null;
   }
+
+  if (result.ok) {
+    emit('signed-in', '/nook');
+    return;
+  }
+  if ('crossDevice' in result) {
+    errorMessage.value = result.message;
+    crossDeviceContext.value = { crossDevice: true, ...result.crossDevice };
+    return;
+  }
+  // A null message is a deliberate silence (the user dismissed the prompt).
+  errorMessage.value = result.message;
+}
+
+/** The single-key case, which is every device until someone else enrols here. */
+function handleSingleKeyLogin() {
+  const only = props.deviceKeys[0];
+  if (only) void handleBiometricLogin(only.memberId);
 }
 </script>
 
@@ -122,7 +90,15 @@ async function handleBiometricLogin() {
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
-      {{ showNotYouLink ? t('fastLogin.notYou') : t('action.back') }}
+      <!--
+        Always "not you?", never a bare "back". Every route into this view now auto-enters
+        a member the user did not choose (a single family auto-selects; the family picker
+        lands here too), so this is the escape hatch for a shared device — the whole
+        mitigation for a biometric that cannot tell two enrolled faces apart. It used to
+        be conditional on single-family auto-select, which was false on exactly the path
+        that most needs it.
+      -->
+      {{ t('fastLogin.notYou') }}
     </button>
 
     <!-- Family name -->
@@ -134,9 +110,9 @@ async function handleBiometricLogin() {
       />
       <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
         {{
-          showNotYouLink && familyName
+          familyName
             ? fillTemplate(t('fastLogin.welcomeBackName'), { name: familyName })
-            : familyName || t('passkey.welcomeBack')
+            : t('passkey.welcomeBack')
         }}
       </h2>
       <!-- File/provider context -->
@@ -152,10 +128,40 @@ async function handleBiometricLogin() {
 
     <!-- Biometric button -->
     <div class="w-full space-y-4">
+      <!--
+        Two or more beans have enrolled on this device, so we cannot know which one is
+        holding the phone — the OS prompt certainly cannot tell. Ask first, then unlock
+        that bean's own key. Labels come from the registration record because at this
+        point the pod is still encrypted, so there is no member roster to read names from.
+      -->
+      <div v-if="needsChooser" class="space-y-2">
+        <p class="text-center text-sm text-gray-500 dark:text-gray-400">
+          {{ t('fastLogin.whoIsSigningIn') }}
+        </p>
+        <button
+          v-for="key in deviceKeys"
+          :key="key.credentialId"
+          :disabled="isAuthenticating"
+          :aria-busy="pendingMemberId === key.memberId"
+          class="group bg-secondary-500 flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 dark:bg-slate-700"
+          @click="handleBiometricLogin(key.memberId)"
+        >
+          <!--
+            `memberName` names the BEAN; `label` names the DEVICE ("Face ID · Safari, iOS")
+            and is identical for everyone enrolled on this phone — useless for telling two
+            people apart, which is the entire job of this chooser. Older records predate
+            the field, so fall back rather than render nothing.
+          -->
+          <BeanieSpinner v-if="pendingMemberId === key.memberId" size="sm" />
+          <span class="font-outfit font-semibold">{{ key.memberName || key.label }}</span>
+        </button>
+      </div>
+
       <button
+        v-else
         :disabled="isAuthenticating"
         class="group bg-secondary-500 flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 dark:bg-slate-700"
-        @click="handleBiometricLogin"
+        @click="handleSingleKeyLogin"
       >
         <template v-if="isAuthenticating">
           <BeanieSpinner size="sm" />
@@ -192,12 +198,14 @@ async function handleBiometricLogin() {
       <!-- Error message -->
       <div
         v-else-if="errorMessage"
+        role="alert"
         class="rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
       >
         {{ errorMessage }}
         <button
+          v-if="!needsChooser"
           class="mt-2 block w-full text-center text-xs font-medium text-red-700 underline dark:text-red-300"
-          @click="handleBiometricLogin"
+          @click="handleSingleKeyLogin"
         >
           {{ t('action.tryAgain') }}
         </button>

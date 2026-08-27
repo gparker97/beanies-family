@@ -19,8 +19,9 @@ import { BaseButton } from '@/components/ui';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import {
   authenticateWithPasskey,
-  hasRegisteredPasskeys,
+  resolveDeviceKeys,
   isWebAuthnSupported,
+  MEMBER_MISMATCH,
 } from '@/services/auth/passkeyService';
 import { isNative } from '@/services/sync/capabilities';
 import { verifyPassword } from '@/services/auth/passwordService';
@@ -63,7 +64,12 @@ async function detectPasskey() {
     return;
   }
   try {
-    passkeyAvailable.value = await hasRegisteredPasskeys(authStore.currentUser.familyId);
+    // Per MEMBER, not per family. `tryPasskey` names `props.member.id`, which native treats
+    // as a hard selector — so a family-level check offers a button that returns
+    // MEMBER_MISMATCH with no prompt at all, i.e. a control guaranteed to fail, while
+    // hiding the password guidance the user actually needs.
+    const deviceKeys = await resolveDeviceKeys(authStore.currentUser.familyId);
+    passkeyAvailable.value = deviceKeys.some((k) => k.memberId === props.member.id);
   } catch (e) {
     // Detection failure is non-fatal — fall back to password-only UX.
     passkeyAvailable.value = false;
@@ -103,10 +109,17 @@ async function tryPasskey() {
   isVerifying.value = true;
   inlineError.value = null;
   try {
+    // Naming the member turns this from "prompt, then discover it was the wrong person"
+    // into "select that member's key, or don't prompt at all" — on native the keystore
+    // item is addressed per member, so a member with no key here costs zero prompts.
     const result = await authenticateWithPasskey({
       familyId: authStore.currentUser.familyId,
+      memberId: props.member.id,
     });
-    if (result.success && result.memberId === props.member.id) {
+    if (result.success) {
+      // The service compares the resolved member against the one we asked for, so a
+      // success here IS the right member. The two hand-written comparisons this
+      // replaced were the drift the MEMBER_MISMATCH sentinel exists to remove.
       emit('verified');
       return;
     }
@@ -114,7 +127,7 @@ async function tryPasskey() {
       // Established noise pattern — silent drop back to the choice screen.
       return;
     }
-    if (result.success && result.memberId !== props.member.id) {
+    if (result.error === MEMBER_MISMATCH) {
       inlineError.value = t('transferOwnership.reauthWrongMember');
       // Native biometric is DEVICE-scoped: it unlocks as the member who enrolled on
       // this device, so a mismatch with the target member is EXPECTED, not an
@@ -125,7 +138,10 @@ async function tryPasskey() {
           surface: 'reauthChallenge.tryPasskey',
           message: 'Passkey authenticated a different member than expected',
           severity: 'warning',
-          context: { expected: props.member.id, got: result.memberId },
+          // `expected`/`got` are NOT in ALLOWED_CONTEXT_KEYS, so every one of these
+          // events has arrived contextless since the day it was written. `member_id_tail`
+          // is the allowlisted form and matches the password-rotation surfaces.
+          context: { member_id_tail: props.member.id.slice(-8) },
         });
       }
       return;
@@ -135,7 +151,8 @@ async function tryPasskey() {
     reportError({
       surface: 'reauthChallenge.tryPasskey',
       message: 'Passkey authentication failed',
-      context: { error: result.error },
+      // `error` is likewise not allowlisted; `detail` is.
+      context: { detail: result.error?.slice(0, 200) },
     });
   } catch (e) {
     inlineError.value = t('transferOwnership.reauthPasskeyFailed');
@@ -162,7 +179,8 @@ async function handlePasswordConfirm(entered: string) {
       surface: 'reauthChallenge.handlePasswordConfirm',
       message: 'Password modal opened for member with no passwordHash',
       severity: 'warning',
-      context: { memberId: props.member.id },
+      // `memberId` is not allowlisted (and would ship a full UUID); `member_id_tail` is.
+      context: { member_id_tail: props.member.id.slice(-8) },
     });
     return;
   }

@@ -10,6 +10,7 @@ import {
 } from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type { Family } from '@/types/models';
 import { generateUUID } from '@/utils/id';
+import { reportError } from '@/utils/errorReporter';
 import { toISODateString } from '@/utils/date';
 
 /**
@@ -149,7 +150,32 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
   // 1. Delete the family's IndexedDB database (data cache)
   await deleteFamilyDatabase(familyId);
 
-  // 2. Remove all passkey registrations and signal platform authenticator
+  // 2a. Native (installed app): reclaim the device-local hardware-Keystore blobs for this
+  // family — every member's, plus the legacy family-keyed one.
+  //
+  // ORDER IS LOAD-BEARING: this MUST run before the registry records are deleted below.
+  // The reclaim enumerates the family's `native-keystore` records to know which per-member
+  // OS items exist, so running it after the loop would find an empty registry, silently
+  // reclaim nothing, and orphan every per-member blob — while a mocked test still passed.
+  //
+  // Routed through `passkeyService` so the `isNative()` guard lives in one place and no
+  // module outside `nativeBiometric` has to know how a keystore account is addressed.
+  try {
+    const { reclaimFamilyKeystore } = await import('@/services/auth/passkeyService');
+    await reclaimFamilyKeystore(familyId);
+  } catch (e) {
+    // Best-effort — an orphaned OS alias is inert without its registry record — but not
+    // silent: this is the only place that reclaims it, so a failure means it leaks.
+    reportError({
+      surface: 'family-context',
+      message: 'failed to reclaim native keystore blobs on family delete',
+      error: e,
+      severity: 'warning',
+      context: { action: 'reclaim_keystore' },
+    });
+  }
+
+  // 2b. Remove all passkey registrations and signal platform authenticator
   const { getPasskeysByFamily, removePasskeyRegistration } =
     await import('@/services/indexeddb/repositories/passkeyRepository');
   const passkeys = await getPasskeysByFamily(familyId);
@@ -161,18 +187,6 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
   if (credentialIds.length > 0) {
     const { signalCredentialsRemoved } = await import('@/services/auth/passkeyService');
     await signalCredentialsRemoved(credentialIds);
-  }
-  // Native (installed app): reclaim the device-local hardware-Keystore biometric blob
-  // for this family. Idempotent + best-effort — the orphaned OS alias is inert without
-  // its registry record, but this is the deliberate place to clean it up. (ADR-029.)
-  const { isNative } = await import('@/services/sync/capabilities');
-  if (isNative()) {
-    try {
-      const { BiometricKeystore } = await import('@/services/auth/biometricKeystorePlugin');
-      await BiometricKeystore.deleteKey({ account: familyId });
-    } catch {
-      /* best-effort */
-    }
   }
 
   // 3. Clear file handle and provider config

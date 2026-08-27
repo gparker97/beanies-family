@@ -1584,12 +1584,19 @@ watch(
       return;
     }
 
-    // Try passkey prompt first (per-family check)
+    // Try passkey prompt first (per-MEMBER check).
+    //
+    // This used to ask "does anyone in this family have a key on this device?", which
+    // silently denied the offer to the SECOND member on a shared device: a sibling's
+    // enrolment suppressed their prompt forever, so they could never enrol even though
+    // the keystore is now per member. Requirement 6 is unreachable without this.
     if (!passkeyPromptDismissed.value && syncStore.isConfigured) {
       const familyId = authStore.currentUser?.familyId;
-      if (familyId) {
-        const hasPasskeys = await authStore.checkHasRegisteredPasskeys(familyId);
-        if (!hasPasskeys) {
+      const memberId = authStore.currentUser?.memberId;
+      if (familyId && memberId) {
+        const deviceKeys = await authStore.resolveDeviceKeysForFamily(familyId);
+        const hasOwnKey = deviceKeys.some((k) => k.memberId === memberId);
+        if (!hasOwnKey) {
           const hasPlatform = await canOfferBiometric();
           // #45: claim the session's single interruption slot only at the true
           // show-site (a no-show branch above never wastes it). If another surface
