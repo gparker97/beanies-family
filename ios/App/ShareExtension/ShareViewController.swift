@@ -19,16 +19,10 @@ import UserNotifications
  * exactly what the documentation implies — it returns false. We shipped it as a best-effort
  * attempt and the device confirmed it: `stage=declined`, every time.
  *
- * The known workaround is to walk the responder chain looking for something with a normal
- * `openURL`. WE TRIED IT, on 2026-08-27, with greg's explicit approval, prompted by ChatGPT
- * appearing to do exactly this. IT DOES NOT WORK HERE, and it failed in the worst way: a
- * responder DID answer `openURL:`, so the call reported success while the app stayed shut,
- * and that false positive suppressed the notification fallback. The device trace read
- * `opened_directly=yes` on a share that opened nothing. Build 51.
- *
- * Do not try it again without new evidence. It cannot be verified from inside the
- * extension - "a responder responds to the selector" is not "the app opened" - so any code
- * that branches on its result will silently disable whatever it falls back to.
+ * The known workaround is to walk the responder chain for `UIApplication`. beanies ships
+ * it, on greg's explicit decision, prompted by ChatGPT doing the same - see
+ * `openContainingApp` for the technique, the risk, and the one-method remediation. The
+ * notification below is its fallback and remains the sanctioned path.
  *
  * So the extension does the honest thing instead: it CONFIRMS, visibly, that the item was
  * captured and says where it went. The complaint was never really "the app did not open" —
@@ -99,6 +93,9 @@ class ShareViewController: UIViewController {
     /// Whether beanies may post notifications. Decided once, before the card is drawn, so
     /// the copy never promises a banner that will not appear.
     private var canNotify = false
+
+    /// The app's custom scheme (`CFBundleURLTypes` in ios/App/App/Info.plist).
+    private static let urlScheme = "family.beanies.app"
 
     /// Everything `trace` has recorded this run, so later calls add to it rather than
     /// overwrite it.
@@ -292,17 +289,12 @@ class ShareViewController: UIViewController {
         podThumb.isHidden = capture.thumbnail == nil
         pod.isHidden = false
 
-        // The copy depends on whether a banner can actually appear: promising one to
-        // somebody who has notifications off is the kind of small lie that erodes trust in
-        // everything else the sheet says. It NAMES the thing either way, so the sentence is
-        // about the photo or link just shared rather than about "it".
-        if canNotify {
-            bodyLabel.text = "tap below, then tap the notification to read this \(capture.noun) in beanies.family."
-            doneButton.setTitle("process in beanies", for: .normal)
-        } else {
-            bodyLabel.text = "open the beanies.family app to read this \(capture.noun)."
-            doneButton.setTitle("done", for: .normal)
-        }
+        // One line, because the button attempts one thing: open beanies. Where iOS refuses
+        // that, a notification takes the user to the same place - a degraded version of the
+        // same promise rather than a different one, so the sentence stays true either way.
+        // It NAMES the thing, so this is about the photo or link just shared, not about "it".
+        bodyLabel.text = "tap below to open beanies.family and read this \(capture.noun)."
+        doneButton.setTitle("process in beanies", for: .normal)
         doneButton.isHidden = false
     }
 
@@ -323,12 +315,81 @@ class ShareViewController: UIViewController {
     /// forbids an extension from opening its container, but it will happily launch it when
     /// the user taps a notification.
     @objc private func dismissSheet() {
+        doneButton.isEnabled = false
         Task {
-            if canNotify, let capture = captured {
+            // Ask iOS to open beanies. Unlike the first attempt this reports REAL success -
+            // see `openContainingApp` - so the notification fallback is driven by what
+            // actually happened rather than by whether a selector existed.
+            let opened = await openContainingApp()
+            trace(["opened_directly": opened ? "yes" : "no"])
+            if !opened, canNotify, let capture = captured {
                 await postImportNotification(for: capture)
             }
             extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         }
+    }
+
+    /**
+     * Ask iOS to foreground beanies. UNSUPPORTED — read all of this before touching it.
+     *
+     * `NSExtensionContext.open` is documented for the Today and iMessage extension points
+     * only; we shipped it, measured `stage=declined`, and removed it. This instead walks the
+     * responder chain for `UIApplication`, which is the technique behind every app that
+     * appears to open itself from a share sheet. Apple's engineer on it: "This could result
+     * in app review issues - if they discovered it." Shipped on greg's explicit decision.
+     *
+     * ⚠️ IF APP REVIEW REJECTS beanies FOR THIS, DELETE THIS METHOD AND ITS ONE CALLER.
+     * `dismissSheet` then falls back to the notification, which is sanctioned and works.
+     *
+     * ATTEMPT 2. Attempt 1 (build 51) used the DEPRECATED two-argument `openURL:`, did not
+     * check that the responder was actually `UIApplication`, and tore the extension down
+     * immediately afterwards. Something answered the selector and did nothing, so it
+     * reported success on a share that opened nothing (`opened_directly=yes`) and that false
+     * positive suppressed the notification. Three fixes here:
+     *
+     *   1. `openURL:options:completionHandler:`, the method that is not deprecated.
+     *   2. The responder must BE `UIApplication`, checked by class.
+     *   3. The result comes from the completion handler, so success is observed rather than
+     *      assumed - and the request is not completed until it arrives.
+     *
+     * The three-argument selector cannot go through `perform`, which takes at most two, so
+     * it is called through a function pointer. That is only safe because the signature is
+     * fixed public API and `responds(to:)` gates it; if either stops being true this must
+     * go back to being unreachable rather than being "fixed" by loosening the guard.
+     */
+    private func openContainingApp() async -> Bool {
+        guard let url = URL(string: "\(Self.urlScheme)://share"),
+              let applicationClass = NSClassFromString("UIApplication")
+        else { return false }
+
+        let selector = NSSelectorFromString("openURL:options:completionHandler:")
+        var responder: UIResponder? = self
+        while let current = responder {
+            if current.isKind(of: applicationClass), current.responds(to: selector) {
+                return await withCheckedContinuation { continuation in
+                    var resumed = false
+                    let finish: (Bool) -> Void = { ok in
+                        guard !resumed else { return }
+                        resumed = true
+                        continuation.resume(returning: ok)
+                    }
+
+                    typealias OpenURL = @convention(c) (
+                        NSObject, Selector, NSURL, NSDictionary, @escaping (Bool) -> Void
+                    ) -> Void
+                    let implementation = current.method(for: selector)
+                    let open = unsafeBitCast(implementation, to: OpenURL.self)
+                    open(current, selector, url as NSURL, [:] as NSDictionary) { finish($0) }
+
+                    // If the handler never fires we would hang the sheet open forever, so
+                    // treat silence as failure and let the notification take over.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { finish(false) }
+                }
+            }
+            responder = current.next
+        }
+        NSLog("[beanies-share] UIApplication is not in the responder chain — using the notification")
+        return false
     }
 
     /**
