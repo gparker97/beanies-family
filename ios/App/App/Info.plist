@@ -43,6 +43,42 @@
 	     src/constants/nativeOAuth.ts — a tripwire test asserts this file
 	     declares exactly that scheme. No LSApplicationQueriesSchemes is needed:
 	     that governs outbound canOpenURL, which the app never calls. -->
+	<!-- DOCUMENT TYPES (#64). What makes beanies appear in the share sheet as a
+	     DOCUMENT HANDLER rather than only as a Share Extension - and, crucially, what
+	     lets iOS OPEN THE APP with the file instead of running an extension that is
+	     forbidden from opening it. This is the mechanism ChatGPT uses when a shared
+	     file opens the app directly; there is no equivalent for a web URL, which is
+	     why links still go through the extension.
+
+	     LSHandlerRank = Alternate: beanies handles these types but does not claim to
+	     own them, so it never displaces Photos, Files or Preview as the default.
+
+	     LSSupportsOpeningDocumentsInPlace is deliberately ABSENT (i.e. false). beanies
+	     copies what it is given into its own inbox and never edits the original, so
+	     in-place access would be a permission we ask for and do not use. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Image</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.image</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PDF</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
