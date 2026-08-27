@@ -1,6 +1,7 @@
 import UIKit
 import Social
 import UniformTypeIdentifiers
+import UserNotifications
 
 /**
  * The Share Extension (#64): beanies in the iOS share sheet for photos, screenshots and PDFs.
@@ -81,6 +82,17 @@ class ShareViewController: UIViewController {
     private let podSource = UILabel()
     private let bodyLabel = UILabel()
     private let doneButton = UIButton(type: .system)
+
+    /// What was captured, held so the button's notification can name it. Nil until staged.
+    private var captured: Capture?
+
+    /// Whether beanies may post notifications. Decided once, before the card is drawn, so
+    /// the copy never promises a banner that will not appear.
+    private var canNotify = false
+
+    /// Everything `trace` has recorded this run, so later calls add to it rather than
+    /// overwrite it.
+    private var traced: [String: String] = [:]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -225,14 +237,24 @@ class ShareViewController: UIViewController {
 
     /// The item landed. Say what it is, and be precise: it is captured, NOT saved.
     @MainActor private func showCaptured(_ capture: Capture, count: Int) {
+        captured = capture
         titleLabel.text = "got it"
         podHeadline.text = capture.headline
         podSource.text = count > 1 ? "\(capture.source) - \(count) items" : capture.source
         podThumb.image = capture.thumbnail
         podThumb.isHidden = capture.thumbnail == nil
         pod.isHidden = false
-        bodyLabel.text = "open beanies and it will work out what this is and where it belongs."
-        doneButton.setTitle("Done", for: .normal)
+
+        // The copy tells the truth about what the NEXT tap does, and that depends on whether
+        // a notification can actually appear. Promising a banner to someone who has
+        // notifications off is exactly the kind of small lie that erodes trust in the rest.
+        if canNotify {
+            bodyLabel.text = "beanies will read this and work out where it belongs."
+            doneButton.setTitle("Process in beanies", for: .normal)
+        } else {
+            bodyLabel.text = "open beanies and it will work out what this is and where it belongs."
+            doneButton.setTitle("Done", for: .normal)
+        }
         doneButton.isHidden = false
     }
 
@@ -247,8 +269,65 @@ class ShareViewController: UIViewController {
 
     /// The ONLY way out. The sheet stays up until it is tapped, so there is time to read
     /// what was captured — an auto-dismissing card was the previous version's mistake.
+    ///
+    /// Posts the notification on the way, when there is something to announce and beanies is
+    /// allowed to. That notification is the ONE sanctioned route back into the app: iOS
+    /// forbids an extension from opening its container, but it will happily launch it when
+    /// the user taps a notification.
     @objc private func dismissSheet() {
-        extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        Task {
+            if canNotify, let capture = captured {
+                await postImportNotification(for: capture)
+            }
+            extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        }
+    }
+
+    /**
+     * Ask whether beanies may post notifications. Authorization belongs to the CONTAINING
+     * APP and extensions inherit it, so this is a read, never a request — an extension has
+     * no business raising a permission prompt on top of somebody else's app.
+     */
+    private func notificationsAllowed() async -> Bool {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return true
+        default: return false
+        }
+    }
+
+    /**
+     * Announce the capture so one tap gets the user into beanies.
+     *
+     * It deliberately carries NO deep-link payload and needs no handler in the app. The tap
+     * only has to LAUNCH beanies; `iosShareAdapter` already drains the app-group inbox on
+     * launch and on resume, so the item is picked up and routed to its review surface by the
+     * path every other platform already uses. Adding a routing payload here would be a
+     * second way to do the same thing, and a second thing to keep in step.
+     *
+     * A fresh identifier per share, so several shares stack rather than replacing each other.
+     */
+    private func postImportNotification(for capture: Capture) async {
+        let content = UNMutableNotificationContent()
+        content.title = "ready to import"
+        // The item's own name, so the notification is worth reading rather than generic.
+        content.body = capture.headline
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "beanies-share-\(UUID().uuidString)",
+            content: content,
+            trigger: nil // immediate
+        )
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            trace(["stage": "notified", "notif": "posted"])
+        } catch {
+            // Never fatal: the item is already staged, so the app still finds it on next
+            // launch. Recorded so a silently-failing notification is diagnosable.
+            NSLog("[beanies-share] could not post the import notification: \(error)")
+            trace(["stage": "notify_failed", "notif": "\(error)"])
+        }
     }
 
     private func handleShare() async {
@@ -307,6 +386,11 @@ class ShareViewController: UIViewController {
         // iOS will not let us take the user to the app (see the header), so the next best
         // thing is to be specific: show WHAT was captured, and what happens next. The sheet
         // now stays up until they dismiss it.
+        // Resolved BEFORE the card renders: `showCaptured` picks its copy and its button
+        // label from this, and the whole point is not to promise a banner that cannot appear.
+        canNotify = await notificationsAllowed()
+        trace(["notif_allowed": canNotify ? "yes" : "no"])
+
         let capture = await describe(items)
         await showCaptured(capture, count: staged)
         // Deliberately NOT completing here. Completing tears the extension down, so doing it
@@ -337,7 +421,11 @@ class ShareViewController: UIViewController {
         guard let root = FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroup)
         else { return }
-        let line = fields.keys.sorted().map { "\($0)=\(fields[$0] ?? "")" }.joined(separator: ";")
+        // MERGE, never replace. The notification outcome is recorded after the staging
+        // outcome, and an overwriting trace would erase the `offered=` types that are the
+        // whole reason this file exists.
+        traced.merge(fields) { _, new in new }
+        let line = traced.keys.sorted().map { "\($0)=\(traced[$0] ?? "")" }.joined(separator: ";")
         do {
             try Data(line.utf8).write(to: root.appendingPathComponent(Self.traceName))
         } catch {
