@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -8,12 +8,14 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { isTemporaryEmail } from '@/utils/email';
-import { raceTimeout } from '@/utils/timing';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import type { FamilyMember } from '@/types/models';
+import type { FamilyMember, PasskeyRegistration } from '@/types/models';
+import { useBiometricSignIn } from '@/composables/useBiometricSignIn';
+import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -41,6 +43,81 @@ const isCreatingPassword = computed(
   () => selectedMember.value && !selectedMember.value.passwordHash
 );
 
+const { isAuthenticating, signIn: biometricSignIn } = useBiometricSignIn();
+/** memberIds that can be signed in with a biometric ON THIS DEVICE. */
+const deviceKeyMemberIds = ref<Set<string>>(new Set());
+
+/**
+ * Does the SELECTED bean have a key here? Only the selected-member panel offers
+ * biometric — the avatar grid deliberately shows nothing, because its status slot is
+ * already a two-state indicator (has a password / needs to create one) and a third
+ * meaning there would either destroy that signal or need a stacked badge.
+ */
+const selectedHasDeviceKey = computed(
+  () => !!selectedMember.value && deviceKeyMemberIds.value.has(selectedMember.value.id)
+);
+
+onMounted(async () => {
+  const familyId = familyContextStore.activeFamilyId;
+  if (!familyId) return;
+  // Guarded: a throw here would take out the whole picker mount, and the biometric offer
+  // is an enhancement — never a reason the password form fails to appear.
+  let keys: PasskeyRegistration[] = [];
+  try {
+    keys = await authStore.resolveDeviceKeysForFamily(familyId);
+  } catch (e) {
+    reportError({
+      surface: 'pick-bean',
+      message: 'could not resolve device keys — biometric offer suppressed',
+      error: e,
+      severity: 'warning',
+    });
+  }
+  deviceKeyMemberIds.value = new Set(keys.map((k) => k.memberId));
+
+  // Emitted once per mount, not per member: six beans would otherwise burn the
+  // 50/surface/min client cap for no extra signal. Counts ride inside `detail`
+  // because `count` is not an allowlisted context key.
+  logEvent({
+    level: 'info',
+    surface: 'native-biometric',
+    message: 'picker_offer',
+    context: {
+      action: keys.length > 0 ? 'offered' : 'not_offered',
+      detail: `keys=${keys.length}/beans=${allMembers.value.length}`,
+    },
+  });
+});
+
+/**
+ * Biometric sign-in for the bean the user just picked. The pod is normally already
+ * decrypted on this surface, so the key's job here is identification, not decryption.
+ */
+async function handleBiometricSignIn() {
+  const member = selectedMember.value;
+  if (!member) return;
+  formError.value = null;
+
+  const result = await biometricSignIn(familyContextStore.activeFamilyId!, member.id);
+  logEvent({
+    level: 'info',
+    surface: 'native-biometric',
+    message: 'picker_unlock',
+    context: {
+      action: result.ok ? 'ok' : result.message === null ? 'cancelled' : 'error',
+      member_id_tail: member.id.slice(-8),
+    },
+  });
+
+  if (result.ok) {
+    emit('signed-in', '/nook');
+    return;
+  }
+  // `null` is a deliberate silence (the user dismissed the prompt); anything else — a
+  // mismatch included — says so and leaves the password field right there beneath it.
+  formError.value = result.message;
+}
+
 function selectMember(member: FamilyMember) {
   selectedMember.value = member;
   password.value = '';
@@ -64,7 +141,22 @@ function getMemberRole(member: FamilyMember): string {
 
 async function handleSignIn() {
   formError.value = null;
+  try {
+    await runSignIn();
+  } catch (e) {
+    // Previously unguarded: a throw from setPassword/signIn left the form silent and
+    // dead, with no message and no spinner to explain itself.
+    formError.value = e instanceof Error ? e.message : t('auth.signInFailed');
+    reportError({
+      surface: 'pick-bean',
+      message: 'sign-in threw',
+      error: e,
+      severity: 'warning',
+    });
+  }
+}
 
+async function runSignIn() {
   if (!selectedMember.value) {
     formError.value = t('auth.selectMember');
     return;
@@ -88,10 +180,11 @@ async function handleSignIn() {
 
     const result = await authStore.setPassword(selectedMember.value.id, password.value);
     if (result.success) {
-      syncStore.setupAutoSync();
-      // Best-effort Drive push — never hang on it (data is in memory + cache and
-      // rides the next auto-sync). Mirrors biometric login / register. (2026-07-14)
-      await raceTimeout(syncStore.syncNow(true), 5000);
+      // No setupAutoSync here: LoginPage.handleSignedIn is the single arm-and-register
+      // point for every entry path. `syncNowBounded` is the one home for the bounded,
+      // rejection-swallowing push — hand-rolling `raceTimeout` again is what left two
+      // copies of it behind in the first place.
+      await syncStore.syncNowBounded();
       emit('signed-in', '/nook');
     } else {
       formError.value = result.error ?? t('auth.signInFailed');
@@ -265,6 +358,23 @@ async function handleSignIn() {
           {{ t('action.change') }}
         </button>
       </div>
+
+      <!--
+        Biometric offer for THIS bean, above the password field — which stays visible and
+        fully usable, so this is an extra door rather than a gate. Shown only when this
+        bean has a key on this device; a bean without one simply sees today's form, with
+        nothing hinting that anything failed (requirement 4 is satisfied by silence).
+      -->
+      <BaseButton
+        v-if="selectedHasDeviceKey && !isCreatingPassword"
+        type="button"
+        variant="secondary"
+        class="mb-4 w-full"
+        :disabled="isAuthenticating"
+        @click="handleBiometricSignIn"
+      >
+        {{ isAuthenticating ? t('passkey.authenticating') : t('passkey.signInButton') }}
+      </BaseButton>
 
       <!-- Creating password for first time -->
       <div v-if="isCreatingPassword">

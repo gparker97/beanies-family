@@ -306,10 +306,45 @@ export const useFamilyStore = defineStore('family', () => {
         if (currentMemberId.value === id) {
           currentMemberId.value = owner.value?.id ?? null;
         }
+        await invalidateDeviceCredentials(id);
       }
       return success;
     });
     return result ?? false;
+  }
+
+  /**
+   * Retire a removed member's biometric/passkey credentials on THIS device.
+   *
+   * Lives here, in the orchestrator, rather than at the three view call sites
+   * (CreateMembersStep / BeanDetailPage / MeetTheBeansPage): views must not call services
+   * (MVO), and putting it at the call sites would triplicate it and leak on any fourth
+   * path added later.
+   *
+   * Deliberately non-fatal. A keystore failure must NOT block the deletion or flip
+   * `deleteMember`'s return value — the member row is already gone, and reporting `false`
+   * for a deletion that happened would be a worse lie than a stale credential. It is
+   * wrapped INSIDE `wrapAsync`'s success branch for the same reason: `wrapAsync` already
+   * toasts and sets `error` on any throw, so an unguarded throw here would both
+   * double-toast and mis-report the outcome.
+   *
+   * SCOPE: this reaches only credentials enrolled on this device — the passkey registry is
+   * device-local. Revoking a removed member's access on THEIR devices, and their ability
+   * to decrypt the pod at all, is tracker #77.
+   */
+  async function invalidateDeviceCredentials(memberId: string): Promise<void> {
+    try {
+      const { removeAllPasskeysForMember } = await import('@/services/auth/passkeyService');
+      await removeAllPasskeysForMember(memberId);
+    } catch (e) {
+      reportError({
+        surface: 'member-removal',
+        message: 'failed to invalidate device credentials for a removed member',
+        error: e,
+        severity: 'warning',
+        context: { action: 'invalidate_credentials', member_id_tail: memberId.slice(-8) },
+      });
+    }
   }
 
   /**
