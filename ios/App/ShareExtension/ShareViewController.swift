@@ -43,76 +43,212 @@ class ShareViewController: UIViewController {
     /// Matches the plugin's cap and the JS `AI_PICKER_MAX_BYTES`.
     private static let maxBytes = 25 * 1024 * 1024
 
-    /// How long the confirmation stays up. Long enough to read six words, short enough that
-    /// it never feels like something to dismiss.
-    private static let confirmationSeconds: TimeInterval = 1.4
+    // ── Brand tokens ──────────────────────────────────────────────────────────────
+    //
+    // Hand-written because an extension is a separate process and cannot reach the app's
+    // theme. Kept to the CIG palette exactly; see docs/brand/beanies-cig-v2.html.
+    private enum Brand {
+        static let orange = UIColor(red: 0.945, green: 0.365, blue: 0.133, alpha: 1) // #F15D22
+        static let terracotta = UIColor(red: 0.902, green: 0.494, blue: 0.133, alpha: 1) // #E67E22
+        static let slate = UIColor(red: 0.173, green: 0.243, blue: 0.314, alpha: 1) // #2C3E50
+        static let silk = UIColor(red: 0.682, green: 0.839, blue: 0.945, alpha: 1) // #AED6F1
+        static let cloud = UIColor(red: 0.973, green: 0.976, blue: 0.980, alpha: 1) // #F8F9FA
+
+        /// Outfit is not in the extension bundle. SF Rounded is the closest system face —
+        /// geometric and friendly where the default SF is neutral — so the sheet reads as
+        /// beanies rather than as a system dialog. Falls back gracefully if unavailable.
+        static func font(_ size: CGFloat, _ weight: UIFont.Weight) -> UIFont {
+            let base = UIFont.systemFont(ofSize: size, weight: weight)
+            guard let rounded = base.fontDescriptor.withDesign(.rounded) else { return base }
+            return UIFont(descriptor: rounded, size: size)
+        }
+    }
+
+    /// What was captured, as the sheet needs to show it. Assembled from the share itself —
+    /// no network, no AI, nothing that could make the user wait.
+    private struct Capture {
+        var headline: String
+        var source: String
+        var thumbnail: UIImage?
+    }
 
     private let card = UIView()
+    private let beansRow = UIStackView()
     private let titleLabel = UILabel()
-    private let detailLabel = UILabel()
+    private let pod = UIView()
+    private let podThumb = UIImageView()
+    private let podHeadline = UILabel()
+    private let podSource = UILabel()
+    private let bodyLabel = UILabel()
+    private let doneButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.25)
-        buildConfirmation()
+        // Deep Slate rather than black: even the scrim is brand.
+        view.backgroundColor = Brand.slate.withAlphaComponent(0.38)
+        buildCard()
+        showCapturing()
         Task { await handleShare() }
     }
 
     /**
-     * A small confirmation card, hidden until there is something to say.
+     * The sheet.
      *
-     * Built in code rather than a storyboard because it is twelve lines of layout and a
-     * storyboard would put the copy somewhere the reviewer of this file cannot see it.
+     * Built in code rather than a storyboard deliberately: it is one card, and a storyboard
+     * would put the copy somewhere nobody reviewing this file would see it.
      *
-     * NOT translated, unlike the rest of the app: an extension is a separate process with no
-     * access to the translation store, and shipping a second copy of the string catalogue
-     * into it to localise six words is a worse trade than English. The app itself, which is
-     * where every subsequent screen happens, is fully translated.
+     * NOT translated, unlike the rest of the app. An extension is a separate process with no
+     * access to the translation store, and shipping a second copy of the string catalogue to
+     * localise a handful of words is the worse trade. Every screen after this one lives in
+     * the app, which is fully translated.
      */
-    private func buildConfirmation() {
-        // Cloud White on Deep Slate-ish shadow, Heritage Orange for the title - the brand
-        // palette, hand-written here because an extension cannot reach the app's theme.
-        card.backgroundColor = UIColor(red: 0.973, green: 0.976, blue: 0.980, alpha: 1) // #F8F9FA
-        card.layer.cornerRadius = 20
+    private func buildCard() {
+        card.backgroundColor = Brand.cloud
+        card.layer.cornerRadius = 28 // squircle, per the CIG — never sharp corners
         card.layer.cornerCurve = .continuous
+        card.layer.shadowColor = Brand.slate.cgColor
+        card.layer.shadowOpacity = 0.18
+        card.layer.shadowRadius = 24
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
         card.alpha = 0
+        card.transform = CGAffineTransform(translationX: 0, y: 12)
         card.translatesAutoresizingMaskIntoConstraints = false
 
-        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textColor = UIColor(red: 0.945, green: 0.365, blue: 0.133, alpha: 1) // #F15D22
+        // THE SIGNATURE, and the one brand rule that must not bend: the beanies hold hands
+        // and are never separated. Four beans, evenly spaced, touching — never rotated,
+        // never split.
+        beansRow.axis = .horizontal
+        beansRow.spacing = 4
+        beansRow.alignment = .center
+        for colour in [Brand.orange, Brand.terracotta, Brand.silk, Brand.slate] {
+            let bean = UIView()
+            bean.backgroundColor = colour
+            bean.layer.cornerRadius = 5
+            bean.translatesAutoresizingMaskIntoConstraints = false
+            bean.widthAnchor.constraint(equalToConstant: 10).isActive = true
+            bean.heightAnchor.constraint(equalToConstant: 10).isActive = true
+            beansRow.addArrangedSubview(bean)
+        }
+
+        titleLabel.font = Brand.font(24, .bold)
+        titleLabel.textColor = Brand.orange
         titleLabel.textAlignment = .center
 
-        detailLabel.font = .systemFont(ofSize: 14, weight: .regular)
-        detailLabel.textColor = UIColor(red: 0.173, green: 0.243, blue: 0.314, alpha: 1) // #2C3E50
-        detailLabel.textAlignment = .center
-        detailLabel.numberOfLines = 0
+        // The captured item, INSET on Sky Silk — the thing you shared, visibly held inside
+        // the pod rather than described in prose.
+        pod.backgroundColor = Brand.silk.withAlphaComponent(0.34)
+        pod.layer.cornerRadius = 18
+        pod.layer.cornerCurve = .continuous
+        pod.isHidden = true
+        pod.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = UIStackView(arrangedSubviews: [titleLabel, detailLabel])
+        podThumb.contentMode = .scaleAspectFill
+        podThumb.clipsToBounds = true
+        podThumb.layer.cornerRadius = 12
+        podThumb.layer.cornerCurve = .continuous
+        podThumb.isHidden = true
+        podThumb.translatesAutoresizingMaskIntoConstraints = false
+        podThumb.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        podThumb.heightAnchor.constraint(equalToConstant: 44).isActive = true
+
+        podHeadline.font = Brand.font(15, .semibold)
+        podHeadline.textColor = Brand.slate
+        podHeadline.numberOfLines = 2
+
+        podSource.font = Brand.font(13, .regular)
+        podSource.textColor = Brand.slate.withAlphaComponent(0.62)
+
+        let podText = UIStackView(arrangedSubviews: [podHeadline, podSource])
+        podText.axis = .vertical
+        podText.spacing = 2
+
+        let podRow = UIStackView(arrangedSubviews: [podThumb, podText])
+        podRow.axis = .horizontal
+        podRow.spacing = 12
+        podRow.alignment = .center
+        podRow.translatesAutoresizingMaskIntoConstraints = false
+        pod.addSubview(podRow)
+        NSLayoutConstraint.activate([
+            podRow.topAnchor.constraint(equalTo: pod.topAnchor, constant: 14),
+            podRow.bottomAnchor.constraint(equalTo: pod.bottomAnchor, constant: -14),
+            podRow.leadingAnchor.constraint(equalTo: pod.leadingAnchor, constant: 14),
+            podRow.trailingAnchor.constraint(equalTo: pod.trailingAnchor, constant: -14)
+        ])
+
+        bodyLabel.font = Brand.font(14, .regular)
+        bodyLabel.textColor = Brand.slate.withAlphaComponent(0.78)
+        bodyLabel.textAlignment = .center
+        bodyLabel.numberOfLines = 0
+
+        doneButton.backgroundColor = Brand.orange
+        doneButton.setTitleColor(.white, for: .normal)
+        doneButton.titleLabel?.font = Brand.font(16, .semibold)
+        doneButton.layer.cornerRadius = 16 // rounded-2xl
+        doneButton.layer.cornerCurve = .continuous
+        doneButton.isHidden = true
+        doneButton.addTarget(self, action: #selector(dismissSheet), for: .touchUpInside)
+        doneButton.translatesAutoresizingMaskIntoConstraints = false
+        doneButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+
+        let stack = UIStackView(arrangedSubviews: [beansRow, titleLabel, pod, bodyLabel, doneButton])
         stack.axis = .vertical
-        stack.spacing = 6
+        stack.spacing = 14
+        stack.alignment = .fill
+        stack.setCustomSpacing(18, after: beansRow)
+        stack.setCustomSpacing(18, after: bodyLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
+        beansRow.setContentHuggingPriority(.required, for: .vertical)
 
         view.addSubview(card)
         card.addSubview(stack)
         NSLayoutConstraint.activate([
             card.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            card.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 20),
-            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -20),
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24)
+            card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 26),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -22),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 22),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -22)
         ])
+
+        UIView.animate(withDuration: 0.26, delay: 0.02, options: [.curveEaseOut]) {
+            self.card.alpha = 1
+            self.card.transform = .identity
+        }
     }
 
-    /// Show the card, hold it briefly, then finish. Always resolves, so the caller can
-    /// complete the request immediately afterwards.
-    @MainActor
-    private func confirm(title: String, detail: String) async {
-        titleLabel.text = title
-        detailLabel.text = detail
-        UIView.animate(withDuration: 0.18) { self.card.alpha = 1 }
-        try? await Task.sleep(nanoseconds: UInt64(Self.confirmationSeconds * 1_000_000_000))
+    @MainActor private func showCapturing() {
+        titleLabel.text = "counting beans..."
+        bodyLabel.text = "catching what you shared."
+    }
+
+    /// The item landed. Say what it is, and be precise: it is captured, NOT saved.
+    @MainActor private func showCaptured(_ capture: Capture, count: Int) {
+        titleLabel.text = "got it"
+        podHeadline.text = capture.headline
+        podSource.text = count > 1 ? "\(capture.source) - \(count) items" : capture.source
+        podThumb.image = capture.thumbnail
+        podThumb.isHidden = capture.thumbnail == nil
+        pod.isHidden = false
+        bodyLabel.text = "open beanies and it will work out what this is and where it belongs."
+        doneButton.setTitle("Done", for: .normal)
+        doneButton.isHidden = false
+    }
+
+    /// Nothing usable. Heritage Orange, never Alert Red — red is for destructive actions
+    /// only, and failing to read a file is not one.
+    @MainActor private func showUnsupported() {
+        titleLabel.text = "can't read that"
+        bodyLabel.text = "beanies takes photos, PDFs and links. this one isn't one of those."
+        doneButton.setTitle("Close", for: .normal)
+        doneButton.isHidden = false
+    }
+
+    /// The ONLY way out. The sheet stays up until it is tapped, so there is time to read
+    /// what was captured — an auto-dismissing card was the previous version's mistake.
+    @objc private func dismissSheet() {
+        extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
     }
 
     private func handleShare() async {
@@ -126,7 +262,7 @@ class ShareViewController: UIViewController {
             // Completing the request anyway is the right call: failing loudly here would put
             // an error sheet on top of the user's own app.
             NSLog("[beanies-share] app group \(Self.appGroup) unavailable — dropping share")
-            extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            await showUnsupported()
             return
         }
 
@@ -157,11 +293,7 @@ class ShareViewController: UIViewController {
                 "offered": offeredTypes.joined(separator: ","),
                 "staged": "0"
             ])
-            await confirm(
-                title: "beanies can't read that",
-                detail: "Try a photo, a PDF, or a link."
-            )
-            extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            await showUnsupported()
             return
         }
 
@@ -172,15 +304,14 @@ class ShareViewController: UIViewController {
             "staged": String(staged)
         ])
 
-        // Tell the user where it went. iOS will not let us take them there (see the header),
-        // so the next best thing is to be specific about what happens next.
-        await confirm(
-            title: staged == 1 ? "Saved to beanies" : "Saved \(staged) to beanies",
-            detail: "Open beanies to finish adding it."
-        )
-
-        // ALWAYS last: completing tears the extension down, so anything after it may not run.
-        extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        // iOS will not let us take the user to the app (see the header), so the next best
+        // thing is to be specific: show WHAT was captured, and what happens next. The sheet
+        // now stays up until they dismiss it.
+        let capture = await describe(items)
+        await showCaptured(capture, count: staged)
+        // Deliberately NOT completing here. Completing tears the extension down, so doing it
+        // now would close the sheet the instant it appeared — which is the whole complaint
+        // this card exists to answer. `dismissSheet` owns the exit, on the user's tap.
     }
 
     /**
@@ -213,6 +344,54 @@ class ShareViewController: UIViewController {
             // Diagnostics must never break the share itself.
             NSLog("[beanies-share] could not record the run trace: \(error)")
         }
+    }
+
+    /**
+     * Describe the share for the card, from what is already in hand.
+     *
+     * Strictly local: no network and no AI, so nothing here can make the user wait or send
+     * anything off the device before they have seen what beanies took. `attributedContentText`
+     * is where most senders put the human title — it is how a YouTube share can name the
+     * video rather than showing a bare URL.
+     */
+    private func describe(_ items: [NSExtensionItem]) async -> Capture {
+        let providers = items.flatMap { $0.attachments ?? [] }
+        let titleText = items.compactMap { $0.attributedContentText?.string ?? $0.attributedTitle?.string }
+            .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+        guard let provider = providers.first else {
+            return Capture(headline: titleText ?? "your item", source: "shared", thumbnail: nil)
+        }
+
+        let types = provider.registeredTypeIdentifiers
+        let isImage = types.contains { $0.hasPrefix("public.image") || $0.contains("jpeg") || $0.contains("png") || $0.contains("heic") }
+        let isPDF = types.contains { $0.contains("pdf") }
+
+        // A thumbnail only for pictures, where it is the fastest possible confirmation that
+        // beanies took the RIGHT one. `loadPreviewImage` is best-effort by design.
+        var thumbnail: UIImage?
+        if isImage {
+            thumbnail = await withCheckedContinuation { continuation in
+                provider.loadPreviewImage(options: [:]) { item, _ in
+                    continuation.resume(returning: item as? UIImage)
+                }
+            }
+        }
+
+        if isImage {
+            return Capture(headline: titleText ?? "a photo", source: "photo", thumbnail: thumbnail)
+        }
+        if isPDF {
+            return Capture(headline: titleText ?? "a document", source: "PDF", thumbnail: nil)
+        }
+        // A link, or text carrying one. Name the site rather than echoing a long URL.
+        let host = titleText.flatMap { text -> String? in
+            guard let match = text.split(separator: " ").compactMap({ URL(string: String($0)) }).first,
+                  let host = match.host
+            else { return nil }
+            return host.replacingOccurrences(of: "www.", with: "")
+        }
+        return Capture(headline: titleText ?? "a link", source: host ?? "link", thumbnail: nil)
     }
 
     /// Resolve one attachment to a file URL and copy it into the inbox. Returns whether it
