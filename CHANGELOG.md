@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-27
+
+### Added
+
+- New beanstalk post: **THE APPS ARE HERE** — the iOS and Android apps are on the App Store and Google Play, with a $1-forever offer for the first 10 families who download and review.
+- Store badges in a blog post now link straight to the right store and open in a new tab, so the post stays open behind you.
+
+### Fixed
+
+- Clicking an image that is a link no longer pops the lightbox on top of the page it was already opening, and such images no longer show a magnifying-glass cursor promising a zoom that never comes.
+- App Store and Google Play badges now render at the same height side by side, instead of one appearing much larger than the other.
+
 ## 2026-08-26
 
 ### Fixed
