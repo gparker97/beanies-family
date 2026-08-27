@@ -243,7 +243,11 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 
   article.addEventListener('click', function(e) {
     const img = e.target.closest('img');
-    if (img) open(img.src);
+    // An image inside a link is a button, not an illustration. Without this
+    // guard a linked badge did both: the lightbox opened ON TOP of the
+    // navigation it had just started. Zooming a store badge is meaningless
+    // anyway -- the reader wants the store, not a bigger picture of it.
+    if (img && !img.closest('a')) open(img.src);
   });
   overlay.addEventListener('click', function(e) {
     if (e.target === overlay) close();
@@ -571,6 +575,38 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   .blog-prose img {
     max-width: 100%;
   }
+}
+/* A linked image is a button. It must not wear the illustration chrome
+   above -- the framed card, the drop shadow and above all `cursor: zoom-in`,
+   which promises a lightbox the click handler now (correctly) refuses to
+   open. `display: block; margin: auto` also broke horizontal rows, since
+   every badge claimed its own line. */
+.blog-prose a img {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  display: inline-block;
+  margin: 0;
+  max-width: 100%;
+  padding: 0;
+}
+/* Store badges. Apple's and Google's assets have different aspect ratios
+   (2.99 vs 3.37), so matching them on WIDTH leaves one visibly taller.
+   Height is the dimension the eye reads as "same size", so set that and
+   let width follow. */
+.blog-prose .store-badges {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin: 2rem 0;
+}
+.blog-prose .store-badges img {
+  height: 48px;
+  width: auto;
 }
 /* Image captions. Posts author them as a separate italic paragraph after
    the image (![img] / blank line / _caption_), which markdown renders as
