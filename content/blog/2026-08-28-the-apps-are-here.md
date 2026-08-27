@@ -27,11 +27,11 @@ Actually, wait. My English teachers always told me, “show, don’t tell”. So
 
 🥳🥳🥳🥳🥳🥳🥳🥳🥳
 
-_**BEANIES.**_
+_**BEANIES**_ 👏
 
-_**HAS.**_
+_**HAS**_ 👏
 
-_**APPS!!!**_
+_**APPS!!**_ 👏
 
 🥳🥳🥳🥳🥳🥳🥳🥳🥳
 
