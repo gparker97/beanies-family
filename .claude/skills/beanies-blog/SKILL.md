@@ -255,11 +255,46 @@ workflow is not a rendered page.
 
 ### 7. Substack
 
-Prepare a paste-ready copy in the scratchpad (never the repo — it's a derived artefact):
+**Never hand greg the copy as terminal text.** Copying prose out of a terminal wrecks the
+line breaks every time — the pane re-wraps long paragraphs and the wrap points paste in as
+real newlines, so a five-paragraph post arrives in Substack as forty ragged ones. He has
+raised this; do not make him raise it again.
 
-- Substack's editor mangles some markdown; flatten what it can't take.
-- Images must be re-uploaded there by hand; list which ones and where they go.
-- Keep the canonical link back to the beanies.family post.
+**Publish the copy as an Artifact instead**, and make the button put *formatted* text on
+the clipboard:
+
+```js
+await navigator.clipboard.write([new ClipboardItem({
+  'text/html':  new Blob([html], { type: 'text/html'  }),
+  'text/plain': new Blob([text], { type: 'text/plain' }),
+})]);
+```
+
+Substack's editor reads `text/html` on paste, so links, bold and italics survive intact and
+there is no reformatting to redo by hand. Always supply `text/plain` alongside it (URLs
+spelled out in parentheses) — it is what older browsers take, and what a plain-text target
+gets. Wrap the call in a `try`: an insecure context or a refused permission should fall back
+to selecting the payload node and telling him to press Ctrl/Cmd+C, never to a silent failure.
+
+Build the payload from the **built HTML**, not by retyping the post: drive the dev server
+with Playwright and take `.blog-prose` innerHTML. That is the only source guaranteed to
+match what shipped.
+
+Four transforms the Substack copy always needs, none of which the site version wants:
+
+- **Retag every link** `utm_source=substack` + `utm_medium=email`. Keep `utm_campaign` and
+  each link's `utm_content` unchanged, so one link reports separately per channel.
+- **Make relative hrefs absolute.** `/ios` and `/download` 404 on substack.com.
+- **Replace repo-relative images.** Substack will not import an image from a URL on paste,
+  so anything referencing `/badges/*.svg` or `/blog/*.webp` becomes an upload slot. Leave a
+  visible placeholder paragraph at the spot rather than a silent gap, and say which file
+  goes there. Where a post uses several small linked images (e.g. two store badges), one
+  uploaded composite is usually the better Substack answer.
+- **Append the canonical credit line** back to the beanstalk post.
+
+Also list what the paste structurally cannot carry: title and subtitle are separate Substack
+fields, image links must be re-attached after upload, and Substack strips `target` so
+open-in-new-tab is re-set per link in its own editor.
 
 Then **remind greg to publish on Substack**. The skill never posts there — Substack has
 no supported write API, and an unofficial one publishing under his name is a bad failure

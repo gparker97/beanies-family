@@ -507,3 +507,23 @@ The fix commit touched only `CHANGELOG.md`. Both `main-ci.yml` and `security.yml
 2. **Check `git log HEAD..origin/main` when a user contradicts a code-based finding.** Being behind is a top-three explanation for "the user says it exists and I cannot find it," alongside a wrong search term and a different repo — check it before defending the conclusion.
 3. **Prefer the deployed artifact when the question is "is this live?"** Fetching production HTML answers directly what source-grepping only answers by inference, and it is immune to checkout staleness. Confirming a claim about production against a source tree is one hop too many.
 4. **Breadth of search is not freshness of search.** Ten greps over stale bytes agree with each other perfectly. When many searches converge suspiciously cleanly against a user's direct recollection, suspect the corpus, not the user.
+
+## Never hand greg prose to copy out of the terminal
+
+**Pattern:** the Substack cross-post copy was about to be printed as terminal text for
+greg to copy/paste. He stopped it: "usually whenever i copy something from the terminal,
+it never pastes properly".
+
+**Why it breaks:** a terminal pane re-wraps long paragraphs to its own width, and those
+wrap points are copied as real newlines. A five-paragraph post lands in the target editor
+as forty ragged ones, and the formatting (links, bold, italics) is gone entirely because
+a terminal only ever holds plain text.
+
+**Rule:** deliverable prose that is destined for another editor gets published as an
+**Artifact** with a copy button writing BOTH `text/html` and `text/plain` via
+`ClipboardItem`. Rich-text targets (Substack, Notion, Google Docs, Gmail) read the
+`text/html` flavour, so formatting survives and nothing is re-done by hand. Always
+include the `text/plain` flavour too, and fall back to selecting the payload node if the
+clipboard API is blocked.
+
+Codified in `.claude/skills/beanies-blog/SKILL.md` § 7.
