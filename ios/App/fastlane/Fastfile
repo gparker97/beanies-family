@@ -17,7 +17,7 @@
 #
 # Env provided by .github/workflows/mobile-ios-release.yml:
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
-#   APP_STORE_CONNECT_API_KEY_PATH (decoded .p8 on disk), APPLE_TEAM_ID,
+#   ASC_API_KEY_P8_PATH (decoded .p8 on disk), APPLE_TEAM_ID,
 #   BUILD_NUMBER (CI run number), MARKETING_VERSION, and (for `release`) IOS_DESTINATION.
 #   match: MATCH_GIT_URL, MATCH_PASSWORD, MATCH_GIT_BASIC_AUTHORIZATION, and
 #   MATCH_BOOTSTRAP (only for the very first run - see `build_ipa`).
@@ -39,7 +39,13 @@ platform :ios do
     app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
-      key_filepath: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
+      # DELIBERATELY NOT named APP_STORE_CONNECT_API_KEY_PATH. That name is the env var
+      # fastlane maps onto the `api_key_path` option of match/sigh/deliver/pilot, so
+      # setting it made match see both an implicit `api_key_path` AND the explicit
+      # `api_key` passed below and abort with "Unresolved conflict between options". It
+      # would have failed even alone: `api_key_path` expects a JSON descriptor, while this
+      # is a raw .p8.
+      key_filepath: ENV["ASC_API_KEY_P8_PATH"],
       duration: 1200,
       in_house: false
     )
