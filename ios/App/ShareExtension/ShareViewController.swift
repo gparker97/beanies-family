@@ -69,12 +69,16 @@ class ShareViewController: UIViewController {
     /// no network, no AI, nothing that could make the user wait.
     private struct Capture {
         var headline: String
+        /// The label under the headline, e.g. "photo" or a site name.
         var source: String
+        /// What to CALL it in a sentence. Separate from `source` because a link's source is
+        /// its site ("youtube.com"), which does not read as a noun in "read this ___".
+        var noun: String
         var thumbnail: UIImage?
     }
 
     private let card = UIView()
-    private let beansRow = UIStackView()
+    private let mark = UIImageView()
     private let titleLabel = UILabel()
     private let pod = UIView()
     private let podThumb = UIImageView()
@@ -94,13 +98,54 @@ class ShareViewController: UIViewController {
     /// overwrite it.
     private var traced: [String: String] = [:]
 
+    /// Retained so `viewDidLayoutSubviews` can resize it — CALayers do not participate in
+    /// autolayout, so a rotation would otherwise leave the wash the wrong size.
+    private var backdropGradient: CAGradientLayer?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         // Deep Slate rather than black: even the scrim is brand.
-        view.backgroundColor = Brand.slate.withAlphaComponent(0.38)
+        buildBackdrop()
         buildCard()
         showCapturing()
         Task { await handleShare() }
+    }
+
+    /**
+     * The ground the card sits on.
+     *
+     * It was a translucent scrim, which composited over the system sheet's own grey and read
+     * as exactly that — grey. An extension sheet covers the whole screen, so this is beanies'
+     * screen for the moment it is up, and it should look like it: a soft Cloud White to Sky
+     * Silk wash, with the wordmark above the card so the app is NAMED rather than merely
+     * implied by its colours.
+     */
+    private func buildBackdrop() {
+        let gradient = CAGradientLayer()
+        gradient.colors = [Brand.cloud.cgColor, Brand.silk.withAlphaComponent(0.55).cgColor]
+        gradient.locations = [0.0, 1.0]
+        gradient.frame = UIScreen.main.bounds
+        view.layer.insertSublayer(gradient, at: 0)
+        view.backgroundColor = Brand.cloud
+        backdropGradient = gradient
+
+        let wordmark = UILabel()
+        wordmark.text = "beanies.family"
+        wordmark.font = Brand.font(15, .semibold)
+        wordmark.textColor = Brand.slate.withAlphaComponent(0.55)
+        wordmark.textAlignment = .center
+        wordmark.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(wordmark)
+        NSLayoutConstraint.activate([
+            wordmark.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            wordmark.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -18)
+        ])
+    }
+
+    /// The gradient needs its frame kept in step with rotation; a CALayer does not autolayout.
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backdropGradient?.frame = view.bounds
     }
 
     /**
@@ -126,21 +171,17 @@ class ShareViewController: UIViewController {
         card.transform = CGAffineTransform(translationX: 0, y: 12)
         card.translatesAutoresizingMaskIntoConstraints = false
 
-        // THE SIGNATURE, and the one brand rule that must not bend: the beanies hold hands
-        // and are never separated. Four beans, evenly spaced, touching — never rotated,
-        // never split.
-        beansRow.axis = .horizontal
-        beansRow.spacing = 4
-        beansRow.alignment = .center
-        for colour in [Brand.orange, Brand.terracotta, Brand.silk, Brand.slate] {
-            let bean = UIView()
-            bean.backgroundColor = colour
-            bean.layer.cornerRadius = 5
-            bean.translatesAutoresizingMaskIntoConstraints = false
-            bean.widthAnchor.constraint(equalToConstant: 10).isActive = true
-            bean.heightAnchor.constraint(equalToConstant: 10).isActive = true
-            beansRow.addArrangedSubview(bean)
-        }
+        // The beanies family itself, bundled into the extension (BeaniesFamily.png in this
+        // target's Resources — an extension cannot reach the app's asset catalogue). This
+        // replaced a row of four drawn beans: with the wordmark on the backdrop, two brand
+        // marks on one small sheet was one accessory too many.
+        mark.image = UIImage(named: "BeaniesFamily")
+        mark.contentMode = .scaleAspectFit
+        mark.translatesAutoresizingMaskIntoConstraints = false
+        mark.heightAnchor.constraint(equalToConstant: 72).isActive = true
+        // If the asset ever failed to bundle, the sheet should still read correctly rather
+        // than leaving a 72pt hole.
+        mark.isHidden = mark.image == nil
 
         titleLabel.font = Brand.font(24, .bold)
         titleLabel.textColor = Brand.orange
@@ -202,14 +243,14 @@ class ShareViewController: UIViewController {
         doneButton.translatesAutoresizingMaskIntoConstraints = false
         doneButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
 
-        let stack = UIStackView(arrangedSubviews: [beansRow, titleLabel, pod, bodyLabel, doneButton])
+        let stack = UIStackView(arrangedSubviews: [mark, titleLabel, pod, bodyLabel, doneButton])
         stack.axis = .vertical
         stack.spacing = 14
         stack.alignment = .fill
-        stack.setCustomSpacing(18, after: beansRow)
+        stack.setCustomSpacing(14, after: mark)
         stack.setCustomSpacing(18, after: bodyLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        beansRow.setContentHuggingPriority(.required, for: .vertical)
+        mark.setContentHuggingPriority(.required, for: .vertical)
 
         view.addSubview(card)
         card.addSubview(stack)
@@ -247,13 +288,16 @@ class ShareViewController: UIViewController {
 
         // The copy tells the truth about what the NEXT tap does, and that depends on whether
         // a notification can actually appear. Promising a banner to someone who has
-        // notifications off is exactly the kind of small lie that erodes trust in the rest.
+        // notifications off is exactly the kind of small lie that erodes trust in the rest -
+        // and with notifications ON it is genuinely two taps, not one, so it says so.
+        // It also NAMES the thing, so the sentence is about the photo or link the user just
+        // shared rather than about "it".
         if canNotify {
-            bodyLabel.text = "beanies will read this and work out where it belongs."
-            doneButton.setTitle("Process in beanies", for: .normal)
+            bodyLabel.text = "tap below, then tap the notification to read this \(capture.noun) in beanies.family."
+            doneButton.setTitle("process in beanies", for: .normal)
         } else {
-            bodyLabel.text = "open beanies and it will work out what this is and where it belongs."
-            doneButton.setTitle("Done", for: .normal)
+            bodyLabel.text = "open the beanies.family app to read this \(capture.noun)."
+            doneButton.setTitle("done", for: .normal)
         }
         doneButton.isHidden = false
     }
@@ -263,7 +307,7 @@ class ShareViewController: UIViewController {
     @MainActor private func showUnsupported() {
         titleLabel.text = "can't read that"
         bodyLabel.text = "beanies takes photos, PDFs and links. this one isn't one of those."
-        doneButton.setTitle("Close", for: .normal)
+        doneButton.setTitle("close", for: .normal)
         doneButton.isHidden = false
     }
 
@@ -309,7 +353,10 @@ class ShareViewController: UIViewController {
      */
     private func postImportNotification(for capture: Capture) async {
         let content = UNMutableNotificationContent()
-        content.title = "ready to import"
+        // An INSTRUCTION, not a status. "ready to import" told the user something was true
+        // and left them to work out that tapping was the point; this asks for the tap, which
+        // is the only thing that gets them back into the app.
+        content.title = "tap to import into beanies.family"
         // The item's own name, so the notification is worth reading rather than generic.
         content.body = capture.headline
         content.sound = .default
@@ -448,7 +495,7 @@ class ShareViewController: UIViewController {
             .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
         guard let provider = providers.first else {
-            return Capture(headline: titleText ?? "your item", source: "shared", thumbnail: nil)
+            return Capture(headline: titleText ?? "your item", source: "shared", noun: "item", thumbnail: nil)
         }
 
         let types = provider.registeredTypeIdentifiers
@@ -467,10 +514,10 @@ class ShareViewController: UIViewController {
         }
 
         if isImage {
-            return Capture(headline: titleText ?? "a photo", source: "photo", thumbnail: thumbnail)
+            return Capture(headline: titleText ?? "a photo", source: "photo", noun: "photo", thumbnail: thumbnail)
         }
         if isPDF {
-            return Capture(headline: titleText ?? "a document", source: "PDF", thumbnail: nil)
+            return Capture(headline: titleText ?? "a document", source: "PDF", noun: "document", thumbnail: nil)
         }
         // A link, or text carrying one. Name the site rather than echoing a long URL.
         let host = titleText.flatMap { text -> String? in
@@ -479,7 +526,7 @@ class ShareViewController: UIViewController {
             else { return nil }
             return host.replacingOccurrences(of: "www.", with: "")
         }
-        return Capture(headline: titleText ?? "a link", source: host ?? "link", thumbnail: nil)
+        return Capture(headline: titleText ?? "a link", source: host ?? "link", noun: "link", thumbnail: nil)
     }
 
     /// Resolve one attachment to a file URL and copy it into the inbox. Returns whether it
