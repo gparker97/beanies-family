@@ -14,13 +14,13 @@ draft: false
 
 It’s time for another “it’ll never happen to us” moment. Are you ready for the big announcement?
 
-Actually, wait. My English teachers always told me, “show, don’t tell”. So I’ll just show you. Feast your eyes on this, my friends:
+Actually, wait. My English teachers always told me, “show, don’t tell”. So I’ll just show you. Feast your eyes on _this_, my friends:
 
 <p class="store-badges">
-  <a href="/ios" style="--ratio: 2.99" data-cta="CTA: App Store (iOS)" data-cta-loc="blog-the-apps-are-here" aria-label="Download beanies.family on the App Store">
+  <a href="/ios" target="_blank" rel="noopener" style="--ratio: 2.99" data-cta="CTA: App Store (iOS)" data-cta-loc="blog-the-apps-are-here" aria-label="Download beanies.family on the App Store">
     <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
   </a>
-  <a href="/android" style="--ratio: 3.37" data-cta="CTA: App Store (Android)" data-cta-loc="blog-the-apps-are-here" aria-label="Get beanies.family on Google Play">
+  <a href="/android" target="_blank" rel="noopener" style="--ratio: 3.37" data-cta="CTA: App Store (Android)" data-cta-loc="blog-the-apps-are-here" aria-label="Get beanies.family on Google Play">
     <img src="/badges/google-play.svg" alt="Get it on Google Play" width="239" height="71" loading="lazy" decoding="async" />
   </a>
 </p>
