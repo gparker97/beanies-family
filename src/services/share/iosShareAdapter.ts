@@ -56,7 +56,11 @@ export const iosShareAdapter: ShareAdapter = {
             // Parse the stage out rather than matching on the raw line: the trace is a
             // sorted `k=v;` string, so `stage` is not at a fixed position and a prefix test
             // silently mis-classified every healthy share as a warning.
-            level: parseStage(openOutcome) === 'opened' ? 'info' : 'warn',
+            // `staged` is the healthy outcome. iOS does not permit a share extension to
+            // open its containing app (Apple: supported for Today widgets only), so the
+            // extension no longer tries and `opened` can no longer occur — it is still
+            // accepted here so a trace from an older build does not read as a failure.
+            level: ['staged', 'opened'].includes(parseStage(openOutcome) ?? '') ? 'info' : 'warn',
             surface: 'share-target-ingest',
             message: 'ios share extension open outcome',
             context: {
