@@ -30,7 +30,7 @@ import { raceTimeout } from '@/utils/timing';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import {
   isPlatformAuthenticatorAvailable,
-  hasRegisteredPasskeys,
+  resolveDeviceKeys,
   registerPasskeyForMember,
 } from '@/services/auth/passkeyService';
 
@@ -162,8 +162,11 @@ async function checkBiometricForFamily(familyId: string, familyName?: string): P
   try {
     const hasPlatform = await isPlatformAuthenticatorAvailable();
     if (!hasPlatform) return false;
-    const hasPasskeys = await hasRegisteredPasskeys(familyId);
-    if (!hasPasskeys) return false;
+    // Resolve the KEYS, not a boolean: LoginPage needs them to drive the biometric view,
+    // and an empty list must not route there at all — that renders a button that cannot do
+    // anything.
+    const deviceKeys = await resolveDeviceKeys(familyId);
+    if (deviceKeys.length === 0) return false;
     emit('biometric-available', { familyId, familyName });
     return true;
   } catch {

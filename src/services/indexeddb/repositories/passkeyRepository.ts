@@ -47,11 +47,3 @@ export async function removePasskeyRegistration(credentialId: string): Promise<v
   const db = await getRegistryDatabase();
   await db.delete('passkeys', credentialId);
 }
-
-export async function removeAllPasskeysByMember(memberId: string): Promise<void> {
-  const db = await getRegistryDatabase();
-  const passkeys = await db.getAllFromIndex('passkeys', 'by-memberId', memberId);
-  const tx = db.transaction('passkeys', 'readwrite');
-  await Promise.all(passkeys.map((p) => tx.store.delete(p.credentialId)));
-  await tx.done;
-}

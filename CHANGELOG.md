@@ -12,11 +12,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Face ID, fingerprint and passkey unlock now signs you in, not just opens your pod.** Before, unlocking only decrypted your family data — you were still asked for your password afterwards, and on a device where the pod was already open you were never offered biometrics at all. One tap now takes you all the way in, as you.
+- Two people can set up biometric unlock on the **same** phone or tablet. beanies asks which of you is signing in, by name, and each of you lands in your own account.
+- From the bean picker, a bean with biometrics set up on this device can sign in with a tap instead of typing a password.
 - New beanstalk post: **THE APPS ARE HERE** — the iOS and Android apps are on the App Store and Google Play, with a $1-forever offer for the first 10 families who download and review.
 - Store badges in a blog post now link straight to the right store and open in a new tab, so the post stays open behind you.
 
+### Changed
+
+- The "Not you? Switch account" escape is now always shown before you land in an account, on every path — the way to correct it when a shared device signs in the wrong person.
+
 ### Fixed
 
+- Removing a family member now also removes their biometric unlock from this device, which previously left the key in place.
+- Deleting a family from a device now reliably reclaims every biometric key it held, instead of leaving some behind.
+- Signing out on a device you have **not** marked as trusted now clears the cached key to your family data, not just the cached data itself.
+- The re-authentication prompt for high-stakes actions no longer offers a biometric button to someone who has not set biometrics up on that device — it could never have worked.
 - Clicking an image that is a link no longer pops the lightbox on top of the page it was already opening, and such images no longer show a magnifying-glass cursor promising a zoom that never comes.
 - App Store and Google Play badges now render at the same height side by side, instead of one appearing much larger than the other.
 
