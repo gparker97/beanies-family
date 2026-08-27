@@ -21,6 +21,7 @@ import { showToast } from '@/composables/useToast';
 import { isNavigationCancelled } from '@/utils/appChrome';
 import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -379,20 +380,49 @@ async function activateFamilyForBiometric(
     // but hasPendingEncryptedFile is somehow false (defensive)
     if (!(await tryAutoDecrypt(familyId))) {
       // File was genuinely unencrypted or already decrypted — go to pick-bean
-
+      logBiometricRouting('pick_bean', 'no_pending_file');
       activeView.value = 'pick-bean';
       return;
     }
     // Auto-decrypt succeeded — go to pick-bean
-
+    logBiometricRouting('pick_bean', 'auto_decrypted');
     activeView.value = 'pick-bean';
     return;
   }
 
   // Happy path: encrypted file is pending, show biometric login
+  logBiometricRouting('biometric', 'pending_encrypted');
   biometricFamilyId.value = familyId;
   biometricFamilyName.value = familyName;
   activeView.value = 'biometric';
+}
+
+/**
+ * Record WHICH WAY login routed, and on what evidence.
+ *
+ * This decision — offer biometric, or go straight to the bean picker — is consequential
+ * and was previously silent, so "why was I not offered Face ID?" could only be answered by
+ * reading the source and guessing at the runtime state. It cost a round of exactly that.
+ *
+ * `hasPendingEncryptedFile` is the whole gate: biometric unlock returns the FAMILY KEY, so
+ * it has nothing to do when the pod is already decrypted. Logging the inputs alongside the
+ * branch is what makes that legible from CloudWatch instead of inferable from code.
+ *
+ * Reuses `action` / `detail` / `kind`, all already allowlisted and already declared — no
+ * new context key, so no store-declaration change.
+ */
+function logBiometricRouting(branch: 'biometric' | 'pick_bean', reason: string): void {
+  logEvent({
+    level: 'info',
+    surface: 'native-biometric',
+    message: 'login_routing',
+    context: {
+      action: branch,
+      detail: reason,
+      kind: syncStore.isConfigured ? 'configured' : 'unconfigured',
+      stage: syncStore.hasPendingEncryptedFile ? 'pending_file' : 'no_pending_file',
+    },
+  });
 }
 
 /**
