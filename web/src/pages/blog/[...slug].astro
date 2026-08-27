@@ -592,21 +592,35 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   max-width: 100%;
   padding: 0;
 }
-/* Store badges. Apple's and Google's assets have different aspect ratios
-   (2.99 vs 3.37), so matching them on WIDTH leaves one visibly taller.
-   Height is the dimension the eye reads as "same size", so set that and
-   let width follow. */
+/* Store badges, sized to fill the column edge to edge -- they are the
+   punchline of "feast your eyes on this", so they are meant to be loud.
+
+   Filling the line and matching heights pull against each other, because
+   Apple's asset is 2.99:1 and Google's is 3.37:1: equal widths leave one
+   visibly taller, equal heights leave a ragged right edge. Growing each
+   badge in proportion to its OWN ratio satisfies both at once -- the
+   widths come out proportional to the ratios, so the rendered heights are
+   identical and the pair still spans the full column. The ratio travels on
+   the anchor as `--ratio` rather than via :nth-child, so the markup can be
+   reordered without silently swapping the two sizes. */
 .blog-prose .store-badges {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
   justify-content: center;
-  margin: 2rem 0;
+  margin: 2.5rem 0;
+}
+.blog-prose .store-badges a {
+  flex: var(--ratio, 3) 1 0;
+  /* Forces a wrap once the two no longer fit side by side. Below that the
+     pair stacks and each goes full-width, which reads far better on a
+     phone than two badges squeezed onto one line. */
+  min-width: 240px;
 }
 .blog-prose .store-badges img {
-  height: 48px;
-  width: auto;
+  height: auto;
+  width: 100%;
 }
 /* Image captions. Posts author them as a separate italic paragraph after
    the image (![img] / blank line / _caption_), which markdown renders as
