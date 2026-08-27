@@ -4,6 +4,7 @@ slug: the-apps-are-here
 date: 2026-08-28
 category: updates
 coverEmoji: 🥳
+coverImage: /blog/the-apps-are-here-badges.webp
 excerpt: 'beanies.family is now a real app on the App Store and Google Play. here is what changed, why it matters, and a $1-forever offer for the first 10 families.'
 subtitle: 'get it on google play / download on the app store. these words i never thought i’d say.'
 featured: false
