@@ -158,7 +158,9 @@ jobs:
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ vars.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_API_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/asc/AuthKey.p8
+          # NOT APP_STORE_CONNECT_API_KEY_PATH - that name collides with match's
+          # `api_key_path` option. See the note in the Fastfile.
+          ASC_API_KEY_P8_PATH: ${{ runner.temp }}/asc/AuthKey.p8
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           # Monotonic build number from the run; marketing version tracks
           # APP_VERSION (derived above, R-suffix stripped).
