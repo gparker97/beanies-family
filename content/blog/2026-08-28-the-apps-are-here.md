@@ -41,11 +41,15 @@ We have real, genuine, honest-to-goodness (my mom used to say that) **iOS** and 
 
 A [download and review](https://beanies.family/download?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=intro-review) is really the key thing here.
 
+## Is this a big deal?
+
 I realize that, for most of you reading this, you could probably care less. And please, let’s not get started about how the phrase should be “you couldn’t care less”. It’s neither the time, nor the place.
 
 Honestly, this is a _big_ deal. There’s so much we can now do with an app that couldn’t be done properly before, and it’s _**exciting**_.
 
 [I’ve talked about PWAs](https://beanies.family/blog/made-a-wish-to-become-a-real-boy/?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=pwa-callback) in the past (and if you have zero recollection of that, for which I honestly wouldn’t blame you at all, that’s ok). PWAs are great, and I stand behind that. But the powers that be still lock you out of many key features of native apps, which is why, as I said before, native apps still win the day.
+
+## What can native apps do that non-native apps cannot?
 
 Outside of simply being listed and searchable within the walled gardens of the Apple and Google app stores (along with about 10 gajillion other apps of massively varying quality), there are features of a native app that are genuinely useful for users that would otherwise not be available to us.
 
@@ -57,11 +61,13 @@ I’m honestly confused about why people don’t talk about this more. Not about
 
 But anyway - we’re here, and that’s all water under the bridge. The only thing left that’s important:
 
-**[DOWNLOAD THE BEANIES APP](https://beanies.family/download?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=main-cta)! You won’t regret it.**
+## [DOWNLOAD THE BEANIES APP](https://beanies.family/download?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=main-cta)! You won’t regret it.
 
 If you're on my mailing list, or reading this right now, or a fan of [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=fan-mention) in any way, shape, or form, [download and review our app](https://beanies.family/download?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=main-cta-review). That's the most important thing that you can do to help us. And me. And yourself.
 
 The _**review**_ part is key for helping [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=review-ask) to gain traction and visibility in the app stores, and hopefully be around for a long time. So if you are so inclined, please give us a 5-star rating. And if you are even more inclined, a review (an honest review, about anything you want). If you have something you really want to complain about, though, such as the fact that I bug you every week with dumb blogs, you can always [tell me to my (virtual) face](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=discord).
+
+## ATTENTION!! (ALMOST) FREE STUFF!!
 
 📢📢📢 **Guess what: The first _10 families_ to download the app and give me a review will win the exclusive prize of having [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=prize) for _$1 per month_, forever** (because I promise, I will start charging at some point). And that’s no joke (I’m actually keeping a list). Just [ping me on discord](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=the-apps-are-here&utm_content=prize-claim) once you’ve left the review, and you’re golden. 📢📢📢
 
