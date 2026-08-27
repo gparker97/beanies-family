@@ -55,7 +55,17 @@
 
 	     LSSupportsOpeningDocumentsInPlace is deliberately ABSENT (i.e. false). beanies
 	     copies what it is given into its own inbox and never edits the original, so
-	     in-place access would be a permission we ask for and do not use. -->
+	     in-place access would be a permission we ask for and do not use.
+
+	     ⚠️ CURRENTLY INERT, and measured so. On build 51 a shared image still went to
+	     the Share Extension (trace: offered=public.png,public.file-url) rather than
+	     opening the app. The extension's NSExtensionActivationRule claims images,
+	     files and attachments, and when both a share extension AND a document type
+	     match, the share sheet routes to the EXTENSION. For a type to reach this
+	     declaration the extension has to stop claiming it - which is a real trade,
+	     since the Photos share sheet offers extensions and may not offer a document
+	     handler at all. Left declared because it is harmless and is half of an
+	     experiment worth finishing; see docs/STATUS.md. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
