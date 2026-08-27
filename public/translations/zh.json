@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-24",
-    "translationCount": 4111
+    "lastUpdated": "2026-08-27",
+    "translationCount": 4187
   },
   "translations": {
     "app.name": {
@@ -14807,9 +14807,9 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.offline.message": {
-      "translation": "连接到互联网，将照片读入活动。",
-      "hash": "p8tcef",
-      "lastUpdated": "2026-06-03"
+      "translation": "连接到互联网， Beanies可以为您阅读此内容。",
+      "hash": "msu8wf",
+      "lastUpdated": "2026-08-27"
     },
     "ai.notEvent.title": {
       "translation": "未找到活动项目",
@@ -14827,14 +14827,14 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.unavailable.message": {
-      "translation": "尚未设置阅读照片。您可以手动添加活动。",
-      "hash": "nvsox6",
-      "lastUpdated": "2026-06-03"
+      "translation": "魔豆还没有准备好。您仍然可以自行添加。",
+      "hash": "wu8imf",
+      "lastUpdated": "2026-08-27"
     },
     "ai.error.title": {
-      "translation": "无法读取该照片",
-      "hash": "liuqql",
-      "lastUpdated": "2026-06-03"
+      "translation": "无法阅读",
+      "hash": "z4aimt",
+      "lastUpdated": "2026-08-27"
     },
     "ai.error.timeout": {
       "translation": "这花了太长时间。请重试。",
@@ -14842,14 +14842,14 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.error.unreadable": {
-      "translation": "我们无法理解这一点。请尝试拍摄更清晰的照片。",
-      "hash": "nswtq6",
-      "lastUpdated": "2026-06-03"
+      "translation": "我们无法理解这一点。请尝试更清晰的照片或更清晰的扫描。",
+      "hash": "m3cl6s",
+      "lastUpdated": "2026-08-27"
     },
     "ai.error.generic": {
-      "translation": "读取该照片时出错。请重试。",
-      "hash": "4deuz5",
-      "lastUpdated": "2026-06-03"
+      "translation": "出错了。请重试。",
+      "hash": "z2ph9f",
+      "lastUpdated": "2026-08-27"
     },
     "ai.lowConfidence.hint": {
       "translation": "我们不确定这一点。值得快速检查。",
@@ -18142,9 +18142,9 @@
       "lastUpdated": "2026-07-01"
     },
     "ai.pdfTruncated.message": {
-      "translation": "我们阅读了本PDF的前几页。完整文件仍在附件中。",
-      "hash": "vrmea9",
-      "lastUpdated": "2026-07-01"
+      "translation": "我们阅读了前几页。附上第一份文件。",
+      "hash": "cmdn8j",
+      "lastUpdated": "2026-08-27"
     },
     "onboarding.privacy.reassure": {
       "translation": "您的数据只属于您。",
@@ -20560,6 +20560,386 @@
       "translation": "无法刷新。您的登录已过期，因此您可能看不到最新信息。",
       "hash": "jfsf5z",
       "lastUpdated": "2026-08-24"
+    },
+    "recipes.field.cookTime": {
+      "translation": "烹调时间",
+      "hash": "z98b5n",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.placeholder.cookTime": {
+      "translation": "例如： 45分钟",
+      "hash": "50nj3x",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.gapNights.one": {
+      "translation": "{count}晚",
+      "hash": "qm145b",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.gapNights.other": {
+      "translation": "%{count} 晚",
+      "hash": "ree382",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.addAPlan": {
+      "translation": "新建计划",
+      "hash": "f3vkd5",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.calendarStale.title": {
+      "translation": "行程已保存，日历可能有延迟",
+      "hash": "awllzp",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.calendarStale.message": {
+      "translation": "您的行程安全无虞。如果日历看起来过期，请刷新页面。",
+      "hash": "yy13ln",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.jumpToIdeas": {
+      "translation": "跳转至行程创意",
+      "hash": "a6710",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.openTrip": {
+      "translation": "打开行程： {name}",
+      "hash": "id8xhk",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.segmentGone.title": {
+      "translation": "预订已取消",
+      "hash": "3q2kyd",
+      "lastUpdated": "2026-08-27"
+    },
+    "travel.segmentGone.message": {
+      "translation": "当您打开此预订时，有人将其删除，因此没有任何内容可以保存。",
+      "hash": "o0plwt",
+      "lastUpdated": "2026-08-27"
+    },
+    "permissions.readOnly.title": {
+      "translation": "仅限查看",
+      "hash": "65a8uf",
+      "lastUpdated": "2026-08-27"
+    },
+    "permissions.readOnly.message": {
+      "translation": "你可以环顾四周，但变化取决于管理这个吊舱的成年人。",
+      "hash": "rl170b",
+      "lastUpdated": "2026-08-27"
+    },
+    "passkey.wrongMemberError": {
+      "translation": "该生物识别属于不同的bean。使用您的密码登录。",
+      "hash": "it7km2",
+      "lastUpdated": "2026-08-27"
+    },
+    "fastLogin.whoIsSigningIn": {
+      "translation": "谁在登录？",
+      "hash": "oyxgll",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.busy.title": {
+      "translation": "仍在阅读",
+      "hash": "8fmzf8",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.busy.message": {
+      "translation": "beanies仍在阅读您分享的最后一篇文章。请稍后重试。",
+      "hash": "ij0gqz",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.signIn.title": {
+      "translation": "请先登录！",
+      "hash": "xn8d08",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.signIn.message": {
+      "translation": "打开Beanies并登录，然后再次分享。",
+      "hash": "vhvccd",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.notReady.title": {
+      "translation": "您的Dokan Pro准备好了！",
+      "hash": "4mp5n3",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.notReady.message": {
+      "translation": "豆子还在数你的豆子。请稍后再尝试分享。",
+      "hash": "gbhjpc",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.unsupported.title": {
+      "translation": "无法读取",
+      "hash": "39z7gy",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.unsupported.message": {
+      "translation": "beanies可以阅读照片、屏幕截图、PDF和链接。",
+      "hash": "ydku42",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.unrecognised.title": {
+      "translation": "不确定那是什么",
+      "hash": "8zbt2d",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.unrecognised.message": {
+      "translation": "beanies无法确定这是一项活动、一次旅行还是一个食谱。您仍然可以自行添加。",
+      "hash": "so6vo9",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.readerOff.title": {
+      "translation": "读卡器不可用",
+      "hash": "8qd37x",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.readerOff.message": {
+      "translation": "beanies弄清楚了那是什么，但该阅读器没有为您的家人打开，或者您无法使用。",
+      "hash": "unczku",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.partial.title": {
+      "translation": "有些已跳过",
+      "hash": "om24f7",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.partial.message": {
+      "translation": "beanies无法打开您共享的所有内容，因此它会阅读它所能阅读的内容。",
+      "hash": "qhadex",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.firstAttached.title": {
+      "translation": "一起阅读",
+      "hash": "woo2gs",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.firstAttached.message": {
+      "translation": "beanies将所有这些都视为一个项目。第一个作为附件保留。",
+      "hash": "x48m51",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.noLink.title": {
+      "translation": "没有链接",
+      "hash": "4z94zp",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.noLink.message": {
+      "translation": "您分享的内容中没有链接。Beanies会阅读链接、照片、屏幕截图和PDF。",
+      "hash": "s3ne7y",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.failed.title": {
+      "translation": "无法打开",
+      "hash": "8v9sdz",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.failed.message": {
+      "translation": "beanies无法读取共享的内容。请尝试再次分享。",
+      "hash": "vdar9n",
+      "lastUpdated": "2026-08-27"
+    },
+    "shareTarget.failed.action": {
+      "translation": "转至...",
+      "hash": "d585h5",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.notRecipe.title": {
+      "translation": "找不到食谱！",
+      "hash": "bnlx73",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.notRecipe.message": {
+      "translation": "豆子在这里找不到食谱。请尝试更清晰的页面照片，或输入。",
+      "hash": "20cz1h",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.photos.willAttach": {
+      "translation": "beanies找到了这道菜的照片，并将在您节省费用时添加。",
+      "hash": "1b6xj8",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.detail.openPhotos": {
+      "translation": "查看全部{count}张照片",
+      "hash": "hd67am",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.detail.source": {
+      "translation": "从",
+      "hash": "1b4cq",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.field.sourceUrl": {
+      "translation": "链接",
+      "hash": "1erkq",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.placeholder.sourceUrl": {
+      "translation": "https://...来自的页面或视频",
+      "hash": "u4sw6r",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipes.photos.addAnother": {
+      "translation": "也添加您自己的照片",
+      "hash": "8c3rc2",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.attaching": {
+      "translation": "正在新增相片…",
+      "hash": "csj79a",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.attachFailed.title": {
+      "translation": "配方已保存",
+      "hash": "2uwl85",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.attachFailed.message": {
+      "translation": "您的食谱是安全的，但我们无法附上原始食谱。您可以从食谱中自行添加。",
+      "hash": "jl2t8f",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.inferred.ingredients": {
+      "translation": "我们自己填写了这些内容，值得与原始内容进行核对：",
+      "hash": "tq3mb5",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.inferred.steps": {
+      "translation": "我们自己填写了这些步骤，值得一看：",
+      "hash": "fgkzwl",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.badLink.title": {
+      "translation": "无法使用该链接",
+      "hash": "823bft",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.badLink.message": {
+      "translation": "该链接必须是我们可以访问的安全(https)网址。请尝试从浏览器再次复制。",
+      "hash": "veu1p9",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.videoBlocked.title": {
+      "translation": "YouTube不会分享这个",
+      "hash": "7agshv",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.videoBlocked.message": {
+      "translation": "YouTube会阻止应用读取某些视频。打开视频，在其描述中查找指向配方的链接，然后使用该链接—它通常有效，并给出确切的数量。",
+      "hash": "jl0tsf",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.unreachable.title": {
+      "translation": "无法打开该链接",
+      "hash": "28z0yr",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.unreachable.message": {
+      "translation": "页面可能已移动，或者网站可能不允许应用读取页面。请尝试自己打开并粘贴文字。",
+      "hash": "wb7xko",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.noContent.title": {
+      "translation": "没有可读的内容",
+      "hash": "6l8v94",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.noContent.message": {
+      "translation": "豆子到达了那个页面，但却发现它什么也看不见。尝试可打印版本，或自己打开并粘贴文本。",
+      "hash": "day9fp",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.noTranscript.title": {
+      "translation": "无法阅读该视频",
+      "hash": "2d489j",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.noTranscript.message": {
+      "translation": "该视频的描述没有文字，也没有可以跟踪的链接，因此没有任何内容可供Beanies阅读。请自行查看描述中的链接，然后使用该链接。",
+      "hash": "tvv6pj",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.titleOnly.title": {
+      "translation": "为您开始",
+      "hash": "7zgejy",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.titleOnly.message": {
+      "translation": "该视频的配方只能大声说出来，因此豆子无法读取配料或步骤。名称和视频链接已保存—在观看时键入其余部分。",
+      "hash": "yzpc9s",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.strip.title": {
+      "translation": "从链接开始",
+      "hash": "m3ilyp",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.strip.subtitle": {
+      "translation": "粘贴食谱页面或YouTube链接， Beanies会为您填写。",
+      "hash": "pa5jav",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.strip.action": {
+      "translation": "填写",
+      "hash": "1cvh4z",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.strip.document": {
+      "translation": "或改为阅读照片或PDF",
+      "hash": "rm617z",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.title": {
+      "translation": "粘贴配方链接",
+      "hash": "46s8bk",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.label": {
+      "translation": "方案链接",
+      "hash": "bd8k38",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.placeholder": {
+      "translation": "https://...或YouTube视频",
+      "hash": "p0rsar",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.invalid": {
+      "translation": "这必须是一个安全的(https)网址。",
+      "hash": "cmyfre",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.action": {
+      "translation": "看看这本书吧",
+      "hash": "pmt9mz",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.hint": {
+      "translation": "大多数食谱网站都有效。我们对成分和步骤的解读与文字完全一致。",
+      "hash": "pvl6o2",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.videoHint": {
+      "translation": "这是一个视频— beanies阅读其描述并遵循大多数厨师放在那里的食谱链接。",
+      "hash": "1g5nbi",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.link.orFrom": {
+      "translation": "或阅读自",
+      "hash": "6vtgy1",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.reader.label": {
+      "translation": "阅读配方",
+      "hash": "ow7fcn",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.reader.aria": {
+      "translation": "通过链接、照片或PDF阅读食谱",
+      "hash": "tskrgj",
+      "lastUpdated": "2026-08-27"
+    },
+    "recipeExtract.chip.title": {
+      "translation": "配方",
+      "hash": "um2dea",
+      "lastUpdated": "2026-08-27"
     }
   }
 }
