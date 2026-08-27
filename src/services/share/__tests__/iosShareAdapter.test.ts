@@ -63,7 +63,7 @@ describe('iosShareAdapter — open-outcome reporting', () => {
   it('reports a successful open at info, alongside the files it carried', async () => {
     const onShare = await drainOnce({
       files: [{ data: 'eA==', name: 'a.txt', type: 'text/plain' }],
-      openOutcome: 'items=1;offered=public.url;staged=1;stage=opened',
+      openOutcome: 'items=1;offered=public.url;staged=1;stage=staged',
     });
 
     expect(logEvent.mock.calls[0][0].level).toBe('info');
@@ -71,12 +71,22 @@ describe('iosShareAdapter — open-outcome reporting', () => {
     expect(onShare).toHaveBeenCalledTimes(1);
   });
 
-  it('treats a NON-opened stage as a warning, so it stands out from the healthy path', async () => {
+  it('treats an UNHEALTHY stage as a warning, so it stands out from the normal path', async () => {
     await drainOnce({
-      files: [{ data: 'eA==', name: 'a.txt', type: 'text/plain' }],
-      openOutcome: 'items=1;offered=public.url;staged=1;stage=declined',
+      files: [],
+      openOutcome: 'items=1;offered=public.vcard;staged=0;stage=nothing_staged',
     });
     expect(logEvent.mock.calls[0][0].level).toBe('warn');
+  });
+
+  it("still reads an OLD build's `opened` trace as healthy, not as a failure", async () => {
+    // The extension stopped trying to open the app once Apple's position was confirmed.
+    // A phone that has not updated yet keeps sending the old stage; it was never a fault.
+    await drainOnce({
+      files: [{ data: 'eA==', name: 'a.txt', type: 'text/plain' }],
+      openOutcome: 'items=1;offered=public.url;staged=1;stage=opened',
+    });
+    expect(logEvent.mock.calls[0][0].level).toBe('info');
   });
 
   it('stays SILENT when there is no marker, so old builds do not spam the firehose', async () => {

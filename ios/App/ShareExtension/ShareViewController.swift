@@ -10,17 +10,23 @@ import UniformTypeIdentifiers
  * and the review form all happen in the app itself — an extension is a short-lived,
  * memory-constrained process and is the wrong place to run an AI call or ask for consent.
  *
- * WHY IT OPENS THE APP. The first version only wrote and exited, leaving the app to collect
- * the item whenever it next happened to be launched. On device that is indistinguishable
- * from the share doing nothing at all: a white sheet rises, falls back, and you are returned
- * to YouTube with no sign anything happened. Android opens the app on a share, and that is
- * what people expect here too.
+ * WHY IT DOES NOT OPEN THE APP, AND MUST NOT TRY. Android opens beanies on a share, and the
+ * obvious expectation is that iOS does too. It cannot. An Apple Frameworks engineer, on the
+ * developer forums: "There's no supported way for you to launch your app directly from App
+ * Extensions, except Today and Widgets ... with the APIs currently available."
+ * `NSExtensionContext.open` is documented for Today widgets only, and from here it does
+ * exactly what the documentation implies — it returns false. We shipped it as a best-effort
+ * attempt and the device confirmed it: `stage=declined`, every time.
  *
- * The open is BEST-EFFORT and never load-bearing. `NSExtensionContext.open` is not
- * guaranteed for share extensions, so if it fails the item still sits in the inbox and the
- * app ingests it on its next launch or resume — the original behaviour, as the floor rather
- * than the design. Which of the two happened is recorded for the app to report; see
- * `markOpenOutcome`.
+ * The known workaround is to walk the responder chain looking for something with a normal
+ * `openURL`. The same engineer on that: "This could result in app review issues - if they
+ * discovered it." beanies has already had one Guideline 2.1 round; an undocumented trick in
+ * the review queue is a bad trade for saving a tap.
+ *
+ * So the extension does the honest thing instead: it CONFIRMS, visibly, that the item was
+ * captured and says where it went. The complaint was never really "the app did not open" —
+ * it was that a sheet rose, fell back, and nothing appeared to happen. A confirmation fixes
+ * that; opening the app was only ever one way to achieve it.
  *
  * The app group is the ONLY channel to the app (`ShareIntentPlugin.swift` drains it), and the
  * identifier below must match `App.entitlements`, this target's entitlements, and the
@@ -31,20 +37,82 @@ class ShareViewController: UIViewController {
     private static let appGroup = "group.family.beanies.app"
     private static let inboxName = "ShareInbox"
 
-    /// The app's custom scheme (`CFBundleURLTypes` in ios/App/App/Info.plist).
-    private static let urlScheme = "family.beanies.app"
-
     /// Group-root file recording what this run did. Read + cleared by the app.
     private static let traceName = "share-open-outcome"
 
     /// Matches the plugin's cap and the JS `AI_PICKER_MAX_BYTES`.
     private static let maxBytes = 25 * 1024 * 1024
 
+    /// How long the confirmation stays up. Long enough to read six words, short enough that
+    /// it never feels like something to dismiss.
+    private static let confirmationSeconds: TimeInterval = 1.4
+
+    private let card = UIView()
+    private let titleLabel = UILabel()
+    private let detailLabel = UILabel()
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        // No UI: the sheet dismisses as soon as the items are written.
-        view.backgroundColor = .clear
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        buildConfirmation()
         Task { await handleShare() }
+    }
+
+    /**
+     * A small confirmation card, hidden until there is something to say.
+     *
+     * Built in code rather than a storyboard because it is twelve lines of layout and a
+     * storyboard would put the copy somewhere the reviewer of this file cannot see it.
+     *
+     * NOT translated, unlike the rest of the app: an extension is a separate process with no
+     * access to the translation store, and shipping a second copy of the string catalogue
+     * into it to localise six words is a worse trade than English. The app itself, which is
+     * where every subsequent screen happens, is fully translated.
+     */
+    private func buildConfirmation() {
+        // Cloud White on Deep Slate-ish shadow, Heritage Orange for the title - the brand
+        // palette, hand-written here because an extension cannot reach the app's theme.
+        card.backgroundColor = UIColor(red: 0.973, green: 0.976, blue: 0.980, alpha: 1) // #F8F9FA
+        card.layer.cornerRadius = 20
+        card.layer.cornerCurve = .continuous
+        card.alpha = 0
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = UIColor(red: 0.945, green: 0.365, blue: 0.133, alpha: 1) // #F15D22
+        titleLabel.textAlignment = .center
+
+        detailLabel.font = .systemFont(ofSize: 14, weight: .regular)
+        detailLabel.textColor = UIColor(red: 0.173, green: 0.243, blue: 0.314, alpha: 1) // #2C3E50
+        detailLabel.textAlignment = .center
+        detailLabel.numberOfLines = 0
+
+        let stack = UIStackView(arrangedSubviews: [titleLabel, detailLabel])
+        stack.axis = .vertical
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(card)
+        card.addSubview(stack)
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 20),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -20),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24)
+        ])
+    }
+
+    /// Show the card, hold it briefly, then finish. Always resolves, so the caller can
+    /// complete the request immediately afterwards.
+    @MainActor
+    private func confirm(title: String, detail: String) async {
+        titleLabel.text = title
+        detailLabel.text = detail
+        UIView.animate(withDuration: 0.18) { self.card.alpha = 1 }
+        try? await Task.sleep(nanoseconds: UInt64(Self.confirmationSeconds * 1_000_000_000))
     }
 
     private func handleShare() async {
@@ -79,7 +147,8 @@ class ShareViewController: UIViewController {
             }
         }
 
-        // Nothing staged: opening beanies would show an empty app for no reason.
+        // Nothing staged. SAY SO rather than closing silently — an unsupported item and a
+        // broken extension look identical when both just dismiss.
         guard staged > 0 else {
             NSLog("[beanies-share] no supported item in this share — nothing staged")
             trace([
@@ -88,41 +157,30 @@ class ShareViewController: UIViewController {
                 "offered": offeredTypes.joined(separator: ","),
                 "staged": "0"
             ])
+            await confirm(
+                title: "beanies can't read that",
+                detail: "Try a photo, a PDF, or a link."
+            )
             extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
             return
         }
 
-        let opened = await openContainingApp()
         trace([
-            "stage": opened ? "opened" : "declined",
+            "stage": "staged",
             "items": String(items.count),
             "offered": offeredTypes.joined(separator: ","),
             "staged": String(staged)
         ])
 
+        // Tell the user where it went. iOS will not let us take them there (see the header),
+        // so the next best thing is to be specific about what happens next.
+        await confirm(
+            title: staged == 1 ? "Saved to beanies" : "Saved \(staged) to beanies",
+            detail: "Open beanies to finish adding it."
+        )
+
         // ALWAYS last: completing tears the extension down, so anything after it may not run.
         extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
-    }
-
-    /**
-     * Ask iOS to foreground beanies via its custom scheme (`CFBundleURLTypes` in the app's
-     * Info.plist). Returns whether the system accepted it.
-     *
-     * No URL handling is needed on the app side: the scheme only has to LAUNCH the app.
-     * `iosShareAdapter` drains the inbox on launch and on every resume, so both a cold
-     * launch and a foregrounding land on the same path.
-     */
-    private func openContainingApp() async -> Bool {
-        guard let url = URL(string: "\(Self.urlScheme)://share") else { return false }
-        guard let context = extensionContext else { return false }
-        return await withCheckedContinuation { continuation in
-            context.open(url) { accepted in
-                if !accepted {
-                    NSLog("[beanies-share] iOS declined to open \(url) — the app will pick the share up on next launch")
-                }
-                continuation.resume(returning: accepted)
-            }
-        }
     }
 
     /**
