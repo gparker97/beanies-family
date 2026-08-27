@@ -53,9 +53,15 @@
 	     LSHandlerRank = Alternate: beanies handles these types but does not claim to
 	     own them, so it never displaces Photos, Files or Preview as the default.
 
-	     LSSupportsOpeningDocumentsInPlace is deliberately ABSENT (i.e. false). beanies
-	     copies what it is given into its own inbox and never edits the original, so
-	     in-place access would be a permission we ask for and do not use.
+	     LSSupportsOpeningDocumentsInPlace is explicitly NO. beanies copies what it is
+	     given into its own inbox and never edits the original, so in-place access
+	     would be a permission we ask for and do not use.
+
+	     It must be PRESENT, not merely absent: Apple rejected build 51's delivery with
+	     ITMS-90737 ("Missing Document Configuration") for declaring document types
+	     without stating one of LSSupportsOpeningDocumentsInPlace or
+	     UISupportsDocumentBrowser. Absent is not read as false - it is read as
+	     unanswered.
 
 	     ⚠️ CURRENTLY INERT, and measured so. On build 51 a shared image still went to
 	     the Share Extension (trace: offered=public.png,public.file-url) rather than
@@ -66,6 +72,8 @@
 	     since the Photos share sheet offers extensions and may not offer a document
 	     handler at all. Left declared because it is harmless and is half of an
 	     experiment worth finishing; see docs/STATUS.md. -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
