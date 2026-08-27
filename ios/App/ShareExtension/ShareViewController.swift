@@ -34,8 +34,8 @@ class ShareViewController: UIViewController {
     /// The app's custom scheme (`CFBundleURLTypes` in ios/App/App/Info.plist).
     private static let urlScheme = "family.beanies.app"
 
-    /// Group-root marker recording whether the open was accepted. Read + cleared by the app.
-    private static let openMarkerName = "share-open-outcome"
+    /// Group-root file recording what this run did. Read + cleared by the app.
+    private static let traceName = "share-open-outcome"
 
     /// Matches the plugin's cap and the JS `AI_PICKER_MAX_BYTES`.
     private static let maxBytes = 25 * 1024 * 1024
@@ -67,22 +67,38 @@ class ShareViewController: UIViewController {
         let items = (extensionContext?.inputItems as? [NSExtensionItem]) ?? []
         // A batch id keeps one share's files together and ordered; the plugin sorts by
         // modification date, and writing sequentially preserves the order they were sent.
-        var wroteAny = false
+        // Every type identifier the sender offered, whether or not we accept it. This is
+        // the one fact that distinguishes "the sender gave us something unsupported" from
+        // "we failed to read something we do support", and it cannot be recovered later.
+        var offeredTypes: [String] = []
+        var staged = 0
         for item in items {
             for provider in item.attachments ?? [] {
-                if await write(provider, to: inbox) { wroteAny = true }
+                offeredTypes.append(contentsOf: provider.registeredTypeIdentifiers)
+                if await write(provider, to: inbox) { staged += 1 }
             }
         }
 
         // Nothing staged: opening beanies would show an empty app for no reason.
-        guard wroteAny else {
+        guard staged > 0 else {
             NSLog("[beanies-share] no supported item in this share — nothing staged")
+            trace([
+                "stage": "nothing_staged",
+                "items": String(items.count),
+                "offered": offeredTypes.joined(separator: ","),
+                "staged": "0"
+            ])
             extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
             return
         }
 
         let opened = await openContainingApp()
-        markOpenOutcome(opened)
+        trace([
+            "stage": opened ? "opened" : "declined",
+            "items": String(items.count),
+            "offered": offeredTypes.joined(separator: ","),
+            "staged": String(staged)
+        ])
 
         // ALWAYS last: completing tears the extension down, so anything after it may not run.
         extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
@@ -110,24 +126,34 @@ class ShareViewController: UIViewController {
     }
 
     /**
-     * Leave a one-byte marker saying whether the open was accepted, for `ShareIntentPlugin`
-     * to read, delete and report to the diagnostics firehose.
+     * Record WHAT HAPPENED on this run, for `ShareIntentPlugin` to read, delete and report
+     * to the diagnostics firehose.
      *
-     * An extension cannot reach `logEvent` — it is a separate process with no WebView — so
-     * without this, "the share silently did nothing" is exactly as unanswerable from the
-     * logs as it was on device. Written to the group ROOT, deliberately NOT the inbox, so it
-     * can never be mistaken for a shared document.
+     * An extension cannot reach `logEvent` — separate process, no WebView — so without this
+     * "the share silently did nothing" is exactly as unanswerable from the logs as it is on
+     * device. The first version recorded ONLY whether the app was opened, which meant every
+     * path that returned earlier than that wrote nothing at all: an absent marker could mean
+     * the container was unreachable, or that no item was staged, or that the extension never
+     * ran. Three very different faults, one indistinguishable silence.
+     *
+     * So it is now written at EVERY exit that can reach the container, and carries the
+     * offered attachment TYPE IDENTIFIERS — the field that says whether a sender is handing
+     * over something the ladder in `write` does not accept, which is otherwise pure guesswork.
+     *
+     * Written to the group ROOT, deliberately NOT the inbox, so it can never be mistaken for
+     * a shared document. Content is a compact `k=v;` string: type identifiers and counts
+     * only, never the shared content itself.
      */
-    private func markOpenOutcome(_ opened: Bool) {
+    private func trace(_ fields: [String: String]) {
         guard let root = FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroup)
         else { return }
-        let marker = root.appendingPathComponent(Self.openMarkerName)
+        let line = fields.keys.sorted().map { "\($0)=\(fields[$0] ?? "")" }.joined(separator: ";")
         do {
-            try Data([opened ? 1 : 0] as [UInt8]).write(to: marker)
+            try Data(line.utf8).write(to: root.appendingPathComponent(Self.traceName))
         } catch {
             // Diagnostics must never break the share itself.
-            NSLog("[beanies-share] could not record the open outcome: \(error)")
+            NSLog("[beanies-share] could not record the run trace: \(error)")
         }
     }
 
@@ -140,11 +166,42 @@ class ShareViewController: UIViewController {
         // Ordered: a file representation is preferred, and `UTType.url` is last so a share
         // carrying BOTH a file and a URL writes only the file. The `return` after a
         // successful write is what guarantees one item per attachment.
-        for type in [UTType.image, UTType.pdf, UTType.url] {
+        // Ordered most specific first. `plainText` is LAST and is the catch-all for the
+        // very common case of a sender that hands a link over as text rather than as a URL
+        // attachment — the app's orchestrator already normalises text/plain and pulls the
+        // URL out of it, exactly as it does for Android, so the two platforms stay identical.
+        for type in [UTType.image, UTType.pdf, UTType.url, UTType.plainText] {
             guard provider.hasItemConformingToTypeIdentifier(type.identifier) else { continue }
 
             // A web URL has no file representation — load it as an item and write the
             // absolute string as a .txt, which `ShareIntentPlugin` maps to text/plain.
+            // Text: write it verbatim as a .txt. No URL validation here on purpose — the
+            // orchestrator owns extracting a link from prose and reports a text share with
+            // no link in it properly, whereas silently dropping it here would look like the
+            // share never happened.
+            if type == .plainText {
+                let wrote: Bool = await withCheckedContinuation { continuation in
+                    provider.loadItem(forTypeIdentifier: type.identifier) { item, _ in
+                        let text = (item as? String) ?? (item as? URL)?.absoluteString
+                        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                              let data = text.data(using: .utf8)
+                        else {
+                            continuation.resume(returning: false)
+                            return
+                        }
+                        do {
+                            try data.write(to: inbox.appendingPathComponent("\(UUID().uuidString).txt"))
+                            continuation.resume(returning: true)
+                        } catch {
+                            NSLog("[beanies-share] could not stage shared text: \(error)")
+                            continuation.resume(returning: false)
+                        }
+                    }
+                }
+                if wrote { return true }
+                continue
+            }
+
             if type == .url {
                 let wrote: Bool = await withCheckedContinuation { continuation in
                     provider.loadItem(forTypeIdentifier: type.identifier) { item, _ in

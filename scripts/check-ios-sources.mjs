@@ -93,7 +93,7 @@ console.log(`✓ all ${swiftFiles.length} Swift file(s) under ios/App/ are in Co
 const CROSS_TARGET_CONSTANTS = [
   { name: 'appGroup', pattern: /private static let appGroup = "([^"]+)"/ },
   { name: 'inboxName', pattern: /private static let inboxName = "([^"]+)"/ },
-  { name: 'openMarkerName', pattern: /private static let openMarkerName = "([^"]+)"/ },
+  { name: 'traceName', pattern: /private static let traceName = "([^"]+)"/ },
 ];
 
 const PAIRED_FILES = {

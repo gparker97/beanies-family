@@ -17,6 +17,15 @@ import { reportError } from '@/utils/errorReporter';
 import { ShareIntent } from './shareIntentPlugin';
 import type { ShareAdapter } from './types';
 
+/** The `stage=` field of the extension's trace, or null if the line does not carry one. */
+function parseStage(trace: string): string | null {
+  for (const pair of trace.split(';')) {
+    const [key, value] = pair.split('=');
+    if (key === 'stage') return value ?? null;
+  }
+  return null;
+}
+
 export const iosShareAdapter: ShareAdapter = {
   name: 'ios',
 
@@ -37,13 +46,17 @@ export const iosShareAdapter: ShareAdapter = {
       try {
         const { files, openOutcome } = await ShareIntent.consume();
 
-        // Report the extension's own outcome BEFORE the empty-return below. The pair that
-        // matters is `declined` with zero files: it says the share staged nothing AND iOS
-        // refused to foreground us, which on device looks exactly like the app ignoring the
-        // share. Without this the two are indistinguishable in the logs.
+        // Report the extension's own trace BEFORE the empty-return below. This is the only
+        // window onto a process that cannot log for itself, and the case that matters most
+        // is a trace arriving with ZERO files: it says the extension ran and staged nothing,
+        // and the `offered=` types in the line say what the sender actually handed over.
+        // Returning early on empty would discard exactly the evidence we need.
         if (openOutcome && openOutcome !== 'none') {
           logEvent({
-            level: openOutcome === 'opened' ? 'info' : 'warn',
+            // Parse the stage out rather than matching on the raw line: the trace is a
+            // sorted `k=v;` string, so `stage` is not at a fixed position and a prefix test
+            // silently mis-classified every healthy share as a warning.
+            level: parseStage(openOutcome) === 'opened' ? 'info' : 'warn',
             surface: 'share-target-ingest',
             message: 'ios share extension open outcome',
             context: {

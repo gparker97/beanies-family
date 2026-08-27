@@ -40,15 +40,17 @@ export interface ShareIntentPlugin {
     offered?: number;
     read?: number;
     /**
-     * iOS only. Whether the Share Extension's request to open beanies was accepted:
-     * `'opened'` | `'declined'` | `'none'` (no marker — every build before the extension
-     * started opening the app, and any share that staged nothing).
+     * iOS only. The Share Extension's run trace: a compact `k=v;` line carrying the stage it
+     * reached (`opened` | `declined` | `nothing_staged`), how many items it was offered,
+     * their TYPE IDENTIFIERS, and how many it staged. `'none'` when the extension left no
+     * trace at all, which now means only that it could not reach the app group container.
      *
-     * `NSExtensionContext.open` is not guaranteed for share extensions, and an extension has
-     * no WebView to log from, so this is the ONLY way the difference between "iOS refused to
-     * open us" and "nothing was ever written" reaches CloudWatch.
+     * An extension has no WebView to log from, so this is the ONLY route by which "the share
+     * appeared to do nothing" reaches CloudWatch — and the offered types are what separate
+     * "the sender gave us something we do not accept" from "we failed to read something we
+     * do". Counts and type identifiers only; never the shared content.
      */
-    openOutcome?: 'opened' | 'declined' | 'none';
+    openOutcome?: string;
   }>;
   addListener(
     event: 'shareReceived',
