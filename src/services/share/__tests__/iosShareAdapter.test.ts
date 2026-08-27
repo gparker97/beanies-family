@@ -44,28 +44,39 @@ async function drainOnce(result: unknown) {
 describe('iosShareAdapter — open-outcome reporting', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('REPORTS a declined open even though there is nothing to ingest', async () => {
-    // The whole point. An early return on `files.length === 0` above the logging would make
-    // this exact state — the one the user actually hit — invisible in CloudWatch.
-    const onShare = await drainOnce({ files: [], openOutcome: 'declined' });
+  it('REPORTS a trace that arrived with NOTHING staged — the case that hid the bug', async () => {
+    // The whole point. An early return on `files.length === 0` above the logging would
+    // discard exactly this, which is the state the user actually hit: the extension ran,
+    // staged nothing, and CloudWatch showed complete silence. The `offered=` types are the
+    // payload that says WHY, so they must survive into the event verbatim.
+    const trace = 'items=1;offered=public.plain-text,public.url;staged=0;stage=nothing_staged';
+    const onShare = await drainOnce({ files: [], openOutcome: trace });
 
     expect(onShare).not.toHaveBeenCalled();
     expect(logEvent).toHaveBeenCalledTimes(1);
     const event = logEvent.mock.calls[0][0];
     expect(event.level).toBe('warn');
     expect(event.surface).toBe('share-target-ingest');
-    expect(event.context).toMatchObject({ os: 'ios', detail: 'declined', file_count: 0 });
+    expect(event.context).toMatchObject({ os: 'ios', detail: trace, file_count: 0 });
   });
 
   it('reports a successful open at info, alongside the files it carried', async () => {
     const onShare = await drainOnce({
       files: [{ data: 'eA==', name: 'a.txt', type: 'text/plain' }],
-      openOutcome: 'opened',
+      openOutcome: 'items=1;offered=public.url;staged=1;stage=opened',
     });
 
     expect(logEvent.mock.calls[0][0].level).toBe('info');
-    expect(logEvent.mock.calls[0][0].context).toMatchObject({ detail: 'opened', file_count: 1 });
+    expect(logEvent.mock.calls[0][0].context).toMatchObject({ file_count: 1 });
     expect(onShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a NON-opened stage as a warning, so it stands out from the healthy path', async () => {
+    await drainOnce({
+      files: [{ data: 'eA==', name: 'a.txt', type: 'text/plain' }],
+      openOutcome: 'items=1;offered=public.url;staged=1;stage=declined',
+    });
+    expect(logEvent.mock.calls[0][0].level).toBe('warn');
   });
 
   it('stays SILENT when there is no marker, so old builds do not spam the firehose', async () => {
