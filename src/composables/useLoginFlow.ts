@@ -50,6 +50,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { registerPasskeyForMember } from '@/services/auth/passkeyService';
 import { raceTimeout } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 export interface UseLoginFlow {
   state: Ref<LoginFlowState>;
@@ -210,32 +211,71 @@ export function useLoginFlow(opts: {
       if (syncStore.hasPendingEncryptedFile && (await tryCachedKeyDecrypt(familyId))) {
         await familyStore.loadMembers();
       }
-    } catch {
-      // Silent by design: this is a fast path, not a gate — the flow works without it.
+    } catch (e) {
+      // A fast path, not a gate — the flow works without it. But never silent (repo
+      // no-silent-failures rule): a persistent failure here quietly demotes every
+      // trusted-device login on this device to manual credentials.
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'trusted_auto_open_failed',
+        context: {
+          action: 'auto_open_failed',
+          error_code: e instanceof Error ? e.name : 'unknown',
+        },
+      });
     }
   }
 
   async function startForFamily(familyId: string, familyName: string): Promise<boolean> {
-    // Same family-activation sequence the old handleFamilySelected ran — PLUS clearing
-    // the previous family's resident members: without it, family A's roster would be
-    // served as family B's picker and a tap-through could mint a cross-family session
-    // (the A∪B corruption class sign-out explicitly guards against).
-    if (familyContextStore.activeFamilyId !== familyId) {
-      await familyContextStore.switchFamily(familyId);
-      familyStore.resetState();
-      syncStore.resetState();
-      await syncStore.initialize();
+    try {
+      // Same family-activation sequence the old handleFamilySelected ran — PLUS clearing
+      // the previous family's resident members: without it, family A's roster would be
+      // served as family B's picker and a tap-through could mint a cross-family session
+      // (the A∪B corruption class sign-out explicitly guards against).
+      //
+      // Review F1: a pending encrypted file staged FOR THIS FAMILY (the /open "Open with
+      // beanies.family" gesture) must survive the switch — syncStore.resetState() nulls
+      // it, silently discarding the file the user explicitly opened. Skip the sync reset
+      // in that case; the family-context switch and member clear still run.
+      if (familyContextStore.activeFamilyId !== familyId) {
+        const pendingIsThisFamily = syncStore.pendingEncryptedFile?.envelope?.familyId === familyId;
+        await familyContextStore.switchFamily(familyId);
+        familyStore.resetState();
+        if (!pendingIsThisFamily) {
+          syncStore.resetState();
+          await syncStore.initialize();
+        }
+      }
+      // Trusted-device fast path: open silently with the cached key so passwordless
+      // members get tap-through and the picker carries live data.
+      await tryTrustedAutoOpen(familyId);
+      const built = await buildPeople(familyId);
+      if (!built) return false;
+      proveError.value = null;
+      pendingPassword = null;
+      pendingCrossDeviceHeal = null;
+      dispatch({
+        type: 'START',
+        familyId,
+        familyName,
+        people: built.people,
+        source: built.source,
+      });
+      return true;
+    } catch (e) {
+      // Review F12: an IndexedDB/initialize throw here used to escape into the caller's
+      // view logic and strand the user on a textless spinner. Degrade to the bootstrap
+      // path instead — it has its own error surfaces.
+      reportError({
+        surface: 'login-flow',
+        message: 'startForFamily failed — degrading to the bootstrap surface',
+        error: e,
+        severity: 'warning',
+        context: { action: 'start_failed' },
+      });
+      return false;
     }
-    // Trusted-device fast path: open silently with the cached key so passwordless
-    // members get tap-through and the picker carries live data.
-    await tryTrustedAutoOpen(familyId);
-    const built = await buildPeople(familyId);
-    if (!built) return false;
-    proveError.value = null;
-    pendingPassword = null;
-    pendingCrossDeviceHeal = null;
-    dispatch({ type: 'START', familyId, familyName, people: built.people, source: built.source });
-    return true;
   }
 
   // ── State-entry effects ───────────────────────────────────────────────────────
@@ -369,6 +409,12 @@ export function useLoginFlow(opts: {
 
   function onPickPerson(person: PersonCard): void {
     proveError.value = null;
+    // Review F5: a cross-device heal intent from a PREVIOUS person's biometric attempt
+    // must not survive a person switch — it could enrol the current user's biometric as
+    // the previous member's key.
+    if (pendingCrossDeviceHeal && pendingCrossDeviceHeal.memberId !== person.id) {
+      pendingCrossDeviceHeal = null;
+    }
     dispatch({ type: 'PICK_PERSON', person });
   }
 
@@ -518,6 +564,14 @@ export function useLoginFlow(opts: {
 
       // ── Cold path: the device wrap IS the unlock. ──
       if (!pinMethod.hasDeviceWrap) return; // unreachable (probe never offers doc-only cold)
+
+      // Stage FIRST (review F10): the #117 fail-closed keyId check needs the envelope's
+      // CURRENT keyId, which only exists once the file is staged — sampling it before
+      // staging left the rotation guard dead on the primary cold path.
+      if (!(await ensureStaged())) {
+        emitOutcome(false, 'transport');
+        return; // OPEN_FAILED dispatched; grant-less recovery retries back into prove
+      }
       const unlock = await unlockWithPin({
         familyId: s.familyId,
         memberId: s.person.id,
@@ -540,30 +594,53 @@ export function useLoginFlow(opts: {
           emitOutcome(false, 'wrong-pin');
           return;
         }
+        if (unlock.reason === 'no-record') {
+          // keyId-invalidated (rotation) or vanished between render and tap — the PIN
+          // method no longer exists here; re-resolve so the screen is honest.
+          proveError.value = t('pin.lockedOut');
+          emitOutcome(false, 'no-record');
+          dispatch({ type: 'BACK' });
+          dispatch({ type: 'PICK_PERSON', person: s.person });
+          return;
+        }
         proveError.value = t('auth.signInFailed');
         emitOutcome(false, unlock.reason);
         return;
       }
 
-      // FK in hand — stage the envelope and decrypt with it.
-      if (!(await ensureStaged())) {
-        emitOutcome(false, 'transport');
-        return; // OPEN_FAILED dispatched; grant-less recovery retries back into prove
-      }
       if (syncStore.hasPendingEncryptedFile) {
         const dec = await syncStore.decryptPendingFileWithKey(unlock.familyKey);
         if (!dec.success) {
-          // Wrong-family / rotated-key blob that slipped the keyId check — clear the
-          // wrap (it can never succeed) and fall back.
-          await removePinUnlock(s.familyId, s.person.id);
+          // Review F4: do NOT destroy the wrap here. decryptPendingFileWithKey folds
+          // every transient throw in its adoption pipeline (worker RPC, cache writes,
+          // registry ops) into success:false — deleting the wrap on that evidence
+          // silently removed a VALID credential. Rotation is already handled fail-closed
+          // by the keyId check above; anything here is retryable.
           proveError.value = t('auth.signInFailed');
           emitOutcome(false, 'decrypt-failed');
+          reportError({
+            surface: 'login-flow',
+            message: 'PIN unlock decrypt failed after a successful unwrap (wrap retained)',
+            severity: 'warning',
+            context: { action: 'pin_decrypt_failed' },
+          });
           return;
         }
         await familyStore.loadMembers();
       }
-      // Doc open now — verify the doc hash to catch a changed-elsewhere PIN, and
-      // complete the session via the shared tail.
+      // Doc open now — verify the doc hash, distinguishing the two stale states
+      // (review F9): no doc-side pinHash at all means the WRAP is stale (the hash never
+      // reached the file) — remove it and say so; a present-but-different hash is the
+      // changed-on-another-device window.
+      const live = familyStore.members.find((m) => m.id === s.person.id);
+      if (live && !live.pinHash) {
+        await removePinUnlock(s.familyId, s.person.id);
+        proveError.value = t('pin.notSet');
+        emitOutcome(false, 'stale-wrap');
+        dispatch({ type: 'BACK' });
+        dispatch({ type: 'PICK_PERSON', person: s.person });
+        return;
+      }
       const result = await authStore.signInWithPin(s.person.id, pin);
       if (!result.success) {
         // Old-PIN window: the wrap opened but the doc says the PIN changed. Honest
@@ -655,10 +732,14 @@ export function useLoginFlow(opts: {
    * asserted without producing a key, re-wrap the family key with fresh PRF material so
    * the NEXT biometric works. Best-effort — never blocks or fails the login.
    */
-  async function healCrossDevicePasskey(): Promise<void> {
+  async function healCrossDevicePasskey(signedInMemberId: string): Promise<void> {
     const heal = pendingCrossDeviceHeal;
     pendingCrossDeviceHeal = null;
     if (!heal) return;
+    // Review F5: the heal must never enrol a DIFFERENT person's biometric as the healed
+    // member's key. If the member who actually opened the pod isn't the one whose
+    // biometric failed keyless, drop the intent silently.
+    if (heal.memberId !== signedInMemberId) return;
     try {
       const fk = syncStore.familyKey;
       const member = familyStore.members.find((m) => m.id === heal.memberId);
@@ -692,6 +773,25 @@ export function useLoginFlow(opts: {
           if (!(await ensureStaged())) return; // dispatched OPEN_FAILED already (password kept)
           if (syncStore.hasPendingEncryptedFile) {
             const dec = await syncStore.decryptPendingFile(password);
+            if (dec.success && dec.viaRecoveryPassphrase) {
+              // Review F3: the typed secret was the FAMILY RECOVERY PASSPHRASE, not this
+              // member's password — the pod is open, but possession of the passphrase
+              // identifies NO ONE. Never sign the picked member in on it; return to the
+              // prove screen (methods re-resolved against the now-open doc: tap-through
+              // for credential-less members, PIN/password for the rest) with copy that
+              // says the phrase was accepted rather than "wrong password".
+              pendingPassword = null;
+              await familyStore.loadMembers();
+              proveError.value = t('recovery.passphraseAcceptedProve');
+              emitProveOutcome({
+                method: 'password',
+                ok: false,
+                errorCode: 'recovery-passphrase',
+                fallbackDepth: pendingProveDepth,
+              });
+              dispatch({ type: 'OPEN_FAILED', reason: 'wrong-password' });
+              return;
+            }
             if (!dec.success) {
               if (dec.corrupted) {
                 // NOT a credential failure: the payload is unusable however right the
@@ -735,7 +835,7 @@ export function useLoginFlow(opts: {
           return;
         }
         pendingPassword = null;
-        await healCrossDevicePasskey();
+        await healCrossDevicePasskey(memberId);
         await verifyDurableHome();
         dispatch({ type: 'OPEN_SUCCEEDED' });
         return;

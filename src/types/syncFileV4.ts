@@ -80,8 +80,10 @@ export interface BeanpodFileV4 {
    * Optional family recovery passphrase wrap (ADDITIVE OPTIONAL). Its own field, NEVER
    * a reserved `wrappedKeys` entry — legacy clients enumerate wrappedKeys as
    * (memberId, wrap) pairs and would surface a phantom member (Pass-4 finding).
+   * `createdAt` arbitrates the envelope merge: newest wins, so a passphrase changed on
+   * one device cannot be silently reverted by another device's stale in-memory copy.
    */
-  recoveryPassphrase?: WrappedMemberKey;
+  recoveryPassphrase?: WrappedMemberKey & { createdAt?: ISODateString };
 
   /** base64( IV || AES-GCM(FK, automerge_binary) ) */
   encryptedPayload: string;

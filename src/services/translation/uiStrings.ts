@@ -4266,6 +4266,11 @@ const STRING_DEFS = {
     beanie: "this family doesn't have a recovery kit on file.",
   },
   'recovery.unlock': { en: 'Unlock', beanie: 'unlock' },
+  'recovery.passphraseAcceptedProve': {
+    en: 'Recovery passphrase accepted — your family data is open. Now confirm who you are to sign in.',
+    beanie:
+      'recovery passphrase accepted — your beans are open. now confirm who you are to sign in.',
+  },
   // ── Member PIN (login rethink Phase 2) ──
   'pin.invalidFormat': {
     en: 'Your PIN must be exactly 6 digits.',

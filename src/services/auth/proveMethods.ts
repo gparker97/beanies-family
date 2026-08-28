@@ -21,8 +21,12 @@
  */
 
 import type { PasskeyRegistration } from '@/types/models';
-import { resolveDeviceKeys } from '@/services/auth/passkeyService';
-import { getPinUnlockRecord } from '@/services/auth/deviceUnlock';
+import {
+  resolveDeviceKeys,
+  isPlatformAuthenticatorAvailable,
+} from '@/services/auth/passkeyService';
+import { getPinUnlockRecord, removePinUnlock } from '@/services/auth/deviceUnlock';
+import { isNative } from '@/services/sync/capabilities';
 import { emitProveMethodsResolved } from '@/services/telemetry/loginFlowEvents';
 import { reportError } from '@/utils/errorReporter';
 
@@ -76,14 +80,30 @@ const PROBES: Probe[] = [
     run: async (ctx) => {
       const keys = await resolveDeviceKeys(ctx.familyId);
       const own = keys.find((k) => k.memberId === ctx.memberId);
-      return own ? { kind: 'biometric', registration: own } : null;
+      if (!own) return null;
+      // Review F15: on web, a registration record alone doesn't mean the button can
+      // work — the platform authenticator can be gone (Windows Hello removed). Native
+      // keystore doesn't use WebAuthn, so the probe only gates the web branch — the
+      // guard the deleted LoadPodView.checkBiometricForFamily used to enforce.
+      if (!isNative() && !(await isPlatformAuthenticatorAvailable())) return null;
+      return { kind: 'biometric', registration: own };
     },
   },
   {
     name: 'pin',
     run: async (ctx) => {
       const record = await getPinUnlockRecord(ctx.familyId, ctx.memberId);
-      if (record) return { kind: 'pin', hasDeviceWrap: true };
+      if (record) {
+        // Review F9: an OPEN pod whose doc carries NO pinHash for this member means the
+        // wrap is stale (the hash never reached the file, or an older beanpod was
+        // restored) — offering it would render a permanently dead PIN method. Self-heal
+        // by removing the record, same pattern as nativeResolveDeviceKeys' cleanup.
+        if (ctx.podOpen && ctx.hasPin === false) {
+          await removePinUnlock(ctx.familyId, ctx.memberId);
+          return null;
+        }
+        return { kind: 'pin', hasDeviceWrap: true };
+      }
       if (ctx.podOpen && ctx.hasPin === true) return { kind: 'pin', hasDeviceWrap: false };
       return null;
     },

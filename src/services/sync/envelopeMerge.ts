@@ -60,10 +60,18 @@ export function preserveLocalKeyDicts(
     ...(mergeKeyDict(incoming.recoveryKeys, local.recoveryKeys)
       ? { recoveryKeys: mergeKeyDict(incoming.recoveryKeys, local.recoveryKeys) }
       : {}),
-    // Scalar, LOCAL-wins like every dict key: the local side is the just-mutated truth
-    // about to be pushed — a passphrase set this session must survive an incoming fetch.
-    ...((local.recoveryPassphrase ?? incoming.recoveryPassphrase)
-      ? { recoveryPassphrase: local.recoveryPassphrase ?? incoming.recoveryPassphrase }
+    // Scalar: NEWEST-wins by createdAt (review F2 — unconditional local-wins let any
+    // device still holding the old wrap in memory revert a passphrase changed elsewhere
+    // on its next fetch+push). A wrap with no createdAt sorts oldest; a side missing the
+    // field entirely loses to any present wrap, so a local-only passphrase still
+    // survives an incoming envelope that lacks one.
+    ...(pickNewerPassphrase(incoming.recoveryPassphrase, local.recoveryPassphrase)
+      ? {
+          recoveryPassphrase: pickNewerPassphrase(
+            incoming.recoveryPassphrase,
+            local.recoveryPassphrase
+          ),
+        }
       : {}),
   };
 }
@@ -78,6 +86,16 @@ export function preserveLocalKeyDicts(
  * signal or a passkey enrolled while offline would never be published. See the
  * "rides the next successful save" contract in `PasskeySettings.vue`.
  */
+function pickNewerPassphrase(
+  incoming: BeanpodFileV4['recoveryPassphrase'],
+  local: BeanpodFileV4['recoveryPassphrase']
+): BeanpodFileV4['recoveryPassphrase'] {
+  if (!incoming) return local;
+  if (!local) return incoming;
+  const ts = (w: NonNullable<BeanpodFileV4['recoveryPassphrase']>) => w.createdAt ?? '';
+  return ts(local) > ts(incoming) ? local : incoming;
+}
+
 export function keyDictSize(envelope: BeanpodFileV4 | null | undefined): number {
   if (!envelope) return 0;
   return (

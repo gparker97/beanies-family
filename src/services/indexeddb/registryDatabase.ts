@@ -78,68 +78,73 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
     );
   }, 5000);
 
-  registryInstance = await openDB<RegistryDB>(REGISTRY_DB_NAME, REGISTRY_DB_VERSION, {
-    blocked() {
-      // An older-version connection elsewhere refuses to close; the timer above reports.
-    },
-    blocking() {
-      // A NEWER version wants to open in another tab — close our connection so that tab
-      // can proceed; the next call here reopens at whatever version wins.
-      registryInstance?.close();
-      registryInstance = null;
-    },
-    terminated() {
-      registryInstance = null;
-    },
-    upgrade(db, oldVersion) {
-      if (!db.objectStoreNames.contains('families')) {
-        db.createObjectStore('families', { keyPath: 'id' });
-      }
+  try {
+    registryInstance = await openDB<RegistryDB>(REGISTRY_DB_NAME, REGISTRY_DB_VERSION, {
+      blocked() {
+        // An older-version connection elsewhere refuses to close; the timer above reports.
+      },
+      blocking() {
+        // A NEWER version wants to open in another tab — close our connection so that tab
+        // can proceed; the next call here reopens at whatever version wins.
+        registryInstance?.close();
+        registryInstance = null;
+      },
+      terminated() {
+        registryInstance = null;
+      },
+      upgrade(db, oldVersion) {
+        if (!db.objectStoreNames.contains('families')) {
+          db.createObjectStore('families', { keyPath: 'id' });
+        }
 
-      if (!db.objectStoreNames.contains('userFamilyMappings')) {
-        const mappingStore = db.createObjectStore('userFamilyMappings', { keyPath: 'id' });
-        mappingStore.createIndex('by-email', 'email', { unique: false });
-        mappingStore.createIndex('by-familyId', 'familyId', { unique: false });
-      }
+        if (!db.objectStoreNames.contains('userFamilyMappings')) {
+          const mappingStore = db.createObjectStore('userFamilyMappings', { keyPath: 'id' });
+          mappingStore.createIndex('by-email', 'email', { unique: false });
+          mappingStore.createIndex('by-familyId', 'familyId', { unique: false });
+        }
 
-      // v2: remove cachedSessions store (Cognito removed)
-      // Cast to native IDBDatabase to access stores not in the typed schema
-      const rawDb = db as unknown as IDBDatabase;
-      if (oldVersion < 2 && rawDb.objectStoreNames.contains('cachedSessions')) {
-        rawDb.deleteObjectStore('cachedSessions');
-      }
+        // v2: remove cachedSessions store (Cognito removed)
+        // Cast to native IDBDatabase to access stores not in the typed schema
+        const rawDb = db as unknown as IDBDatabase;
+        if (oldVersion < 2 && rawDb.objectStoreNames.contains('cachedSessions')) {
+          rawDb.deleteObjectStore('cachedSessions');
+        }
 
-      if (!db.objectStoreNames.contains('globalSettings')) {
-        db.createObjectStore('globalSettings', { keyPath: 'id' });
-      }
+        if (!db.objectStoreNames.contains('globalSettings')) {
+          db.createObjectStore('globalSettings', { keyPath: 'id' });
+        }
 
-      // v3: add passkeys store for WebAuthn/biometric credentials
-      if (!db.objectStoreNames.contains('passkeys')) {
-        const passkeyStore = db.createObjectStore('passkeys', { keyPath: 'credentialId' });
-        passkeyStore.createIndex('by-memberId', 'memberId', { unique: false });
-        passkeyStore.createIndex('by-familyId', 'familyId', { unique: false });
-      }
+        // v3: add passkeys store for WebAuthn/biometric credentials
+        if (!db.objectStoreNames.contains('passkeys')) {
+          const passkeyStore = db.createObjectStore('passkeys', { keyPath: 'credentialId' });
+          passkeyStore.createIndex('by-memberId', 'memberId', { unique: false });
+          passkeyStore.createIndex('by-familyId', 'familyId', { unique: false });
+        }
 
-      // v4: device-local roster cache for the pre-decrypt person picker (2026-08-28
-      // login rethink). Display data only — see RosterCacheEntry in models.ts.
-      if (!db.objectStoreNames.contains('rosterCache')) {
-        db.createObjectStore('rosterCache', { keyPath: 'familyId' });
-      }
+        // v4: device-local roster cache for the pre-decrypt person picker (2026-08-28
+        // login rethink). Display data only — see RosterCacheEntry in models.ts.
+        if (!db.objectStoreNames.contains('rosterCache')) {
+          db.createObjectStore('rosterCache', { keyPath: 'familyId' });
+        }
 
-      // v5: PIN device-unlock wraps + the per-device secret (login rethink Phase 2).
-      // See DeviceUnlockRecord / DeviceSecretRecord in models.ts.
-      if (!db.objectStoreNames.contains('deviceUnlock')) {
-        const unlockStore = db.createObjectStore('deviceUnlock', { keyPath: 'id' });
-        unlockStore.createIndex('by-familyId', 'familyId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('deviceSecrets')) {
-        db.createObjectStore('deviceSecrets', { keyPath: 'id' });
-      }
-    },
-  });
+        // v5: PIN device-unlock wraps + the per-device secret (login rethink Phase 2).
+        // See DeviceUnlockRecord / DeviceSecretRecord in models.ts.
+        if (!db.objectStoreNames.contains('deviceUnlock')) {
+          const unlockStore = db.createObjectStore('deviceUnlock', { keyPath: 'id' });
+          unlockStore.createIndex('by-familyId', 'familyId', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('deviceSecrets')) {
+          db.createObjectStore('deviceSecrets', { keyPath: 'id' });
+        }
+      },
+    });
 
-  clearTimeout(blockedTimer);
-  return registryInstance;
+    return registryInstance;
+  } finally {
+    // Cleared on BOTH outcomes — a rejected open must not leave the 5s timer to fire a
+    // spurious VersionBlocked into the firehose.
+    clearTimeout(blockedTimer);
+  }
 }
 
 export async function closeRegistryDatabase(): Promise<void> {
