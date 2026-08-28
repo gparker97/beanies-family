@@ -93,6 +93,7 @@ vi.mock('@/services/indexeddb/database', () => ({
 // in-memory teardown (`reset`) runs on sign-out — even on a trusted device where
 // the cache DB is preserved. Mirrors the mock in syncStore.resume.test.ts.
 vi.mock('@/services/automerge/worker/docClient', () => ({
+  beginQuietTeardown: vi.fn(),
   setFamilyKey: vi.fn(async () => {}),
   setKey: vi.fn(async () => {}),
   initDoc: vi.fn(async () => ({ loaded: true })),
