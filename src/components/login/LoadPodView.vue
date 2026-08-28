@@ -6,6 +6,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import LoginChoiceCard from './LoginChoiceCard.vue';
+import RecoveryKitLink from './RecoveryKitLink.vue';
 import NoPodEmptyState from './NoPodEmptyState.vue';
 import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
@@ -86,19 +87,27 @@ watch(
 );
 
 /** Photo/screenshot scan: decode the printed kit's QR instead of transcribing 32 chars. */
+/** Photo/PDF scan in flight — a PDF render takes a few seconds; the label shows it. */
+const isScanningKit = ref(false);
+
 async function handleKitPhotoPicked(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   (event.target as HTMLInputElement).value = '';
-  if (!file) return;
+  if (!file || isScanningKit.value) return;
   formError.value = null;
-  const { decodeQrFromImageFile } = await import('@/utils/qrDecode');
-  const decoded = await decodeQrFromImageFile(file);
-  if (!decoded) {
-    formError.value = t('recovery.kitScanFailed');
-    return;
+  isScanningKit.value = true;
+  try {
+    const { decodeQrFromImageFile } = await import('@/utils/qrDecode');
+    const decoded = await decodeQrFromImageFile(file);
+    if (!decoded) {
+      formError.value = t('recovery.kitScanFailed');
+      return;
+    }
+    const { parseKitInput } = await import('@/services/auth/recoveryKit');
+    kitCodeInput.value = parseKitInput(decoded);
+  } finally {
+    isScanningKit.value = false;
   }
-  const { parseKitInput } = await import('@/services/auth/recoveryKit');
-  kitCodeInput.value = parseKitInput(decoded);
 }
 const kitCodeInput = ref('');
 /** Whether the pending envelope carries any recovery-kit wraps at all. */
@@ -966,14 +975,9 @@ async function handleDriveRefresh() {
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
 
-        <button
-          v-if="hasRecoveryKits"
-          type="button"
-          class="mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          @click="((showKitEntry = true), (formError = null))"
-        >
-          {{ t('recovery.useKitLink') }}
-        </button>
+        <div v-if="hasRecoveryKits" class="mt-4">
+          <RecoveryKitLink @click="((showKitEntry = true), (formError = null))" />
+        </div>
 
         <p
           v-if="pendingMemberCount > 0"
@@ -1007,9 +1011,12 @@ async function handleDriveRefresh() {
           required
         />
         <label
-          class="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          class="mt-3 flex w-full items-center justify-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          :class="isScanningKit ? 'cursor-wait opacity-70' : 'cursor-pointer'"
         >
+          <BeanieSpinner v-if="isScanningKit" size="sm" />
           <svg
+            v-else
             class="h-4 w-4"
             fill="none"
             stroke="currentColor"
@@ -1019,11 +1026,12 @@ async function handleDriveRefresh() {
             <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
             <circle cx="12" cy="13" r="4" />
           </svg>
-          {{ t('recovery.kitScanPhoto') }}
+          {{ isScanningKit ? t('recovery.kitScanReading') : t('recovery.kitScanPhoto') }}
           <input
             type="file"
             accept="image/*,application/pdf,.pdf"
             class="hidden"
+            :disabled="isScanningKit"
             @change="handleKitPhotoPicked"
           />
         </label>
