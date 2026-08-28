@@ -38,6 +38,10 @@ import {
   emitRosterFallbackUsed,
 } from '@/services/telemetry/loginFlowEvents';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { registerPasskeyForMember } from '@/services/auth/passkeyService';
+import { raceTimeout } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
 
 export interface UseLoginFlow {
@@ -52,6 +56,8 @@ export interface UseLoginFlow {
    * bootstrap load surface, exactly like a brand-new device.
    */
   startForFamily(familyId: string, familyName: string): Promise<boolean>;
+  /** Trusted-device cached-key decrypt of the STAGED pending file. Shared with the bootstrap branch. */
+  tryCachedKeyDecrypt(familyId: string): Promise<boolean>;
   dispatch(event: LoginFlowEvent): void;
   // Prove-screen handlers (wired to ProveView's events)
   onPickPerson(person: PersonCard): void;
@@ -75,6 +81,7 @@ export function useLoginFlow(opts: {
   const familyContextStore = useFamilyContextStore();
   const syncStore = useSyncStore();
   const { t } = useTranslation();
+  const settingsStore = useSettingsStore();
   const { signIn: biometricSignIn } = useBiometricSignIn();
   const { reconnect: googleReconnect, reconnectError } = useGoogleReconnect();
 
@@ -82,8 +89,21 @@ export function useLoginFlow(opts: {
   const proveError = ref<string | null>(null);
   const isBusy = ref(false);
 
-  /** Out-of-band password for the current opening attempt. Never reactive. */
+  /**
+   * Out-of-band password for the current opening attempt. Never reactive. RETAINED
+   * across transport failures (a reconnect retry must be able to re-run the password
+   * open without re-asking) — cleared only on success, on a wrong password, and on
+   * leaving the flow.
+   */
   let pendingPassword: string | null = null;
+  /** The prove screen's fallbackDepth captured with the password (telemetry fidelity). */
+  let pendingProveDepth = 0;
+  /**
+   * A web passkey asserted this member but produced no key (no PRF, no cache). Once
+   * they open with their password instead, re-wrap the family key for this device so
+   * the NEXT biometric works — the self-heal the old cross-device path performed.
+   */
+  let pendingCrossDeviceHeal: { memberId: string; familyId: string } | null = null;
 
   function dispatch(event: LoginFlowEvent): void {
     const next = transition(state.value, event);
@@ -150,37 +170,124 @@ export function useLoginFlow(opts: {
     return null;
   }
 
+  /**
+   * Trusted-device fast open: stage the file and decrypt with the cached family key,
+   * silently. Restores main's pre-picker auto-decrypt — without it, a passwordless
+   * (deferred-password) kid on a trusted device would face a password-only prove
+   * screen after a plain sign-out. No-ops (false) when there is no cached key.
+   */
+  async function tryCachedKeyDecrypt(familyId: string): Promise<boolean> {
+    const cachedKeyB64 = settingsStore.getCachedFamilyKey(familyId);
+    if (!cachedKeyB64) return false;
+    try {
+      const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+      const { base64ToBuffer } = await import('@/utils/encoding');
+      const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+      const result = await syncStore.decryptPendingFileWithKey(fk);
+      return result.success;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Silently stage + cached-key-decrypt when a trusted device holds the key. */
+  async function tryTrustedAutoOpen(familyId: string): Promise<void> {
+    if (podOpen() || !settingsStore.getCachedFamilyKey(familyId)) return;
+    if (!syncStore.isConfigured || syncStore.needsPermission) return;
+    try {
+      if (!syncStore.hasPendingEncryptedFile) {
+        const result = await syncStore.loadFromFile();
+        if (!result.success && !result.needsPassword) return; // stay silent — prove handles it
+      }
+      if (syncStore.hasPendingEncryptedFile && (await tryCachedKeyDecrypt(familyId))) {
+        await familyStore.loadMembers();
+      }
+    } catch {
+      // Silent by design: this is a fast path, not a gate — the flow works without it.
+    }
+  }
+
   async function startForFamily(familyId: string, familyName: string): Promise<boolean> {
-    // Same family-activation sequence the old handleFamilySelected ran.
+    // Same family-activation sequence the old handleFamilySelected ran — PLUS clearing
+    // the previous family's resident members: without it, family A's roster would be
+    // served as family B's picker and a tap-through could mint a cross-family session
+    // (the A∪B corruption class sign-out explicitly guards against).
     if (familyContextStore.activeFamilyId !== familyId) {
       await familyContextStore.switchFamily(familyId);
+      familyStore.resetState();
       syncStore.resetState();
       await syncStore.initialize();
     }
+    // Trusted-device fast path: open silently with the cached key so passwordless
+    // members get tap-through and the picker carries live data.
+    await tryTrustedAutoOpen(familyId);
     const built = await buildPeople(familyId);
     if (!built) return false;
     proveError.value = null;
+    pendingPassword = null;
+    pendingCrossDeviceHeal = null;
     dispatch({ type: 'START', familyId, familyName, people: built.people, source: built.source });
     return true;
   }
 
   // ── State-entry effects ───────────────────────────────────────────────────────
 
+  /**
+   * When the pod is OPEN, the live doc — not the roster snapshot — is the truth about a
+   * person's credential state. A stale `hasCredential:false` card would otherwise render
+   * create-password mode over a member who HAS a password (silent overwrite), and the
+   * reverse staleness would suppress tap-through. Returns null when the member no longer
+   * exists in the open doc (removed on another device) — the picker must be rebuilt.
+   */
+  function liveProjectPerson(person: PersonCard): PersonCard | null {
+    if (!podOpen()) return person;
+    const live = familyStore.members.find((m) => m.id === person.id);
+    if (!live || live.isPet) return null;
+    return {
+      id: live.id,
+      name: live.name,
+      color: live.color,
+      gender: live.gender,
+      ageGroup: live.ageGroup,
+      hasCredential: !!live.passwordHash,
+      photoUrl: getMemberAvatarUrl(live) ?? undefined,
+    };
+  }
+
   async function runStateEffect(): Promise<void> {
     const s = state.value;
     if (s.kind === 'prove-loading') {
+      const livePerson = liveProjectPerson(s.person);
+      if (!livePerson) {
+        // Member vanished from the open doc — rebuild the picker rather than proving
+        // a ghost. (START re-enters person-select with fresh people.)
+        const rebuilt = await buildPeople(s.familyId);
+        if (rebuilt) {
+          dispatch({
+            type: 'START',
+            familyId: s.familyId,
+            familyName: s.familyName,
+            people: rebuilt.people,
+            source: rebuilt.source,
+          });
+        } else {
+          dispatch({ type: 'EXIT' });
+        }
+        return;
+      }
       const methods = await resolveProveMethods({
         familyId: s.familyId,
-        memberId: s.person.id,
+        memberId: livePerson.id,
         podOpen: podOpen(),
-        hasCredential: s.person.hasCredential ?? null,
+        hasCredential: livePerson.hasCredential ?? null,
         rosterSource: s.source,
       });
       // The machine drops stale events itself, but avoid dispatching for a superseded
       // person at all (two quick picks) — check we're still loading the same person.
       const cur = state.value;
       if (cur.kind === 'prove-loading' && cur.person.id === s.person.id) {
-        dispatch({ type: 'METHODS_RESOLVED', methods });
+        // The event carries the LIVE re-projection so the prove screen renders truth.
+        dispatch({ type: 'METHODS_RESOLVED', methods, person: livePerson });
       }
       return;
     }
@@ -253,6 +360,26 @@ export function useLoginFlow(opts: {
     dispatch({ type: 'PICK_PERSON', person });
   }
 
+  /**
+   * True when the prove screen the effect started from is still the one on screen.
+   * ProveView disables its escape hatches while busy, so a mismatch here is a defect
+   * (or a rogue re-entry) — refuse to dispatch a sign-in for a person the user is no
+   * longer looking at, and say so loudly.
+   */
+  function stillProving(personId: string): boolean {
+    const cur = state.value;
+    const ok = cur.kind === 'prove' && cur.person.id === personId;
+    if (!ok) {
+      reportError({
+        surface: 'login-flow',
+        message: 'prove effect completed for a superseded person — result discarded',
+        severity: 'warning',
+        context: { action: 'stale_prove_result' },
+      });
+    }
+    return ok;
+  }
+
   async function onBiometric(): Promise<void> {
     const s = currentProve();
     if (!s || isBusy.value) return;
@@ -269,12 +396,20 @@ export function useLoginFlow(opts: {
         fallbackDepth: s.fallbackDepth,
       });
       if (result.ok) {
+        if (!stillProving(s.person.id)) return;
         // The tail decrypted (if pending) and completed the session — opening verifies.
         dispatch({
           type: 'PROVE_SUCCEEDED',
           grant: { memberId: s.person.id, fkAvailable: true },
         });
         return;
+      }
+      // A passkey verified the member but produced no key (no PRF, no cached key):
+      // remember it so a successful password open re-wraps the family key for this
+      // device — the self-heal that makes the NEXT biometric work (was
+      // registerCrossDevicePasskey on the old surface).
+      if ('crossDevice' in result) {
+        pendingCrossDeviceHeal = { memberId: result.crossDevice.memberId, familyId: s.familyId };
       }
       // null message = user cancelled — deliberate silence, stay on the prove screen.
       proveError.value = result.message;
@@ -297,6 +432,7 @@ export function useLoginFlow(opts: {
         fallbackDepth: s.fallbackDepth,
       });
       if (result.success) {
+        if (!stillProving(s.person.id)) return;
         dispatch({
           type: 'PROVE_SUCCEEDED',
           grant: { memberId: s.person.id, fkAvailable: false },
@@ -314,6 +450,7 @@ export function useLoginFlow(opts: {
     if (!s || isBusy.value) return;
     proveError.value = null;
     pendingPassword = password;
+    pendingProveDepth = s.fallbackDepth;
     dispatch({ type: 'PASSWORD_SUBMITTED', memberId: s.person.id });
   }
 
@@ -321,6 +458,14 @@ export function useLoginFlow(opts: {
     const s = currentProve();
     if (!s || isBusy.value) return;
     proveError.value = null;
+    // Fail-closed re-check against the LIVE doc: create-password must never overwrite
+    // an existing hash, whatever a stale card claimed. (setPassword itself has no
+    // existing-hash guard — this is the boundary that provides it.)
+    const live = familyStore.members.find((m) => m.id === s.person.id);
+    if (!live || live.passwordHash) {
+      proveError.value = live ? t('auth.memberHasPassword') : t('auth.memberNotFound');
+      return;
+    }
     isBusy.value = true;
     try {
       const result = await authStore.setPassword(s.person.id, password);
@@ -332,6 +477,7 @@ export function useLoginFlow(opts: {
       });
       if (result.success) {
         await syncStore.syncNowBounded();
+        if (!stillProving(s.person.id)) return;
         dispatch({
           type: 'PROVE_SUCCEEDED',
           grant: { memberId: s.person.id, fkAvailable: false },
@@ -369,24 +515,70 @@ export function useLoginFlow(opts: {
     }
   }
 
+  /**
+   * Cross-device passkey self-heal: after a password open on a device whose passkey
+   * asserted without producing a key, re-wrap the family key with fresh PRF material so
+   * the NEXT biometric works. Best-effort — never blocks or fails the login.
+   */
+  async function healCrossDevicePasskey(): Promise<void> {
+    const heal = pendingCrossDeviceHeal;
+    pendingCrossDeviceHeal = null;
+    if (!heal) return;
+    try {
+      const fk = syncStore.familyKey;
+      const member = familyStore.members.find((m) => m.id === heal.memberId);
+      if (!fk || !member) return;
+      const result = await registerPasskeyForMember({
+        memberId: member.id,
+        memberName: member.name,
+        memberEmail: member.email,
+        familyId: heal.familyId,
+        familyKey: fk,
+      });
+      if (result.success && result.passkeySecret) {
+        syncStore.addPasskeySecret(result.passkeySecret);
+        // Best-effort push — the secret rides the next save either way.
+        await raceTimeout(syncStore.syncNow(true), 5000);
+      }
+    } catch (e) {
+      console.warn('[useLoginFlow] cross-device passkey re-wrap failed (non-blocking):', e);
+    }
+  }
+
   async function runOpening(memberId: string, fkAvailable: boolean): Promise<void> {
     isBusy.value = true;
     try {
-      // Password path: fetch → decrypt → verify identity against the doc.
+      // Password path: fetch → decrypt → verify identity against the doc. The password
+      // is RETAINED across transport failures (a reconnect retry re-runs this branch);
+      // it is cleared on success and on a wrong password.
       if (!fkAvailable && pendingPassword !== null) {
         const password = pendingPassword;
-        pendingPassword = null;
         if (!podOpen()) {
-          if (!(await ensureStaged())) return; // dispatched OPEN_FAILED already
+          if (!(await ensureStaged())) return; // dispatched OPEN_FAILED already (password kept)
           if (syncStore.hasPendingEncryptedFile) {
             const dec = await syncStore.decryptPendingFile(password);
             if (!dec.success) {
+              if (dec.corrupted) {
+                // NOT a credential failure: the payload is unusable however right the
+                // password is. Re-asking loops forever — route to transport recovery,
+                // which carries the load-a-file escape.
+                proveError.value = t('loginFlow.recoveryCorruptBody');
+                emitProveOutcome({
+                  method: 'password',
+                  ok: false,
+                  errorCode: 'corrupted',
+                  fallbackDepth: pendingProveDepth,
+                });
+                dispatch({ type: 'OPEN_FAILED', reason: 'error' });
+                return;
+              }
+              pendingPassword = null;
               proveError.value = dec.error ?? t('password.decryptionError');
               emitProveOutcome({
                 method: 'password',
                 ok: false,
                 errorCode: 'wrong-password',
-                fallbackDepth: 0,
+                fallbackDepth: pendingProveDepth,
               });
               dispatch({ type: 'OPEN_FAILED', reason: 'wrong-password' });
               return;
@@ -399,13 +591,16 @@ export function useLoginFlow(opts: {
           method: 'password',
           ok: result.success,
           errorCode: result.success ? undefined : 'wrong-password',
-          fallbackDepth: 0,
+          fallbackDepth: pendingProveDepth,
         });
         if (!result.success) {
+          pendingPassword = null;
           proveError.value = result.error ?? t('auth.signInFailed');
           dispatch({ type: 'OPEN_FAILED', reason: 'wrong-password' });
           return;
         }
+        pendingPassword = null;
+        await healCrossDevicePasskey();
         await verifyDurableHome();
         dispatch({ type: 'OPEN_SUCCEEDED' });
         return;
@@ -431,6 +626,7 @@ export function useLoginFlow(opts: {
   }
 
   function onRecoveryRetry(): void {
+    proveError.value = null;
     dispatch({ type: 'RECOVERY_RETRY' });
   }
 
@@ -440,12 +636,16 @@ export function useLoginFlow(opts: {
     isBusy.value = true;
     try {
       const ok = await googleReconnect(syncStore.providerAccountEmail ?? undefined);
-      // On redirect surfaces (iOS/PWA) reconnect() navigates away; nothing more to do —
-      // the boot path re-enters the flow with a fresh token on return.
+      // On redirect surfaces (iOS/PWA) reconnect() kicked off a FULL-PAGE navigation and
+      // resolves while the page is unloading — dispatching a retry now would churn
+      // against the still-dead token and pollute the firehose. The boot path re-enters
+      // the flow with a fresh token on return.
+      if (shouldUseRedirectAuth()) return;
       if (!ok) {
         proveError.value = reconnectError.value || t('googleDrive.reconnectFailed');
         return;
       }
+      proveError.value = null;
       dispatch({ type: 'RECOVERY_RETRY' });
     } finally {
       isBusy.value = false;
@@ -462,6 +662,7 @@ export function useLoginFlow(opts: {
         proveError.value = t('auth.fileLoadFailed');
         return;
       }
+      proveError.value = null;
       dispatch({ type: 'RECOVERY_RETRY' });
     } catch (e) {
       reportError({
@@ -482,6 +683,7 @@ export function useLoginFlow(opts: {
     proveError,
     isBusy,
     startForFamily,
+    tryCachedKeyDecrypt,
     dispatch,
     onPickPerson,
     onBiometric,

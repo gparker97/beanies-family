@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4195
+    "translationCount": 4200
   },
   "translations": {
     "app.name": {
@@ -20979,6 +20979,31 @@
     "loginFlow.recoveryUseBootstrap": {
       "translation": "改为加载家庭文件",
       "hash": "fv8idb",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryTitleUnproven": {
+      "translation": "让我们重新连接",
+      "hash": "ay3o3i",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryAuthBodyUnproven": {
+      "translation": "在您登录之前，我们需要重新连接到Google ，只需轻触一下，即可到达您所在的位置。",
+      "hash": "9fhkwr",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryCorruptBody": {
+      "translation": "无法读取您的家庭数据文件—该文件可能已损坏。请重试，或加载家庭文件的其他副本。",
+      "hash": "prwrf9",
+      "lastUpdated": "2026-08-28"
+    },
+    "auth.memberNotFound": {
+      "translation": "找不到会员",
+      "hash": "gzj56p",
+      "lastUpdated": "2026-08-28"
+    },
+    "auth.memberHasPassword": {
+      "translation": "此会员有密码，请使用该密码登录。",
+      "hash": "5nh75",
       "lastUpdated": "2026-08-28"
     }
   }

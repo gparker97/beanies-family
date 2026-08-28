@@ -52,6 +52,12 @@ export async function refreshRosterCache(members: FamilyMember[]): Promise<void>
       members: humans.map(toRosterMember),
       cachedAt: toISODateString(new Date()),
     };
+    // TOCTOU guard: the active family can switch between the read above and this write
+    // (a late family-A members mutation landing after startForFamily flipped to B would
+    // otherwise durably file A's names under B's entry — a cross-household privacy leak
+    // on a shared device). Re-check just before persisting; a mismatch means this
+    // refresh belongs to a superseded family — drop it.
+    if (getActiveFamilyId() !== familyId) return;
     await saveRosterCache(entry);
   } catch (err) {
     // Non-critical (the picker falls back to credential records / the open-pod roster),

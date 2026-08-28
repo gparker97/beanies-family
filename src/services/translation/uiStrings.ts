@@ -4156,6 +4156,22 @@ const STRING_DEFS = {
     en: "Something got in the way of loading your family data. It's usually temporary — try again.",
     beanie: "something got in the way of loading your beans. it's usually temporary — try again.",
   },
+  'loginFlow.recoveryTitleUnproven': { en: "Let's Reconnect", beanie: "let's reconnect" },
+  'loginFlow.recoveryAuthBodyUnproven': {
+    en: 'We need to reconnect to Google before you can sign in — one tap, then pick up right where you were.',
+    beanie:
+      'we need to reconnect to google before you can sign in — one tap, then right back to your beans.',
+  },
+  'loginFlow.recoveryCorruptBody': {
+    en: "Your family data file couldn't be read — the file may be damaged. Try again, or load a different copy of your family file.",
+    beanie:
+      "your family file couldn't be read — it may be damaged. try again, or load a different copy.",
+  },
+  'auth.memberNotFound': { en: 'Member not found.', beanie: 'that bean is not here.' },
+  'auth.memberHasPassword': {
+    en: 'This member has a password — please sign in with it.',
+    beanie: 'this bean has a password — please sign in with it.',
+  },
   'loginFlow.recoveryReconnect': { en: 'Reconnect Google', beanie: 'reconnect google' },
   'loginFlow.recoveryGrant': { en: 'Grant Access', beanie: 'grant access' },
   'loginFlow.recoveryUseBootstrap': {

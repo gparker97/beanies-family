@@ -650,17 +650,19 @@ export const useAuthStore = defineStore('auth', () => {
   ): Promise<{ success: boolean; error?: string }> {
     isLoading.value = true;
     error.value = null;
+    const translationStore = useTranslationStore();
     try {
       const familyStore = useFamilyStore();
       const member = familyStore.members.find((m) => m.id === memberId);
 
       if (!member) {
-        error.value = 'Member not found';
+        error.value = translationStore.t('auth.memberNotFound');
         return { success: false, error: error.value };
       }
       if (member.passwordHash) {
-        // A credentialed member must prove — never tap through.
-        error.value = 'Member has a password set';
+        // A credentialed member must prove — never tap through. Translated: this string
+        // reaches ProveView's role=alert box (repo i18n rule for script-level strings).
+        error.value = translationStore.t('auth.memberHasPassword');
         return { success: false, error: error.value };
       }
 
@@ -683,7 +685,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       return { success: true };
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Sign in failed';
+      error.value = e instanceof Error ? e.message : translationStore.t('auth.signInFailed');
       return { success: false, error: error.value };
     } finally {
       isLoading.value = false;

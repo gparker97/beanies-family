@@ -23,7 +23,6 @@ import { isNavigationCancelled } from '@/utils/appChrome';
 import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
 import { useLoginFlow } from '@/composables/useLoginFlow';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -41,7 +40,6 @@ const router = useRouter();
 const route = useRoute();
 const { t } = useTranslation();
 const syncStore = useSyncStore();
-const settingsStore = useSettingsStore();
 const familyContextStore = useFamilyContextStore();
 const familyStore = useFamilyStore();
 const authStore = useAuthStore();
@@ -315,6 +313,14 @@ onMounted(async () => {
     // see `hasPendingEncryptedFile === true` and show the password modal
     // immediately — no file picker, no second OAuth.
     if (syncStore.hasPendingEncryptedFile) {
+      // 2026-08-28 rethink (review F9): a device with a person list must get the machine
+      // (and its biometric offer) even on the /open "Open with beanies.family" gesture —
+      // the envelope names the family, and ensureStaged already handles the pending file.
+      const envelope = syncStore.pendingEncryptedFile?.envelope;
+      if (envelope?.familyId && (await enterFlow(envelope.familyId, envelope.familyName ?? ''))) {
+        isInitializing.value = false;
+        return;
+      }
       autoLoadPod.value = true;
       activeView.value = 'load-pod';
       isInitializing.value = false;
@@ -348,25 +354,6 @@ onMounted(async () => {
 
   isInitializing.value = false;
 });
-
-/**
- * Try to auto-decrypt using cached family key.
- * Returns true if decryption succeeded.
- */
-async function tryAutoDecrypt(familyId: string): Promise<boolean> {
-  const cachedKeyB64 = settingsStore.getCachedFamilyKey(familyId);
-  if (!cachedKeyB64) return false;
-
-  try {
-    const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
-    const { base64ToBuffer } = await import('@/utils/encoding');
-    const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
-    const result = await syncStore.decryptPendingFileWithKey(fk);
-    return result.success;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Derive a provider hint from a PersistedProviderConfig for LoadPodView.
@@ -452,7 +439,7 @@ async function handleFamilySelected(payload: {
         await handleFileLoaded();
       } else if (loadResult.needsPassword) {
         // Encrypted — try the trusted-device cached key first.
-        if (await tryAutoDecrypt(payload.id)) {
+        if (await flow.tryCachedKeyDecrypt(payload.id)) {
           await handleFileLoaded();
         } else {
           // Can't auto-decrypt — LoadPodView's decrypt modal.
@@ -655,6 +642,8 @@ async function handleStartOver() {
           v-else-if="flowState.kind === 'open-recovery'"
           :reason="flowState.reason"
           :family-name="flowState.resume.familyName"
+          :proven="flowState.grant !== null"
+          :error="flowError"
           :is-busy="flowBusy"
           @reconnect="flow.onRecoveryReconnect"
           @grant-permission="flow.onRecoveryGrantPermission"

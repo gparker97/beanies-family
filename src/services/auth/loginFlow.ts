@@ -132,8 +132,12 @@ export type LoginFlowEvent =
       source: PersonSource;
     }
   | { type: 'PICK_PERSON'; person: PersonCard }
-  /** The prove-loading effect finished. */
-  | { type: 'METHODS_RESOLVED'; methods: ProveMethod[] }
+  /**
+   * The prove-loading effect finished. `person` is the effect's LIVE re-projection of
+   * the picked card (when the pod is open, the doc — not the roster snapshot — is the
+   * truth about names and credential state); absent = keep the picked card.
+   */
+  | { type: 'METHODS_RESOLVED'; methods: ProveMethod[]; person?: PersonCard }
   /**
    * A local prove method succeeded (biometric assert, tap-through). The session tail has
    * run; the machine's job is to open the pod.
@@ -204,7 +208,7 @@ export function transition(state: LoginFlowState, event: LoginFlowEvent): LoginF
         kind: 'prove',
         familyId: state.familyId,
         familyName: state.familyName,
-        person: state.person,
+        person: event.person ?? state.person,
         methods: event.methods,
         fallbackDepth: 0,
         source: state.source,
