@@ -706,6 +706,17 @@ export const useSettingsStore = defineStore('settings', () => {
       });
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to record kit confirmation';
+      // Never console/ref-only (review R2-F10): a swallowed stamp failure makes the
+      // kit nag re-fire for every manager, and one who obeys it regenerates — and
+      // thereby inerts — the kit the family actually stored. The nag re-firing is
+      // the designed safety net; the firehose trail is what was missing.
+      reportError({
+        surface: 'login-flow',
+        message: 'recoveryKitConfirmedAt stamp failed — kit nag will re-fire',
+        error: e,
+        severity: 'warning',
+        context: { action: 'kit_confirm_stamp_failed' },
+      });
     }
   }
 
