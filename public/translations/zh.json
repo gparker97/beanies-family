@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4290
+    "translationCount": 4293
   },
   "translations": {
     "app.name": {
@@ -3147,14 +3147,14 @@
       "lastUpdated": "2026-02-25"
     },
     "passkey.signInError": {
-      "translation": "生物识别登录失败。请使用您的密码尝试。",
-      "hash": "1ys9nd",
-      "lastUpdated": "2026-02-25"
+      "translation": "生物识别登录失败。请使用您的PIN码尝试。",
+      "hash": "pysjmj",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.dekStale": {
-      "translation": "自生物识别设置以来，您的加密密钥已更改。请使用您的密码登录，然后在“设置”中重新注册生物识别。",
-      "hash": "kbgu1x",
-      "lastUpdated": "2026-02-25"
+      "translation": "自生物识别设置以来，您的加密密钥已更改。请使用您的PIN码登录，然后在“设置”中重新注册生物识别。",
+      "hash": "dh43j1",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.prfFull": {
       "translation": "完全解锁",
@@ -3177,9 +3177,9 @@
       "lastUpdated": "2026-03-03"
     },
     "passkey.noAuthenticator": {
-      "translation": "此设备上未检测到生物识别身份验证器。",
-      "hash": "5h7ppp",
-      "lastUpdated": "2026-02-25"
+      "translation": "此设备上尚未设置生物识别身份验证器。与此同时，您的PIN码会为您登录。",
+      "hash": "mjlnrk",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.registeredPasskeys": {
       "translation": "已注册的生物识别技术",
@@ -3192,9 +3192,9 @@
       "lastUpdated": "2026-03-03"
     },
     "passkey.settingsDescription": {
-      "translation": "使用指纹、面部或设备PIN而不是密码登录。",
-      "hash": "ezysm9",
-      "lastUpdated": "2026-02-25"
+      "translation": "这允许您使用指纹或人脸解锁记录。",
+      "hash": "u3pn34",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.noPasskeys": {
       "translation": "尚未注册生物识别登录。",
@@ -3202,9 +3202,9 @@
       "lastUpdated": "2026-02-25"
     },
     "passkey.unsupported": {
-      "translation": "生物识别解锁在此设备上不可用。使用您的密码登录。",
-      "hash": "wi17rr",
-      "lastUpdated": "2026-05-23"
+      "translation": "生物识别解锁在此设备上不可用。您的PIN码会为您登录。",
+      "hash": "dpey5z",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.rename": {
       "translation": "重命名",
@@ -3792,9 +3792,9 @@
       "lastUpdated": "2026-02-28"
     },
     "passkey.fileLoadError": {
-      "translation": "无法加载您的数据文件。请使用您的密码登录。",
-      "hash": "9t9th3",
-      "lastUpdated": "2026-02-28"
+      "translation": "无法加载您的数据文件。请使用您的PIN码登录。",
+      "hash": "rcyd2j",
+      "lastUpdated": "2026-08-28"
     },
     "fastLogin.notYou": {
       "translation": "不是您本人？切换账号",
@@ -12992,9 +12992,9 @@
       "lastUpdated": "2026-05-03"
     },
     "transferOwnership.reauthPasskeyFailed": {
-      "translation": "密钥验证失败。请重试或使用您的密码。",
-      "hash": "l1svh1",
-      "lastUpdated": "2026-05-03"
+      "translation": "生物识别验证失败。请重试或使用您的PIN码。",
+      "hash": "bq5xa9",
+      "lastUpdated": "2026-08-28"
     },
     "transferOwnership.reauthWrongPassword": {
       "translation": "密码不正确。请再试一次。",
@@ -18592,9 +18592,9 @@
       "lastUpdated": "2026-07-13"
     },
     "passkey.errEnableFailed": {
-      "translation": "目前无法在此设备上设置生物识别解锁。您仍然可以使用密码登录。",
-      "hash": "xqtx4o",
-      "lastUpdated": "2026-07-14"
+      "translation": "目前无法在此设备上设置生物识别解锁。您仍然可以使用PIN码登录。",
+      "hash": "sdt6p0",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.errNotReadable": {
       "translation": "您的设备无法完成此请求。请确保已设置设备生物识别（指纹或面部解锁） ，然后重试。",
@@ -18602,9 +18602,9 @@
       "lastUpdated": "2026-07-14"
     },
     "passkey.errNotSupported": {
-      "translation": "此设备目前无法使用生物识别解锁。您可以使用密码登录。",
-      "hash": "xtfoou",
-      "lastUpdated": "2026-07-14"
+      "translation": "此设备目前无法使用生物识别解锁。您可以使用PIN码登录。",
+      "hash": "mymgk6",
+      "lastUpdated": "2026-08-28"
     },
     "passkey.errSecurity": {
       "translation": "发生安全错误。请确保您使用的是安全(HTTPS)连接。",
@@ -18612,9 +18612,9 @@
       "lastUpdated": "2026-07-14"
     },
     "passkey.errGeneric": {
-      "translation": "生物识别解锁出错。您可以使用密码登录。",
-      "hash": "wrhqqw",
-      "lastUpdated": "2026-07-14"
+      "translation": "生物识别解锁出错。您可以使用PIN码登录。",
+      "hash": "8phsk4",
+      "lastUpdated": "2026-08-28"
     },
     "biometric.cancelled": {
       "translation": "生物识别已取消。您可以使用密码登录。",
@@ -20627,9 +20627,9 @@
       "lastUpdated": "2026-08-27"
     },
     "passkey.wrongMemberError": {
-      "translation": "该生物识别属于不同的bean。使用您的密码登录。",
-      "hash": "it7km2",
-      "lastUpdated": "2026-08-27"
+      "translation": "该生物识别信息属于另一个设备。请使用您的PIN码登录。",
+      "hash": "g3g824",
+      "lastUpdated": "2026-08-28"
     },
     "fastLogin.whoIsSigningIn": {
       "translation": "谁在登录？",
@@ -21454,6 +21454,21 @@
     "join.pinHint": {
       "translation": "要稍后登录全新的设备，请使用设备链接或家庭恢复套件—此设备需要0.14或更高版本。",
       "hash": "hk5a4s",
+      "lastUpdated": "2026-08-28"
+    },
+    "passkey.webRetired": {
+      "translation": "在适用于iPhone和Android的Beanies应用程序中，人脸识别和指纹会实时解锁。在浏览器中，您可以快速输入6位数PIN码，无需在此处进行设置。",
+      "hash": "43tgpw",
+      "lastUpdated": "2026-08-28"
+    },
+    "passkey.webLeftoverNote": {
+      "translation": "在您不再登录之前的浏览器密钥—您的PIN将替换它们。您可以删除这些旧条目。",
+      "hash": "flef27",
+      "lastUpdated": "2026-08-28"
+    },
+    "deviceLink.publishFailed": {
+      "translation": "链接无法发布到您的家庭文件—请检查您的连接，然后重试。",
+      "hash": "dl2izp",
       "lastUpdated": "2026-08-28"
     }
   }

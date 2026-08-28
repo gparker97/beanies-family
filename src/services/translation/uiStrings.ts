@@ -2350,8 +2350,8 @@ const STRING_DEFS = {
   },
   'transferOwnership.reauthVerifyButton': { en: 'Verify', beanie: 'verify' },
   'transferOwnership.reauthPasskeyFailed': {
-    en: 'Passkey verification failed. Try again or use your password.',
-    beanie: 'passkey verification failed. try again or use your password.',
+    en: 'Biometric verification failed. Try again or use your PIN.',
+    beanie: 'biometric verification failed. try again or use your pin.',
   },
   'transferOwnership.reauthWrongPassword': {
     en: 'Incorrect password. Try again.',
@@ -3715,8 +3715,8 @@ const STRING_DEFS = {
     beanie: 'failed to register biometric. please try again.',
   },
   'passkey.signInError': {
-    en: 'Biometric sign-in failed. Please try with your password.',
-    beanie: 'biometric sign-in failed. please try with your password.',
+    en: 'Biometric sign-in failed. Please try with your PIN.',
+    beanie: 'biometric sign-in failed. please try with your pin.',
   },
   'passkey.crossDeviceNoCache': {
     en: 'This biometric was synced from another device. Sign in with your password once to enable it here.',
@@ -3731,22 +3731,22 @@ const STRING_DEFS = {
   // has no biometric on this device, which is the normal case for everyone else in the
   // family — telling them their biometrics changed would be both wrong and alarming.
   'passkey.wrongMemberError': {
-    en: 'That biometric belongs to a different bean. Use your password to sign in.',
-    beanie: 'that biometric belongs to a different bean. use your password to sign in.',
+    en: 'That biometric belongs to a different bean. Use your PIN to sign in.',
+    beanie: 'that biometric belongs to a different bean. use your pin to sign in.',
   },
   'passkey.dekStale': {
-    en: 'Your encryption key has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
+    en: 'Your encryption key has changed since biometric was set up. Please sign in with your PIN and re-register biometric in Settings.',
     beanie:
-      'your encryption key has changed since biometric was set up. please sign in with your password and re-register biometric in settings.',
+      'your encryption key has changed since biometric was set up. please sign in with your pin and re-register biometric in settings.',
   },
   'passkey.fileLoadError': {
-    en: 'Could not load your data file. Please sign in with your password.',
-    beanie: 'could not load your data file. please sign in with your password.',
+    en: 'Could not load your data file. Please sign in with your PIN.',
+    beanie: 'could not load your data file. please sign in with your pin.',
   },
   'passkey.errEnableFailed': {
-    en: "Biometric unlock couldn't be set up on this device right now. You can still sign in with your password.",
+    en: "Biometric unlock couldn't be set up on this device right now. You can still sign in with your PIN.",
     beanie:
-      "biometric unlock couldn't be set up on this device right now. you can still sign in with your password.",
+      "biometric unlock couldn't be set up on this device right now. you can still sign in with your pin.",
   },
   'passkey.errNotReadable': {
     en: 'Your device could not complete this request. Please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.',
@@ -3754,17 +3754,17 @@ const STRING_DEFS = {
       'your device could not complete this request. please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.',
   },
   'passkey.errNotSupported': {
-    en: "Biometric unlock isn't available on this device right now. You can sign in with your password.",
+    en: "Biometric unlock isn't available on this device right now. You can sign in with your PIN.",
     beanie:
-      "biometric unlock isn't available on this device right now. you can sign in with your password.",
+      "biometric unlock isn't available on this device right now. you can sign in with your pin.",
   },
   'passkey.errSecurity': {
     en: 'A security error occurred. Please make sure you are on a secure (HTTPS) connection.',
     beanie: 'a security error occurred. please make sure you are on a secure (https) connection.',
   },
   'passkey.errGeneric': {
-    en: 'Something went wrong with biometric unlock. You can sign in with your password.',
-    beanie: 'something went wrong with biometric unlock. you can sign in with your password.',
+    en: 'Something went wrong with biometric unlock. You can sign in with your PIN.',
+    beanie: 'something went wrong with biometric unlock. you can sign in with your pin.',
   },
   // Native (installed app) hardware-Keystore biometric copy. See nativeBiometric.ts.
   'biometric.cancelled': {
@@ -3794,22 +3794,33 @@ const STRING_DEFS = {
   'passkey.lastUsed': { en: 'Last used', beanie: 'last used' },
   'passkey.neverUsed': { en: 'Never used', beanie: 'never used' },
   'passkey.noAuthenticator': {
-    en: 'No biometric authenticator detected on this device.',
-    beanie: 'no biometric authenticator detected on this device.',
+    en: 'No biometric authenticator is set up on this device yet. Your PIN signs you in meanwhile.',
+    beanie:
+      'no biometric authenticator is set up on this device yet. your pin signs you in meanwhile.',
   },
   'passkey.registeredPasskeys': { en: 'Registered biometrics', beanie: 'registered biometrics' },
   'passkey.settingsTitle': { en: 'Biometric Login', beanie: 'biometric login' },
   'passkey.settingsDescription': {
-    en: 'Sign in with your fingerprint, face, or device PIN instead of a password.',
-    beanie: 'sign in with your fingerprint, face, or device pin instead of a password.',
+    en: 'Unlock beanies with your fingerprint or face — quicker than typing your PIN.',
+    beanie: 'unlock beanies with your fingerprint or face — quicker than typing your pin.',
   },
   'passkey.noPasskeys': {
     en: 'No biometric logins registered yet.',
     beanie: 'no biometric logins registered yet.',
   },
   'passkey.unsupported': {
-    en: "Biometric unlock isn't available on this device. Use your password to sign in.",
-    beanie: "biometric unlock isn't available on this device. use your password to sign in.",
+    en: "Biometric unlock isn't available on this device. Your PIN signs you in.",
+    beanie: "biometric unlock isn't available on this device. your pin signs you in.",
+  },
+  'passkey.webRetired': {
+    en: 'Face ID and fingerprint unlock live in the beanies app for iPhone and Android. In your browser, your 6-digit PIN is the quick way in — nothing to set up here.',
+    beanie:
+      'face id and fingerprint unlock live in the beanies app for iphone and android. in your browser, your 6-digit pin is the quick way in — nothing to set up here.',
+  },
+  'passkey.webLeftoverNote': {
+    en: 'Browser passkeys from before no longer sign you in — your PIN replaces them. You can remove these old entries.',
+    beanie:
+      'browser passkeys from before no longer sign you in — your pin replaces them. you can remove these old entries.',
   },
   'passkey.rename': { en: 'Rename', beanie: 'rename' },
   'passkey.renameLabel': { en: 'Device name', beanie: 'device name' },

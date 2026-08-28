@@ -29,13 +29,16 @@ const isRegistering = ref(false);
 const editingId = ref<string | null>(null);
 const editLabel = ref('');
 
+const native = isNative();
+
 onMounted(async () => {
   // Phase 4: NEW enrolment is native-keystore only (the web WebAuthn+PRF path is
-  // retired). On web the card renders as management-only when leftover
-  // registrations exist — list / rename / remove — and hides entirely otherwise.
+  // retired). On web the card explains that biometric lives in the installed app
+  // (never "no authenticator detected" — the browser isn't broken, the mechanism
+  // moved) and renders leftover registrations as management-only (rename/remove).
   platformAvailable.value = await canEnrollBiometric();
   await loadPasskeys();
-  supported.value = isNative() || platformAvailable.value || passkeys.value.length > 0;
+  supported.value = native || passkeys.value.length > 0;
 });
 
 async function loadPasskeys() {
@@ -112,17 +115,30 @@ function formatDate(dateStr: string): string {
 
 <template>
   <BaseCard :title="t('passkey.settingsTitle')">
-    <div v-if="!supported" class="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-      {{ t('passkey.unsupported') }}
+    <div v-if="!supported" class="py-2 text-sm text-gray-500 dark:text-gray-400">
+      {{ t('passkey.webRetired') }}
     </div>
 
     <div v-else class="space-y-4">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p v-if="native" class="text-sm text-gray-500 dark:text-gray-400">
         {{ t('passkey.settingsDescription') }}
       </p>
 
-      <!-- Platform authenticator status -->
+      <!-- Web with leftover registrations: the retirement explainer + cleanup hint,
+           never an authenticator warning (the browser isn't broken — the mechanism
+           moved to the installed app in Phase 4). -->
+      <template v-if="!native">
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('passkey.webRetired') }}</p>
+        <p
+          class="rounded-xl bg-[#AED6F1]/15 p-3 text-sm text-gray-600 dark:bg-[#AED6F1]/10 dark:text-gray-300"
+        >
+          {{ t('passkey.webLeftoverNote') }}
+        </p>
+      </template>
+
+      <!-- Native: real authenticator status -->
       <div
+        v-else
         class="flex items-center gap-2 text-sm"
         :class="
           platformAvailable
@@ -259,8 +275,10 @@ function formatDate(dateStr: string): string {
         {{ t('passkey.noPasskeys') }}
       </div>
 
-      <!-- Register button -->
+      <!-- Register button — native only (web enrolment is retired; a permanently
+           disabled button would read as a defect) -->
       <BaseButton
+        v-if="native"
         variant="secondary"
         :disabled="!platformAvailable || isRegistering"
         @click="handleRegister"
