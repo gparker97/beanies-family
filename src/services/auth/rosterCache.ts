@@ -16,7 +16,7 @@ import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { getFamilyById } from '@/services/familyContext';
 import { saveRosterCache } from '@/services/indexeddb/repositories/rosterCacheRepository';
 import { toISODateString } from '@/utils/date';
-import { logEvent } from '@/services/telemetry/logEvent';
+import { emitRosterRefreshFailed } from '@/services/telemetry/loginFlowEvents';
 
 function toRosterMember(m: FamilyMember): RosterCacheMember {
   return {
@@ -57,14 +57,6 @@ export async function refreshRosterCache(members: FamilyMember[]): Promise<void>
     // Non-critical (the picker falls back to credential records / the open-pod roster),
     // but never silent: a persistent failure here degrades every future login on this
     // device, and only this event says so.
-    logEvent({
-      level: 'warn',
-      surface: 'login-flow',
-      message: 'roster_cache_refresh_failed',
-      context: {
-        action: 'refresh_failed',
-        error_code: err instanceof Error ? err.name : 'unknown',
-      },
-    });
+    emitRosterRefreshFailed(err instanceof Error ? err.name : 'unknown');
   }
 }
