@@ -494,3 +494,39 @@ trustworthy if payload shapes can't drift per call site.
   the old writer's `reEncryptEnvelope` spread and `envelopeMerge` (explicit test).
 - E2E: one journey through the new flow (Three-Gate compliant), replacing superseded login
   specs, not adding.
+
+## OUTCOME — Phases 2 + 3 + 5 implemented (2026-08-28, same session as Phase 1)
+
+Commits `c16a5a5d..1b7e8422` (local, unpushed with the Phase-1 series). Phase 4 (retire
+PRF + passwords) deliberately NOT built — it is gated on families holding PINs-for-all +
+a stored kit, which none can until this ships and is used.
+
+**Deviations from the plan, with reasons:**
+
+1. **Device linking deferred to the Phase-4 package.** The join flow serves only
+   UNCLAIMED members (`useJoinFlow.unclaimedMembers` filters on `requiresPassword`), so
+   linking an existing member needs join-surface changes — and its real consumer is
+   password retirement (until Phase 4, an existing member's password bootstraps any new
+   device). Building it now would touch the hardened JoinPodView twice. Kit + passphrase
+   cover the no-password bootstrap paths meanwhile.
+2. **`signOutSteps.ts` step-list decomposition deferred.** The tier semantics shipped as
+   three store functions (switchMember / signOut / signOutAndClearData), each step
+   individually caught, rather than the Pass-3 data-driven step lists. Rationale:
+   rewriting two recently-hardened ~100-line teardowns late in a large batch trades a
+   structural nicety for regression risk; the tier-N+1-superset property is enforced by
+   `dataClearingSecurity.test.ts` coverage instead. Revisit with Phase 4.
+3. **Plaintext `cachedFamilyKeys` retirement deferred to Phase 4.** The cache is per
+   FAMILY; PIN wraps are per member. Deleting the family cache when one member enrols
+   would break `tryTrustedAutoOpen` (and tap-through kids) for everyone else on the
+   device. Retirement needs the per-member wrap coverage Phase 4's gate guarantees.
+4. **App-level post-open PIN nag deferred; Settings is the enrolment surface.** The
+   prompt stack already carries the trust + passkey prompts; a third needs its own UX
+   pass. The create-flow mandatory kit step is likewise represented as the Settings card
+   - the orange "no kit yet" callout rather than a wizard step for now.
+5. **Kit codes are Crockford base32 (160-bit)** rather than base64url — transcription
+   robustness (no I/L/O/U; aliases normalized on redeem).
+
+**Phase-5 semantics as shipped:** no sign-out tier touches Google's revoke endpoint;
+tier 2 keeps local tokens on trusted devices and clears them on untrusted (Pass-4
+amendment); tier 3 clears local tokens only; `disconnectGoogleEverywhere()` (Settings,
+danger-confirmed) is the sole revoke site; untrusted sign-out re-arms the trust prompt.
