@@ -4,10 +4,11 @@ import type {
   UserFamilyMapping,
   GlobalSettings,
   PasskeyRegistration,
+  RosterCacheEntry,
 } from '@/types/models';
 
 const REGISTRY_DB_NAME = 'beanies-registry';
-const REGISTRY_DB_VERSION = 3;
+const REGISTRY_DB_VERSION = 4;
 
 export interface RegistryDB extends DBSchema {
   families: {
@@ -33,6 +34,10 @@ export interface RegistryDB extends DBSchema {
       'by-memberId': string;
       'by-familyId': string;
     };
+  };
+  rosterCache: {
+    key: string;
+    value: RosterCacheEntry;
   };
 }
 
@@ -71,6 +76,12 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
         const passkeyStore = db.createObjectStore('passkeys', { keyPath: 'credentialId' });
         passkeyStore.createIndex('by-memberId', 'memberId', { unique: false });
         passkeyStore.createIndex('by-familyId', 'familyId', { unique: false });
+      }
+
+      // v4: device-local roster cache for the pre-decrypt person picker (2026-08-28
+      // login rethink). Display data only — see RosterCacheEntry in models.ts.
+      if (!db.objectStoreNames.contains('rosterCache')) {
+        db.createObjectStore('rosterCache', { keyPath: 'familyId' });
       }
     },
   });

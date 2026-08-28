@@ -113,6 +113,45 @@ export interface PasskeyRegistration {
   lastUsedAt?: ISODateString;
 }
 
+/**
+ * RosterCacheMember - one person on the pre-decrypt login picker.
+ *
+ * The minimal projection of a FamilyMember that the person picker needs BEFORE the pod
+ * is decrypted: who they are, how to draw their bean, and whether picking them leads to
+ * a credential step. Deliberately excludes email, role, photos and every other doc field.
+ */
+export interface RosterCacheMember {
+  id: UUID;
+  name: string;
+  color: string;
+  gender?: Gender;
+  ageGroup?: AgeGroup;
+  /** Had a password/PIN hash at cache time — drives the green-dot/+ status glyph. */
+  hasCredential: boolean;
+}
+
+/**
+ * RosterCacheEntry - device-local roster for the pre-decrypt person picker.
+ *
+ * Registry DB (survives sign-out on trusted devices), one entry per family, refreshed on
+ * every successful open. Same privacy class as `PasskeyRegistration.memberName`: device
+ * local only — never synced, never logged, never sent to telemetry, and NEVER consulted
+ * for authorization. It is display data; the credential records are the source of truth
+ * for what this device can actually do. Cleared on untrusted sign-out, on
+ * sign-out-and-clear, and on `deleteLocalFamily`.
+ *
+ * Part of the 2026-08-28 login rethink (docs/plans/2026-08-28-login-auth-rethink-pin-
+ * recovery-kit.md): lets identity selection happen before any secret entry, unifying the
+ * pod-unlock and member-picker login surfaces.
+ */
+export interface RosterCacheEntry {
+  familyId: UUID; // keyPath
+  familyName: string;
+  /** Humans only, in roster order (adults oldest→youngest, then children). */
+  members: RosterCacheMember[];
+  cachedAt: ISODateString;
+}
+
 // PasskeySecret - PRF-wrapped family key stored in .beanpod envelope
 export interface PasskeySecret {
   credentialId: string; // Which passkey credential created this
