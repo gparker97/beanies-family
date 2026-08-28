@@ -4218,6 +4218,7 @@ const STRING_DEFS = {
     en: 'Load your kit PDF or a photo of it',
     beanie: 'load your kit pdf or a photo of it',
   },
+  'recovery.kitScanReading': { en: 'reading your kit...', beanie: 'reading your kit...' },
   'recovery.kitScanFailed': {
     en: "Couldn't read a QR code in that file — try the saved PDF or a clearer picture, or type the code.",
     beanie:
