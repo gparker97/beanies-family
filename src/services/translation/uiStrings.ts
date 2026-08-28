@@ -4215,12 +4215,13 @@ const STRING_DEFS = {
   'recovery.kitDownloadPdf': { en: 'Save as PDF', beanie: 'save as pdf' },
   'recovery.kitShare': { en: 'Share', beanie: 'share' },
   'recovery.kitScanPhoto': {
-    en: 'Scan a photo of your kit',
-    beanie: 'scan a photo of your kit',
+    en: 'Load your kit PDF or a photo of it',
+    beanie: 'load your kit pdf or a photo of it',
   },
   'recovery.kitScanFailed': {
-    en: "Couldn't read a QR code in that photo — try a clearer picture, or type the code.",
-    beanie: "couldn't read a qr code in that photo — try a clearer picture, or type the code.",
+    en: "Couldn't read a QR code in that file — try the saved PDF or a clearer picture, or type the code.",
+    beanie:
+      "couldn't read a qr code in that file — try the saved pdf or a clearer picture, or type the code.",
   },
   'recovery.kitCopyCode': { en: 'Copy Code', beanie: 'copy code' },
   'recovery.kitCopied': { en: 'Copied!', beanie: 'copied!' },
