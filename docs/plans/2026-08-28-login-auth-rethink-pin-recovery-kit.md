@@ -530,3 +530,376 @@ a stored kit, which none can until this ships and is used.
 tier 2 keeps local tokens on trusted devices and clears them on untrusted (Pass-4
 amendment); tier 3 clears local tokens only; `disconnectGoogleEverywhere()` (Settings,
 danger-confirmed) is the sole revoke site; untrusted sign-out re-arms the trust prompt.
+
+---
+
+# PHASE 4 — FINAL PHASE SPEC (revised 2026-08-28, supersedes the original Phase-4 sketch)
+
+> Status: drafted after Phases 1+2+3+5 shipped as web 0.13/0.13R1. Scope: EVERYTHING
+> remaining in the rethink, including the setup-wizard rework greg requested
+> ("has the setup wizard been updated? it is still asking to set a password").
+> Three very-thorough code maps (creation flow + invariants; PRF/linking surfaces;
+> debt sweep) inform every line below. Decision (greg, 2026-08-28): the recovery
+> passphrase is NOT auto-generated and NOT added to the kit — it stays a Settings-only
+> opt-in; the wizard is PIN + kit only.
+
+## What "done" means
+
+After this phase, a NEW family is born password-free (PIN + mandatory recovery kit),
+an EXISTING family migrates to PINs via a post-open nag, no surface ever collects a
+new password, the web WebAuthn+PRF path is gone, the plaintext `cachedFamilyKeys`
+store is gone, sign-out tiers are data-driven step lists, and the docs/help/ADR
+record matches reality. Zero auth-flow feature flags (none exist today — confirmed).
+
+## Revised decisions (deviations from the original Phase-4 sketch, with reasons)
+
+1. **`wrappedKeys` is NOT emptied for existing families.** The original sketch
+   ("empties `wrappedKeys` on next re-encrypt, gated on a `writerVersion` floor") is
+   unimplementable as written: `envelopeMerge` is union/local-wins and its header
+   states deletions cannot propagate — any stale device would resurrect the emptied
+   dict on its next fetch+push; and no `writerVersion` floor mechanism exists (the
+   envelope carries only the LAST writer's version, not a fleet floor). Instead:
+   password _entry and creation_ surfaces are retired (nothing ever collects or
+   offers a password where a PIN exists), existing wraps stay inert-but-present, and
+   dropping them from the envelope is explicitly re-homed to #117 key rotation
+   (which rebuilds the envelope wholesale under a new keyId — the only mechanically
+   safe deletion point). The file-side "weakest password wrap" exposure for existing
+   families therefore persists until #117 — documented as a known residual.
+2. **Passphrase leaves the create flow** (greg, 2026-08-28): auto-adding it to the
+   kit would duplicate the kit's storage location at ~32 bits of entropy (offline-
+   crackable for a file-holder in ~GPU-day) while being unmemorized (never typed).
+   Settings-only opt-in stands. Wizard = PIN + kit.
+3. **Password prove method becomes conditional, not deleted.** `resolveProveMethods`
+   currently appends `{kind:'password'}` unconditionally (the never-blank guarantee).
+   "Member has passwordHash" is NOT knowable on a closed pod today (`ProveContext`
+   carries only the merged `hasCredential`; `hasPin` is open-pod-only), and the
+   prove engine must stay pure (no envelope I/O — "prove first, fetch second"), so
+   the facts are carried as device-local open-time data:
+   (a) `RosterCacheMember` gains an additive per-member `hasPassword` flag and the
+   family-level `RosterCacheEntry` gains `envelopeHasPasswordWraps: boolean`, both
+   written by `refreshRosterCache` (which already reads the open family);
+   `ProveContext` gains both as `boolean | null` (null → today's safe default:
+   offer password). (b) Structurally: a new `{ kind: 'recovery' }` becomes the
+   unconditionally-appended terminal outside the probe loop (the never-blank
+   guarantee), and password moves INTO `PROBES` as an ordinary conditional probe,
+   gated on `hasPassword !== false` AND
+   `!(ctx.podOpen && ctx.hasPin === true)` AND (cold)
+   `envelopeHasPasswordWraps !== false` — i.e. password is suppressed only where a
+   PIN is verifiably usable instead (warm), because `setMemberPin` does NOT clear
+   `passwordHash` and on a cold device a converted legacy member's password wrap is
+   their only working local bootstrap; kit-born families get the recovery terminal,
+   where a password could never succeed. Full password retirement later = delete that probe, exactly per the
+   module's stated mechanism. (c) `ProveView`'s `?? 'password'` fallback default
+   prefers `pin`, else the recovery terminal. A legacy member (passwordHash, no
+   PIN) still signs in with their password — then the nag converts them.
+4. **Device linking = FK transport + PIN identity.** A link minted from a signed-in
+   device carries a short-expiry invite-style wrap (FK transport). On redeem the
+   device opens the pod, then the person picks themselves and proves with their PIN
+   (doc-synced — they know it). This serves CLAIMED members, which the classic join
+   flow structurally cannot (`unclaimedMembers` filter), without touching the
+   unclaimed-claim path.
+
+## Work packages
+
+### WP1 — Passwordless creation wizard (the setup-wizard rework)
+
+New-family flow: **identity (name + 6-digit PIN) → survey → finalize (pod written
+with a kit wrap, never a password wrap) → recovery-kit step (save + "I stored it")
+→ members → in.**
+
+- `ResumePodSetup.identity`: replace password+confirm with `PinInput` new+confirm
+  (reuse `PinInput.vue`; `isValidPin`). Copy explains: "your PIN unlocks beanies on
+  your devices" + "your recovery kit (next) is the master key".
+- **Sentinel generalization** — the three lockstep invariants survive, re-pointed at
+  the PIN:
+  1. `signUp({deferPassword:true})` unchanged (owner born with `DEFERRED_PASSWORD_HASH`
+     sentinel, and now permanently: the owner NEVER gets a passwordHash).
+  2. `rehydrateOwnerDoc(name, pin)` applies `pinHash` + `pinVersion: 1` (in place on
+     desktop, rebuild on iOS — both branches). No-op guard becomes "early-return only
+     when the owner already holds a real `pinHash`".
+  3. `syncStore.createNewFile` fail-closed precondition becomes: refuse to write when
+     the resolved owner has no `pinHash` (the password-sentinel check is subsumed —
+     an owner with the sentinel AND no pinHash is exactly the refused state).
+- **`requiresPassword` derivation change** (`familyMemberRepository.applyDefaults`):
+  derive from "no credential at all" — `!passwordHash && !pinHash`. The field keeps
+  its name (rename = huge blast radius) but its doc comment is rewritten to
+  "unclaimed: has neither a password nor a PIN". Verified consumers (owner election,
+  transfer guard, join filter, invite picker, BeanCard) all mean "unclaimed" and are
+  correct under the new derivation (`applyDefaults` computes it unconditionally on
+  every read, so stored values are already overridden). In the same change, DELETE
+  the now-dead explicit `requiresPassword` doc writes (`authStore.setPassword` and
+  any inherited by the reworked join claim) — single derivation source, no stored
+  value that can disagree with it. Explicit unit tests for: PIN-only owner reads
+  claimed; password-only legacy member reads claimed; fresh invitee reads unclaimed.
+- **`createNewFile` signature**: the `password: string` param is DROPPED, nothing
+  replaces it (the caller cannot supply kit material — the kit wrap needs the FK,
+  which `createNewFile` generates internally). `createNewFile()` generates the FK
+  → calls `generateRecoveryKit(fk)` internally → the kit wrap becomes the
+  envelope's only wrap at birth: `wrappedKeys: {}` +
+  `recoveryKeys: { [kitId]: pkg }` (`createBeanpodV4` gains an optional
+  `recoveryKeys` param) → returns `{ ..., kit: { kitId, code } }` to the wizard
+  for the display step. The kit CODE is never persisted (same one-time contract as
+  `generateRecoveryKit`/`redeemRecoveryKit` in `recoveryKit.ts`). A
+  `generateRecoveryKit` throw aborts BEFORE any write and surfaces through
+  `createNewFile`'s existing mapped-error + cleanup path — no pod may ever be
+  written whose only wrap failed to generate, and never a bare throw to the wizard.
+  All existing ordering invariants (write → verify → persist → register →
+  markPodCreated) and the step-7 key caching are untouched.
+- **Kit step** (new phase `'recovery-kit'` between finalize-success and `members`):
+  shows code + QR deep link + Save-PDF/Share, requires the "I stored my kit"
+  confirmation to proceed. Extract the kit-display body out of
+  `RecoverySettings.vue`'s modal into a shared `RecoveryKitDisplay.vue`
+  (DRY — one kit surface, two hosts). The confirmation writes a doc-side
+  `recoveryKitConfirmedAt` timestamp (inside the ciphertext; also written by
+  `RecoverySettings`' existing confirm) — for kit-BORN families this, NOT
+  envelope `recoveryKeys` presence, is the "family has a stored kit" signal,
+  because their envelope carries a wrap from birth even when nobody saved the
+  code. The full confirmed-signal is
+  `recoveryKitConfirmedAt || (recoveryKeys non-empty && owner holds a real
+non-sentinel passwordHash)`: legacy 0.13 families always have a password-holding
+  owner and their kits went through `RecoverySettings`' unclosable confirm modal,
+  so they are never re-nagged; the owner-credential key is spoof-proof (old
+  clients can add member wraps to a kit-born envelope via classic invites, but no
+  old client can ever alter the OWNER's credential — kit-born owners are
+  permanently password-free). Backfill the timestamp on first Phase-4 open when
+  the legacy condition holds. The timestamp lives on the doc-side `Settings`
+  entity (`app_settings` via `settingsRepository`), inside the ciphertext.
+  Abandon-at-kit-step is then recoverable: the pod exists with a kit wrap, the
+  device is signed in + trusted, and the WP5 nag (keyed on missing
+  `recoveryKitConfirmedAt`) re-offers generation (a NEW kit — old entry inert,
+  same regenerate semantics).
+- **Empty-`wrappedKeys` open path**: `tryUnwrapFamilyKey` currently throws
+  "No wrapped keys" when `wrappedKeys` is empty and no passphrase is set — but a
+  kit-born family's envelope is exactly that. `tryUnwrapFamilyKey` itself stays
+  UNTOUCHED (no hybrid throw/result contract). Instead `fileSync.ts` exports a
+  pure predicate `envelopeNeedsRecovery(envelope): boolean` (`wrappedKeys` empty
+  AND (`recoveryKeys` non-empty OR `recoveryPassphrase` set)); the three routing
+  sites check it BEFORE offering any password entry and route to the existing
+  kit-entry / passphrase surfaces: pending-file decrypt, LoadPodView bootstrap,
+  AND the resume path (`ResumePodSetup`'s `auto-load` phase via
+  `syncStore.completeAutoLoad` — its `'wrong-password'` error mapping must not be
+  reachable for a kit-born family, or an untrusted sign-out during setup strands
+  the owner on a password prompt that can never succeed). One unit test per call
+  site. LoadPodView's per-member password check renders only
+  members that actually have wraps; zero wraps → kit/passphrase panel directly.
+- **Join claim becomes PIN-based**: `JoinPodView` `set-password` step → `set-pin`
+  (PinInput new+confirm). Both real surfaces change: the envelope wrap call is
+  DELETED at its actual site (`useJoinFlow`'s `syncStore.wrapFamilyKeyForMember(...)`
+  after claim — no new password wraps, ever), and `authStore.joinFamily` is
+  reworked to take a PIN and write `pinHash`+`pinVersion` directly (it can no
+  longer delegate to `setPassword`, whose `requiresPassword` doc write is deleted
+  in the derivation change above) and enrols the device wrap (`enrollPinUnlock` —
+  the pod is open at that moment).
+  Cross-device access for that member thereafter = their PIN on an opened device,
+  device link, kit, or passphrase. `track('login',{method:'pin'})`.
+- **`createNewFile` callers beyond the wizard**: `demoSeed.ts` drops
+  `DEMO_PASSWORD` — the demo owner is born with a fixed `DEMO_PIN` `pinHash`, the
+  generated demo kit code is discarded; verify the demo prove path under the new
+  derivation.
+- **Abandon-at-kit edge (honesty + escape)**: if the trusted cache is lost (site
+  data cleared) before the nag regenerates a kit, a kit-born family whose code was
+  never stored is permanently unopenable — the family is minutes old, stakes
+  near-zero, but the kit-entry recovery surface reached for a just-created family
+  keeps a "start over with a new family" escape (registry delete + re-create), and
+  the plan's accepted-trade-off note gains this sub-case.
+- E2E: `e2e/helpers/auth.ts` finish-surface steps updated (PIN entry + kit-step
+  confirm); `setup-flow.spec.ts` + `google-drive.spec.ts` comments updated. Budget
+  unchanged (updates, not additions).
+
+### WP2 — Device linking (claimed members)
+
+- `inviteService`: `INVITE_EXPIRY_MS` gains a per-call override;
+  `LINK_EXPIRY_MS = 15 min`. `buildInviteLink`/`parseInviteLink` gain a
+  `mode: 'link'` marker param (`lk=1`). Wrap storage: same `inviteKeys` dict
+  (merge-safe, additive).
+- Mint UI: "Link a Device" card in Settings → Security & Recovery (QR + copy link,
+  reuse the invite link/QR machinery + `useInviteFlow`'s error pattern; no Drive
+  share step — the link is shown/scanned directly).
+- Redeem: `/join?...&lk=1` → same cloud/file fetch → FK via `redeemInviteToken` →
+  instead of the unclaimed-only picker, land in the standard person-select → the
+  member proves with their PIN → device wraps enrolled. No change to the classic
+  claim path.
+- Telemetry: `device_link_minted` / `device_link_redeemed` (facade functions exist
+  in the plan's observability contract; add to `loginFlowEvents.ts`).
+
+### WP3 — Web PRF retirement (the one-release window closed at 0.13)
+
+- Stop CREATING: App.vue passkey prompt branch retired on web (see WP5 — slot
+  reused); `PasskeySettings.vue` enrol path native-only; `healCrossDevicePasskey`
+  and `pendingCrossDeviceHeal` deleted from `useLoginFlow` (its trigger,
+  `crossDevice`, is web-only).
+- Stop ASSERTING: delete the web branch of `authenticateWithPasskey`
+  (`authenticateWithPasskeyWeb`, `tryUnwrapFamilyKeyFromPRF`,
+  `establishPasskeyWrap`, `evaluatePRFForCredential`, `registerSyncedCredential`,
+  retry/fallback helpers); `registerPasskeyForMember` becomes native-only (refuses
+  on web). `device-biometric` probe drops its web branch (`isNative()` required;
+  `isPlatformAuthenticatorAvailable` gate deleted with it).
+- Delete PRF crypto: `getPRFOutput`, `buildPRFEvalExtension`, `prfSaltBytes`,
+  `normalizePRFOutput` from `passkeyCrypto.ts`; remaining thin pass-throughs
+  collapse into direct `keyWrap.ts` imports and `passkeyCrypto.ts` is deleted.
+- KEEP: `nativeBiometric.ts` + `biometricKeystorePlugin` + `passkeyRepository`
+  (native records live there) + `biometricShared.ts`; `passkeyWrappedKeys` envelope
+  field + its merge handling (existing entries inert, documented — same policy as
+  legacy password wraps); Settings list/rename/remove for existing registrations.
+- `ReauthChallenge` step-up: PIN verify (`verifyMemberPin`) becomes the primary
+  fallback; password verify remains only for members with `passwordHash` and no
+  `pinHash`; web-passkey branch deleted, native branch kept.
+- `ResetMemberPasswordModal` → `ResetMemberPinModal` (admin/owner resets a member's
+  PIN — parents for kids). NO third copy of gate or mutation: extract the existing
+  authz gate from `resetMemberPassword` (its closed `ResetError` union) into a
+  shared `assertCanResetMember(targetId)` consumed by both reset functions (point
+  `BeanAccountPanel.vue`'s mirrored-gate comment at the shared helper), and
+  `adminResetMemberPin(memberId, newPin)` delegates its mutation to the same
+  internal body `resetMemberPinViaRecovery` uses (validate PIN → pinHash →
+  pinVersion bump → `enrollPinUnlock` → bounded sync → `reportError` on failure).
+  `ChangePasswordSettings` stays but only for legacy members with a passwordHash
+  (change-only; no set-password path — its header already flags the gap; it renders
+  nothing for PIN-only members). `PasswordEntryFields.vue` survives only for those
+  two legacy surfaces; deleted when they go (#117 follow-up).
+- Grep gates: `getPRFOutput|buildPRFEvalExtension|prf` gone from `src/services/`
+  (except historical ADR/docs); `authenticateWithPasskeyWeb` zero hits.
+
+### WP4 — `cachedFamilyKeys` retirement (#77 route 2 closed)
+
+- Replacement: `trustedAutoOpen` registry store — FK wrapped via
+  `AES-KW(HKDF(deviceSecret, salt, info='beanies.family-trusted-auto-open-v1'), FK)`
+  per family, reusing `keyWrap.ts` + the existing per-device `deviceSecrets`
+  non-extractable HKDF base key (registry bump v5→v6, additive; same blocked-upgrade
+  handling as v5 — the 0.13R1 bounded-wait machinery is already generic). No user
+  secret in the derivation — this is deliberately a TRUST wrap (silent open), the
+  win over plaintext is purely at-rest: a registry-DB dump no longer yields the FK
+  without also executing code in the origin (non-extractable key material).
+- Same write moments as today's cache — ALL FOUR write sites: `decryptPendingFile`
+  (force), post-`createNewFile` (force), `decryptPendingFileWithKey` (conditional
+  force, join/kit/passphrase redeem), and App.vue `handleTrustDevice` (non-force);
+  and the five surviving read sites: App.vue boot x2, `tryCachedKeyDecrypt` +
+  `tryTrustedAutoOpen` (useLoginFlow), `tryDecryptWithCachedKey` (syncStore),
+  LoadPodView fast path — the passkeyService fallback read dies with WP3. The
+  grep gate is the backstop, not the inventory.
+- Migration: lazy — on first successful open where a legacy plaintext entry exists,
+  write the wrapped form and delete the plaintext entry; sign-out tiers clear both
+  forms during the window. `models.ts` `cachedFamilyKeys` field + settingsStore
+  API deleted once all readers are converted (grep gate:
+  `cachedFamilyKeys|cacheFamilyKey|getCachedFamilyKey` zero hits outside the
+  migration shim and tests of it).
+- Tap-through kids + trusted auto-open behavior is UNCHANGED (same trust wrap,
+  different at-rest form).
+- E2E `trusted-device.spec.ts` rewritten to assert the wrapped store (data-level,
+  Three-Gate compliant).
+
+### WP5 — Post-open enrolment nag + prompt-stack rework
+
+- The App.vue one-slot sequencer (`claimInterruption('auth-prompt')`) gets a new
+  priority order: **1) member has no PIN → "Set up your PIN" modal** (the unused
+  `pin.promptTitle/Body` strings finally get their component; PinInput new+confirm;
+  writes via `setMemberPin`) → **2) family lacks the kit confirmed-signal (see WP1) → "Create your
+  recovery kit"** (opens the shared `RecoveryKitDisplay` flow) → **3) native
+  biometric enrol prompt** (native only — the web passkey prompt is retired in WP3)
+  → **4) trust prompt** (unchanged). The sequencer is EXTRACTED from App.vue's
+  inline watcher chain into `src/services/auth/authPrompts.ts`: an ordered array
+  of descriptors `{ id, eligible(ctx): Promise<boolean>, shownFlag }` with one
+  loop that claims the interruption slot for the first eligible entry (the same
+  shape as `PROBES` and the WP6 step lists); App.vue reduces to "winning id →
+  modal component". Flags: the KIT and TRUST prompts keep device-level flags
+  (pattern: `trustedDevicePromptShown`), but the PIN nag's dismiss flag is keyed
+  per `(familyId, memberId)` — on a shared family device, member A dismissing must
+  not suppress it for B/C/D. Eligibility: members with a credential history only
+  (`hasCredential`) — deliberately PIN-less tap-through kids are excluded (their
+  PIN setup stays a parent-initiated action via the reset-PIN modal). Re-arm rules
+  mirror the trust prompt on untrusted sign-out where applicable; priority order
+  and re-arm rules become unit-testable as data. This is the existing-family
+  migration engine: every legacy member gets the PIN nag exactly once per
+  dismissal cycle.
+- Members phase / join already-set members skip the PIN nag (they have pinHash).
+
+### WP6 — Sign-out step lists (`signOutSteps.ts`)
+
+- The deferred Pass-3 design, now justified by the measured duplication (~7
+  byte-identical blocks + a 5-line tail ×3): named idempotent steps
+  (`quietTeardownAndForceSave`, `cancelReminders`, `captureDepartingAccount`,
+  `clearGoogleSession(tier)`, `resetSyncState`, `resetDocClient`,
+  `clearDepartedArtifacts`, `resolveFamilyId`, `deleteFamilyDb`, `clearKeyCache`,
+  `removePinWraps`, `removeRoster`, `reclaimKeystores`, `clearAllRefreshTokens`,
+  `reArmTrustPrompt`, `finalizeSession`), each individually caught, tiers as ordered
+  lists. The store keeps the three public functions; their bodies become "run this
+  list". The tier-N+1-superset property asserted by a unit test over the lists AS
+  DATA — with the two deliberate asymmetries (docClient.reset tier-2-only; trust
+  re-arm tier-2-untrusted-only) encoded as documented exceptions, not violations.
+  `dataClearingSecurity.test.ts` contracts unchanged (F14 etc.).
+
+### WP7 — Docs, help, ADRs, strings
+
+- **New ADR-034 “PIN-first identity, recovery-kit root of trust, password
+  retirement”** — the credential model table, the no-revoke logout decisions, the
+  merge/no-deletion constraint that re-homed wrap removal to #117.
+- Amendment notes (Status header lines, not rewrites): ADR-014, 015 (PRF retired),
+  019 (recoveryKeys/recoveryPassphrase fields + kit root of trust), 028 (revoke
+  relocation note landed in Phase 5), 031 (trusted-device sign-out grant semantics
+  superseded by the three tiers).
+- Help center (`src/content/help/security.ts`): rewrite `biometric-login` (native
+  keystore + PIN, no WebAuthn/password-master-key claims); replace
+  `password-recovery` with a recovery-kit/passphrase article (“Your Recovery Kit”)
+  — kit, passphrase, PIN reset via recovery, device linking; targeted edits to
+  `the-beanpod-file-explained` (recoveryKeys/recoveryPassphrase, wrappedKeys now
+  historical for new families), light edits to `how-your-data-is-encrypted` +
+  `zero-knowledge-architecture`.
+- uiStrings: all new copy en+beanie (wizard PIN step, kit step, link-a-device,
+  PIN nag, kit nag, join set-pin, reset-PIN modal, reauth PIN). `npm run translate`.
+- STATUS.md + CHANGELOG on ship.
+
+## Observability coverage (Phase 4 delta)
+
+Surface `login-flow` via the existing typed facade (`loginFlowEvents.ts`) — new
+events: `create_flow_pin_set`, `create_flow_kit_confirmed` (+ `skipped` variant if
+abandoned — fired from the nag instead), `join_claim_pin`, `device_link_minted`,
+`device_link_redeemed` {ok, error_code}, a `prf_withheld: boolean` field added to the existing `prove_methods_resolved`
+payload, computed by the resolver loop (NOT inside a probe — probes stay free of
+telemetry per the module contract) when `!isNative()` and a web registration
+record exists — the retired method being withheld is the only observable
+straggler signal once the assertion path is gone,
+`auto_open_wrap_migrated` (plaintext→wrapped migration), `nag_shown`/`nag_outcome`
+{kind: pin|kit|biometric|trust, action}. Sign-out tier events unchanged. All context
+keys already allowlisted (`action`/`kind`/`detail`/`error_code`/`stage`) — no new
+allowlist keys, no store-declaration delta. Failure paths classify + `reportError`;
+FK-loss-class only remains `critical`.
+
+## Verification
+
+- Unit: sentinel-invariant trio under PIN (create refuses pin-less owner; rehydrate
+  both branches; requiresPassword derivation matrix); empty-wrappedKeys typed
+  outcome + caller routing; link mint/expiry/redeem round-trip; adminResetMemberPin
+  role gate; step-list superset-with-exceptions assertion; auto-open wrap
+  round-trip + migration + sign-out clearing (extend `dataClearingSecurity`).
+- E2E: auth helper PIN path; trusted-device spec rewrite; invite-join spec still
+  green (classic claim now sets PIN).
+- On-device walkthrough (greg, all three platforms): fresh create end-to-end;
+  legacy family gets PIN nag → sets PIN → password no longer offered on a warm
+  prove (it remains the cold-bootstrap fallback for legacy members until #117);
+  device link phone→laptop; web sign-in after PRF removal (legacy passkey user
+  falls back to password → nag).
+- Mixed-version — THREE documented caveats (STATUS), same acceptance rationale
+  (native update ships in the same window): (a) a <=0.13 client opening a kit-born
+  (empty wrappedKeys) file hits 0.13's "No wrapped keys" throw unless a passphrase
+  is set; (b) a PIN-only member (kit-born family, or WP1 set-pin join into a
+  LEGACY family) reads as unclaimed on <=0.13 clients (`requiresPassword:
+!passwordHash`) — re-invitable, excluded from ownership transfer, un-provable on
+  pre-0.13 native builds; (c) an old client scanning a WP2 `lk=1` device-link QR
+  ignores the marker and dead-ends in the unclaimed-only join. Mitigation copy:
+  one line on the WP2 mint card and the join set-pin step: "the other device
+  needs beanies 0.14 or later".
+
+## Rollback
+
+Wizard + join changes are forward-only for NEW families (a kit-born family needs a
+0.14+ client — see caveat above); existing families are untouched at rest (no wrap
+deletion anywhere). PRF removal is reversible by revert (envelope entries were
+honored, not deleted). `cachedFamilyKeys` migration is lazy and reversible until the
+field is deleted (final commit of WP4, separable). Step-list refactor is pure
+restructuring under existing tests.
+
+## Review Passes (Phase 4 spec)
+
+- **Pass 1 (Initial draft)**: drafted from three very-thorough code maps; revised decisions — no `wrappedKeys` emptying (merge can't delete; re-homed to #117), passphrase out of the wizard (greg: kit-only creation), conditional password probe, link=FK-transport+PIN-identity.
+- **Pass 2 (DRY + error handling)**: 8 revisions — kit-confirmation nag predicate (FK-loss hole), cold-path `hasPassword` data, resume-path recovery routing, reset-PIN reuse of existing gate/mutation, straggler-telemetry emission site, kit-gen failure taxonomy, API-name fix, dead `requiresPassword` writes deleted.
+- **Pass 3 (Sustainability)**: 7 revisions — roster-carried wrap flags (prove stays pure), password-as-probe + `recovery` terminal, `createNewFile` generates kit internally (signature contradiction fixed), legacy families never re-nagged, `prf_withheld` into resolver payload, pure `envelopeNeedsRecovery` predicate, App.vue prompt sequencer extracted as data (`authPrompts.ts`).
+- **Pass 4 (Fresh-eyes sweep)**: 8 revisions — warm-only password suppression (reconciled with walkthrough), owner-credential-keyed confirmation backfill (old-client spoof closed), three mixed-version caveats + version copy, full cache write/read inventory, demoSeed + useJoinFlow wrap-site coverage, per-member PIN-nag flags + kid exclusion, start-over escape for the abandoned-kit edge.
