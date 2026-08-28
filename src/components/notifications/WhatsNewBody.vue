@@ -104,7 +104,8 @@ function handleSeeAll() {
             class="wn-tryit"
             @click="handleTryIt(feature.tryItRoute!)"
           >
-            {{ t('whatsNew.tryIt') }}<span class="wn-tryit-arrow">→</span>
+            {{ feature.tryItLabel ? txt(feature.tryItLabel) : t('whatsNew.tryIt')
+            }}<span class="wn-tryit-arrow">→</span>
           </button>
           <button v-if="feature.cta" class="wn-tryit" @click="openExternal(feature.cta.href)">
             {{ txt(feature.cta.label) }}<span class="wn-tryit-arrow">↗</span>
