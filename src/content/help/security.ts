@@ -151,7 +151,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     icon: '\u{1F510}',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-08-28',
     sections: [
       {
         type: 'heading',
@@ -162,7 +162,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every piece of data in your pod is encrypted using <strong>AES-256-GCM</strong> \u2014 the same standard used by banks and governments. Your password never leaves your device.',
+          'Every piece of data in your pod is encrypted using <strong>AES-256-GCM</strong> \u2014 the same standard used by banks and governments. The keys that open it never leave your device.',
       },
       {
         type: 'heading',
@@ -175,7 +175,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'When you create a pod, a random 256-bit <strong>family key</strong> is generated',
-          'Your password is run through <strong>PBKDF2</strong> (100,000 rounds, SHA-256) with a random 16-byte salt to derive a wrapping key',
+          'A <strong>wrapping key</strong> is made from a secret only your family holds \u2014 the recovery kit code created with your family, an optional recovery passphrase, or (for members of older families) a password run through <strong>PBKDF2</strong> (100,000 rounds, SHA-256) with a random 16-byte salt',
           'The family key is wrapped (encrypted) with your wrapping key using <strong>AES-KW</strong>',
           'All your family data (Automerge binary) is encrypted with the family key using <strong>AES-GCM</strong> with a random 12-byte IV',
           'The encrypted payload, wrapped keys, and salts are stored in the <code>.beanpod</code> file',
@@ -192,7 +192,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Algorithm:</strong> AES-256-GCM (encryption) + AES-KW (key wrapping)',
-          '<strong>Key derivation:</strong> PBKDF2 with 100,000 iterations, SHA-256, 16-byte random salt',
+          '<strong>Key derivation:</strong> PBKDF2 with 100,000 iterations, SHA-256, 16-byte random salt (for passphrase and password wraps)',
           '<strong>IV:</strong> 12 bytes, randomly generated for each save',
           '<strong>Implementation:</strong> Web Crypto API (native browser cryptography)',
         ],
@@ -200,7 +200,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'All encryption happens in your browser using the native Web Crypto API. No keys, passwords, or unencrypted data are ever transmitted to any server.',
+          'All encryption happens in your browser using the native Web Crypto API. No keys, PINs, passwords, recovery codes, or unencrypted data are ever transmitted to any server.',
         title: 'Client-side only',
         icon: '\u{1F6E1}\uFE0F',
       },
@@ -215,7 +215,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4E6}',
     readTime: 4,
     popular: true,
-    updatedDate: '2026-08-10',
+    updatedDate: '2026-08-28',
     sections: [
       {
         type: 'heading',
@@ -246,8 +246,9 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
           '<strong>familyId</strong> \u2014 Unique identifier for your family',
           "<strong>familyName</strong> \u2014 Your family's display name",
           '<strong>keyId</strong> \u2014 Key rotation identifier',
-          '<strong>wrappedKeys</strong> \u2014 Per-member wrapped copies of the family key',
-          '<strong>passkeyWrappedKeys</strong> \u2014 Per-passkey wrapped copies (for biometric login)',
+          '<strong>wrappedKeys</strong> \u2014 Per-member password-wrapped copies of the family key (older families)',
+          '<strong>recoveryKeys</strong> \u2014 Recovery-kit wrapped copies of the family key \u2014 how new families are unlocked (see <a href="/help/security/password-recovery">Your Recovery Kit</a>)',
+          '<strong>passkeyWrappedKeys</strong> \u2014 Per-passkey wrapped copies (for biometric login in the installed app)',
           '<strong>inviteKeys</strong> \u2014 Active invite link packages (24-hour expiry)',
           '<strong>encryptedPayload</strong> \u2014 Your actual data: IV + AES-GCM encrypted Automerge binary',
         ],
@@ -255,8 +256,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Each family member has their own wrapped copy of the family key, derived from their password. This means members can change their passwords independently without re-encrypting the entire file.',
-        title: 'Per-member keys',
+          'In families created before PINs arrived, each member has their own wrapped copy of the family key, derived from their password. New families start with a recovery-kit wrap instead \u2014 everyday sign-in is each member\u2019s 6-digit PIN, which travels inside the encrypted family data itself, never in the file wrapper and never on a server.',
+        title: 'How the key is wrapped',
         icon: '\u{1F511}',
       },
       {
@@ -289,8 +290,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'The file is still encrypted \u2014 opening it always asks for your family password, so a copied <code>.beanpod</code> is useless to anyone who doesn\u2019t know it.',
-        title: 'Still needs your password',
+          'The file is still encrypted \u2014 opening it on a fresh device always needs something only your family holds: your recovery kit code, your recovery passphrase, or a link from a device that\u2019s already signed in (then your PIN). A copied <code>.beanpod</code> is useless to anyone without one of those.',
+        title: 'Still needs your key',
         icon: '\u{1F510}',
       },
       {
@@ -337,7 +338,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       "We can't see your data. Period. Learn about the zero-knowledge design that keeps your family finances private.",
     icon: '\u{1F440}',
     readTime: 3,
-    updatedDate: '2026-05-20',
+    updatedDate: '2026-08-28',
     sections: [
       {
         type: 'heading',
@@ -361,7 +362,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           "<strong>No server-side storage</strong> \u2014 We don't run a database. Your data lives on your device and optionally in your own Google Drive.",
-          "<strong>No password transmission</strong> \u2014 Your password never leaves your browser. It's used locally to derive encryption keys.",
+          "<strong>No secret transmission</strong> \u2014 Your PIN, password, and recovery codes never leave your browser. They're used locally to unlock encryption keys.",
           "<strong>No analytics on data</strong> \u2014 We can't compute on, index, or profile your financial information.",
           '<strong>Open encryption</strong> \u2014 We use standard Web Crypto API algorithms (AES-256-GCM, PBKDF2, AES-KW) with no custom crypto.',
         ],
@@ -382,7 +383,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "If you use Google Drive sync, Google stores your <code>.beanpod</code> file \u2014 but it's fully encrypted. Google sees the file name and size, but the contents are indistinguishable from random data without your password.",
+          "If you use Google Drive sync, Google stores your <code>.beanpod</code> file \u2014 but it's fully encrypted. Google sees the file name and size, but the contents are indistinguishable from random data without your family's keys.",
       },
       {
         type: 'heading',
@@ -407,51 +408,119 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
   {
     slug: 'password-recovery',
     category: 'security',
-    title: 'Password Recovery (There Is None)',
+    title: 'Your Recovery Kit (and Other Ways Back In)',
     excerpt:
-      'By design, there is no password reset or recovery. Learn why, and how to protect yourself.',
-    icon: '\u{1F6AB}',
-    readTime: 2,
-    updatedDate: '2026-03-09',
+      'Your recovery kit is the master key to your family\u2019s data. Learn how to store it, the recovery passphrase option, and every other way back in if a PIN or device is lost.',
+    icon: '\u{1F5DD}\uFE0F',
+    readTime: 4,
+    updatedDate: '2026-08-28',
     sections: [
       {
         type: 'heading',
-        content: "Why there's no recovery",
+        content: 'The recovery kit is your master key',
         level: 2,
-        id: 'why-no-recovery',
+        id: 'what-is-the-kit',
       },
       {
         type: 'paragraph',
         content:
-          'Because of our zero-knowledge design, <strong>your password exists only in your head</strong>. We never store it, hash it on a server, or have any mechanism to reset it. If you forget your password, your data is permanently inaccessible.',
+          'Day to day you sign in with your personal <strong>6-digit PIN</strong>, on any device where your family is set up. Behind that sits one master key: your family\u2019s <strong>recovery kit</strong> \u2014 a generated code you can save as a printable PDF with a QR code. If every device and every PIN were ever lost, the kit is the only way back into your family\u2019s data.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The kit is created when your family is created. You can also create (or replace) one any time in <strong>Settings \u2192 Security &amp; Recovery</strong>. <strong>Regenerating replaces the old kit</strong> \u2014 the old code stops working, and the new one is the copy to keep.',
       },
       {
         type: 'callout',
         content:
-          "This is intentional. It's the same reason a safe deposit box key can't be recovered \u2014 the security depends on no one else having access.",
-        title: 'By design, not by accident',
-        icon: '\u{1F512}',
+          'Keep the kit somewhere <em>other than</em> the Google Drive that holds your family\u2019s data \u2014 print it and put it with your important documents, save it in a password manager, or keep it in a different cloud account. If the kit sits right next to the file it unlocks, losing one account exposes both.',
+        title: 'Store it away from your family\u2019s data',
+        icon: '\u{1F5C4}\uFE0F',
       },
       {
         type: 'heading',
-        content: 'How to stay safe',
+        content: 'The recovery passphrase (optional)',
         level: 2,
-        id: 'stay-safe',
+        id: 'recovery-passphrase',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you\u2019d rather remember something than store something, you can also set a <strong>recovery passphrase</strong> in <strong>Settings \u2192 Security &amp; Recovery</strong> \u2014 a memorable phrase that can open your family\u2019s data on a fresh device, just like the kit. It\u2019s optional, and it works alongside the kit rather than replacing it.',
+      },
+      {
+        type: 'heading',
+        content: 'Forgot your PIN?',
+        level: 2,
+        id: 'forgot-pin',
+      },
+      {
+        type: 'paragraph',
+        content: 'A forgotten PIN is not an emergency. You have two easy ways back in:',
       },
       {
         type: 'list',
         content: '',
         items: [
-          '<strong>Write it down</strong> \u2014 Store your password in a physical location (not digitally)',
-          '<strong>Use a password manager</strong> \u2014 Tools like 1Password or Bitwarden can store it securely',
-          '<strong>Set up a passkey</strong> \u2014 Biometric login (fingerprint/face) as a convenient alternative',
-          '<strong>Multiple family members</strong> \u2014 If another family member knows their password, they can still access the pod',
+          '<strong>Ask another parent</strong> \u2014 any pod manager can reset your PIN from your bean page, right in the app. (This is also how parents set or reset a child\u2019s PIN.)',
+          '<strong>Use your recovery kit or passphrase</strong> \u2014 either one unlocks your family\u2019s data on the device, and you can then set yourself a new PIN.',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'Signing in on a new device',
+        level: 2,
+        id: 'new-device',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'On a device that\u2019s already signed in, open <strong>Settings \u2192 Security &amp; Recovery</strong> and tap <strong>Link a Device</strong>.',
+          'A QR code and link appear \u2014 they work for <strong>15 minutes</strong>.',
+          'Scan the QR code (or open the link) on the new device.',
+          'Pick yourself and sign in with your PIN. That\u2019s it \u2014 the new device is set up.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'No signed-in device handy? Your recovery kit or passphrase opens your family\u2019s data on a fresh device too.',
+      },
+      {
+        type: 'heading',
+        content: 'What about passwords?',
+        level: 2,
+        id: 'passwords',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'New families don\u2019t have passwords at all. If you created your family before PINs arrived, your old password still works to sign in on a new device \u2014 and once you\u2019re in, beanies offers to set up a PIN so you can leave the password behind.',
+      },
+      {
+        type: 'heading',
+        content: 'The honest trade-off',
+        level: 2,
+        id: 'honest-trade-off',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'beanies is built so that <strong>nobody but your family</strong> \u2014 not even us \u2014 can open your data. That means there is no \u201creset by email\u201d: we hold nothing that could unlock it. If every signed-in device is gone, the recovery kit is lost, and no passphrase was set, the data is unrecoverable. That\u2019s not a punishment \u2014 it\u2019s the proof that no one else could get in either.',
+      },
+      {
+        type: 'callout',
+        content:
+          'This is intentional. It\u2019s the same reason a safe deposit box key can\u2019t be conjured up by the bank \u2014 the security depends on no one else having a way in.',
+        title: 'By design, not by accident',
+        icon: '\u{1F512}',
       },
       {
         type: 'infoBox',
         content:
-          'Each family member has their own password and wrapped key. As long as <em>any</em> member remembers their password, the family data remains accessible.',
+          'You\u2019ll rarely need the kit itself: any family member with a signed-in device can link your new device, and a pod manager can reset your PIN. The kit is for the day <em>all</em> of that is gone \u2014 which is exactly why it\u2019s worth storing well.',
         title: 'Family safety net',
         icon: '\u{1F91D}',
       },
@@ -460,12 +529,12 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
   {
     slug: 'biometric-login',
     category: 'security',
-    title: 'Unlock With Biometrics (Face ID, Fingerprint, Device PIN)',
+    title: 'Unlock With Biometrics (Face ID & Fingerprint)',
     excerpt:
-      'Sign back in with a tap using your device biometrics — in the app and the browser. It opens your pod and signs you in as you, and your password always still works.',
-    icon: '\u{1F441}️',
-    readTime: 4,
-    updatedDate: '2026-05-23',
+      'In the installed iPhone and Android app, Face ID or a fingerprint signs you in with a tap. Everywhere else, your 6-digit PIN is the way in.',
+    icon: '\u{1F441}\uFE0F',
+    readTime: 3,
+    updatedDate: '2026-08-28',
     sections: [
       {
         type: 'heading',
@@ -476,19 +545,19 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Biometric unlock lets you reopen your pod with <strong>Face ID, a fingerprint, or your device PIN</strong> instead of typing a password every time. It uses <strong>passkeys</strong> (WebAuthn) — the same passwordless standard your bank and Google use — and works in the installed app and in your browser.',
+          'In the <strong>installed iPhone or Android app</strong>, biometric unlock lets you sign back in with <strong>Face ID or a fingerprint</strong> instead of typing your PIN every time. One tap opens your family\u2019s data <em>and</em> signs you in as you, so you land straight in your own account.',
       },
       {
         type: 'paragraph',
         content:
-          'Once it is set up, it does <strong>both</strong> jobs your password does: it opens your family pod <em>and</em> signs you in as you. So on a device you have already set up, a single tap takes you all the way into the app — you should not be asked for a password afterwards. If you ever are, something needs re-setting up, and the fix is in <strong>Settings → Security</strong>.',
+          'Your everyday sign-in everywhere is your personal <strong>6-digit PIN</strong>. It works on any device where your family is set up \u2014 phone, tablet, or browser \u2014 and it travels safely inside your family\u2019s encrypted data, never on a server. Biometrics are simply a faster way past the PIN on a device with the app installed.',
       },
       {
         type: 'callout',
         content:
-          'Biometric unlock sits <em>alongside</em> your password — never instead of it. Your password always works, and losing or replacing your device never locks you out of your pod. Keep your password somewhere safe.',
-        title: 'Your password is still the master key',
-        icon: '\u{1F511}',
+          'Biometrics and your PIN are for everyday convenience. If a device is lost or replaced, your <strong>recovery kit</strong> (or recovery passphrase) is what gets your family back in \u2014 see <a href="/help/security/password-recovery">Your Recovery Kit (and Other Ways Back In)</a>.',
+        title: 'Your recovery kit is the master key',
+        icon: '\u{1F5DD}\uFE0F',
       },
       {
         type: 'heading',
@@ -500,10 +569,28 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>Settings → Account</strong>.',
-          'Under <strong>Biometric login</strong>, tap <strong>Set up</strong> and confirm with your device biometrics.',
-          "That's it — next time you sign in on that device, you'll be offered a one-tap biometric unlock.",
+          'Install the beanies.family app from the App Store or Google Play and sign in with your PIN.',
+          'When the app offers biometric unlock, confirm with Face ID or your fingerprint \u2014 or turn it on later in <strong>Settings \u2192 Account &amp; Sign-In</strong>.',
+          'That\u2019s it \u2014 next time you open the app on that device, one tap signs you in.',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'Only in the installed app',
+        level: 2,
+        id: 'app-only',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Biometric unlock uses your phone\u2019s <strong>secure hardware</strong>, which only the installed app can reach \u2014 so it isn\u2019t available in a browser. In a browser, you sign in with your PIN.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Older versions of beanies offered biometric sign-in (passkeys) in the browser. That has been retired \u2014 a passkey saved in your browser no longer signs you in there. Your PIN replaces it, and biometrics live on in the installed app.',
+        title: 'Had browser biometrics before?',
+        icon: '\u{1F310}',
       },
       {
         type: 'heading',
@@ -514,14 +601,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Two people in your family can each set up biometric unlock on the <strong>same</strong> tablet or phone. When more than one of you has, beanies asks which of you is signing in before it unlocks, so you each land in your own account.',
-      },
-      {
-        type: 'callout',
-        content:
-          'One thing worth knowing: your device\u2019s Face ID or fingerprint check cannot tell family members apart. If two of you are set up on the <em>device itself</em> \u2014 both faces in Face ID, say \u2014 then either of you can pass the check and open whichever account is offered. That is how the phone works, not something beanies can change. This is why there is always a <strong>\u201cNot you? Switch account\u201d</strong> link before you land in an account \u2014 use it if the wrong bean comes up. On a device other people use, a password is the safer choice.',
-        title: 'Biometrics identify the device, not the person',
-        icon: '\u{1F441}\u{FE0F}',
+          'Sign-in is always <strong>per family member</strong> \u2014 on a shared tablet, each of you signs in with your own PIN and lands in your own account. More than one of you can set up biometric unlock on the same device; beanies simply asks who is signing in first, and there\u2019s always a <strong>\u201cNot you? Switch account\u201d</strong> link if the wrong bean comes up.',
       },
       {
         type: 'heading',
@@ -533,27 +613,15 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          'Your <strong>biometrics never leave your device</strong> — Face ID / fingerprint data is handled by your phone or computer’s secure hardware, and beanies.family never sees it.',
-          'The passkey unwraps your family key <strong>on your device</strong>; beanies only ever stores the <em>wrapped</em> (encrypted) key. See <a href="/help/security/how-your-data-is-encrypted">How Your Data Is Encrypted</a>.',
-          'A passkey you create on one device can sync to your other devices on the <strong>same platform</strong> (iCloud Keychain for Apple, Google Password Manager for Android/Chrome) — but not across ecosystems.',
+          'Your <strong>biometrics never leave your device</strong> \u2014 Face ID and fingerprint data are handled by your phone\u2019s secure hardware, and beanies.family never sees them.',
+          'The unlock key is kept inside that same secure hardware and only released when your face or fingerprint matches. See <a href="/help/security/how-your-data-is-encrypted">How Your Data Is Encrypted</a>.',
         ],
-      },
-      {
-        type: 'heading',
-        content: 'Which devices support it',
-        level: 2,
-        id: 'device-support',
-      },
-      {
-        type: 'paragraph',
-        content:
-          'Biometric unlock needs a reasonably recent device: <strong>iOS 16+</strong>, a modern <strong>Android</strong> with the system passkey/credential manager, or an up-to-date desktop browser. On older devices — or any device without biometric hardware set up — beanies.family simply asks for your password instead. Nothing breaks; you just sign in the usual way.',
       },
       {
         type: 'infoBox',
         content:
-          'If a device can’t use biometrics, you’ll see a short note and the password field instead of a dead end. You can always fall back to your password on any device, anytime.',
-        title: 'No supported device? No problem',
+          'On a device without Face ID or a fingerprint reader set up \u2014 or in any browser \u2014 you simply sign in with your PIN instead. Nothing breaks.',
+        title: 'No biometrics? No problem',
         icon: '\u{1F50F}',
       },
     ],

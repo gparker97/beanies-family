@@ -1,5 +1,7 @@
 # ADR-014: File-Based Authentication (Cognito Removal)
 
+> **2026-08-28 (ADR-034):** the credential model here is further superseded — PIN-first identity, recovery-kit root of trust; passwords retired for new families. See [ADR-034](034-pin-first-identity-recovery-kit.md).
+
 > **Superseded by [ADR-019](019-family-key-encryption.md)** — this ADR describes the original design; the superseding ADR documents the current architecture.
 
 **Status:** Accepted

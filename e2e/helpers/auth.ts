@@ -1,7 +1,7 @@
 import { type Page } from '@playwright/test';
 import { ui } from './ui-strings';
 
-const E2E_PASSWORD = 'test1234';
+const E2E_PIN = '123456';
 // Distinctive name so any future registry-table scrub can grep for it. The E2E
 // suite also calls deleteFamilyFromRegistry() in afterEach to clean up; this
 // name is the safety net for failed tests that crash before teardown.
@@ -17,8 +17,8 @@ const E2E_FAMILY_NAME = 'E2E Test Family';
  * headless, so we inject a DEV in-memory provider via
  * `__e2eCreatePod.installMemoryProvider` and drive everything else through the
  * REAL UI: step-1 identity, the step-2 Continue hand-off, then the finish
- * surface's single password entry. The password is collected ONCE here — not at
- * step 1 (those fields no longer exist).
+ * surface's PIN entry (Phase 4: families are born password-free) and the
+ * mandatory recovery-kit confirmation.
  */
 async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Promise<void> {
   // Step 1 — identity only (no password; it moved to the finish surface).
@@ -40,12 +40,18 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
   // The step-2 CTA enables once storage is marked connected.
   await page.getByRole('button', { name: ui('loginV6.createNext') }).click();
 
-  // Finish surface (ResumePodSetup) — identity phase: set the password ONCE.
-  const passwordField = page.getByLabel(ui('loginV6.signInPasswordLabel'));
-  await passwordField.waitFor({ state: 'visible', timeout: 10000 });
-  await passwordField.fill(E2E_PASSWORD);
-  await page.getByLabel(ui('auth.confirmPassword')).fill(E2E_PASSWORD);
+  // Finish surface (ResumePodSetup) — identity phase: set the 6-digit PIN ONCE
+  // (Phase 4). PinInput exposes a hidden input carrying the aria-label.
+  const pinField = page.getByLabel(ui('setup.choosePinLabel'));
+  await pinField.waitFor({ state: 'visible', timeout: 10000 });
+  await pinField.fill(E2E_PIN);
+  await page.getByLabel(ui('pin.confirmPin')).fill(E2E_PIN);
   await page.getByRole('button', { name: ui('action.continue') }).click();
+
+  // Recovery-kit phase (Phase 4, mandatory): the one-time kit modal — confirm stored.
+  const kitStored = page.getByRole('button', { name: ui('recovery.kitConfirmStored') });
+  await kitStored.waitFor({ state: 'visible', timeout: 15000 });
+  await kitStored.click();
 
   // Members phase — the Finish button is the marker we leave visible.
   await page

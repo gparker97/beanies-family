@@ -24,7 +24,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const { mockProvider, mockSelectSyncFile, mockSave, stateChangeCallbackHolder, mockFamilyKey } =
   vi.hoisted(() => {
     const mockFamilyKey = {} as CryptoKey;
-    const mockProviderWrite = vi.fn(async () => {});
+    const mockProviderWrite = vi.fn(async (_envelopeJson: string) => {});
     // read() is called by `verifyJustWritten` after every successful write —
     // return a parseable V4 envelope so the verify step's decrypt call (also
     // mocked at the fileSync level) doesn't trip on empty bytes.
@@ -194,23 +194,32 @@ vi.mock('@/services/sync/capabilities', () => ({
   canAutoSync: () => true,
 }));
 
-// File sync — mock crypto-dependent parts but keep format logic
-vi.mock('@/services/sync/fileSync', () => ({
-  createBeanpodV4: vi.fn(async () => '{"version":"4.0","familyId":"fam-test-1"}'),
-  parseBeanpodV4: vi.fn(() => ({
-    version: '4.0',
-    familyId: 'fam-test-1',
-    familyName: 'Test Family',
-    keyId: 'key-1',
-    wrappedKeys: {},
-    passkeyWrappedKeys: {},
-    inviteKeys: {},
-    encryptedPayload: 'base64==',
+// File sync — mock crypto-dependent parts but keep the REAL format logic
+// (createBeanpodV4/parseBeanpodV4 are pure JSON assembly/validation; keeping them
+// real lets the tests assert the ACTUAL envelope bytes handed to provider.write —
+// Phase 4's recoveryKeys-only birth contract lives in that JSON).
+vi.mock('@/services/sync/fileSync', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/sync/fileSync')>();
+  return {
+    ...actual,
+    reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
+    downloadAsFile: vi.fn(),
+    tryUnwrapFamilyKey: vi.fn(),
+  };
+});
+
+// Recovery kit (Phase 4): createNewFile generates the pod's ONLY birth wrap via
+// this service. Mocked so the kit is deterministic and its failure injectable.
+vi.mock('@/services/auth/recoveryKit', () => ({
+  generateRecoveryKit: vi.fn(async () => ({
+    kitId: 'kit0001',
+    code: 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH',
+    pkg: {
+      salt: 'kit-salt-b64',
+      wrapped: 'kit-wrapped-key-b64',
+      createdAt: '2026-08-28',
+    },
   })),
-  reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
-  detectFileVersion: vi.fn(() => '4.0'),
-  downloadAsFile: vi.fn(),
-  tryUnwrapFamilyKey: vi.fn(),
 }));
 
 // Crypto — mock Web Crypto API
@@ -413,20 +422,24 @@ describe('pod creation: full end-to-end flow', () => {
    *   2. select storage + createNewFile (crypto + V4 envelope)
    *   3. syncNow (save to file)
    */
-  it('complete pod creation: signUp → selectStorage → createNewFile → syncNow', async () => {
+  it('complete pod creation: signUp(defer) → rehydrateOwnerDoc(PIN) → selectStorage → createNewFile → syncNow', async () => {
     const authStore = useAuthStore();
     const syncStore = useSyncStore();
 
-    // --- Step 1: Sign up (handleStep1Next) ---
+    // --- Step 1: Sign up (handleStep1Next — Phase 4: password-free) ---
     const signUpResult = await authStore.signUp({
+      deferPassword: true,
       email: 'test@example.com',
-      password: 'password123',
       familyName: 'Test Family',
       memberName: 'Test User',
     });
     expect(signUpResult.success).toBe(true);
     expect(authStore.currentUser).not.toBeNull();
     const memberId = authStore.currentUser!.memberId;
+
+    // --- Step 1b: Apply the owner's 6-digit PIN on the finish surface ---
+    const rehydrate = await authStore.rehydrateOwnerDoc('Test User', '123456');
+    expect(rehydrate.success).toBe(true);
 
     // --- Step 2a: Select storage provider (handleChooseLocalStorage) ---
     stateChangeCallbackHolder.callback?.({
@@ -440,14 +453,26 @@ describe('pod creation: full end-to-end flow', () => {
     // --- Step 2b: Create new file (handleStep2Next) ---
     const createResult = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password-123',
       memberId,
       'fam-test-1',
       'Test Family'
     );
     expect(createResult.ok).toBe(true);
+    if (!createResult.ok) return; // type narrow
+    // Phase 4: the pod is born password-free — success returns the freshly
+    // generated recovery kit for the wizard's mandatory display step.
+    expect(createResult.kit.kitId).toBe('kit0001');
+    expect(createResult.kit.code.length).toBeGreaterThan(0);
     expect(syncStore.familyKey).toBe(mockFamilyKey);
     expect(syncStore.envelope).not.toBeNull();
+    // The WRITTEN envelope is the contract: no member wraps at birth, exactly
+    // one recovery-kit wrap, and the kit's one-time code never persisted.
+    expect(mockProvider.write).toHaveBeenCalledTimes(1);
+    const writtenJson = mockProvider.write.mock.calls[0]![0];
+    const written = JSON.parse(writtenJson);
+    expect(written.wrappedKeys).toEqual({});
+    expect(Object.keys(written.recoveryKeys)).toHaveLength(1);
+    expect(writtenJson).not.toContain(createResult.kit.code);
     // criticalWriteState must return to idle after every createNewFile call
     // (success or failure) — otherwise the router beforeEach guard would
     // block every subsequent navigation.
@@ -528,13 +553,18 @@ describe('pod creation: full end-to-end flow', () => {
 
   async function signUpAndConfigureStorage() {
     const authStore = useAuthStore();
+    // Phase 4 unified flow: password-free signUp, then the 6-digit PIN applied
+    // via rehydrateOwnerDoc — createNewFile's fail-closed guard requires the
+    // owner to carry a pinHash before any write.
     const signUp = await authStore.signUp({
+      deferPassword: true,
       email: 'test@example.com',
-      password: 'password123',
       familyName: 'Test Family',
       memberName: 'Test User',
     });
     expect(signUp.success).toBe(true);
+    const rehydrate = await authStore.rehydrateOwnerDoc('Test User', '123456');
+    expect(rehydrate.success).toBe(true);
     stateChangeCallbackHolder.callback?.({
       isInitialized: true,
       isConfigured: true,
@@ -551,7 +581,6 @@ describe('pod creation: full end-to-end flow', () => {
     // the top of createNewFile catches it before any I/O runs.
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       'no-such-member',
       'fam-test-1',
       'Test Family'
@@ -571,7 +600,6 @@ describe('pod creation: full end-to-end flow', () => {
     mockProvider.write.mockRejectedValueOnce(new Error('Network down'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -584,6 +612,32 @@ describe('pod creation: full end-to-end flow', () => {
     expect(useAuthStore().podCreated).toBe(false);
   });
 
+  it('a generateRecoveryKit throw aborts BEFORE provider.write (kit is the only birth wrap)', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const kitSvc = await import('@/services/auth/recoveryKit');
+    vi.mocked(kitSvc.generateRecoveryKit).mockRejectedValueOnce(new Error('entropy source failed'));
+    mockProvider.write.mockClear();
+
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // Kit generation lives in the critical section's first step, before any
+    // I/O — classified in the 'write' step region by the mapped-error path.
+    expect(result.reason).toBe('write');
+    expect(result.error.message).toContain('entropy source failed');
+    // Nothing was written: a pod may never be born without its recovery wrap.
+    expect(mockProvider.write).not.toHaveBeenCalled();
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+  });
+
   it('returns reason="verify" when the read-back envelope is empty', async () => {
     const { memberId } = await signUpAndConfigureStorage();
     const syncStore = useSyncStore();
@@ -592,7 +646,6 @@ describe('pod creation: full end-to-end flow', () => {
     mockProvider.read.mockResolvedValueOnce('');
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -613,7 +666,6 @@ describe('pod creation: full end-to-end flow', () => {
     vi.mocked(docClient.flush).mockRejectedValueOnce(new Error('IndexedDB quota'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -632,7 +684,6 @@ describe('pod creation: full end-to-end flow', () => {
     vi.mocked(registry.registerFamilyOrThrow).mockRejectedValueOnce(new Error('Registry 503'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -658,7 +709,6 @@ describe('pod creation: full end-to-end flow', () => {
     mockProvider.write.mockClear();
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -679,7 +729,6 @@ describe('pod creation: full end-to-end flow', () => {
     vi.mocked(registry.lookupFamilyResult).mockRejectedValueOnce(new Error('registry 503'));
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -703,20 +752,13 @@ describe('pod creation: full end-to-end flow', () => {
       await writeBlocker;
     });
 
-    const first = syncStore.createNewFile(
-      'test.beanpod',
-      'pod-password',
-      memberId,
-      'fam-test-1',
-      'Test Family'
-    );
+    const first = syncStore.createNewFile('test.beanpod', memberId, 'fam-test-1', 'Test Family');
     // Microtask: let the first call enter the critical section and flip the flag.
     await Promise.resolve();
     expect(syncStore.criticalWriteState.kind).toBe('creating');
 
     const second = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       memberId,
       'fam-test-1',
       'Test Family'
@@ -780,12 +822,16 @@ describe('pod creation: full end-to-end flow', () => {
       const authStore = useAuthStore();
       const syncStore = useSyncStore();
 
+      // seedDemoFamily now uses the unified deferred flow: password-free
+      // signUp, then the demo PIN via rehydrateOwnerDoc.
       await authStore.signUp({
+        deferPassword: true,
         email: 'demo@example.invalid',
-        password: 'password123',
         familyName: 'Demo Family',
         memberName: 'Demo Owner',
       });
+      const rehydrate = await authStore.rehydrateOwnerDoc('Demo Owner', '123456');
+      expect(rehydrate.success).toBe(true);
       const memberId = authStore.currentUser!.memberId;
 
       stateChangeCallbackHolder.callback?.({
@@ -798,7 +844,6 @@ describe('pod creation: full end-to-end flow', () => {
 
       return syncStore.createNewFile(
         'demo.beanpod',
-        'pod-password-123',
         memberId,
         // The shared mock provider reads back a fixture pinned to this family
         // id; using anything else fails verify with a familyId mismatch.
@@ -876,7 +921,7 @@ describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc �
     expect(authStore.podCreated).toBe(false);
   });
 
-  it('rehydrateOwnerDoc applies the real hash to a deferred owner EVEN when it already exists (desktop, no reload)', async () => {
+  it('rehydrateOwnerDoc applies the PIN hash to a deferred owner EVEN when it already exists (desktop, no reload)', async () => {
     const authStore = useAuthStore();
     const familyStore = useFamilyStore();
 
@@ -888,19 +933,67 @@ describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc �
     });
     const ownerIdBefore = familyStore.owner!.id;
     expect(familyStore.owner!.passwordHash).toBe(DEFERRED_PASSWORD_HASH);
+    expect(familyStore.owner!.pinHash).toBeUndefined();
 
     // Desktop hand-off: the owner is STILL in the in-memory doc (no redirect
-    // reload). rehydrateOwnerDoc must NOT early-return — it must rebuild the
-    // owner with the real hash, or createNewFile's fail-closed guard blocks.
-    const r = await authStore.rehydrateOwnerDoc('Owner', 'realpw123');
+    // reload). rehydrateOwnerDoc must NOT early-return while the owner has no
+    // pinHash — it must stamp the PIN hash in place, or createNewFile's
+    // fail-closed guard blocks.
+    const r = await authStore.rehydrateOwnerDoc('Owner', '123456');
     expect(r.success).toBe(true);
     expect(familyStore.owner!.id).toBe(ownerIdBefore); // same memberId preserved
-    expect(familyStore.owner!.passwordHash).toBe('hashed-realpw123');
-    // Derived from the now-non-empty hash → flips back to false.
+    // Phase 4: the PIN is the credential — pinHash + pinVersion:1 are written,
+    // and the owner keeps the '' password sentinel PERMANENTLY (kit-born
+    // families are password-free).
+    expect(familyStore.owner!.pinHash).toBe('hashed-123456');
+    expect(familyStore.owner!.pinVersion).toBe(1);
+    expect(familyStore.owner!.passwordHash).toBe(DEFERRED_PASSWORD_HASH);
+    // A PIN is a first-class claim credential → no longer reads as unclaimed.
     expect(familyStore.owner!.requiresPassword).toBe(false);
   });
 
-  it('createNewFile refuses (precondition, no write) when the owner still carries the deferred sentinel', async () => {
+  it('rehydrateOwnerDoc rejects a non-6-digit PIN (isValidPin) and leaves the owner deferred', async () => {
+    const authStore = useAuthStore();
+    const familyStore = useFamilyStore();
+
+    await authStore.signUp({
+      deferPassword: true,
+      email: 'owner@example.com',
+      familyName: 'Test Family',
+      memberName: 'Owner',
+    });
+
+    for (const badPin of ['12345', '1234567', 'abcdef', '12 456']) {
+      const r = await authStore.rehydrateOwnerDoc('Owner', badPin);
+      expect(r.success).toBe(false);
+    }
+    // Nothing was written — the owner still has no credential.
+    expect(familyStore.owner!.pinHash).toBeUndefined();
+    expect(familyStore.owner!.passwordHash).toBe(DEFERRED_PASSWORD_HASH);
+  });
+
+  it('rehydrateOwnerDoc early-returns success (no rewrite) when the owner already holds a REAL pinHash', async () => {
+    const authStore = useAuthStore();
+    const familyStore = useFamilyStore();
+
+    await authStore.signUp({
+      deferPassword: true,
+      email: 'owner@example.com',
+      familyName: 'Test Family',
+      memberName: 'Owner',
+    });
+    await authStore.rehydrateOwnerDoc('Owner', '123456');
+    expect(familyStore.owner!.pinHash).toBe('hashed-123456');
+
+    // Genuine recovery re-entry on the same session: must not overwrite the
+    // established PIN with a different one.
+    const r = await authStore.rehydrateOwnerDoc('Owner', '654321');
+    expect(r.success).toBe(true);
+    expect(familyStore.owner!.pinHash).toBe('hashed-123456'); // unchanged
+    expect(familyStore.owner!.pinVersion).toBe(1);
+  });
+
+  it('createNewFile refuses (precondition, no write) when the owner has NO pinHash (PIN step skipped)', async () => {
     const authStore = useAuthStore();
     const syncStore = useSyncStore();
 
@@ -919,10 +1012,10 @@ describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc �
     });
     mockProvider.write.mockClear();
 
-    // Password step was skipped — the fail-closed guard must refuse the write.
+    // The PIN step was skipped (owner still sentinel + no pinHash) — the
+    // fail-closed guard must refuse the write.
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'pod-password',
       authStore.currentUser!.memberId,
       'fam-test-1',
       'Test Family'
@@ -936,7 +1029,7 @@ describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc �
     expect(authStore.podCreated).toBe(false);
   });
 
-  it('full deferred happy path: signUp(defer) → rehydrateOwnerDoc → createNewFile succeeds', async () => {
+  it('full deferred happy path: signUp(defer) → rehydrateOwnerDoc(PIN) → createNewFile succeeds with a kit', async () => {
     const authStore = useAuthStore();
     const syncStore = useSyncStore();
 
@@ -946,7 +1039,7 @@ describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc �
       familyName: 'Test Family',
       memberName: 'Owner',
     });
-    const rehydrate = await authStore.rehydrateOwnerDoc('Owner', 'realpw123');
+    const rehydrate = await authStore.rehydrateOwnerDoc('Owner', '123456');
     expect(rehydrate.success).toBe(true);
 
     stateChangeCallbackHolder.callback?.({
@@ -959,12 +1052,13 @@ describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc �
 
     const result = await syncStore.createNewFile(
       'test.beanpod',
-      'realpw123',
       authStore.currentUser!.memberId,
       'fam-test-1',
       'Test Family'
     );
     expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kit.code.length).toBeGreaterThan(0);
     expect(authStore.podCreated).toBe(true);
   });
 });

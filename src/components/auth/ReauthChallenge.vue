@@ -5,10 +5,11 @@
  * high-stakes operations (transfer ownership, future: delete pod, leave
  * pod, change family name, etc.).
  *
- * Tries passkey first when one is registered, falls back to password
- * verification via the shared <PasswordModal>. Cancellation drops back
- * to the choice screen (so the user can switch methods); a real failure
- * surfaces an inline error and reports it.
+ * Phase 4 order: native biometric (when enrolled on this device) → member PIN
+ * (the standard step-up — doc-synced, every claimed member has one) → password
+ * (LEGACY members without a PIN only). Cancellation drops back to the choice
+ * screen (so the user can switch methods); a real failure surfaces an inline
+ * error and reports it.
  *
  * Renders as a content panel — does NOT wrap itself in a modal. The
  * caller is responsible for the host modal/overlay. The only modal this
@@ -20,9 +21,9 @@ import PasswordModal from '@/components/common/PasswordModal.vue';
 import {
   authenticateWithPasskey,
   resolveDeviceKeys,
-  isWebAuthnSupported,
   MEMBER_MISMATCH,
 } from '@/services/auth/passkeyService';
+import PinInput from '@/components/ui/PinInput.vue';
 import { isNative } from '@/services/sync/capabilities';
 import { verifyPassword } from '@/services/auth/passwordService';
 import { useTranslation } from '@/composables/useTranslation';
@@ -51,15 +52,46 @@ const passwordOpen = ref(false);
 const passwordError = ref<string | null>(null);
 const inlineError = ref<string | null>(null);
 
-const hasPassword = computed(() => !!props.member.passwordHash);
+const hasPin = computed(() => !!props.member.pinHash);
+// Password step-up survives ONLY for legacy members who haven't set a PIN yet —
+// once a PIN exists it is the memorable step-up, password entry stops appearing.
+const hasPassword = computed(() => !!props.member.passwordHash && !props.member.pinHash);
 
-/** Final fallback: no passkey on file AND no password — user can't re-auth. */
-const noCredential = computed(() => !passkeyAvailable.value && !hasPassword.value);
+// PIN step-up state
+const pinValue = ref('');
+const pinError = ref<string | null>(null);
+const showPinEntry = ref(false);
+
+async function handlePinComplete(pin: string) {
+  if (!props.member.pinHash) return;
+  isVerifying.value = true;
+  pinError.value = null;
+  try {
+    const ok = await verifyPassword(pin, props.member.pinHash);
+    if (ok) {
+      emit('verified');
+    } else {
+      pinValue.value = '';
+      pinError.value = t('pin.incorrect');
+    }
+  } catch (e) {
+    pinError.value = t('transferOwnership.reauthPasskeyFailed');
+    reportError({
+      surface: 'reauthChallenge.handlePinComplete',
+      message: 'PIN verify threw during re-auth',
+      error: e,
+    });
+  } finally {
+    isVerifying.value = false;
+  }
+}
+
+/** Final fallback: no biometric, no PIN, no password — user can't re-auth. */
+const noCredential = computed(() => !passkeyAvailable.value && !hasPin.value && !hasPassword.value);
 
 async function detectPasskey() {
-  // Native (installed app) uses the hardware Keystore, not WebAuthn — so don't gate
-  // on `isWebAuthnSupported()` there (it can be false on the native WebView).
-  if ((!isNative() && !isWebAuthnSupported()) || !authStore.currentUser?.familyId) {
+  // Phase 4: biometric step-up is NATIVE-only (the web WebAuthn+PRF path is retired).
+  if (!isNative() || !authStore.currentUser?.familyId) {
     passkeyAvailable.value = false;
     return;
   }
@@ -252,6 +284,32 @@ function cancel() {
         @click="tryPasskey"
       >
         🔐 {{ t('transferOwnership.reauthPasskeyButton') }}
+      </BaseButton>
+
+      <div v-if="hasPin && showPinEntry" class="space-y-2">
+        <p class="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+          {{ t('pin.enterPin') }}
+        </p>
+        <PinInput
+          v-model="pinValue"
+          :has-error="!!pinError"
+          :disabled="isVerifying"
+          autofocus
+          :label="t('pin.enterPin')"
+          @complete="handlePinComplete"
+        />
+        <p v-if="pinError" class="text-center text-sm text-red-600 dark:text-red-400">
+          {{ pinError }}
+        </p>
+      </div>
+      <BaseButton
+        v-else-if="hasPin"
+        :variant="passkeyAvailable ? 'ghost' : 'primary'"
+        :disabled="isVerifying"
+        class="w-full"
+        @click="showPinEntry = true"
+      >
+        🔢 {{ t('pin.signInWithPin') }}
       </BaseButton>
 
       <BaseButton

@@ -23,7 +23,7 @@
  * 2026-05-15 hotfix). If we find an existing `fileId`, we route through the
  * non-destructive auto-load path:
  *
- *    attemptResumeFromRegistry() → 'auto-loadable' ⇒ render password phase
+ *    attemptResumeFromRegistry() → 'auto-loadable' ⇒ render password phase (LEGACY families; kit-born route to recovery)
  *      → completeAutoLoad(password) → success ⇒ markPodCreated, route /nook
  *
  * If the registry has nothing, we fall through to the previous (destructive)
@@ -37,7 +37,8 @@
  *
  * Since the unified create flow, this is ALSO the single post-connect finish
  * surface for a brand-new family (desktop hands off here after the step-2
- * popup; iPhone resumes here after the Drive redirect). The password is
+ * popup; iPhone resumes here after the Drive redirect). The owner's 6-digit PIN
+ * (Phase 4 — families are born password-free) is
  * collected ONCE in the `identity` phase, then the pod is written and the new
  * terminal `members` phase runs for every user before `/nook`.
  *
@@ -49,7 +50,7 @@
  *       → finalizePod SUCCESS → members → SetupProgressModal → signed-in /nook
  *
  *   The `survey` phase ("how did you hear about us?") sits between `identity`
- *   (the one universal pre-finalize node — password is collected there) and the
+ *   (the one universal pre-finalize node — the PIN is collected there) and the
  *   finalize dispatch, so its answer can ride the `createNewFile` Slack. It is
  *   optional/skippable and MUST never block finalize (see `proceedToFinalize`).
  *
@@ -68,6 +69,9 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
+import PinInput from '@/components/ui/PinInput.vue';
+import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
+import { isValidPin } from '@/services/auth/deviceUnlock';
 import CreatePodSurvey from '@/components/login/CreatePodSurvey.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -98,6 +102,9 @@ const emit = defineEmits<{
   'signed-in': [destination: string];
   /** "Start over instead" — sign out + return to the welcome gate. */
   'start-over': [];
+  /** Phase 4: the fetched envelope is kit-born (no password wraps) — the host
+   *  routes to the recovery-kit / passphrase bootstrap surface. */
+  'use-recovery': [];
 }>();
 
 /**
@@ -111,12 +118,27 @@ const emit = defineEmits<{
  * after a successful pod write (see the phase-reachability table above).
  */
 type Phase =
-  'probing' | 'auto-load' | 'identity' | 'survey' | 'storage' | 'finishing' | 'members' | 'retry';
+  | 'probing'
+  | 'auto-load'
+  | 'identity'
+  | 'survey'
+  | 'storage'
+  | 'finishing'
+  | 'recovery-kit'
+  | 'members'
+  | 'retry';
 const phase = ref<Phase>('probing');
 
 const ownerName = ref('');
+// Phase 4: the create-flow credential is the owner's 6-digit PIN. `password`
+// survives ONLY for the auto-load phase (decrypting a LEGACY family's pod).
+const pin = ref('');
+const confirmPin = ref('');
 const password = ref('');
-const confirmPassword = ref('');
+// One-time recovery kit from `createNewFile` — the mandatory `recovery-kit`
+// phase displays it; the code leaves memory on confirmation.
+const kitCode = ref('');
+const kitId = ref('');
 // "How did you hear about us?" answer (a stable English Slack label or free text;
 // null = skipped). Captured in the `survey` phase, threaded into createNewFile.
 const heardVia = ref<string | null>(null);
@@ -174,9 +196,9 @@ onMounted(async () => {
 
   // No secret is stashed across the iOS Drive redirect (the round-2 stash was
   // removed 2026-06-20 — WebKit bounce-tracking cleared it anyway). The generic
-  // `runProbe()` flow IS the clean single-password resume: on a fresh-token
+  // `runProbe()` flow IS the clean single-credential resume: on a fresh-token
   // return for a genuinely-new family, the registry probe yields
-  // `no-registry-entry` → the `identity` phase asks for the password ONCE →
+  // `no-registry-entry` → the `identity` phase asks for the PIN ONCE →
   // `handleIdentityNext` finishes on Drive. See
   // docs/plans/2026-06-20-ios-oauth-bounce-state-param.md.
   await runProbe();
@@ -305,6 +327,11 @@ async function handleAutoLoadSubmit() {
         formError.value = t('auth.passwordIncorrect');
         phase.value = 'auto-load';
         return;
+      case 'needs-recovery':
+        // Kit-born family: no password can ever open this envelope. Route to
+        // the recovery-kit / passphrase bootstrap surface instead.
+        emit('use-recovery');
+        return;
       case 'corrupted':
         // The decrypted bytes aren't a valid Automerge doc. Do NOT call
         // createNewFile — that's the exact bug that produced the original
@@ -359,16 +386,16 @@ async function handleAutoLoadSubmit() {
 
 function validateIdentity(): boolean {
   formError.value = null;
-  if (!ownerName.value || !password.value || !confirmPassword.value) {
+  if (!ownerName.value || !pin.value || !confirmPin.value) {
     formError.value = t('auth.fillAllFields');
     return false;
   }
-  if (password.value.length < 8) {
-    formError.value = t('auth.passwordMinLength');
+  if (!isValidPin(pin.value)) {
+    formError.value = t('pin.invalidFormat');
     return false;
   }
-  if (password.value !== confirmPassword.value) {
-    formError.value = t('auth.passwordsDoNotMatch');
+  if (pin.value !== confirmPin.value) {
+    formError.value = t('pin.mismatch');
     return false;
   }
   return true;
@@ -379,7 +406,7 @@ async function handleIdentityNext() {
   if (!validateIdentity()) return;
   busy.value = true;
   try {
-    const r = await authStore.rehydrateOwnerDoc(ownerName.value, password.value);
+    const r = await authStore.rehydrateOwnerDoc(ownerName.value, pin.value);
     if (!r.success) {
       formError.value = t('setup.fileCreateFailed');
       console.error('[ResumePodSetup] rehydrateOwnerDoc failed:', r.error);
@@ -390,7 +417,7 @@ async function handleIdentityNext() {
       });
       return;
     }
-    // Password is set + owner rehydrated. Show the optional "how did you hear
+    // PIN is set + owner rehydrated. Show the optional "how did you hear
     // about us?" survey before finalize — the `identity` phase is the one node
     // every create path passes through, so the answer can ride createNewFile's
     // Slack. The survey drives `proceedToFinalize()` on complete/skip.
@@ -521,7 +548,6 @@ async function finalizePod(): Promise<boolean> {
   const createPod = () =>
     syncStore.createNewFile(
       podFileName,
-      password.value,
       user.memberId,
       familyContextStore.activeFamilyId ?? user.familyId ?? '',
       familyContextStore.activeFamilyName ?? 'My Family',
@@ -622,9 +648,28 @@ async function finalizePod(): Promise<boolean> {
       provider_type: syncStore.storageProviderType ?? null,
     },
   });
+  // Phase 4: mandatory recovery-kit step BEFORE members — the kit generated
+  // inside createNewFile is the envelope's only wrap; someone must store it.
+  // `membersStepActive` is set NOW (the pod exists) so the router's ALREADY_AUTH
+  // guard doesn't bounce /welcome → /nook out of the kit step.
+  kitCode.value = result.kit.code;
+  kitId.value = result.kit.kitId;
   syncStore.membersStepActive = true;
-  phase.value = 'members';
+  phase.value = 'recovery-kit';
   return true;
+}
+
+/** The kit-step confirmation: stamp the doc-side signal, drop the code, advance. */
+async function handleKitStepStored() {
+  kitCode.value = '';
+  try {
+    await settingsStore.markRecoveryKitConfirmed();
+  } catch (e) {
+    // Non-fatal: the envelope wrap exists; the nag re-offers if the stamp is
+    // missing. Never block the create tail on this write.
+    console.warn('[ResumePodSetup] markRecoveryKitConfirmed failed', e);
+  }
+  phase.value = 'members';
 }
 
 /**
@@ -935,26 +980,48 @@ async function handleConnectLocal() {
         required
         @input="formError = null"
       />
-      <BaseInput
-        v-model="password"
-        :label="t('loginV6.signInPasswordLabel')"
-        type="password"
-        :placeholder="t('auth.passwordPlaceholder')"
-        required
-        @input="formError = null"
-      />
-      <BaseInput
-        v-model="confirmPassword"
-        :label="t('auth.confirmPassword')"
-        type="password"
-        :placeholder="t('auth.confirmPasswordPlaceholder')"
-        required
-        @input="formError = null"
-      />
+      <div>
+        <p class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          {{ t('setup.choosePinLabel') }}
+        </p>
+        <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('setup.choosePinHint') }}
+        </p>
+        <PinInput
+          v-model="pin"
+          :label="t('setup.choosePinLabel')"
+          autofocus
+          @update:model-value="formError = null"
+        />
+      </div>
+      <div>
+        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          {{ t('pin.confirmPin') }}
+        </p>
+        <PinInput
+          v-model="confirmPin"
+          :label="t('pin.confirmPin')"
+          @update:model-value="formError = null"
+        />
+      </div>
       <BaseButton type="submit" class="w-full" :disabled="busy" :loading="busy">
         {{ t('action.continue') }}
       </BaseButton>
     </form>
+
+    <!-- Recovery kit (Phase 4): mandatory post-write step — the kit generated inside
+         createNewFile is the envelope's ONLY wrap; confirm-stored gates progress. -->
+    <div v-else-if="phase === 'recovery-kit'" class="space-y-4">
+      <p class="text-center text-sm text-gray-600 dark:text-gray-300">
+        {{ t('setup.kitStepIntro') }}
+      </p>
+      <RecoveryKitDisplay
+        :open="phase === 'recovery-kit'"
+        :kit-id="kitId"
+        :code="kitCode"
+        @stored="handleKitStepStored"
+      />
+    </div>
 
     <!-- Storage (fallback for scenario (a)) -->
     <div v-else-if="phase === 'storage'" class="space-y-3">

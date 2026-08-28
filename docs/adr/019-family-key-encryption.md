@@ -1,5 +1,7 @@
 # ADR-019: Family Key Encryption
 
+> **2026-08-28 (ADR-034):** the envelope gained additive `recoveryKeys` + `recoveryPassphrase` fields; for NEW families the recovery kit is the root of trust and `wrappedKeys` starts empty (password wraps are legacy-only, retired at #117 rotation). See [ADR-034](034-pin-first-identity-recovery-kit.md).
+
 - **Status:** Accepted
 - **Date:** 2026-03-03
 - **Supersedes:** ADR-014 (File-Based Auth)

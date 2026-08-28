@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   // stores
   currentUser: { value: null as { memberId: string; familyId?: string } | null },
   signUp: vi.fn(),
+  rehydrateOwnerDoc: vi.fn(),
   signOutAndClearData: vi.fn(),
   createNewFile: vi.fn(),
   reloadAllStores: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('@/stores/authStore', () => ({
       return h.currentUser.value;
     },
     signUp: h.signUp,
+    rehydrateOwnerDoc: h.rehydrateOwnerDoc,
     signOutAndClearData: h.signOutAndClearData,
   }),
 }));
@@ -85,7 +87,8 @@ function happyPath(): void {
     h.currentUser.value = { memberId: OWNER, familyId: FAMILY };
     return { success: true };
   });
-  h.createNewFile.mockResolvedValue({ ok: true });
+  h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
+  h.createNewFile.mockResolvedValue({ ok: true, kit: { kitId: 'demo-kit', code: 'AAAA-BBBB' } });
   h.seedDocument.mockResolvedValue(47);
   h.setOnboardingCompleted.mockResolvedValue(undefined);
   h.onboardingCompleted.value = true;
@@ -164,7 +167,7 @@ describe('seedDemoFamily — happy path', () => {
 
   it('suppresses every remote side effect of the create', async () => {
     await seedDemoFamily();
-    const opts = h.createNewFile.mock.calls[0]![6];
+    const opts = h.createNewFile.mock.calls[0]![5];
     expect(opts).toEqual({ suppressRemoteSideEffects: true });
     expect(h.slackNotify).not.toHaveBeenCalled();
   });

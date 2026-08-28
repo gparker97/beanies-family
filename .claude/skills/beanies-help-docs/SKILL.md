@@ -299,7 +299,7 @@ For reference, the current help center contains these articles:
 - How Your Data Is Encrypted
 - The .beanpod File Explained
 - Zero-Knowledge Architecture
-- Password Recovery (There Is None)
+- Your Recovery Kit (and Other Ways Back In) — slug `password-recovery` kept for old links
 
 **How It Works (5):**
 - Net Worth Calculation

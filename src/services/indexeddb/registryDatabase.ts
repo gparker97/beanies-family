@@ -7,10 +7,11 @@ import type {
   RosterCacheEntry,
   DeviceUnlockRecord,
   DeviceSecretRecord,
+  TrustedAutoOpenRecord,
 } from '@/types/models';
 
 const REGISTRY_DB_NAME = 'beanies-registry';
-const REGISTRY_DB_VERSION = 5;
+const REGISTRY_DB_VERSION = 6;
 
 export interface RegistryDB extends DBSchema {
   families: {
@@ -51,6 +52,10 @@ export interface RegistryDB extends DBSchema {
   deviceSecrets: {
     key: string;
     value: DeviceSecretRecord;
+  };
+  trustedAutoOpen: {
+    key: string;
+    value: TrustedAutoOpenRecord;
   };
 }
 
@@ -152,6 +157,15 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
           }
           if (!db.objectStoreNames.contains('deviceSecrets')) {
             db.createObjectStore('deviceSecrets', { keyPath: 'id' });
+          }
+
+          // v6 (Phase 4): trusted-device auto-open wraps — the family key wrapped
+          // under the device secret (NO user secret; this is deliberately a TRUST
+          // wrap for silent open). Replaces the plaintext `cachedFamilyKeys` in
+          // globalSettings: a registry-DB dump no longer yields the FK without also
+          // executing code in the origin. See TrustedAutoOpenRecord in models.ts.
+          if (!db.objectStoreNames.contains('trustedAutoOpen')) {
+            db.createObjectStore('trustedAutoOpen', { keyPath: 'familyId' });
           }
         },
       }),
