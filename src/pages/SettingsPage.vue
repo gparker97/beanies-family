@@ -4,6 +4,7 @@ import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import SettingsAdminOnlyNotice from '@/components/settings/SettingsAdminOnlyNotice.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
+import PinSettings from '@/components/settings/PinSettings.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
@@ -1229,6 +1230,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       @save="showAccount = false"
     >
       <ChangePasswordSettings />
+      <PinSettings class="mt-4" />
       <PasskeySettings class="mt-4" />
     </BeanieFormModal>
 
