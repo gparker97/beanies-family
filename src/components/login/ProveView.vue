@@ -94,8 +94,11 @@ function handleSubmit() {
       (or an auto-select), so this is the shared-device escape hatch — the mitigation
       for a biometric that cannot tell two enrolled faces apart.
     -->
+    <!-- Disabled while a prove effect is in flight: navigating away mid-prompt is how an
+         abandoned effect could sign in the person the screen no longer shows. -->
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-300"
+      :disabled="isBusy"
       @click="emit('back')"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
