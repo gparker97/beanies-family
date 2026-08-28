@@ -4135,6 +4135,33 @@ const STRING_DEFS = {
     beanie: 'reconnect to google to load {familyName}',
   },
   'loginV6.recommended': { en: 'Recommended', beanie: 'recommended' },
+  // ── Login-flow recovery panel (2026-08-28 login rethink) ──
+  'loginFlow.recoveryTitle': { en: "You're Verified", beanie: "you're in — almost!" },
+  'loginFlow.recoveryAuthBody': {
+    en: 'We just need to reconnect to Google to fetch your family data. Your sign-in is done — one tap and your beans are back.',
+    beanie:
+      'we just need to reconnect to google to fetch your beans. your sign-in is done — one tap and they are back.',
+  },
+  'loginFlow.recoveryPermissionBody': {
+    en: 'Your browser needs permission to read your family data file again. Grant it once and your beans are back.',
+    beanie:
+      'your browser needs permission to read your family file again. grant it once and your beans are back.',
+  },
+  'loginFlow.recoveryNotFoundBody': {
+    en: "We couldn't find your family data file where it used to be. It may have moved — you can pick it again.",
+    beanie:
+      "we couldn't find your family file where it used to be. it may have moved — you can pick it again.",
+  },
+  'loginFlow.recoveryErrorBody': {
+    en: "Something got in the way of loading your family data. It's usually temporary — try again.",
+    beanie: "something got in the way of loading your beans. it's usually temporary — try again.",
+  },
+  'loginFlow.recoveryReconnect': { en: 'Reconnect Google', beanie: 'reconnect google' },
+  'loginFlow.recoveryGrant': { en: 'Grant Access', beanie: 'grant access' },
+  'loginFlow.recoveryUseBootstrap': {
+    en: 'Load a family file instead',
+    beanie: 'load a family file instead',
+  },
   'loginV6.googleDriveCardDesc': {
     en: 'Load from your cloud storage',
     beanie: 'load from your cloud storage',

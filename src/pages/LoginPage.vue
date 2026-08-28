@@ -9,11 +9,12 @@ import WelcomeGate from '@/components/login/WelcomeGate.vue';
 import ReviewDemoCodeModal from '@/components/login/ReviewDemoCodeModal.vue';
 import FamilyPickerView from '@/components/login/FamilyPickerView.vue';
 import LoadPodView from '@/components/login/LoadPodView.vue';
-import PickBeanView from '@/components/login/PickBeanView.vue';
+import PersonSelectView from '@/components/login/PersonSelectView.vue';
+import ProveView from '@/components/login/ProveView.vue';
+import OpenRecoveryPanel from '@/components/login/OpenRecoveryPanel.vue';
 import CreatePodView from '@/components/login/CreatePodView.vue';
 import ResumePodSetup from '@/components/login/ResumePodSetup.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
-import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
 import CreatePodWelcome from '@/components/login/CreatePodWelcome.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -21,14 +22,13 @@ import { showToast } from '@/composables/useToast';
 import { isNavigationCancelled } from '@/utils/appChrome';
 import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
-import { logEvent } from '@/services/telemetry/logEvent';
+import { useLoginFlow } from '@/composables/useLoginFlow';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
-import type { PasskeyRegistration } from '@/types/models';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import {
   RESUME_LOAD_DRIVE,
@@ -50,11 +50,10 @@ type LoginView =
   | 'welcome'
   | 'loading'
   | 'load-pod'
-  | 'pick-bean'
+  | 'flow'
   | 'create'
   | 'resume-setup'
   | 'join'
-  | 'biometric'
   | 'family-picker';
 
 const props = withDefaults(defineProps<{ initialView?: LoginView }>(), {
@@ -75,20 +74,6 @@ const autoLoadPod = ref(false);
  */
 const autoOpenDrivePicker = ref(false);
 const isInitializing = ref(true);
-const biometricFamilyId = ref('');
-const biometricFamilyName = ref<string | undefined>();
-/**
- * The device keys for the family being signed into — resolved once at family selection
- * and handed to BiometricLoginView, so the registry is read once per selection rather
- * than again by every consumer.
- */
-const biometricDeviceKeys = ref<PasskeyRegistration[]>([]);
-const biometricDeclined = ref(false);
-const crossDeviceContext = ref<{
-  crossDevice: true;
-  memberId: string;
-  credentialId?: string;
-} | null>(null);
 const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
@@ -115,6 +100,35 @@ const isSingleFamilyAutoSelect = ref(false);
 // inviteToken.ts + the inviteGate.* strings.
 const inviteGateLocked = ref(features.inviteGate);
 const showCreateWelcome = ref(true);
+
+// ── The login-flow machine (2026-08-28 rethink) ─────────────────────────────
+// LoginPage is a thin renderer over it for the returning-user path: 'flow' view
+// renders whatever state the machine is in; every routing decision lives in
+// loginFlow.ts + useLoginFlow, not here.
+const flow = useLoginFlow({
+  onSignedIn: (destination) => handleSignedIn(destination),
+  onExit: () => {
+    // BACK out of the person picker / recovery — same destinations the old
+    // pick-bean/biometric back handlers used.
+    if (activeView.value === 'flow') {
+      activeView.value = isSingleFamilyAutoSelect.value ? 'welcome' : 'family-picker';
+    }
+  },
+});
+const flowState = flow.state;
+const flowError = flow.proveError;
+const flowBusy = flow.isBusy;
+
+/**
+ * Enter the machine for a family; falls back to the legacy bootstrap surface when this
+ * device has no person list at all (fresh device — load the file, decrypt, identity
+ * inferred from the password).
+ */
+async function enterFlow(familyId: string, familyName: string): Promise<boolean> {
+  const ok = await flow.startForFamily(familyId, familyName);
+  if (ok) activeView.value = 'flow';
+  return ok;
+}
 
 // Reactive resume-setup detection. Runs synchronously on setup and re-fires
 // whenever auth state or `?resume=setup` changes, so we catch BOTH cases:
@@ -311,10 +325,7 @@ onMounted(async () => {
     const allFamilies = familyContextStore.allFamilies;
     const singleFamily = allFamilies.length === 1 ? allFamilies[0] : undefined;
     if (singleFamily) {
-      const [deviceKeys, providerConfig] = await Promise.all([
-        authStore.resolveDeviceKeysForFamily(singleFamily.id),
-        getProviderConfig(singleFamily.id),
-      ]);
+      const providerConfig = await getProviderConfig(singleFamily.id);
       isSingleFamilyAutoSelect.value = true;
       // Keep the spinner up until handleFamilySelected has chosen a view. Clearing it
       // first painted the full WelcomeGate for the whole duration of the Drive fetch,
@@ -322,157 +333,21 @@ onMounted(async () => {
       await handleFamilySelected({
         id: singleFamily.id,
         name: singleFamily.name ?? 'My Family',
-        deviceKeys,
         providerConfig,
       });
       isInitializing.value = false;
       return;
     }
   } else {
-    // Members already loaded (e.g. navigated back) — go to pick-bean
-    activeView.value = 'pick-bean';
+    // Members already loaded (e.g. navigated back) — the machine renders the picker.
+    await enterFlow(
+      familyContextStore.activeFamilyId ?? '',
+      familyContextStore.activeFamilyName ?? ''
+    );
   }
 
   isInitializing.value = false;
 });
-
-/**
- * Activate a family and prepare for biometric login.
- * Pre-loads the encrypted file so BiometricLoginView can decrypt it with a passkey.
- * Falls back to load-pod if file loading fails or file turns out to be unencrypted.
- */
-/**
- * Prepare a family for a biometric sign-in and route to the right view.
- *
- * Takes one options object rather than positionals: this change adds a fourth argument,
- * two of which are optional, and `f(a, b, undefined, d)` at a call site is unreadable.
- */
-async function activateFamilyForBiometric(opts: {
-  familyId: string;
-  familyName: string;
-  providerConfig?: PersistedProviderConfig | null;
-  deviceKeys: PasskeyRegistration[];
-}) {
-  const { familyId, familyName, providerConfig, deviceKeys } = opts;
-  // Switch to the selected family
-  if (familyContextStore.activeFamilyId !== familyId) {
-    await familyContextStore.switchFamily(familyId);
-    syncStore.resetState();
-    await syncStore.initialize();
-  }
-
-  // Pre-load the encrypted file so biometric login can decrypt it
-  if (syncStore.isConfigured) {
-    try {
-      if (syncStore.needsPermission) {
-        // After PWA restart, local file handle permissions are revoked by the browser.
-        // Request permission first (safe — this runs during a user gesture).
-        const granted = await syncStore.requestPermission();
-        if (!granted) {
-          // Permission denied — fall back to load-pod with the permission grant UI.
-          enterGenericLoadFallback(toProviderHint(providerConfig ?? null), {
-            needsPermission: true,
-            withError: false,
-          });
-          return;
-        }
-        // Permission granted — requestPermission() internally loaded the file.
-        // If file was unencrypted, it auto-decrypted (no pending file).
-      } else {
-        const loadResult = await syncStore.loadFromFile();
-        if (!loadResult.success && !loadResult.needsPassword) {
-          // Load failed for non-password reasons — fall back with error
-          enterGenericLoadFallback(toProviderHint(providerConfig ?? null));
-          return;
-        }
-        // success: true → file loaded (unencrypted, auto-decrypted)
-        // needsPassword: true → file encrypted, pending for biometric decrypt
-      }
-    } catch (err) {
-      // File moved/deleted/network error. This used to be a bare `catch {}`, so the pod
-      // failing to pre-load was indistinguishable from any other provider problem — the
-      // user saw a generic message and we saw nothing at all.
-      logEvent({
-        level: 'warn',
-        surface: 'native-biometric',
-        message: 'login_routing',
-        context: {
-          action: 'preload_failed',
-          // The ERROR NAME only. A raw message here is unbounded third-party text
-          // (filenames, account hints), and `detail` goes to the firehose.
-          error_code: err instanceof Error ? err.name : 'unknown',
-        },
-      });
-      enterGenericLoadFallback(toProviderHint(providerConfig ?? null));
-      return;
-    }
-  }
-
-  // No pending encrypted file: the pod is already open (unencrypted, auto-decrypted, or
-  // decrypted earlier in this session).
-  //
-  // THIS IS THE #76 DEFECT. It used to send every such case to pick-bean, on the
-  // reasoning that "biometric decrypt would fail" — true, but decryption is only HALF of
-  // what a key does. It also identifies the member. So on the most common path of all —
-  // sign out, come back, pod still cached — a device holding a perfectly good key was
-  // never offered it, and asked for a member password biometric was never designed to
-  // satisfy. Telemetry showed unlock_result:ok and a password prompt in the same session.
-  if (syncStore.isConfigured && !syncStore.hasPendingEncryptedFile) {
-    // Last resort: try auto-decrypt with cached passwords in case pending file was set
-    // but hasPendingEncryptedFile is somehow false (defensive)
-    const autoDecrypted = await tryAutoDecrypt(familyId);
-
-    if (deviceKeys.length > 0) {
-      // Already decrypted AND this device can identify a member — sign them in.
-      logBiometricRouting('biometric', 'decrypted_with_key', deviceKeys.length);
-      enterBiometricView(familyId, familyName, deviceKeys);
-      return;
-    }
-
-    logBiometricRouting('pick_bean', autoDecrypted ? 'auto_decrypted' : 'no_pending_file');
-    activeView.value = 'pick-bean';
-    return;
-  }
-
-  // Happy path: encrypted file is pending, show biometric login
-  logBiometricRouting('biometric', 'pending_encrypted', deviceKeys.length);
-  enterBiometricView(familyId, familyName, deviceKeys);
-}
-
-/**
- * Record WHICH WAY login routed, and on what evidence.
- *
- * This decision — offer biometric, or go straight to the bean picker — is consequential
- * and was previously silent, so "why was I not offered Face ID?" could only be answered by
- * reading the source and guessing at the runtime state. It cost a round of exactly that.
- *
- * `hasPendingEncryptedFile` is the whole gate: biometric unlock returns the FAMILY KEY, so
- * it has nothing to do when the pod is already decrypted. Logging the inputs alongside the
- * branch is what makes that legible from CloudWatch instead of inferable from code.
- *
- * Reuses `action` / `detail` / `kind`, all already allowlisted and already declared — no
- * new context key, so no store-declaration change.
- */
-function logBiometricRouting(
-  branch: 'biometric' | 'pick_bean',
-  reason: string,
-  deviceKeyCount = 0
-): void {
-  logEvent({
-    level: 'info',
-    surface: 'native-biometric',
-    message: 'login_routing',
-    context: {
-      action: branch,
-      // The key count rides INSIDE `detail`: `count` is not in ALLOWED_CONTEXT_KEYS, so
-      // passing it as its own field would be silently stripped by redactContext — which
-      // is precisely the blindness this event exists to remove.
-      detail: deviceKeyCount > 0 ? `${reason}:keys=${deviceKeyCount}` : reason,
-      kind: syncStore.isConfigured ? 'configured' : 'unconfigured',
-      stage: syncStore.hasPendingEncryptedFile ? 'pending_file' : 'no_pending_file',
-    },
-  });
-}
 
 /**
  * Try to auto-decrypt using cached family key.
@@ -511,24 +386,15 @@ function providerErrorMessage(hint: 'local' | 'google_drive' | undefined): strin
 
 /**
  * Clear the whole LoadPodView intent group so no stale mode leaks across a
- * navigation. The single reset site for `reconnectDriveFile` (the rest are
- * historically hand-set; routing the new ref through here keeps it honest).
- * Does NOT touch `forceNewGoogleAccount` — that's an orthogonal "force the
- * account chooser" flag the caller manages.
+ * navigation. Does NOT touch `forceNewGoogleAccount` — that's an orthogonal
+ * "force the account chooser" flag the caller manages.
  */
-function resetLoadPodState() {
+function resetLoadPodFlags() {
   autoLoadPod.value = false;
   needsPermissionGrant.value = false;
-  biometricDeclined.value = false;
   loadError.value = undefined;
   loadErrorProviderHint.value = undefined;
   reconnectDriveFile.value = undefined;
-  // Belongs to the family we were routing to — leaving it set renders one family's beans
-  // under another family's name, and every button on it fails as a member mismatch.
-  biometricDeviceKeys.value = [];
-  // Likewise scoped to one attempt: left set, it makes a LATER password load pop an
-  // unexplained biometric-enrolment prompt (LoadPodView consumes it after decrypt).
-  crossDeviceContext.value = null;
 }
 
 /**
@@ -538,7 +404,7 @@ function resetLoadPodState() {
  * four-ref assignment blocks: `needsPermission` for a denied file-handle grant (which
  * shows the permission UI and has no error text), and `autoLoad` for the encrypted-file
  * decrypt modal. Routing all of them through here makes an inconsistent flag combination
- * structurally impossible — `resetLoadPodState` clears every flag first, so a caller can
+ * structurally impossible — `resetLoadPodFlags` clears every flag first, so a caller can
  * only ever turn ON what it names.
  */
 function enterGenericLoadFallback(
@@ -546,7 +412,7 @@ function enterGenericLoadFallback(
   opts: { needsPermission?: boolean; autoLoad?: boolean; withError?: boolean } = {}
 ) {
   const { needsPermission = false, autoLoad = false, withError = true } = opts;
-  resetLoadPodState();
+  resetLoadPodFlags();
   if (withError) loadError.value = providerErrorMessage(hint);
   loadErrorProviderHint.value = hint;
   needsPermissionGrant.value = needsPermission;
@@ -555,53 +421,41 @@ function enterGenericLoadFallback(
 }
 
 /**
- * Handle family selection from FamilyPickerView.
- * Routes to biometric (if passkeys), attempts auto-load, or falls back to load-pod.
+ * Handle family selection from FamilyPickerView (and the single-family fast path).
+ *
+ * The 2026-08-28 rethink: this routes to the MACHINE first (`enterFlow` — person picker
+ * from the roster/credential records, prove, open), and only falls back to the legacy
+ * bootstrap load surface when this device has no person list at all (a genuinely fresh
+ * device). All the "biometric or password?" routing that used to live here is gone —
+ * `resolveProveMethods` is the single decision engine now.
  */
 async function handleFamilySelected(payload: {
   id: string;
   name: string;
-  /** Resolved by the picker (or the single-family fast path) — see `biometricDeviceKeys`. */
-  deviceKeys: PasskeyRegistration[];
   providerConfig: PersistedProviderConfig | null;
 }) {
-  // Switch to selected family
-  if (familyContextStore.activeFamilyId !== payload.id) {
-    await familyContextStore.switchFamily(payload.id);
-    syncStore.resetState();
-    await syncStore.initialize();
-  }
-
   // Clear any stale LoadPodView intent (incl. reconnectDriveFile) before routing.
-  resetLoadPodState();
+  resetLoadPodFlags();
 
-  if (payload.deviceKeys.length > 0) {
-    // Go to biometric login (pre-load file)
-    await activateFamilyForBiometric({
-      familyId: payload.id,
-      familyName: payload.name,
-      providerConfig: payload.providerConfig,
-      deviceKeys: payload.deviceKeys,
-    });
-  } else if (syncStore.isConfigured && !syncStore.needsPermission) {
-    // No key on this device — the single commonest answer to "why wasn't I offered
-    // biometric?", and it used to log nothing at all, so the question was unanswerable
-    // from CloudWatch precisely when it was asked.
-    logBiometricRouting('pick_bean', 'no_device_keys');
-    // File configured and accessible — try auto-load
+  // The machine path: any person list at all → person-select → prove → open.
+  // (startForFamily also performs the family-context switch.)
+  if (await enterFlow(payload.id, payload.name)) return;
+
+  // Bootstrap: no roster, no credential records — a fresh device. Load the file;
+  // identity is inferred from the password (tryUnwrapFamilyKey), as it always was.
+  if (syncStore.isConfigured && !syncStore.needsPermission) {
     activeView.value = 'loading';
     try {
       const loadResult = await syncStore.loadFromFile();
       if (loadResult.success) {
-        // Loaded successfully — go to pick-bean
-
-        activeView.value = 'pick-bean';
+        // Loaded (unencrypted or auto-decrypted) — the roster is live now.
+        await handleFileLoaded();
       } else if (loadResult.needsPassword) {
-        // Encrypted — try auto-decrypt
+        // Encrypted — try the trusted-device cached key first.
         if (await tryAutoDecrypt(payload.id)) {
-          activeView.value = 'pick-bean';
+          await handleFileLoaded();
         } else {
-          // Can't auto-decrypt — fall back to LoadPodView with decrypt modal
+          // Can't auto-decrypt — LoadPodView's decrypt modal.
           enterGenericLoadFallback(toProviderHint(payload.providerConfig), {
             autoLoad: true,
             withError: false,
@@ -613,17 +467,13 @@ async function handleFamilySelected(payload: {
         // cards, no file picker); otherwise the generic provider+file picker.
         const cfg = payload.providerConfig;
         if (loadResult.reason === 'auth' && cfg?.type === 'google_drive' && cfg.driveFileId) {
-          // Silent reconnect BEFORE prompting (2026-06-19, cluster 2):
-          // syncStore.initialize() already restored the refresh token, but the
-          // cold-start silent refresh can fail/time out on the first try and
-          // surface a needless reconnect prompt even though data wasn't cleared.
-          // Retry silently; on success route into the normal auto-load path
-          // (which reads the file + prompts for password/biometric as usual).
+          // Silent reconnect BEFORE prompting (2026-06-19, cluster 2): the cold-start
+          // silent refresh can fail/time out on the first try and surface a needless
+          // reconnect prompt even though data wasn't cleared. Retry silently.
           const recovered = await tryReconnectSilently(syncStore.providerAccountEmail ?? undefined);
           if (recovered) {
             autoLoadPod.value = true;
             needsPermissionGrant.value = false;
-            biometricDeclined.value = false;
             loadErrorProviderHint.value = toProviderHint(cfg);
             activeView.value = 'load-pod';
           } else {
@@ -647,16 +497,13 @@ async function handleFamilySelected(payload: {
     }
   } else if (syncStore.isConfigured && syncStore.needsPermission) {
     // File configured but needs permission — go to load-pod with permission grant UI
-    autoLoadPod.value = false;
-    needsPermissionGrant.value = true;
-    biometricDeclined.value = false;
-    activeView.value = 'load-pod';
+    enterGenericLoadFallback(toProviderHint(payload.providerConfig), {
+      needsPermission: true,
+      withError: false,
+    });
   } else {
     // No file configured — go to load-pod for manual selection
-    autoLoadPod.value = false;
-    needsPermissionGrant.value = false;
-    biometricDeclined.value = false;
-    activeView.value = 'load-pod';
+    enterGenericLoadFallback(undefined, { withError: false });
   }
 }
 
@@ -665,7 +512,7 @@ async function handleFamilySelected(payload: {
  * Forces Google account chooser when loading via Drive.
  */
 function handleLoadDifferentFile() {
-  resetLoadPodState();
+  resetLoadPodFlags();
   forceNewGoogleAccount.value = true;
   activeView.value = 'load-pod';
 }
@@ -681,7 +528,7 @@ function handleNavigate(view: 'load-pod' | 'create' | 'join' | 'review-demo') {
     return;
   }
 
-  resetLoadPodState();
+  resetLoadPodFlags();
   forceNewGoogleAccount.value = false;
 
   if (view === 'load-pod') {
@@ -696,38 +543,6 @@ function handleNavigate(view: 'load-pod' | 'create' | 'join' | 'review-demo') {
   }
 
   activeView.value = view;
-}
-
-/**
- * Enter the biometric view. THE only way in — every one of the three routes here needs
- * all three pieces of state, and setting two of them yields a screen whose button does
- * nothing at all (no prompt, no error, no telemetry), because the view drives itself off
- * `deviceKeys`. Keeping the assignment in one place is what stops that recurring.
- */
-function enterBiometricView(
-  familyId: string,
-  familyName: string | undefined,
-  deviceKeys: PasskeyRegistration[]
-) {
-  biometricFamilyId.value = familyId;
-  biometricFamilyName.value = familyName;
-  biometricDeviceKeys.value = deviceKeys;
-  activeView.value = 'biometric';
-}
-
-async function handleBiometricAvailable(payload: { familyId: string; familyName?: string }) {
-  // LoadPodView tells us biometric is possible for this family, but not WHICH members —
-  // it only knows the boolean. Resolve the keys here so the view is never handed an
-  // empty list.
-  const deviceKeys = await authStore.resolveDeviceKeysForFamily(payload.familyId);
-  if (deviceKeys.length === 0) {
-    // Raced with a revocation/invalidation between LoadPodView's check and now. Falling
-    // into the biometric view would strand the user on a dead button.
-    logBiometricRouting('pick_bean', 'keys_vanished');
-    activeView.value = 'pick-bean';
-    return;
-  }
-  enterBiometricView(payload.familyId, payload.familyName, deviceKeys);
 }
 
 /**
@@ -752,58 +567,26 @@ function handleFinishStorage() {
   activeView.value = 'resume-setup';
 }
 
-function handleFileLoaded() {
-  activeView.value = 'pick-bean';
-}
-
-function handleBiometricFallback(context?: {
-  crossDevice: true;
-  memberId: string;
-  credentialId?: string;
-}) {
-  biometricDeclined.value = true;
-  crossDeviceContext.value = context ?? null;
-
-  // WHERE "use my password instead" goes depends on whether the pod is still locked.
-  // Since #76 this view is also reached with the pod ALREADY DECRYPTED (biometric is
-  // offered there to identify the member, not to decrypt). Sending that case to
-  // LoadPodView would ask the user to load and decrypt a pod that is already open —
-  // the wrong surface entirely. The member picker is where they belong: pick a bean,
-  // type that bean's password. That IS requirement 4's path.
-  if (!syncStore.hasPendingEncryptedFile) {
-    activeView.value = 'pick-bean';
-    return;
-  }
-
-  autoLoadPod.value = syncStore.isConfigured && !syncStore.needsPermission;
-  needsPermissionGrant.value = syncStore.isConfigured && syncStore.needsPermission;
-  activeView.value = 'load-pod';
-}
-
 /**
- * "Not you?" — the escape hatch from an auto-entered account. Same destination logic as
- * the password fallback (an already-open pod goes back to the bean picker, not to a load
- * surface), plus the metric that tells us how often auto-enter picked the wrong member.
- *
- * That rate is what says whether the always-auto-enter policy was the right call on
- * shared devices, so it has to exist from day one rather than be added after a complaint.
+ * A bootstrap load finished (LoadPodView emitted `file-loaded`): the pod is open, the
+ * roster is live — hand over to the machine, which renders the person picker from it.
  */
-function handleBiometricBack() {
-  logEvent({
-    level: 'info',
-    surface: 'native-biometric',
-    message: 'not_you_used',
-    context: {
-      action: 'not_you',
-      detail: isSingleFamilyAutoSelect.value ? 'auto_select' : 'family_picker',
-    },
-  });
-
-  if (!syncStore.hasPendingEncryptedFile) {
-    activeView.value = 'pick-bean';
-    return;
+async function handleFileLoaded() {
+  const ok = await enterFlow(
+    familyContextStore.activeFamilyId ?? '',
+    familyContextStore.activeFamilyName ?? ''
+  );
+  if (!ok) {
+    // A loaded pod with zero human members is a data problem, not a routing one —
+    // surface the welcome gate rather than a blank flow screen.
+    reportError({
+      surface: 'login-flow',
+      message: 'file loaded but no person list could be built',
+      severity: 'warning',
+      context: { action: 'post_load_no_people' },
+    });
+    activeView.value = 'welcome';
   }
-  activeView.value = isSingleFamilyAutoSelect.value ? 'welcome' : 'family-picker';
 }
 
 function handleSignedIn(destination: string) {
@@ -844,15 +627,54 @@ async function handleStartOver() {
         @load-different-file="handleLoadDifferentFile"
       />
 
-      <BiometricLoginView
-        v-else-if="activeView === 'biometric'"
-        :family-id="biometricFamilyId"
-        :family-name="biometricFamilyName"
-        :device-keys="biometricDeviceKeys"
-        @signed-in="handleSignedIn"
-        @use-password="handleBiometricFallback"
-        @back="handleBiometricBack"
-      />
+      <!-- The login-flow machine renderer: state.kind → view (2026-08-28 rethink) -->
+      <template v-else-if="activeView === 'flow'">
+        <PersonSelectView
+          v-if="flowState.kind === 'person-select'"
+          :family-name="flowState.familyName"
+          :people="flowState.people"
+          @pick="flow.onPickPerson"
+          @back="flow.dispatch({ type: 'BACK' })"
+        />
+        <ProveView
+          v-else-if="flowState.kind === 'prove'"
+          :family-name="flowState.familyName"
+          :person="flowState.person"
+          :methods="flowState.methods"
+          :error="flowError"
+          :is-busy="flowBusy"
+          :pod-open="familyStore.members.length > 0"
+          @biometric="flow.onBiometric"
+          @tap-through="flow.onTapThrough"
+          @password="flow.onPasswordSubmit"
+          @create-password="flow.onCreatePassword"
+          @fell-back="flow.onFellBack"
+          @back="flow.dispatch({ type: 'BACK' })"
+        />
+        <OpenRecoveryPanel
+          v-else-if="flowState.kind === 'open-recovery'"
+          :reason="flowState.reason"
+          :family-name="flowState.resume.familyName"
+          :is-busy="flowBusy"
+          @reconnect="flow.onRecoveryReconnect"
+          @grant-permission="flow.onRecoveryGrantPermission"
+          @retry="flow.onRecoveryRetry"
+          @use-bootstrap="enterGenericLoadFallback(undefined, { withError: false })"
+          @back="flow.dispatch({ type: 'BACK' })"
+        />
+        <!-- prove-loading / opening / done: brief transitions — branded spinner -->
+        <div
+          v-else
+          class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800"
+        >
+          <div class="py-12 text-center">
+            <div
+              class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
+            ></div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+          </div>
+        </div>
+      </template>
 
       <WelcomeGate v-else-if="activeView === 'welcome'" @navigate="handleNavigate" />
 
@@ -882,23 +704,14 @@ async function handleStartOver() {
         :needs-permission-grant="needsPermissionGrant"
         :auto-load="autoLoadPod"
         :auto-open-drive-picker="autoOpenDrivePicker"
-        :skip-biometric="biometricDeclined"
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"
         :reconnect-drive-file="reconnectDriveFile"
-        :cross-device-context="crossDeviceContext"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"
         @signed-in="handleSignedIn"
-        @biometric-available="handleBiometricAvailable"
         @request-create="handleRequestCreate"
-      />
-
-      <PickBeanView
-        v-else-if="activeView === 'pick-bean'"
-        @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
-        @signed-in="handleSignedIn"
       />
 
       <div v-else-if="activeView === 'create'" class="relative">

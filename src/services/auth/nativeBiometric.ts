@@ -10,7 +10,7 @@
  * blob is device-local and never synced. Decision + rationale: ADR-029 (2026-07-14).
  *
  * `passkeyService.ts` delegates to this module via an `isNative()` guard, so callers
- * (authStore/App.vue/BiometricLoginView/PasskeySettings) are unchanged and receive
+ * (authStore/App.vue/ProveView/PasskeySettings) are unchanged and receive
  * the SAME result types. Web/PWA keeps WebAuthn-PRF untouched.
  *
  * Identity model: the OS biometric authenticates the DEVICE, not a member — it cannot
@@ -21,7 +21,7 @@
  * its own, so nothing has to be inferred and nothing is migrated. See ADR-029, amended.
  *
  * Because the prompt cannot distinguish members, a successful unlock proves only
- * "someone this device trusts"; the "not you?" escape in BiometricLoginView is the
+ * "someone this device trusts"; the "not you?" escape on the prove screen is the
  * mitigation, not this module.
  *
  * THIS MODULE IS THE ONLY PLACE THAT BUILDS A KEYSTORE ACCOUNT STRING. Nothing else
