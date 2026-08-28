@@ -230,18 +230,35 @@ async function confirmSwitchMember() {
   router.replace('/login');
 }
 
+// Sign-out takes a few seconds (bounded force-save + Google/session teardown).
+// The modal STAYS OPEN as the progress surface — closing it immediately left a
+// frozen-looking app until the welcome gate flashed in (greg's field report).
+const isSigningOut = ref(false);
+
 async function confirmSignOut() {
-  showSignOutModal.value = false;
-  await authStore.signOut();
-  resetAllAppStores();
-  router.replace('/login');
+  if (isSigningOut.value) return;
+  isSigningOut.value = true;
+  try {
+    await authStore.signOut();
+    resetAllAppStores();
+    await router.replace('/login');
+  } finally {
+    isSigningOut.value = false;
+    showSignOutModal.value = false;
+  }
 }
 
 async function confirmSignOutAndClearData() {
-  showSignOutModal.value = false;
-  await authStore.signOutAndClearData();
-  resetAllAppStores();
-  router.replace('/login');
+  if (isSigningOut.value) return;
+  isSigningOut.value = true;
+  try {
+    await authStore.signOutAndClearData();
+    resetAllAppStores();
+    await router.replace('/login');
+  } finally {
+    isSigningOut.value = false;
+    showSignOutModal.value = false;
+  }
 }
 </script>
 
@@ -839,7 +856,7 @@ async function confirmSignOutAndClearData() {
         :title="t('auth.signOutConfirmTitle')"
         size="sm"
         layer="overlay"
-        @close="showSignOutModal = false"
+        @close="isSigningOut ? undefined : (showSignOutModal = false)"
       >
         <div class="flex flex-col items-center gap-4 text-center">
           <!-- Icon -->
@@ -870,17 +887,25 @@ async function confirmSignOutAndClearData() {
         <template #footer>
           <div class="flex flex-col gap-3">
             <!-- The standard action, full-width and unambiguous -->
-            <BaseButton variant="danger" size="sm" class="!h-auto !w-full" @click="confirmSignOut">
+            <BaseButton
+              variant="danger"
+              size="sm"
+              class="!h-auto !w-full"
+              :loading="isSigningOut"
+              :disabled="isSigningOut"
+              @click="confirmSignOut"
+            >
               <template #default>
                 <span class="flex items-center justify-center gap-1.5">
-                  🚪 {{ t('auth.signOut') }}
+                  🚪 {{ isSigningOut ? t('auth.signingOut') : t('auth.signOut') }}
                 </span>
               </template>
             </BaseButton>
             <!-- Clear-data: deliberately quiet — only for shared devices / emergencies -->
             <button
               type="button"
-              class="mx-auto text-xs font-medium text-red-400 underline-offset-2 hover:text-red-500 hover:underline dark:text-red-500/80 dark:hover:text-red-400"
+              class="mx-auto text-xs font-medium text-red-400 underline-offset-2 hover:text-red-500 hover:underline disabled:opacity-50 dark:text-red-500/80 dark:hover:text-red-400"
+              :disabled="isSigningOut"
               @click="confirmSignOutAndClearData"
             >
               🗑️ {{ t('auth.signOutClearData') }}
@@ -896,6 +921,7 @@ async function confirmSignOutAndClearData() {
 
             <!-- Cancel -->
             <button
+              v-if="!isSigningOut"
               type="button"
               class="font-outfit mx-auto text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
               @click="showSignOutModal = false"

@@ -125,8 +125,16 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         var query = baseQuery(account)
-        // Do NOT prompt: skip the auth UI. Present-but-gated returns interactionNotAllowed.
-        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
+        // Do NOT prompt — but NEVER use kSecUseAuthenticationUISkip here: Skip makes
+        // SecItemCopyMatching silently EXCLUDE access-controlled items from the results,
+        // so a healthy biometry-gated key came back errSecItemNotFound and the JS
+        // self-heal deleted live enrolments ("biometrics changed" on every unlock —
+        // 0.13R2 field bug). An LAContext with interactionNotAllowed makes a gated
+        // match return errSecInteractionNotAllowed instead, which is exactly the
+        // "present but locked" signal this probe exists to read.
+        let ctx = LAContext()
+        ctx.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = ctx
         let status = SecItemCopyMatching(query as CFDictionary, nil)
         let present = status == errSecSuccess || status == errSecInteractionNotAllowed
         call.resolve(["present": present])

@@ -3519,6 +3519,7 @@ const STRING_DEFS = {
     beanie: "we couldn't finish connecting to google. please try signing in again.",
   },
   'auth.signOut': { en: 'Sign Out', beanie: 'sign out' },
+  'auth.signingOut': { en: 'Signing out…', beanie: 'signing out…' },
   'auth.signOutConfirmTitle': { en: 'Sign Out', beanie: 'sign out' },
   'auth.signOutConfirmMessage': {
     en: 'Are you sure you want to sign out?',

@@ -21,6 +21,7 @@ import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import { getReleaseNote } from '@/content/release-notes';
 import CelebrationDetail from '@/components/notifications/CelebrationDetail.vue';
 import type { AppNotification } from '@/types/notifications';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 const props = defineProps<{ notification: AppNotification }>();
 
@@ -57,9 +58,24 @@ const isSingle = computed(() => blocks.value.length === 1);
 const fixes = computed(() => release.value?.fixes ?? []);
 const summaryText = computed(() => (release.value?.summary ? txt(release.value.summary) : ''));
 
-function handleTryIt(route: string) {
+async function handleTryIt(route: string) {
   store.close();
-  router.push(route);
+  // `router.push` reports guard cancellations as a RESOLVED NavigationFailure —
+  // swallowed, this read as "tapping the button does nothing" (0.13R2 field bug:
+  // the first post-login tap can land while a guard, e.g. the critical-write
+  // block, rejects navigation). Await it, retry once after a beat, and log the
+  // failure so the real guard is identifiable from CloudWatch if it recurs.
+  const failure = await router.push(route).catch((e) => e);
+  if (failure) {
+    logEvent({
+      level: 'warn',
+      surface: 'notifications',
+      message: 'whats-new CTA navigation was cancelled — retrying once',
+      context: { action: 'tryit_nav_cancelled', detail: String(failure).slice(0, 120) },
+    });
+    await new Promise((r) => setTimeout(r, 400));
+    await router.push(route).catch(() => {});
+  }
 }
 
 function handleSeeAll() {
