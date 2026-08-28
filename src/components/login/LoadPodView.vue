@@ -53,6 +53,11 @@ const props = defineProps<{
    * one consent, then load this fileId directly (no list, no picker).
    */
   reconnectDriveFile?: { fileId: string; fileName: string; familyName?: string };
+  /**
+   * Open the decrypt panel straight in recovery-kit entry (the prove screen's
+   * "use a recovery kit" escape routes here). The password form stays one tap away.
+   */
+  startInKitEntry?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -68,6 +73,12 @@ const showDecryptModal = ref(false);
 const decryptPassword = ref('');
 /** Recovery-kit entry mode on the decrypt panel (login rethink Phase 3). */
 const showKitEntry = ref(false);
+watch(
+  () => showDecryptModal.value,
+  (open) => {
+    if (open && props.startInKitEntry) showKitEntry.value = true;
+  }
+);
 const kitCodeInput = ref('');
 /** Whether the pending envelope carries any recovery-kit wraps at all. */
 const hasRecoveryKits = computed(

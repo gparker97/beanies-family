@@ -73,6 +73,8 @@ const autoLoadPod = ref(false);
 const autoOpenDrivePicker = ref(false);
 const isInitializing = ref(true);
 const forceNewGoogleAccount = ref(false);
+/** The prove screen's "use a recovery kit" escape — opens LoadPodView in kit entry. */
+const kitEntryRequested = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 /**
@@ -377,6 +379,7 @@ function providerErrorMessage(hint: 'local' | 'google_drive' | undefined): strin
  * "force the account chooser" flag the caller manages.
  */
 function resetLoadPodFlags() {
+  kitEntryRequested.value = false;
   autoLoadPod.value = false;
   needsPermissionGrant.value = false;
   loadError.value = undefined;
@@ -560,6 +563,17 @@ function handleFinishStorage() {
 }
 
 /**
+ * The prove screen's recovery escape: leave the machine and open the bootstrap surface
+ * straight in recovery-kit entry (stages the file, shows the kit-code form; password
+ * stays one tap away).
+ */
+function handleUseRecoveryKit() {
+  enterGenericLoadFallback(undefined, { autoLoad: true, withError: false });
+  kitEntryRequested.value = true; // AFTER the reset (resetLoadPodFlags clears it)
+  flow.dispatch({ type: 'EXIT' }); // activeView is already 'load-pod' -> onExit no-ops
+}
+
+/**
  * A bootstrap load finished (LoadPodView emitted `file-loaded`): the pod is open, the
  * roster is live — hand over to the machine, which renders the person picker from it.
  */
@@ -644,6 +658,7 @@ async function handleStartOver() {
           @password="flow.onPasswordSubmit"
           @create-password="flow.onCreatePassword"
           @fell-back="flow.onFellBack"
+          @use-recovery="handleUseRecoveryKit"
           @back="flow.dispatch({ type: 'BACK' })"
         />
         <OpenRecoveryPanel
@@ -705,6 +720,7 @@ async function handleStartOver() {
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"
         :reconnect-drive-file="reconnectDriveFile"
+        :start-in-kit-entry="kitEntryRequested"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"
         @signed-in="handleSignedIn"

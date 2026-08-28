@@ -1971,6 +1971,28 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
       console.warn('Failed to clear PIN unlocks on sign-out-and-clear:', e);
     }
+    // ...and every passkey/biometric registration (greg's local-test find: leaving them
+    // made the person picker fall back to credential records and render a lone card
+    // named after the DEVICE — "Windows Hello · Chrome" — instead of the bootstrap
+    // surface). Reuses deleteLocalFamily's reclaim order: native keystore blobs first
+    // (they're enumerated FROM the registry records), then the records.
+    try {
+      const { getAllFamilies } = await import('@/services/familyContext');
+      const { reclaimFamilyKeystore, signalCredentialsRemoved } =
+        await import('@/services/auth/passkeyService');
+      const { getPasskeysByFamily, removePasskeyRegistration } =
+        await import('@/services/indexeddb/repositories/passkeyRepository');
+      for (const family of await getAllFamilies()) {
+        await reclaimFamilyKeystore(family.id);
+        const passkeys = await getPasskeysByFamily(family.id);
+        for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
+        if (passkeys.length > 0) {
+          await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to reclaim passkeys on sign-out-and-clear:', e);
+    }
     try {
       const { clearAllRosterCache } =
         await import('@/services/indexeddb/repositories/rosterCacheRepository');

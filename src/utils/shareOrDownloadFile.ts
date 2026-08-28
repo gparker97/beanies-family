@@ -62,9 +62,21 @@ export async function shareOrDownloadFile(
   blob: Blob,
   filename: string,
   mimeType: string,
-  title: string
+  title: string,
+  opts: {
+    /**
+     * Skip the OS share sheet and download directly. For deliverables the user asked to
+     * SAVE (the recovery kit PDF): on share-capable desktops the sheet offered no plain
+     * "save to disk", which is exactly what they wanted.
+     */
+    preferDownload?: boolean;
+  } = {}
 ): Promise<ShareOrDownloadResult> {
   const file = new File([blob], filename, { type: mimeType });
+
+  if (opts.preferDownload) {
+    return downloadFile(blob, filename);
+  }
 
   const canShareFiles =
     typeof navigator !== 'undefined' &&
