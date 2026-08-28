@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-08-28
+
+### Changed
+
+- **Signing in is one unified flow now: pick your bean, then prove it's you.** The person picker appears before your family data is even decrypted (a device remembers your family's names once it has opened the pod), and the same screen offers whichever ways in you actually have — Face ID/fingerprint first where it's set up, one tap for beans without a password, and the password as the always-available fallback. Three different sign-in screens with three different opinions became one.
+- **A connection problem no longer bounces you back to a password screen.** If Google needs reconnecting or a file permission lapsed after you've proven who you are, you get a reconnect panel that picks up exactly where you were — your sign-in is not asked for twice.
+- Opening your `.beanpod` straight from Google Drive now offers biometric sign-in on devices where it's set up, instead of always demanding the password.
+
+### Fixed
+
+- Biometric sign-in after a logout works on iPhone and Android again — the check that decided whether to offer it used a web-only probe that always failed inside the apps.
+
 ## 2026-08-27
 
 ### Added
