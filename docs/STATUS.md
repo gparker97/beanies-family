@@ -1671,6 +1671,36 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+### ⭐ Login/auth rethink — Phase 1 IMPLEMENTED on `main`, NOT pushed, ON-DEVICE VERIFY OWED ⭐
+
+**Plan:** `docs/plans/2026-08-28-login-auth-rethink-pin-recovery-kit.md` (approved, 4-pass
+gauntlet complete). **Seven commits** `1e160b11..840d0332`, all local — NOT pushed, NOT
+deployed.
+
+**What shipped (Phase 1 of 5):** the unified login flow. Pure `loginFlow.ts` state machine
+(person-select → prove → open, transport failures → recovery, never back to a credential
+screen) + `useLoginFlow` driver + `PersonSelectView`/`ProveView`/`OpenRecoveryPanel`;
+`resolveProveMethods` is the single biometric-vs-password decision engine (probe array);
+device-local `rosterCache` (registry v4) gives the pre-decrypt person picker;
+`signInPasswordless` tap-through for credential-less kids; trusted-device cached-key
+auto-open preserved (`tryTrustedAutoOpen`). **Deleted per the phase gate:** `PickBeanView`,
+`BiometricLoginView`, `LoadPodView.checkBiometricForFamily` (the #76 native bug),
+`activateFamilyForBiometric`, `resetLoadPodState`. LoadPodView demoted to pure bootstrap.
+A `/code-review max` over the whole surface returned **15 verified findings — all fixed**
+(`840d0332`; incl. a stale-roster create-password overwrite, cross-family picker bleed, and
+a recovery-loop dead-end). Full unit suite green (5097); 2 local E2E failures reproduce on
+the pre-change baseline (pre-existing local-env, not regressions — CI arbitrates on push).
+
+**OWED — the acceptance gate:** greg's exact repro walked ON-DEVICE on all three platforms
+(logout → re-auth → person picker → biometric/PIN). No green-suite claim substitutes
+(`docs/lessons.md`). Phases 2-5 (member PIN + device wraps; recovery kit + passphrase +
+device linking; retire PRF + passwords; logout tiers + revoke relocation) are unstarted —
+the phasing, specs, and deletion gates are all in the plan.
+
+⚠️ Phase-1 behavior notes for testing: sign-out still uses the OLD tier model (logout
+decomposition is Phase 5), so untrusted sign-out still revokes the Google grant until then.
+The `/open` Drive gesture now offers biometric on enrolled devices (review F9).
+
 ### Travel plans — review fixed, decomposition PART DONE (2026-08-26)
 
 `/code-review max` over the whole travel surface (~5,900 lines) returned 15 findings plus a

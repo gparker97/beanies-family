@@ -86,3 +86,16 @@ Greg's follow-up decisions after reviewing the draft plan:
 - greg accepted the Pass-4 amendment: tier-2 sign-out on UNTRUSTED devices clears local
   Google tokens (never revokes); trusted devices keep tokens untouched.
 - Plan status: APPROVED. Implementation begins with Phase 1.
+
+## Implementation round (2026-08-28, afternoon)
+
+> greg (mid-implementation): "once implementation is complete, directly run a /code-review
+> max on the entire welcome gate and login and authentication and logout process including
+> all new code just implemented ... fix any issues found."
+
+Phase 1 implemented in 6 commits + 1 fix commit (`32f74465..840d0332`, local, unpushed):
+roster cache → prove engine + telemetry facade → pure state machine → integration
+(PersonSelectView/ProveView/OpenRecoveryPanel, LoginPage thin renderer, LoadPodView
+demoted, PickBeanView + BiometricLoginView deleted) → /code-review max (15 verified
+findings, all fixed). Full unit suite green (5097). On-device walkthrough on all three
+platforms is the outstanding acceptance gate before push/deploy.
