@@ -22,9 +22,9 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
     month: '28 august 2026',
     spotlight: true,
     summary: {
-      en: 'Passwords are retired: a personal 6-digit PIN now signs you in everywhere, and a one-page Recovery Kit becomes your family\u2019s master key.',
+      en: 'Passwords are retired: a personal 6-digit PIN now signs you in everywhere, and a one-page Recovery Kit becomes your family\u2019s master key. Every member should create their PIN \u2014 and every family should save their Recovery Kit \u2014 today.',
       beanie:
-        'passwords are retired: a personal 6-digit pin now signs you in everywhere, and a one-page recovery kit becomes your family\u2019s master key.',
+        'passwords are retired: a personal 6-digit pin now signs you in everywhere, and a one-page recovery kit becomes your family\u2019s master key. every member should create their pin \u2014 and every family should save their recovery kit \u2014 today.',
     },
     features: [
       {
@@ -39,6 +39,7 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
             'every family member now signs in with their own 6-digit pin \u2014 the same pin on every device where your family is set up, and much quicker to type than a password. anyone still on a password is offered a pin at their next sign-in, and parents can set or reset a child\u2019s pin from their bean page. face id and fingerprint unlock continue as before in the iphone and android apps.',
         },
         tryItRoute: '/settings?open=account',
+        tryItLabel: { en: 'Create your PIN now', beanie: 'create your pin now' },
       },
       {
         title: {
@@ -47,11 +48,12 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
         },
         icon: '\u{1F5DD}\uFE0F',
         description: {
-          en: 'The Recovery Kit is a one-page master key (a printable PDF with a QR code) that opens your family\u2019s data even if every device and PIN is ever lost. New families create one during setup; existing families can create theirs now from Settings \u2192 Security & Recovery \u2014 then keep it somewhere safe, outside your family\u2019s own Google Drive. An optional memorable passphrase can be added there too.',
+          en: 'The Recovery Kit is a one-page master key (a printable PDF with a QR code) that opens your family\u2019s data even if every device and PIN is ever lost. Every family should download theirs \u2014 new families create one during setup, and existing families can get theirs now from Settings \u2192 Security & Recovery. Keep it somewhere safe, outside your family\u2019s own Google Drive. An optional memorable passphrase can be added there too.',
           beanie:
-            'the recovery kit is a one-page master key (a printable pdf with a qr code) that opens your family\u2019s data even if every device and pin is ever lost. new families create one during setup; existing families can create theirs now from settings \u2192 security & recovery \u2014 then keep it somewhere safe, outside your family\u2019s own google drive. an optional memorable passphrase can be added there too.',
+            'the recovery kit is a one-page master key (a printable pdf with a qr code) that opens your family\u2019s data even if every device and pin is ever lost. every family should download theirs \u2014 new families create one during setup, and existing families can get theirs now from settings \u2192 security & recovery. keep it somewhere safe, outside your family\u2019s own google drive. an optional memorable passphrase can be added there too.',
         },
         tryItRoute: '/settings?open=security',
+        tryItLabel: { en: 'Get your Recovery Kit', beanie: 'get your recovery kit' },
       },
       {
         title: {
