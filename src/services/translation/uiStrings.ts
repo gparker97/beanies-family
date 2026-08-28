@@ -4156,6 +4156,90 @@ const STRING_DEFS = {
     en: "Something got in the way of loading your family data. It's usually temporary — try again.",
     beanie: "something got in the way of loading your beans. it's usually temporary — try again.",
   },
+  // ── Recovery kit + passphrase (login rethink Phase 3) ──
+  'recovery.podNotOpen': {
+    en: 'Your family data must be open to do this.',
+    beanie: 'your beans must be open to do this.',
+  },
+  'recovery.sectionTitle': { en: 'Recovery & Backup', beanie: 'recovery & backup' },
+  'recovery.kitTitle': { en: 'Recovery Kit', beanie: 'recovery kit' },
+  'recovery.kitDescription': {
+    en: "A one-page backup key that unlocks your family data if every password and PIN is forgotten. Keep it somewhere safe — beanies can't recover your data without it.",
+    beanie:
+      'a one-page backup key that unlocks your beans if every password and pin is forgotten. keep it somewhere safe.',
+  },
+  'recovery.kitGenerate': { en: 'Create Recovery Kit', beanie: 'create recovery kit' },
+  'recovery.kitRegenerate': { en: 'Create a New Kit', beanie: 'create a new kit' },
+  'recovery.kitCount': { en: '{count} kit(s) on file', beanie: '{count} kit(s) on file' },
+  'recovery.kitNone': {
+    en: 'No recovery kit yet — we recommend creating one.',
+    beanie: 'no recovery kit yet — we recommend creating one.',
+  },
+  'recovery.kitModalTitle': { en: 'Your Recovery Kit', beanie: 'your recovery kit' },
+  'recovery.kitCodeLabel': { en: 'Recovery Code', beanie: 'recovery code' },
+  'recovery.kitIdLabel': { en: 'Kit ID', beanie: 'kit id' },
+  'recovery.kitStoreWarning': {
+    en: "Save or print this now — it's shown only once, and it is the only way into your family data if everything else is forgotten. Don't keep it in the same Google Drive as your family data.",
+    beanie:
+      "save or print this now — it's shown only once. don't keep it in the same google drive as your beans.",
+  },
+  'recovery.kitDownloadPdf': { en: 'Save as PDF', beanie: 'save as pdf' },
+  'recovery.kitCopyCode': { en: 'Copy Code', beanie: 'copy code' },
+  'recovery.kitCopied': { en: 'Copied!', beanie: 'copied!' },
+  'recovery.kitConfirmStored': {
+    en: "I've stored my kit somewhere safe",
+    beanie: "i've stored my kit somewhere safe",
+  },
+  'recovery.kitPdfFailed': {
+    en: "Couldn't create the PDF — copy the code above instead, or try again.",
+    beanie: "couldn't make the pdf — copy the code above instead, or try again.",
+  },
+  'recovery.passphraseTitle': { en: 'Recovery Passphrase', beanie: 'recovery passphrase' },
+  'recovery.passphraseDescription': {
+    en: 'An optional memorable phrase that can unlock your family data on any device — sign in to Google, type the phrase, done. Anyone who knows it can open your data, so make it strong and keep it private.',
+    beanie:
+      'an optional memorable phrase that unlocks your beans on any device. anyone who knows it can open your data, so keep it private.',
+  },
+  'recovery.passphraseSet': { en: 'Set Passphrase', beanie: 'set passphrase' },
+  'recovery.passphraseChange': { en: 'Change Passphrase', beanie: 'change passphrase' },
+  'recovery.passphraseIsSet': {
+    en: 'A recovery passphrase is set for this family.',
+    beanie: 'a recovery passphrase is set for this family.',
+  },
+  'recovery.passphraseNotSet': {
+    en: 'No recovery passphrase set.',
+    beanie: 'no recovery passphrase set.',
+  },
+  'recovery.passphraseSuggestion': { en: 'Suggested Passphrase', beanie: 'suggested passphrase' },
+  'recovery.passphraseRegenerate': { en: 'Suggest Another', beanie: 'suggest another' },
+  'recovery.passphraseUseOwn': { en: 'Use my own phrase', beanie: 'use my own phrase' },
+  'recovery.passphraseTooWeak': {
+    en: 'That phrase is too easy to guess — use at least 14 characters and 3 different words.',
+    beanie: 'that phrase is too easy to guess — use at least 14 characters and 3 different words.',
+  },
+  'recovery.passphraseMatchesName': {
+    en: "Your family or a member's name is too easy to guess — pick something else.",
+    beanie: "your family or a bean's name is too easy to guess — pick something else.",
+  },
+  'recovery.passphraseSaved': {
+    en: 'Recovery passphrase saved. It works on any device from the next sync.',
+    beanie: 'recovery passphrase saved. it works on any device from the next sync.',
+  },
+  'recovery.useKitLink': { en: 'Use a recovery kit', beanie: 'use a recovery kit' },
+  'recovery.kitEnterTitle': { en: 'Enter Your Recovery Code', beanie: 'enter your recovery code' },
+  'recovery.kitEnterBody': {
+    en: 'Type the code from your recovery kit (the dashes are optional).',
+    beanie: 'type the code from your recovery kit (dashes optional).',
+  },
+  'recovery.kitWrongCode': {
+    en: "That code doesn't match this family's recovery kit.",
+    beanie: "that code doesn't match this family's recovery kit.",
+  },
+  'recovery.kitNoKits': {
+    en: "This family doesn't have a recovery kit on file.",
+    beanie: "this family doesn't have a recovery kit on file.",
+  },
+  'recovery.unlock': { en: 'Unlock', beanie: 'unlock' },
   // ── Member PIN (login rethink Phase 2) ──
   'pin.invalidFormat': {
     en: 'Your PIN must be exactly 6 digits.',

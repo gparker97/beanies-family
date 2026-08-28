@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4200
+    "translationCount": 4254
   },
   "translations": {
     "app.name": {
@@ -21004,6 +21004,276 @@
     "auth.memberHasPassword": {
       "translation": "此会员有密码，请使用该密码登录。",
       "hash": "5nh75",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.podNotOpen": {
+      "translation": "您的家庭数据必须开放才能执行此操作。",
+      "hash": "je581j",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.sectionTitle": {
+      "translation": "恢复和备份",
+      "hash": "k8ckkn",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitTitle": {
+      "translation": "恢复试剂盒",
+      "hash": "z7py5x",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitDescription": {
+      "translation": "一页备份密钥，可在忘记所有密码和PIN码时解锁您的家庭数据。将其保存在安全的地方—没有它， Beanies无法恢复您的数据。",
+      "hash": "5p6pti",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitGenerate": {
+      "translation": "创建恢复工具包",
+      "hash": "e347u9",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitRegenerate": {
+      "translation": "新建 ",
+      "hash": "k0ffpv",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitCount": {
+      "translation": "{count}个套件已存档",
+      "hash": "w6qp7g",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitNone": {
+      "translation": "还没有恢复工具包—我们建议创建一个。",
+      "hash": "q14z0z",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitModalTitle": {
+      "translation": "您的恢复工具包",
+      "hash": "d3deh4",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitCodeLabel": {
+      "translation": "救援码",
+      "hash": "q6sl7s",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitIdLabel": {
+      "translation": "Kit ID",
+      "hash": "xux83f",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitStoreWarning": {
+      "translation": "立即保存或打印—它只显示一次，如果其他所有内容都被遗忘，这是进入家庭数据的唯一途径。请勿将其与家庭数据保存在相同的Google云端硬盘中。",
+      "hash": "vaytou",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitDownloadPdf": {
+      "translation": "另存为PDF",
+      "hash": "vn8ngn",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitCopyCode": {
+      "translation": "复制代码",
+      "hash": "dz2hjc",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitCopied": {
+      "translation": "已复制！",
+      "hash": "rqllj7",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitConfirmStored": {
+      "translation": "我已将工具包存放在安全的地方",
+      "hash": "7nx72q",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitPdfFailed": {
+      "translation": "无法创建PDF —请复制上述代码，或重试。",
+      "hash": "xn8jdv",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseTitle": {
+      "translation": "恢复密码",
+      "hash": "9qsd4l",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseDescription": {
+      "translation": "一个可选的难忘短语，可以在任何设备上解锁您的家庭数据—登录Google ，键入短语，完成。任何知道的人都可以打开您的数据，因此请将其强化并保密。",
+      "hash": "cmi8hd",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseSet": {
+      "translation": "设置密码",
+      "hash": "abj8i0",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseChange": {
+      "translation": "更改密码句...",
+      "hash": "ci1ldm",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseIsSet": {
+      "translation": "已为此系列设置恢复密码。",
+      "hash": "ug1fc9",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseNotSet": {
+      "translation": "未设置恢复密码。",
+      "hash": "h48vue",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseSuggestion": {
+      "translation": "建议的密码",
+      "hash": "frl21l",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseRegenerate": {
+      "translation": "建议另一个",
+      "hash": "igtj53",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseUseOwn": {
+      "translation": "使用我自己的短语",
+      "hash": "woo2vi",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseTooWeak": {
+      "translation": "该短语太容易猜到—使用至少14个字符和3个不同的单词。",
+      "hash": "4nk3yi",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseMatchesName": {
+      "translation": "您的家人或成员的名字太容易猜到—选择其他东西。",
+      "hash": "9ohkna",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseSaved": {
+      "translation": "恢复密码已保存。它适用于下次同步的任何设备。",
+      "hash": "oy3az5",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.useKitLink": {
+      "translation": "使用恢复工具包",
+      "hash": "t0jb3x",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitEnterTitle": {
+      "translation": "输入您的救援码",
+      "hash": "94ee4t",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitEnterBody": {
+      "translation": "键入恢复工具包中的代码（破折号为可选）。",
+      "hash": "e3qnwm",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitWrongCode": {
+      "translation": "该代码与此家庭的恢复工具包不匹配。",
+      "hash": "yb6zya",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitNoKits": {
+      "translation": "此系列没有存档的恢复工具包。",
+      "hash": "vdlh7r",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.unlock": {
+      "translation": "解锁",
+      "hash": "t1thuk",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.invalidFormat": {
+      "translation": "必须恰好是 6 位数",
+      "hash": "ippxws",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.currentRequired": {
+      "translation": "输入您当前的PIN码以进行更改。",
+      "hash": "omhctd",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.notSet": {
+      "translation": "此会员尚未设置PIN码。",
+      "hash": "fl5kmv",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.incorrect": {
+      "translation": "PIN码不正确。",
+      "hash": "8ty4th",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.attemptsLeft": {
+      "translation": "该PIN码不正确—在此设备上关闭PIN码解锁之前，还有{count}次尝试。",
+      "hash": "hap3u9",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.lockedOut": {
+      "translation": "尝试次数过多后，此设备上的PIN解锁已关闭。以其他方式登录，然后重新设置。",
+      "hash": "4xe8fz",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.changedElsewhere": {
+      "translation": "您的PIN码已在其他设备上更改—请输入您当前的PIN码。",
+      "hash": "yybq26",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.enterPin": {
+      "translation": "输入您的 PIN 码",
+      "hash": "glpje8",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.signInWithPin": {
+      "translation": "登入身分﹕",
+      "hash": "3nqeab",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.setTitle": {
+      "translation": "设置PIN码",
+      "hash": "ietf4o",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.changeTitle": {
+      "translation": "更改您的PIN码",
+      "hash": "qbfslk",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.newPin": {
+      "translation": "新PIN码",
+      "hash": "d0db1n",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.confirmPin": {
+      "translation": "确认密码",
+      "hash": "x94elx",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.currentPin": {
+      "translation": "当前 PIN 码",
+      "hash": "xj30sy",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.mismatch": {
+      "translation": "这些PIN码不匹配。",
+      "hash": "2wnkc8",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.setSuccess": {
+      "translation": "已设置密码！您现在可以在任何设备上使用它登录。",
+      "hash": "bj0ba2",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.settingsDescription": {
+      "translation": "6位数PIN码可让您在设置家庭成员的任何设备上登录，比密码更快，而且永远不会离开您的家庭数据文件。",
+      "hash": "xeziv4",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.promptTitle": {
+      "translation": "设置PIN码？",
+      "hash": "m5c4ts",
+      "lastUpdated": "2026-08-28"
+    },
+    "pin.promptBody": {
+      "translation": "使用快速的6位数PIN码登录，而不是密码。您可以立即或稍后在“设置”中进行设置。",
+      "hash": "5y8d0z",
       "lastUpdated": "2026-08-28"
     }
   }

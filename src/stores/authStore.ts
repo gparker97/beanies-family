@@ -1237,6 +1237,110 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // ── Recovery kit + passphrase (Phase 3 of the 2026-08-28 login rethink) ────
+
+  /**
+   * Generate a recovery kit for the open pod: full-entropy code wrapped into the
+   * envelope's `recoveryKeys`. Returns the one-time code for display — NEVER persisted.
+   * Best-effort push; the wrap rides the next save either way (keyDictSize counts it).
+   */
+  async function createRecoveryKit(): Promise<
+    { success: true; kitId: string; code: string } | { success: false; error: string }
+  > {
+    const translationStore = useTranslationStore();
+    try {
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      if (!syncStore.familyKey || !syncStore.envelope) {
+        return { success: false, error: translationStore.t('recovery.podNotOpen') };
+      }
+      const { generateRecoveryKit } = await import('@/services/auth/recoveryKit');
+      const kit = await generateRecoveryKit(syncStore.familyKey);
+      syncStore.addRecoveryKey(kit.kitId, kit.pkg);
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'kit_generated',
+        context: { action: 'kit_generated' },
+      });
+      await syncStore.syncNowBounded();
+      return { success: true, kitId: kit.kitId, code: kit.code };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'recovery kit generation failed',
+        error: e,
+        severity: 'warning',
+        context: { action: 'kit_generate_failed' },
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : translationStore.t('auth.signInFailed'),
+      };
+    }
+  }
+
+  /**
+   * Set (or replace) the family recovery passphrase: a strength-checked memorable
+   * phrase wrapped into the envelope's own `recoveryPassphrase` field via the SAME
+   * password machinery members use (deriveMemberKey → AES-KW). Never a `wrappedKeys`
+   * entry — legacy clients would surface a phantom member (Pass-4 finding).
+   */
+  async function setRecoveryPassphrase(
+    passphrase: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const translationStore = useTranslationStore();
+    try {
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      if (!syncStore.familyKey || !syncStore.envelope) {
+        return { success: false, error: translationStore.t('recovery.podNotOpen') };
+      }
+      const { checkPassphrase } = await import('@/utils/passphraseStrength');
+      const familyStore = useFamilyStore();
+      const familyContextStore = useFamilyContextStore();
+      const verdict = checkPassphrase(passphrase, {
+        familyName: familyContextStore.activeFamilyName ?? undefined,
+        memberNames: familyStore.members.map((m) => m.name),
+      });
+      if (!verdict.ok) {
+        const key =
+          verdict.reason === 'matches-name'
+            ? 'recovery.passphraseMatchesName'
+            : 'recovery.passphraseTooWeak';
+        return { success: false, error: translationStore.t(key) };
+      }
+
+      const { deriveMemberKey, wrapFamilyKey, SALT_LENGTH } =
+        await import('@/services/crypto/familyKeyService');
+      const { bufferToBase64 } = await import('@/utils/encoding');
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+      const wrapKey = await deriveMemberKey(passphrase, salt);
+      const wrapped = await wrapFamilyKey(syncStore.familyKey, wrapKey);
+      syncStore.setRecoveryPassphraseWrap({ salt: bufferToBase64(salt), wrapped });
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'recovery_passphrase_set',
+        context: { action: 'passphrase_set' },
+      });
+      await syncStore.syncNowBounded();
+      return { success: true };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'recovery passphrase set failed',
+        error: e,
+        severity: 'warning',
+        context: { action: 'passphrase_set_failed' },
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : translationStore.t('auth.signInFailed'),
+      };
+    }
+  }
+
   /**
    * Join an existing family as a pre-created member.
    * Sets the member's password, creates a UserFamilyMapping, and marks onboarding complete.
@@ -1820,6 +1924,8 @@ export const useAuthStore = defineStore('auth', () => {
     signInWithPin,
     setMemberPin,
     verifyMemberPin,
+    createRecoveryKit,
+    setRecoveryPassphrase,
     signInWithPasskey,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,
