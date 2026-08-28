@@ -108,3 +108,18 @@ describe('loginFlow transition', () => {
     expect(transition(atOpening(), { type: 'EXIT' })).toEqual(idle);
   });
 });
+
+describe('prove-time transport failure (web cold start)', () => {
+  it('OPEN_FAILED from prove goes to recovery with a null grant; retry re-proves', () => {
+    const prove = atProve([{ kind: 'password' }]);
+    const rec = transition(prove, { type: 'OPEN_FAILED', reason: 'auth' });
+    expect(rec).toMatchObject({ kind: 'open-recovery', grant: null, reason: 'auth' });
+    const retry = transition(rec, { type: 'RECOVERY_RETRY' });
+    expect(retry).toMatchObject({ kind: 'prove-loading', person: mum });
+  });
+
+  it('wrong-password from prove stays inert (only opening can judge a password)', () => {
+    const prove = atProve();
+    expect(transition(prove, { type: 'OPEN_FAILED', reason: 'wrong-password' })).toEqual(prove);
+  });
+});
