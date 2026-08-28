@@ -2260,20 +2260,20 @@ const STRING_DEFS = {
     beanie: "couldn't find that family member.",
   },
   'family.resetPassword.error.cannotResetSelf': {
-    en: 'Use Settings → Change Password for your own account.',
-    beanie: 'use settings → change password for your own account.',
+    en: 'Change your own PIN from Settings → Account & Sign-In.',
+    beanie: 'change your own pin from settings → account & sign-in.',
   },
   'family.resetPassword.error.isPet': {
-    en: 'Pets do not have passwords.',
-    beanie: 'pets do not have passwords.',
+    en: "Pets don't need a PIN.",
+    beanie: "pets don't need a pin.",
   },
   'family.resetPassword.error.cannotResetOwner': {
-    en: 'The pod owner must change their own password from Settings.',
-    beanie: 'the pod owner must change their own password from settings.',
+    en: 'The pod owner changes their own PIN from Settings.',
+    beanie: 'the pod owner changes their own pin from settings.',
   },
   'family.resetPassword.error.notAuthorized': {
-    en: "You don't have permission to reset another member's password.",
-    beanie: "you don't have permission to reset another member's password.",
+    en: "You don't have permission to reset another member's PIN.",
+    beanie: "you don't have permission to reset another member's pin.",
   },
   'family.resetPassword.error.familyKeyMissing': {
     en: 'Could not load family key — please sign out and back in, then try again.',
