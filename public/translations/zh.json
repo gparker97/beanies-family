@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4293
+    "translationCount": 4294
   },
   "translations": {
     "app.name": {
@@ -21469,6 +21469,11 @@
     "deviceLink.publishFailed": {
       "translation": "链接无法发布到您的家庭文件—请检查您的连接，然后重试。",
       "hash": "dl2izp",
+      "lastUpdated": "2026-08-28"
+    },
+    "bean.hero.invite": {
+      "translation": "邀请",
+      "hash": "yq6orb",
       "lastUpdated": "2026-08-28"
     }
   }
