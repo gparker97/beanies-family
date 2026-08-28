@@ -1671,7 +1671,23 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐ Login/auth rethink — Phase 4 (FINAL) IMPLEMENTED locally — review + on-device verify pending ⭐
+### ⭐ Login/auth rethink — Phase 4 (FINAL) DEPLOYED — full shipment 2026-08-28 as 0.13R2 ⭐
+
+**SHIPPED 2026-08-28 (`25aafc2f`)** after greg's local verification (setup wizard PIN +
+kit confirmed working; biometric-copy + bean-page PIN copy + detail-page invite fixes
+folded in): **Vue** live + verified (`build_sha 25aafc2f`, v0.13R2 in the served
+bundle, run 33174339578); **Astro** deployed (run 33173502483); **Android** → open
+testing / beta track, auto-submitted for Google review (run 33174367808); **iOS** →
+TestFlight (run 33174370322). Spotlight release note 2026.08.28 ships in-app
+(auto-opens the drawer once): passwords → PIN + Recovery Kit, with "Create your PIN
+now" / "Get your Recovery Kit" CTAs deep-linking to `/settings?open=account` /
+`?open=security` (feature cards gained an optional `tryItLabel`). The native releases
+close the mixed-version window (≤0.13 clients vs kit-born families) once testers
+update. Watch `#beanies-errors` + `login-flow` in CloudWatch: `prove_outcome`
+first-try rate, `prf_withheld` stragglers, `auto_open_wrap_migrated`,
+`registry_open_blocked` (v6 upgrade), `device_link_minted/redeemed`.
+
+### (superseded) Phase 4 implemented locally
 
 **2026-08-28 (same session, after 0.13R1):** the revised Phase-4 spec (appended to
 `docs/plans/2026-08-28-login-auth-rethink-pin-recovery-kit.md`, its own 4-pass review
