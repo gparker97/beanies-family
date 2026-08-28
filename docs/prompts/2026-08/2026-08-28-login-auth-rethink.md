@@ -121,3 +121,11 @@ Sequence agreed: greg's local verification → web-only /deploy-prod-auto → Ph
 Three local-test rounds (all findings fixed) → version 0.13 → pushed
 (`e1b94784..988db304`, ~30 commits) → CI + Security green → `deploy.yml` run
 33156153528 → verified live (`build_sha 988db304`). Phase 4 next.
+
+## Post-deploy incident (2026-08-28, same hour)
+
+greg reported prod in a constant-load loop. Root causes: DevTools "Update on reload" ×
+PWA updater (loop; not a defect), and the REAL one — old-tab registry connection
+blocking the v3→v5 upgrade → 35s watchdog fatal screen. Hotfixed as 0.13R1
+(`7b72f104`): bounded 15s blocked-wait → typed error → actionable "close other beanies
+tabs" copy. Verified live.

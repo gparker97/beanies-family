@@ -1671,7 +1671,19 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐ Login/auth rethink — Phases 1+2+3+5 DEPLOYED to prod web (0.13, `988db304`) — Phase 4 is next ⭐
+### ⭐ Login/auth rethink — DEPLOYED to prod web (0.13 → hotfix 0.13R1 `7b72f104`) — Phase 4 is next ⭐
+
+**Post-deploy incident, resolved same hour (2026-08-28):** greg's prod session appeared
+stuck in a load loop. TWO stacked causes: (1) DevTools "Update on reload" × the PWA
+updater = an infinite SW-reinstall/reload cycle (not a code defect; real users get one
+update reload); (2) REAL: an old-bundle tab/PWA window held the registry DB open with no
+blocking handler, so the new tab's v5 upgrade blocked forever → 35s watchdog fatal
+screen (`registry_open_blocked` ×7 + `onboardingStallTimeout` ×3 in the firehose — the 3
+Slack criticals from ~08:40 are this incident). Hotfix `0.13R1`: after 15s of CONFIRMED
+blocked, boot rejects with `RegistryBlockedError` and renders the actionable "close your
+other beanies tabs and windows, then reload" copy. Self-resolves when old tabs
+auto-update. Note for the fleet: users with multiple beanies contexts open may see that
+message ONCE during the 0.12→0.13 changeover — expected, self-explanatory.
 
 **DEPLOYED 2026-08-28** via `Deploy beanies PROD` (run 33156153528), verified live
 (`build_sha 988db304` in the served bundle). Web/PWA only — native apps deliberately
