@@ -19,6 +19,7 @@ import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { canInviteFamily } from '@/config/features';
 import type { QuickAddAction } from '@/constants/quickAddItems';
 import type { AgeGroup, FamilyMember, Gender, UUID } from '@/types/models';
@@ -247,7 +248,7 @@ function onAddButtonClick(): void {
           @click="emit('invite')"
         >
           <BeanieIcon name="share" size="xs" />
-          <span>{{ t('bean.hero.invite') }}</span>
+          <span>{{ fillTemplate(t('bean.hero.invite'), { name: member.name }) }}</span>
         </button>
 
         <div class="relative flex-1 sm:flex-initial" data-add-menu-root>
