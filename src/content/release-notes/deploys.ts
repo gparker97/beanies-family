@@ -17,16 +17,6 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
-    version: '2026.08.28.2',
-    date: '2026-08-28',
-    month: '28 august 2026',
-    summary: {
-      en: 'Fixes for the new sign-in: Face ID unlock on iPhone works again, the What\u2019s New buttons open reliably, and signing out shows its progress.',
-      beanie:
-        'fixes for the new sign-in: face id unlock on iphone works again, the what\u2019s new buttons open reliably, and signing out shows its progress.',
-    },
-  },
-  {
     version: '2026.08.28',
     date: '2026-08-28',
     month: '28 august 2026',
