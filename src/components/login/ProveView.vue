@@ -7,9 +7,10 @@
  * password form as the always-available terminal. Pure renderer — every outcome emits
  * up to the flow driver; no store writes, no routing.
  */
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import PinInput from '@/components/ui/PinInput.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -32,6 +33,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   biometric: [];
   'tap-through': [];
+  pin: [pin: string];
   password: [password: string];
   'create-password': [password: string];
   /** The user moved past an offered stronger method (telemetry). */
@@ -48,7 +50,22 @@ const localError = ref<string | null>(null);
 let fellBackOnce = false;
 
 const hasBiometric = computed(() => props.methods.some((m) => m.kind === 'biometric'));
+const hasPin = computed(() => props.methods.some((m) => m.kind === 'pin'));
 const hasTapThrough = computed(() => props.methods.some((m) => m.kind === 'tap-through'));
+const pinValue = ref('');
+/** A wrong PIN comes back via the error prop — clear the boxes so retyping is one motion. */
+watch(
+  () => props.error,
+  (e) => {
+    if (e) pinValue.value = '';
+  }
+);
+/**
+ * The password form is tucked behind a link whenever a PIN is offered — the PIN is the
+ * primary credential of the redesign; password is the legacy/bootstrap terminal.
+ */
+const showPasswordForm = ref(false);
+const passwordFormVisible = computed(() => !hasPin.value || showPasswordForm.value);
 /**
  * Create-password mode: the member has no credential AND the pod is open (the doc must
  * be writable to store the hash). A credential-less member on a CLOSED pod cannot
@@ -60,9 +77,14 @@ const isCreatingPassword = computed(() => props.person.hasCredential === false &
 const shownError = computed(() => localError.value ?? props.error);
 
 function noteFallback() {
-  if (fellBackOnce || (!hasBiometric.value && !hasTapThrough.value)) return;
+  if (fellBackOnce || (!hasBiometric.value && !hasTapThrough.value && !hasPin.value)) return;
   fellBackOnce = true;
   emit('fell-back');
+}
+
+function revealPasswordForm() {
+  showPasswordForm.value = true;
+  noteFallback();
 }
 
 function handleSubmit() {
@@ -169,8 +191,34 @@ function handleSubmit() {
         {{ `${t('loginV6.signInAs')} ${person.name}` }}
       </BaseButton>
 
+      <!-- Method: member PIN (primary credential of the redesign) -->
+      <div v-if="hasPin" class="space-y-2">
+        <p class="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+          {{ t('pin.enterPin') }}
+        </p>
+        <PinInput
+          v-model="pinValue"
+          :has-error="!!shownError"
+          :disabled="isBusy"
+          :autofocus="!hasBiometric"
+          :label="t('pin.enterPin')"
+          @complete="(pin) => emit('pin', pin)"
+        />
+      </div>
+
+      <!-- Reveal-password link when the PIN is the offered credential -->
+      <button
+        v-if="hasPin && !passwordFormVisible"
+        type="button"
+        class="w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        :disabled="isBusy"
+        @click="revealPasswordForm"
+      >
+        {{ t('passkey.usePassword') }}
+      </button>
+
       <!-- Terminal: the password form (create mode for credential-less on an open pod) -->
-      <form @submit.prevent="handleSubmit">
+      <form v-if="passwordFormVisible" @submit.prevent="handleSubmit">
         <div v-if="isCreatingPassword">
           <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
             {{ t('auth.createPasswordPrompt') }}

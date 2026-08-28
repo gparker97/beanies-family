@@ -640,6 +640,7 @@ async function handleStartOver() {
           :pod-open="familyStore.members.length > 0"
           @biometric="flow.onBiometric"
           @tap-through="flow.onTapThrough"
+          @pin="flow.onPinSubmit"
           @password="flow.onPasswordSubmit"
           @create-password="flow.onCreatePassword"
           @fell-back="flow.onFellBack"

@@ -11,6 +11,11 @@ const reportError = vi.fn();
 vi.mock('@/utils/errorReporter', () => ({
   reportError: (...args: unknown[]) => reportError(...args),
 }));
+const getPinUnlockRecord = vi.fn(async () => undefined);
+vi.mock('@/services/auth/deviceUnlock', () => ({
+  getPinUnlockRecord: (...args: unknown[]) =>
+    (getPinUnlockRecord as unknown as (...a: unknown[]) => Promise<unknown>)(...args),
+}));
 const emitProveMethodsResolved = vi.fn();
 vi.mock('@/services/telemetry/loginFlowEvents', () => ({
   emitProveMethodsResolved: (...args: unknown[]) => emitProveMethodsResolved(...args),
@@ -37,6 +42,7 @@ function ctx(overrides: Partial<ProveContext> = {}): ProveContext {
     memberId: 'm-1',
     podOpen: false,
     hasCredential: true,
+    hasPin: null,
     rosterSource: 'roster',
     ...overrides,
   };
@@ -92,6 +98,21 @@ describe('resolveProveMethods', () => {
     const methods = await resolveProveMethods(ctx());
     expect(methods.length).toBeGreaterThan(0);
     expect(methods.at(-1)).toEqual({ kind: 'password' });
+  });
+
+  it('offers PIN when a device wrap exists (cold), and doc-only PIN only on an open pod', async () => {
+    getPinUnlockRecord.mockResolvedValueOnce({ id: 'fam-1:m-1' } as never);
+    const cold = await resolveProveMethods(ctx());
+    expect(cold.map((m) => m.kind)).toEqual(['pin', 'password']);
+    expect(cold[0]).toMatchObject({ hasDeviceWrap: true });
+
+    const openDocPin = await resolveProveMethods(ctx({ podOpen: true, hasPin: true }));
+    expect(openDocPin.map((m) => m.kind)).toEqual(['pin', 'password']);
+    expect(openDocPin[0]).toMatchObject({ hasDeviceWrap: false });
+
+    // Doc-only PIN is NEVER offered cold (nothing to verify against, nothing to unwrap).
+    const coldDocPin = await resolveProveMethods(ctx({ podOpen: false, hasPin: true }));
+    expect(coldDocPin.map((m) => m.kind)).toEqual(['password']);
   });
 
   it('emits prove_methods_resolved with the ordered kinds and roster source', async () => {
