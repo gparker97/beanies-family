@@ -48,7 +48,36 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
     return registryInstance;
   }
 
+  // v4 upgrade hazard: a still-open OLD-bundle tab holds a v3 connection with no
+  // `blocking` handler, so this openDB can sit in 'blocked' FOREVER (idb neither
+  // resolves nor rejects) — hanging boot and the whole login flow silently. We cannot
+  // fix already-deployed bundles, but we (a) surface the stall to CloudWatch after 5s
+  // so it is diagnosable blind, and (b) ship the handlers so every FUTURE bump closes
+  // our own connection instead of blocking the new tab.
+  const blockedTimer = setTimeout(() => {
+    void import('@/services/telemetry/logEvent').then(({ logEvent }) =>
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'registry_open_blocked',
+        context: { action: 'open_blocked', error_code: 'VersionBlocked' },
+      })
+    );
+  }, 5000);
+
   registryInstance = await openDB<RegistryDB>(REGISTRY_DB_NAME, REGISTRY_DB_VERSION, {
+    blocked() {
+      // An older-version connection elsewhere refuses to close; the timer above reports.
+    },
+    blocking() {
+      // A NEWER version wants to open in another tab — close our connection so that tab
+      // can proceed; the next call here reopens at whatever version wins.
+      registryInstance?.close();
+      registryInstance = null;
+    },
+    terminated() {
+      registryInstance = null;
+    },
     upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains('families')) {
         db.createObjectStore('families', { keyPath: 'id' });
@@ -86,6 +115,7 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
     },
   });
 
+  clearTimeout(blockedTimer);
   return registryInstance;
 }
 

@@ -15,6 +15,14 @@ const props = defineProps<{
   reason: Exclude<OpenFailReason, 'wrong-password'>;
   familyName: string;
   isBusy: boolean;
+  /**
+   * Identity was proven BEFORE the transport failed. False on the web cold-start case
+   * (the envelope fetch died before the assert could run) — the copy must not claim
+   * "you're verified" there, and retry returns to the prove screen.
+   */
+  proven: boolean;
+  /** Failure text from a recovery action (reconnect/grant failed) — owned by the driver. */
+  error: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -34,7 +42,9 @@ const { t } = useTranslation();
 const body = computed(() => {
   switch (props.reason) {
     case 'auth':
-      return t('loginFlow.recoveryAuthBody');
+      return props.proven
+        ? t('loginFlow.recoveryAuthBody')
+        : t('loginFlow.recoveryAuthBodyUnproven');
     case 'permission':
       return t('loginFlow.recoveryPermissionBody');
     case 'not-found':
@@ -64,7 +74,7 @@ const body = computed(() => {
         class="mx-auto mb-3 h-16 w-16"
       />
       <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
-        {{ t('loginFlow.recoveryTitle') }}
+        {{ proven ? t('loginFlow.recoveryTitle') : t('loginFlow.recoveryTitleUnproven') }}
       </h2>
       <p v-if="familyName" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         {{ familyName }}
@@ -74,6 +84,15 @@ const body = computed(() => {
     <p class="mb-6 text-center text-sm text-gray-600 dark:text-gray-400">
       {{ body }}
     </p>
+
+    <!-- Recovery-action failure (reconnect/grant failed) — never invisible -->
+    <div
+      v-if="error"
+      role="alert"
+      class="mb-4 rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
+    >
+      {{ error }}
+    </div>
 
     <div class="space-y-3">
       <BaseButton
