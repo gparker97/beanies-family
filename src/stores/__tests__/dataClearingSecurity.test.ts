@@ -36,6 +36,32 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   updateGlobalExchangeRates: vi.fn(),
 }));
 
+// Trusted auto-open service (Phase 4): the wrapped replacement for the plaintext
+// `cachedFamilyKeys` store. Mocked as an in-memory Map at the SERVICE boundary so
+// these tests stay at the store-contract level: `cacheFamilyKey` must WRAP (store
+// via the service), `getCachedFamilyKey` must read the wrapped store first, and the
+// clear paths must empty it. The Map is deliberately VALUE-AGNOSTIC — it faithfully
+// hands back exactly what the store put in (a CryptoKey or an exported-b64 string,
+// whichever the store↔service contract uses), so the round-trip assertion pins the
+// store's behavior, not the service's internal wire type.
+const autoOpenState = vi.hoisted(() => ({ map: new Map<string, unknown>() }));
+
+vi.mock('@/services/auth/trustedAutoOpen', () => ({
+  saveTrustedAutoOpenKey: vi.fn(async (familyId: string, key: unknown) => {
+    autoOpenState.map.set(familyId, key);
+  }),
+  loadTrustedAutoOpenKey: vi.fn(
+    async (familyId: string) => autoOpenState.map.get(familyId) ?? null
+  ),
+  hasTrustedAutoOpenKey: vi.fn(async (familyId: string) => autoOpenState.map.has(familyId)),
+  removeTrustedAutoOpenKey: vi.fn(async (familyId: string) => {
+    autoOpenState.map.delete(familyId);
+  }),
+  clearAllTrustedAutoOpenKeys: vi.fn(async () => {
+    autoOpenState.map.clear();
+  }),
+}));
+
 vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getDefaultSettings: () => ({
     id: 'app_settings',
@@ -191,6 +217,11 @@ vi.mock('@/stores/familyContextStore', () => ({
 // ---------------------------------------------------------------------------
 
 import { useAuthStore } from '../authStore';
+import {
+  SIGN_OUT_TRUSTED_STEPS,
+  SIGN_OUT_UNTRUSTED_STEPS,
+  SIGN_OUT_CLEAR_STEPS,
+} from '@/services/auth/signOutSteps';
 import { useSettingsStore } from '../settingsStore';
 import { useSyncStore } from '../syncStore';
 import { useFamilyStore } from '../familyStore';
@@ -204,6 +235,17 @@ import { useMemberFilterStore } from '../memberFilterStore';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Valid 32-byte AES key fixtures (base64). Phase 4's cacheFamilyKey imports the
+ * exported key as a real CryptoKey before wrapping, so the fixture must be a
+ * genuine key — an arbitrary string would fail the import, not the contract
+ * under test. Round-tripping through getCachedFamilyKey re-exports the same bytes.
+ */
+const keyB64 = (fill: number): string =>
+  btoa(String.fromCharCode(...new Uint8Array(32).fill(fill)));
+const KEY_A = keyB64(1);
+const KEY_B = keyB64(2);
 
 /** Populate every store with realistic sensitive data */
 function populateAllStores() {
@@ -413,6 +455,7 @@ describe('Sensitive Data Clearing Security', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     savedGlobalSettings = { ...mockGlobalSettings };
+    autoOpenState.map.clear();
   });
 
   // =========================================================================
@@ -422,14 +465,14 @@ describe('Sensitive Data Clearing Security', () => {
     it('clears cachedFamilyKeys from global settings', async () => {
       const { auth, settings } = populateAllStores();
 
-      // Trust device and cache a password
+      // Trust device and cache a key
       await settings.setTrustedDevice(true);
-      await settings.cacheFamilyKey('my-encryption-key', 'family-123');
-      expect(settings.getCachedFamilyKey('family-123')).toBe('my-encryption-key');
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_A);
 
       await auth.signOutAndClearData();
 
-      expect(settings.getCachedFamilyKey('family-123')).toBeNull();
+      expect(await settings.getCachedFamilyKey('family-123')).toBeNull();
     });
 
     it('resets isTrustedDevice to false', async () => {
@@ -510,12 +553,12 @@ describe('Sensitive Data Clearing Security', () => {
       // `{ force: true }` is how the key actually gets here: syncStore caches it on
       // every successful password decrypt regardless of the trusted-device flag, so an
       // untrusted device really does hold one.
-      await settings.cacheFamilyKey('my-encryption-key', 'family-123', { force: true });
-      expect(settings.getCachedFamilyKey('family-123')).toBe('my-encryption-key');
+      await settings.cacheFamilyKey(KEY_A, 'family-123', { force: true });
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_A);
 
       await auth.signOut();
 
-      expect(settings.getCachedFamilyKey('family-123')).toBeNull();
+      expect(await settings.getCachedFamilyKey('family-123')).toBeNull();
     });
 
     it('clears auth session state', async () => {
@@ -586,11 +629,11 @@ describe('Sensitive Data Clearing Security', () => {
       // pin both halves of the decision rather than just the safe-looking one.
       const { auth, settings } = populateAllStores();
       await settings.setTrustedDevice(true);
-      await settings.cacheFamilyKey('my-encryption-key', 'family-123');
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
 
       await auth.signOut();
 
-      expect(settings.getCachedFamilyKey('family-123')).toBe('my-encryption-key');
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_A);
     });
 
     // Cross-family data-integrity regression (2026-07-06): even though the cache DB
@@ -631,12 +674,12 @@ describe('Sensitive Data Clearing Security', () => {
     it('preserves cached encryption password for auto-reconnect', async () => {
       const { auth, settings } = populateAllStores();
       await settings.setTrustedDevice(true);
-      await settings.cacheFamilyKey('keep-this-password', 'family-123');
+      await settings.cacheFamilyKey(KEY_B, 'family-123');
 
       await auth.signOut();
 
-      // Cached password persists — by design for trusted device auto-reconnect
-      expect(settings.getCachedFamilyKey('family-123')).toBe('keep-this-password');
+      // Cached key persists — by design for trusted device auto-reconnect
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_B);
     });
   });
 
@@ -783,13 +826,15 @@ describe('Sensitive Data Clearing Security', () => {
     it('clears cachedFamilyKeys before wiping', async () => {
       const { settings } = populateAllStores();
       await settings.setTrustedDevice(true);
-      await settings.cacheFamilyKey('cached-pw', 'family-123');
-      expect(settings.getCachedFamilyKey('family-123')).toBe('cached-pw');
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_A);
 
       // Simulate the SettingsPage handleClearData flow (clears all families)
       await settings.clearCachedFamilyKey();
 
-      expect(settings.getCachedFamilyKey('family-123')).toBeNull();
+      expect(await settings.getCachedFamilyKey('family-123')).toBeNull();
+      // The all-families clear also wipes any legacy plaintext remnants.
+      expect(savedGlobalSettings.cachedFamilyKeys).toEqual({});
     });
 
     it('resets isTrustedDevice to false', async () => {
@@ -841,6 +886,134 @@ describe('Sensitive Data Clearing Security', () => {
       await mockClearAllData();
 
       expect(callOrder).toEqual(['clearPassword', 'clearTrust', 'clearData']);
+    });
+  });
+
+  // =========================================================================
+  // 5b. Wrapped key-cache trio (Phase 4) — wrap on write, wrapped-first read,
+  //     lazy legacy migration
+  // =========================================================================
+  describe('wrapped auto-open key cache (Phase 4)', () => {
+    it('cacheFamilyKey stores via the trustedAutoOpen service, never plaintext settings', async () => {
+      const { settings } = populateAllStores();
+      const autoOpen = await import('@/services/auth/trustedAutoOpen');
+      await settings.setTrustedDevice(true);
+
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
+
+      expect(vi.mocked(autoOpen.saveTrustedAutoOpenKey)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(autoOpen.saveTrustedAutoOpenKey).mock.calls[0]![0]).toBe('family-123');
+      // No plaintext copy may land in global settings anymore.
+      expect(savedGlobalSettings.cachedFamilyKeys ?? {}).toEqual({});
+    });
+
+    it('cacheFamilyKey still refuses on an untrusted device without force', async () => {
+      const { settings } = populateAllStores();
+      expect(settings.isTrustedDevice).toBe(false);
+
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
+
+      expect(await settings.getCachedFamilyKey('family-123')).toBeNull();
+    });
+
+    it('getCachedFamilyKey lazily migrates a legacy plaintext entry (wrap + delete plaintext + return value)', async () => {
+      const { settings } = populateAllStores();
+      const autoOpen = await import('@/services/auth/trustedAutoOpen');
+      // A pre-Phase-4 device: plaintext key in global settings, nothing wrapped.
+      savedGlobalSettings = {
+        ...savedGlobalSettings,
+        cachedFamilyKeys: { 'family-123': KEY_A },
+      } as GlobalSettings;
+      await settings.loadGlobalSettings();
+
+      const value = await settings.getCachedFamilyKey('family-123');
+
+      // The legacy value is returned so the silent open still works this session…
+      expect(value).toBe(KEY_A);
+      // …the wrapped record now exists…
+      expect(vi.mocked(autoOpen.saveTrustedAutoOpenKey)).toHaveBeenCalledWith(
+        'family-123',
+        expect.anything()
+      );
+      // …and the plaintext entry is gone.
+      expect(savedGlobalSettings.cachedFamilyKeys).toEqual({});
+      // Second read is served from the wrapped store (same bytes back).
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_A);
+    });
+
+    it('clearCachedFamilyKey(familyId) clears the wrapped store AND the legacy plaintext remnant', async () => {
+      const { settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
+      // Simulate a lingering legacy remnant alongside the wrapped record.
+      savedGlobalSettings = {
+        ...savedGlobalSettings,
+        cachedFamilyKeys: { 'family-123': KEY_A, 'family-other': KEY_B },
+      } as GlobalSettings;
+      await settings.loadGlobalSettings();
+
+      await settings.clearCachedFamilyKey('family-123');
+
+      expect(await settings.getCachedFamilyKey('family-123')).toBeNull();
+      // Family-scoped: the OTHER family's legacy entry survives.
+      expect(savedGlobalSettings.cachedFamilyKeys).toEqual({ 'family-other': KEY_B });
+    });
+  });
+
+  // =========================================================================
+  // 5c. Sign-out tier step lists — the tier contracts as DATA
+  // =========================================================================
+  describe('sign-out tier step lists (signOutSteps.ts data contracts)', () => {
+    it('trusted tier 2 ⊂ untrusted tier 2, except the keep-vs-drop Google-token substitution', () => {
+      // The one deliberate substitution: trusted keeps local tokens, untrusted drops them.
+      expect(SIGN_OUT_TRUSTED_STEPS).toContain('clearGoogleSessionKeepTokens');
+      expect(SIGN_OUT_TRUSTED_STEPS).not.toContain('clearGoogleSessionDropTokens');
+      expect(SIGN_OUT_UNTRUSTED_STEPS).toContain('clearGoogleSessionDropTokens');
+      expect(SIGN_OUT_UNTRUSTED_STEPS).not.toContain('clearGoogleSessionKeepTokens');
+      // Every other trusted step also runs on the untrusted tier.
+      for (const step of SIGN_OUT_TRUSTED_STEPS) {
+        if (step === 'clearGoogleSessionKeepTokens') continue;
+        expect(SIGN_OUT_UNTRUSTED_STEPS).toContain(step);
+      }
+      // And NO tier revokes at Google — no revoke step name exists at all.
+      for (const steps of [
+        SIGN_OUT_TRUSTED_STEPS,
+        SIGN_OUT_UNTRUSTED_STEPS,
+        SIGN_OUT_CLEAR_STEPS,
+      ]) {
+        expect(steps.some((n) => n.toLowerCase().includes('revoke'))).toBe(false);
+      }
+    });
+
+    it('tier 3 ⊇ untrusted tier 2 under the family→all scope mapping, with the two documented exceptions', () => {
+      const scopeMap: Record<string, string> = {
+        clearKeyCacheFamily: 'clearKeyCacheAll',
+        removePinWrapsFamily: 'removePinWrapsAll',
+        removeRosterFamily: 'removeRosterAll',
+      };
+      for (const step of SIGN_OUT_UNTRUSTED_STEPS) {
+        if (step === 'resetDocClient') {
+          // Documented exception 1: tier-2 only — tier 3's deleteFamilyDb path
+          // resets the worker doc anyway.
+          expect(SIGN_OUT_CLEAR_STEPS).not.toContain('resetDocClient');
+          continue;
+        }
+        if (step === 'reArmTrustPrompt') {
+          // Documented exception 2: tier-2-untrusted only — superseded in tier 3
+          // by untrustDevice, which sets the trust flag itself.
+          expect(SIGN_OUT_CLEAR_STEPS).not.toContain('reArmTrustPrompt');
+          expect(SIGN_OUT_CLEAR_STEPS).toContain('untrustDevice');
+          continue;
+        }
+        expect(SIGN_OUT_CLEAR_STEPS).toContain(scopeMap[step] ?? step);
+      }
+      // reArmTrustPrompt is exclusively the untrusted tier-2's.
+      expect(SIGN_OUT_TRUSTED_STEPS).not.toContain('reArmTrustPrompt');
+      // Tier 3 additionally drops every family's refresh tokens + reclaims passkeys.
+      expect(SIGN_OUT_CLEAR_STEPS).toContain('clearAllRefreshTokens');
+      expect(SIGN_OUT_CLEAR_STEPS).toContain('reclaimAllPasskeys');
+      expect(SIGN_OUT_UNTRUSTED_STEPS).not.toContain('clearAllRefreshTokens');
+      expect(SIGN_OUT_UNTRUSTED_STEPS).not.toContain('reclaimAllPasskeys');
     });
   });
 

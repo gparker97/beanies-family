@@ -1,5 +1,7 @@
 # ADR-028: Redirect auth always forces consent, and refresh tokens self-heal from `__pending__`
 
+> **2026-08-28 (ADR-034 / login rethink Phase 5):** NO sign-out tier revokes the Google grant any more (the sole revoke site is the explicit Settings "Disconnect Google Everywhere" action); trusted-device sign-out keeps local tokens, untrusted clears them locally. The `prompt=consent` invariant here is unchanged — with grants surviving sign-out, the consent screen is now rarely reached.
+
 > Date: 2026-05-20
 > Status: Accepted
 > Plan: `docs/plans/2026-05-20-google-refresh-token-persistence-fix.md`

@@ -110,7 +110,9 @@ describe('useBiometricSignIn — the one shared "biometric succeeded, now become
     expect(syncMocks.decryptPendingFileWithKey).toHaveBeenCalledWith(familyKey);
   });
 
-  it('returns the crossDevice variant WITH its message when a file is pending but no key came back', async () => {
+  it('Phase 4: a keyless success with a pending file is a reported defect, not a crossDevice variant', async () => {
+    // The web PRF path (the only producer of keyless successes) is retired; native
+    // always returns the key it unwrapped. A keyless success here is defensive.
     syncMocks.hasPendingEncryptedFile = true;
     authMocks.signInWithPasskey.mockResolvedValue({
       success: true,
@@ -121,12 +123,7 @@ describe('useBiometricSignIn — the one shared "biometric succeeded, now become
 
     const result = await signIn(FAMILY, MEMBER);
 
-    // The variant carries its own copy so every non-ok outcome has one source of message.
-    expect(result).toEqual({
-      ok: false,
-      message: 'passkey.crossDeviceNoCache',
-      crossDevice: { memberId: MEMBER, credentialId: 'cred-1' },
-    });
+    expect(result).toEqual({ ok: false, message: 'passkey.signInError' });
   });
 
   it('maps a "No pending" decrypt failure to the file-load message', async () => {

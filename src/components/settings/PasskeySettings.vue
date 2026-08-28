@@ -3,7 +3,6 @@ import { ref, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import {
-  isWebAuthnSupported,
   canEnrollBiometric,
   listRegisteredPasskeys,
   removePasskey,
@@ -31,19 +30,12 @@ const editingId = ref<string | null>(null);
 const editLabel = ref('');
 
 onMounted(async () => {
-  // Native (installed app) uses the hardware Keystore, not WebAuthn — so the raw
-  // `isWebAuthnSupported()` (which the retired shim used to prop up) must NOT gate
-  // the panel on native, or shim removal would dead-render the deliberate enroll
-  // surface. Capability is decided by `canEnrollBiometric()` below either way.
-  supported.value = isNative() || isWebAuthnSupported();
-  if (supported.value) {
-    // Settings is the deliberate management surface: gate on capability only
-    // (canEnrollBiometric), NOT canOfferBiometric — the latter folds in the
-    // proactive-nag suppression, which would lock the retry button after a
-    // transient decline. See passkeyService canOfferBiometric/canEnrollBiometric.
-    platformAvailable.value = await canEnrollBiometric();
-  }
+  // Phase 4: NEW enrolment is native-keystore only (the web WebAuthn+PRF path is
+  // retired). On web the card renders as management-only when leftover
+  // registrations exist — list / rename / remove — and hides entirely otherwise.
+  platformAvailable.value = await canEnrollBiometric();
   await loadPasskeys();
+  supported.value = isNative() || platformAvailable.value || passkeys.value.length > 0;
 });
 
 async function loadPasskeys() {

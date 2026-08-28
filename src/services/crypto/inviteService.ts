@@ -18,6 +18,12 @@ const PBKDF2_ITERATIONS = 100_000;
 const KEY_LENGTH = 256;
 const WRAPPING_ALGO = 'AES-KW';
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+/**
+ * Device-link expiry (Phase 4): a link minted to sign an EXISTING member in on a new
+ * device is redeemed within minutes (both devices are in hand) — a short window
+ * shrinks the leak surface of a full-FK transport link.
+ */
+export const LINK_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // ── Token generation ────────────────────────────────────────────────
 
@@ -69,12 +75,14 @@ export interface InvitePackage {
  */
 export async function createInvitePackage(
   familyKey: CryptoKey,
-  token: string
+  token: string,
+  /** Override the default 24h expiry — device links pass `LINK_EXPIRY_MS`. */
+  expiryMs: number = INVITE_EXPIRY_MS
 ): Promise<InvitePackage> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
   const wrappingKey = await deriveInviteKey(token, salt);
   const wrapped = await wrapFamilyKey(familyKey, wrappingKey);
-  const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MS).toISOString();
+  const expiresAt = new Date(Date.now() + expiryMs).toISOString();
 
   return {
     salt: bufferToBase64url(salt),
@@ -132,6 +140,13 @@ export interface InviteLinkParams {
    * the invite token is the bigger concern if the link leaks).
    */
   inviteeEmail?: string;
+  /**
+   * Phase 4 device-link marker (`lk=1` on the wire): the redeeming client serves the
+   * FULL person picker (an existing member proves with their doc-synced PIN) instead
+   * of the unclaimed-only claim flow. Pre-0.14 clients ignore the param — the mint
+   * card's copy says the other device needs 0.14+.
+   */
+  linkMode?: boolean;
 }
 
 /**
@@ -149,6 +164,7 @@ export function buildInviteLink(params: InviteLinkParams): string {
   if (params.fileId) search.set('fileId', params.fileId);
   if (params.token) search.set('t', params.token);
   if (params.inviteeEmail) search.set('hint', encodeBase64(params.inviteeEmail));
+  if (params.linkMode) search.set('lk', '1');
   return `${origin}/join?${search.toString()}`;
 }
 
@@ -201,6 +217,8 @@ export function parseInviteLink(url: string): InviteLinkParams | null {
     const decoded = decodeBase64(hintEncoded);
     if (decoded) result.inviteeEmail = decoded;
   }
+
+  if (sp.get('lk') === '1') result.linkMode = true;
 
   return result;
 }

@@ -8,7 +8,7 @@
  *
  * MVO note: the composable is the orchestrator; the view binds reactive
  * state and emits user intents (`handleAuthTap`, `handleSelectMember`,
- * `handleSubmitPassword`, etc.). Stores and services are imported at
+ * `handleSubmitPin`, etc.). Stores and services are imported at
  * module scope so tests can `vi.mock` them — no DI plumbing.
  */
 
@@ -47,7 +47,8 @@ export type JoinStep =
   | 'authenticating' // OAuth in flight (popup or redirect)
   | 'loading' // file fetch / Picker / decrypt / familyId validate
   | 'pick-member' // unclaimed-member grid
-  | 'set-password' // password form
+  | 'set-password' // set-pin form (historical step name kept — one rename, many consumers)
+  | 'link-ready' // Phase 4 device link: pod open — hand off to the standard login machine
   | 'joining'; // final commit
 
 export type JoinErrorCode =
@@ -182,6 +183,10 @@ export function useJoinFlow() {
 
   // Parsed from URL on mount.
   const targetFamilyId = ref('');
+  // Phase 4 device-link mode (`lk=1`): the redeemer is an EXISTING member — after
+  // decrypt, hand off to the standard login machine (full person picker + PIN prove)
+  // instead of the unclaimed-only claim flow.
+  const linkMode = ref(false);
   const targetProvider = ref<'google_drive' | 'local'>('local');
   const targetFileId = ref('');
   const targetFileName = ref('');
@@ -365,6 +370,7 @@ export function useJoinFlow() {
     targetFileId.value = parsed.fileId ?? '';
     inviteToken.value = parsed.token ?? '';
     inviteEmailHint.value = parsed.inviteeEmail ?? null;
+    linkMode.value = parsed.linkMode === true;
   }
 
   /**
@@ -562,6 +568,15 @@ export function useJoinFlow() {
       return;
     }
 
+    // Phase 4 device link: the pod is open — the view hands off to the standard
+    // login machine, which serves EVERY member (PIN / tap-through prove), not just
+    // unclaimed ones. The claim flow below structurally cannot serve a claimed member.
+    if (linkMode.value) {
+      clearError();
+      currentStep.value = 'link-ready';
+      return;
+    }
+
     if (unclaimedMembers.value.length === 0) {
       recordError('NO_UNCLAIMED_MEMBERS');
       return;
@@ -695,21 +710,25 @@ export function useJoinFlow() {
     currentStep.value = 'set-password';
   }
 
-  /** Final commit: set the member's password and join. Returns true on success. */
-  async function handleSubmitPassword(password: string): Promise<boolean> {
+  /**
+   * Final commit (Phase 4): claim the bean with a 6-digit PIN — doc-side hash +
+   * this device's unlock wrap (both inside `authStore.joinFamily`). NO envelope
+   * wrap is created any more (the old password `wrapFamilyKeyForMember` call is
+   * retired — no new password wraps, ever); cross-device access thereafter is
+   * the PIN on an opened device, a device link, the kit, or the passphrase.
+   * Returns true on success.
+   */
+  async function handleSubmitPin(pin: string): Promise<boolean> {
     if (!selectedMember.value) return false;
     currentStep.value = 'joining';
     const ok = await tryStep('FILE_DECRYPT_FAILED', async () => {
       const result = await authStore.joinFamily({
         memberId: selectedMember.value!.id,
-        password,
+        pin,
         familyId: familyContextStore.activeFamilyId ?? targetFamilyId.value,
       });
       if (!result.success) throw new Error(result.error ?? 'Join failed');
-      // Wrap the family key with the member's password so they can
-      // decrypt from any browser/device on subsequent visits.
-      await syncStore.wrapFamilyKeyForMember(selectedMember.value!.id, password);
-      // Persist password hash + wrapped key to the file before handing off.
+      // Persist the PIN hash to the file before handing off.
       await syncStore.syncNow(true);
       return true;
     });
@@ -773,7 +792,8 @@ export function useJoinFlow() {
     handleRetry,
     handleSubmitDecryptPassword,
     handleSelectMember,
-    handleSubmitPassword,
+    handleSubmitPin,
+    linkMode,
     handleTryAnotherDevice,
     clearError,
     // diagnostics

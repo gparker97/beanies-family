@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle */
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import PinInput from '@/components/ui/PinInput.vue';
+import { isValidPin, PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -17,6 +19,7 @@ import { resolveErrorView } from '@/utils/structuredError';
 import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { emitDeviceLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 import type { FamilyMember } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -46,11 +49,30 @@ const emit = defineEmits<{
   back: [];
   'signed-in': [destination: string];
   navigate: [view: LoginView];
+  /** Phase 4 device link redeemed: pod open — host enters the standard login machine. */
+  'link-ready': [familyId: string, familyName: string];
 }>();
 
+// Phase 4 device link: the flow lands on 'link-ready' once the linked file is
+// decrypted — hand off to the login machine (person picker + PIN prove).
+watch(
+  () => flow.currentStep.value,
+  (step) => {
+    if (step === 'link-ready') {
+      emitDeviceLinkRedeemed(true);
+      emit(
+        'link-ready',
+        syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId ?? '',
+        syncStore.envelope?.familyName ?? familyContextStore.activeFamilyName ?? ''
+      );
+    }
+  }
+);
+
 // ── View-local form state ────────────────────────────────────────────────────
-const password = ref('');
-const confirmPassword = ref('');
+// Phase 4: the claim credential is a 6-digit PIN (no new passwords, ever).
+const pin = ref('');
+const confirmPin = ref('');
 const decryptPassword = ref('');
 const showDecryptModal = ref(false);
 const isLoadingLocalFile = ref(false);
@@ -201,20 +223,20 @@ async function handleDecrypt(): Promise<void> {
   }
 }
 
-// ── Password creation (final join step) ──────────────────────────────────────
+// ── PIN creation (final join step, Phase 4) ─────────────────────────────────
 
-async function handleCreatePassword(): Promise<void> {
-  if (!password.value || password.value.length < 8) return;
-  if (password.value !== confirmPassword.value) return;
-  const ok = await flow.handleSubmitPassword(password.value);
+async function handleCreatePin(): Promise<void> {
+  if (!isValidPin(pin.value)) return;
+  if (pin.value !== confirmPin.value) return;
+  const ok = await flow.handleSubmitPin(pin.value);
   if (ok) emit('signed-in', '/nook');
 }
 
-const passwordError = computed(() => {
-  if (!password.value) return null;
-  if (password.value.length < 8) return t('auth.passwordMinLength');
-  if (password.value !== confirmPassword.value && confirmPassword.value)
-    return t('auth.passwordsDoNotMatch');
+const pinError = computed(() => {
+  if (!pin.value) return null;
+  if (pin.value.length === PIN_LENGTH && !isValidPin(pin.value)) return t('pin.invalidFormat');
+  if (pin.value !== confirmPin.value && confirmPin.value.length === PIN_LENGTH)
+    return t('pin.mismatch');
   return null;
 });
 
@@ -224,8 +246,8 @@ function handleBack(): void {
   if (flow.currentStep.value === 'set-password') {
     flow.currentStep.value = 'pick-member';
     flow.selectedMember.value = null;
-    password.value = '';
-    confirmPassword.value = '';
+    pin.value = '';
+    confirmPin.value = '';
     flow.clearError();
   } else if (flow.currentStep.value === 'pick-member') {
     flow.currentStep.value = 'awaiting-auth';
@@ -594,7 +616,7 @@ onMounted(() => {
         </p>
       </div>
 
-      <form @submit.prevent="handleCreatePassword">
+      <form @submit.prevent="handleCreatePin">
         <!-- Selected member card -->
         <div class="mb-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-4 dark:bg-slate-700/50">
           <BeanieAvatar
@@ -627,32 +649,31 @@ onMounted(() => {
           </button>
         </div>
 
-        <BaseInput
-          v-model="password"
-          :label="t('auth.createPassword')"
-          type="password"
-          :placeholder="t('auth.createPasswordPlaceholder')"
-          required
-        />
-        <div class="mt-3">
-          <BaseInput
-            v-model="confirmPassword"
-            :label="t('auth.confirmPassword')"
-            type="password"
-            :placeholder="t('auth.confirmPasswordPlaceholder')"
-            required
-          />
+        <div>
+          <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('join.choosePinLabel') }}
+          </p>
+          <PinInput v-model="pin" :label="t('join.choosePinLabel')" autofocus />
         </div>
+        <div class="mt-3">
+          <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('pin.confirmPin') }}
+          </p>
+          <PinInput v-model="confirmPin" :label="t('pin.confirmPin')" />
+        </div>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('join.pinHint') }}
+        </p>
 
-        <p v-if="passwordError" class="mt-2 text-xs text-red-600 dark:text-red-400">
-          {{ passwordError }}
+        <p v-if="pinError" class="mt-2 text-xs text-red-600 dark:text-red-400">
+          {{ pinError }}
         </p>
 
         <BaseButton
           type="submit"
           class="mt-4 w-full"
           :loading="flow.currentStep.value === 'joining'"
-          :disabled="!!passwordError || !password || !confirmPassword"
+          :disabled="!!pinError || pin.length !== PIN_LENGTH || confirmPin.length !== PIN_LENGTH"
         >
           {{
             flow.currentStep.value === 'joining' ? t('join.completing') : t('auth.createAndSignIn')

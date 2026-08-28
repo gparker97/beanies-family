@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **New families are created with a PIN and a Recovery Kit — no password at all.** The setup wizard now asks for a 6-digit PIN, then shows the family's one-page Recovery Kit (save the PDF or scan the QR later to get back in) before adding members. The kit is the master key; the PIN is the everyday way in.
+- **Joining a family now sets your PIN** instead of a password — the same short code then signs you in on any of your family's devices.
+- **Link a Device** (Settings → Security & Recovery) — show a QR code (or send a link, valid 15 minutes) to a new phone or computer, then sign in there with your PIN. No password, no re-invite.
+- **Set-up reminders after sign-in** — members who still use a password are offered a PIN once per sign-in, and families without a saved Recovery Kit are reminded to create one.
+- **Parents can reset a family member's PIN** from their bean page — handy when a young bean forgets theirs.
+
 - **Sign in with a 6-digit PIN.** Set yours in Settings → Security: it works on any device where your family is set up, unlocks your family data with one short code, and turns itself off on a device after five wrong tries.
 - **Recovery Kit** — a one-page backup key (printable PDF with a QR code) that opens your family data if every password and PIN is ever forgotten. Create it in Settings → Recovery & Backup, and keep it somewhere safe.
 - **Recovery passphrase** — an optional memorable phrase that unlocks your family data on any device: sign in to Google, type the phrase, done.
@@ -19,6 +25,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Browser passkeys are retired.** They failed more often than they worked; your PIN replaces them everywhere in the browser. Face ID and fingerprint unlock continue unchanged in the iOS/Android apps.
+- **The trusted-device key is no longer stored in plain form** — it is now wrapped under a per-device secret, so device storage alone can't reveal it.
 - **Signing out no longer disconnects Google — anywhere.** Sign out and sign back in without re-consenting, and signing out on one device no longer breaks your family's other devices. The one deliberate exception is the new Settings action "Disconnect Google Everywhere", for emergencies.
 
 - **Signing in is one unified flow now: pick your bean, then prove it's you.** The person picker appears before your family data is even decrypted (a device remembers your family's names once it has opened the pod), and the same screen offers whichever ways in you actually have — Face ID/fingerprint first where it's set up, one tap for beans without a password, and the password as the always-available fallback. Three different sign-in screens with three different opinions became one.

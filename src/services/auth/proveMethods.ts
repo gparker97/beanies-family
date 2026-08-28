@@ -14,17 +14,17 @@
  * screen), and the bootstrap/recovery terminal is appended unconditionally after the
  * loop. Phase 4 retirement of a legacy mechanism = deleting one probe from the array.
  *
- * Phase 1 probes: device biometric (native keystore, or web passkey until Phase 4),
- * tap-through (passwordless member on an open pod), and password (the legacy prove +
- * cold-bootstrap terminal). Phase 2 inserts the deviceUnlock PIN probe between
- * biometric and tap-through.
+ * Phase 4 probes: device biometric (native keystore ONLY — the web WebAuthn+PRF
+ * path is retired; a lingering web registration surfaces as `prf_withheld` on the
+ * resolved event, never as a method), deviceUnlock PIN, tap-through (credential-less
+ * member on an open pod), and password (LEGACY members only — suppressed for
+ * PIN-only members and for kit-born families cold, where no password wrap exists).
+ * The unconditional terminal is now `recovery` (kit / passphrase / bootstrap), so
+ * the never-blank guarantee no longer rests on the retiring password method.
  */
 
 import type { PasskeyRegistration } from '@/types/models';
-import {
-  resolveDeviceKeys,
-  isPlatformAuthenticatorAvailable,
-} from '@/services/auth/passkeyService';
+import { resolveDeviceKeys } from '@/services/auth/passkeyService';
 import { getPinUnlockRecord, removePinUnlock } from '@/services/auth/deviceUnlock';
 import { isNative } from '@/services/sync/capabilities';
 import { emitProveMethodsResolved } from '@/services/telemetry/loginFlowEvents';
@@ -47,12 +47,24 @@ export interface ProveContext {
    * open — `null` when cold, where the device-wrap record alone decides the PIN offer.
    */
   hasPin: boolean | null;
+  /**
+   * Phase 4: whether the member has a doc-side passwordHash (from the roster cache
+   * when cold, the open doc when warm). `null` = unknown → password stays offered
+   * (the safe legacy default).
+   */
+  hasPassword: boolean | null;
+  /**
+   * Phase 4: whether the envelope holds ANY password wraps (roster-carried; false
+   * for kit-born families). Consulted only COLD — a password can never open a
+   * wrap-less envelope. `null` = unknown → offered.
+   */
+  envelopeHasPasswordWraps: boolean | null;
   /** Where the person list came from — carried through to telemetry only. */
   rosterSource: 'roster' | 'credential-records' | 'open-pod';
 }
 
 export type ProveMethod =
-  /** OS biometric (native keystore) or web passkey — the member's key on THIS device. */
+  /** OS biometric (native keystore) — the member's key on THIS device. Native only. */
   | { kind: 'biometric'; registration: PasskeyRegistration }
   /**
    * Member PIN (Phase 2). `hasDeviceWrap` true = this device holds a PIN wrap, so the
@@ -60,10 +72,21 @@ export type ProveMethod =
    * verify against the doc hash, then silently enrol this device's wrap).
    */
   | { kind: 'pin'; hasDeviceWrap: boolean }
-  /** Passwordless member on an already-open pod — one tap, no ceremony. */
+  /** Credential-less member on an already-open pod — one tap, no ceremony. */
   | { kind: 'tap-through' }
-  /** Legacy prove + cold-device bootstrap terminal. Always present until Phase 4. */
-  | { kind: 'password' };
+  /**
+   * LEGACY members' password prove. A conditional probe since Phase 4: suppressed
+   * where a PIN is verifiably usable instead (warm + hasPin), and cold for
+   * kit-born families (no password wrap exists). Full retirement (#117) = delete
+   * the probe from the array.
+   */
+  | { kind: 'password' }
+  /**
+   * The unconditional bootstrap/recovery terminal (Phase 4): recovery kit,
+   * passphrase, device link, or re-bootstrap. Appended outside the probe loop —
+   * the never-blank guarantee.
+   */
+  | { kind: 'recovery' };
 
 type Probe = {
   name: string;
@@ -78,14 +101,13 @@ const PROBES: Probe[] = [
   {
     name: 'device-biometric',
     run: async (ctx) => {
+      // Phase 4: NATIVE keystore only — the web WebAuthn+PRF path is retired. A
+      // leftover web registration is reported by the resolver as `prf_withheld`
+      // (the straggler signal), never offered as a method.
+      if (!isNative()) return null;
       const keys = await resolveDeviceKeys(ctx.familyId);
       const own = keys.find((k) => k.memberId === ctx.memberId);
       if (!own) return null;
-      // Review F15: on web, a registration record alone doesn't mean the button can
-      // work — the platform authenticator can be gone (Windows Hello removed). Native
-      // keystore doesn't use WebAuthn, so the probe only gates the web branch — the
-      // guard the deleted LoadPodView.checkBiometricForFamily used to enforce.
-      if (!isNative() && !(await isPlatformAuthenticatorAvailable())) return null;
       return { kind: 'biometric', registration: own };
     },
   },
@@ -114,18 +136,45 @@ const PROBES: Probe[] = [
     run: async (ctx) =>
       ctx.podOpen && ctx.hasCredential === false ? { kind: 'tap-through' } : null,
   },
+  {
+    name: 'password',
+    // LEGACY members only (Phase 4). Suppressed when: the member verifiably has no
+    // password; a PIN is verifiably usable instead (warm — `setMemberPin` never
+    // clears passwordHash, but cold the password wrap is a converted member's only
+    // local bootstrap, so cold suppression keys on the ENVELOPE, not the PIN); or
+    // cold against a kit-born envelope, where no password wrap exists to unwrap.
+    run: async (ctx) => {
+      if (ctx.hasPassword === false) return null;
+      if (ctx.podOpen && ctx.hasPin === true) return null;
+      if (!ctx.podOpen && ctx.envelopeHasPasswordWraps === false) return null;
+      return { kind: 'password' };
+    },
+  },
 ];
 
 /**
  * Resolve the ordered prove methods for one member on this device.
  *
- * Never throws; never returns []. The password terminal is appended outside the probe
- * loop so no probe failure — or all of them failing at once — can strand the user on a
- * blank prove screen.
+ * Never throws; never returns []. The `recovery` terminal is appended outside the
+ * probe loop so no probe failure — or all of them failing at once — can strand the
+ * user on a blank prove screen.
  */
 export async function resolveProveMethods(ctx: ProveContext): Promise<ProveMethod[]> {
   const methods: ProveMethod[] = [];
   let firstErrorCode: string | undefined;
+
+  // Straggler signal for the PRF retirement: a web passkey registration exists for
+  // this member but the method is withheld (assertion path deleted). Computed HERE,
+  // not inside a probe — probes stay free of telemetry per the module contract.
+  let prfWithheld = false;
+  if (!isNative()) {
+    try {
+      const keys = await resolveDeviceKeys(ctx.familyId);
+      prfWithheld = keys.some((k) => k.memberId === ctx.memberId);
+    } catch {
+      // Signal-only — never degrade the screen for it.
+    }
+  }
 
   for (const probe of PROBES) {
     try {
@@ -144,14 +193,15 @@ export async function resolveProveMethods(ctx: ProveContext): Promise<ProveMetho
     }
   }
 
-  // The unconditional bootstrap/recovery terminal (Phase 1: password; the create-password
-  // path handles members who have none yet). Appended OUTSIDE the loop by design.
-  methods.push({ kind: 'password' });
+  // The unconditional bootstrap/recovery terminal. Appended OUTSIDE the loop by
+  // design — the never-blank guarantee no longer rests on the retiring password.
+  methods.push({ kind: 'recovery' });
 
   emitProveMethodsResolved({
     methods: methods.map((m) => m.kind),
     rosterSource: ctx.rosterSource,
     errorCode: firstErrorCode,
+    prfWithheld,
   });
 
   return methods;

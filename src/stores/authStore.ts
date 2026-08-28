@@ -9,7 +9,7 @@ import {
   WRONG_FAMILY_CREDENTIAL,
   type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
-import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
+import type { FamilyMember, PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
@@ -29,6 +29,13 @@ import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { emitSignoutTier } from '@/services/telemetry/loginFlowEvents';
+import {
+  runSignOutSteps,
+  SIGN_OUT_TRUSTED_STEPS,
+  SIGN_OUT_UNTRUSTED_STEPS,
+  SIGN_OUT_CLEAR_STEPS,
+  type SignOutStepImpls,
+} from '@/services/auth/signOutSteps';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from './translationStore';
@@ -52,15 +59,19 @@ import { track } from '@/services/analytics/plausible';
  * an owner when `owners.length === 0`, and our owner keeps `role: 'owner'`.
  *
  * ⚠️ THREE LOCKSTEP INVARIANTS — keep all three in sync or a pod can ship with
- * an owner who can never authenticate (empty hash → `signIn` rejects it → the
- * encrypted pod is unrecoverable):
+ * an owner who can never authenticate. Phase 4 (login rethink): the deferred
+ * credential is now the owner's PIN — the owner NEVER gets a passwordHash (it
+ * stays this sentinel permanently; `requiresPassword` derives from
+ * "no passwordHash AND no pinHash", so a PIN-only owner reads as claimed):
  *   1. `signUp({ deferPassword: true })` builds the owner with this sentinel
- *      and does NO hashing/key derivation.
- *   2. `rehydrateOwnerDoc` MUST NOT early-return when the owner still holds
- *      this sentinel — it applies the real hash (in place on desktop, via a
- *      rebuild on iOS). Early-returning only on a REAL hash is the guard.
+ *      and NO pinHash, and does no hashing/key derivation.
+ *   2. `rehydrateOwnerDoc` MUST NOT early-return while the owner has no
+ *      `pinHash` — it applies the real PIN hash (in place on desktop, via a
+ *      rebuild on iOS). Early-returning only on a REAL pinHash is the guard.
  *   3. `syncStore.createNewFile`'s fail-closed precondition refuses to write a
- *      pod whose resolved owner still carries this sentinel.
+ *      pod whose resolved owner has no `pinHash` (the envelope's only wrap at
+ *      creation is the recovery kit's — the PIN is the owner's identity +
+ *      device-unlock credential, never an envelope wrap).
  *
  * FUTURE: the cleaner design is to not create the owner member at all until the
  * password is known — pre-generate `memberId` in `signUp`, create the owner via
@@ -744,7 +755,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function buildOwnerDoc(
-    owner: { name: string; email: string; passwordHash: string },
+    owner: {
+      name: string;
+      email: string;
+      passwordHash: string;
+      pinHash?: string;
+      pinVersion?: number;
+    },
     id?: string
   ) {
     // Tear down any previous family's in-memory state, then start a fresh doc.
@@ -759,6 +776,7 @@ export const useAuthStore = defineStore('auth', () => {
       role: 'owner' as const,
       color: '#3b82f6',
       passwordHash: owner.passwordHash,
+      ...(owner.pinHash ? { pinHash: owner.pinHash, pinVersion: owner.pinVersion ?? 1 } : {}),
       requiresPassword: false,
     };
     const member = id
@@ -777,10 +795,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Apply the real password to the owner on the create-finish surface (and
-   * rebuild the owner after a full-page redirect destroyed the in-memory doc).
-   * Re-uses the persisted session for the immutable bits (memberId/email) and
-   * the caller-supplied name + password for the rest. Requires an active session.
+   * Apply the owner's real credential — Phase 4: their 6-digit PIN — on the
+   * create-finish surface (and rebuild the owner after a full-page redirect
+   * destroyed the in-memory doc). The owner's `passwordHash` stays the deferred
+   * sentinel PERMANENTLY (kit-born families are password-free); the PIN hash +
+   * `pinVersion: 1` are what get applied. Re-uses the persisted session for the
+   * immutable bits (memberId/email) and the caller-supplied name + PIN for the
+   * rest. Requires an active session.
    *
    * Two paths:
    * - **Owner still in the doc** (desktop deferred-password hand-off — no reload
@@ -794,36 +815,46 @@ export const useAuthStore = defineStore('auth', () => {
    * - **Owner gone** (iOS Drive redirect reloaded the app → in-memory doc wiped):
    *   rebuild it from the persisted session via `buildOwnerDoc`.
    *
-   * No-op short-circuit when the owner already holds a REAL hash (a genuine
-   * recovery re-entry on the same session) — never when it still carries the
-   * `DEFERRED_PASSWORD_HASH` sentinel, or the fail-closed `createNewFile` guard
-   * would block the create.
+   * No-op short-circuit when the owner already holds a REAL `pinHash` (a genuine
+   * recovery re-entry on the same session) — never while they have none, or the
+   * fail-closed `createNewFile` guard would block the create.
    */
   async function rehydrateOwnerDoc(
     name: string,
-    password: string
+    pin: string
   ): Promise<{ success: boolean; error?: string }> {
     if (!currentUser.value) return { success: false, error: 'No active session to resume' };
     const familyStore = useFamilyStore();
     const existingOwner = familyStore.owner;
-    if (existingOwner && existingOwner.passwordHash !== DEFERRED_PASSWORD_HASH) {
+    if (existingOwner?.pinHash) {
       return { success: true };
     }
     try {
-      const passwordHashValue = await hashPassword(password);
+      const { isValidPin } = await import('@/services/auth/deviceUnlock');
+      if (!isValidPin(pin)) {
+        return { success: false, error: useTranslationStore().t('pin.invalidFormat') };
+      }
+      const pinHashValue = await hashPassword(pin);
       if (existingOwner) {
-        // Desktop: owner present with the deferred sentinel — set the hash (and
+        // Desktop: owner present with no credential yet — set the PIN hash (and
         // any edited name) in place, preserving the rest of the step-1 doc.
         const updated = await familyStore.updateMember(existingOwner.id, {
           name,
-          passwordHash: passwordHashValue,
+          pinHash: pinHashValue,
+          pinVersion: 1,
         });
-        if (!updated) return { success: false, error: 'Failed to set owner password' };
+        if (!updated) return { success: false, error: 'Failed to set owner PIN' };
         return { success: true };
       }
       // iOS: the redirect reloaded the app — rebuild the owner from scratch.
       const member = await buildOwnerDoc(
-        { name, email: currentUser.value.email, passwordHash: passwordHashValue },
+        {
+          name,
+          email: currentUser.value.email,
+          passwordHash: DEFERRED_PASSWORD_HASH,
+          pinHash: pinHashValue,
+          pinVersion: 1,
+        },
         currentUser.value.memberId
       );
       if (!member) return { success: false, error: 'Failed to rebuild owner member' };
@@ -846,8 +877,8 @@ export const useAuthStore = defineStore('auth', () => {
    *   before.
    *
    * Either way nothing here derives a key or writes the `.beanpod` — that's
-   * `syncStore.createNewFile`, which always receives the real plaintext
-   * password on the finish surface.
+   * `syncStore.createNewFile` on the finish surface (Phase 4: it generates the
+   * recovery kit internally as the envelope's only wrap; no password anywhere).
    */
   async function signUp(
     params: {
@@ -933,7 +964,7 @@ export const useAuthStore = defineStore('auth', () => {
       podCreated.value = false;
       persistPodCreated(false);
       track('signup');
-      track('login', { props: { method: 'password' } });
+      track('login', { props: { method: 'pin' } });
 
       return { success: true };
     } catch (e) {
@@ -1031,30 +1062,32 @@ export const useAuthStore = defineStore('auth', () => {
    * the pod. Resetting another member's password is strictly less
    * destructive than the delete-member capability they already have.
    */
+  /**
+   * The SINGLE admin-reset authorization gate, shared by the password (legacy) and
+   * PIN reset paths. Returns the refusal reason or null when allowed.
+   * `BeanAccountPanel.vue` mirrors these conditions for its UI gating — keep them
+   * in step with THIS helper.
+   */
+  function assertCanResetMember(targetMemberId: string): ResetError | null {
+    if (!isAuthenticated.value || !currentUser.value) return 'notAuthenticated';
+    if (targetMemberId === currentUser.value.memberId) return 'cannotResetSelf';
+    const familyStore = useFamilyStore();
+    const target = familyStore.members.find((m) => m.id === targetMemberId);
+    if (!target) return 'memberNotFound';
+    if (target.isPet) return 'isPet';
+    if (target.role === 'owner') return 'cannotResetOwner';
+    const me = familyStore.members.find((m) => m.id === currentUser.value!.memberId);
+    if (!me?.canManagePod) return 'notAuthorized';
+    return null;
+  }
+
   async function resetMemberPassword(
     targetMemberId: string,
     newPassword: string
   ): Promise<{ success: true } | { success: false; error: ResetError }> {
-    if (!isAuthenticated.value || !currentUser.value) {
-      return { success: false, error: 'notAuthenticated' };
-    }
-    if (targetMemberId === currentUser.value.memberId) {
-      return { success: false, error: 'cannotResetSelf' };
-    }
-    const familyStore = useFamilyStore();
-    const target = familyStore.members.find((m) => m.id === targetMemberId);
-    if (!target) {
-      return { success: false, error: 'memberNotFound' };
-    }
-    if (target.isPet) {
-      return { success: false, error: 'isPet' };
-    }
-    if (target.role === 'owner') {
-      return { success: false, error: 'cannotResetOwner' };
-    }
-    const me = familyStore.members.find((m) => m.id === currentUser.value!.memberId);
-    if (!me?.canManagePod) {
-      return { success: false, error: 'notAuthorized' };
+    const refused = assertCanResetMember(targetMemberId);
+    if (refused) {
+      return { success: false, error: refused };
     }
 
     const result = await rotateMemberPassword(targetMemberId, newPassword, 'reset-member-password');
@@ -1075,9 +1108,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const passwordHashValue = await hashPassword(password);
       const familyStore = useFamilyStore();
+      // `requiresPassword` is DERIVED from credential presence on every read
+      // (familyMemberRepository.applyDefaults) — never written here.
       await familyStore.updateMember(memberId, {
         passwordHash: passwordHashValue,
-        requiresPassword: false,
       });
 
       const familyContextStore = useFamilyContextStore();
@@ -1192,39 +1226,105 @@ export const useAuthStore = defineStore('auth', () => {
    * protect nothing and would strand the family the kit exists to rescue. Callers MUST
    * only reach this from the recovery-mode prove screen.
    */
+  /**
+   * The ONE no-current-check "set this member's PIN" mutation body (validate →
+   * hash → doc write → this device's unlock wrap). Shared by the recovery reset
+   * (break-glass) and the admin reset (parents for kids) so there is exactly one
+   * implementation. Authorization is the CALLER's job.
+   */
+  async function applyPinReset(
+    memberId: string,
+    newPin: string
+  ): Promise<
+    | { success: true; member: FamilyMember; pinVersion: number; familyId: string | null }
+    | { success: false; error: string }
+  > {
+    const translationStore = useTranslationStore();
+    const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
+    if (!isValidPin(newPin)) {
+      return { success: false, error: translationStore.t('pin.invalidFormat') };
+    }
+    const familyStore = useFamilyStore();
+    const member = familyStore.members.find((m) => m.id === memberId);
+    if (!member) {
+      return { success: false, error: translationStore.t('auth.memberNotFound') };
+    }
+
+    const pinHash = await hashPassword(newPin);
+    const pinVersion = (member.pinVersion ?? 0) + 1;
+    await familyStore.updateMember(memberId, { pinHash, pinVersion });
+
+    const { useSyncStore } = await import('./syncStore');
+    const syncStore = useSyncStore();
+    const familyContextStore = useFamilyContextStore();
+    const familyId = familyContextStore.activeFamilyId;
+    if (syncStore.familyKey && familyId) {
+      await enrollPinUnlock({
+        familyId,
+        member: { id: member.id, name: member.name, pinVersion },
+        pin: newPin,
+        familyKey: syncStore.familyKey,
+        keyId: syncStore.envelope?.keyId ?? '',
+      });
+    }
+    return { success: true, member, pinVersion, familyId };
+  }
+
+  /**
+   * Admin PIN reset (Phase 4 — replaces the admin password reset for PIN members):
+   * an authenticated pod manager sets a member's NEW PIN with no current-PIN check.
+   * Same trust model as the password reset it succeeds: the admin already holds the
+   * family key. Gate + mutation are both shared single implementations
+   * (`assertCanResetMember` + `applyPinReset`) — no third copy of either.
+   */
+  async function adminResetMemberPin(
+    targetMemberId: string,
+    newPin: string
+  ): Promise<{ success: true } | { success: false; error: ResetError | string }> {
+    const refused = assertCanResetMember(targetMemberId);
+    if (refused) {
+      return { success: false, error: refused };
+    }
+    try {
+      const result = await applyPinReset(targetMemberId, newPin);
+      if (!result.success) return result;
+      const { useSyncStore } = await import('./syncStore');
+      await useSyncStore().syncNowBounded();
+      track('admin_password_reset');
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'admin_pin_reset',
+        context: { action: 'admin_reset', member_id_tail: targetMemberId.slice(-8) },
+      });
+      return { success: true };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'admin PIN reset failed',
+        error: e,
+        severity: 'warning',
+        context: { action: 'admin_reset_failed' },
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : useTranslationStore().t('auth.signInFailed'),
+      };
+    }
+  }
+
   async function resetMemberPinViaRecovery(
     memberId: string,
     newPin: string
   ): Promise<{ success: boolean; error?: string }> {
     const translationStore = useTranslationStore();
     try {
-      const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
-      if (!isValidPin(newPin)) {
-        return { success: false, error: translationStore.t('pin.invalidFormat') };
-      }
+      const result = await applyPinReset(memberId, newPin);
+      if (!result.success) return result;
+      const { member, familyId } = result;
       const familyStore = useFamilyStore();
-      const member = familyStore.members.find((m) => m.id === memberId);
-      if (!member) {
-        return { success: false, error: translationStore.t('auth.memberNotFound') };
-      }
-
-      const pinHash = await hashPassword(newPin);
-      const pinVersion = (member.pinVersion ?? 0) + 1;
-      await familyStore.updateMember(memberId, { pinHash, pinVersion });
-
       const { useSyncStore } = await import('./syncStore');
       const syncStore = useSyncStore();
-      const familyContextStore = useFamilyContextStore();
-      const familyId = familyContextStore.activeFamilyId;
-      if (syncStore.familyKey && familyId) {
-        await enrollPinUnlock({
-          familyId,
-          member: { id: member.id, name: member.name, pinVersion },
-          pin: newPin,
-          familyKey: syncStore.familyKey,
-          keyId: syncStore.envelope?.keyId ?? '',
-        });
-      }
 
       // Session tail — mirrors signIn.
       const user: AuthUser = {
@@ -1437,20 +1537,73 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Join an existing family as a pre-created member.
-   * Sets the member's password, creates a UserFamilyMapping, and marks onboarding complete.
+   *
+   * Phase 4 (login rethink): the claim credential is the member's 6-digit PIN —
+   * doc-side hash + this device's unlock wrap. NO envelope wrap is created (the
+   * old `wrapFamilyKeyForMember` password wrap is retired; cross-device access
+   * thereafter = PIN on an opened device, a device link, the kit, or the
+   * passphrase). Creates a UserFamilyMapping and marks onboarding complete.
    */
   async function joinFamily(params: {
     memberId: string;
-    password: string;
+    pin: string;
     familyId: string;
   }): Promise<{ success: boolean; error?: string }> {
     isLoading.value = true;
     error.value = null;
 
     try {
-      // Set password (this also auto-signs in and sets currentMember)
-      const result = await setPassword(params.memberId, params.password);
-      if (!result.success) return result;
+      const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
+      if (!isValidPin(params.pin)) {
+        return { success: false, error: useTranslationStore().t('pin.invalidFormat') };
+      }
+      const familyStoreForPin = useFamilyStore();
+      const joiningMember = familyStoreForPin.members.find((m) => m.id === params.memberId);
+      if (!joiningMember) {
+        return { success: false, error: useTranslationStore().t('auth.memberNotFound') };
+      }
+      const pinHash = await hashPassword(params.pin);
+      const pinVersion = (joiningMember.pinVersion ?? 0) + 1;
+      await familyStoreForPin.updateMember(params.memberId, { pinHash, pinVersion });
+
+      // Sign the member in (same session shape `setPassword` used to mint).
+      const familyContextStoreForPin = useFamilyContextStore();
+      const user: AuthUser = {
+        memberId: params.memberId,
+        email: joiningMember.email ?? '',
+        familyId: familyContextStoreForPin.activeFamilyId ?? params.familyId,
+        role: joiningMember.role,
+      };
+      currentUser.value = user;
+      isAuthenticated.value = true;
+      freshSignIn.value = true;
+      persistSession(user);
+      familyStoreForPin.setCurrentMember(params.memberId);
+
+      // Device unlock wrap — the pod is open at claim time (the invite/file was
+      // just decrypted), so the joiner's PIN unlocks this device from now on.
+      // A wrap failure is non-fatal (the doc-side hash IS set): report + continue.
+      {
+        const { useSyncStore } = await import('./syncStore');
+        const syncStoreForPin = useSyncStore();
+        if (syncStoreForPin.familyKey) {
+          const enrolled = await enrollPinUnlock({
+            familyId: params.familyId,
+            member: { id: params.memberId, name: joiningMember.name, pinVersion },
+            pin: params.pin,
+            familyKey: syncStoreForPin.familyKey,
+            keyId: syncStoreForPin.envelope?.keyId ?? '',
+          });
+          if (!enrolled.success) {
+            reportError({
+              surface: 'login-flow',
+              message: 'join claim set PIN but device-unlock enrolment failed',
+              severity: 'warning',
+              context: { action: 'enroll_after_join_failed' },
+            });
+          }
+        }
+      }
 
       // Create UserFamilyMapping in registry DB
       const familyStore = useFamilyStore();
@@ -1473,7 +1626,7 @@ export const useAuthStore = defineStore('auth', () => {
       const settingsStore = useSettingsStore();
       await settingsStore.setOnboardingCompleted(true);
       track('member_joined');
-      track('login', { props: { method: 'password' } });
+      track('login', { props: { method: 'pin' } });
 
       return { success: true };
     } catch (e) {
@@ -1674,10 +1827,7 @@ export const useAuthStore = defineStore('auth', () => {
       trusted: settingsStore.isTrustedDevice,
       tokensKept: true,
     });
-    currentUser.value = null;
-    isAuthenticated.value = false;
-    newsletterOptIn.value = null;
-    clearSession();
+    finalizeSession();
   }
 
   /**
@@ -1735,151 +1885,136 @@ export const useAuthStore = defineStore('auth', () => {
     clearLastGoogleAccount();
   }
 
-  async function signOut(): Promise<void> {
-    // Force a durable save of the latest doc BEFORE the cache is torn down, so
-    // the freshest edit (which may live only in the worker cache) reaches Drive.
-    // Bounded timeout — Drive can hang indefinitely if its API key is rejected,
-    // the file was deleted, or the network is offline. Don't let that block sign-out.
-    // Deliberate teardown: in-flight doc ops failing against the reset worker are the
-    // expected consequence of leaving, not edits in doubt — keep them off the toast
-    // layer for the teardown window (they still reach the firehose).
-    docClient.beginQuietTeardown();
-    await forceSaveWithTimeout(3000);
-
-    await cancelRemindersForSignOut();
-
-    // Wipe Google session state (in-memory tokens, refresh tokens in
-    // IndexedDB+localStorage, folder cache). Without this, signing in
-    // with a different Google account on the next session can silently
-    // re-use the previous account's refresh token via a silent token
-    // refresh, leaving the app stuck on the wrong Drive.
-    //
-    // On a TRUSTED device we preserve the active family's refresh token so the
-    // same user's next sign-in reconnects to Drive silently instead of seeing a
-    // reconnect prompt. This mirrors the IndexedDB cache below, which is also
-    // kept on trusted devices — "this is my personal device, keep my session".
-    // The pending-family slot is still cleared and the grant is not revoked, so
-    // a *different* account signing in on a shared (untrusted) device still gets
-    // the full teardown.
-    const settingsStore = useSettingsStore();
-    const trusted = settingsStore.isTrustedDevice;
-    // Capture the departing account BEFORE clearGoogleSessionState nulls the
-    // cached email — only needed on a full (untrusted) teardown (#62).
-    const departedEmail = trusted ? null : getGoogleAccountEmail();
-    // Phase 5 (2026-08-28 rethink): NO sign-out revokes the grant at Google any more
-    // (whole-grant revoke kills every device on the account). Trusted devices keep
-    // their local tokens too (silent reconnect, no Google screen); untrusted devices
-    // clear the LOCAL tokens — a refresh token is a bearer secret with drive.file
-    // WRITE scope on a shared machine, and keeping it would break the wrong-account
-    // teardown invariant above.
-    await clearGoogleSessionStateWithTimeout(3000, { clearLocalTokens: !trusted });
-
-    // Reset per-session sync state — banner flags, polling timer, encrypted
-    // pending file, family key, file metadata. Without this, transient UI
-    // state (e.g. `showGoogleReconnect = true` set by an earlier blip) bleeds
-    // into the next session and the user sees a phantom "session expired"
-    // toast immediately after a successful re-login.
-    try {
-      const { useSyncStore } = await import('./syncStore');
-      useSyncStore().resetState();
-    } catch (e) {
-      console.warn('[authStore] syncStore.resetState failed during sign-out', e);
-    }
-
-    // Full (untrusted) teardown only: clear the departed account's .beanpod mirror
-    // + last-account breadcrumb while the doc is still resident (before reset).
-    // A trusted same-account sign-out keeps both (preservation). (#62)
-    if (!trusted) {
-      await clearDepartedGoogleArtifacts(departedEmail);
-    }
-
-    // Cross-family safety: drop the in-memory worker doc + family key + projection
-    // on EVERY sign-out, INDEPENDENT of the trusted-device cache-retention gate
-    // below. `docClient.reset()` keeps the cache DB (so a trusted device still gets
-    // fast silent re-login), but without it a trusted-device sign-out leaves the
-    // previous family's doc resident in the worker — and the next sign-in to a
-    // family whose cache missed would CRDT-merge its remote into that stale doc,
-    // producing an A∪B doc that gets persisted + uploaded to the new family's file
-    // (durable cross-family corruption; see `replaceDocWithCacheRecovery`). On an
-    // untrusted device `deleteFamilyDatabase` → `clearCache` resets again (idempotent).
-    try {
-      await docClient.reset();
-    } catch (e) {
-      console.warn('[authStore] docClient.reset failed during sign-out', e);
-    }
-
-    // Fallback chain (review F14): a legacy session may lack familyId, and skipping the
-    // teardown on a shared machine would leave the family DB, cached key, PIN wraps and
-    // roster in place — the security-critical clears must never be gated on an optional.
-    const familyId =
-      currentUser.value?.familyId ??
-      useFamilyContextStore().activeFamilyId ??
-      getActiveFamilyIdFromDb() ??
-      undefined;
-
-    // Delete the per-family IndexedDB cache unless this is a trusted device
-    if (familyId && !trusted) {
-      try {
-        await deleteFamilyDatabase(familyId);
-      } catch (e) {
-        console.warn('Failed to delete family database on sign-out:', e);
-      }
-      // ...and the cached FAMILY KEY with it. Deleting the encrypted cache while
-      // leaving the key that decrypts it behind is the wrong half: the key is stored
-      // unencrypted in the registry DB, so on a shared device it let the next person
-      // auto-decrypt the pod (`tryAutoDecrypt`) without proving anything at all.
-      // Trusted devices keep it — that is exactly what "this is my own device" buys.
-      try {
-        await settingsStore.clearCachedFamilyKey(familyId);
-      } catch (e) {
-        reportError({
-          surface: 'auth-signout',
-          message: 'failed to clear the cached family key on an untrusted sign-out',
-          error: e,
-          severity: 'warning',
-          context: { action: 'clear_cached_key' },
-        });
-      }
-      // ...and this family's PIN device-unlock wraps — they ARE family-key material
-      // (wrapped, but the shared device holds the secret half). Same rule as the cached
-      // key: trusted keeps, untrusted clears.
-      try {
-        const { removePinUnlocksForFamily } = await import('@/services/auth/deviceUnlock');
-        await removePinUnlocksForFamily(familyId);
-      } catch (e) {
-        console.warn('Failed to clear PIN unlocks on sign-out:', e);
-      }
-      // ...and the pre-decrypt roster cache. It is display data, not key material, but
-      // on a shared device it names the family's members to whoever opens the app next —
-      // same trust class as the cached key, so it follows the same rule: trusted keeps,
-      // untrusted clears. Best-effort (a stale roster is harmless; the picker re-caches
-      // on the next successful open).
-      try {
-        const { deleteRosterCache } =
-          await import('@/services/indexeddb/repositories/rosterCacheRepository');
-        await deleteRosterCache(familyId);
-      } catch (e) {
-        console.warn('Failed to clear roster cache on sign-out:', e);
-      }
-    }
-
-    // Phase 5: the trust prompt is re-offerable. An untrusted sign-out re-arms it so
-    // the NEXT sign-in gets the offer again — the one-shot flag made an early dismissal
-    // permanent, which is how devices ended up untrusted (and re-authing) forever.
-    if (!trusted) {
-      try {
-        await settingsStore.resetTrustedDevicePrompt();
-      } catch (e) {
-        console.warn('Failed to re-arm the trust prompt on sign-out:', e);
-      }
-    }
-    emitSignoutTier({ tier: 'sign-out', trusted, tokensKept: trusted });
-
-    // Clear auth state
+  /**
+   * Shared session-clear tail (all three tiers + switchMember).
+   */
+  function finalizeSession(): void {
     currentUser.value = null;
     isAuthenticated.value = false;
     newsletterOptIn.value = null;
     clearSession();
+  }
+
+  /**
+   * Step IMPLEMENTATIONS for the sign-out tiers (Phase 4: the ORDER lives as data in
+   * `signOutSteps.ts`; the store owns the bodies because it holds the session refs and
+   * bounded-timeout helpers). `ctx` is mutated by the capture/resolve steps so later
+   * steps read what earlier ones established — the runner guarantees order.
+   *
+   * Rationale for the individual steps (force-save semantics, wrong-account teardown
+   * invariant, F14 fallback chain, cross-family worker-doc reset, trusted-keeps rules)
+   * is documented on the helpers they call and in `signOutSteps.ts`'s header.
+   */
+  function buildSignOutStepImpls(ctx: {
+    departedEmail: string | null;
+    familyId: string | undefined;
+  }): SignOutStepImpls {
+    const settingsStore = useSettingsStore();
+    return {
+      quietTeardownAndForceSave: async () => {
+        // Deliberate teardown: in-flight doc ops failing against the reset worker are
+        // the expected consequence of leaving — keep them off the toast layer.
+        docClient.beginQuietTeardown();
+        await forceSaveWithTimeout(3000);
+      },
+      cancelReminders: () => cancelRemindersForSignOut(),
+      captureDepartingAccount: () => {
+        // MUST run before the Google clear nulls the cached email (#62).
+        ctx.departedEmail = getGoogleAccountEmail();
+      },
+      clearGoogleSessionKeepTokens: () =>
+        clearGoogleSessionStateWithTimeout(3000, { clearLocalTokens: false }),
+      clearGoogleSessionDropTokens: () =>
+        clearGoogleSessionStateWithTimeout(3000, { clearLocalTokens: true }),
+      clearAllRefreshTokens: async () => {
+        // Clean-device promise, multi-family: every OTHER family's drive.file refresh
+        // token is a live bearer secret for the next user of the machine (review F8).
+        const { getAllFamilies } = await import('@/services/familyContext');
+        const { clearGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+        const families = await getAllFamilies();
+        await Promise.allSettled(families.map((f) => clearGoogleRefreshToken(f.id)));
+      },
+      resetSyncState: async () => {
+        const { useSyncStore } = await import('./syncStore');
+        useSyncStore().resetState();
+      },
+      clearDepartedArtifacts: () => clearDepartedGoogleArtifacts(ctx.departedEmail),
+      resetDocClient: () => docClient.reset(),
+      resolveFamilyId: () => {
+        // Fallback chain (review F14): a legacy session may lack familyId, and the
+        // security-critical clears must never be gated on an optional.
+        ctx.familyId =
+          currentUser.value?.familyId ??
+          useFamilyContextStore().activeFamilyId ??
+          getActiveFamilyIdFromDb() ??
+          undefined;
+      },
+      deleteFamilyDb: async () => {
+        if (ctx.familyId) await deleteFamilyDatabase(ctx.familyId);
+      },
+      clearKeyCacheFamily: async () => {
+        if (ctx.familyId) await settingsStore.clearCachedFamilyKey(ctx.familyId);
+      },
+      clearKeyCacheAll: () => settingsStore.clearCachedFamilyKey(),
+      removePinWrapsFamily: async () => {
+        if (!ctx.familyId) return;
+        const { removePinUnlocksForFamily } = await import('@/services/auth/deviceUnlock');
+        await removePinUnlocksForFamily(ctx.familyId);
+      },
+      removePinWrapsAll: async () => {
+        const { removeAllPinUnlocks } = await import('@/services/auth/deviceUnlock');
+        await removeAllPinUnlocks();
+      },
+      removeRosterFamily: async () => {
+        if (!ctx.familyId) return;
+        const { deleteRosterCache } =
+          await import('@/services/indexeddb/repositories/rosterCacheRepository');
+        await deleteRosterCache(ctx.familyId);
+      },
+      removeRosterAll: async () => {
+        const { clearAllRosterCache } =
+          await import('@/services/indexeddb/repositories/rosterCacheRepository');
+        await clearAllRosterCache();
+      },
+      reclaimAllPasskeys: async () => {
+        // Native keystore blobs first (enumerated FROM the registry records), then the
+        // records + the platform Signal (greg's local-test find: leftovers rendered a
+        // ghost "Windows Hello · Chrome" person card after clear-data).
+        const { getAllFamilies } = await import('@/services/familyContext');
+        const { reclaimFamilyKeystore, signalCredentialsRemoved } =
+          await import('@/services/auth/passkeyService');
+        const { getPasskeysByFamily, removePasskeyRegistration } =
+          await import('@/services/indexeddb/repositories/passkeyRepository');
+        for (const family of await getAllFamilies()) {
+          await reclaimFamilyKeystore(family.id);
+          const passkeys = await getPasskeysByFamily(family.id);
+          for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
+          if (passkeys.length > 0) {
+            await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
+          }
+        }
+      },
+      untrustDevice: () => settingsStore.setTrustedDevice(false),
+      reArmTrustPrompt: () => settingsStore.resetTrustedDevicePrompt(),
+    };
+  }
+
+  /**
+   * Tier 2 — Sign out (Phase 5 semantics, Phase 4 structure): force-save, close the
+   * pod, clear the member session. NO tier revokes at Google. Trusted devices keep
+   * tokens + caches + wraps (silent reconnect); untrusted devices get the full
+   * family-scoped local teardown. The step ORDER is data in `signOutSteps.ts`.
+   */
+  async function signOut(): Promise<void> {
+    const settingsStore = useSettingsStore();
+    const trusted = settingsStore.isTrustedDevice;
+    const ctx = { departedEmail: null as string | null, familyId: undefined as string | undefined };
+    await runSignOutSteps(
+      trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS,
+      buildSignOutStepImpls(ctx)
+    );
+    emitSignoutTier({ tier: 'sign-out', trusted, tokensKept: trusted });
+    finalizeSession();
   }
 
   /**
@@ -1965,126 +2100,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Sign out and always clear the per-family IndexedDB cache,
-   * regardless of trusted device status. Also resets the trust flag.
+   * Tier 3 — Sign out & clear data: the clean-device promise. Full LOCAL teardown
+   * (every family's tokens, caches, wraps, passkeys, rosters) — and still NO revoke
+   * at Google (device-local action; whole-grant revoke would kill every other device
+   * on the account — the explicit Settings disconnect is the sole revoke site).
+   * Step ORDER is data in `signOutSteps.ts`.
    */
   async function signOutAndClearData(): Promise<void> {
-    // Force a durable save of the latest doc before clearing the cache.
-    // Bounded — see signOut() for rationale.
-    // Deliberate teardown: in-flight doc ops failing against the reset worker are the
-    // expected consequence of leaving, not edits in doubt — keep them off the toast
-    // layer for the teardown window (they still reach the firehose).
-    docClient.beginQuietTeardown();
-    await forceSaveWithTimeout(3000);
-
-    // Doubly important here: this path promises the device is clean.
-    await cancelRemindersForSignOut();
-
-    // Capture the departing account BEFORE clearGoogleSessionState nulls the
-    // cached email — this path is always a full teardown (#62).
-    const departedEmail = getGoogleAccountEmail();
-
-    // Wipe Google session state: full LOCAL teardown (this device's tokens deleted) —
-    // but NO revoke at Google (Phase 5): clear-data is a device-local action, and a
-    // whole-grant revoke would kill every other device and family member on the same
-    // Google account. The explicit revoke lives in Settings ("Disconnect Google from
-    // beanies everywhere" → disconnectGoogleEverywhere).
-    await clearGoogleSessionStateWithTimeout(3000);
-
-    // This tier promises a CLEAN DEVICE, and it's multi-family: clearGoogleSessionState
-    // only clears the ACTIVE family's token + the pending slot, so every OTHER family's
-    // drive.file refresh token would survive (review F8) — a live bearer secret for the
-    // next user of the machine now that no tier revokes server-side. Clear them all.
-    try {
-      const { getAllFamilies } = await import('@/services/familyContext');
-      const { clearGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
-      const families = await getAllFamilies();
-      await Promise.allSettled(families.map((f) => clearGoogleRefreshToken(f.id)));
-    } catch (e) {
-      console.warn("[authStore] failed to clear all families' refresh tokens:", e);
-    }
-
-    // Reset per-session sync state — same rationale as signOut().
-    try {
-      const { useSyncStore } = await import('./syncStore');
-      useSyncStore().resetState();
-    } catch (e) {
-      console.warn('[authStore] syncStore.resetState failed during sign-out', e);
-    }
-
-    // Full teardown: clear the departed account's .beanpod mirror + last-account
-    // breadcrumb while the doc is still resident (before the cache is deleted). (#62)
-    await clearDepartedGoogleArtifacts(departedEmail);
-
-    // Fallback chain (review F14): a legacy session may lack familyId, and skipping the
-    // teardown on a shared machine would leave the family DB, cached key, PIN wraps and
-    // roster in place — the security-critical clears must never be gated on an optional.
-    const familyId =
-      currentUser.value?.familyId ??
-      useFamilyContextStore().activeFamilyId ??
-      getActiveFamilyIdFromDb() ??
-      undefined;
-
-    // Always delete regardless of trust setting
-    if (familyId) {
-      try {
-        await deleteFamilyDatabase(familyId);
-      } catch (e) {
-        console.warn('Failed to delete family database on sign-out:', e);
-      }
-    }
-
-    // Clear trust flag and cached family key
-    const settingsStore = useSettingsStore();
-    await settingsStore.setTrustedDevice(false);
-    await settingsStore.clearCachedFamilyKey();
-
+    const ctx = { departedEmail: null as string | null, familyId: undefined as string | undefined };
+    await runSignOutSteps(SIGN_OUT_CLEAR_STEPS, buildSignOutStepImpls(ctx));
     emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });
-
-    // This path promises a clean device: every PIN device-unlock wrap goes (family-key
-    // material), then every family's pre-decrypt roster (display data, but it names the
-    // family's members to the next user of the machine).
-    try {
-      const { removeAllPinUnlocks } = await import('@/services/auth/deviceUnlock');
-      await removeAllPinUnlocks();
-    } catch (e) {
-      console.warn('Failed to clear PIN unlocks on sign-out-and-clear:', e);
-    }
-    // ...and every passkey/biometric registration (greg's local-test find: leaving them
-    // made the person picker fall back to credential records and render a lone card
-    // named after the DEVICE — "Windows Hello · Chrome" — instead of the bootstrap
-    // surface). Reuses deleteLocalFamily's reclaim order: native keystore blobs first
-    // (they're enumerated FROM the registry records), then the records.
-    try {
-      const { getAllFamilies } = await import('@/services/familyContext');
-      const { reclaimFamilyKeystore, signalCredentialsRemoved } =
-        await import('@/services/auth/passkeyService');
-      const { getPasskeysByFamily, removePasskeyRegistration } =
-        await import('@/services/indexeddb/repositories/passkeyRepository');
-      for (const family of await getAllFamilies()) {
-        await reclaimFamilyKeystore(family.id);
-        const passkeys = await getPasskeysByFamily(family.id);
-        for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
-        if (passkeys.length > 0) {
-          await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to reclaim passkeys on sign-out-and-clear:', e);
-    }
-    try {
-      const { clearAllRosterCache } =
-        await import('@/services/indexeddb/repositories/rosterCacheRepository');
-      await clearAllRosterCache();
-    } catch (e) {
-      console.warn('Failed to clear roster caches on sign-out-and-clear:', e);
-    }
-
-    // Clear auth state
-    currentUser.value = null;
-    isAuthenticated.value = false;
-    newsletterOptIn.value = null;
-    clearSession();
+    finalizeSession();
   }
 
   return {
@@ -2112,6 +2138,7 @@ export const useAuthStore = defineStore('auth', () => {
     setMemberPin,
     verifyMemberPin,
     resetMemberPinViaRecovery,
+    adminResetMemberPin,
     createRecoveryKit,
     setRecoveryPassphrase,
     signInWithPasskey,

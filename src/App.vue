@@ -62,7 +62,9 @@ import { breadcrumbsForReport } from '@/utils/diagnosticContext';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
-import { canOfferBiometric } from '@/services/auth/passkeyService';
+import { resolveAuthPrompt, type AuthPromptId } from '@/services/auth/authPrompts';
+import PinPromptModal from '@/components/auth/PinPromptModal.vue';
+import RecoveryKitPromptModal from '@/components/auth/RecoveryKitPromptModal.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import {
@@ -215,9 +217,10 @@ const headerReclaimed = useHeaderReclaimed();
 // (sticky `top:0` rests at the padding edge), so we drop ONLY the top padding on
 // that route — both breakpoints. The command bar supplies its own top spacing.
 const isPlannerRoute = computed(() => route.name === 'Activities');
-const showTrustPrompt = ref(false);
-const showPasskeyPrompt = ref(false);
-const passkeyPromptDismissed = ref(false);
+// Phase 4: ONE active auth prompt at a time, resolved by the data-driven sequencer
+// in `authPrompts.ts` (pin → kit → native-biometric → trust). null = nothing shown.
+const activeAuthPrompt = ref<AuthPromptId | null>(null);
+const authPromptDeclinedThisSignIn = ref(false);
 
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
@@ -229,17 +232,40 @@ async function handleTrustDevice() {
       await settingsStore.cacheFamilyKey(exportedKey, familyId);
     }
   }
-  showTrustPrompt.value = false;
+  activeAuthPrompt.value = null;
 }
 
 function handleDeclineTrust() {
   settingsStore.setTrustedDevicePromptShown();
-  showTrustPrompt.value = false;
+  activeAuthPrompt.value = null;
+}
+
+// ── Phase 4 nag handlers ────────────────────────────────────────────────────
+function handlePinPromptDone() {
+  activeAuthPrompt.value = null;
+}
+
+async function handlePinPromptDecline() {
+  activeAuthPrompt.value = null;
+  authPromptDeclinedThisSignIn.value = true;
+  const familyId = authStore.currentUser?.familyId;
+  const memberId = authStore.currentUser?.memberId;
+  if (familyId && memberId) await settingsStore.dismissPinPrompt(familyId, memberId);
+}
+
+function handleKitPromptDone() {
+  activeAuthPrompt.value = null;
+}
+
+async function handleKitPromptDecline() {
+  activeAuthPrompt.value = null;
+  authPromptDeclinedThisSignIn.value = true;
+  await settingsStore.dismissKitPrompt();
 }
 
 async function handleEnablePasskey() {
-  showPasskeyPrompt.value = false;
-  passkeyPromptDismissed.value = true;
+  activeAuthPrompt.value = null;
+  authPromptDeclinedThisSignIn.value = true;
 
   try {
     const result = await authStore.registerPasskeyForCurrentUser();
@@ -270,8 +296,8 @@ async function handleEnablePasskey() {
 }
 
 function handleDeclinePasskey() {
-  passkeyPromptDismissed.value = true;
-  showPasskeyPrompt.value = false;
+  authPromptDeclinedThisSignIn.value = true;
+  activeAuthPrompt.value = null;
 }
 
 /**
@@ -545,7 +571,9 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
   if (syncStore.isConfigured && !syncStore.needsPermission) {
     // Step 1a: Try loading from IndexedDB persistence cache for instant display
     const activeFamilyId = familyContextStore.activeFamilyId;
-    const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+    const cachedKeyB64 = activeFamilyId
+      ? await settingsStore.getCachedFamilyKey(activeFamilyId)
+      : null;
 
     if (activeFamilyId && cachedKeyB64) {
       setOpenPath('path1a');
@@ -686,7 +714,9 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
     initBreadcrumbs.push('path2: file needs permission, trying cache');
     console.log('[loadFamilyData] File needs permission — trying persistence cache');
     const activeFamilyId = familyContextStore.activeFamilyId;
-    const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+    const cachedKeyB64 = activeFamilyId
+      ? await settingsStore.getCachedFamilyKey(activeFamilyId)
+      : null;
     initBreadcrumbs.push(
       `path2: familyId=${activeFamilyId ?? 'null'}, hasCachedKey=${!!cachedKeyB64}`
     );
@@ -1585,45 +1615,41 @@ watch(
       return;
     }
 
-    // Reset dismiss flag on new sign-in (freshSignIn transitioned from false to true)
+    // Reset the per-sign-in decline latch on a new sign-in
     if (oldVal && !oldVal[0] && isFresh) {
-      passkeyPromptDismissed.value = false;
+      authPromptDeclinedThisSignIn.value = false;
     }
 
-    // Don't re-prompt if already showing or dismissed
-    if (showPasskeyPrompt.value || showTrustPrompt.value) {
+    // Don't re-prompt if already showing, or if the user already declined one this
+    // sign-in (one interruption per sign-in — the rest re-fire on the next one).
+    if (activeAuthPrompt.value || authPromptDeclinedThisSignIn.value) {
       return;
     }
+    if (!syncStore.isConfigured) return;
 
-    // Try passkey prompt first (per-MEMBER check).
-    //
-    // This used to ask "does anyone in this family have a key on this device?", which
-    // silently denied the offer to the SECOND member on a shared device: a sibling's
-    // enrolment suppressed their prompt forever, so they could never enrol even though
-    // the keystore is now per member. Requirement 6 is unreachable without this.
-    if (!passkeyPromptDismissed.value && syncStore.isConfigured) {
-      const familyId = authStore.currentUser?.familyId;
-      const memberId = authStore.currentUser?.memberId;
-      if (familyId && memberId) {
-        const deviceKeys = await authStore.resolveDeviceKeysForFamily(familyId);
-        const hasOwnKey = deviceKeys.some((k) => k.memberId === memberId);
-        if (!hasOwnKey) {
-          const hasPlatform = await canOfferBiometric();
-          // #45: claim the session's single interruption slot only at the true
-          // show-site (a no-show branch above never wastes it). If another surface
-          // won this load, defer — passkey re-fires on the next fresh sign-in and
-          // stays reachable in Settings, so nothing is lost.
-          if (hasPlatform && claimInterruption('auth-prompt')) {
-            showPasskeyPrompt.value = true;
-            return;
-          }
-        }
-      }
-    }
+    const familyId = authStore.currentUser?.familyId;
+    const memberId = authStore.currentUser?.memberId;
+    if (!familyId || !memberId) return;
 
-    // Fall back to trust device prompt
-    if (!settingsStore.trustedDevicePromptShown && claimInterruption('auth-prompt')) {
-      showTrustPrompt.value = true;
+    // Phase 4: the ordered prompt chain lives in `authPrompts.ts` (pin → kit →
+    // native-biometric → trust) — data-driven and unit-tested there; this watcher
+    // only assembles the context and claims the interruption slot at the true
+    // show-site (#45: a no-show never wastes the slot).
+    const winner = await resolveAuthPrompt({
+      familyId,
+      memberId,
+      member: familyStore.members.find((m) => m.id === memberId),
+      owner: familyStore.owner,
+      envelope: syncStore.envelope,
+      settings: settingsStore.settings,
+      flags: {
+        isPinPromptDismissed: settingsStore.isPinPromptDismissed,
+        kitPromptDismissed: settingsStore.kitPromptDismissed,
+        trustedDevicePromptShown: settingsStore.trustedDevicePromptShown,
+      },
+    });
+    if (winner && claimInterruption('auth-prompt')) {
+      activeAuthPrompt.value = winner;
     }
   }
 );
@@ -2001,14 +2027,26 @@ watch(
     <QuickAddFab />
     <QuickAddSheet />
     <TrustDeviceModal
-      :open="showTrustPrompt"
+      :open="activeAuthPrompt === 'trust'"
       @trust="handleTrustDevice"
       @decline="handleDeclineTrust"
     />
     <PasskeyPromptModal
-      :open="showPasskeyPrompt"
+      :open="activeAuthPrompt === 'native-biometric'"
       @enable="handleEnablePasskey"
       @decline="handleDeclinePasskey"
+    />
+    <PinPromptModal
+      v-if="authStore.currentUser?.memberId"
+      :open="activeAuthPrompt === 'pin'"
+      :member-id="authStore.currentUser.memberId"
+      @done="handlePinPromptDone"
+      @decline="handlePinPromptDecline"
+    />
+    <RecoveryKitPromptModal
+      :open="activeAuthPrompt === 'kit'"
+      @done="handleKitPromptDone"
+      @decline="handleKitPromptDecline"
     />
     <NotificationsDrawer />
     <PwaReinstallModal />

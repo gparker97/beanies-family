@@ -801,8 +801,43 @@ describe('useJoinFlow', () => {
     });
   });
 
-  describe('handleSelectMember + handleSubmitPassword', () => {
-    it('selecting a member moves to set-password; submitting succeeds and finishes', async () => {
+  describe('link-ready (Phase 4 device link, lk=1)', () => {
+    it('a link-mode invite lands on link-ready instead of pick-member — even with no unclaimed members', async () => {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({
+          familyId: 'fam',
+          token: 'tok',
+          provider: 'google_drive',
+          fileId: 'drive-1',
+          linkMode: true, // → lk=1 on the wire
+        }).replace('http://localhost:3000', '')
+      );
+      mockGoogleAuth.silent = vi.fn(async () => 'silent-token');
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({
+        success: false,
+        needsPassword: true,
+      }));
+      mockSyncStore.pendingEncryptedFile = {
+        envelope: { inviteKeys: { 'hash:tok': { wrapped: 'w', salt: 's', expiresAt: 'never' } } },
+      };
+      mockSyncStore.envelope = { familyId: 'fam' };
+      // Every member already claimed — the claim flow would error, but link mode
+      // serves EVERY member via the standard login machine, so no error fires.
+      familyMembers.push({ id: 'm1', requiresPassword: false, isPet: false });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+
+      expect(flow.linkMode.value).toBe(true);
+      expect(flow.currentStep.value).toBe('link-ready');
+      expect(flow.currentError.value).toBeNull();
+    });
+  });
+
+  describe('handleSelectMember + handleSubmitPin (Phase 4: PIN-based claim)', () => {
+    it('selecting a member moves to set-password; submitting the PIN succeeds and finishes', async () => {
       const { useJoinFlow } = await import('../useJoinFlow');
       const flow = useJoinFlow();
       // Skip init — directly drive the post-load steps.
@@ -812,14 +847,17 @@ describe('useJoinFlow', () => {
       expect(flow.currentStep.value).toBe('set-password');
       expect(flow.selectedMember.value?.id).toBe('m1');
 
-      const ok = await flow.handleSubmitPassword('hunter2');
+      const ok = await flow.handleSubmitPin('482913');
       expect(ok).toBe(true);
       expect(mockAuthStore.joinFamily).toHaveBeenCalledWith({
         memberId: 'm1',
-        password: 'hunter2',
+        pin: '482913',
         familyId: '',
       });
-      expect(mockSyncStore.wrapFamilyKeyForMember).toHaveBeenCalledWith('m1', 'hunter2');
+      // Phase 4: NO envelope password wrap is created any more — the claim is
+      // doc-side hash + device unlock wrap, both inside authStore.joinFamily.
+      expect(mockSyncStore.wrapFamilyKeyForMember).not.toHaveBeenCalled();
+      // The PIN hash still gets persisted to the file before handing off.
       expect(mockSyncStore.syncNow).toHaveBeenCalledWith(true);
     });
 
@@ -827,14 +865,15 @@ describe('useJoinFlow', () => {
       const { useJoinFlow } = await import('../useJoinFlow');
       const flow = useJoinFlow();
       familyMembers.push({ id: 'm1', requiresPassword: true, isPet: false });
-      mockAuthStore.joinFamily = vi.fn(async () => ({ success: false, error: 'wrong password' }));
+      mockAuthStore.joinFamily = vi.fn(async () => ({ success: false, error: 'wrong pin' }));
 
       flow.handleSelectMember(familyMembers[0]! as never);
-      const ok = await flow.handleSubmitPassword('wrong');
+      const ok = await flow.handleSubmitPin('000000');
 
       expect(ok).toBe(false);
       expect(flow.currentStep.value).toBe('set-password');
       expect(flow.currentError.value?.code).toBe('FILE_DECRYPT_FAILED');
+      expect(mockSyncStore.wrapFamilyKeyForMember).not.toHaveBeenCalled();
     });
   });
 
