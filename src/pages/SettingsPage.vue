@@ -1234,13 +1234,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       <ChangePasswordSettings />
       <PinSettings class="mt-4" />
       <PasskeySettings class="mt-4" />
-      <RecoverySettings class="mt-4" />
-      <GoogleDisconnectCard class="mt-4" />
     </BeanieFormModal>
 
-    <!-- ── Security & Privacy Modal ──────────────────────────────────────
-         System-level controls only (trusted device + future advanced
-         toggles). Self-serve account actions moved to Your Account above.
+    <!-- ── Security & Recovery Modal ─────────────────────────────────────
+         Family/device-level protection: device trust, the family recovery
+         kit + passphrase, and the emergency Google disconnect. Personal
+         sign-in methods (password/PIN/biometric) live in Account & Sign-In
+         above — "who am I" vs "how is this family and device protected".
     ────────────────────────────────────────────────────────────────────── -->
     <BeanieFormModal
       v-if="authStore.isAuthenticated"
@@ -1271,6 +1271,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           @update:model-value="settingsStore.setTrustedDevice($event)"
         />
       </div>
+
+      <RecoverySettings class="mt-4" />
+      <GoogleDisconnectCard class="mt-4" />
     </BeanieFormModal>
 
     <!-- ── Family Data Modal ───────────────────────────────────────────── -->
