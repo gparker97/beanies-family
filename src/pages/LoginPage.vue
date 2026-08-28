@@ -75,6 +75,8 @@ const isInitializing = ref(true);
 const forceNewGoogleAccount = ref(false);
 /** The prove screen's "use a recovery kit" escape — opens LoadPodView in kit entry. */
 const kitEntryRequested = ref(false);
+/** Code carried by the kit QR deep link (fragment — never sent to a server). */
+const kitPrefillCode = ref('');
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 /**
@@ -303,6 +305,21 @@ onMounted(async () => {
         context: { action: 'init_failed' },
       });
       activeView.value = 'welcome';
+      isInitializing.value = false;
+      return;
+    }
+
+    // Kit QR deep link: a phone camera pointed at the printed recovery kit lands here
+    // with the code in the URL FRAGMENT (never sent to a server). Strip it immediately
+    // (history hygiene) and open the bootstrap surface straight in kit entry, code
+    // pre-filled.
+    const kitHashMatch = window.location.hash.match(/beanies-kit=([^&]+)/);
+    if (kitHashMatch?.[1]) {
+      const { parseKitInput } = await import('@/services/auth/recoveryKit');
+      kitPrefillCode.value = parseKitInput(decodeURIComponent(kitHashMatch[1]));
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      enterGenericLoadFallback(undefined, { autoLoad: true, withError: false });
+      kitEntryRequested.value = true; // after the reset inside enterGenericLoadFallback
       isInitializing.value = false;
       return;
     }
@@ -577,7 +594,7 @@ function handleUseRecoveryKit() {
  * A bootstrap load finished (LoadPodView emitted `file-loaded`): the pod is open, the
  * roster is live — hand over to the machine, which renders the person picker from it.
  */
-async function handleFileLoaded() {
+async function handleFileLoaded(source?: 'recovery') {
   // Same spinner rule: the flow hand-off can take a beat (roster build, live members).
   activeView.value = 'loading';
   const ok = await enterFlow(
@@ -594,7 +611,11 @@ async function handleFileLoaded() {
       context: { action: 'post_load_no_people' },
     });
     activeView.value = 'welcome';
+    return;
   }
+  // Armed AFTER the flow entered: a family-level recovery secret opened the pod, so the
+  // prove screen offers set-a-new-PIN instead of demanding forgotten credentials.
+  flow.recoveryMode.value = source === 'recovery';
 }
 
 function handleSignedIn(destination: string) {
@@ -652,6 +673,8 @@ async function handleStartOver() {
           :error="flowError"
           :is-busy="flowBusy"
           :pod-open="familyStore.members.length > 0"
+          :recovery-mode="flow.recoveryMode.value"
+          :has-passphrase="!!syncStore.pendingEncryptedFile?.envelope?.recoveryPassphrase"
           @biometric="flow.onBiometric"
           @tap-through="flow.onTapThrough"
           @pin="flow.onPinSubmit"
@@ -659,6 +682,7 @@ async function handleStartOver() {
           @create-password="flow.onCreatePassword"
           @fell-back="flow.onFellBack"
           @use-recovery="handleUseRecoveryKit"
+          @reset-pin="flow.onResetPin"
           @back="flow.dispatch({ type: 'BACK' })"
         />
         <OpenRecoveryPanel
@@ -721,6 +745,7 @@ async function handleStartOver() {
         :provider-hint="loadErrorProviderHint"
         :reconnect-drive-file="reconnectDriveFile"
         :start-in-kit-entry="kitEntryRequested"
+        :prefill-kit-code="kitPrefillCode"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"
         @signed-in="handleSignedIn"

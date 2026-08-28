@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4262
+    "translationCount": 4269
   },
   "translations": {
     "app.name": {
@@ -21062,8 +21062,8 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitStoreWarning": {
-      "translation": "立即保存或打印—它只显示一次，如果其他所有内容都被遗忘，这是进入家庭数据的唯一途径。请勿将其与家庭数据保存在相同的Google云端硬盘中。",
-      "hash": "vaytou",
+      "translation": "立即保存或打印，仅显示一次。请将行程码存放在安全的地方，以防丢失行程码。",
+      "hash": "2f6pwe",
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitDownloadPdf": {
@@ -21314,6 +21314,41 @@
     "recovery.passphraseAcceptedProve": {
       "translation": "恢复密码已接受—您的家庭数据已打开。现在，请确认您要登录的用户。",
       "hash": "o084fn",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitShare": {
+      "translation": "共享",
+      "hash": "1bjem7",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitScanPhoto": {
+      "translation": "扫描工具包的照片",
+      "hash": "8796le",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitScanFailed": {
+      "translation": "无法读取该照片中的二维码。请尝试更清晰的图片，或输入二维码。",
+      "hash": "8k8xyo",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.resetPinTitle": {
+      "translation": "设置新PIN码",
+      "hash": "oummyg",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.resetPinBody": {
+      "translation": "您已使用恢复密钥—设置一个新的6位数PIN码，以便从现在开始使用。",
+      "hash": "h3dpuu",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.resetPinAction": {
+      "translation": "设置PIN码并登录",
+      "hash": "sskmor",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseHint": {
+      "translation": "您的密码—或您的家庭恢复密码（如果已设置）。",
+      "hash": "l5oe2p",
       "lastUpdated": "2026-08-28"
     }
   }

@@ -785,6 +785,28 @@ async function confirmSignOutAndClearData() {
               <!-- Divider -->
               <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
 
+              <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-slate-700/50"
+                :title="t('auth.switchMemberHint')"
+                @mousedown.prevent="confirmSwitchMember"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 11h-6" />
+                  <path d="M20 8l3 3-3 3" />
+                </svg>
+                {{ t('auth.switchMember') }}
+              </button>
+
               <!-- Sign out -->
               <button
                 type="button"
