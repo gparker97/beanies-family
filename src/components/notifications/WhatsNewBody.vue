@@ -65,7 +65,7 @@ async function handleTryIt(route: string) {
   // the first post-login tap can land while a guard, e.g. the critical-write
   // block, rejects navigation). Await it, retry once after a beat, and log the
   // failure so the real guard is identifiable from CloudWatch if it recurs.
-  const failure = await router.push(route).catch((e) => e);
+  const failure = await Promise.resolve(router.push(route)).catch((e) => e);
   if (failure) {
     logEvent({
       level: 'warn',
@@ -74,7 +74,7 @@ async function handleTryIt(route: string) {
       context: { action: 'tryit_nav_cancelled', detail: String(failure).slice(0, 120) },
     });
     await new Promise((r) => setTimeout(r, 400));
-    await router.push(route).catch(() => {});
+    await Promise.resolve(router.push(route)).catch(() => {});
   }
 }
 
