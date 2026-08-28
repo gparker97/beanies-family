@@ -263,6 +263,9 @@ async function handleSavePassphrase() {
             type="text"
             autocomplete="off"
           />
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('recovery.passphraseRules') }}
+          </p>
         </template>
         <div class="flex gap-3">
           <BaseButton :disabled="isSavingPassphrase" @click="handleSavePassphrase">

@@ -4248,6 +4248,11 @@ const STRING_DEFS = {
   'recovery.passphraseSuggestion': { en: 'Suggested Passphrase', beanie: 'suggested passphrase' },
   'recovery.passphraseRegenerate': { en: 'Suggest Another', beanie: 'suggest another' },
   'recovery.passphraseUseOwn': { en: 'Use my own phrase', beanie: 'use my own phrase' },
+  'recovery.passphraseRules': {
+    en: "At least 14 characters and 3 different words — spaces or dashes between words are fine, and any characters are allowed. Your family or member names are too easy to guess and won't be accepted.",
+    beanie:
+      'at least 14 characters and 3 different words — spaces or dashes are fine, any characters allowed. family or bean names are too easy to guess.',
+  },
   'recovery.passphraseTooWeak': {
     en: 'That phrase is too easy to guess — use at least 14 characters and 3 different words.',
     beanie: 'that phrase is too easy to guess — use at least 14 characters and 3 different words.',
