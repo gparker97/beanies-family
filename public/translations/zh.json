@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-27",
-    "translationCount": 4187
+    "lastUpdated": "2026-08-28",
+    "translationCount": 4195
   },
   "translations": {
     "app.name": {
@@ -20940,6 +20940,46 @@
       "translation": "配方",
       "hash": "um2dea",
       "lastUpdated": "2026-08-27"
+    },
+    "loginFlow.recoveryTitle": {
+      "translation": "您已通过验证",
+      "hash": "8j2wq5",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryAuthBody": {
+      "translation": "我们只需重新连接到Google即可获取您的家庭数据。您的登录已完成—只需轻触一下，您的豆子就回来了。",
+      "hash": "eq3gvl",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryPermissionBody": {
+      "translation": "您的浏览器需要权限才能再次读取您的家庭数据文件。给它一次，你的豆子就回来了。",
+      "hash": "7x89td",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryNotFoundBody": {
+      "translation": "我们无法找到您以前的家庭数据文件。它可能已经移动了—您可以再次选择它。",
+      "hash": "3r08qv",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryErrorBody": {
+      "translation": "加载您的家庭数据时遇到了问题。这通常是暂时的，请重试。",
+      "hash": "8i0dfz",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryReconnect": {
+      "translation": "重新连接Google",
+      "hash": "ox2avy",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryGrant": {
+      "translation": "授予访问权限",
+      "hash": "awid3s",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryUseBootstrap": {
+      "translation": "改为加载家庭文件",
+      "hash": "fv8idb",
+      "lastUpdated": "2026-08-28"
     }
   }
 }

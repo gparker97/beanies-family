@@ -16,7 +16,7 @@
  * Avatar rendering reuses `<BeanieAvatar>` (handles photo / beanie
  * variant / fallback) and `getMemberAvatarUrl` from the established
  * `useMemberInfo` helpers — same trio used by `<QuickAddPicker>`,
- * `<PickBeanView>`, and `<ProfileHeader>`.
+ * `<PersonSelectView>`, and `<ProfileHeader>`.
  */
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';

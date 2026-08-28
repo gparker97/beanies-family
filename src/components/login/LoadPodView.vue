@@ -12,7 +12,6 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import {
   getGoogleAccountEmail,
   shouldUseRedirectAuth,
@@ -26,19 +25,12 @@ import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { raceTimeout } from '@/utils/timing';
 import { LOAD_DRIVE_PATH } from './resumePaths';
-import {
-  isPlatformAuthenticatorAvailable,
-  resolveDeviceKeys,
-  registerPasskeyForMember,
-} from '@/services/auth/passkeyService';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const authStore = useAuthStore();
-const familyStore = useFamilyStore();
 
 const props = defineProps<{
   needsPermissionGrant?: boolean;
@@ -51,7 +43,6 @@ const props = defineProps<{
    * `onMounted` would never re-fire. See ADR-029.
    */
   autoOpenDrivePicker?: boolean;
-  skipBiometric?: boolean;
   forceNewGoogleAccount?: boolean;
   loadError?: string;
   providerHint?: 'local' | 'google_drive';
@@ -62,18 +53,12 @@ const props = defineProps<{
    * one consent, then load this fileId directly (no list, no picker).
    */
   reconnectDriveFile?: { fileId: string; fileName: string; familyName?: string };
-  crossDeviceContext?: {
-    crossDevice: true;
-    memberId: string;
-    credentialId?: string;
-  } | null;
 }>();
 
 const emit = defineEmits<{
   back: [];
   'file-loaded': [];
   'signed-in': [destination: string];
-  'biometric-available': [payload: { familyId: string; familyName?: string }];
   'request-create': [];
 }>();
 
@@ -154,35 +139,6 @@ async function tryAutoDecrypt(): Promise<boolean> {
 }
 
 /**
- * Check if biometric login is available for the given family.
- * Returns true if biometric-available was emitted (caller should stop the password flow).
- */
-async function checkBiometricForFamily(familyId: string, familyName?: string): Promise<boolean> {
-  if (props.skipBiometric) return false;
-  try {
-    const hasPlatform = await isPlatformAuthenticatorAvailable();
-    if (!hasPlatform) return false;
-    // Resolve the KEYS, not a boolean: LoginPage needs them to drive the biometric view,
-    // and an empty list must not route there at all — that renders a button that cannot do
-    // anything.
-    const deviceKeys = await resolveDeviceKeys(familyId);
-    if (deviceKeys.length === 0) return false;
-    emit('biometric-available', { familyId, familyName });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Extract familyId/familyName from the pending encrypted file's raw sync data.
- */
-function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
-  const raw = syncStore.pendingEncryptedFile?.envelope;
-  return { familyId: raw?.familyId, familyName: raw?.familyName };
-}
-
-/**
  * Shared "the file is encrypted — now what?" handoff (2026-06-19, finding 14).
  * Previously copy-pasted across all six load entry points (auto-load, grant-
  * permission, manual load, drop, Drive pick), each with a slightly different
@@ -247,20 +203,9 @@ async function handlePendingPassword(
   fileName: string | null,
   opts: { tryAuto?: boolean } = {}
 ): Promise<void> {
-  // Prefer biometric when this family has registered passkeys. A passkey unlock
-  // authenticates the member AND yields the family key in one gesture, replacing
-  // BOTH the cached-key auto-decrypt and the member-password picker. This must run
-  // BEFORE the cached-key auto-decrypt below: a cached family key survives a
-  // logout-without-clearing, so if we auto-decrypted first we'd silently open the
-  // file and route to the member-password picker — never offering biometric even
-  // though it was set up. `checkBiometricForFamily` only emits when a passkey is
-  // actually registered (and a platform authenticator exists), so users WITHOUT a
-  // passkey still fall through to the silent cached-key path unchanged. (2026-07-14)
-  const { familyId, familyName } = getPendingFamilyInfo();
-  if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
-    // Biometric flow will handle decryption — don't auto-decrypt or show password.
-    return;
-  }
+  // 2026-08-28 rethink: this surface makes NO biometric decision any more — the single
+  // prove engine (`resolveProveMethods`) owns that, on the machine's prove screen. This
+  // view is pure fetch/decrypt bootstrap now: cached-key auto-decrypt, else password.
   if ((opts.tryAuto ?? true) && (await tryAutoDecrypt())) {
     await finishLoaded();
     return;
@@ -428,41 +373,6 @@ async function handleLoadFile() {
   }
 }
 
-/**
- * Register a new passkey on this device after cross-device password fallback.
- * Wraps the family key with fresh PRF material and saves to the envelope.
- */
-async function registerCrossDevicePasskey(memberId: string) {
-  try {
-    const fk = syncStore.familyKey;
-    if (!fk) return;
-
-    const member = familyStore.members.find((m) => m.id === memberId);
-    if (!member) return;
-
-    const familyId = syncStore.envelope?.familyId ?? authStore.currentUser?.familyId;
-    if (!familyId) return;
-
-    const result = await registerPasskeyForMember({
-      memberId,
-      memberName: member.name,
-      memberEmail: member.email,
-      familyId,
-      familyKey: fk,
-    });
-
-    if (result.success && result.passkeySecret) {
-      syncStore.addPasskeySecret(result.passkeySecret);
-      // Best-effort — the secret is in the in-memory envelope and rides the next
-      // save; never block login on a slow/offline Drive push. (2026-07-14)
-      await raceTimeout(syncStore.syncNow(true), 5000);
-    }
-  } catch (e) {
-    // Non-critical — passkey registration failure shouldn't block login
-    console.warn('[LoadPodView] Cross-device passkey registration failed:', e);
-  }
-}
-
 async function handleDecrypt() {
   if (!decryptPassword.value) {
     formError.value = t('password.required');
@@ -480,7 +390,7 @@ async function handleDecrypt() {
       // Auto-sign-in is safe ONLY when exactly one member's wrappedKey
       // unwrapped with this password. If more than one matched, multiple
       // members share this password — we cannot infer identity from the
-      // unwrap alone. Fall through to PickBeanView so the user explicitly
+      // unwrap alone. Fall through to the machine's person picker so the user explicitly
       // chooses which bean they are; the per-member verifyPassword check
       // there is salt-scoped per member, so identity is unambiguous after
       // they pick.
@@ -491,10 +401,6 @@ async function handleDecrypt() {
         const signInResult = await authStore.signIn(unambiguousMemberId, decryptPassword.value);
         decryptPassword.value = '';
         if (signInResult.success) {
-          // Cross-device: register passkey on this device and wrap family key with new PRF
-          if (props.crossDeviceContext) {
-            await registerCrossDevicePasskey(unambiguousMemberId);
-          }
           // B2: this branch returns WITHOUT reaching finishLoaded(), so it must
           // establish the durable home itself — otherwise a single-member file opened
           // via the native picker (no provider installed by decrypt) is left with no
