@@ -22,6 +22,7 @@ import { generateInviteQR } from '@/utils/qrCode';
 import { useSheetExport, ExportError } from '@/composables/useSheetExport';
 import { shareOrDownloadFile } from '@/utils/shareOrDownloadFile';
 import { generatePassphrase } from '@/utils/passphraseStrength';
+import { kitDeepLink } from '@/services/auth/recoveryKit';
 import { reportError } from '@/utils/errorReporter';
 
 const { t } = useTranslation();
@@ -58,7 +59,9 @@ async function handleGenerateKit() {
     kitCopied.value = false;
     kitPdfError.value = false;
     try {
-      kitQr.value = await generateInviteQR(result.code);
+      // The QR is a DEEP LINK: a phone camera pointed at the printed kit opens the app
+      // straight into recovery with the code pre-filled (the code rides the fragment).
+      kitQr.value = await generateInviteQR(kitDeepLink(result.code));
     } catch {
       kitQr.value = ''; // QR is an extra — the code is the credential
     }
@@ -81,6 +84,34 @@ async function handleCopyKitCode() {
       severity: 'warning',
       context: { action: 'kit_copy_failed' },
     });
+  }
+}
+
+/** Share the kit PDF via the OS sheet (WhatsApp, Drive, …) where available. */
+async function handleShareKitPdf() {
+  if (!kitCardEl.value || isExportingPdf.value) return;
+  kitPdfError.value = false;
+  isExportingPdf.value = true;
+  try {
+    const png = await exportElementToPng(kitCardEl.value);
+    const pdf = await pngBlobToPdf(png);
+    await shareOrDownloadFile(
+      pdf,
+      `beanies-recovery-kit-${kitId.value}.pdf`,
+      'application/pdf',
+      t('recovery.kitModalTitle')
+    );
+  } catch (e) {
+    kitPdfError.value = true;
+    reportError({
+      surface: 'login-flow',
+      message: `kit PDF share failed${e instanceof ExportError ? ` at ${e.stage}` : ''}`,
+      error: e,
+      severity: 'warning',
+      context: { action: 'kit_share_failed' },
+    });
+  } finally {
+    isExportingPdf.value = false;
   }
 }
 
@@ -185,7 +216,7 @@ async function handleSavePassphrase() {
             : fillTemplate(t('recovery.kitCount'), { count: String(kitCount) })
         }}
       </p>
-      <BaseButton variant="secondary" :disabled="isGeneratingKit" @click="handleGenerateKit">
+      <BaseButton variant="secondary" :loading="isGeneratingKit" @click="handleGenerateKit">
         {{ kitCount === 0 ? t('recovery.kitGenerate') : t('recovery.kitRegenerate') }}
       </BaseButton>
     </div>
@@ -270,11 +301,42 @@ async function handleSavePassphrase() {
         <p class="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
           {{ t('recovery.kitCodeLabel') }}
         </p>
-        <p
-          class="font-outfit rounded-xl bg-gray-50 p-3 text-base font-bold tracking-wider break-all text-gray-900 select-all dark:bg-slate-700 dark:text-gray-100"
-        >
-          {{ kitCode }}
-        </p>
+        <div class="flex items-start gap-2 rounded-xl bg-gray-50 p-3 dark:bg-slate-700">
+          <p
+            class="font-outfit flex-1 text-base font-bold tracking-wider break-all text-gray-900 select-all dark:text-gray-100"
+          >
+            {{ kitCode }}
+          </p>
+          <button
+            type="button"
+            class="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-slate-600 dark:hover:text-gray-200"
+            :title="kitCopied ? t('recovery.kitCopied') : t('recovery.kitCopyCode')"
+            :aria-label="t('recovery.kitCopyCode')"
+            @click="handleCopyKitCode"
+          >
+            <svg
+              v-if="!kitCopied"
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+            <svg
+              v-else
+              class="h-4 w-4 text-green-500"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <p class="mt-4 rounded-xl bg-[#F15D22]/10 p-3 text-sm text-gray-700 dark:text-gray-300">
@@ -289,19 +351,26 @@ async function handleSavePassphrase() {
       </p>
 
       <template #footer>
-        <div class="flex w-full flex-wrap gap-3">
-          <BaseButton variant="secondary" type="button" @click="handleCopyKitCode">
-            {{ kitCopied ? t('recovery.kitCopied') : t('recovery.kitCopyCode') }}
-          </BaseButton>
-          <BaseButton
-            variant="secondary"
-            type="button"
-            :disabled="isExportingPdf"
-            @click="handleDownloadKitPdf"
-          >
-            {{ t('recovery.kitDownloadPdf') }}
-          </BaseButton>
-          <BaseButton class="flex-1" type="button" @click="handleKitStored">
+        <div class="flex w-full flex-col gap-3">
+          <div class="grid grid-cols-2 gap-3">
+            <BaseButton
+              variant="secondary"
+              type="button"
+              :disabled="isExportingPdf"
+              @click="handleDownloadKitPdf"
+            >
+              {{ t('recovery.kitDownloadPdf') }}
+            </BaseButton>
+            <BaseButton
+              variant="secondary"
+              type="button"
+              :disabled="isExportingPdf"
+              @click="handleShareKitPdf"
+            >
+              {{ t('recovery.kitShare') }}
+            </BaseButton>
+          </div>
+          <BaseButton class="w-full" type="button" @click="handleKitStored">
             {{ t('recovery.kitConfirmStored') }}
           </BaseButton>
         </div>

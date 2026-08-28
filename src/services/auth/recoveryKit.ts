@@ -102,6 +102,29 @@ export async function generateRecoveryKit(familyKey: CryptoKey): Promise<Generat
   };
 }
 
+/** Hash marker for the kit deep link — the code rides the FRAGMENT (never sent to a server). */
+export const KIT_LINK_HASH = 'beanies-kit=';
+
+/**
+ * The QR content: a deep link, so a phone camera pointed at the printed kit opens the
+ * app straight into recovery with the code pre-filled. The code lives in the URL
+ * fragment — fragments never leave the browser.
+ */
+export function kitDeepLink(code: string): string {
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'https://app.beanies.family';
+  return `${origin}/welcome#${KIT_LINK_HASH}${encodeURIComponent(code)}`;
+}
+
+/** Accept a scanned QR payload OR a hand-typed code: extract the kit code either way. */
+export function parseKitInput(text: string): string {
+  const idx = text.indexOf(KIT_LINK_HASH);
+  if (idx >= 0) {
+    return decodeURIComponent(text.slice(idx + KIT_LINK_HASH.length).split(/[&?]/)[0] ?? '');
+  }
+  return text;
+}
+
 export type KitRedeemResult =
   | { ok: true; familyKey: CryptoKey; kitId: string }
   | { ok: false; reason: 'no-kits' | 'wrong-code' | 'error' };

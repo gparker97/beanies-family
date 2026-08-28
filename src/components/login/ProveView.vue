@@ -30,6 +30,13 @@ const props = defineProps<{
   isBusy: boolean;
   /** Whether the pod is already open — drives create-password vs bootstrap copy. */
   podOpen: boolean;
+  /**
+   * A family-level recovery secret opened the pod: identity is granted by possession,
+   * so this screen offers SET-A-NEW-PIN instead of demanding forgotten credentials.
+   */
+  recoveryMode?: boolean;
+  /** The staged envelope carries a recovery passphrase — hint it under the password. */
+  hasPassphrase?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -42,6 +49,8 @@ const emit = defineEmits<{
   'fell-back': [];
   /** Cold-path escape: redeem a recovery kit instead. */
   'use-recovery': [];
+  /** Recovery mode: set a fresh PIN in place of the forgotten credentials. */
+  'reset-pin': [pin: string];
   back: [];
 }>();
 
@@ -56,11 +65,29 @@ const offered = computed<MethodKind[]>(() => props.methods.map((m) => m.kind));
  * remounts this component), where the password form must stay up rather than collapsing
  * behind a link.
  */
-const activeMethod = ref<MethodKind>(
-  props.error && props.methods.some((m) => m.kind === 'password')
-    ? 'password'
-    : (props.methods[0]?.kind ?? 'password')
+type ActiveKind = MethodKind | 'reset-pin';
+const activeMethod = ref<ActiveKind>(
+  props.recoveryMode
+    ? 'reset-pin'
+    : props.error && props.methods.some((m) => m.kind === 'password')
+      ? 'password'
+      : (props.methods[0]?.kind ?? 'password')
 );
+const resetPin = ref('');
+const resetPinConfirm = ref('');
+
+function handleResetPinSubmit() {
+  localError.value = null;
+  if (resetPin.value.length !== 6) {
+    localError.value = t('pin.invalidFormat');
+    return;
+  }
+  if (resetPin.value !== resetPinConfirm.value) {
+    localError.value = t('pin.mismatch');
+    return;
+  }
+  emit('reset-pin', resetPin.value);
+}
 
 const password = ref('');
 const confirmPassword = ref('');
@@ -104,9 +131,14 @@ watch(
   { immediate: true }
 );
 
-function switchTo(method: MethodKind) {
+function switchTo(method: ActiveKind) {
   localError.value = null;
-  if (!fellBackOnce && offered.value[0] && offered.value.indexOf(method) > 0) {
+  if (
+    !fellBackOnce &&
+    offered.value[0] &&
+    method !== 'reset-pin' &&
+    offered.value.indexOf(method) > 0
+  ) {
     fellBackOnce = true;
     emit('fell-back');
   }
@@ -114,12 +146,18 @@ function switchTo(method: MethodKind) {
 }
 
 /** The switch links: every offered method except the active one, in offer order. */
-const switchTargets = computed(() =>
-  props.methods.filter((m) => m.kind !== activeMethod.value).map((m) => m.kind)
-);
+const switchTargets = computed<ActiveKind[]>(() => {
+  const targets: ActiveKind[] = props.methods
+    .filter((m) => m.kind !== activeMethod.value)
+    .map((m) => m.kind);
+  if (props.recoveryMode && activeMethod.value !== 'reset-pin') targets.unshift('reset-pin');
+  return targets;
+});
 
-function switchLabel(method: MethodKind): string {
+function switchLabel(method: ActiveKind): string {
   switch (method) {
+    case 'reset-pin':
+      return t('recovery.resetPinTitle');
     case 'biometric':
       return t('passkey.signInButton');
     case 'pin':
@@ -201,9 +239,35 @@ function handleSubmit() {
     <div class="space-y-4">
       <!-- ONE active method at a time -->
 
+      <!-- Recovery mode: set a fresh PIN (identity granted by the family recovery secret) -->
+      <form
+        v-if="activeMethod === 'reset-pin'"
+        class="space-y-4"
+        @submit.prevent="handleResetPinSubmit"
+      >
+        <p class="text-center text-sm text-gray-600 dark:text-gray-400">
+          {{ t('recovery.resetPinBody') }}
+        </p>
+        <div>
+          <p class="mb-2 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('pin.newPin') }}
+          </p>
+          <PinInput v-model="resetPin" :disabled="isBusy" autofocus :label="t('pin.newPin')" />
+        </div>
+        <div>
+          <p class="mb-2 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('pin.confirmPin') }}
+          </p>
+          <PinInput v-model="resetPinConfirm" :disabled="isBusy" :label="t('pin.confirmPin')" />
+        </div>
+        <BaseButton type="submit" class="w-full" :disabled="isBusy || resetPin.length !== 6">
+          {{ isBusy ? t('auth.signingIn') : t('recovery.resetPinAction') }}
+        </BaseButton>
+      </form>
+
       <!-- Biometric -->
       <button
-        v-if="activeMethod === 'biometric'"
+        v-else-if="activeMethod === 'biometric'"
         :disabled="isBusy"
         class="group bg-secondary-500 flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 dark:bg-slate-700"
         @click="emit('biometric')"
@@ -283,6 +347,9 @@ function handleSubmit() {
             :placeholder="t('auth.enterYourPassword')"
             required
           />
+          <p v-if="hasPassphrase && !podOpen" class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            {{ t('recovery.passphraseHint') }}
+          </p>
         </div>
 
         <BaseButton type="submit" class="mt-4 w-full" :disabled="isBusy">

@@ -1184,6 +1184,85 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * Recovery-mode PIN reset (the kit/passphrase break-glass): set a NEW PIN for a member
+   * with NO current-credential check, then sign them in. Authorization is possession of
+   * the family-level recovery secret that just opened the pod — the holder already has
+   * the family key (they can read everything), so gating this on the forgotten PIN would
+   * protect nothing and would strand the family the kit exists to rescue. Callers MUST
+   * only reach this from the recovery-mode prove screen.
+   */
+  async function resetMemberPinViaRecovery(
+    memberId: string,
+    newPin: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const translationStore = useTranslationStore();
+    try {
+      const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
+      if (!isValidPin(newPin)) {
+        return { success: false, error: translationStore.t('pin.invalidFormat') };
+      }
+      const familyStore = useFamilyStore();
+      const member = familyStore.members.find((m) => m.id === memberId);
+      if (!member) {
+        return { success: false, error: translationStore.t('auth.memberNotFound') };
+      }
+
+      const pinHash = await hashPassword(newPin);
+      const pinVersion = (member.pinVersion ?? 0) + 1;
+      await familyStore.updateMember(memberId, { pinHash, pinVersion });
+
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      const familyContextStore = useFamilyContextStore();
+      const familyId = familyContextStore.activeFamilyId;
+      if (syncStore.familyKey && familyId) {
+        await enrollPinUnlock({
+          familyId,
+          member: { id: member.id, name: member.name, pinVersion },
+          pin: newPin,
+          familyKey: syncStore.familyKey,
+          keyId: syncStore.envelope?.keyId ?? '',
+        });
+      }
+
+      // Session tail — mirrors signIn.
+      const user: AuthUser = {
+        memberId: member.id,
+        email: member.email,
+        familyId: familyId ?? undefined,
+        role: member.role,
+      };
+      currentUser.value = user;
+      isAuthenticated.value = true;
+      freshSignIn.value = true;
+      persistSession(user);
+      familyStore.setCurrentMember(member.id);
+      familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
+      track('login', { props: { method: 'recovery-reset' } });
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'recovery_pin_reset',
+        context: { action: 'reset', member_id_tail: memberId.slice(-8) },
+      });
+      await syncStore.syncNowBounded();
+      return { success: true };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'recovery PIN reset failed',
+        error: e,
+        severity: 'warning',
+        context: { action: 'recovery_reset_failed' },
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : translationStore.t('auth.signInFailed'),
+      };
+    }
+  }
+
   /** Verify a PIN against the doc-side hash (identity check on an open pod). */
   async function verifyMemberPin(memberId: string, pin: string): Promise<boolean> {
     const familyStore = useFamilyStore();
@@ -2032,6 +2111,7 @@ export const useAuthStore = defineStore('auth', () => {
     signInWithPin,
     setMemberPin,
     verifyMemberPin,
+    resetMemberPinViaRecovery,
     createRecoveryKit,
     setRecoveryPassphrase,
     signInWithPasskey,
