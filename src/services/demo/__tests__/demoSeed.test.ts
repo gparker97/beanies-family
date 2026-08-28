@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   createNewFile: vi.fn(),
   reloadAllStores: vi.fn(),
   setOnboardingCompleted: vi.fn(),
+  dismissKitPrompt: vi.fn(),
   onboardingCompleted: { value: true },
   // services
   setProvider: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock('@/stores/syncStore', () => ({
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
     setOnboardingCompleted: h.setOnboardingCompleted,
+    dismissKitPrompt: h.dismissKitPrompt,
     get onboardingCompleted() {
       return h.onboardingCompleted.value;
     },
@@ -91,6 +93,7 @@ function happyPath(): void {
   h.createNewFile.mockResolvedValue({ ok: true, kit: { kitId: 'demo-kit', code: 'AAAA-BBBB' } });
   h.seedDocument.mockResolvedValue(47);
   h.setOnboardingCompleted.mockResolvedValue(undefined);
+  h.dismissKitPrompt.mockResolvedValue(undefined);
   h.onboardingCompleted.value = true;
   h.reloadAllStores.mockResolvedValue(undefined);
   h.signOutAndClearData.mockResolvedValue(undefined);

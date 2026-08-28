@@ -51,7 +51,14 @@ async function handleMint() {
     const token = generateInviteToken();
     const pkg = await createInvitePackage(fk, token, LINK_EXPIRY_MS);
     const tokenHash = await hashInviteToken(token);
-    await syncStore.addInvitePackage(tokenHash, pkg);
+    // R2-F15: a link whose key never reached the durable file cannot be redeemed
+    // within its 15-minute window — refuse to hand out a dead QR.
+    const published = await syncStore.addInvitePackage(tokenHash, pkg);
+    if (!published) {
+      formError.value = t('deviceLink.publishFailed');
+      emitDeviceLinkMinted(false);
+      return;
+    }
 
     const provider = syncStore.storageProviderType;
     link.value = buildInviteLink({
@@ -67,7 +74,7 @@ async function handleMint() {
     } catch {
       qr.value = ''; // QR is an extra — the link itself is the transport
     }
-    emitDeviceLinkMinted();
+    emitDeviceLinkMinted(true);
   } catch (e) {
     formError.value = t('deviceLink.mintFailed');
     reportError({

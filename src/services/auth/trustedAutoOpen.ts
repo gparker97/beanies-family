@@ -72,8 +72,26 @@ export async function saveTrustedAutoOpenKey(
  * it cannot permanently poison the silent-open path).
  */
 export async function loadTrustedAutoOpenKey(familyId: string): Promise<string | null> {
-  const db = await getRegistryDatabase();
-  const record = await db.get('trustedAutoOpen', familyId);
+  // Read failures (registry blocked by a v5→v6 upgrade race, private-mode IDB,
+  // transient InvalidStateError) must NEVER throw out of here: the old plaintext
+  // read was synchronous and could not fail, and App.vue's boot paths await this —
+  // a throw would render the fatal init overlay on a healthy trusted device.
+  // Degrade to "no key" and report (review R2-F5).
+  let record: TrustedAutoOpenRecord | undefined;
+  let db: Awaited<ReturnType<typeof getRegistryDatabase>> | null = null;
+  try {
+    db = await getRegistryDatabase();
+    record = await db.get('trustedAutoOpen', familyId);
+  } catch (e) {
+    reportError({
+      surface: 'login-flow',
+      message: 'trusted auto-open read failed — degraded to no-key',
+      error: e,
+      severity: 'warning',
+      context: { action: 'auto_open_read_failed' },
+    });
+    return null;
+  }
   if (!record) return null;
   try {
     const salt = new Uint8Array(base64ToBuffer(record.salt));
@@ -82,16 +100,23 @@ export async function loadTrustedAutoOpenKey(familyId: string): Promise<string |
     const raw = await crypto.subtle.exportKey('raw', fk);
     return bufferToBase64(raw);
   } catch (e) {
-    // Unwrap failure = the record is unusable on this device (secret rotated,
-    // corrupt row). Delete it — callers degrade to the normal prove path.
+    // Delete the record ONLY on a genuine WebCrypto unwrap failure (OperationError:
+    // wrong key material — secret rotated, corrupt row). A transient failure
+    // anywhere else (secret read, derivation IDB access) must NOT destroy a valid
+    // credential; degrade to no-key and let the next open retry (review R2-F5).
+    const isUnwrapFailure = e instanceof DOMException && e.name === 'OperationError';
     reportError({
       surface: 'login-flow',
-      message: 'trusted auto-open unwrap failed — record removed',
+      message: isUnwrapFailure
+        ? 'trusted auto-open unwrap failed — record removed'
+        : 'trusted auto-open derivation failed transiently — record kept',
       error: e,
       severity: 'warning',
-      context: { action: 'auto_open_unwrap_failed' },
+      context: { action: isUnwrapFailure ? 'auto_open_unwrap_failed' : 'auto_open_transient' },
     });
-    await db.delete('trustedAutoOpen', familyId).catch(() => {});
+    if (isUnwrapFailure) {
+      await db.delete('trustedAutoOpen', familyId).catch(() => {});
+    }
     return null;
   }
 }

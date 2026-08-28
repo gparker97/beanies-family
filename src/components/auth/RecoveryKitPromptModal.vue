@@ -29,6 +29,10 @@ const kitId = ref('');
 const showKit = ref(false);
 const formError = ref<string | null>(null);
 const isGenerating = ref(false);
+// Review R2-F9: while the confirmation stamp + push are in flight the intro modal
+// must NOT reappear — a second Generate tap would mint a new kit and silently inert
+// the one the user just confirmed storing.
+const isConfirming = ref(false);
 
 async function handleGenerate() {
   formError.value = null;
@@ -48,17 +52,22 @@ async function handleGenerate() {
 }
 
 async function handleStored() {
+  isConfirming.value = true;
   showKit.value = false;
   kitCode.value = '';
-  await settingsStore.markRecoveryKitConfirmed();
-  await syncStore.syncNowBounded();
-  emit('done');
+  try {
+    await settingsStore.markRecoveryKitConfirmed();
+    await syncStore.syncNowBounded();
+  } finally {
+    isConfirming.value = false;
+    emit('done');
+  }
 }
 </script>
 
 <template>
   <div v-if="props.open">
-    <BaseModal :open="open && !showKit" size="sm" :closable="false">
+    <BaseModal :open="open && !showKit && !isConfirming" size="sm" :closable="false">
       <div class="text-center">
         <img
           src="/brand/beanies_logo_transparent_logo_only_192x192.png"

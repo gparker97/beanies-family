@@ -14,7 +14,10 @@
 import type { FamilyMember, RosterCacheEntry, RosterCacheMember } from '@/types/models';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { getFamilyById } from '@/services/familyContext';
-import { saveRosterCache } from '@/services/indexeddb/repositories/rosterCacheRepository';
+import {
+  saveRosterCache,
+  getRosterCache,
+} from '@/services/indexeddb/repositories/rosterCacheRepository';
 import { toISODateString } from '@/utils/date';
 import { emitRosterRefreshFailed } from '@/services/telemetry/loginFlowEvents';
 
@@ -56,11 +59,24 @@ export async function refreshRosterCache(
     if (!familyId) return;
     const family = await getFamilyById(familyId);
 
+    // "Omit = leave unknown" must mean PRESERVE, not erase (review R2-F4): the
+    // caller fires on every members mutation, including snapshot fast-paints where
+    // the envelope isn't loaded yet — a wholesale rebuild would durably wipe a
+    // kit-born family's stored `false` and re-offer a password that can never work.
+    let resolvedWrapsFlag = envelopeHasPasswordWraps;
+    if (resolvedWrapsFlag === undefined) {
+      try {
+        resolvedWrapsFlag = (await getRosterCache(familyId))?.envelopeHasPasswordWraps;
+      } catch {
+        // Preservation is best-effort; an unreadable prior entry stays unknown.
+      }
+    }
+
     const entry: RosterCacheEntry = {
       familyId,
       familyName: family?.name ?? '',
       members: humans.map(toRosterMember),
-      ...(envelopeHasPasswordWraps !== undefined ? { envelopeHasPasswordWraps } : {}),
+      ...(resolvedWrapsFlag !== undefined ? { envelopeHasPasswordWraps: resolvedWrapsFlag } : {}),
       cachedAt: toISODateString(new Date()),
     };
     // TOCTOU guard: the active family can switch between the read above and this write

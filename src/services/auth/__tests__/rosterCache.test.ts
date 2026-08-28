@@ -80,19 +80,26 @@ describe('rosterCache', () => {
     ]);
   });
 
-  it('carries envelopeHasPasswordWraps only when the caller provides it', async () => {
-    await refreshRosterCache([member({ id: 'a' })], false);
+  it('carries envelopeHasPasswordWraps; omission PRESERVES the stored value (review R2-F4)', async () => {
+    // Never stored + omitted → absent (unknown), not defaulted to false.
+    await refreshRosterCache([member({ id: 'a' })]);
     let entry = await getRosterCache('fam-1');
+    expect('envelopeHasPasswordWraps' in entry!).toBe(false);
+
+    await refreshRosterCache([member({ id: 'a' })], false);
+    entry = await getRosterCache('fam-1');
+    expect(entry!.envelopeHasPasswordWraps).toBe(false);
+
+    // Omitted with a stored value → PRESERVED, never erased: the caller fires on
+    // snapshot fast-paints where the envelope isn't loaded yet, and wiping a
+    // kit-born family's `false` would re-offer a password that can never work.
+    await refreshRosterCache([member({ id: 'a' })]);
+    entry = await getRosterCache('fam-1');
     expect(entry!.envelopeHasPasswordWraps).toBe(false);
 
     await refreshRosterCache([member({ id: 'a' })], true);
     entry = await getRosterCache('fam-1');
     expect(entry!.envelopeHasPasswordWraps).toBe(true);
-
-    // Omitted → the field is ABSENT (unknown), not defaulted to false.
-    await refreshRosterCache([member({ id: 'a' })]);
-    entry = await getRosterCache('fam-1');
-    expect('envelopeHasPasswordWraps' in entry!).toBe(false);
   });
 
   it('filters pets out', async () => {

@@ -195,7 +195,21 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
   await clearFileHandleForFamily(familyId);
   await clearProviderConfig(familyId);
 
-  // 4. Clear cached family key
+  // 4. Clear cached family key — BOTH forms (Phase 4): the wrapped trustedAutoOpen
+  // record (family-key material, same class as the PIN wraps below) and any legacy
+  // plaintext remnant.
+  try {
+    const { removeTrustedAutoOpenKey } = await import('@/services/auth/trustedAutoOpen');
+    await removeTrustedAutoOpenKey(familyId);
+  } catch (e) {
+    reportError({
+      surface: 'family-context',
+      message: 'failed to clear the trusted auto-open key on family delete',
+      error: e,
+      severity: 'warning',
+      context: { action: 'delete_family_auto_open' },
+    });
+  }
   const { saveGlobalSettings, getGlobalSettings: getGS } =
     await import('@/services/indexeddb/repositories/globalSettingsRepository');
   const gs = await getGS();

@@ -1600,8 +1600,14 @@ onUnmounted(() => {
 // re-evaluates when any of these reactive values change (avoids race conditions where
 // config state settles after the route change).
 watch(
-  () => [authStore.freshSignIn, route.path, syncStore.isConfigured] as const,
-  async ([isFresh, path], oldVal) => {
+  () =>
+    [
+      authStore.freshSignIn,
+      route.path,
+      syncStore.isConfigured,
+      authStore.currentUser?.memberId,
+    ] as const,
+  async ([isFresh, path, , memberId], oldVal) => {
     if (
       !isFresh ||
       !familyStore.isSetupComplete ||
@@ -1615,8 +1621,12 @@ watch(
       return;
     }
 
-    // Reset the per-sign-in decline latch on a new sign-in
-    if (oldVal && !oldVal[0] && isFresh) {
+    // Reset the per-sign-in decline latch on a new sign-in — keyed on the MEMBER
+    // changing, not a freshSignIn transition (review R2-F11: freshSignIn is only
+    // ever set true, so a switch-person re-sign-in never transitions it and one
+    // member's decline would suppress every sibling's per-member PIN nag for the
+    // whole session).
+    if (oldVal && oldVal[3] !== memberId) {
       authPromptDeclinedThisSignIn.value = false;
     }
 
@@ -1628,7 +1638,6 @@ watch(
     if (!syncStore.isConfigured) return;
 
     const familyId = authStore.currentUser?.familyId;
-    const memberId = authStore.currentUser?.memberId;
     if (!familyId || !memberId) return;
 
     // Phase 4: the ordered prompt chain lives in `authPrompts.ts` (pin → kit →
