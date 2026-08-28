@@ -268,11 +268,11 @@ const STRING_DEFS = {
   // not owner, not pet, member has joined).
   'bean.account.title': { en: 'Account Access', beanie: 'account access' },
   'bean.account.description': {
-    en: "{name} signs in with a password. If they can't sign in, you can set a new one and share it with them.",
+    en: "{name} signs in with their 6-digit PIN. If they've forgotten it (or never had one), you can set a new PIN here and share it with them.",
     beanie:
-      "{name} signs in with a password. if they can't sign in, you can set a new one and share it.",
+      "{name} signs in with their 6-digit pin. if they've forgotten it (or never had one), set a new one here and share it.",
   },
-  'bean.account.resetButton': { en: "Reset {name}'s password", beanie: "reset {name}'s password" },
+  'bean.account.resetButton': { en: "Reset {name}'s PIN", beanie: "reset {name}'s pin" },
   'bean.notFound.title': { en: "We can't find this member", beanie: "can't find this bean" },
   'bean.notFound.body': {
     en: "This member isn't in your pod (or has been removed).",
