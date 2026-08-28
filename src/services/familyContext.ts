@@ -205,17 +205,22 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
     await saveGlobalSettings({ cachedFamilyKeys: updated });
   }
 
-  // 5. Remove from local registry
+  // 5. Clear the device-local roster cache (display data for the pre-decrypt picker)
+  const { deleteRosterCache } =
+    await import('@/services/indexeddb/repositories/rosterCacheRepository');
+  await deleteRosterCache(familyId);
+
+  // 6. Remove from local registry
   const db = await getRegistryDatabase();
   await db.delete('families', familyId);
 
-  // 6. If this was the last active family, clear lastActiveFamilyId
+  // 7. If this was the last active family, clear lastActiveFamilyId
   const currentGs = await getGS();
   if (currentGs.lastActiveFamilyId === familyId) {
     await setLastActiveFamilyId(null);
   }
 
-  // 7. Unregister from remote registry (fire-and-forget)
+  // 8. Unregister from remote registry (fire-and-forget)
   try {
     const { removeFamily } = await import('@/services/registry/registryService');
     await removeFamily(familyId);
