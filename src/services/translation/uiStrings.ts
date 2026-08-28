@@ -4156,6 +4156,32 @@ const STRING_DEFS = {
     en: "Something got in the way of loading your family data. It's usually temporary — try again.",
     beanie: "something got in the way of loading your beans. it's usually temporary — try again.",
   },
+  // ── Logout tiers + Google disconnect (login rethink Phase 5) ──
+  'auth.switchMember': { en: 'Switch Member', beanie: 'switch bean' },
+  'auth.switchMemberHint': {
+    en: 'Hand the app to another family member — your family data stays open, they just sign in as themselves.',
+    beanie:
+      'hand the app to another bean — your family stays open, they just sign in as themselves.',
+  },
+  'googleDisconnect.title': {
+    en: 'Disconnect Google Everywhere',
+    beanie: 'disconnect google everywhere',
+  },
+  'googleDisconnect.description': {
+    en: "For emergencies — if you think this device or your tokens were stolen. Cuts beanies' Google access for EVERY device and family member using this Google account; each will need to reconnect. For a normal sign-out, just use Sign Out.",
+    beanie:
+      "for emergencies — if you think this device or your tokens were stolen. cuts beanies' google access for every device on this google account.",
+  },
+  'googleDisconnect.action': { en: 'Disconnect Everywhere', beanie: 'disconnect everywhere' },
+  'googleDisconnect.confirmTitle': {
+    en: 'Disconnect Google Everywhere?',
+    beanie: 'disconnect google everywhere?',
+  },
+  'googleDisconnect.confirmMessage': {
+    en: 'Every device and family member using this Google account with beanies will lose access until they reconnect. Continue?',
+    beanie:
+      'every device and bean using this google account with beanies will lose access until they reconnect. continue?',
+  },
   // ── Recovery kit + passphrase (login rethink Phase 3) ──
   'recovery.podNotOpen': {
     en: 'Your family data must be open to do this.',
