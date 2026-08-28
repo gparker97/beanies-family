@@ -66,6 +66,24 @@ export function emitRosterFallbackUsed(): void {
   emit('warn', 'roster_fallback_used', { action: 'fallback' });
 }
 
+/** One sign-out ran. Confirms no tier ever revokes; local token deletion only on 2-untrusted/3. */
+export function emitSignoutTier(payload: {
+  tier: 'switch-person' | 'sign-out' | 'sign-out-clear';
+  trusted: boolean;
+  tokensKept: boolean;
+}): void {
+  emit('info', 'signout_tier', {
+    action: payload.tier,
+    kind: payload.trusted ? 'trusted' : 'untrusted',
+    detail: payload.tokensKept ? 'tokens-kept' : 'tokens-cleared',
+  });
+}
+
+/** The Settings "Disconnect Google everywhere" action ran — the ONLY revoke site left. */
+export function emitExplicitRevokeUsed(): void {
+  emit('warn', 'explicit_revoke_used', { action: 'explicit_revoke' });
+}
+
 /** The roster-cache refresh failed (non-fatal; picker degrades to credential records). */
 export function emitRosterRefreshFailed(errorCode: string): void {
   emit('warn', 'roster_cache_refresh_failed', {

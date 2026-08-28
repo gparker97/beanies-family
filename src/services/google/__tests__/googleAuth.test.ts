@@ -1282,7 +1282,7 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     });
 
-    it('preserveRefreshToken keeps the active family token but still clears __pending__', async () => {
+    it('clearLocalTokens:false keeps the active family token but still clears __pending__', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
 
@@ -1294,7 +1294,7 @@ describe('googleAuth (PKCE)', () => {
       });
       await googleAuth.initializeAuth('family-D');
 
-      await googleAuth.clearGoogleSessionState({ preserveRefreshToken: true });
+      await googleAuth.clearGoogleSessionState({ clearLocalTokens: false });
 
       // Active family's token is preserved (trusted-device silent reconnect)…
       expect(clearGoogleRefreshToken).not.toHaveBeenCalledWith('family-D');
@@ -1304,7 +1304,7 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     });
 
-    it('preserveRefreshToken does not fire the network revoke (grant must survive)', async () => {
+    it('NEVER fires a network revoke from session teardown (Phase 5: the grant survives every sign-out)', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       const fetchMock = vi
         .fn()
@@ -1320,15 +1320,17 @@ describe('googleAuth (PKCE)', () => {
       await googleAuth.attemptSilentRefresh();
 
       const callsBefore = fetchMock.mock.calls.length;
-      await googleAuth.clearGoogleSessionState({ preserveRefreshToken: true });
+      await googleAuth.clearGoogleSessionState({ clearLocalTokens: false });
+      await googleAuth.clearGoogleSessionState({ clearLocalTokens: true });
 
-      // No additional fetch (the revoke endpoint) should have been hit.
+      // No additional fetch (the revoke endpoint) on EITHER tier — a whole-grant
+      // revoke would kill every device on the account (2026-08-28 rethink).
       expect(fetchMock.mock.calls.length).toBe(callsBefore);
 
       vi.unstubAllEnvs();
     });
 
-    it('fires best-effort revoke fetch but does not throw on network error', async () => {
+    it('disconnectGoogleEverywhere is the ONE explicit revoke, and does not throw on network error', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       const fetchMock = vi
         .fn()
@@ -1344,8 +1346,10 @@ describe('googleAuth (PKCE)', () => {
       await googleAuth.initializeAuth('family-C');
       await googleAuth.attemptSilentRefresh();
 
-      // Should not throw
-      await expect(googleAuth.clearGoogleSessionState()).resolves.toBeUndefined();
+      // The explicit Settings action revokes (or queues) and tears down — never throws.
+      await expect(googleAuth.disconnectGoogleEverywhere()).resolves.toBeUndefined();
+      expect(googleAuth.isTokenValid()).toBe(false);
+      expect(googleAuth.hasRefreshToken()).toBe(false);
 
       vi.unstubAllEnvs();
     });

@@ -801,6 +801,18 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   }
 
+  /**
+   * Re-arm the trust prompt (Phase 5 of the 2026-08-28 rethink): the one-shot flag made
+   * a single early dismissal permanent, which is how most devices ended up untrusted
+   * forever (and, pre-rethink, revoking Google on every sign-out). Called on untrusted
+   * sign-out so the NEXT sign-in gets the offer again.
+   */
+  async function resetTrustedDevicePrompt(): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      trustedDevicePromptShown: false,
+    });
+  }
+
   async function setPasskeyPromptShown(): Promise<void> {
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
       passkeyPromptShown: true,
@@ -947,6 +959,7 @@ export const useSettingsStore = defineStore('settings', () => {
     removeExchangeRate,
     setTrustedDevice,
     setTrustedDevicePromptShown,
+    resetTrustedDevicePrompt,
     setPasskeyPromptShown,
     cacheFamilyKey,
     getCachedFamilyKey,

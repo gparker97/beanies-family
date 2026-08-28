@@ -135,6 +135,13 @@ function handlePrivacyToggle() {
   playBlink();
 }
 
+function handleSwitchMember() {
+  close();
+  // Tier 1: member-only — the pod stays open, no store resets, no Google anything.
+  authStore.switchMember();
+  router.replace('/login');
+}
+
 async function handleSignOut() {
   close();
   // Sign out first — flushes pending saves while sync service still has the
@@ -554,6 +561,13 @@ const encryptionLabel = computed(() => {
 
               <!-- Sign out buttons -->
               <div class="space-y-1">
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm text-white/80 transition-colors hover:bg-white/[0.05]"
+                  @click="handleSwitchMember"
+                >
+                  {{ t('auth.switchMember') }}
+                </button>
                 <button
                   type="button"
                   class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm text-red-400 transition-colors hover:bg-white/[0.05]"

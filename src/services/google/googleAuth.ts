@@ -1559,34 +1559,33 @@ export async function revokeToken(): Promise<void> {
 }
 
 /**
- * Wipe every layer of Google account session state. Safe to call when
- * no session is active (idempotent). Used by both `signOut` paths and
- * `googleDriveProvider.disconnect()` so the same cleanup runs whether
- * the user explicitly signs out or the storage provider is replaced.
+ * Wipe the Google session state layers this device holds. Safe to call when
+ * no session is active (idempotent). Used by both `signOut` tiers and
+ * `googleDriveProvider.disconnect()`.
  *
- * Local state is cleared synchronously and unconditionally. The network
- * revoke is best-effort and fire-and-forget — a failed revoke does not
- * leave state behind locally, and Google will expire the token on its
- * own anyway. The load-bearing step is removing the refresh token from
- * our storage so subsequent silent-refresh attempts cannot pick it up.
+ * 2026-08-28 login rethink, Phase 5: **no sign-out path revokes the grant at Google any
+ * more.** Revoke is whole-grant per (user, client) — empirically it kills EVERY device's
+ * tokens for that account (`googleRevoke.ts` header) — so revoking from a device-local
+ * action punished every other family member on the account (the cross-device churn the
+ * rethink kills). Deleting the LOCAL tokens already makes this device unable to use the
+ * grant; a live-but-tokenless grant at Google is only exploitable by someone who already
+ * controls the Google account. The ONE user-facing revoke is
+ * `disconnectGoogleEverywhere()` below (Settings → "Disconnect Google from beanies
+ * everywhere") plus the account-CHANGE teardown (`teardownDepartedAccount`), which must
+ * keep its revoke. ADR-031's trusted-device rationale is unchanged; ADR-028's
+ * prompt=consent invariant is untouched.
  *
- * Why both keys are cleared: the `__pending__` family slot is used
- * during login-page OAuth before a family is adopted. If a user signs
- * in with account B (joins/creates a different family) and signs out
- * mid-flow, account B's refresh token can survive under `__pending__`
- * and silently log them in as B on the next session. Always clear it.
+ * `clearLocalTokens`: false (trusted sign-out) keeps the ACTIVE family's persisted
+ * refresh token so re-login silently reconnects to Drive with no Google screen; true
+ * (untrusted sign-out, clear-data, disconnect) deletes it locally. The `__pending__`
+ * family slot is ALWAYS cleared: it can hold a WRONG account's refresh token mid-login
+ * (sign in with account B, sign out mid-flow) which would silently resurrect account B
+ * on the next session.
  */
 export async function clearGoogleSessionState(
-  options: { preserveRefreshToken?: boolean } = {}
+  options: { clearLocalTokens?: boolean } = {}
 ): Promise<void> {
-  // `preserveRefreshToken` keeps the ACTIVE family's persisted refresh token so
-  // a re-login on the same device can silently reconnect to Drive without an
-  // interactive reauth prompt. Used for trusted-device sign-out (mirrors the
-  // IndexedDB cache, which is likewise preserved on trusted devices). The
-  // pending-family slot is ALWAYS cleared and the network revoke is skipped
-  // when preserving, so the surviving grant stays valid. Default (false) is the
-  // full teardown used by shared-device sign-out and `disconnect()`.
-  const { preserveRefreshToken = false } = options;
+  const { clearLocalTokens = true } = options;
 
   // Session teardown: bump the epoch FIRST so any acquisition in flight discards
   // its result, and clear any pending redirect-auth intent (Req 6).
@@ -1597,58 +1596,51 @@ export async function clearGoogleSessionState(
   // revocation incident and page Slack for it.
   clearPermanentFailureFlag();
 
-  const tokenSnapshot = accessToken;
-  // Capture the long-lived refresh token BEFORE clearTokenState() nulls it — it,
-  // not the access token, is what a durable offline revoke must target (#62).
-  const refreshSnapshot = currentRefreshToken?.token ?? null;
   const familyIdSnapshot = currentFamilyId;
 
   // 1. Clear in-memory state immediately (synchronous, fast).
   clearTokenState();
   currentFamilyId = null;
 
-  // 2. Best-effort fire-and-forget network revoke. Never await. Skipped when
-  //    preserving — revoking the grant would invalidate the refresh token we
-  //    are deliberately keeping for a silent reconnect.
-  //
-  //    SECURITY NOTE (2026-06-19, finding 8 — reviewed, intended): on a trusted
-  //    device this leaves the OAuth grant LIVE at Google after sign-out. That is
-  //    deliberate — it's the whole point of trusted-device preservation (commit
-  //    1e8090f7) and mirrors the preserved IndexedDB cache. The user-facing
-  //    "revoke everything" escape hatch is `authStore.signOutAndClearData()`,
-  //    which calls this WITHOUT preserveRefreshToken (full network revoke) AND
-  //    deletes the local cache + resets the trust flag. See ADR-031.
-  if (!preserveRefreshToken && (refreshSnapshot || tokenSnapshot)) {
-    // Shared helper: idempotent, offline-durable, observable (#62). Prefer the
-    // long-lived REFRESH token so an offline sign-out's queued revoke still kills
-    // the grant when it drains (a queued ACCESS token would expire first and leak
-    // it); fall back to the access token when no refresh token is in memory.
-    // Fire-and-forget to keep the synchronous-teardown contract; a transient
-    // failure is queued, not silently dropped.
-    void revokeGrant(refreshSnapshot ?? tokenSnapshot, { grant: 'drive', trigger: 'signout' });
-  } else if (!preserveRefreshToken && familyIdSnapshot) {
-    // (#62c) Nothing in memory to revoke, but a persisted refresh token may still
-    // exist and would be cleared un-revoked in step 3 below — leaking a live grant
-    // toward Google's per-account cap. Read + revoke it first. Awaited (unlike the
-    // fire-and-forget path above) because it only runs on the uncommon both-null
-    // teardown, so it does not slow the common case. Skipped when preserving (the
-    // grant is deliberately kept alive for a trusted-device silent reconnect).
-    const stored = await getGoogleRefreshToken(familyIdSnapshot);
-    if (stored?.token) {
-      await revokeGrant(stored.token, { grant: 'drive', trigger: 'signout' });
-    }
-  }
-
-  // 3. Clear persisted refresh tokens. The pending-family slot is ALWAYS
-  //    cleared (it can hold a wrong account mid-login — see header). The active
-  //    family's token is cleared unless we're preserving the connection.
+  // 2. Clear persisted refresh tokens. The pending-family slot is ALWAYS cleared
+  //    (see header). The active family's token is cleared per `clearLocalTokens`.
   //    Promise.allSettled so one failure doesn't leave the other layer dirty.
   await Promise.allSettled([
-    familyIdSnapshot && !preserveRefreshToken
+    familyIdSnapshot && clearLocalTokens
       ? clearGoogleRefreshToken(familyIdSnapshot)
       : Promise.resolve(),
     clearGoogleRefreshToken(PENDING_FAMILY_KEY),
   ]);
+}
+
+/**
+ * The ONE user-facing whole-grant revoke (Phase 5): Settings → "Disconnect Google from
+ * beanies everywhere". For the my-tokens-were-stolen case. Revokes the grant at Google
+ * (which disconnects EVERY device on this Google account — the caller's UI says so
+ * plainly) and then runs the full local teardown. Google's own account-permissions page
+ * remains the out-of-band alternative.
+ */
+export async function disconnectGoogleEverywhere(): Promise<void> {
+  const tokenSnapshot = accessToken;
+  const refreshSnapshot = currentRefreshToken?.token ?? null;
+  const familyIdSnapshot = currentFamilyId;
+
+  // Prefer the long-lived REFRESH token (an offline-queued revoke of an access token
+  // would expire before draining and leak the grant — #62); fall back through the
+  // persisted copy, then the access token.
+  let target = refreshSnapshot ?? null;
+  if (!target && familyIdSnapshot) {
+    const stored = await getGoogleRefreshToken(familyIdSnapshot);
+    target = stored?.token ?? null;
+  }
+  target ??= tokenSnapshot;
+
+  if (target) {
+    // Shared helper: idempotent, offline-durable, observable (#62). Awaited — this is
+    // an explicit, deliberate action, not a teardown side effect.
+    await revokeGrant(target, { grant: 'drive', trigger: 'explicit-disconnect' });
+  }
+  await clearGoogleSessionState({ clearLocalTokens: true });
 }
 
 /**

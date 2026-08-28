@@ -222,6 +222,13 @@ function promptSignOut() {
   showSignOutModal.value = true;
 }
 
+async function confirmSwitchMember() {
+  showSignOutModal.value = false;
+  // Tier 1: member-only — the pod stays open, no store resets, no Google anything.
+  authStore.switchMember();
+  router.replace('/login');
+}
+
 async function confirmSignOut() {
   showSignOutModal.value = false;
   await authStore.signOut();
@@ -817,6 +824,19 @@ async function confirmSignOutAndClearData() {
 
         <template #footer>
           <div class="flex flex-col gap-3">
+            <!-- Tier 1: switch member — the safe, everyday option (Phase 5) -->
+            <BaseButton
+              variant="secondary"
+              size="sm"
+              class="!h-auto !w-full"
+              @click="confirmSwitchMember"
+            >
+              <template #default>
+                <span class="flex items-center justify-center gap-1.5">
+                  👥 {{ t('auth.switchMember') }}
+                </span>
+              </template>
+            </BaseButton>
             <!-- Sign-out options — side by side -->
             <div class="grid grid-cols-2 gap-3">
               <BaseButton
