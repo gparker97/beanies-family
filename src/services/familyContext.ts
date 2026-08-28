@@ -205,6 +205,20 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
     await saveGlobalSettings({ cachedFamilyKeys: updated });
   }
 
+  // 4b. Clear this family's PIN device-unlock wraps (family-key material)
+  try {
+    const { removePinUnlocksForFamily } = await import('@/services/auth/deviceUnlock');
+    await removePinUnlocksForFamily(familyId);
+  } catch (e) {
+    reportError({
+      surface: 'family-context',
+      message: 'failed to clear PIN unlocks on family delete',
+      error: e,
+      severity: 'warning',
+      context: { action: 'clear_pin_unlocks' },
+    });
+  }
+
   // 5. Clear the device-local roster cache (display data for the pre-decrypt picker)
   const { deleteRosterCache } =
     await import('@/services/indexeddb/repositories/rosterCacheRepository');

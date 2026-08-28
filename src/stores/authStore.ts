@@ -1095,6 +1095,148 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // ── Member PIN (Phase 2 of the 2026-08-28 login rethink) ──────────────────
+  // The PIN is the member's family-wide identity secret: its hash lives INSIDE the
+  // encrypted doc (FamilyMember.pinHash — a file-only attacker never sees anything
+  // guessable), and each set/change also (re-)wraps the family key for THIS device
+  // via deviceUnlock so the PIN unlocks here. Envelope untouched: a PIN can never be
+  // an envelope wrap (10⁶ offline guesses — see the plan's Decision 6).
+
+  /**
+   * Set a member's PIN: doc-side hash + version bump, then this device's unlock wrap.
+   * Guard: setting is allowed when the member has NO PIN yet, or when `currentPin`
+   * verifies (a change). Fail-closed — never overwrites a hash it can't verify.
+   */
+  async function setMemberPin(
+    memberId: string,
+    pin: string,
+    currentPin?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const translationStore = useTranslationStore();
+    try {
+      const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
+      if (!isValidPin(pin)) {
+        return { success: false, error: translationStore.t('pin.invalidFormat') };
+      }
+      const familyStore = useFamilyStore();
+      const member = familyStore.members.find((m) => m.id === memberId);
+      if (!member) {
+        return { success: false, error: translationStore.t('auth.memberNotFound') };
+      }
+      if (member.pinHash) {
+        const okCurrent = currentPin ? await verifyPassword(currentPin, member.pinHash) : false;
+        if (!okCurrent) {
+          return { success: false, error: translationStore.t('pin.currentRequired') };
+        }
+      }
+
+      const pinHash = await hashPassword(pin);
+      const pinVersion = (member.pinVersion ?? 0) + 1;
+      await familyStore.updateMember(memberId, { pinHash, pinVersion });
+
+      // Device wrap: only possible while the pod is open (we hold the family key).
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      const familyContextStore = useFamilyContextStore();
+      const familyId = familyContextStore.activeFamilyId;
+      if (syncStore.familyKey && familyId) {
+        const enrolled = await enrollPinUnlock({
+          familyId,
+          member: { id: member.id, name: member.name, pinVersion },
+          pin,
+          familyKey: syncStore.familyKey,
+          keyId: syncStore.envelope?.keyId ?? '',
+        });
+        if (!enrolled.success) {
+          // The doc-side hash IS set (the PIN works family-wide); only this device's
+          // fast-unlock wrap failed. Say so rather than pretending total failure.
+          reportError({
+            surface: 'login-flow',
+            message: 'PIN set but device-unlock enrolment failed on this device',
+            severity: 'warning',
+            context: { action: 'enroll_after_set_failed' },
+          });
+        }
+      }
+
+      // Ride the next save; best-effort push so the doc-side hash reaches other devices.
+      await syncStore.syncNowBounded();
+      return { success: true };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'setMemberPin threw',
+        error: e,
+        severity: 'warning',
+        context: { action: 'set_pin_failed' },
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : translationStore.t('auth.signInFailed'),
+      };
+    }
+  }
+
+  /** Verify a PIN against the doc-side hash (identity check on an open pod). */
+  async function verifyMemberPin(memberId: string, pin: string): Promise<boolean> {
+    const familyStore = useFamilyStore();
+    const member = familyStore.members.find((m) => m.id === memberId);
+    if (!member?.pinHash) return false;
+    return verifyPassword(pin, member.pinHash);
+  }
+
+  /**
+   * Sign a member in with their PIN on an OPEN pod (identity-only — the pod is already
+   * decrypted; the device wrap covers the closed-pod case in the flow driver). Mirrors
+   * signIn's session tail.
+   */
+  async function signInWithPin(
+    memberId: string,
+    pin: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const translationStore = useTranslationStore();
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const familyStore = useFamilyStore();
+      const member = familyStore.members.find((m) => m.id === memberId);
+      if (!member) {
+        error.value = translationStore.t('auth.memberNotFound');
+        return { success: false, error: error.value };
+      }
+      if (!member.pinHash) {
+        error.value = translationStore.t('pin.notSet');
+        return { success: false, error: error.value };
+      }
+      const valid = await verifyPassword(pin, member.pinHash);
+      if (!valid) {
+        error.value = translationStore.t('pin.incorrect');
+        return { success: false, error: error.value };
+      }
+
+      const familyContextStore = useFamilyContextStore();
+      const user: AuthUser = {
+        memberId: member.id,
+        email: member.email,
+        familyId: familyContextStore.activeFamilyId ?? undefined,
+        role: member.role,
+      };
+      currentUser.value = user;
+      isAuthenticated.value = true;
+      freshSignIn.value = true;
+      persistSession(user);
+      familyStore.setCurrentMember(member.id);
+      familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
+      track('login', { props: { method: 'pin' } });
+      return { success: true };
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : translationStore.t('auth.signInFailed');
+      return { success: false, error: error.value };
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   /**
    * Join an existing family as a pre-created member.
    * Sets the member's password, creates a UserFamilyMapping, and marks onboarding complete.
@@ -1467,6 +1609,15 @@ export const useAuthStore = defineStore('auth', () => {
           context: { action: 'clear_cached_key' },
         });
       }
+      // ...and this family's PIN device-unlock wraps — they ARE family-key material
+      // (wrapped, but the shared device holds the secret half). Same rule as the cached
+      // key: trusted keeps, untrusted clears.
+      try {
+        const { removePinUnlocksForFamily } = await import('@/services/auth/deviceUnlock');
+        await removePinUnlocksForFamily(familyId);
+      } catch (e) {
+        console.warn('Failed to clear PIN unlocks on sign-out:', e);
+      }
       // ...and the pre-decrypt roster cache. It is display data, not key material, but
       // on a shared device it names the family's members to whoever opens the app next —
       // same trust class as the cached key, so it follows the same rule: trusted keeps,
@@ -1621,8 +1772,15 @@ export const useAuthStore = defineStore('auth', () => {
     await settingsStore.setTrustedDevice(false);
     await settingsStore.clearCachedFamilyKey();
 
-    // This path promises a clean device: clear every family's pre-decrypt roster too
-    // (display data, but it names the family's members to the next user of the machine).
+    // This path promises a clean device: every PIN device-unlock wrap goes (family-key
+    // material), then every family's pre-decrypt roster (display data, but it names the
+    // family's members to the next user of the machine).
+    try {
+      const { removeAllPinUnlocks } = await import('@/services/auth/deviceUnlock');
+      await removeAllPinUnlocks();
+    } catch (e) {
+      console.warn('Failed to clear PIN unlocks on sign-out-and-clear:', e);
+    }
     try {
       const { clearAllRosterCache } =
         await import('@/services/indexeddb/repositories/rosterCacheRepository');
@@ -1659,6 +1817,9 @@ export const useAuthStore = defineStore('auth', () => {
     initializeAuth,
     signIn,
     signInPasswordless,
+    signInWithPin,
+    setMemberPin,
+    verifyMemberPin,
     signInWithPasskey,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,

@@ -152,6 +152,52 @@ export interface RosterCacheEntry {
   cachedAt: ISODateString;
 }
 
+/**
+ * DeviceUnlockRecord - a member's PIN-wrapped family key on THIS device (Phase 2 of the
+ * 2026-08-28 login rethink). Registry DB, survives sign-out on trusted devices. The wrap
+ * is AES-KW under HKDF(deviceSecret, info=PIN) — never derivable from the file alone, so
+ * the Drive file stays brute-force-resistant exactly as before. FK MATERIAL: cleared on
+ * untrusted sign-out, sign-out-and-clear, and deleteLocalFamily.
+ */
+export interface DeviceUnlockRecord {
+  /** `${familyId}:${memberId}` (keyPath). */
+  id: string;
+  familyId: UUID;
+  memberId: UUID;
+  /** Enrol-time display hint — same privacy class as PasskeyRegistration.memberName. */
+  memberName: string;
+  /** Base64 AES-KW wrap of the family key. */
+  wrappedFK: string;
+  /** Base64 32-byte per-record HKDF salt. */
+  hkdfSalt: string;
+  /** Envelope keyId at wrap time — key rotation invalidates this record fail-closed (#117). */
+  keyId: string;
+  /** Doc-side member.pinVersion at wrap time — a mismatch after open prompts a re-wrap. */
+  pinVersion: number;
+  /**
+   * Persisted (awaited) BEFORE the failure UI renders, so closing the tab between
+   * attempts cannot reset the counter. Single writer: deviceUnlock.ts only.
+   */
+  failCount: number;
+  /** 'hkdf' = non-extractable device CryptoKey; 'hkdf+pbkdf2' = extractable-bytes fallback. */
+  kdf: 'hkdf' | 'hkdf+pbkdf2';
+  createdAt: ISODateString;
+}
+
+/**
+ * DeviceSecretRecord - the per-device 256-bit secret mixed into every PIN wrap. Stored
+ * as a NON-EXTRACTABLE HKDF base CryptoKey via structured clone where supported;
+ * `rawSecret` is the extractable fallback (flagged in telemetry, PIN additionally
+ * stretched with PBKDF2). One per device, shared across families.
+ */
+export interface DeviceSecretRecord {
+  id: 'device_secret';
+  key?: CryptoKey;
+  rawSecret?: string;
+  kdf: 'hkdf' | 'hkdf+pbkdf2';
+  createdAt: ISODateString;
+}
+
 // PasskeySecret - PRF-wrapped family key stored in .beanpod envelope
 export interface PasskeySecret {
   credentialId: string; // Which passkey credential created this
@@ -224,7 +270,21 @@ export interface FamilyMember {
   canEditActivities?: boolean;
   canManagePod?: boolean;
   color: string; // UI differentiation
-  passwordHash?: string; // PBKDF2 hash in "salt:hash" format
+  passwordHash?: string;
+  /**
+   * PBKDF2 hash of the member's 6-digit PIN, 'salt:hash' format (passwordService) —
+   * the family-wide identity secret of the 2026-08-28 login rethink. Lives INSIDE the
+   * encrypted doc, so a file-only attacker never sees anything guessable. Optional and
+   * additive: passwordHash keeps working until Phase 4 retires it per family.
+   */
+  pinHash?: string;
+  /**
+   * Incremented on every PIN change. Device-unlock wraps record the version they were
+   * created against; a mismatch after open prompts a re-wrap with the current PIN
+   * (the stale device's OLD PIN keeps unlocking until then — the same bounded trust
+   * window healStaleWrappedKey accepts for passwords).
+   */
+  pinVersion?: number; // PBKDF2 hash in "salt:hash" format
   requiresPassword: boolean; // true when member needs to set a password
   lastLoginAt?: ISODateString;
   /**

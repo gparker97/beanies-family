@@ -4156,6 +4156,56 @@ const STRING_DEFS = {
     en: "Something got in the way of loading your family data. It's usually temporary — try again.",
     beanie: "something got in the way of loading your beans. it's usually temporary — try again.",
   },
+  // ── Member PIN (login rethink Phase 2) ──
+  'pin.invalidFormat': {
+    en: 'Your PIN must be exactly 6 digits.',
+    beanie: 'your pin must be exactly 6 digits.',
+  },
+  'pin.currentRequired': {
+    en: 'Enter your current PIN to change it.',
+    beanie: 'enter your current pin to change it.',
+  },
+  'pin.notSet': {
+    en: "This member hasn't set a PIN yet.",
+    beanie: "this bean hasn't set a pin yet.",
+  },
+  'pin.incorrect': { en: "That PIN isn't right.", beanie: "that pin isn't right." },
+  'pin.attemptsLeft': {
+    en: "That PIN isn't right — {count} attempts left before PIN unlock is turned off on this device.",
+    beanie: "that pin isn't right — {count} tries left before pin unlock turns off on this device.",
+  },
+  'pin.lockedOut': {
+    en: 'PIN unlock is turned off on this device after too many attempts. Sign in another way, then set it up again.',
+    beanie:
+      'pin unlock turned off on this device after too many tries. sign in another way, then set it up again.',
+  },
+  'pin.changedElsewhere': {
+    en: 'Your PIN was changed on another device — enter your current PIN.',
+    beanie: 'your pin changed on another device — enter your current pin.',
+  },
+  'pin.enterPin': { en: 'Enter Your PIN', beanie: 'enter your pin' },
+  'pin.signInWithPin': { en: 'Sign In with PIN', beanie: 'sign in with pin' },
+  'pin.setTitle': { en: 'Set a PIN', beanie: 'set a pin' },
+  'pin.changeTitle': { en: 'Change Your PIN', beanie: 'change your pin' },
+  'pin.newPin': { en: 'New PIN', beanie: 'new pin' },
+  'pin.confirmPin': { en: 'Confirm PIN', beanie: 'confirm pin' },
+  'pin.currentPin': { en: 'Current PIN', beanie: 'current pin' },
+  'pin.mismatch': { en: "Those PINs don't match.", beanie: "those pins don't match." },
+  'pin.setSuccess': {
+    en: 'PIN set! You can now sign in with it on any of your devices.',
+    beanie: 'pin set! you can now sign in with it on any of your devices.',
+  },
+  'pin.settingsDescription': {
+    en: 'A 6-digit PIN signs you in on any device where your family is set up — quicker than a password, and it never leaves your family data file.',
+    beanie:
+      'a 6-digit pin signs you in on any device where your family is set up — quicker than a password.',
+  },
+  'pin.promptTitle': { en: 'Set Up a PIN?', beanie: 'set up a pin?' },
+  'pin.promptBody': {
+    en: 'Sign in with a quick 6-digit PIN instead of your password. You can set one up now or later in Settings.',
+    beanie:
+      'sign in with a quick 6-digit pin instead of your password. set one up now or later in settings.',
+  },
   'loginFlow.recoveryTitleUnproven': { en: "Let's Reconnect", beanie: "let's reconnect" },
   'loginFlow.recoveryAuthBodyUnproven': {
     en: 'We need to reconnect to Google before you can sign in — one tap, then pick up right where you were.',

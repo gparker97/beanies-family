@@ -5,10 +5,12 @@ import type {
   GlobalSettings,
   PasskeyRegistration,
   RosterCacheEntry,
+  DeviceUnlockRecord,
+  DeviceSecretRecord,
 } from '@/types/models';
 
 const REGISTRY_DB_NAME = 'beanies-registry';
-const REGISTRY_DB_VERSION = 4;
+const REGISTRY_DB_VERSION = 5;
 
 export interface RegistryDB extends DBSchema {
   families: {
@@ -38,6 +40,17 @@ export interface RegistryDB extends DBSchema {
   rosterCache: {
     key: string;
     value: RosterCacheEntry;
+  };
+  deviceUnlock: {
+    key: string;
+    value: DeviceUnlockRecord;
+    indexes: {
+      'by-familyId': string;
+    };
+  };
+  deviceSecrets: {
+    key: string;
+    value: DeviceSecretRecord;
   };
 }
 
@@ -111,6 +124,16 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
       // login rethink). Display data only — see RosterCacheEntry in models.ts.
       if (!db.objectStoreNames.contains('rosterCache')) {
         db.createObjectStore('rosterCache', { keyPath: 'familyId' });
+      }
+
+      // v5: PIN device-unlock wraps + the per-device secret (login rethink Phase 2).
+      // See DeviceUnlockRecord / DeviceSecretRecord in models.ts.
+      if (!db.objectStoreNames.contains('deviceUnlock')) {
+        const unlockStore = db.createObjectStore('deviceUnlock', { keyPath: 'id' });
+        unlockStore.createIndex('by-familyId', 'familyId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('deviceSecrets')) {
+        db.createObjectStore('deviceSecrets', { keyPath: 'id' });
       }
     },
   });
