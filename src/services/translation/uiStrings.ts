@@ -314,6 +314,7 @@ const STRING_DEFS = {
   'bean.stats.age': { en: 'years old', beanie: 'years old' },
   'bean.hero.edit': { en: 'Edit', beanie: 'edit' },
   'bean.hero.addSomething': { en: 'Add Something', beanie: 'add something' },
+  'bean.hero.invite': { en: 'Invite', beanie: 'invite' },
   'bean.hero.add.favorite': { en: '💝 Favorite', beanie: '💝 favorite' },
   'bean.hero.add.saying': { en: '💬 Saying', beanie: '💬 saying' },
   'bean.hero.add.milestone': { en: '🌟 Milestone', beanie: '🌟 milestone' },
