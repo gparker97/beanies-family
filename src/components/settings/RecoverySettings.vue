@@ -91,11 +91,14 @@ async function handleDownloadKitPdf() {
   try {
     const png = await exportElementToPng(kitCardEl.value);
     const pdf = await pngBlobToPdf(png);
+    // preferDownload: "Save as PDF" means SAVE — on share-capable desktops the OS sheet
+    // offered no plain save-to-disk (greg's local-test find).
     await shareOrDownloadFile(
       pdf,
       `beanies-recovery-kit-${kitId.value}.pdf`,
       'application/pdf',
-      t('recovery.kitModalTitle')
+      t('recovery.kitModalTitle'),
+      { preferDownload: true }
     );
   } catch (e) {
     kitPdfError.value = true;
@@ -214,10 +217,10 @@ async function handleSavePassphrase() {
             {{ suggested }}
           </p>
           <div class="flex gap-3">
-            <BaseButton variant="ghost" type="button" @click="suggested = generatePassphrase()">
+            <BaseButton variant="secondary" type="button" @click="suggested = generatePassphrase()">
               {{ t('recovery.passphraseRegenerate') }}
             </BaseButton>
-            <BaseButton variant="ghost" type="button" @click="useOwn = true">
+            <BaseButton variant="secondary" type="button" @click="useOwn = true">
               {{ t('recovery.passphraseUseOwn') }}
             </BaseButton>
           </div>
