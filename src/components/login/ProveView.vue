@@ -29,7 +29,7 @@ const props = defineProps<{
   /** Error text owned by the flow driver (wrong password, mismatch, …). */
   error: string | null;
   isBusy: boolean;
-  /** Whether the pod is already open — drives create-password vs bootstrap copy. */
+  /** Whether the pod is already open — drives tap-through and passphrase-hint copy. */
   podOpen: boolean;
   /**
    * A family-level recovery secret opened the pod: identity is granted by possession,
@@ -45,7 +45,6 @@ const emit = defineEmits<{
   'tap-through': [];
   pin: [pin: string];
   password: [password: string];
-  'create-password': [password: string];
   /** The user moved past an offered stronger method (telemetry). */
   'fell-back': [];
   /** Cold-path escape: redeem a recovery kit instead. */
@@ -67,12 +66,13 @@ const offered = computed<MethodKind[]>(() => props.methods.map((m) => m.kind));
  * behind a link.
  */
 type ActiveKind = MethodKind | 'reset-pin';
+const firstNonRecovery = props.methods.find((m) => m.kind !== 'recovery')?.kind;
 const activeMethod = ref<ActiveKind>(
   props.recoveryMode
     ? 'reset-pin'
     : props.error && props.methods.some((m) => m.kind === 'password')
       ? 'password'
-      : (props.methods[0]?.kind ?? 'password')
+      : (firstNonRecovery ?? 'recovery')
 );
 const resetPin = ref('');
 const resetPinConfirm = ref('');
@@ -91,20 +91,11 @@ function handleResetPinSubmit() {
 }
 
 const password = ref('');
-const confirmPassword = ref('');
 const pinValue = ref('');
 const localError = ref<string | null>(null);
 const pinInputRef = ref<InstanceType<typeof PinInput> | null>(null);
 /** One telemetry ping per screen, however many times the user switches down. */
 let fellBackOnce = false;
-
-/**
- * Create-password mode: the member has no credential AND the pod is open (the doc must
- * be writable to store the hash). A credential-less member on a CLOSED pod cannot
- * bootstrap alone — the password form stays in normal mode and the family's usual
- * opener is the path in (matches today's deferred-password semantics).
- */
-const isCreatingPassword = computed(() => props.person.hasCredential === false && props.podOpen);
 
 const shownError = computed(() => localError.value ?? props.error);
 
@@ -134,6 +125,11 @@ watch(
 
 function switchTo(method: ActiveKind) {
   localError.value = null;
+  // Phase 4: 'recovery' is the terminal ESCAPE, not a pane — route straight out.
+  if (method === 'recovery') {
+    emit('use-recovery');
+    return;
+  }
   if (
     !fellBackOnce &&
     offered.value[0] &&
@@ -150,7 +146,10 @@ function switchTo(method: ActiveKind) {
 const switchTargets = computed<ActiveKind[]>(() => {
   const targets: ActiveKind[] = props.methods
     .filter((m) => m.kind !== activeMethod.value)
-    .map((m) => m.kind);
+    .map((m) => m.kind)
+    // The recovery terminal renders as the standalone kit chip below (always
+    // visible now, warm included) — never as a switch link too.
+    .filter((k) => k !== 'recovery');
   if (props.recoveryMode && activeMethod.value !== 'reset-pin') targets.unshift('reset-pin');
   return targets;
 });
@@ -165,6 +164,8 @@ function switchLabel(method: ActiveKind): string {
       return t('pin.signInWithPin');
     case 'tap-through':
       return `${t('loginV6.signInAs')} ${props.person.name}`;
+    case 'recovery':
+      return t('recovery.useKitLink');
     default:
       return t('passkey.usePassword');
   }
@@ -174,18 +175,6 @@ function handleSubmit() {
   localError.value = null;
   if (!password.value) {
     localError.value = t('auth.enterPassword');
-    return;
-  }
-  if (isCreatingPassword.value) {
-    if (password.value.length < 8) {
-      localError.value = t('auth.passwordMinLength');
-      return;
-    }
-    if (password.value !== confirmPassword.value) {
-      localError.value = t('auth.passwordsDoNotMatch');
-      return;
-    }
-    emit('create-password', password.value);
     return;
   }
   emit('password', password.value);
@@ -317,50 +306,28 @@ function handleSubmit() {
         {{ `${t('loginV6.signInAs')} ${person.name}` }}
       </BaseButton>
 
-      <!-- Password (create mode for credential-less on an open pod) -->
+      <!-- Recovery-only (no local method at all): the escape IS the screen -->
+      <div v-else-if="activeMethod === 'recovery'" class="space-y-3 text-center">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {{ t('loginFlow.recoveryOnlyBody') }}
+        </p>
+      </div>
+
+      <!-- Password (legacy members) -->
       <form v-else @submit.prevent="handleSubmit">
-        <div v-if="isCreatingPassword">
-          <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
-            {{ t('auth.createPasswordPrompt') }}
-          </p>
-          <BaseInput
-            v-model="password"
-            :label="t('auth.createPassword')"
-            type="password"
-            :placeholder="t('auth.createPasswordPlaceholder')"
-            required
-          />
-          <div class="mt-3">
-            <BaseInput
-              v-model="confirmPassword"
-              :label="t('auth.confirmPassword')"
-              type="password"
-              :placeholder="t('auth.confirmPasswordPlaceholder')"
-              required
-            />
-          </div>
-        </div>
-        <div v-else>
-          <BaseInput
-            v-model="password"
-            :label="t('auth.password')"
-            type="password"
-            :placeholder="t('auth.enterYourPassword')"
-            required
-          />
-          <p v-if="hasPassphrase && !podOpen" class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-            {{ t('recovery.passphraseHint') }}
-          </p>
-        </div>
+        <BaseInput
+          v-model="password"
+          :label="t('auth.password')"
+          type="password"
+          :placeholder="t('auth.enterYourPassword')"
+          required
+        />
+        <p v-if="hasPassphrase && !podOpen" class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+          {{ t('recovery.passphraseHint') }}
+        </p>
 
         <BaseButton type="submit" class="mt-4 w-full" :disabled="isBusy">
-          {{
-            isBusy
-              ? t('auth.signingIn')
-              : isCreatingPassword
-                ? t('auth.createAndSignIn')
-                : `${t('loginV6.signInAs')} ${person.name}`
-          }}
+          {{ isBusy ? t('auth.signingIn') : `${t('loginV6.signInAs')} ${person.name}` }}
         </BaseButton>
       </form>
 
@@ -378,8 +345,9 @@ function handleSubmit() {
         </button>
       </div>
 
-      <!-- Cold-path escape: a member who has forgotten everything reaches the kit here -->
-      <div v-if="!podOpen" class="pt-2">
+      <!-- The recovery terminal: a member who has forgotten everything reaches the
+           kit / passphrase / bootstrap here. Always present (never-blank guarantee). -->
+      <div class="pt-2">
         <RecoveryKitLink :disabled="isBusy" @click="emit('use-recovery')" />
       </div>
     </div>

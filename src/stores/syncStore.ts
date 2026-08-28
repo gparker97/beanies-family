@@ -23,7 +23,7 @@ import { useMealPlanStore } from './mealPlanStore';
 import { useEmergencyContactsStore } from './emergencyContactsStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
-import { useAuthStore, DEFERRED_PASSWORD_HASH } from './authStore';
+import { useAuthStore } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import { isLoaded as isProjectionLoaded } from '@/services/automerge/projection';
@@ -94,6 +94,7 @@ import {
   createBeanpodV4,
   parseBeanpodV4,
   tryUnwrapFamilyKey,
+  envelopeNeedsRecovery,
   reEncryptEnvelope,
   detectFileVersion,
 } from '@/services/sync/fileSync';
@@ -104,7 +105,6 @@ import {
   wrapFamilyKey,
 } from '@/services/crypto/familyKeyService';
 import * as docClient from '@/services/automerge/worker/docClient';
-import { bufferToBase64 } from '@/utils/encoding';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
@@ -1630,8 +1630,12 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Create a new V4 beanpod file.
    *
-   * Returns a `CreatePodResult` discriminated union: on success `{ ok: true }`,
-   * on failure `{ ok: false, reason, error }` where `reason` is the specific
+   * Returns a `CreatePodResult` discriminated union: on success
+   * `{ ok: true, kit }` — Phase 4: the pod is born PASSWORD-FREE, its only
+   * envelope wrap is a freshly generated recovery kit's (generated internally
+   * because the wrap needs the FK, which this function creates); the kit's
+   * one-time code is returned for the wizard's mandatory display step and never
+   * persisted. On failure `{ ok: false, reason, error }` where `reason` is the specific
    * failure mode the caller can branch on. The caller is responsible for
    * surfacing the failure to the user (it has translation context and can
    * pick the right per-reason message); this function does cleanup only.
@@ -1648,7 +1652,6 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function createNewFile(
     _podFileName: string,
-    password: string,
     memberId: string,
     familyId: string,
     familyName: string,
@@ -1705,16 +1708,18 @@ export const useSyncStore = defineStore('sync', () => {
       };
     }
 
-    // Fail-closed: the unified create flow builds the owner with the empty
-    // `DEFERRED_PASSWORD_HASH` sentinel at step 1 and applies the real hash via
+    // Fail-closed: the unified create flow builds the owner credential-less at
+    // step 1 (`passwordHash` = the DEFERRED_PASSWORD_HASH sentinel, permanently —
+    // kit-born families are password-free) and applies the real PIN hash via
     // `rehydrateOwnerDoc` on the finish surface BEFORE this runs. If the owner
-    // still carries the sentinel, the password step was skipped — writing the
-    // pod would mint an envelope whose owner can never authenticate. Refuse the
-    // write (structurally impossible to ship a deferred-hash pod) and report it
-    // loudly. References the SAME constant as `signUp`'s deferred branch.
-    if (ownerMember.passwordHash === DEFERRED_PASSWORD_HASH) {
+    // still has no `pinHash`, the PIN step was skipped — writing the pod would
+    // mint a family whose owner can never authenticate. Refuse the write
+    // (structurally impossible to ship a credential-less pod) and report it
+    // loudly. Subsumes the old password-sentinel check: sentinel + no pinHash is
+    // exactly this refused state.
+    if (!ownerMember.pinHash) {
       const err = new Error(
-        `createNewFile refused: owner member ${memberId} still carries the deferred-password sentinel (rehydrateOwnerDoc was not called before the write)`
+        `createNewFile refused: owner member ${memberId} has no pinHash (rehydrateOwnerDoc was not called before the write)`
       );
       reportError({
         surface: 'syncStore.deferredHashLeak',
@@ -1781,14 +1786,15 @@ export const useSyncStore = defineStore('sync', () => {
     let partialFileId: string | null = null;
 
     try {
-      // 1. Build the encrypted envelope (in-memory, no I/O).
+      // 1. Build the encrypted envelope (in-memory, no I/O). Phase 4: the
+      // envelope's ONLY wrap at birth is the recovery kit's — full entropy,
+      // offline-attack-proof; the owner's PIN is identity + device unlock,
+      // never an envelope wrap. A kit-generation throw aborts here, BEFORE any
+      // write, and surfaces through the mapped-error + cleanup path below.
       const fk = await generateFamilyKey();
-      const salt = crypto.getRandomValues(new Uint8Array(16));
-      const memberKey = await deriveMemberKey(password, salt);
-      const wrapped = await wrapFamilyKey(fk, memberKey);
-      const wrappedKeys: Record<string, WrappedMemberKey> = {
-        [memberId]: { salt: bufferToBase64(salt), wrapped },
-      };
+      const { generateRecoveryKit } = await import('@/services/auth/recoveryKit');
+      const kit = await generateRecoveryKit(fk);
+      const wrappedKeys: Record<string, WrappedMemberKey> = {};
       // Note: the Automerge doc was initialized by `authStore.signUp()` (now in
       // the worker) before this function was called. We deliberately do NOT
       // re-init here — that would wipe the owner-member writes already in the doc.
@@ -1796,7 +1802,17 @@ export const useSyncStore = defineStore('sync', () => {
       // assembles the envelope (keys never leave main).
       await docClient.setFamilyKey(fk);
       const { payload } = await docClient.exportEncryptedPayload();
-      const envelopeJson = createBeanpodV4(familyId, familyName, payload, wrappedKeys);
+      const envelopeJson = createBeanpodV4(
+        familyId,
+        familyName,
+        payload,
+        wrappedKeys,
+        {},
+        {},
+        {
+          [kit.kitId]: kit.pkg,
+        }
+      );
 
       // 2. Write to provider. `getFileId()` is captured after write so the
       //    cleanup helper can target the correct file for rename on failure.
@@ -1902,7 +1918,7 @@ export const useSyncStore = defineStore('sync', () => {
         );
       }
 
-      return { ok: true };
+      return { ok: true, kit: { kitId: kit.kitId, code: kit.code } };
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
       const reason = classifyCreateFailure(step, err);
@@ -2400,7 +2416,7 @@ export const useSyncStore = defineStore('sync', () => {
     const familyCtx = useFamilyContextStore();
     const settingsStore = useSettingsStore();
     const famId = familyCtx.activeFamilyId;
-    const cachedKeyB64 = famId ? settingsStore.getCachedFamilyKey(famId) : null;
+    const cachedKeyB64 = famId ? await settingsStore.getCachedFamilyKey(famId) : null;
     if (!cachedKeyB64) return false;
 
     try {
@@ -3614,6 +3630,13 @@ export const useSyncStore = defineStore('sync', () => {
         kind: 'network-error',
         error: new Error('No pending pod envelope — fetch step did not run'),
       };
+    }
+
+    // Phase 4: a kit-born envelope has NO password wraps — a password can never
+    // succeed and `tryUnwrapFamilyKey` would throw "No wrapped keys" (which the
+    // old mapping surfaced as a retrying network-error). Route to recovery.
+    if (envelopeNeedsRecovery(pending.envelope)) {
+      return { kind: 'needs-recovery' };
     }
 
     const previousState = criticalWriteState.value;

@@ -618,6 +618,17 @@ async function handleFileLoaded(source?: 'recovery') {
   flow.recoveryMode.value = source === 'recovery';
 }
 
+/**
+ * Phase 4 device link redeemed: the linked family's pod is open in memory — enter the
+ * standard machine (person picker; the member proves with their doc-synced PIN or
+ * taps through). Falls back to the welcome gate if the machine can't start.
+ */
+async function handleLinkReady(familyId: string, familyName: string) {
+  activeView.value = 'loading';
+  if (await enterFlow(familyId, familyName)) return;
+  activeView.value = 'welcome';
+}
+
 function handleSignedIn(destination: string) {
   // Single canonical arm-and-register point for EVERY entry path — create,
   // load, join, reconnect. SetupProgressModal no longer calls these (it used to,
@@ -679,7 +690,6 @@ async function handleStartOver() {
           @tap-through="flow.onTapThrough"
           @pin="flow.onPinSubmit"
           @password="flow.onPasswordSubmit"
-          @create-password="flow.onCreatePassword"
           @fell-back="flow.onFellBack"
           @use-recovery="handleUseRecoveryKit"
           @reset-pin="flow.onResetPin"
@@ -779,6 +789,7 @@ async function handleStartOver() {
         v-else-if="activeView === 'resume-setup'"
         @signed-in="handleSignedIn"
         @start-over="handleStartOver"
+        @use-recovery="handleUseRecoveryKit"
       />
 
       <JoinPodView
@@ -786,6 +797,7 @@ async function handleStartOver() {
         @back="activeView = 'welcome'"
         @signed-in="handleSignedIn"
         @navigate="handleNavigate"
+        @link-ready="handleLinkReady"
       />
     </template>
 

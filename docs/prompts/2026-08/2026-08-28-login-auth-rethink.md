@@ -129,3 +129,15 @@ PWA updater (loop; not a defect), and the REAL one — old-tab registry connecti
 blocking the v3→v5 upgrade → 35s watchdog fatal screen. Hotfixed as 0.13R1
 (`7b72f104`): bounded 15s blocked-wait → typed error → actionable "close other beanies
 tabs" copy. Verified live.
+
+### Phase 4 (final phase) — same day, post-0.13R1
+
+> **greg:** "confirmed working now on my desktop in prod. question - has the setup wizard or onboarding process been updated at all? from what i can tell it is still asking to set a password. should we update this to set a PIN, as well as giving the opportunity to set a passphrase and download the emergency backup file? should we consult /frontend-design:frontend-design for the easiest and most intuitive way to do this as part of setup to make it seamless and minimal friction - no need for a mockup."
+
+> **greg:** "pls do not implement anything just review and update the plan for the final implementation phase 4. pls ensure that all angles are covered so that phase 4 covers everything remaining, including the setup wizard work and anything else. once done you can go ahead with the final implementation. once done run a code review max again to review all code implemented to ensure it works as designed and as per the plan, and no new bugs or side effects were introduced."
+
+> **greg:** "how can we make the passphrase creation as simple as possible? should the passphrase simply be generated automatically and added to the recovery kit to reduce the number of steps"
+
+Decision recorded: passphrase NOT auto-generated and NOT added to the kit (weaker
+duplicate of the kit in the same storage location, ~32-bit entropy exposed by default,
+unmemorized). Wizard = PIN + kit only; passphrase stays a Settings opt-in.

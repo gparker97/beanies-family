@@ -47,8 +47,6 @@ import {
 } from '@/services/auth/deviceUnlock';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { registerPasskeyForMember } from '@/services/auth/passkeyService';
-import { raceTimeout } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 
@@ -80,7 +78,6 @@ export interface UseLoginFlow {
   onPasswordSubmit(password: string): void;
   onPinSubmit(pin: string): Promise<void>;
   onResetPin(pin: string): Promise<void>;
-  onCreatePassword(password: string): Promise<void>;
   onFellBack(): void;
   // Recovery-panel handlers
   onRecoveryRetry(): void;
@@ -115,12 +112,6 @@ export function useLoginFlow(opts: {
   let pendingPassword: string | null = null;
   /** The prove screen's fallbackDepth captured with the password (telemetry fidelity). */
   let pendingProveDepth = 0;
-  /**
-   * A web passkey asserted this member but produced no key (no PRF, no cache). Once
-   * they open with their password instead, re-wrap the family key for this device so
-   * the NEXT biometric works — the self-heal the old cross-device path performed.
-   */
-  let pendingCrossDeviceHeal: { memberId: string; familyId: string } | null = null;
 
   function dispatch(event: LoginFlowEvent): void {
     const next = transition(state.value, event);
@@ -131,6 +122,11 @@ export function useLoginFlow(opts: {
 
   const podOpen = () => familyStore.members.length > 0;
 
+  // Phase 4: whether the family's envelope holds ANY password wraps — roster-carried
+  // when cold (kit-born families store `false`), read live when warm. Feeds the prove
+  // engine's conditional password probe; `null` = unknown → password stays offered.
+  const envelopeHasPasswordWraps = ref<boolean | null>(null);
+
   // ── People-list resolution (roster → credential records → bootstrap) ──────────
 
   async function buildPeople(
@@ -138,6 +134,8 @@ export function useLoginFlow(opts: {
   ): Promise<{ people: PersonCard[]; source: PersonSource } | null> {
     // 1. Pod already open: the live roster, photos included.
     if (podOpen()) {
+      const env = syncStore.envelope;
+      envelopeHasPasswordWraps.value = env ? Object.keys(env.wrappedKeys ?? {}).length > 0 : null;
       const people: PersonCard[] = familyStore.sortedHumans.map((m) => ({
         id: m.id,
         name: m.name,
@@ -145,6 +143,7 @@ export function useLoginFlow(opts: {
         gender: m.gender,
         ageGroup: m.ageGroup,
         hasCredential: !!m.passwordHash || !!m.pinHash,
+        hasPassword: !!m.passwordHash,
         photoUrl: getMemberAvatarUrl(m) ?? undefined,
       }));
       return people.length > 0 ? { people, source: 'open-pod' } : null;
@@ -154,6 +153,7 @@ export function useLoginFlow(opts: {
     try {
       const entry = await getRosterCache(familyId);
       if (entry && entry.members.length > 0) {
+        envelopeHasPasswordWraps.value = entry.envelopeHasPasswordWraps ?? null;
         return { people: entry.members, source: 'roster' };
       }
     } catch (e) {
@@ -171,6 +171,7 @@ export function useLoginFlow(opts: {
       const keys = await resolveDeviceKeys(familyId);
       if (keys.length > 0) {
         emitRosterFallbackUsed();
+        envelopeHasPasswordWraps.value = null;
         const people: PersonCard[] = keys.map((k) => ({
           id: k.memberId,
           name: k.memberName || k.label,
@@ -194,7 +195,7 @@ export function useLoginFlow(opts: {
    * screen after a plain sign-out. No-ops (false) when there is no cached key.
    */
   async function tryCachedKeyDecrypt(familyId: string): Promise<boolean> {
-    const cachedKeyB64 = settingsStore.getCachedFamilyKey(familyId);
+    const cachedKeyB64 = await settingsStore.getCachedFamilyKey(familyId);
     if (!cachedKeyB64) return false;
     try {
       const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
@@ -209,7 +210,7 @@ export function useLoginFlow(opts: {
 
   /** Silently stage + cached-key-decrypt when a trusted device holds the key. */
   async function tryTrustedAutoOpen(familyId: string): Promise<void> {
-    if (podOpen() || !settingsStore.getCachedFamilyKey(familyId)) return;
+    if (podOpen() || !(await settingsStore.getCachedFamilyKey(familyId))) return;
     if (!syncStore.isConfigured || syncStore.needsPermission) return;
     try {
       if (!syncStore.hasPendingEncryptedFile) {
@@ -262,7 +263,6 @@ export function useLoginFlow(opts: {
       if (!built) return false;
       proveError.value = null;
       pendingPassword = null;
-      pendingCrossDeviceHeal = null;
       dispatch({
         type: 'START',
         familyId,
@@ -291,7 +291,7 @@ export function useLoginFlow(opts: {
   /**
    * When the pod is OPEN, the live doc — not the roster snapshot — is the truth about a
    * person's credential state. A stale `hasCredential:false` card would otherwise render
-   * create-password mode over a member who HAS a password (silent overwrite), and the
+   * a wrong prove pane over a member whose credentials changed underneath it, and the
    * reverse staleness would suppress tap-through. Returns null when the member no longer
    * exists in the open doc (removed on another device) — the picker must be rebuilt.
    */
@@ -306,6 +306,7 @@ export function useLoginFlow(opts: {
       gender: live.gender,
       ageGroup: live.ageGroup,
       hasCredential: !!live.passwordHash || !!live.pinHash,
+      hasPassword: !!live.passwordHash,
       photoUrl: getMemberAvatarUrl(live) ?? undefined,
     };
   }
@@ -340,6 +341,9 @@ export function useLoginFlow(opts: {
         podOpen: podOpen(),
         hasCredential: livePerson.hasCredential ?? null,
         hasPin: liveMember !== undefined ? !!liveMember.pinHash : null,
+        hasPassword:
+          liveMember !== undefined ? !!liveMember.passwordHash : (livePerson.hasPassword ?? null),
+        envelopeHasPasswordWraps: envelopeHasPasswordWraps.value,
         rosterSource: s.source,
       });
       // The machine drops stale events itself, but avoid dispatching for a superseded
@@ -419,12 +423,6 @@ export function useLoginFlow(opts: {
 
   function onPickPerson(person: PersonCard): void {
     proveError.value = null;
-    // Review F5: a cross-device heal intent from a PREVIOUS person's biometric attempt
-    // must not survive a person switch — it could enrol the current user's biometric as
-    // the previous member's key.
-    if (pendingCrossDeviceHeal && pendingCrossDeviceHeal.memberId !== person.id) {
-      pendingCrossDeviceHeal = null;
-    }
     dispatch({ type: 'PICK_PERSON', person });
   }
 
@@ -454,7 +452,7 @@ export function useLoginFlow(opts: {
     proveError.value = null;
     isBusy.value = true;
     try {
-      // Web PRF needs the envelope's passkeyWrappedKeys in reach; native ignores this.
+      // The pending file must be staged so the native unlock's key has bytes to open.
       if (!(await ensureStaged())) return;
       const result = await biometricSignIn(s.familyId, s.person.id);
       emitProveOutcome({
@@ -471,13 +469,6 @@ export function useLoginFlow(opts: {
           grant: { memberId: s.person.id, fkAvailable: true },
         });
         return;
-      }
-      // A passkey verified the member but produced no key (no PRF, no cached key):
-      // remember it so a successful password open re-wraps the family key for this
-      // device — the self-heal that makes the NEXT biometric work (was
-      // registerCrossDevicePasskey on the old surface).
-      if ('crossDevice' in result) {
-        pendingCrossDeviceHeal = { memberId: result.crossDevice.memberId, familyId: s.familyId };
       }
       // null message = user cancelled — deliberate silence, stay on the prove screen.
       proveError.value = result.message;
@@ -705,42 +696,6 @@ export function useLoginFlow(opts: {
     dispatch({ type: 'PASSWORD_SUBMITTED', memberId: s.person.id });
   }
 
-  async function onCreatePassword(password: string): Promise<void> {
-    const s = currentProve();
-    if (!s || isBusy.value) return;
-    proveError.value = null;
-    // Fail-closed re-check against the LIVE doc: create-password must never overwrite
-    // an existing hash, whatever a stale card claimed. (setPassword itself has no
-    // existing-hash guard — this is the boundary that provides it.)
-    const live = familyStore.members.find((m) => m.id === s.person.id);
-    if (!live || live.passwordHash) {
-      proveError.value = live ? t('auth.memberHasPassword') : t('auth.memberNotFound');
-      return;
-    }
-    isBusy.value = true;
-    try {
-      const result = await authStore.setPassword(s.person.id, password);
-      emitProveOutcome({
-        method: 'create-password',
-        ok: result.success,
-        errorCode: result.success ? undefined : 'rejected',
-        fallbackDepth: s.fallbackDepth,
-      });
-      if (result.success) {
-        await syncStore.syncNowBounded();
-        if (!stillProving(s.person.id)) return;
-        dispatch({
-          type: 'PROVE_SUCCEEDED',
-          grant: { memberId: s.person.id, fkAvailable: false },
-        });
-        return;
-      }
-      proveError.value = result.error ?? t('auth.signInFailed');
-    } finally {
-      isBusy.value = false;
-    }
-  }
-
   function onFellBack(): void {
     dispatch({ type: 'PROVE_FELL_BACK' });
   }
@@ -763,40 +718,6 @@ export function useLoginFlow(opts: {
         error: e,
         context: { action: 'VERIFY_UNAVAILABLE' },
       });
-    }
-  }
-
-  /**
-   * Cross-device passkey self-heal: after a password open on a device whose passkey
-   * asserted without producing a key, re-wrap the family key with fresh PRF material so
-   * the NEXT biometric works. Best-effort — never blocks or fails the login.
-   */
-  async function healCrossDevicePasskey(signedInMemberId: string): Promise<void> {
-    const heal = pendingCrossDeviceHeal;
-    pendingCrossDeviceHeal = null;
-    if (!heal) return;
-    // Review F5: the heal must never enrol a DIFFERENT person's biometric as the healed
-    // member's key. If the member who actually opened the pod isn't the one whose
-    // biometric failed keyless, drop the intent silently.
-    if (heal.memberId !== signedInMemberId) return;
-    try {
-      const fk = syncStore.familyKey;
-      const member = familyStore.members.find((m) => m.id === heal.memberId);
-      if (!fk || !member) return;
-      const result = await registerPasskeyForMember({
-        memberId: member.id,
-        memberName: member.name,
-        memberEmail: member.email,
-        familyId: heal.familyId,
-        familyKey: fk,
-      });
-      if (result.success && result.passkeySecret) {
-        syncStore.addPasskeySecret(result.passkeySecret);
-        // Best-effort push — the secret rides the next save either way.
-        await raceTimeout(syncStore.syncNow(true), 5000);
-      }
-    } catch (e) {
-      console.warn('[useLoginFlow] cross-device passkey re-wrap failed (non-blocking):', e);
     }
   }
 
@@ -875,7 +796,6 @@ export function useLoginFlow(opts: {
           return;
         }
         pendingPassword = null;
-        await healCrossDevicePasskey(memberId);
         await verifyDurableHome();
         dispatch({ type: 'OPEN_SUCCEEDED' });
         return;
@@ -967,7 +887,6 @@ export function useLoginFlow(opts: {
     onPasswordSubmit,
     onPinSubmit,
     onResetPin,
-    onCreatePassword,
     onFellBack,
     onRecoveryRetry,
     onRecoveryReconnect,

@@ -6,6 +6,7 @@ import SettingsAdminOnlyNotice from '@/components/settings/SettingsAdminOnlyNoti
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import PinSettings from '@/components/settings/PinSettings.vue';
 import RecoverySettings from '@/components/settings/RecoverySettings.vue';
+import DeviceLinkCard from '@/components/settings/DeviceLinkCard.vue';
 import GoogleDisconnectCard from '@/components/settings/GoogleDisconnectCard.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
@@ -1273,6 +1274,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
 
       <RecoverySettings class="mt-4" />
+      <DeviceLinkCard class="mt-4" />
       <GoogleDisconnectCard class="mt-4" />
     </BeanieFormModal>
 

@@ -2205,6 +2205,20 @@ const STRING_DEFS = {
   // ── Admin/owner reset of another member's password ────────────────────────
   // Used by ResetMemberPasswordModal. Error keys map 1:1 onto `ResetError`
   // in authStore — adding a new ResetError requires adding a key here.
+  'family.resetPin.modalTitle': { en: "Reset {name}'s PIN", beanie: "reset {name}'s pin" },
+  'family.resetPin.modalDescription': {
+    en: 'Choose a new 6-digit PIN for {name}. They can change it themselves later in Settings.',
+    beanie: 'choose a new 6-digit pin for {name}. they can change it later in settings.',
+  },
+  'family.resetPin.submit': { en: 'Reset PIN', beanie: 'reset pin' },
+  'family.resetPin.success': {
+    en: "{name}'s PIN has been reset.",
+    beanie: "{name}'s pin has been reset.",
+  },
+  'family.resetPin.warning': {
+    en: "{name}'s new PIN works on every family device. Their old PIN stops working on this device right away — other devices update the next time the family data syncs.",
+    beanie: "{name}'s new pin works on every family device.",
+  },
   'family.resetPassword.modalTitle': {
     en: 'Reset password for {name}',
     beanie: 'reset password for {name}',
@@ -4186,6 +4200,21 @@ const STRING_DEFS = {
       'every device and bean using this google account with beanies will lose access until they reconnect. continue?',
   },
   // ── Recovery kit + passphrase (login rethink Phase 3) ──
+  'deviceLink.title': { en: 'Link a Device', beanie: 'link a device' },
+  'deviceLink.description': {
+    en: 'Signing in on a new phone or computer? Show this QR code to it (or send the link) — then sign in there with your PIN. The other device needs beanies 0.14 or later.',
+    beanie:
+      'signing in on a new phone or computer? show this qr code to it (or send the link) — then sign in there with your pin.',
+  },
+  'deviceLink.mint': { en: 'Create Link', beanie: 'create link' },
+  'deviceLink.mintFailed': {
+    en: "Couldn't create the device link. Check your connection and try again.",
+    beanie: "couldn't create the device link. check your connection and try again.",
+  },
+  'deviceLink.expiryNote': {
+    en: 'This link works for 15 minutes and can only be used with a family PIN.',
+    beanie: 'this link works for 15 minutes and can only be used with a family pin.',
+  },
   'recovery.podNotOpen': {
     en: 'Your family data must be open to do this.',
     beanie: 'your beans must be open to do this.',
@@ -4344,11 +4373,32 @@ const STRING_DEFS = {
     beanie:
       'a 6-digit pin signs you in on any device where your family is set up — quicker than a password.',
   },
+  'setup.choosePinLabel': { en: 'Choose Your PIN', beanie: 'choose your pin' },
+  'setup.choosePinHint': {
+    en: 'A 6-digit PIN unlocks beanies on your devices. Your recovery kit (next step) is the master key.',
+    beanie:
+      'a 6-digit pin unlocks beanies on your devices. your recovery kit (next step) is the master key.',
+  },
+  'setup.kitStepIntro': {
+    en: 'Your family pod is ready! One last thing — save your recovery kit somewhere safe.',
+    beanie: 'your family pod is ready! one last thing — save your recovery kit somewhere safe.',
+  },
+  'recovery.kitPromptTitle': { en: 'Save Your Recovery Kit', beanie: 'save your recovery kit' },
+  'recovery.kitPromptBody': {
+    en: "Your recovery kit is the master key to your family's data — if every device and PIN is lost, it's the only way back in. Create it now and keep it somewhere safe.",
+    beanie:
+      "your recovery kit is the master key to your family's data — if every device and pin is lost, it's the only way back in. create it now and keep it somewhere safe.",
+  },
   'pin.promptTitle': { en: 'Set Up a PIN?', beanie: 'set up a pin?' },
   'pin.promptBody': {
     en: 'Sign in with a quick 6-digit PIN instead of your password. You can set one up now or later in Settings.',
     beanie:
       'sign in with a quick 6-digit pin instead of your password. set one up now or later in settings.',
+  },
+  'loginFlow.recoveryOnlyBody': {
+    en: 'No sign-in method is set up on this device yet — use your recovery kit, your recovery passphrase, or a device link from another family device.',
+    beanie:
+      'no sign-in method is set up on this device yet — use your recovery kit, passphrase, or a link from another family device.',
   },
   'loginFlow.recoveryTitleUnproven': { en: "Let's Reconnect", beanie: "let's reconnect" },
   'loginFlow.recoveryAuthBodyUnproven': {
@@ -4553,10 +4603,16 @@ const STRING_DEFS = {
     en: 'Generating secure invite link...',
     beanie: 'generating secure invite link...',
   },
-  'join.setPasswordTitle': { en: 'Create your password', beanie: 'create your password' },
+  'join.setPasswordTitle': { en: 'Choose Your PIN', beanie: 'choose your pin' },
   'join.setPasswordSubtitle': {
-    en: 'This password is just for you to sign in',
-    beanie: 'this password is just for you to sign in',
+    en: 'This 6-digit PIN is just for you — it signs you in on any of your family devices.',
+    beanie: 'this 6-digit pin is just for you — it signs you in on any of your family devices.',
+  },
+  'join.choosePinLabel': { en: 'Your PIN', beanie: 'your pin' },
+  'join.pinHint': {
+    en: 'To sign in on a brand-new device later, use a device link or your family recovery kit — this device needs beanies 0.14 or later.',
+    beanie:
+      'to sign in on a brand-new device later, use a device link or your family recovery kit.',
   },
   'join.completing': { en: 'Joining your family...', beanie: 'joining your beanies...' },
   'join.success': { en: 'Welcome to the family!', beanie: 'welcome to your pod!' },

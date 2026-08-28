@@ -26,6 +26,7 @@ function toRosterMember(m: FamilyMember): RosterCacheMember {
     gender: m.gender,
     ageGroup: m.ageGroup,
     hasCredential: !!m.passwordHash || !!m.pinHash,
+    hasPassword: !!m.passwordHash,
   };
 }
 
@@ -37,7 +38,16 @@ function toRosterMember(m: FamilyMember): RosterCacheMember {
  * active family or the list is empty: an empty write would erase a good roster during
  * the sign-out reset churn, which is exactly the moment the cache exists to survive.
  */
-export async function refreshRosterCache(members: FamilyMember[]): Promise<void> {
+export async function refreshRosterCache(
+  members: FamilyMember[],
+  /**
+   * Phase 4: whether the open envelope holds ANY password wraps (pass
+   * `Object.keys(envelope.wrappedKeys).length > 0`). Omit where the envelope
+   * isn't in reach — the stored value is left unknown, which the prove engine
+   * treats as "offer password" (the safe default).
+   */
+  envelopeHasPasswordWraps?: boolean
+): Promise<void> {
   const humans = members.filter((m) => !m.isPet);
   if (humans.length === 0) return;
 
@@ -50,6 +60,7 @@ export async function refreshRosterCache(members: FamilyMember[]): Promise<void>
       familyId,
       familyName: family?.name ?? '',
       members: humans.map(toRosterMember),
+      ...(envelopeHasPasswordWraps !== undefined ? { envelopeHasPasswordWraps } : {}),
       cachedAt: toISODateString(new Date()),
     };
     // TOCTOU guard: the active family can switch between the read above and this write

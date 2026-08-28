@@ -12,9 +12,8 @@
  * - The outcome is the RETURN VALUE, not a shared `errorMessage` ref. Both callers
  *   already own an error surface (`errorMessage` / `formError`); a ref here would give
  *   each of them two places a message can live and force them to check both.
- * - `crossDevice` is a result VARIANT carrying its own message, not a ref. Only the
- *   pod-level view can hit it, so the picker narrows it away at the type level instead
- *   of inheriting a permanently-null ref.
+ * - Phase 4: the `crossDevice` variant is GONE with the web PRF path — biometric is
+ *   native-only, and native always returns the key it just unwrapped.
  * - No route literal. Both views already emit `('signed-in', '/nook')`; where to go next
  *   is the view's contract with the router, not this orchestrator's business.
  * - `message: null` means "say nothing" — used for a user cancel, which is a deliberate
@@ -28,14 +27,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { MEMBER_MISMATCH, WRONG_FAMILY_CREDENTIAL } from '@/services/auth/passkeyService';
 import { reportError } from '@/utils/errorReporter';
 
-export type BiometricSignInResult =
-  | { ok: true }
-  | { ok: false; message: string | null }
-  | {
-      ok: false;
-      message: string;
-      crossDevice: { memberId: string; credentialId?: string };
-    };
+export type BiometricSignInResult = { ok: true } | { ok: false; message: string | null };
 
 export function useBiometricSignIn(): {
   isAuthenticating: Ref<boolean>;
@@ -77,13 +69,15 @@ export function useBiometricSignIn(): {
       // error on a perfectly successful unlock.
       if (syncStore.hasPendingEncryptedFile) {
         if (!result.familyKey) {
-          // Verified the member but no family key — cross-device, or no PRF and no cache.
-          // Web only: native always returns the key it just unwrapped.
-          return {
-            ok: false,
-            message: t('passkey.crossDeviceNoCache'),
-            crossDevice: { memberId: result.memberId!, credentialId: result.credentialId },
-          };
+          // Native always returns the key it just unwrapped, so this is defensive:
+          // report loudly rather than silently drop into a dead state.
+          reportError({
+            surface: 'native-biometric',
+            message: 'biometric unlock succeeded but returned no family key',
+            severity: 'warning',
+            context: { action: 'sign_in', member_id_tail: memberId.slice(-8) },
+          });
+          return { ok: false, message: t('passkey.signInError') };
         }
         const fkResult = await syncStore.decryptPendingFileWithKey(result.familyKey);
         if (!fkResult.success) {

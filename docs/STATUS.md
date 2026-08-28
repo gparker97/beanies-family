@@ -1671,7 +1671,61 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐ Login/auth rethink — DEPLOYED to prod web (0.13 → hotfix 0.13R1 `7b72f104`) — Phase 4 is next ⭐
+### ⭐ Login/auth rethink — Phase 4 (FINAL) IMPLEMENTED locally — review + on-device verify pending ⭐
+
+**2026-08-28 (same session, after 0.13R1):** the revised Phase-4 spec (appended to
+`docs/plans/2026-08-28-login-auth-rethink-pin-recovery-kit.md`, its own 4-pass review
+record at the bottom of that file) is implemented across WP1-WP7:
+
+- **WP1 Passwordless creation**: ResumePodSetup identity phase collects a 6-digit PIN
+  (never a password); `createNewFile` drops its password param, generates the recovery
+  kit internally and writes a KIT-BORN envelope (`wrappedKeys: {}` + one `recoveryKeys`
+  entry); mandatory `recovery-kit` confirm-stored phase (shared `RecoveryKitDisplay`)
+  before members; doc-side `recoveryKitConfirmedAt` signal (Settings entity); sentinel
+  invariants re-pointed at `pinHash` (owner keeps the '' password sentinel forever);
+  `requiresPassword` derives from "no passwordHash AND no pinHash"; join claims set a
+  PIN (envelope `wrapFamilyKeyForMember` call deleted — no new password wraps, ever);
+  `envelopeNeedsRecovery` predicate routes kit-born envelopes to kit/passphrase on all
+  three password-prompting surfaces (pending decrypt, LoadPodView, `completeAutoLoad`
+  → new `needs-recovery` result); demoSeed uses a DEMO_PIN.
+- **WP2 Device linking**: `lk=1` invite-link marker + 15-min `LINK_EXPIRY_MS`;
+  "Link a Device" card (Settings → Security & Recovery) mints QR/link; redeem hands off
+  to the standard login machine (`link-ready` join step → person picker → PIN prove).
+- **WP3 PRF retirement**: web WebAuthn+PRF DELETED (`passkeyCrypto.ts` gone,
+  passkeyService native-only + registry management, prove probe native-only with a
+  `prf_withheld` straggler signal, `healCrossDevicePasskey` dead code removed);
+  ProveView: `recovery` terminal (never-blank), conditional password probe (suppressed
+  warm-with-PIN and cold-kit-born), create-password claim mode removed; ReauthChallenge
+  step-up = native biometric → PIN → legacy password; ResetMemberPasswordModal →
+  `ResetMemberPinModal` on the shared `assertCanResetMember` gate +
+  `adminResetMemberPin` (reuses the recovery-reset mutation body).
+- **WP4 cachedFamilyKeys retirement**: registry v6 `trustedAutoOpen` store — FK wrapped
+  under HKDF(deviceSecret, 'beanies.family-trusted-auto-open-v1'); settingsStore keeps
+  the same API (`getCachedFamilyKey` now async) with lazy plaintext migration
+  (`auto_open_wrap_migrated`); all 4 write + 5 read sites converted.
+- **WP5 Auth-prompt sequencer**: `authPrompts.ts` data-driven chain (PIN nag per
+  (family,member) → kit nag on the confirmed-signal, owner-credential spoof-proof
+  backfill → native biometric → trust); `PinPromptModal` + `RecoveryKitPromptModal`.
+- **WP6 Sign-out step lists**: `signOutSteps.ts` — three tiers as ordered idempotent
+  step-name lists, differences as membership (family→all scope substitutions), two
+  documented exceptions; authStore tier fns reduced to "run this list".
+- **WP7 Docs**: ADR-034 + amendment notes on 014/015/019/028/031; help-center security
+  articles rewritten (PIN/kit model); E2E auth helper + trusted-device spec updated;
+  CHANGELOG; zh translations regenerated.
+
+**Mixed-version caveats (documented, accepted — native update ships in same window):**
+(a) ≤0.13 clients can't open KIT-BORN envelopes (throw "No wrapped keys" unless a
+passphrase is set); (b) PIN-only members read as UNCLAIMED on ≤0.13 clients
+(re-invitable, excluded from transfer, un-provable on pre-0.13 native); (c) old
+clients ignore `lk=1` and dead-end a device link in the unclaimed-only join. Copy on
+the mint card + join set-pin step says "the other device needs beanies 0.14 or later".
+
+**PENDING:** `/code-review max` on the full Phase-4 batch → fix findings → greg's
+on-device walkthrough (fresh create end-to-end; legacy PIN nag; device link
+phone→laptop; web sign-in post-PRF for a legacy passkey user) → deploy as 0.14 with a
+native release in the same window.
+
+### (superseded) ⭐ Login/auth rethink — DEPLOYED to prod web (0.13 → hotfix 0.13R1 `7b72f104`) ⭐
 
 **Post-deploy incident, resolved same hour (2026-08-28):** greg's prod session appeared
 stuck in a load loop. TWO stacked causes: (1) DevTools "Update on reload" × the PWA

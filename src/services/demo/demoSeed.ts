@@ -55,7 +55,7 @@ const DEMO_OWNER_EMAIL = 'alex@example.invalid';
  * invented data. There is nothing here to protect, and making it a build secret
  * would imply otherwise. Never reuse this value anywhere else.
  */
-const DEMO_PASSWORD = 'demo-pod-not-a-secret';
+const DEMO_PIN = '000000';
 
 /**
  * Every distinct way seeding can fail. Closed union: the modal's message lookup
@@ -157,17 +157,22 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
       return fail('provider-install', error, false);
     }
 
-    // 4. Identity + owner doc. Non-deferred password: `createNewFile` refuses a
-    //    pod whose owner still carries the deferred-password sentinel.
+    // 4. Identity + owner doc, exactly like the production create flow (Phase 4):
+    //    deferred signUp, then the PIN applied via rehydrateOwnerDoc —
+    //    `createNewFile` refuses a pod whose owner has no pinHash.
     const signUpResult = await authStore.signUp({
       email: DEMO_OWNER_EMAIL,
       familyName: DEMO_FAMILY_NAME,
       memberName: DEMO_OWNER_NAME,
-      password: DEMO_PASSWORD,
+      deferPassword: true,
       subscribeNewsletter: false,
     });
     if (!signUpResult.success) {
       return fail('signup', new Error(signUpResult.error ?? 'signUp returned success: false'));
+    }
+    const pinResult = await authStore.rehydrateOwnerDoc(DEMO_OWNER_NAME, DEMO_PIN);
+    if (!pinResult.success) {
+      return fail('signup', new Error(pinResult.error ?? 'demo owner PIN set failed'));
     }
 
     const memberId = authStore.currentUser?.memberId;
@@ -180,9 +185,9 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
     }
 
     // 5. Build + write the pod, with every remote interaction suppressed.
+    // The generated demo kit code is discarded — the demo pod is in-memory only.
     const createResult = await syncStore.createNewFile(
       DEMO_POD_FILE,
-      DEMO_PASSWORD,
       memberId,
       familyId,
       DEMO_FAMILY_NAME,

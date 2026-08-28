@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4272
+    "translationCount": 4290
   },
   "translations": {
     "app.name": {
@@ -2937,14 +2937,14 @@
       "lastUpdated": "2026-02-24"
     },
     "join.setPasswordTitle": {
-      "translation": "创建您的密码",
-      "hash": "47qmn0",
-      "lastUpdated": "2026-03-03"
+      "translation": "选择",
+      "hash": "mjsnbj",
+      "lastUpdated": "2026-08-28"
     },
     "join.setPasswordSubtitle": {
-      "translation": "此密码仅供您登录",
-      "hash": "5591es",
-      "lastUpdated": "2026-03-03"
+      "translation": "这款6位数PIN码仅供您使用，可在您的任何家庭设备上登录。",
+      "hash": "uoowrs",
+      "lastUpdated": "2026-08-28"
     },
     "join.completing": {
       "translation": "正在加入您的家庭...",
@@ -21364,6 +21364,96 @@
     "app.initError.registryBlocked": {
       "translation": "beanies在另一个选项卡或窗口中打开，并且正在保留存储更新。关闭其他Beanies选项卡和窗口（包括已安装的应用） ，然后重新加载此页面。",
       "hash": "biwkd1",
+      "lastUpdated": "2026-08-28"
+    },
+    "family.resetPin.modalTitle": {
+      "translation": "重置{name}的PIN码",
+      "hash": "dqg2fd",
+      "lastUpdated": "2026-08-28"
+    },
+    "family.resetPin.modalDescription": {
+      "translation": "为{name}选择一个新的6位数PIN码。他们稍后可以在“设置”中自行更改。",
+      "hash": "av1zym",
+      "lastUpdated": "2026-08-28"
+    },
+    "family.resetPin.submit": {
+      "translation": "重置 PIN",
+      "hash": "4g0vss",
+      "lastUpdated": "2026-08-28"
+    },
+    "family.resetPin.success": {
+      "translation": "{name}的PIN码已重置。",
+      "hash": "j2s0w5",
+      "lastUpdated": "2026-08-28"
+    },
+    "family.resetPin.warning": {
+      "translation": "{name}的新PIN码适用于所有家庭设备。他们的旧PIN会立即停止在此设备上工作—其他设备会在下次家庭数据同步时更新。",
+      "hash": "ia9wxx",
+      "lastUpdated": "2026-08-28"
+    },
+    "deviceLink.title": {
+      "translation": "连接设备",
+      "hash": "1zu89n",
+      "lastUpdated": "2026-08-28"
+    },
+    "deviceLink.description": {
+      "translation": "在新手机或电脑上登录？向其出示此二维码（或发送链接） ，然后使用PIN登录。其他设备需要0.14或更高版本的beanies。",
+      "hash": "9l54cb",
+      "lastUpdated": "2026-08-28"
+    },
+    "deviceLink.mint": {
+      "translation": "创建链接",
+      "hash": "ifsmn2",
+      "lastUpdated": "2026-08-28"
+    },
+    "deviceLink.mintFailed": {
+      "translation": "无法创建设备链接。请检查您的网络连接，然后重试。",
+      "hash": "19kfpq",
+      "lastUpdated": "2026-08-28"
+    },
+    "deviceLink.expiryNote": {
+      "translation": "此链接有效期为15分钟，只能与家庭PIN码一起使用。",
+      "hash": "ni3i8p",
+      "lastUpdated": "2026-08-28"
+    },
+    "setup.choosePinLabel": {
+      "translation": "选择",
+      "hash": "mjsnbj",
+      "lastUpdated": "2026-08-28"
+    },
+    "setup.choosePinHint": {
+      "translation": "6位数PIN码可解锁您设备上的BEANS。您的恢复工具包（下一步）是主密钥。",
+      "hash": "podvur",
+      "lastUpdated": "2026-08-28"
+    },
+    "setup.kitStepIntro": {
+      "translation": "您的家庭舱已准备就绪！最后一件事—将您的恢复工具包保存在安全的地方。",
+      "hash": "wtht27",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitPromptTitle": {
+      "translation": "保存您的恢复工具包",
+      "hash": "mfbbd7",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitPromptBody": {
+      "translation": "您的恢复工具包是您家人数据的主密钥—如果每台设备和PIN都丢失了，这是唯一的回归方式。立即创建，并将其保存在安全的地方。",
+      "hash": "p539ov",
+      "lastUpdated": "2026-08-28"
+    },
+    "loginFlow.recoveryOnlyBody": {
+      "translation": "此设备上尚未设置登录方法—请使用您的恢复工具包、恢复密码或来自其他家庭设备的设备链接。",
+      "hash": "o0y5rz",
+      "lastUpdated": "2026-08-28"
+    },
+    "join.choosePinLabel": {
+      "translation": "您的PIN码",
+      "hash": "a8l4uw",
+      "lastUpdated": "2026-08-28"
+    },
+    "join.pinHint": {
+      "translation": "要稍后登录全新的设备，请使用设备链接或家庭恢复套件—此设备需要0.14或更高版本。",
+      "hash": "hk5a4s",
       "lastUpdated": "2026-08-28"
     }
   }

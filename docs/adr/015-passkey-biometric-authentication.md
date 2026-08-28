@@ -1,5 +1,7 @@
 # ADR-015: Passkey / Biometric Authentication
 
+> **2026-08-28 (ADR-034):** the WEB WebAuthn+PRF path described here is RETIRED — no new web passkeys are created and the web assertion path is deleted; native keystore biometric (per the ADR-029 scope note) is the only surviving mechanism. See [ADR-034](034-pin-first-identity-recovery-kit.md).
+
 > **Updated by [ADR-019](019-family-key-encryption.md)** — passkey PRF now unwraps the family key directly via AES-KW instead of caching a file password.
 >
 > **Scope note (ADR-029, 2026-07-14):** this ADR describes the **web/PWA** biometric path, which is unchanged. On the **installed native apps** biometric unlock no longer uses WebAuthn/PRF at all — it uses the hardware Keystore (`BiometricPrompt`/`AndroidKeyStore` CryptoObject on Android; `LocalAuthentication` + a biometric-gated Keychain item on iOS) via the custom `BiometricKeystore` plugin, with a device-local blob (never synced). See ADR-029 → "IMPLEMENTED (2026-07-14)".

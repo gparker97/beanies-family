@@ -58,17 +58,41 @@ describe('rosterCache', () => {
     expect(entry).toBeDefined();
     expect(entry!.familyName).toBe('The Beans');
     expect(entry!.members.map((m) => m.id)).toEqual(['a', 'b']);
-    expect(entry!.members[0]).toMatchObject({ name: 'Mum', hasCredential: true });
-    expect(entry!.members[1]).toMatchObject({ name: 'Kid', hasCredential: false });
+    expect(entry!.members[0]).toMatchObject({
+      name: 'Mum',
+      hasCredential: true,
+      hasPassword: true,
+    });
+    expect(entry!.members[1]).toMatchObject({
+      name: 'Kid',
+      hasCredential: false,
+      hasPassword: false,
+    });
     // Minimal projection: no email/role/passwordHash ever lands in the cache.
     expect(Object.keys(entry!.members[0]!).sort()).toEqual([
       'ageGroup',
       'color',
       'gender',
       'hasCredential',
+      'hasPassword',
       'id',
       'name',
     ]);
+  });
+
+  it('carries envelopeHasPasswordWraps only when the caller provides it', async () => {
+    await refreshRosterCache([member({ id: 'a' })], false);
+    let entry = await getRosterCache('fam-1');
+    expect(entry!.envelopeHasPasswordWraps).toBe(false);
+
+    await refreshRosterCache([member({ id: 'a' })], true);
+    entry = await getRosterCache('fam-1');
+    expect(entry!.envelopeHasPasswordWraps).toBe(true);
+
+    // Omitted → the field is ABSENT (unknown), not defaulted to false.
+    await refreshRosterCache([member({ id: 'a' })]);
+    entry = await getRosterCache('fam-1');
+    expect('envelopeHasPasswordWraps' in entry!).toBe(false);
   });
 
   it('filters pets out', async () => {

@@ -24,7 +24,11 @@ function applyDefaults(member: FamilyMember): FamilyMember {
     role: member.role ?? 'member',
     gender: member.gender ?? 'other',
     ageGroup: member.ageGroup ?? 'adult',
-    requiresPassword: !member.passwordHash,
+    // "Unclaimed": has NO credential at all. Phase 4 (login rethink): a PIN is a
+    // first-class claim credential, so a PIN-only member (kit-born family, or a
+    // set-pin join) reads as claimed exactly like a password holder. Derived
+    // unconditionally on every read — no stored value can disagree with it.
+    requiresPassword: !member.passwordHash && !member.pinHash,
     canViewFinances: member.canViewFinances ?? true,
     canEditActivities: member.canEditActivities ?? true,
     canManagePod: member.canManagePod ?? member.role === 'owner',

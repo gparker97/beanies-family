@@ -18,7 +18,7 @@
 import { ref, computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import ResetMemberPasswordModal from '@/components/family/ResetMemberPasswordModal.vue';
+import ResetMemberPinModal from '@/components/family/ResetMemberPinModal.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePermissions } from '@/composables/usePermissions';
@@ -101,7 +101,7 @@ const liveMember = computed<FamilyMember | null>(
       </div>
     </div>
 
-    <ResetMemberPasswordModal
+    <ResetMemberPinModal
       :open="showResetModal"
       :member="liveMember"
       @close="showResetModal = false"

@@ -15,6 +15,7 @@ import type {
   WrappedMemberKey,
   WrappedPasskeyKey,
   InviteKeyPackage,
+  RecoveryKeyPackage,
 } from '@/types/syncFileV4';
 
 /**
@@ -29,7 +30,9 @@ export function createBeanpodV4(
   encryptedPayload: string,
   wrappedKeys: Record<string, WrappedMemberKey>,
   passkeyWrappedKeys: Record<string, WrappedPasskeyKey> = {},
-  inviteKeys: Record<string, InviteKeyPackage> = {}
+  inviteKeys: Record<string, InviteKeyPackage> = {},
+  /** Phase 4: a kit-born family's ONLY wrap at creation (wrappedKeys is `{}`). */
+  recoveryKeys: Record<string, RecoveryKeyPackage> = {}
 ): string {
   // ADR-032: the worker produces `encryptedPayload` (via docClient.exportEncrypted
   // Payload); main assembles the envelope so wrappedKeys/inviteKeys never leave it.
@@ -41,6 +44,7 @@ export function createBeanpodV4(
     wrappedKeys,
     passkeyWrappedKeys,
     inviteKeys,
+    ...(Object.keys(recoveryKeys).length > 0 ? { recoveryKeys } : {}),
     encryptedPayload,
     writerVersion: APP_VERSION, // #44: which app version wrote this file
   };
@@ -147,6 +151,22 @@ export async function unwrapWrappedKey(
  *   `viaRecoveryPassphrase` is true
  * @throws Error('Incorrect password') if nothing matches
  */
+/**
+ * Phase 4: does this envelope have NO password-style wraps, only recovery material?
+ * True for a kit-born family (created password-free — `wrappedKeys` empty from birth,
+ * a recovery kit and/or passphrase is the only way in from cold). Callers that would
+ * otherwise offer a password prompt (pending-file decrypt, LoadPodView bootstrap, the
+ * resume-setup auto-load) MUST check this first and route to the kit/passphrase
+ * surfaces — a password can never succeed against such an envelope, and
+ * `tryUnwrapFamilyKey` would throw its "No wrapped keys" error.
+ */
+export function envelopeNeedsRecovery(envelope: BeanpodFileV4): boolean {
+  return (
+    Object.keys(envelope.wrappedKeys).length === 0 &&
+    (Object.keys(envelope.recoveryKeys ?? {}).length > 0 || !!envelope.recoveryPassphrase)
+  );
+}
+
 export async function tryUnwrapFamilyKey(
   envelope: BeanpodFileV4,
   password: string

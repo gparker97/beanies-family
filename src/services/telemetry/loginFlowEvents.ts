@@ -28,10 +28,16 @@ export function emitProveMethodsResolved(payload: {
   rosterSource: string;
   /** Probe failures that degraded a method away (empty when all probes ran clean). */
   errorCode?: string;
+  /**
+   * Phase 4 straggler signal: a WEB passkey registration exists for the member but
+   * the retired method was withheld. Rides `detail` (allowlisted) — measures how
+   * many users still lean on the deleted PRF path.
+   */
+  prfWithheld?: boolean;
 }): void {
   emit('info', 'prove_methods_resolved', {
     action: 'resolved',
-    detail: payload.methods.join(',') || 'none',
+    detail: (payload.methods.join(',') || 'none') + (payload.prfWithheld ? '+prf-withheld' : ''),
     kind: payload.rosterSource,
     ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
   });
@@ -59,6 +65,19 @@ export function emitOpenFetchRecovery(payload: {
   reason: string; // 'auth' | 'permission' | 'not-found' | 'network' | ...
 }): void {
   emit('info', 'open_fetch_recovery', { action: 'recovery', kind: payload.reason });
+}
+
+/** Phase 4 device linking: a link was minted from a signed-in device. */
+export function emitDeviceLinkMinted(): void {
+  emit('info', 'device_link_minted', { action: 'minted' });
+}
+
+/** Phase 4 device linking: a link was redeemed on the receiving device. */
+export function emitDeviceLinkRedeemed(ok: boolean, errorCode?: string): void {
+  emit(ok ? 'info' : 'warn', 'device_link_redeemed', {
+    action: ok ? 'ok' : 'failed',
+    ...(errorCode ? { error_code: errorCode } : {}),
+  });
 }
 
 /** The person picker rendered from credential records because the roster was missing. */

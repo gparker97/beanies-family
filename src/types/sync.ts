@@ -43,7 +43,13 @@ export type CreatePodFailureReason =
   | 'existing-pod';
 
 export type CreatePodResult =
-  { ok: true } | { ok: false; reason: CreatePodFailureReason; error: Error };
+  /**
+   * Phase 4 (login rethink): a successful create returns the freshly generated
+   * recovery kit's one-time CODE (+ its non-secret kitId) for the wizard's
+   * mandatory display step. NEVER persisted — show once, then drop.
+   */
+  | { ok: true; kit: { kitId: string; code: string } }
+  | { ok: false; reason: CreatePodFailureReason; error: Error };
 
 // ─── In-flight critical writes ────────────────────────────────────────────
 
@@ -101,12 +107,17 @@ export type ResumeFromRegistryResult =
  *   "your pod file is damaged — contact support" screen with diagnostic
  *   context; do NOT fall back to `createNewFile` (that's what caused the
  *   original data loss).
+ * - `needs-recovery` — Phase 4: the envelope is kit-born (no password wraps,
+ *   only recovery material). A password can NEVER succeed against it — the
+ *   caller must route to the recovery-kit / passphrase surfaces instead of
+ *   showing a password form.
  * - `network-error` — anything else (Drive 5xx, IndexedDB write fail, etc.).
  *   Recoverable — user retries or contacts support.
  */
 export type CompleteAutoLoadResult =
   | { kind: 'success' }
   | { kind: 'wrong-password' }
+  | { kind: 'needs-recovery' }
   | {
       kind: 'corrupted';
       fileId: string;

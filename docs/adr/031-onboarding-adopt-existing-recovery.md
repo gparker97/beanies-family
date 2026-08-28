@@ -1,5 +1,7 @@
 # ADR-031: Onboarding adopt-existing recovery & trusted-device sign-out grant
 
+> **2026-08-28 (ADR-034):** the trusted-device sign-out grant semantics referenced here are superseded by the three-tier logout (switch person / sign out / sign out & clear) — see ADR-034; the adopt-existing recovery flow itself stands, now PIN-based on the finish surface.
+
 > Status: Accepted
 > Date: 2026-06-19
 > Related: ADR-026 (iOS redirect OAuth), ADR-028 (refresh-token persistence consent), ADR-029 (Capacitor native distribution)

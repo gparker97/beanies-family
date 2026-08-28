@@ -65,6 +65,14 @@ export interface GlobalSettings {
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;
   passkeyPromptShown?: boolean;
+  /**
+   * Phase 4 PIN nag dismissals, keyed `${familyId}:${memberId}` → ISO timestamp.
+   * Per MEMBER (not device-level like the trust flag): on a shared family device,
+   * one member dismissing must not suppress the nag for the others.
+   */
+  pinPromptDismissed?: Record<string, string>;
+  /** Phase 4 recovery-kit nag dismissal (device-level). */
+  kitPromptDismissedAt?: string;
   country?: CountryCode; // device mirror of Settings.country (dual-persisted, like language) — drives public-holiday display
 }
 
@@ -128,6 +136,13 @@ export interface RosterCacheMember {
   ageGroup?: AgeGroup;
   /** Had a password/PIN hash at cache time — drives the green-dot/+ status glyph. */
   hasCredential: boolean;
+  /**
+   * Phase 4: had a doc-side passwordHash at cache time. Lets the prove engine
+   * suppress the password method for PIN-only members on a COLD device without
+   * any envelope I/O ("prove first, fetch second"). Absent on pre-Phase-4
+   * entries — `null`/undefined means unknown → password stays offered.
+   */
+  hasPassword?: boolean;
 }
 
 /**
@@ -149,6 +164,12 @@ export interface RosterCacheEntry {
   familyName: string;
   /** Humans only, in roster order (adults oldest→youngest, then children). */
   members: RosterCacheMember[];
+  /**
+   * Phase 4: whether the envelope had ANY password wraps at cache time. False for
+   * a kit-born family — the prove engine's cold password probe keys on it (a
+   * password can never open a wrap-less envelope). Absent = unknown → offered.
+   */
+  envelopeHasPasswordWraps?: boolean;
   cachedAt: ISODateString;
 }
 
@@ -194,6 +215,25 @@ export interface DeviceSecretRecord {
   id: 'device_secret';
   key?: CryptoKey;
   rawSecret?: string;
+  kdf: 'hkdf' | 'hkdf+pbkdf2';
+  createdAt: ISODateString;
+}
+
+/**
+ * TrustedAutoOpenRecord — Phase 4 replacement for the plaintext `cachedFamilyKeys`.
+ * The family key AES-KW-wrapped under HKDF(deviceSecret, salt,
+ * info='beanies.family-trusted-auto-open-v1'). NO user secret in the derivation —
+ * this is deliberately a TRUST wrap (silent open on a trusted device); the win over
+ * plaintext is purely at-rest (a DB dump alone no longer yields the FK when the
+ * device secret is a non-extractable CryptoKey). Registry store `trustedAutoOpen`.
+ */
+export interface TrustedAutoOpenRecord {
+  familyId: UUID; // keyPath
+  /** base64 AES-KW-wrapped family key. */
+  wrapped: string;
+  /** base64 HKDF salt. */
+  salt: string;
+  /** 'hkdf' (non-extractable secret) | 'hkdf+pbkdf2' (extractable-bytes fallback). */
   kdf: 'hkdf' | 'hkdf+pbkdf2';
   createdAt: ISODateString;
 }
@@ -1739,6 +1779,12 @@ export interface Settings {
   helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
   helpfulHintLeadDays?: Partial<Record<HelpfulHintType, number>>; // #40: per-type days-before-event override; missing type → HINT_LEAD_DAYS default. Family-scoped.
   feedbackOptOut?: boolean; // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens (default: false). Family-scoped.
+  /** Phase 4 (login rethink): ISO timestamp of the family's "I stored my recovery
+   *  kit" confirmation (wizard kit step or Settings). Inside the ciphertext, synced.
+   *  For kit-BORN families this — not envelope `recoveryKeys` presence — is the
+   *  "family has a stored kit" signal (their envelope carries a wrap from birth
+   *  even when nobody saved the code); the kit nag keys on it. */
+  recoveryKitConfirmedAt?: string;
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
   createdAt: ISODateString;
   updatedAt: ISODateString;

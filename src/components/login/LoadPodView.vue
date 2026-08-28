@@ -27,6 +27,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
+import { envelopeNeedsRecovery } from '@/services/sync/fileSync';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -168,7 +169,7 @@ async function tryAutoDecrypt(): Promise<boolean> {
   if (!pendingFamilyId) return false;
 
   // Try cached family key from trusted device
-  const cachedKey = settingsStore.getCachedFamilyKey(pendingFamilyId);
+  const cachedKey = await settingsStore.getCachedFamilyKey(pendingFamilyId);
   if (cachedKey) {
     try {
       const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
@@ -259,6 +260,14 @@ async function handlePendingPassword(
     return;
   }
   loadedFileName.value = fileName;
+  // Phase 4: a kit-born envelope has NO password wraps — a password can never
+  // open it. Open the decrypt surface straight in recovery-kit entry (the
+  // passphrase stays available inside the modal's flow) instead of showing a
+  // password form that is guaranteed to fail.
+  const pendingEnv = syncStore.pendingEncryptedFile?.envelope;
+  if (pendingEnv && envelopeNeedsRecovery(pendingEnv)) {
+    showKitEntry.value = true;
+  }
   showDecryptModal.value = true;
 }
 

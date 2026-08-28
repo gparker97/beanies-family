@@ -698,6 +698,17 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /** Phase 4: the family confirmed a recovery kit is stored (see models.ts). */
+  async function markRecoveryKitConfirmed(): Promise<void> {
+    try {
+      settings.value = await settingsRepo.saveSettings({
+        recoveryKitConfirmedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to record kit confirmation';
+    }
+  }
+
   async function setWeekStartDay(day: 0 | 1): Promise<void> {
     try {
       settings.value = await settingsRepo.saveSettings({ weekStartDay: day });
@@ -813,6 +824,28 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   }
 
+  // ── Phase 4 nag dismissals (device-local; PIN nag per member) ─────────────
+  function isPinPromptDismissed(familyId: string, memberId: string): boolean {
+    return !!globalSettings.value.pinPromptDismissed?.[`${familyId}:${memberId}`];
+  }
+
+  async function dismissPinPrompt(familyId: string, memberId: string): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      pinPromptDismissed: {
+        ...globalSettings.value.pinPromptDismissed,
+        [`${familyId}:${memberId}`]: new Date().toISOString(),
+      },
+    });
+  }
+
+  const kitPromptDismissed = computed(() => !!globalSettings.value.kitPromptDismissedAt);
+
+  async function dismissKitPrompt(): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      kitPromptDismissedAt: new Date().toISOString(),
+    });
+  }
+
   async function setPasskeyPromptShown(): Promise<void> {
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
       passkeyPromptShown: true,
@@ -825,37 +858,82 @@ export const useSettingsStore = defineStore('settings', () => {
    * Pass `force: true` to bypass the trust check (e.g. during join flow
    * when the user just created a password on this device).
    */
+  /**
+   * Cache the family key for silent trusted-device open — Phase 4: stored as a
+   * WRAPPED record (`trustedAutoOpen` service) instead of the retired plaintext
+   * `cachedFamilyKeys`. Same trust gate + `force` semantics as before (`force` =
+   * the user JUST proved a family secret on this device).
+   */
   async function cacheFamilyKey(
     exportedKey: string,
     familyId: string,
     options?: { force?: boolean }
   ): Promise<void> {
     if (!options?.force && !isTrustedDevice.value) return;
-    const existing = globalSettings.value.cachedFamilyKeys ?? {};
+    const { saveTrustedAutoOpenKey } = await import('@/services/auth/trustedAutoOpen');
+    await saveTrustedAutoOpenKey(familyId, exportedKey);
+    // One-time migration hygiene: a legacy plaintext entry for this family is now
+    // superseded — delete it (fire-and-forget; the wrapped record is authoritative).
+    if (globalSettings.value.cachedFamilyKeys?.[familyId]) {
+      await clearLegacyPlaintextKey(familyId);
+    }
+  }
+
+  /**
+   * Retrieve this device's auto-open family key (base64 exported raw), or null.
+   * ASYNC since Phase 4 (the wrapped record must be unwrapped). Lazy migration:
+   * a legacy plaintext entry is wrapped into the new store and deleted on first
+   * read, so existing trusted devices keep their silent open across the upgrade.
+   */
+  async function getCachedFamilyKey(familyId: string): Promise<string | null> {
+    const { loadTrustedAutoOpenKey, saveTrustedAutoOpenKey } =
+      await import('@/services/auth/trustedAutoOpen');
+    const stored = await loadTrustedAutoOpenKey(familyId);
+    if (stored) return stored;
+    // Legacy plaintext migration path.
+    const legacy = globalSettings.value.cachedFamilyKeys?.[familyId];
+    if (!legacy) return null;
+    try {
+      await saveTrustedAutoOpenKey(familyId, legacy);
+      await clearLegacyPlaintextKey(familyId);
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'auto_open_wrap_migrated',
+        context: { action: 'migrated' },
+      });
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'plaintext key migration to wrapped store failed — legacy value still used',
+        error: e,
+        severity: 'warning',
+        context: { action: 'auto_open_migrate_failed' },
+      });
+    }
+    return legacy;
+  }
+
+  async function clearLegacyPlaintextKey(familyId: string): Promise<void> {
+    const existing = { ...(globalSettings.value.cachedFamilyKeys ?? {}) };
+    delete existing[familyId];
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-      cachedFamilyKeys: { ...existing, [familyId]: exportedKey },
+      cachedFamilyKeys: existing,
     });
   }
 
   /**
-   * Retrieve the cached family key for a specific family.
-   */
-  function getCachedFamilyKey(familyId: string): string | null {
-    return globalSettings.value.cachedFamilyKeys?.[familyId] ?? null;
-  }
-
-  /**
-   * Clear the cached family key.
+   * Clear the auto-open key (wrapped store + any legacy plaintext remnant).
    * With familyId: clear one entry. Without: clear all.
    */
   async function clearCachedFamilyKey(familyId?: string): Promise<void> {
+    const { removeTrustedAutoOpenKey, clearAllTrustedAutoOpenKeys } =
+      await import('@/services/auth/trustedAutoOpen');
     if (familyId) {
-      const existing = { ...(globalSettings.value.cachedFamilyKeys ?? {}) };
-      delete existing[familyId];
-      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-        cachedFamilyKeys: existing,
-      });
+      await removeTrustedAutoOpenKey(familyId);
+      await clearLegacyPlaintextKey(familyId);
     } else {
+      await clearAllTrustedAutoOpenKeys();
       globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
         cachedFamilyKeys: {},
       });
@@ -947,6 +1025,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setTravelReminderLead,
     setPreferredCurrencies,
     setOnboardingCompleted,
+    markRecoveryKitConfirmed,
     setWeekStartDay,
     setCountry,
     setShowPublicHolidays,
@@ -961,6 +1040,10 @@ export const useSettingsStore = defineStore('settings', () => {
     setTrustedDevicePromptShown,
     resetTrustedDevicePrompt,
     setPasskeyPromptShown,
+    isPinPromptDismissed,
+    dismissPinPrompt,
+    kitPromptDismissed,
+    dismissKitPrompt,
     cacheFamilyKey,
     getCachedFamilyKey,
     clearCachedFamilyKey,

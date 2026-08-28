@@ -87,6 +87,70 @@ async function updateGlobalSettings(
   }, updates);
 }
 
+/** Read one trustedAutoOpen record (Phase 4 wrapped key store). */
+async function getTrustedAutoOpenRecord(page: import('@playwright/test').Page, familyId: string) {
+  return await page.evaluate(async (familyId) => {
+    return new Promise<Record<string, unknown> | null>((resolve) => {
+      const request = indexedDB.open('beanies-registry');
+      request.onsuccess = () => {
+        const db = request.result;
+        try {
+          if (!db.objectStoreNames.contains('trustedAutoOpen')) {
+            db.close();
+            resolve(null);
+            return;
+          }
+          const tx = db.transaction('trustedAutoOpen', 'readonly');
+          const get = tx.objectStore('trustedAutoOpen').get(familyId);
+          get.onsuccess = () => {
+            db.close();
+            resolve((get.result as Record<string, unknown>) ?? null);
+          };
+          get.onerror = () => {
+            db.close();
+            resolve(null);
+          };
+        } catch {
+          db.close();
+          resolve(null);
+        }
+      };
+      request.onerror = () => resolve(null);
+    });
+  }, familyId);
+}
+
+/** Write a synthetic trustedAutoOpen record (opaque wrapped bytes — persistence-level test). */
+async function putTrustedAutoOpenRecord(
+  page: import('@playwright/test').Page,
+  record: Record<string, unknown>
+) {
+  await page.evaluate(async (record) => {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('beanies-registry');
+      request.onsuccess = () => {
+        const db = request.result;
+        try {
+          const tx = db.transaction('trustedAutoOpen', 'readwrite');
+          tx.objectStore('trustedAutoOpen').put(record);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+          };
+        } catch (e) {
+          db.close();
+          reject(e);
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }, record);
+}
+
 test.describe('Trusted Device Password Cache', () => {
   // Firefox on CI can be slow during the create-pod flow in beforeEach
   test.setTimeout(60000);
@@ -112,29 +176,37 @@ test.describe('Trusted Device Password Cache', () => {
   }) => {
     test.skip(browserName === 'webkit', 'webkit-CI: page.goto race (E2E_HEALTH 2026-05-16)');
 
-    // --- Phase 1: Set cached password and verify persistence across reload ---
-
-    // Simulate trusted device with cached password (as if user trusted + decrypted)
+    // --- Phase 1: Set the trusted auto-open key and verify persistence ---
+    // Phase 4: the auto-open key lives WRAPPED in the registry's `trustedAutoOpen`
+    // store (the plaintext `cachedFamilyKeys` is retired to a legacy-migration
+    // remnant). Persistence-level test: opaque wrapped bytes are fine.
     await updateGlobalSettings(page, {
       isTrustedDevice: true,
       trustedDevicePromptShown: true,
-      cachedFamilyKeys: { 'test-family': 'test-encryption-pw' },
+      // Legacy plaintext remnant — clear-data must remove this too.
+      cachedFamilyKeys: { 'test-family': 'legacy-remnant' },
+    });
+    await putTrustedAutoOpenRecord(page, {
+      familyId: 'test-family',
+      wrapped: 'opaque-wrapped-bytes',
+      salt: 'opaque-salt',
+      kdf: 'hkdf',
+      createdAt: new Date().toISOString(),
     });
 
-    // Verify it was written
+    // Verify both were written
     let settings = await getGlobalSettings(page);
     expect(settings!.isTrustedDevice).toBe(true);
-    let cached = settings!.cachedFamilyKeys as Record<string, string>;
-    expect(cached['test-family']).toBe('test-encryption-pw');
+    let record = await getTrustedAutoOpenRecord(page, 'test-family');
+    expect(record?.wrapped).toBe('opaque-wrapped-bytes');
 
     // Reload page — IndexedDB persists
     await page.reload();
     await page.waitForURL('/nook');
 
-    // Verify password survived reload
-    settings = await getGlobalSettings(page);
-    cached = settings!.cachedFamilyKeys as Record<string, string>;
-    expect(cached['test-family']).toBe('test-encryption-pw');
+    // Verify the wrapped record survived reload
+    record = await getTrustedAutoOpenRecord(page, 'test-family');
+    expect(record?.wrapped).toBe('opaque-wrapped-bytes');
 
     // --- Phase 2: Clear all data removes cached password and trust flag ---
 
@@ -159,10 +231,12 @@ test.describe('Trusted Device Password Cache', () => {
     // After clearing all data, the registry DB should be deleted
     settings = await getGlobalSettings(page);
     if (settings) {
-      // If settings still exist, passwords should be cleared
+      // If settings still exist, the legacy plaintext remnant must be cleared
       const pw = (settings.cachedFamilyKeys as Record<string, string> | undefined) ?? {};
       expect(Object.keys(pw)).toHaveLength(0);
     }
-    // If settings is null (DB deleted entirely), that's also acceptable
+    // ...and the wrapped auto-open record must be gone either way.
+    record = await getTrustedAutoOpenRecord(page, 'test-family');
+    expect(record).toBeNull();
   });
 });

@@ -71,7 +71,7 @@ export function isValidPin(pin: string): boolean {
  * back to extractable base64 bytes — flagged to telemetry so the fleet share of the
  * weaker mode is measurable.
  */
-async function getOrCreateDeviceSecret(): Promise<{
+export async function getOrCreateDeviceSecret(): Promise<{
   baseKey: CryptoKey;
   kdf: 'hkdf' | 'hkdf+pbkdf2';
 }> {
