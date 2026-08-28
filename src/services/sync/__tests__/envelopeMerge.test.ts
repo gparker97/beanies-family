@@ -135,3 +135,62 @@ describe('preserveLocalKeyDicts', () => {
     expect(result.wrappedKeys.m1).toEqual(sampleWrapped);
   });
 });
+
+// ── Phase 3 (2026-08-28 rethink): recovery fields ride the same preservation rules ──
+import { keyDictSize as kds } from '../envelopeMerge';
+
+describe('recovery fields (Phase 3)', () => {
+  const base = (over: Partial<import('@/types/syncFileV4').BeanpodFileV4> = {}) =>
+    ({
+      version: '4.0',
+      familyId: 'f',
+      familyName: 'Beans',
+      keyId: 'k',
+      wrappedKeys: {},
+      passkeyWrappedKeys: {},
+      inviteKeys: {},
+      encryptedPayload: 'x',
+      ...over,
+    }) as import('@/types/syncFileV4').BeanpodFileV4;
+
+  it('a locally generated kit survives an old-writer incoming envelope', () => {
+    const local = base({
+      recoveryKeys: { kit1: { salt: 's', wrapped: 'w', createdAt: '2026-08-28' } },
+      recoveryPassphrase: { salt: 'ps', wrapped: 'pw' },
+    });
+    const incoming = base(); // an old client never wrote the fields
+    const merged = preserveLocalKeyDicts(incoming, local);
+    expect(merged.recoveryKeys).toEqual(local.recoveryKeys);
+    expect(merged.recoveryPassphrase).toEqual(local.recoveryPassphrase);
+  });
+
+  it('incoming entries win on collision; unions otherwise', () => {
+    const local = base({
+      recoveryKeys: { kit1: { salt: 'L', wrapped: 'L', createdAt: 'L' } },
+    });
+    const incoming = base({
+      recoveryKeys: {
+        kit1: { salt: 'R', wrapped: 'R', createdAt: 'R' },
+        kit2: { salt: 'R2', wrapped: 'R2', createdAt: 'R2' },
+      },
+      recoveryPassphrase: { salt: 'RP', wrapped: 'RP' },
+    });
+    const merged = preserveLocalKeyDicts(incoming, local);
+    // Local-wins per key, matching the other dicts — and the scalar follows suit.
+    expect(merged.recoveryKeys!.kit1.salt).toBe('L');
+    expect(merged.recoveryKeys!.kit2.salt).toBe('R2');
+    expect(merged.recoveryPassphrase!.salt).toBe('RP'); // local had none → incoming survives
+  });
+
+  it('keyDictSize counts kits + passphrase (the offline-publish signal)', () => {
+    expect(kds(base())).toBe(0);
+    expect(
+      kds(
+        base({
+          recoveryKeys: { a: { salt: '', wrapped: '', createdAt: '' } },
+          recoveryPassphrase: { salt: '', wrapped: '' },
+        })
+      )
+    ).toBe(2);
+  });
+});

@@ -30,6 +30,18 @@ export interface WrappedPasskeyKey {
 }
 
 /** A family key wrapped for an invite link (token-derived AES-KW, time-limited). */
+/**
+ * A recovery-kit wrap (login rethink Phase 3): the family key wrapped under a
+ * full-entropy 256-bit kit token (PBKDF2 over the raw token — same derivation as
+ * invites, offline-safe by entropy, not by iteration count). The kit token itself is
+ * printed/saved by the family and NEVER persisted anywhere.
+ */
+export interface RecoveryKeyPackage {
+  salt: string; // PBKDF2 salt (base64, 16 bytes)
+  wrapped: string; // AES-KW wrapped family key (base64)
+  createdAt: ISODateString;
+}
+
 export interface InviteKeyPackage {
   /** PBKDF2 salt (base64, 16 bytes) */
   salt: string;
@@ -56,6 +68,20 @@ export interface BeanpodFileV4 {
 
   /** Active invite packages. Key = SHA-256 hash of invite token (base64url). */
   inviteKeys: Record<string, InviteKeyPackage>;
+  /**
+   * Recovery-kit wraps (ADDITIVE OPTIONAL on '4.0' — never a version bump; old writers
+   * preserve unknown fields via reEncryptEnvelope's spread and envelopeMerge). Keyed by
+   * kitId (a random id printed on the kit so a family can tell copies apart). Old
+   * entries persist until #117 key rotation retires them — same no-deletion-propagation
+   * semantics as every other envelope dict.
+   */
+  recoveryKeys?: Record<string, RecoveryKeyPackage>;
+  /**
+   * Optional family recovery passphrase wrap (ADDITIVE OPTIONAL). Its own field, NEVER
+   * a reserved `wrappedKeys` entry — legacy clients enumerate wrappedKeys as
+   * (memberId, wrap) pairs and would surface a phantom member (Pass-4 finding).
+   */
+  recoveryPassphrase?: WrappedMemberKey;
 
   /** base64( IV || AES-GCM(FK, automerge_binary) ) */
   encryptedPayload: string;

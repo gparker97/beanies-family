@@ -4099,6 +4099,35 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  /**
+   * Store a recovery-kit wrap in the envelope (Phase 3). Mirrors addPasskeySecret's
+   * write shape; the entry rides the next save (keyDictSize counts it, so an
+   * offline-generated kit still triggers a publish).
+   */
+  function addRecoveryKey(
+    kitId: string,
+    pkg: import('@/types/syncFileV4').RecoveryKeyPackage
+  ): void {
+    if (!envelope.value) return;
+    const env: import('@/types/syncFileV4').BeanpodFileV4 = {
+      ...envelope.value,
+      recoveryKeys: { ...envelope.value.recoveryKeys, [kitId]: pkg },
+    };
+    envelope.value = env;
+    syncService.setEnvelope(env);
+  }
+
+  /** Store (or replace) the family recovery-passphrase wrap in the envelope (Phase 3). */
+  function setRecoveryPassphraseWrap(pkg: import('@/types/syncFileV4').WrappedMemberKey): void {
+    if (!envelope.value) return;
+    const env: import('@/types/syncFileV4').BeanpodFileV4 = {
+      ...envelope.value,
+      recoveryPassphrase: pkg,
+    };
+    envelope.value = env;
+    syncService.setEnvelope(env);
+  }
+
   function removePasskeySecretsForCredential(credentialId: string): void {
     passkeySecrets.value = passkeySecrets.value.filter((s) => s.credentialId !== credentialId);
   }
@@ -4311,6 +4340,8 @@ export const useSyncStore = defineStore('sync', () => {
     passkeySecrets,
     effectivePasskeySecrets,
     addPasskeySecret,
+    addRecoveryKey,
+    setRecoveryPassphraseWrap,
     removePasskeySecretsForCredential,
     clearAllPasskeySecrets,
   };
