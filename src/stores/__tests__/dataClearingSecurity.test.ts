@@ -945,26 +945,30 @@ describe('Sensitive Data Clearing Security', () => {
   // 7. Edge cases
   // =========================================================================
   describe('Edge cases', () => {
-    it('signOut gracefully handles missing familyId', async () => {
+    it('signOut with a familyId-less session FALLS BACK to the active family (review F14)', async () => {
+      // The old behavior — skipping the teardown entirely — was the vulnerability: a
+      // legacy session without familyId left the family DB, cached key, PIN wraps and
+      // roster on a shared machine. The fallback chain (session → context → registry)
+      // must find the active family and clear it.
       const auth = useAuthStore();
       auth.currentUser = { memberId: 'x', email: 'x@x.com' }; // no familyId
       auth.isAuthenticated = true;
 
       await auth.signOut();
 
-      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
       expect(auth.currentUser).toBeNull();
       expect(auth.isAuthenticated).toBe(false);
     });
 
-    it('signOutAndClearData gracefully handles missing familyId', async () => {
+    it('signOutAndClearData with a familyId-less session still clears via the fallback (review F14)', async () => {
       const auth = useAuthStore();
       auth.currentUser = { memberId: 'x', email: 'x@x.com' }; // no familyId
       auth.isAuthenticated = true;
 
       await auth.signOutAndClearData();
 
-      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
       expect(auth.currentUser).toBeNull();
       expect(auth.isAuthenticated).toBe(false);
     });

@@ -63,8 +63,11 @@ watch(
 /**
  * The password form is tucked behind a link whenever a PIN is offered — the PIN is the
  * primary credential of the redesign; password is the legacy/bootstrap terminal.
+ * Initialized OPEN when the screen mounts already carrying an error (review F13: the
+ * wrong-password round-trip remounts this component, and collapsing the form under the
+ * "incorrect password" message forced a re-click + retype).
  */
-const showPasswordForm = ref(false);
+const showPasswordForm = ref(!!props.error);
 const passwordFormVisible = computed(() => !hasPin.value || showPasswordForm.value);
 /**
  * Create-password mode: the member has no credential AND the pod is open (the doc must
