@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4269
+    "translationCount": 4270
   },
   "translations": {
     "app.name": {
@@ -21349,6 +21349,11 @@
     "recovery.passphraseHint": {
       "translation": "您的密码—或您的家庭恢复密码（如果已设置）。",
       "hash": "l5oe2p",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.passphraseRules": {
+      "translation": "至少14个字符和3个不同的单词—单词之间可以使用空格或破折号，并且允许任何字符。您的家人或成员姓名太容易猜到，不被接受。",
+      "hash": "v99x6n",
       "lastUpdated": "2026-08-28"
     }
   }
