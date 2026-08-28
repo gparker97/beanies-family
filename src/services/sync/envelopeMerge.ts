@@ -1,10 +1,12 @@
 /**
  * Envelope key-dict merge helpers.
  *
- * `BeanpodFileV4` carries three dictionaries outside the encrypted payload:
+ * `BeanpodFileV4` carries these key holders outside the encrypted payload:
  *   - `wrappedKeys`         — per-member password-wrapped family keys
  *   - `inviteKeys`          — per-token invite-wrapped family keys
  *   - `passkeyWrappedKeys`  — per-credential PRF-wrapped family keys
+ *   - `recoveryKeys`        — per-kit recovery wraps (Phase 3, additive optional)
+ *   - `recoveryPassphrase`  — the single optional passphrase wrap (Phase 3)
  *
  * They're not CRDT-merged. Whenever an in-memory envelope is replaced by a
  * fetched one (Drive read, cache load, background sync), the just-mutated
@@ -53,6 +55,16 @@ export function preserveLocalKeyDicts(
     inviteKeys: mergeKeyDict(incoming.inviteKeys, local.inviteKeys) ?? {},
     wrappedKeys: mergeKeyDict(incoming.wrappedKeys, local.wrappedKeys) ?? {},
     passkeyWrappedKeys: mergeKeyDict(incoming.passkeyWrappedKeys, local.passkeyWrappedKeys) ?? {},
+    // A kit generated on this device must survive an old-writer envelope arriving —
+    // preserveLocalKeyDicts' shape SILENTLY DROPS any dict it doesn't name (Pass-4).
+    ...(mergeKeyDict(incoming.recoveryKeys, local.recoveryKeys)
+      ? { recoveryKeys: mergeKeyDict(incoming.recoveryKeys, local.recoveryKeys) }
+      : {}),
+    // Scalar, LOCAL-wins like every dict key: the local side is the just-mutated truth
+    // about to be pushed — a passphrase set this session must survive an incoming fetch.
+    ...((local.recoveryPassphrase ?? incoming.recoveryPassphrase)
+      ? { recoveryPassphrase: local.recoveryPassphrase ?? incoming.recoveryPassphrase }
+      : {}),
   };
 }
 
@@ -71,6 +83,10 @@ export function keyDictSize(envelope: BeanpodFileV4 | null | undefined): number 
   return (
     Object.keys(envelope.wrappedKeys ?? {}).length +
     Object.keys(envelope.passkeyWrappedKeys ?? {}).length +
-    Object.keys(envelope.inviteKeys ?? {}).length
+    Object.keys(envelope.inviteKeys ?? {}).length +
+    // Kit/passphrase wraps are key material too: one set offline must trigger a
+    // publish exactly like an offline passkey enrolment (this count is that signal).
+    Object.keys(envelope.recoveryKeys ?? {}).length +
+    (envelope.recoveryPassphrase ? 1 : 0)
   );
 }

@@ -137,16 +137,23 @@ export async function unwrapWrappedKey(
  * security risk of returning the first match without checking for
  * ambiguity.
  *
- * @returns { familyKey, memberIds } on success — memberIds.length ≥ 1
- * @throws Error('Incorrect password') if no wrapped key matches
+ * Phase 3 (2026-08-28 rethink): the optional family recovery PASSPHRASE is tried too
+ * (same derivation, its own envelope field). A passphrase match identifies NO member —
+ * `memberIds` comes back empty with `viaRecoveryPassphrase: true`, and the caller routes
+ * to the person picker. Tried AFTER the member wraps so a member password can never be
+ * shadowed by an identical passphrase.
+ *
+ * @returns { familyKey, memberIds } on success — memberIds may be EMPTY only when
+ *   `viaRecoveryPassphrase` is true
+ * @throws Error('Incorrect password') if nothing matches
  */
 export async function tryUnwrapFamilyKey(
   envelope: BeanpodFileV4,
   password: string
-): Promise<{ familyKey: CryptoKey; memberIds: string[] }> {
+): Promise<{ familyKey: CryptoKey; memberIds: string[]; viaRecoveryPassphrase?: boolean }> {
   const entries = Object.entries(envelope.wrappedKeys);
 
-  if (entries.length === 0) {
+  if (entries.length === 0 && !envelope.recoveryPassphrase) {
     throw new Error('No wrapped keys in beanpod file — cannot unlock');
   }
 
@@ -160,11 +167,18 @@ export async function tryUnwrapFamilyKey(
     memberIds.push(memberId);
   }
 
-  if (!familyKey || memberIds.length === 0) {
-    throw new Error('Incorrect password');
+  if (familyKey && memberIds.length > 0) {
+    return { familyKey, memberIds };
   }
 
-  return { familyKey, memberIds };
+  if (envelope.recoveryPassphrase) {
+    const fk = await unwrapWrappedKey(envelope.recoveryPassphrase, password);
+    if (fk) {
+      return { familyKey: fk, memberIds: [], viaRecoveryPassphrase: true };
+    }
+  }
+
+  throw new Error('Incorrect password');
 }
 
 /**
