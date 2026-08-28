@@ -13,6 +13,7 @@ import { ref, computed, watch, nextTick } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PinInput from '@/components/ui/PinInput.vue';
+import RecoveryKitLink from '@/components/login/RecoveryKitLink.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -378,15 +379,9 @@ function handleSubmit() {
       </div>
 
       <!-- Cold-path escape: a member who has forgotten everything reaches the kit here -->
-      <button
-        v-if="!podOpen"
-        type="button"
-        class="w-full pt-1 text-center text-xs text-gray-400 underline-offset-2 transition-colors hover:text-gray-600 hover:underline disabled:opacity-40 dark:text-gray-500 dark:hover:text-gray-300"
-        :disabled="isBusy"
-        @click="emit('use-recovery')"
-      >
-        {{ t('recovery.useKitLink') }}
-      </button>
+      <div v-if="!podOpen" class="pt-2">
+        <RecoveryKitLink :disabled="isBusy" @click="emit('use-recovery')" />
+      </div>
     </div>
   </div>
 </template>

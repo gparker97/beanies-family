@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4270
+    "translationCount": 4271
   },
   "translations": {
     "app.name": {
@@ -21354,6 +21354,11 @@
     "recovery.passphraseRules": {
       "translation": "至少14个字符和3个不同的单词—单词之间可以使用空格或破折号，并且允许任何字符。您的家人或成员姓名太容易猜到，不被接受。",
       "hash": "v99x6n",
+      "lastUpdated": "2026-08-28"
+    },
+    "recovery.kitScanReading": {
+      "translation": "正在读取您的工具包……",
+      "hash": "mff4r5",
       "lastUpdated": "2026-08-28"
     }
   }
