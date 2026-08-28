@@ -763,7 +763,29 @@ async function requestMutate<T>(
  * failure is background + self-healable → firehose-only. Nothing here ever
  * pages Slack: the single `critical` escalation for "data isn't saving" is the
  * debounced save-failure banner (syncStore), which carries real recovery CTAs. */
+/**
+ * Deliberate-teardown window (sign-out / clear-data). Ops that fail because the doc was
+ * just reset are the EXPECTED consequence of the user leaving, not an edit in doubt —
+ * toasting "we couldn't update your data" over the welcome gate reads as a scary defect
+ * (observed 2026-08-28: an in-flight passkey-enrolment push straddling a sign-out).
+ * During the window, user-action failures are downgraded to the firehose path; nothing
+ * is swallowed. Cleared by the window elapsing or the next initDoc (a new session).
+ */
+let quietTeardownUntil = 0;
+export function beginQuietTeardown(windowMs = 10_000): void {
+  quietTeardownUntil = Date.now() + windowMs;
+}
+
 function notifyFailure(error: Error, methods: string[]): void {
+  if (Date.now() < quietTeardownUntil) {
+    reportError({
+      surface: 'doc-worker',
+      message: `op(s) '${methods.join(',')}' failed during sign-out teardown (expected drain)`,
+      error,
+      severity: 'warning', // firehose + console only — never a toast, never pages
+    });
+    return;
+  }
   if (methods.some((m) => USER_ACTION_METHODS.has(m))) {
     // No `critical` flag — never pages. useToast auto-reports error toasts
     // (surface/error) at non-paging severity, so no separate reportError here
@@ -816,6 +838,8 @@ export async function setFamilyKey(key: CryptoKey): Promise<void> {
 
 /** Create a fresh empty document (create-family). Pushes the full projection. */
 export function initDoc(): Promise<{ loaded: true }> {
+  // A fresh doc means a fresh session — restore normal toast policy immediately.
+  quietTeardownUntil = 0;
   return request('initDoc');
 }
 
@@ -1039,6 +1063,8 @@ export function dropDoc(): Promise<void> {
 
 /** Drop the in-memory doc + projection (sign-out); does NOT delete the cache. */
 export async function reset(): Promise<void> {
+  // reset() during the quiet window is the teardown itself; nothing to change here —
+  // the next initDoc (below) re-arms normal toast policy.
   currentFamilyId = null;
   familyKey = null;
   await request('reset');

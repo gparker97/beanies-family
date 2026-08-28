@@ -1380,6 +1380,10 @@ export const useAuthStore = defineStore('auth', () => {
     // the freshest edit (which may live only in the worker cache) reaches Drive.
     // Bounded timeout — Drive can hang indefinitely if its API key is rejected,
     // the file was deleted, or the network is offline. Don't let that block sign-out.
+    // Deliberate teardown: in-flight doc ops failing against the reset worker are the
+    // expected consequence of leaving, not edits in doubt — keep them off the toast
+    // layer for the teardown window (they still reach the firehose).
+    docClient.beginQuietTeardown();
     await forceSaveWithTimeout(3000);
 
     await cancelRemindersForSignOut();
@@ -1573,6 +1577,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function signOutAndClearData(): Promise<void> {
     // Force a durable save of the latest doc before clearing the cache.
     // Bounded — see signOut() for rationale.
+    // Deliberate teardown: in-flight doc ops failing against the reset worker are the
+    // expected consequence of leaving, not edits in doubt — keep them off the toast
+    // layer for the teardown window (they still reach the firehose).
+    docClient.beginQuietTeardown();
     await forceSaveWithTimeout(3000);
 
     // Doubly important here: this path promises the device is clean.

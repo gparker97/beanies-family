@@ -424,6 +424,11 @@ async function handleFamilySelected(payload: {
   // Clear any stale LoadPodView intent (incl. reconnectDriveFile) before routing.
   resetLoadPodFlags();
 
+  // Spinner up FIRST: startForFamily can do real work before it resolves (silent token
+  // refresh + Drive fetch on the trusted-device auto-open path — 5-10s cold). Leaving
+  // the family picker on screen for that window looked like a freeze.
+  activeView.value = 'loading';
+
   // The machine path: any person list at all → person-select → prove → open.
   // (startForFamily also performs the family-context switch.)
   if (await enterFlow(payload.id, payload.name)) return;
@@ -559,6 +564,8 @@ function handleFinishStorage() {
  * roster is live — hand over to the machine, which renders the person picker from it.
  */
 async function handleFileLoaded() {
+  // Same spinner rule: the flow hand-off can take a beat (roster build, live members).
+  activeView.value = 'loading';
   const ok = await enterFlow(
     familyContextStore.activeFamilyId ?? '',
     familyContextStore.activeFamilyName ?? ''
