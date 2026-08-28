@@ -1408,6 +1408,18 @@ export const useAuthStore = defineStore('auth', () => {
           context: { action: 'clear_cached_key' },
         });
       }
+      // ...and the pre-decrypt roster cache. It is display data, not key material, but
+      // on a shared device it names the family's members to whoever opens the app next —
+      // same trust class as the cached key, so it follows the same rule: trusted keeps,
+      // untrusted clears. Best-effort (a stale roster is harmless; the picker re-caches
+      // on the next successful open).
+      try {
+        const { deleteRosterCache } =
+          await import('@/services/indexeddb/repositories/rosterCacheRepository');
+        await deleteRosterCache(familyId);
+      } catch (e) {
+        console.warn('Failed to clear roster cache on sign-out:', e);
+      }
     }
 
     // Clear auth state
@@ -1545,6 +1557,16 @@ export const useAuthStore = defineStore('auth', () => {
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
     await settingsStore.clearCachedFamilyKey();
+
+    // This path promises a clean device: clear every family's pre-decrypt roster too
+    // (display data, but it names the family's members to the next user of the machine).
+    try {
+      const { clearAllRosterCache } =
+        await import('@/services/indexeddb/repositories/rosterCacheRepository');
+      await clearAllRosterCache();
+    } catch (e) {
+      console.warn('Failed to clear roster caches on sign-out-and-clear:', e);
+    }
 
     // Clear auth state
     currentUser.value = null;

@@ -7,6 +7,7 @@ import { mutate } from '@/services/automerge/worker/docClient';
 import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
+import { refreshRosterCache } from '@/services/auth/rosterCache';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
@@ -69,6 +70,15 @@ export const useFamilyStore = defineStore('family', () => {
 
   /** True when at least one pet exists — handy for conditional UI. */
   const hasPets = computed(() => members.value.some((m) => m.isPet));
+
+  // Keep the device-local pre-decrypt roster cache current (2026-08-28 login rethink).
+  // Every mutation path replaces `members.value` wholesale, so a shallow watch on the
+  // sorted projection covers load + add + update + remove with one seam. The service
+  // no-ops on an empty list (so the sign-out reset can't erase a good roster) and on a
+  // missing active family (join/create flows before registration).
+  watch(sortedMembers, (list) => {
+    void refreshRosterCache(list);
+  });
 
   // Diagnostic: track permission changes on currentMember
   watch(currentMember, (newMember, oldMember) => {
