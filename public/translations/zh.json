@@ -14397,14 +14397,14 @@
       "lastUpdated": "2026-05-16"
     },
     "bean.account.description": {
-      "translation": "{name}使用密码登录。如果他们无法登录，您可以设置新的账号并与他们分享。",
-      "hash": "icdw5",
-      "lastUpdated": "2026-05-16"
+      "translation": "{name}使用6位数PIN码登录。如果他们忘记了（或从未有过） ，您可以在此处设置新的PIN码并与他们分享。",
+      "hash": "fda83k",
+      "lastUpdated": "2026-08-28"
     },
     "bean.account.resetButton": {
-      "translation": "重置{name}的密码",
-      "hash": "pk8p89",
-      "lastUpdated": "2026-05-16"
+      "translation": "重置{name}的PIN码",
+      "hash": "dqg2fd",
+      "lastUpdated": "2026-08-28"
     },
     "settings.card.account": {
       "translation": "帐户登录",
