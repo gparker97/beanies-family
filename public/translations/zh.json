@@ -14347,24 +14347,24 @@
       "lastUpdated": "2026-05-16"
     },
     "family.resetPassword.error.cannotResetSelf": {
-      "translation": "为您自己的帐户使用“设置” “→更改密码”。",
-      "hash": "tt94l2",
-      "lastUpdated": "2026-05-16"
+      "translation": "从“设置” “→帐户和登录”更改您自己的个人识别码。",
+      "hash": "2u1tvh",
+      "lastUpdated": "2026-08-28"
     },
     "family.resetPassword.error.isPet": {
-      "translation": "宠物没有密码。",
-      "hash": "lsyavs",
-      "lastUpdated": "2026-05-16"
+      "translation": "宠物不需要PIN码。",
+      "hash": "aymd6",
+      "lastUpdated": "2026-08-28"
     },
     "family.resetPassword.error.cannotResetOwner": {
-      "translation": "Pod所有者必须在“设置”中更改自己的密码。",
-      "hash": "ax56ve",
-      "lastUpdated": "2026-05-16"
+      "translation": "Pod所有者在“设置”中更改自己的PIN。",
+      "hash": "8nn450",
+      "lastUpdated": "2026-08-28"
     },
     "family.resetPassword.error.notAuthorized": {
-      "translation": "您无权重置其他成员的密码。",
-      "hash": "kxhmn6",
-      "lastUpdated": "2026-05-16"
+      "translation": "您没有重置其他会员PIN码的权限。",
+      "hash": "xnujuy",
+      "lastUpdated": "2026-08-28"
     },
     "family.resetPassword.error.familyKeyMissing": {
       "translation": "无法加载家庭密钥—请注销并重新登录，然后重试。",
