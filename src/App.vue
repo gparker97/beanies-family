@@ -244,12 +244,17 @@ async function handleEnablePasskey() {
   try {
     const result = await authStore.registerPasskeyForCurrentUser();
     if (result.success) {
+      // The registration IS the outcome — report success before the push, and push
+      // best-effort via the bounded, rejection-swallowing helper. The old unbounded
+      // `await syncNow(true)` here could straddle a sign-out: the reset doc worker
+      // failed the save, the rejection landed in the catch below, and a SUCCESSFUL
+      // enrolment was toasted as "failed to register" over the welcome gate.
+      showToast('success', t('passkey.registerSuccess'));
       if (result.passkeySecret) {
         // Store PRF-wrapped family key in the .beanpod envelope for cross-device access
         syncStore.addPasskeySecret(result.passkeySecret);
-        await syncStore.syncNow(true);
+        await syncStore.syncNowBounded();
       }
-      showToast('success', t('passkey.registerSuccess'));
     } else if (result.cancelled) {
       // User dismissed the platform-authenticator prompt — a deliberate
       // gesture, not an error. Stay silent (no toast, no Slack alert).
