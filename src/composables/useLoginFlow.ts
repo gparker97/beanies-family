@@ -59,6 +59,12 @@ export interface UseLoginFlow {
   /** A prove/opening effect is in flight — views disable their affordances. */
   isBusy: Ref<boolean>;
   /**
+   * A family-level recovery secret (kit or passphrase) opened the pod this session: the
+   * prove screen offers SET-A-NEW-PIN instead of demanding forgotten credentials. Set by
+   * the kit/passphrase redeem paths; cleared on sign-in and on leaving the flow.
+   */
+  recoveryMode: Ref<boolean>;
+  /**
    * Enter the flow for a family. Returns false when this device has NO person list at
    * all (no open pod, no roster, no credential records) — the caller falls back to the
    * bootstrap load surface, exactly like a brand-new device.
@@ -73,6 +79,7 @@ export interface UseLoginFlow {
   onTapThrough(): Promise<void>;
   onPasswordSubmit(password: string): void;
   onPinSubmit(pin: string): Promise<void>;
+  onResetPin(pin: string): Promise<void>;
   onCreatePassword(password: string): Promise<void>;
   onFellBack(): void;
   // Recovery-panel handlers
@@ -97,6 +104,7 @@ export function useLoginFlow(opts: {
   const state = ref<LoginFlowState>({ kind: 'idle' });
   const proveError = ref<string | null>(null);
   const isBusy = ref(false);
+  const recoveryMode = ref(false);
 
   /**
    * Out-of-band password for the current opening attempt. Never reactive. RETAINED
@@ -348,6 +356,7 @@ export function useLoginFlow(opts: {
       return;
     }
     if (s.kind === 'done') {
+      recoveryMode.value = false;
       opts.onSignedIn(s.destination);
       return;
     }
@@ -357,6 +366,7 @@ export function useLoginFlow(opts: {
     }
     if (s.kind === 'idle') {
       pendingPassword = null;
+      recoveryMode.value = false;
       opts.onExit();
     }
   }
@@ -657,6 +667,35 @@ export function useLoginFlow(opts: {
     }
   }
 
+  /**
+   * Recovery-mode PIN reset: the kit/passphrase opened the pod, identity is granted by
+   * that family-level secret, and the member sets a fresh PIN in place of the forgotten
+   * credentials. Only reachable when `recoveryMode` armed the prove screen.
+   */
+  async function onResetPin(pin: string): Promise<void> {
+    const s = currentProve();
+    if (!s || isBusy.value || !recoveryMode.value) return;
+    proveError.value = null;
+    isBusy.value = true;
+    try {
+      const result = await authStore.resetMemberPinViaRecovery(s.person.id, pin);
+      emitProveOutcome({
+        method: 'recovery-reset',
+        ok: result.success,
+        errorCode: result.success ? undefined : 'rejected',
+        fallbackDepth: s.fallbackDepth,
+      });
+      if (result.success) {
+        if (!stillProving(s.person.id)) return;
+        dispatch({ type: 'PROVE_SUCCEEDED', grant: { memberId: s.person.id, fkAvailable: false } });
+        return;
+      }
+      proveError.value = result.error ?? t('auth.signInFailed');
+    } finally {
+      isBusy.value = false;
+    }
+  }
+
   function onPasswordSubmit(password: string): void {
     const s = currentProve();
     if (!s || isBusy.value) return;
@@ -782,6 +821,7 @@ export function useLoginFlow(opts: {
               // says the phrase was accepted rather than "wrong password".
               pendingPassword = null;
               await familyStore.loadMembers();
+              recoveryMode.value = true;
               proveError.value = t('recovery.passphraseAcceptedProve');
               emitProveOutcome({
                 method: 'password',
@@ -917,6 +957,7 @@ export function useLoginFlow(opts: {
     state,
     proveError,
     isBusy,
+    recoveryMode,
     startForFamily,
     tryCachedKeyDecrypt,
     dispatch,
@@ -925,6 +966,7 @@ export function useLoginFlow(opts: {
     onTapThrough,
     onPasswordSubmit,
     onPinSubmit,
+    onResetPin,
     onCreatePassword,
     onFellBack,
     onRecoveryRetry,

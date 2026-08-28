@@ -58,11 +58,13 @@ const props = defineProps<{
    * "use a recovery kit" escape routes here). The password form stays one tap away.
    */
   startInKitEntry?: boolean;
+  /** Pre-fill the kit code (the QR deep link landed here with the code in the fragment). */
+  prefillKitCode?: string;
 }>();
 
 const emit = defineEmits<{
   back: [];
-  'file-loaded': [];
+  'file-loaded': [source?: 'recovery'];
   'signed-in': [destination: string];
   'request-create': [];
 }>();
@@ -76,9 +78,28 @@ const showKitEntry = ref(false);
 watch(
   () => showDecryptModal.value,
   (open) => {
-    if (open && props.startInKitEntry) showKitEntry.value = true;
+    if (open && props.startInKitEntry) {
+      showKitEntry.value = true;
+      if (props.prefillKitCode) kitCodeInput.value = props.prefillKitCode;
+    }
   }
 );
+
+/** Photo/screenshot scan: decode the printed kit's QR instead of transcribing 32 chars. */
+async function handleKitPhotoPicked(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  (event.target as HTMLInputElement).value = '';
+  if (!file) return;
+  formError.value = null;
+  const { decodeQrFromImageFile } = await import('@/utils/qrDecode');
+  const decoded = await decodeQrFromImageFile(file);
+  if (!decoded) {
+    formError.value = t('recovery.kitScanFailed');
+    return;
+  }
+  const { parseKitInput } = await import('@/services/auth/recoveryKit');
+  kitCodeInput.value = parseKitInput(decoded);
+}
 const kitCodeInput = ref('');
 /** Whether the pending envelope carries any recovery-kit wraps at all. */
 const hasRecoveryKits = computed(
@@ -212,9 +233,9 @@ async function ensureDurableHome() {
   }
 }
 
-async function finishLoaded() {
+async function finishLoaded(source?: 'recovery') {
   await ensureDurableHome();
-  emit('file-loaded');
+  emit('file-loaded', source);
 }
 
 async function handlePendingPassword(
@@ -406,8 +427,8 @@ async function handleKitRedeem() {
   isLoadingFile.value = true;
   formError.value = null;
   try {
-    const { redeemRecoveryKit } = await import('@/services/auth/recoveryKit');
-    const result = await redeemRecoveryKit(envelope, kitCodeInput.value);
+    const { redeemRecoveryKit, parseKitInput } = await import('@/services/auth/recoveryKit');
+    const result = await redeemRecoveryKit(envelope, parseKitInput(kitCodeInput.value));
     if (!result.ok) {
       formError.value =
         result.reason === 'no-kits' ? t('recovery.kitNoKits') : t('recovery.kitWrongCode');
@@ -432,7 +453,9 @@ async function handleKitRedeem() {
     });
     showDecryptModal.value = false;
     kitCodeInput.value = '';
-    await finishLoaded();
+    // 'recovery': a family-level secret opened the pod — the person picker's prove
+    // screen offers SET-A-NEW-PIN instead of demanding the forgotten credentials.
+    await finishLoaded('recovery');
   } catch (e) {
     console.error('[LoadPodView] kit redeem failed:', e);
     formError.value = t('password.decryptionError');
@@ -481,7 +504,7 @@ async function handleDecrypt() {
       }
 
       decryptPassword.value = '';
-      await finishLoaded();
+      await finishLoaded(result.viaRecoveryPassphrase ? 'recovery' : undefined);
     } else {
       formError.value = result.error ?? t('password.decryptionError');
     }
@@ -983,6 +1006,22 @@ async function handleDriveRefresh() {
           spellcheck="false"
           required
         />
+        <label
+          class="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        >
+          <svg
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          {{ t('recovery.kitScanPhoto') }}
+          <input type="file" accept="image/*" class="hidden" @change="handleKitPhotoPicked" />
+        </label>
         <BaseButton
           type="submit"
           class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"

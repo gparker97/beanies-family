@@ -4205,11 +4205,20 @@ const STRING_DEFS = {
   'recovery.kitCodeLabel': { en: 'Recovery Code', beanie: 'recovery code' },
   'recovery.kitIdLabel': { en: 'Kit ID', beanie: 'kit id' },
   'recovery.kitStoreWarning': {
-    en: "Save or print this now — it's shown only once, and it is the only way into your family data if everything else is forgotten. Don't keep it in the same Google Drive as your family data.",
+    en: "Save or print this now — it's shown only once. Keep it somewhere safe that you can reach if you ever lose your PIN.",
     beanie:
-      "save or print this now — it's shown only once. don't keep it in the same google drive as your beans.",
+      "save or print this now — it's shown only once. keep it somewhere safe you can reach if you ever lose your pin.",
   },
   'recovery.kitDownloadPdf': { en: 'Save as PDF', beanie: 'save as pdf' },
+  'recovery.kitShare': { en: 'Share', beanie: 'share' },
+  'recovery.kitScanPhoto': {
+    en: 'Scan a photo of your kit',
+    beanie: 'scan a photo of your kit',
+  },
+  'recovery.kitScanFailed': {
+    en: "Couldn't read a QR code in that photo — try a clearer picture, or type the code.",
+    beanie: "couldn't read a qr code in that photo — try a clearer picture, or type the code.",
+  },
   'recovery.kitCopyCode': { en: 'Copy Code', beanie: 'copy code' },
   'recovery.kitCopied': { en: 'Copied!', beanie: 'copied!' },
   'recovery.kitConfirmStored': {
@@ -4266,6 +4275,16 @@ const STRING_DEFS = {
     beanie: "this family doesn't have a recovery kit on file.",
   },
   'recovery.unlock': { en: 'Unlock', beanie: 'unlock' },
+  'recovery.resetPinTitle': { en: 'Set a New PIN', beanie: 'set a new pin' },
+  'recovery.resetPinBody': {
+    en: "You're in with your recovery key — set a fresh 6-digit PIN to use from now on.",
+    beanie: "you're in with your recovery key — set a fresh 6-digit pin to use from now on.",
+  },
+  'recovery.resetPinAction': { en: 'Set PIN & Sign In', beanie: 'set pin & sign in' },
+  'recovery.passphraseHint': {
+    en: 'Your password — or your family recovery passphrase, if one was set.',
+    beanie: 'your password — or your family recovery passphrase, if one was set.',
+  },
   'recovery.passphraseAcceptedProve': {
     en: 'Recovery passphrase accepted — your family data is open. Now confirm who you are to sign in.',
     beanie:
