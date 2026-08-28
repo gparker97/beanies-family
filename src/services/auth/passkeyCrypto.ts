@@ -11,12 +11,13 @@
  * the PRF output comes back as an `ArrayBuffer`.
  */
 
-import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
-
-const HKDF_HASH = 'SHA-256';
-const WRAPPING_ALGO = 'AES-KW';
-const WRAPPING_KEY_LENGTH = 256;
-const HKDF_SALT_LENGTH = 32;
+import {
+  deriveWrappingKey as deriveWrappingKeyGeneric,
+  generateHKDFSalt as generateHKDFSaltGeneric,
+  wrapDEK as wrapDEKGeneric,
+  unwrapDEK as unwrapDEKGeneric,
+  HKDF_SALT_LENGTH,
+} from '@/services/crypto/keyWrap';
 
 /**
  * Fixed, app-wide PRF eval salt (32 bytes). MUST NOT change — the PRF output is
@@ -64,71 +65,31 @@ export function getPRFOutput(
 }
 
 /**
- * Generate a random HKDF salt (32 bytes).
+ * Generate a random HKDF salt (32 bytes). Delegates to the shared keyWrap module.
  */
 export function generateHKDFSalt(): Uint8Array {
-  return crypto.getRandomValues(new Uint8Array(HKDF_SALT_LENGTH));
+  return generateHKDFSaltGeneric();
 }
 
 /**
- * Derive an AES-KW wrapping key from PRF output using HKDF.
- *
- * @param prfOutput - Raw PRF first output (ArrayBuffer from authenticator)
- * @param hkdfSalt - 32-byte salt (stored alongside the credential)
- * @returns AES-KW CryptoKey for wrap/unwrap operations
+ * Derive an AES-KW wrapping key from PRF output using HKDF. Delegates to the shared
+ * keyWrap module with this path's immutable domain-separation info string.
  */
 export async function deriveWrappingKey(
   prfOutput: ArrayBuffer,
   hkdfSalt: Uint8Array
 ): Promise<CryptoKey> {
-  // Import PRF output as HKDF key material
-  const keyMaterial = await crypto.subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey']);
-
-  // Derive AES-KW wrapping key via HKDF
-  return crypto.subtle.deriveKey(
-    {
-      name: 'HKDF',
-      hash: HKDF_HASH,
-      salt: hkdfSalt.buffer as ArrayBuffer,
-      info: new TextEncoder().encode('beanies.family-passkey-dek-wrap'),
-    },
-    keyMaterial,
-    { name: WRAPPING_ALGO, length: WRAPPING_KEY_LENGTH },
-    false,
-    ['wrapKey', 'unwrapKey']
-  );
+  return deriveWrappingKeyGeneric(prfOutput, hkdfSalt, 'beanies.family-passkey-dek-wrap');
 }
 
-/**
- * Wrap (encrypt) a DEK using AES-KW.
- *
- * @param dek - The data encryption key to wrap (must be extractable)
- * @param wrappingKey - AES-KW key derived from PRF output
- * @returns Base64-encoded wrapped key blob
- */
+/** Wrap (encrypt) a DEK using AES-KW. Delegates to the shared keyWrap module. */
 export async function wrapDEK(dek: CryptoKey, wrappingKey: CryptoKey): Promise<string> {
-  const wrapped = await crypto.subtle.wrapKey('raw', dek, wrappingKey, WRAPPING_ALGO);
-  return bufferToBase64(wrapped);
+  return wrapDEKGeneric(dek, wrappingKey);
 }
 
-/**
- * Unwrap (decrypt) a DEK using AES-KW.
- *
- * @param wrappedBase64 - Base64-encoded wrapped key blob
- * @param wrappingKey - AES-KW key derived from PRF output
- * @returns AES-GCM CryptoKey ready for encrypt/decrypt
- */
+/** Unwrap a DEK using AES-KW (non-extractable, this path's historical behavior). */
 export async function unwrapDEK(wrappedBase64: string, wrappingKey: CryptoKey): Promise<CryptoKey> {
-  const wrappedBuffer = base64ToBuffer(wrappedBase64);
-  return crypto.subtle.unwrapKey(
-    'raw',
-    wrappedBuffer,
-    wrappingKey,
-    WRAPPING_ALGO,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+  return unwrapDEKGeneric(wrappedBase64, wrappingKey, false);
 }
 
 /**
