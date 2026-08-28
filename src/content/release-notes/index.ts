@@ -44,6 +44,8 @@ export interface ReleaseNote {
     icon?: string;
     /** Route for "try it →" button */
     tryItRoute?: string;
+    /** Optional label overriding the generic "Try It" on the tryItRoute button. */
+    tryItLabel?: { en: string; beanie: string };
     /**
      * Turn a phrase that appears inside `description` into an external link
      * (e.g. a help article). The phrase must be a verbatim substring of the
