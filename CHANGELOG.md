@@ -10,7 +10,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-28
 
+### Added
+
+- **Sign in with a 6-digit PIN.** Set yours in Settings → Security: it works on any device where your family is set up, unlocks your family data with one short code, and turns itself off on a device after five wrong tries.
+- **Recovery Kit** — a one-page backup key (printable PDF with a QR code) that opens your family data if every password and PIN is ever forgotten. Create it in Settings → Recovery & Backup, and keep it somewhere safe.
+- **Recovery passphrase** — an optional memorable phrase that unlocks your family data on any device: sign in to Google, type the phrase, done.
+- **Switch Member** — hand the app to another family member without signing the family out; they just confirm it's them.
+
 ### Changed
+
+- **Signing out no longer disconnects Google — anywhere.** Sign out and sign back in without re-consenting, and signing out on one device no longer breaks your family's other devices. The one deliberate exception is the new Settings action "Disconnect Google Everywhere", for emergencies.
 
 - **Signing in is one unified flow now: pick your bean, then prove it's you.** The person picker appears before your family data is even decrypted (a device remembers your family's names once it has opened the pod), and the same screen offers whichever ways in you actually have — Face ID/fingerprint first where it's set up, one tap for beans without a password, and the password as the always-available fallback. Three different sign-in screens with three different opinions became one.
 - **A connection problem no longer bounces you back to a password screen.** If Google needs reconnecting or a file permission lapsed after you've proven who you are, you get a reconnect panel that picks up exactly where you were — your sign-in is not asked for twice.

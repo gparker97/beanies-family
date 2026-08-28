@@ -1671,7 +1671,22 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐ Login/auth rethink — Phase 1 IMPLEMENTED on `main`, NOT pushed, ON-DEVICE VERIFY OWED ⭐
+### ⭐ Login/auth rethink — Phases 1+2+3+5 IMPLEMENTED on `main`, NOT pushed — greg's local round → WEB-ONLY DEPLOY → Phase 4 ⭐
+
+**Updated 2026-08-28 (session 2 of the rethink):** Phases 2 (member PIN + device wraps),
+3 (recovery kit + passphrase; device linking deferred to Phase 4), and 5 (logout tiers,
+no-revoke Google, explicit disconnect, switch-member) are implemented on top of Phase 1.
+A second `/code-review max` over the batch returned 15 verified findings — ALL FIXED
+(`a1b48946`; headline: /open-gesture file discard, stale-device passphrase revert,
+passphrase-as-wrong-password, transient-failure wrap destruction, cross-member passkey
+heal). Suite 5117 green, build passes. **Agreed sequence: greg's local round (PIN → cold
+PIN unlock, kit generate→redeem, passphrase, switch-member, no-re-auth logout) → deploy
+WEB ONLY via `/deploy-prod-auto` (mixed-version families are safe by design — all
+envelope changes additive) → then implement Phase 4 (device linking, PRF retirement,
+gated password removal).** Phase-4 production completion needs one deploy cycle (the
+writerVersion floor + the one-release PRF honor window).
+
+### (superseded) Phase 1 record
 
 **Plan:** `docs/plans/2026-08-28-login-auth-rethink-pin-recovery-kit.md` (approved, 4-pass
 gauntlet complete). **Seven commits** `1e160b11..840d0332`, all local — NOT pushed, NOT

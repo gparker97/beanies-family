@@ -99,3 +99,15 @@ roster cache → prove engine + telemetry facade → pure state machine → inte
 demoted, PickBeanView + BiometricLoginView deleted) → /code-review max (15 verified
 findings, all fixed). Full unit suite green (5097). On-device walkthrough on all three
 platforms is the outstanding acceptance gate before push/deploy.
+
+## Phases 2+3+5 round (2026-08-28, continued)
+
+> greg: fixes confirmed on laptop; "proceed with phase 2. can we do phases 2 and 3
+> together, then once done run a code review?" → then "should we do all remaining phases
+> together...?" → agreed 2+3+5 now, Phase 4 held (gated on families holding PINs+kits;
+> would break working biometrics pre-migration). → "let's deploy first but only the Vue
+> app and then implement the final phase... careful this doesn't impact existing users."
+
+Implemented Phases 2, 3 (device linking deferred to Phase 4 with rationale), and 5.
+Second /code-review max over the batch: 15 verified findings, all fixed (a1b48946).
+Sequence agreed: greg's local verification → web-only /deploy-prod-auto → Phase 4.
