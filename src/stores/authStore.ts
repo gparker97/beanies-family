@@ -25,6 +25,7 @@ import { clearLastGoogleAccount } from '@/services/sync/fileHandleStore';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { emitSignoutTier } from '@/services/telemetry/loginFlowEvents';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from './translationStore';
@@ -1567,6 +1568,26 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Tier 1 — "Switch person" (Phase 5 of the 2026-08-28 rethink): clear the MEMBER
+   * session only. The decrypted doc, family key, sync state, and Google tokens are all
+   * untouched — the next screen is the person picker (LoginPage's boot sees an open pod
+   * and enters the machine), and the target member proves with their PIN/biometric.
+   * No teardown of any kind; deliberately tiny.
+   */
+  function switchMember(): void {
+    const settingsStore = useSettingsStore();
+    emitSignoutTier({
+      tier: 'switch-person',
+      trusted: settingsStore.isTrustedDevice,
+      tokensKept: true,
+    });
+    currentUser.value = null;
+    isAuthenticated.value = false;
+    newsletterOptIn.value = null;
+    clearSession();
+  }
+
+  /**
    * Sign out: reset auth state and optionally delete IndexedDB cache.
    * File handle is preserved so next login auto-reconnects to the data file.
    *
@@ -1652,7 +1673,13 @@ export const useAuthStore = defineStore('auth', () => {
     // Capture the departing account BEFORE clearGoogleSessionState nulls the
     // cached email — only needed on a full (untrusted) teardown (#62).
     const departedEmail = trusted ? null : getGoogleAccountEmail();
-    await clearGoogleSessionStateWithTimeout(3000, { preserveRefreshToken: trusted });
+    // Phase 5 (2026-08-28 rethink): NO sign-out revokes the grant at Google any more
+    // (whole-grant revoke kills every device on the account). Trusted devices keep
+    // their local tokens too (silent reconnect, no Google screen); untrusted devices
+    // clear the LOCAL tokens — a refresh token is a bearer secret with drive.file
+    // WRITE scope on a shared machine, and keeping it would break the wrong-account
+    // teardown invariant above.
+    await clearGoogleSessionStateWithTimeout(3000, { clearLocalTokens: !trusted });
 
     // Reset per-session sync state — banner flags, polling timer, encrypted
     // pending file, family key, file metadata. Without this, transient UI
@@ -1736,6 +1763,18 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
+    // Phase 5: the trust prompt is re-offerable. An untrusted sign-out re-arms it so
+    // the NEXT sign-in gets the offer again — the one-shot flag made an early dismissal
+    // permanent, which is how devices ended up untrusted (and re-authing) forever.
+    if (!trusted) {
+      try {
+        await settingsStore.resetTrustedDevicePrompt();
+      } catch (e) {
+        console.warn('Failed to re-arm the trust prompt on sign-out:', e);
+      }
+    }
+    emitSignoutTier({ tier: 'sign-out', trusted, tokensKept: trusted });
+
     // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
@@ -1789,7 +1828,7 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function clearGoogleSessionStateWithTimeout(
     timeoutMs: number,
-    options: { preserveRefreshToken?: boolean } = {}
+    options: { clearLocalTokens?: boolean } = {}
   ): Promise<void> {
     try {
       await Promise.race([
@@ -1845,7 +1884,11 @@ export const useAuthStore = defineStore('auth', () => {
     // cached email — this path is always a full teardown (#62).
     const departedEmail = getGoogleAccountEmail();
 
-    // Wipe Google session state — same rationale as signOut().
+    // Wipe Google session state: full LOCAL teardown (this device's tokens deleted) —
+    // but NO revoke at Google (Phase 5): clear-data is a device-local action, and a
+    // whole-grant revoke would kill every other device and family member on the same
+    // Google account. The explicit revoke lives in Settings ("Disconnect Google from
+    // beanies everywhere" → disconnectGoogleEverywhere).
     await clearGoogleSessionStateWithTimeout(3000);
 
     // Reset per-session sync state — same rationale as signOut().
@@ -1875,6 +1918,8 @@ export const useAuthStore = defineStore('auth', () => {
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
     await settingsStore.clearCachedFamilyKey();
+
+    emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });
 
     // This path promises a clean device: every PIN device-unlock wrap goes (family-key
     // material), then every family's pre-decrypt roster (display data, but it names the
@@ -1937,6 +1982,7 @@ export const useAuthStore = defineStore('auth', () => {
     changePassword,
     resetMemberPassword,
     joinFamily,
+    switchMember,
     signOut,
     signOutAndClearData,
     restoreE2EAuth,

@@ -66,6 +66,13 @@ const isLoadingFile = ref(false);
 const formError = ref<string | null>(null);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
+/** Recovery-kit entry mode on the decrypt panel (login rethink Phase 3). */
+const showKitEntry = ref(false);
+const kitCodeInput = ref('');
+/** Whether the pending envelope carries any recovery-kit wraps at all. */
+const hasRecoveryKits = computed(
+  () => Object.keys(syncStore.pendingEncryptedFile?.envelope?.recoveryKeys ?? {}).length > 0
+);
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -368,6 +375,56 @@ async function handleLoadFile() {
     }
   } catch {
     formError.value = syncStore.error || t('auth.fileLoadFailed');
+  } finally {
+    isLoadingFile.value = false;
+  }
+}
+
+/**
+ * Redeem a recovery-kit code against the pending envelope (Phase 3): unwrap the family
+ * key, decrypt, land on the person picker (a kit identifies no member — like the
+ * recovery passphrase). Mirrors handleDecrypt's flow, minus any auto-sign-in.
+ */
+async function handleKitRedeem() {
+  if (!kitCodeInput.value.trim()) {
+    formError.value = t('recovery.kitWrongCode');
+    return;
+  }
+  const envelope = syncStore.pendingEncryptedFile?.envelope;
+  if (!envelope) return;
+  isLoadingFile.value = true;
+  formError.value = null;
+  try {
+    const { redeemRecoveryKit } = await import('@/services/auth/recoveryKit');
+    const result = await redeemRecoveryKit(envelope, kitCodeInput.value);
+    if (!result.ok) {
+      formError.value =
+        result.reason === 'no-kits' ? t('recovery.kitNoKits') : t('recovery.kitWrongCode');
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'kit_redeemed',
+        context: { action: 'failed', error_code: result.reason },
+      });
+      return;
+    }
+    const dec = await syncStore.decryptPendingFileWithKey(result.familyKey);
+    if (!dec.success) {
+      formError.value = t('password.decryptionError');
+      return;
+    }
+    logEvent({
+      level: 'info',
+      surface: 'login-flow',
+      message: 'kit_redeemed',
+      context: { action: 'ok' },
+    });
+    showDecryptModal.value = false;
+    kitCodeInput.value = '';
+    await finishLoaded();
+  } catch (e) {
+    console.error('[LoadPodView] kit redeem failed:', e);
+    formError.value = t('password.decryptionError');
   } finally {
     isLoadingFile.value = false;
   }
@@ -851,7 +908,7 @@ async function handleDriveRefresh() {
       </div>
 
       <!-- Password form -->
-      <form class="mt-6" @submit.prevent="handleDecrypt">
+      <form v-if="!showKitEntry" class="mt-6" @submit.prevent="handleDecrypt">
         <div
           v-if="formError"
           class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
@@ -875,6 +932,15 @@ async function handleDriveRefresh() {
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
 
+        <button
+          v-if="hasRecoveryKits"
+          type="button"
+          class="mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          @click="((showKitEntry = true), (formError = null))"
+        >
+          {{ t('recovery.useKitLink') }}
+        </button>
+
         <p
           v-if="pendingMemberCount > 0"
           class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500"
@@ -885,6 +951,41 @@ async function handleDriveRefresh() {
         <p class="mt-2 text-center text-xs opacity-30">
           {{ t('loginV6.unlockFooter') }}
         </p>
+      </form>
+
+      <!-- Recovery-kit entry (Phase 3): swaps in for the password form -->
+      <form v-else class="mt-6" @submit.prevent="handleKitRedeem">
+        <div
+          v-if="formError"
+          class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+        >
+          {{ formError }}
+        </div>
+        <p class="mb-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          {{ t('recovery.kitEnterBody') }}
+        </p>
+        <BaseInput
+          v-model="kitCodeInput"
+          :label="t('recovery.kitCodeLabel')"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        />
+        <BaseButton
+          type="submit"
+          class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
+          :loading="isLoadingFile"
+        >
+          {{ t('recovery.unlock') }}
+        </BaseButton>
+        <button
+          type="button"
+          class="mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          @click="((showKitEntry = false), (formError = null))"
+        >
+          {{ t('passkey.usePassword') }}
+        </button>
       </form>
 
       <!-- Cold-arrival hint: user landed on this screen via a shared .beanpod
