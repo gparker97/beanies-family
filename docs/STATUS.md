@@ -1671,7 +1671,26 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐ Login/auth rethink — Phases 1+2+3+5 IMPLEMENTED on `main`, NOT pushed — greg's local round → WEB-ONLY DEPLOY → Phase 4 ⭐
+### ⭐ Login/auth rethink — Phases 1+2+3+5 DEPLOYED to prod web (0.13, `988db304`) — Phase 4 is next ⭐
+
+**DEPLOYED 2026-08-28** via `Deploy beanies PROD` (run 33156153528), verified live
+(`build_sha 988db304` in the served bundle). Web/PWA only — native apps deliberately
+stay on their store versions (mixed-version families safe by design; all envelope
+changes additive). greg locally verified three rounds (his findings each fixed:
+clear-data ghost member, unreachable kit entry, recovery-mode reset-PIN, kit PDF
+scanning, Switch Member in both dropdowns, one-method-at-a-time prove screen, settings
+reorg to Account & Sign-In / Security & Recovery, kit chip + decode spinner).
+
+**NEXT: Phase 4** — device linking (join-surface change; the plan's deferred piece),
+stop creating PRF enrolments → remove the web passkey assertion path after ONE release
+honoring existing enrolments (that window started with this deploy), the runtime-gated
+per-family "remove passwords" (PINs-for-all + stored kit + writerVersion floor),
+plaintext `cachedFamilyKeys` retirement, and the sign-out step-list refactor. All
+recorded in the plan's OUTCOME section. Watch `#beanies-errors` + the `login-flow`
+CloudWatch surface (`prove_outcome` first-try rate is the headline metric;
+`registry_open_blocked` would flag old-tab upgrade hangs).
+
+### (superseded) pre-deploy record
 
 **Updated 2026-08-28 (session 2 of the rethink):** Phases 2 (member PIN + device wraps),
 3 (recovery kit + passphrase; device linking deferred to Phase 4), and 5 (logout tiers,

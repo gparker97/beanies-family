@@ -111,3 +111,13 @@ platforms is the outstanding acceptance gate before push/deploy.
 Implemented Phases 2, 3 (device linking deferred to Phase 4 with rationale), and 5.
 Second /code-review max over the batch: 15 verified findings, all fixed (a1b48946).
 Sequence agreed: greg's local verification → web-only /deploy-prod-auto → Phase 4.
+
+## Deploy (2026-08-28)
+
+> greg: "tested and confirmed working... this is a massive improvement over the previous
+> flow, and it seems things just work now. /deploy-prod-auto vue only - no apps or web.
+> no release note, just increment as we're still in intermediate state"
+
+Three local-test rounds (all findings fixed) → version 0.13 → pushed
+(`e1b94784..988db304`, ~30 commits) → CI + Security green → `deploy.yml` run
+33156153528 → verified live (`build_sha 988db304`). Phase 4 next.
