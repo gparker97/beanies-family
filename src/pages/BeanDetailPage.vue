@@ -24,6 +24,7 @@ import BeanMedicationsTab from '@/components/pod/BeanMedicationsTab.vue';
 import BeanMilestonesTab from '@/components/pod/BeanMilestonesTab.vue';
 import BeanAccountPanel from '@/components/pod/BeanAccountPanel.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
+import InviteWizardModal from '@/components/family/InviteWizardModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
@@ -33,6 +34,9 @@ import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useMilestonesStore } from '@/stores/milestonesStore';
 import { usePermissions } from '@/composables/usePermissions';
+import { useInviteFlow } from '@/composables/useInviteFlow';
+import { useSyncStore } from '@/stores/syncStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import type { CreateFamilyMemberInput, UpdateFamilyMemberInput } from '@/types/models';
@@ -49,6 +53,8 @@ const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
 const milestonesStore = useMilestonesStore();
 const { canManagePod } = usePermissions();
+const syncStore = useSyncStore();
+const familyContextStore = useFamilyContextStore();
 
 const memberId = computed(() => (route.params.memberId as string) ?? '');
 const activeTab = computed<BeanTabId>(() => (route.params.tab as BeanTabId) ?? 'overview');
@@ -56,6 +62,20 @@ const activeTab = computed<BeanTabId>(() => (route.params.tab as BeanTabId) ?? '
 const member = computed(() => familyStore.members.find((m) => m.id === memberId.value));
 
 const showEditModal = ref(false);
+
+// Invite-from-detail-page (the twin of Meet the Beans' per-bean share icon):
+// same shared wizard + invite flow, always prefilled with THIS bean.
+const inviteFlow = useInviteFlow();
+const showInviteModal = ref(false);
+
+const wizardPrefill = computed(() =>
+  member.value ? { email: member.value.email || '', memberName: member.value.name } : undefined
+);
+
+function openInviteModal(): void {
+  inviteFlow.reset();
+  showInviteModal.value = true;
+}
 
 async function handleSave(
   data: CreateFamilyMemberInput | { id: string; data: UpdateFamilyMemberInput }
@@ -105,7 +125,12 @@ function selectTab(tab: BeanTabId): void {
 <template>
   <div class="space-y-6">
     <template v-if="member">
-      <BeanHero :member="member" :can-manage="canManagePod" @edit="showEditModal = true" />
+      <BeanHero
+        :member="member"
+        :can-manage="canManagePod"
+        @edit="showEditModal = true"
+        @invite="openInviteModal"
+      />
       <BeanTabs :active="activeTab" :counts="counts" @select="selectTab" />
 
       <BeanOverviewTab v-if="activeTab === 'overview'" :member="member" />
@@ -127,6 +152,19 @@ function selectTab(tab: BeanTabId): void {
         @close="showEditModal = false"
         @save="handleSave"
         @delete="handleDelete"
+      />
+
+      <!-- Prefilled for this bean, so the wizard's add-bean escape (a picker-step
+           affordance) is unreachable here — close is the only exit it needs. -->
+      <InviteWizardModal
+        :open="showInviteModal"
+        :provider="syncStore.storageProviderType"
+        :inviter-name="familyStore.currentMember?.name ?? t('family.title')"
+        :family-name="familyContextStore.activeFamilyName || t('family.title')"
+        :prefill="wizardPrefill"
+        :invite-flow="inviteFlow"
+        @close="showInviteModal = false"
+        @add-bean="showInviteModal = false"
       />
     </template>
     <div

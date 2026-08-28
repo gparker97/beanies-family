@@ -19,6 +19,7 @@ import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
+import { canInviteFamily } from '@/config/features';
 import type { QuickAddAction } from '@/constants/quickAddItems';
 import type { AgeGroup, FamilyMember, Gender, UUID } from '@/types/models';
 
@@ -30,7 +31,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   edit: [];
+  /** Open the invite wizard prefilled for this (not-yet-joined) bean. */
+  invite: [];
 }>();
+
+// Same gate as BeanCard's share icon: an unclaimed, non-pet member can be invited;
+// the affordance greys out (never hides) when the storage config can't share links.
+const showInvite = computed(() => props.member.requiresPassword && !props.member.isPet);
+const inviteAvailable = computed(() => canInviteFamily());
 
 const router = useRouter();
 const { t } = useTranslation();
@@ -217,6 +225,29 @@ function onAddButtonClick(): void {
         >
           <BeanieIcon name="edit" size="xs" />
           <span>{{ t('bean.hero.edit') }}</span>
+        </button>
+
+        <!-- Invite (unclaimed beans only) — the detail-page twin of BeanCard's
+             share icon; funnels into the same prefilled InviteWizardModal. -->
+        <button
+          v-if="showInvite"
+          type="button"
+          :disabled="!inviteAvailable"
+          :class="[
+            'font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100',
+            inviteAvailable
+              ? 'hover:text-primary-500 hover:bg-white/90 dark:hover:bg-slate-800'
+              : 'cursor-not-allowed opacity-50',
+          ]"
+          :title="
+            inviteAvailable
+              ? t('family.copyInviteLinkHint')
+              : t('selfHost.inviteUnavailableTooltip')
+          "
+          @click="emit('invite')"
+        >
+          <BeanieIcon name="share" size="xs" />
+          <span>{{ t('bean.hero.invite') }}</span>
         </button>
 
         <div class="relative flex-1 sm:flex-initial" data-add-menu-root>
