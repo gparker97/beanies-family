@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4271
+    "translationCount": 4272
   },
   "translations": {
     "app.name": {
@@ -21359,6 +21359,11 @@
     "recovery.kitScanReading": {
       "translation": "正在读取您的工具包……",
       "hash": "mff4r5",
+      "lastUpdated": "2026-08-28"
+    },
+    "app.initError.registryBlocked": {
+      "translation": "beanies在另一个选项卡或窗口中打开，并且正在保留存储更新。关闭其他Beanies选项卡和窗口（包括已安装的应用） ，然后重新加载此页面。",
+      "hash": "biwkd1",
       "lastUpdated": "2026-08-28"
     }
   }

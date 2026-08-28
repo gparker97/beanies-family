@@ -6907,6 +6907,11 @@ const STRING_DEFS = {
     beanie:
       'the app failed to start properly. you can try reloading, or clear your data and start fresh.',
   },
+  'app.initError.registryBlocked': {
+    en: 'beanies is open in another tab or window, and it is holding up a storage update. Close your other beanies tabs and windows (including the installed app), then reload this page.',
+    beanie:
+      'beanies is open in another tab or window and holding up a storage update. close your other beanies tabs and windows, then reload this page.',
+  },
   'app.initError.stalled': {
     en: 'Setup is taking longer than expected. Reload to try again.',
     beanie: 'setup is taking longer than expected. reload to try again.',

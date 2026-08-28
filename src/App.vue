@@ -1356,7 +1356,13 @@ onMounted(async () => {
       });
     }
     const message = err instanceof Error ? err.message : String(err);
-    initError.value = message;
+    // A blocked registry upgrade has ONE user-fixable cause: an old beanies tab/window
+    // still open. Render the actionable instruction, not the raw error (2026-08-28
+    // 0.13-deploy incident: users saw a 35s stall + mystery fatal screen).
+    initError.value =
+      err instanceof Error && err.name === 'RegistryBlockedError'
+        ? t('app.initError.registryBlocked')
+        : message;
     const stack = err instanceof Error ? (err.stack ?? '') : '';
     const breadcrumbLog = initBreadcrumbs.join('\n');
     initErrorDetail.value = `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`;
