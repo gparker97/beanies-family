@@ -355,6 +355,25 @@ export const useFamilyStore = defineStore('family', () => {
         context: { action: 'invalidate_credentials', member_id_tail: memberId.slice(-8) },
       });
     }
+    // The PIN device-unlock wrap is family-key material too: a removed member's PIN must
+    // stop unwrapping the family key on this device (review: it previously survived
+    // removal forever — only sign-out tiers and family deletion ever reclaimed it).
+    try {
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      const familyId = getActiveFamilyId();
+      if (familyId) {
+        const { removePinUnlock } = await import('@/services/auth/deviceUnlock');
+        await removePinUnlock(familyId, memberId);
+      }
+    } catch (e) {
+      reportError({
+        surface: 'member-removal',
+        message: 'failed to remove the PIN unlock wrap for a removed member',
+        error: e,
+        severity: 'warning',
+        context: { action: 'invalidate_pin_wrap', member_id_tail: memberId.slice(-8) },
+      });
+    }
   }
 
   /**

@@ -16,7 +16,10 @@ import { toISODateString } from '@/utils/date';
 import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
-import { deleteFamilyDatabase } from '@/services/indexeddb/database';
+import {
+  deleteFamilyDatabase,
+  getActiveFamilyId as getActiveFamilyIdFromDb,
+} from '@/services/indexeddb/database';
 import { saveNow, cancelPendingSave } from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState, getGoogleAccountEmail } from '@/services/google/googleAuth';
@@ -660,9 +663,12 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = translationStore.t('auth.memberNotFound');
         return { success: false, error: error.value };
       }
-      if (member.passwordHash) {
-        // A credentialed member must prove — never tap through. Translated: this string
-        // reaches ProveView's role=alert box (repo i18n rule for script-level strings).
+      if (member.passwordHash || member.pinHash) {
+        // A credentialed member must prove — never tap through. "Credentialed" means
+        // password OR PIN, matching the prove engine's definition (review F6: a
+        // PIN-only member could previously be minted a session with zero proof via a
+        // stale card or a sync race). Translated: this string reaches ProveView's
+        // role=alert box (repo i18n rule for script-level strings).
         error.value = translationStore.t('auth.memberHasPassword');
         return { success: false, error: error.value };
       }
@@ -1297,6 +1303,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (!syncStore.familyKey || !syncStore.envelope) {
         return { success: false, error: translationStore.t('recovery.podNotOpen') };
       }
+      // Trim FIRST (review F11): validation ran on the trimmed string while the wrap
+      // derived from the raw one, so a stray trailing space made the recovery credential
+      // permanently un-redeemable as the user knows it.
+      passphrase = passphrase.trim();
       const { checkPassphrase } = await import('@/utils/passphraseStrength');
       const familyStore = useFamilyStore();
       const familyContextStore = useFamilyContextStore();
@@ -1318,7 +1328,11 @@ export const useAuthStore = defineStore('auth', () => {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
       const wrapKey = await deriveMemberKey(passphrase, salt);
       const wrapped = await wrapFamilyKey(syncStore.familyKey, wrapKey);
-      syncStore.setRecoveryPassphraseWrap({ salt: bufferToBase64(salt), wrapped });
+      syncStore.setRecoveryPassphraseWrap({
+        salt: bufferToBase64(salt),
+        wrapped,
+        createdAt: toISODateString(new Date()),
+      });
       logEvent({
         level: 'info',
         surface: 'login-flow',
@@ -1715,7 +1729,14 @@ export const useAuthStore = defineStore('auth', () => {
       console.warn('[authStore] docClient.reset failed during sign-out', e);
     }
 
-    const familyId = currentUser.value?.familyId;
+    // Fallback chain (review F14): a legacy session may lack familyId, and skipping the
+    // teardown on a shared machine would leave the family DB, cached key, PIN wraps and
+    // roster in place — the security-critical clears must never be gated on an optional.
+    const familyId =
+      currentUser.value?.familyId ??
+      useFamilyContextStore().activeFamilyId ??
+      getActiveFamilyIdFromDb() ??
+      undefined;
 
     // Delete the per-family IndexedDB cache unless this is a trusted device
     if (familyId && !trusted) {
@@ -1891,6 +1912,19 @@ export const useAuthStore = defineStore('auth', () => {
     // beanies everywhere" → disconnectGoogleEverywhere).
     await clearGoogleSessionStateWithTimeout(3000);
 
+    // This tier promises a CLEAN DEVICE, and it's multi-family: clearGoogleSessionState
+    // only clears the ACTIVE family's token + the pending slot, so every OTHER family's
+    // drive.file refresh token would survive (review F8) — a live bearer secret for the
+    // next user of the machine now that no tier revokes server-side. Clear them all.
+    try {
+      const { getAllFamilies } = await import('@/services/familyContext');
+      const { clearGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      const families = await getAllFamilies();
+      await Promise.allSettled(families.map((f) => clearGoogleRefreshToken(f.id)));
+    } catch (e) {
+      console.warn("[authStore] failed to clear all families' refresh tokens:", e);
+    }
+
     // Reset per-session sync state — same rationale as signOut().
     try {
       const { useSyncStore } = await import('./syncStore');
@@ -1903,7 +1937,14 @@ export const useAuthStore = defineStore('auth', () => {
     // breadcrumb while the doc is still resident (before the cache is deleted). (#62)
     await clearDepartedGoogleArtifacts(departedEmail);
 
-    const familyId = currentUser.value?.familyId;
+    // Fallback chain (review F14): a legacy session may lack familyId, and skipping the
+    // teardown on a shared machine would leave the family DB, cached key, PIN wraps and
+    // roster in place — the security-critical clears must never be gated on an optional.
+    const familyId =
+      currentUser.value?.familyId ??
+      useFamilyContextStore().activeFamilyId ??
+      getActiveFamilyIdFromDb() ??
+      undefined;
 
     // Always delete regardless of trust setting
     if (familyId) {

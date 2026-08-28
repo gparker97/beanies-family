@@ -71,7 +71,6 @@ defineExpose({ focus: focusInput });
       type="password"
       inputmode="numeric"
       autocomplete="one-time-code"
-      :maxlength="PIN_LENGTH"
       :value="modelValue"
       :disabled="disabled"
       :aria-label="label"

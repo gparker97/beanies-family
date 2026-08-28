@@ -3,18 +3,26 @@ import type { PasskeyRegistration } from '@/types/models';
 import type { ProveContext } from '@/services/auth/proveMethods';
 
 const resolveDeviceKeys = vi.fn<() => Promise<PasskeyRegistration[]>>();
+const isPlatformAuthenticatorAvailable = vi.fn(async () => true);
 vi.mock('@/services/auth/passkeyService', () => ({
   resolveDeviceKeys: (...args: unknown[]) =>
     (resolveDeviceKeys as unknown as (...a: unknown[]) => Promise<PasskeyRegistration[]>)(...args),
+  isPlatformAuthenticatorAvailable: () => isPlatformAuthenticatorAvailable(),
+}));
+vi.mock('@/services/sync/capabilities', () => ({
+  isNative: () => false,
 }));
 const reportError = vi.fn();
 vi.mock('@/utils/errorReporter', () => ({
   reportError: (...args: unknown[]) => reportError(...args),
 }));
 const getPinUnlockRecord = vi.fn(async () => undefined);
+const removePinUnlock = vi.fn(async () => {});
 vi.mock('@/services/auth/deviceUnlock', () => ({
   getPinUnlockRecord: (...args: unknown[]) =>
     (getPinUnlockRecord as unknown as (...a: unknown[]) => Promise<unknown>)(...args),
+  removePinUnlock: (...args: unknown[]) =>
+    (removePinUnlock as unknown as (...a: unknown[]) => Promise<void>)(...args),
 }));
 const emitProveMethodsResolved = vi.fn();
 vi.mock('@/services/telemetry/loginFlowEvents', () => ({
@@ -52,6 +60,7 @@ describe('resolveProveMethods', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resolveDeviceKeys.mockResolvedValue([]);
+    isPlatformAuthenticatorAvailable.mockResolvedValue(true);
   });
 
   it('offers biometric first when this member has a key on this device', async () => {
@@ -113,6 +122,22 @@ describe('resolveProveMethods', () => {
     // Doc-only PIN is NEVER offered cold (nothing to verify against, nothing to unwrap).
     const coldDocPin = await resolveProveMethods(ctx({ podOpen: false, hasPin: true }));
     expect(coldDocPin.map((m) => m.kind)).toEqual(['password']);
+  });
+
+  it('suppresses web biometric when the platform authenticator is gone (review F15)', async () => {
+    resolveDeviceKeys.mockResolvedValue([reg('m-1')]);
+    isPlatformAuthenticatorAvailable.mockResolvedValue(false);
+    const methods = await resolveProveMethods(ctx());
+    expect(methods.map((m) => m.kind)).toEqual(['password']);
+  });
+
+  it('self-heals a stale PIN wrap when the OPEN doc has no pinHash (review F9)', async () => {
+    getPinUnlockRecord.mockResolvedValueOnce({ id: 'fam-1:m-1' } as never);
+    const methods = await resolveProveMethods(
+      ctx({ podOpen: true, hasPin: false, hasCredential: false })
+    );
+    expect(methods.map((m) => m.kind)).toEqual(['tap-through', 'password']);
+    expect(removePinUnlock).toHaveBeenCalledWith('fam-1', 'm-1');
   });
 
   it('emits prove_methods_resolved with the ordered kinds and roster source', async () => {

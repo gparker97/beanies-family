@@ -1180,6 +1180,9 @@ export const useSyncStore = defineStore('sync', () => {
     success: boolean;
     error?: string;
     memberIds?: string[];
+    /** True when the FAMILY RECOVERY PASSPHRASE (not a member password) unlocked the
+     *  file — identity is NOT established; callers must route to a person pick/prove. */
+    viaRecoveryPassphrase?: boolean;
     /** Set when the envelope decrypted but the payload bytes aren't a usable
      *  Automerge doc. Lets the caller distinguish corruption from wrong
      *  password / network failure when picking the user-facing message. */
@@ -1197,7 +1200,11 @@ export const useSyncStore = defineStore('sync', () => {
       // share the same password. Callers must NOT assume the first id is
       // the authenticated user; they should use it for auto-sign-in only
       // when length === 1.
-      const { familyKey: fk, memberIds } = await tryUnwrapFamilyKey(pending.envelope, password);
+      const {
+        familyKey: fk,
+        memberIds,
+        viaRecoveryPassphrase,
+      } = await tryUnwrapFamilyKey(pending.envelope, password);
 
       // Post the just-unwrapped key to the worker so it can decrypt + merge.
       await docClient.setFamilyKey(fk);
@@ -1313,7 +1320,7 @@ export const useSyncStore = defineStore('sync', () => {
       // Arm auto-sync
       setupAutoSync();
 
-      return { success: true, memberIds };
+      return { success: true, memberIds, viaRecoveryPassphrase };
     } catch (e) {
       const errorMessage = (e as Error).message;
       if (e instanceof CorruptPayloadError) {
@@ -4118,7 +4125,9 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /** Store (or replace) the family recovery-passphrase wrap in the envelope (Phase 3). */
-  function setRecoveryPassphraseWrap(pkg: import('@/types/syncFileV4').WrappedMemberKey): void {
+  function setRecoveryPassphraseWrap(
+    pkg: import('@/types/syncFileV4').BeanpodFileV4['recoveryPassphrase'] & object
+  ): void {
     if (!envelope.value) return;
     const env: import('@/types/syncFileV4').BeanpodFileV4 = {
       ...envelope.value,
