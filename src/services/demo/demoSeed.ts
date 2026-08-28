@@ -222,6 +222,13 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
       // guarantee (caught in the browser walkthrough). The fixture is authored in
       // USD to match the default instead.
       await settingsStore.setOnboardingCompleted(true);
+      // Suppress the Phase-4 recovery-kit nag for the reviewer session: the demo pod
+      // is kit-born (createNewFile generated a kit whose code was discarded) with no
+      // confirmed-signal, so without this the kit prompt would claim the interruption
+      // slot and interrupt the App Store reviewer mid-demo. Device-local flag;
+      // signOutAndClearData's teardown leaves it set, which is fine (a reviewer
+      // device never needs the nag).
+      await settingsStore.dismissKitPrompt();
 
       await syncStore.reloadAllStores();
     } catch (error) {

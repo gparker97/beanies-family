@@ -10,6 +10,7 @@ import {
   type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
 import type { FamilyMember, PasskeyRegistration, PasskeySecret } from '@/types/models';
+import { bufferToBase64 } from '@/utils/encoding';
 import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
@@ -1144,6 +1145,59 @@ export const useAuthStore = defineStore('auth', () => {
   // an envelope wrap (10⁶ offline guesses — see the plan's Decision 6).
 
   /**
+   * Enrol THIS device's PIN unlock wrap for a member whose doc-side pinHash is
+   * already set (review R2-F8: the create flow sets the owner's hash via
+   * `rehydrateOwnerDoc` long before the pod/key exist, so the wrap has to be
+   * enrolled AFTER `createNewFile` — without it the owner's own PIN cannot open
+   * their pod cold and the kit becomes the only cold method). Verifies the PIN
+   * against the doc hash first (fail-closed; never wraps on an unverified secret).
+   * Non-fatal by contract: callers treat a failure as degraded, not broken.
+   */
+  async function enrollDevicePinWrapForMember(
+    memberId: string,
+    pin: string
+  ): Promise<{ success: boolean }> {
+    try {
+      const { enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
+      const familyStore = useFamilyStore();
+      const member = familyStore.members.find((m) => m.id === memberId);
+      if (!member?.pinHash || !(await verifyPassword(pin, member.pinHash))) {
+        return { success: false };
+      }
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      const familyContextStore = useFamilyContextStore();
+      const familyId = familyContextStore.activeFamilyId;
+      if (!syncStore.familyKey || !familyId) return { success: false };
+      const enrolled = await enrollPinUnlock({
+        familyId,
+        member: { id: member.id, name: member.name, pinVersion: member.pinVersion ?? 1 },
+        pin,
+        familyKey: syncStore.familyKey,
+        keyId: syncStore.envelope?.keyId ?? '',
+      });
+      if (!enrolled.success) {
+        reportError({
+          surface: 'login-flow',
+          message: 'post-create owner PIN wrap enrolment failed',
+          severity: 'warning',
+          context: { action: 'enroll_owner_wrap_failed' },
+        });
+      }
+      return { success: enrolled.success };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'enrollDevicePinWrapForMember threw',
+        error: e,
+        severity: 'warning',
+        context: { action: 'enroll_owner_wrap_failed' },
+      });
+      return { success: false };
+    }
+  }
+
+  /**
    * Set a member's PIN: doc-side hash + version bump, then this device's unlock wrap.
    * Guard: setting is allowed when the member has NO PIN yet, or when `currentPin`
    * verifies (a change). Fail-closed — never overwrites a hash it can't verify.
@@ -1259,13 +1313,23 @@ export const useAuthStore = defineStore('auth', () => {
     const familyContextStore = useFamilyContextStore();
     const familyId = familyContextStore.activeFamilyId;
     if (syncStore.familyKey && familyId) {
-      await enrollPinUnlock({
+      const enrolled = await enrollPinUnlock({
         familyId,
         member: { id: member.id, name: member.name, pinVersion },
         pin: newPin,
         familyKey: syncStore.familyKey,
         keyId: syncStore.envelope?.keyId ?? '',
       });
+      if (!enrolled.success) {
+        // The doc-side hash IS set (the PIN works family-wide); only this device's
+        // fast-unlock wrap failed — report, never silent (R2-F13).
+        reportError({
+          surface: 'login-flow',
+          message: 'PIN reset set the doc hash but device-unlock enrolment failed',
+          severity: 'warning',
+          context: { action: 'enroll_after_reset_failed' },
+        });
+      }
     }
     return { success: true, member, pinVersion, familyId };
   }
@@ -1288,8 +1352,52 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const result = await applyPinReset(targetMemberId, newPin);
       if (!result.success) return result;
+      // Review R2-F7: this surface REPLACED the admin password reset, and its use
+      // case includes "I think their password is compromised". A legacy target's old
+      // password must stop opening the pod — rotate their envelope wrap + hash to a
+      // random secret nobody knows (full-entropy wrap = harmless leftover; the
+      // member is PIN-first from here, per the Phase-4 model). Best-effort: the PIN
+      // reset itself already succeeded; a rotation failure is reported, not fatal.
+      if (result.member.passwordHash) {
+        try {
+          const randomSecret = bufferToBase64(
+            crypto.getRandomValues(new Uint8Array(32)).buffer as ArrayBuffer
+          );
+          const rotated = await rotateMemberPassword(
+            targetMemberId,
+            randomSecret,
+            'reset-member-password'
+          );
+          if (!rotated.success) {
+            reportError({
+              surface: 'login-flow',
+              message: 'admin PIN reset could not retire the legacy password wrap',
+              severity: 'warning',
+              context: { action: 'admin_reset_pw_retire_failed', detail: rotated.error },
+            });
+          }
+        } catch (rotateErr) {
+          reportError({
+            surface: 'login-flow',
+            message: 'admin PIN reset password retirement threw',
+            error: rotateErr,
+            severity: 'warning',
+            context: { action: 'admin_reset_pw_retire_failed' },
+          });
+        }
+      }
       const { useSyncStore } = await import('./syncStore');
-      await useSyncStore().syncNowBounded();
+      const pushed = await useSyncStore().syncNowBounded();
+      if (!pushed) {
+        // R2-F13: the deferred push must be visible in the firehose — other devices
+        // keep the old PIN until the next successful save.
+        logEvent({
+          level: 'warn',
+          surface: 'login-flow',
+          message: 'admin_pin_reset push deferred — rides the next save',
+          context: { action: 'admin_reset_push_deferred' },
+        });
+      }
       track('admin_password_reset');
       logEvent({
         level: 'info',
@@ -1553,20 +1661,16 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
-      if (!isValidPin(params.pin)) {
-        return { success: false, error: useTranslationStore().t('pin.invalidFormat') };
-      }
-      const familyStoreForPin = useFamilyStore();
-      const joiningMember = familyStoreForPin.members.find((m) => m.id === params.memberId);
-      if (!joiningMember) {
-        return { success: false, error: useTranslationStore().t('auth.memberNotFound') };
-      }
-      const pinHash = await hashPassword(params.pin);
-      const pinVersion = (joiningMember.pinVersion ?? 0) + 1;
-      await familyStoreForPin.updateMember(params.memberId, { pinHash, pinVersion });
+      // ONE set-PIN mutation body (R2-F13 DRY): validate → hash → doc write → this
+      // device's unlock wrap, shared with the recovery and admin resets. The pod is
+      // open at claim time (the invite/file was just decrypted), so the wrap enrols
+      // here; a wrap failure is reported inside and is non-fatal.
+      const pinResult = await applyPinReset(params.memberId, params.pin);
+      if (!pinResult.success) return pinResult;
+      const joiningMember = pinResult.member;
 
       // Sign the member in (same session shape `setPassword` used to mint).
+      const familyStoreForPin = useFamilyStore();
       const familyContextStoreForPin = useFamilyContextStore();
       const user: AuthUser = {
         memberId: params.memberId,
@@ -1579,31 +1683,6 @@ export const useAuthStore = defineStore('auth', () => {
       freshSignIn.value = true;
       persistSession(user);
       familyStoreForPin.setCurrentMember(params.memberId);
-
-      // Device unlock wrap — the pod is open at claim time (the invite/file was
-      // just decrypted), so the joiner's PIN unlocks this device from now on.
-      // A wrap failure is non-fatal (the doc-side hash IS set): report + continue.
-      {
-        const { useSyncStore } = await import('./syncStore');
-        const syncStoreForPin = useSyncStore();
-        if (syncStoreForPin.familyKey) {
-          const enrolled = await enrollPinUnlock({
-            familyId: params.familyId,
-            member: { id: params.memberId, name: joiningMember.name, pinVersion },
-            pin: params.pin,
-            familyKey: syncStoreForPin.familyKey,
-            keyId: syncStoreForPin.envelope?.keyId ?? '',
-          });
-          if (!enrolled.success) {
-            reportError({
-              surface: 'login-flow',
-              message: 'join claim set PIN but device-unlock enrolment failed',
-              severity: 'warning',
-              context: { action: 'enroll_after_join_failed' },
-            });
-          }
-        }
-      }
 
       // Create UserFamilyMapping in registry DB
       const familyStore = useFamilyStore();
@@ -2139,6 +2218,7 @@ export const useAuthStore = defineStore('auth', () => {
     verifyMemberPin,
     resetMemberPinViaRecovery,
     adminResetMemberPin,
+    enrollDevicePinWrapForMember,
     createRecoveryKit,
     setRecoveryPassphrase,
     signInWithPasskey,

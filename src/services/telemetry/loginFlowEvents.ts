@@ -67,9 +67,10 @@ export function emitOpenFetchRecovery(payload: {
   emit('info', 'open_fetch_recovery', { action: 'recovery', kind: payload.reason });
 }
 
-/** Phase 4 device linking: a link was minted from a signed-in device. */
-export function emitDeviceLinkMinted(): void {
-  emit('info', 'device_link_minted', { action: 'minted' });
+/** Phase 4 device linking: a mint attempt — ok=false means the invite key never
+ *  reached the durable file and the link was withheld (R2-F15). */
+export function emitDeviceLinkMinted(ok: boolean): void {
+  emit(ok ? 'info' : 'warn', 'device_link_minted', { action: ok ? 'minted' : 'publish_failed' });
 }
 
 /** Phase 4 device linking: a link was redeemed on the receiving device. */

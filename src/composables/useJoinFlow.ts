@@ -38,6 +38,7 @@ import { getDeviceInfo, tail } from '@/utils/diagnostics';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
+import { emitDeviceLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 
 // ─── State machine + error registry ──────────────────────────────────────────
 
@@ -535,10 +536,14 @@ export function useJoinFlow() {
     const pkg = pending.envelope.inviteKeys[tokenHash];
 
     if (!pkg) {
+      // R2-F15: the redeem failure arm must reach the firehose for device links —
+      // "minted with no matching redeem" is otherwise untriageable.
+      if (linkMode.value) emitDeviceLinkRedeemed(false, 'token-invalid');
       recordError('INVITE_TOKEN_INVALID');
       return false;
     }
     if (isInviteExpired(pkg.expiresAt)) {
+      if (linkMode.value) emitDeviceLinkRedeemed(false, 'token-expired');
       recordError('INVITE_TOKEN_EXPIRED', { expiresAt: pkg.expiresAt });
       return false;
     }
@@ -550,6 +555,7 @@ export function useJoinFlow() {
       return true;
     });
 
+    if (!decrypted && linkMode.value) emitDeviceLinkRedeemed(false, 'decrypt-failed');
     return decrypted ?? false;
   }
 

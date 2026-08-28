@@ -654,6 +654,12 @@ async function finalizePod(): Promise<boolean> {
   // guard doesn't bounce /welcome → /nook out of the kit step.
   kitCode.value = result.kit.code;
   kitId.value = result.kit.kitId;
+  // The owner's PIN device wrap (review R2-F8): the doc hash was set back in the
+  // identity phase, but the pod/key only exist NOW — enrol this device's unlock
+  // wrap so the owner's own PIN can open their pod cold. Degraded, not fatal, on
+  // failure (the store reports internally; the trusted auto-open cache still
+  // covers the common path).
+  await authStore.enrollDevicePinWrapForMember(user.memberId, pin.value);
   syncStore.membersStepActive = true;
   phase.value = 'recovery-kit';
   return true;

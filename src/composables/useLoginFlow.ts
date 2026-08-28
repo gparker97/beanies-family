@@ -47,6 +47,7 @@ import {
 } from '@/services/auth/deviceUnlock';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { envelopeNeedsRecovery } from '@/services/sync/fileSync';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 
@@ -731,6 +732,25 @@ export function useLoginFlow(opts: {
         const password = pendingPassword;
         if (!podOpen()) {
           if (!(await ensureStaged())) return; // dispatched OPEN_FAILED already (password kept)
+          // Review R2-F4: a KIT-BORN envelope has no password wraps — a password can
+          // never succeed (only the passphrase branch of decryptPendingFile could).
+          // When no passphrase is set either, route to recovery with honest copy
+          // instead of surfacing the raw "No wrapped keys" throw as an error.
+          {
+            const pendingEnv = syncStore.pendingEncryptedFile?.envelope;
+            if (pendingEnv && envelopeNeedsRecovery(pendingEnv) && !pendingEnv.recoveryPassphrase) {
+              pendingPassword = null;
+              proveError.value = t('loginFlow.recoveryOnlyBody');
+              emitProveOutcome({
+                method: 'password',
+                ok: false,
+                errorCode: 'needs-recovery',
+                fallbackDepth: pendingProveDepth,
+              });
+              dispatch({ type: 'OPEN_FAILED', reason: 'wrong-password' });
+              return;
+            }
+          }
           if (syncStore.hasPendingEncryptedFile) {
             const dec = await syncStore.decryptPendingFile(password);
             if (dec.success && dec.viaRecoveryPassphrase) {

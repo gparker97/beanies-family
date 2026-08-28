@@ -93,11 +93,10 @@ async function handleSave() {
       return;
     }
     // Closed-union `ResetError` → translated copy; a free-text error (thrown
-    // message) renders as-is.
-    const known = t(`family.resetPassword.error.${result.error}` as never);
-    formError.value = known.startsWith('family.resetPassword.error.')
-      ? String(result.error)
-      : known;
+    // message inside the store) renders as-is. `t()` yields undefined for unknown
+    // keys (R2-F14) — never call string methods on it.
+    const known = t(`family.resetPassword.error.${result.error}` as never) as string | undefined;
+    formError.value = known || String(result.error);
   } catch (e) {
     formError.value = t('family.resetPassword.error.unexpected');
     reportError({

@@ -22,6 +22,8 @@
  * than a missed cleanup step). Failures are logged with the step name — never silent.
  */
 
+import { reportError } from '@/utils/errorReporter';
+
 export type SignOutStepName =
   | 'quietTeardownAndForceSave'
   | 'cancelReminders'
@@ -104,6 +106,16 @@ export async function runSignOutSteps(
       await impls[name]();
     } catch (e) {
       console.warn(`[signOutSteps] step '${name}' failed — continuing sign-out:`, e);
+      // Never console-only (review R2-F6): a failed security-critical clear
+      // (family DB, key cache, PIN wraps, passkeys) on a shared device is exactly
+      // the class of failure that must be triageable from CloudWatch alone.
+      reportError({
+        surface: 'auth-signout',
+        message: `sign-out step '${name}' failed — sign-out continued`,
+        error: e,
+        severity: 'warning',
+        context: { action: 'step_failed', kind: name },
+      });
     }
   }
 }

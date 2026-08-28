@@ -4211,6 +4211,11 @@ const STRING_DEFS = {
     en: "Couldn't create the device link. Check your connection and try again.",
     beanie: "couldn't create the device link. check your connection and try again.",
   },
+  'deviceLink.publishFailed': {
+    en: "The link couldn't be published to your family file — check your connection and try again.",
+    beanie:
+      "the link couldn't be published to your family file — check your connection and try again.",
+  },
   'deviceLink.expiryNote': {
     en: 'This link works for 15 minutes and can only be used with a family PIN.',
     beanie: 'this link works for 15 minutes and can only be used with a family pin.',

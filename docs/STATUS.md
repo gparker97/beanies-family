@@ -1720,7 +1720,22 @@ passphrase is set); (b) PIN-only members read as UNCLAIMED on ≤0.13 clients
 clients ignore `lk=1` and dead-end a device link in the unclaimed-only join. Copy on
 the mint card + join set-pin step says "the other device needs beanies 0.14 or later".
 
-**PENDING:** `/code-review max` on the full Phase-4 batch → fix findings → greg's
+**Code-review max COMPLETE (2026-08-28):** 15 verified findings, ALL FIXED — headline
+items: decrypt-tail key caching made non-fatal (a transient cache failure was
+destroying the valid trusted key via LoadPodView's success:false clear);
+`deleteLocalFamily` now removes the family's `trustedAutoOpen` wrap; the App-Review
+demo suppresses the kit nag; roster-cache omission PRESERVES the stored
+`envelopeHasPasswordWraps` (fast-paints were erasing it); `loadTrustedAutoOpenKey`
+never throws out of a read and deletes only on genuine OperationError; sign-out step
+failures reach the firehose; `adminResetMemberPin` retires a legacy target's
+password wrap (rotate-to-random); the create flow enrols the owner's PIN device wrap
+post-write; kit-prompt double-generate window closed; confirmation-stamp failures
+reported; the per-sign-in prompt latch resets on member switch; tap-through kids are
+resettable from the bean page; PIN-reset mutations report wrap/push failures;
+device links are withheld (with copy) when the invite key never reached the durable
+file, and redeem failures emit telemetry.
+
+**PENDING:** greg's
 on-device walkthrough (fresh create end-to-end; legacy PIN nag; device link
 phone→laptop; web sign-in post-PRF for a legacy passkey user) → deploy as 0.14 with a
 native release in the same window.

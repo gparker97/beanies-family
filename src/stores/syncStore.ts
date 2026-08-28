@@ -1306,12 +1306,28 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Cache exported family key so auto-decrypt works after page refresh.
       // Force-cache when decrypting a pending file (user entered password on this device).
-      const settingsStore = useSettingsStore();
-      if (familyCtx.activeFamilyId && fk) {
-        const exported = await getExportedFamilyKey();
-        if (exported) {
-          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId, { force: true });
+      // NON-FATAL (review R2-F1): the decrypt already succeeded and the pending file is
+      // consumed — a cache failure (registry IDB blocked, v6-upgrade race, private
+      // mode) must never fail the open, or LoadPodView's success:false handling would
+      // destroy the still-valid trusted key. Same treatment as createNewFile step 7.
+      try {
+        const settingsStore = useSettingsStore();
+        if (familyCtx.activeFamilyId && fk) {
+          const exported = await getExportedFamilyKey();
+          if (exported) {
+            await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId, {
+              force: true,
+            });
+          }
         }
+      } catch (cacheErr) {
+        reportError({
+          surface: 'login-flow',
+          message: 'cacheFamilyKey after decryptPendingFile failed (non-fatal)',
+          error: cacheErr,
+          severity: 'warning',
+          context: { action: 'cache_after_decrypt_failed' },
+        });
       }
 
       // Reload all stores
@@ -2072,16 +2088,28 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Cache exported family key so auto-decrypt works after page refresh.
       // Force-cache during join/decrypt flow (driveFileId present) since the user
-      // just created a password on this device — it's clearly their personal device.
-      const settingsStore = useSettingsStore();
-      if (familyCtx.activeFamilyId) {
-        const exported = await getExportedFamilyKey();
-        if (exported) {
-          const forceCache = !!pending.driveFileId || !!pending.provider;
-          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId, {
-            force: forceCache,
-          });
+      // just proved a family secret on this device — it's clearly their personal device.
+      // NON-FATAL (review R2-F1): see decryptPendingFile — a cache failure must never
+      // fail an open that already succeeded.
+      try {
+        const settingsStore = useSettingsStore();
+        if (familyCtx.activeFamilyId) {
+          const exported = await getExportedFamilyKey();
+          if (exported) {
+            const forceCache = !!pending.driveFileId || !!pending.provider;
+            await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId, {
+              force: forceCache,
+            });
+          }
         }
+      } catch (cacheErr) {
+        reportError({
+          surface: 'login-flow',
+          message: 'cacheFamilyKey after decryptPendingFileWithKey failed (non-fatal)',
+          error: cacheErr,
+          severity: 'warning',
+          context: { action: 'cache_after_decrypt_failed' },
+        });
       }
 
       await reloadAllStores();
@@ -2153,10 +2181,16 @@ export const useSyncStore = defineStore('sync', () => {
    * Add an invite key package to the envelope and persist.
    * Returns the token hash (storage key) so the caller can verify storage.
    */
+  /**
+   * Returns whether the invite key REACHED the durable file (R2-F15): a device link
+   * with a 15-minute expiry is useless if the key is local-only — the mint UI needs
+   * the truth to warn instead of handing out a dead QR. (In-memory + cache always
+   * updated; a false return means "rides the next save".)
+   */
   async function addInvitePackage(
     tokenHash: string,
     pkg: { salt: string; wrapped: string; expiresAt: string }
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (!envelope.value) throw new Error('No envelope loaded');
     const env = { ...envelope.value };
     env.inviteKeys = {
@@ -2178,7 +2212,14 @@ export const useSyncStore = defineStore('sync', () => {
       console.error(
         '[syncStore] addInvitePackage: syncNow failed — invite key may not be on Drive'
       );
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'invite key publish deferred — not yet on the durable file',
+        context: { action: 'invite_key_publish_deferred' },
+      });
     }
+    return saved;
   }
 
   /**

@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { useTranslation } from '@/composables/useTranslation';
+import { isTemporaryEmail } from '@/utils/email';
 import type { FamilyMember } from '@/types/models';
 
 const { t } = useTranslation();
@@ -45,9 +46,21 @@ const canReset = computed<boolean>(() => {
   if (!canManagePod.value) return false;
   if (props.member.isPet) return false;
   if (props.member.role === 'owner') return false;
-  if (props.member.requiresPassword) return false; // not joined yet — use the invite flow
+  // Phase 4 (review R2-F12): `requiresPassword` now means "no credential at all",
+  // which includes deliberately PIN-less tap-through kids added at setup — exactly
+  // who the parent-initiated PIN reset exists for. Exclude only a genuinely INVITED
+  // pending member (real email, hasn't claimed via join yet): setting their PIN here
+  // would silently "claim" them and hide them from the join flow. Members added in
+  // the wizard carry a synthetic `…@setup.local` placeholder (or no email).
+  if (
+    props.member.requiresPassword &&
+    props.member.email &&
+    !isTemporaryEmail(props.member.email)
+  ) {
+    return false; // pending invitee — use the invite flow
+  }
   const myId = authStore.currentUser?.memberId;
-  if (!myId || props.member.id === myId) return false; // Settings → Change Password for self
+  if (!myId || props.member.id === myId) return false; // Settings → self-serve PIN change
   return true;
 });
 
