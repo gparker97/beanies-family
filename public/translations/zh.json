@@ -21472,8 +21472,8 @@
       "lastUpdated": "2026-08-28"
     },
     "bean.hero.invite": {
-      "translation": "邀请",
-      "hash": "yq6orb",
+      "translation": "邀请{name}",
+      "hash": "gdhm5u",
       "lastUpdated": "2026-08-28"
     }
   }
