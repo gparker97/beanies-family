@@ -638,6 +638,59 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Tap-through sign-in for a member with NO credential, on an already-open pod
+   * (2026-08-28 login rethink — the prove engine's 'tap-through' method; today's
+   * passwordless kids). Fail-closed guards: the member must exist in the LOADED doc and
+   * must genuinely have no hash — a credentialed member can never enter this way, and a
+   * closed pod has no roster to check against so it refuses too. Mirrors `signIn`'s
+   * session tail exactly (one drift point fewer than a hand-rolled copy in a view).
+   */
+  async function signInPasswordless(
+    memberId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const familyStore = useFamilyStore();
+      const member = familyStore.members.find((m) => m.id === memberId);
+
+      if (!member) {
+        error.value = 'Member not found';
+        return { success: false, error: error.value };
+      }
+      if (member.passwordHash) {
+        // A credentialed member must prove — never tap through.
+        error.value = 'Member has a password set';
+        return { success: false, error: error.value };
+      }
+
+      const familyContextStore = useFamilyContextStore();
+      const user: AuthUser = {
+        memberId: member.id,
+        email: member.email,
+        familyId: familyContextStore.activeFamilyId ?? undefined,
+        role: member.role,
+      };
+      currentUser.value = user;
+      isAuthenticated.value = true;
+      freshSignIn.value = true;
+      persistSession(user);
+      familyStore.setCurrentMember(member.id);
+
+      const now = toISODateString(new Date());
+      familyStore.updateMember(member.id, { lastLoginAt: now });
+      track('login', { props: { method: 'tap-through' } });
+
+      return { success: true };
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Sign in failed';
+      return { success: false, error: error.value };
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /**
    * (Re)build the in-memory Automerge doc with just the owner member.
    *
    * Shared by `signUp` (fresh) and `rehydrateOwnerDoc` (recovery — a
@@ -1595,6 +1648,7 @@ export const useAuthStore = defineStore('auth', () => {
     rehydrateOwnerDoc,
     initializeAuth,
     signIn,
+    signInPasswordless,
     signInWithPasskey,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,

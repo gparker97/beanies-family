@@ -2,11 +2,10 @@
  * The single implementation of "a biometric/passkey unlock succeeded — now become that
  * member and get into the app".
  *
- * Two surfaces need this exact sequence: `BiometricLoginView` (pod-level, usually with a
- * file still to decrypt) and `PickBeanView` (the member picker, where the pod is normally
- * already open). Copying it would duplicate the cancel handling, the sentinel mapping,
- * the decrypt branch, the session update and the bounded sync — five things that must
- * agree, in two files that would drift.
+ * The login-flow driver (`useLoginFlow`) is its one consumer since the 2026-08-28
+ * rethink — the biometric prove method terminates here whichever surface offered it.
+ * Keeping it a separate composable preserves the five agreeing steps (cancel handling,
+ * sentinel mapping, decrypt branch, session update, bounded sync) as one unit.
  *
  * DESIGN NOTES, because each of these was a deliberate narrowing:
  *
