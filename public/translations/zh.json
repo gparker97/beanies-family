@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-08-28",
-    "translationCount": 4294
+    "translationCount": 4295
   },
   "translations": {
     "app.name": {
@@ -21474,6 +21474,11 @@
     "bean.hero.invite": {
       "translation": "邀请{name}",
       "hash": "gdhm5u",
+      "lastUpdated": "2026-08-28"
+    },
+    "auth.signingOut": {
+      "translation": "正在退出",
+      "hash": "t1639p",
       "lastUpdated": "2026-08-28"
     }
   }

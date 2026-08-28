@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, toRef, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
@@ -142,21 +143,38 @@ function handleSwitchMember() {
   router.replace('/login');
 }
 
+// Sign-out takes a few seconds (bounded force-save + session teardown). The menu
+// closes immediately, so a full-screen overlay carries the progress — without it
+// the app looked frozen until the welcome gate flashed in (greg's field report).
+const isSigningOut = ref(false);
+
 async function handleSignOut() {
+  if (isSigningOut.value) return;
+  isSigningOut.value = true;
   close();
-  // Sign out first — flushes pending saves while sync service still has the
-  // file handle and session password, preventing plaintext writes
-  await authStore.signOut();
-  resetAllAppStores();
-  router.replace('/login');
+  try {
+    // Sign out first — flushes pending saves while sync service still has the
+    // file handle and session key, preventing plaintext writes
+    await authStore.signOut();
+    resetAllAppStores();
+    await router.replace('/login');
+  } finally {
+    isSigningOut.value = false;
+  }
 }
 
 async function handleSignOutAndClearData() {
+  if (isSigningOut.value) return;
+  isSigningOut.value = true;
   close();
-  // Sign out first — flushes pending saves while session password is still available
-  await authStore.signOutAndClearData();
-  resetAllAppStores();
-  router.replace('/login');
+  try {
+    // Sign out first — flushes pending saves while the session key is still available
+    await authStore.signOutAndClearData();
+    resetAllAppStores();
+    await router.replace('/login');
+  } finally {
+    isSigningOut.value = false;
+  }
 }
 
 function selectLanguage(code: LanguageCode) {
@@ -592,5 +610,18 @@ const encryptionLabel = computed(() => {
         </Transition>
       </div>
     </Transition>
+
+    <!-- Signing-out progress overlay: outlives the closed menu drawer -->
+    <div
+      v-if="isSigningOut"
+      class="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-[#F8F9FA]/90 backdrop-blur-sm dark:bg-[#1a252f]/90"
+      role="status"
+      aria-live="polite"
+    >
+      <BeanieSpinner size="lg" />
+      <p class="font-outfit text-sm font-semibold text-[#2C3E50] dark:text-gray-100">
+        {{ t('auth.signingOut') }}
+      </p>
+    </div>
   </Teleport>
 </template>

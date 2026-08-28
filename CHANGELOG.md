@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-08-28
 
+### Fixed
+
+- **Face ID / fingerprint unlock on iPhone works again** — a keychain probe was mistaking a healthy protected key for a missing one and turning biometric unlock off with a "your biometrics changed" message on every sign-in.
+- The What's New buttons ("Create your PIN now", "Get your Recovery Kit") now open Settings reliably on the first tap.
+- Signing out now shows a "Signing out…" progress state instead of appearing frozen for a few seconds.
+
 ### Added
 
 - **New families are created with a PIN and a Recovery Kit — no password at all.** The setup wizard now asks for a 6-digit PIN, then shows the family's one-page Recovery Kit (save the PDF or scan the QR later to get back in) before adding members. The kit is the master key; the PIN is the everyday way in.
