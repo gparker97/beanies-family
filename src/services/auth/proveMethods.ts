@@ -22,6 +22,7 @@
 
 import type { PasskeyRegistration } from '@/types/models';
 import { resolveDeviceKeys } from '@/services/auth/passkeyService';
+import { getPinUnlockRecord } from '@/services/auth/deviceUnlock';
 import { emitProveMethodsResolved } from '@/services/telemetry/loginFlowEvents';
 import { reportError } from '@/utils/errorReporter';
 
@@ -31,12 +32,17 @@ export interface ProveContext {
   /** The doc is decrypted in memory — tap-through and doc-hash checks are possible. */
   podOpen: boolean;
   /**
-   * Whether the member has a password/PIN hash. `null` = unknown (pod not open and the
-   * roster entry didn't say) — treated as "has one", because offering tap-through to a
-   * credentialed member is the dangerous direction and asking for a password from a
-   * passwordless member merely falls through to the create-password path.
+   * Whether the member has ANY credential (password or PIN hash). `null` = unknown (pod
+   * not open and the roster entry didn't say) — treated as "has one", because offering
+   * tap-through to a credentialed member is the dangerous direction and asking for a
+   * password from a passwordless member merely falls through to the create-password path.
    */
   hasCredential: boolean | null;
+  /**
+   * Whether the member has a doc-side PIN hash (Phase 2). Only knowable when the pod is
+   * open — `null` when cold, where the device-wrap record alone decides the PIN offer.
+   */
+  hasPin: boolean | null;
   /** Where the person list came from — carried through to telemetry only. */
   rosterSource: 'roster' | 'credential-records' | 'open-pod';
 }
@@ -44,6 +50,12 @@ export interface ProveContext {
 export type ProveMethod =
   /** OS biometric (native keystore) or web passkey — the member's key on THIS device. */
   | { kind: 'biometric'; registration: PasskeyRegistration }
+  /**
+   * Member PIN (Phase 2). `hasDeviceWrap` true = this device holds a PIN wrap, so the
+   * PIN can unlock a CLOSED pod; false = doc-side PIN only (offered on an open pod:
+   * verify against the doc hash, then silently enrol this device's wrap).
+   */
+  | { kind: 'pin'; hasDeviceWrap: boolean }
   /** Passwordless member on an already-open pod — one tap, no ceremony. */
   | { kind: 'tap-through' }
   /** Legacy prove + cold-device bootstrap terminal. Always present until Phase 4. */
@@ -65,6 +77,15 @@ const PROBES: Probe[] = [
       const keys = await resolveDeviceKeys(ctx.familyId);
       const own = keys.find((k) => k.memberId === ctx.memberId);
       return own ? { kind: 'biometric', registration: own } : null;
+    },
+  },
+  {
+    name: 'pin',
+    run: async (ctx) => {
+      const record = await getPinUnlockRecord(ctx.familyId, ctx.memberId);
+      if (record) return { kind: 'pin', hasDeviceWrap: true };
+      if (ctx.podOpen && ctx.hasPin === true) return { kind: 'pin', hasDeviceWrap: false };
+      return null;
     },
   },
   {

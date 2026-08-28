@@ -25,7 +25,7 @@ function toRosterMember(m: FamilyMember): RosterCacheMember {
     color: m.color,
     gender: m.gender,
     ageGroup: m.ageGroup,
-    hasCredential: !!m.passwordHash,
+    hasCredential: !!m.passwordHash || !!m.pinHash,
   };
 }
 

@@ -39,6 +39,13 @@ import {
 } from '@/services/telemetry/loginFlowEvents';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import {
+  unlockWithPin,
+  enrollPinUnlock,
+  removePinUnlock,
+  MAX_PIN_ATTEMPTS,
+} from '@/services/auth/deviceUnlock';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { registerPasskeyForMember } from '@/services/auth/passkeyService';
 import { raceTimeout } from '@/utils/timing';
@@ -64,6 +71,7 @@ export interface UseLoginFlow {
   onBiometric(): Promise<void>;
   onTapThrough(): Promise<void>;
   onPasswordSubmit(password: string): void;
+  onPinSubmit(pin: string): Promise<void>;
   onCreatePassword(password: string): Promise<void>;
   onFellBack(): void;
   // Recovery-panel handlers
@@ -127,7 +135,7 @@ export function useLoginFlow(opts: {
         color: m.color,
         gender: m.gender,
         ageGroup: m.ageGroup,
-        hasCredential: !!m.passwordHash,
+        hasCredential: !!m.passwordHash || !!m.pinHash,
         photoUrl: getMemberAvatarUrl(m) ?? undefined,
       }));
       return people.length > 0 ? { people, source: 'open-pod' } : null;
@@ -249,7 +257,7 @@ export function useLoginFlow(opts: {
       color: live.color,
       gender: live.gender,
       ageGroup: live.ageGroup,
-      hasCredential: !!live.passwordHash,
+      hasCredential: !!live.passwordHash || !!live.pinHash,
       photoUrl: getMemberAvatarUrl(live) ?? undefined,
     };
   }
@@ -275,11 +283,15 @@ export function useLoginFlow(opts: {
         }
         return;
       }
+      const liveMember = podOpen()
+        ? familyStore.members.find((m) => m.id === livePerson.id)
+        : undefined;
       const methods = await resolveProveMethods({
         familyId: s.familyId,
         memberId: livePerson.id,
         podOpen: podOpen(),
         hasCredential: livePerson.hasCredential ?? null,
+        hasPin: liveMember !== undefined ? !!liveMember.pinHash : null,
         rosterSource: s.source,
       });
       // The machine drops stale events itself, but avoid dispatching for a superseded
@@ -440,6 +452,129 @@ export function useLoginFlow(opts: {
         return;
       }
       proveError.value = result.error ?? t('auth.signInFailed');
+    } finally {
+      isBusy.value = false;
+    }
+  }
+
+  /**
+   * PIN prove. Two shapes, one screen:
+   *  - device wrap present: the PIN unlocks the CLOSED pod (unwrap FK → stage → decrypt)
+   *    or, on an open pod, signs the member in after a doc-hash verify (catching the
+   *    changed-on-another-device case, which re-prompts rather than burning attempts —
+   *    the wrap's old-PIN window is bounded exactly like healStaleWrappedKey's).
+   *  - doc-side PIN only (open pod): verify against the doc hash, sign in, and silently
+   *    enrol this device's wrap so the NEXT login can use the PIN cold.
+   */
+  async function onPinSubmit(pin: string): Promise<void> {
+    const s = currentProve();
+    if (!s || isBusy.value) return;
+    const pinMethod = s.methods.find((m) => m.kind === 'pin');
+    if (!pinMethod) return;
+    proveError.value = null;
+    isBusy.value = true;
+    try {
+      const emitOutcome = (ok: boolean, errorCode?: string) =>
+        emitProveOutcome({ method: 'pin', ok, errorCode, fallbackDepth: s.fallbackDepth });
+
+      // ── Doc-side verify path (pod open) — covers both shapes when the pod is open. ──
+      if (podOpen()) {
+        const result = await authStore.signInWithPin(s.person.id, pin);
+        if (!result.success) {
+          // Device-wrap holders whose entered PIN fails the doc hash may be typing the
+          // OLD pin of a changed-elsewhere PIN — surface that case's copy explicitly.
+          const live = familyStore.members.find((m) => m.id === s.person.id);
+          const record =
+            pinMethod.hasDeviceWrap && live
+              ? await import('@/services/auth/deviceUnlock').then((m) =>
+                  m.getPinUnlockRecord(s.familyId, s.person.id)
+                )
+              : undefined;
+          if (record && live?.pinVersion && record.pinVersion !== live.pinVersion) {
+            proveError.value = t('pin.changedElsewhere');
+          } else {
+            proveError.value = result.error ?? t('pin.incorrect');
+          }
+          emitOutcome(false, 'wrong-pin');
+          return;
+        }
+        // Success: heal the device side — (re-)wrap under the verified current PIN so
+        // cold unlocks work and any stale-version wrap is replaced.
+        const live = familyStore.members.find((m) => m.id === s.person.id);
+        if (live && syncStore.familyKey) {
+          await enrollPinUnlock({
+            familyId: s.familyId,
+            member: { id: live.id, name: live.name, pinVersion: live.pinVersion ?? 1 },
+            pin,
+            familyKey: syncStore.familyKey,
+            keyId: syncStore.envelope?.keyId ?? '',
+          });
+        }
+        emitOutcome(true);
+        if (!stillProving(s.person.id)) return;
+        dispatch({ type: 'PROVE_SUCCEEDED', grant: { memberId: s.person.id, fkAvailable: true } });
+        return;
+      }
+
+      // ── Cold path: the device wrap IS the unlock. ──
+      if (!pinMethod.hasDeviceWrap) return; // unreachable (probe never offers doc-only cold)
+      const unlock = await unlockWithPin({
+        familyId: s.familyId,
+        memberId: s.person.id,
+        pin,
+        expectedKeyId: syncStore.pendingEncryptedFile?.envelope?.keyId,
+      });
+      if (!unlock.ok) {
+        if (unlock.reason === 'destroyed') {
+          proveError.value = t('pin.lockedOut');
+          emitOutcome(false, 'destroyed');
+          // The PIN method is gone from this device — re-resolve so the screen is honest.
+          dispatch({ type: 'BACK' });
+          dispatch({ type: 'PICK_PERSON', person: s.person });
+          return;
+        }
+        if (unlock.reason === 'wrong-pin') {
+          proveError.value = fillTemplate(t('pin.attemptsLeft'), {
+            count: String(unlock.attemptsLeft ?? MAX_PIN_ATTEMPTS - 1),
+          });
+          emitOutcome(false, 'wrong-pin');
+          return;
+        }
+        proveError.value = t('auth.signInFailed');
+        emitOutcome(false, unlock.reason);
+        return;
+      }
+
+      // FK in hand — stage the envelope and decrypt with it.
+      if (!(await ensureStaged())) {
+        emitOutcome(false, 'transport');
+        return; // OPEN_FAILED dispatched; grant-less recovery retries back into prove
+      }
+      if (syncStore.hasPendingEncryptedFile) {
+        const dec = await syncStore.decryptPendingFileWithKey(unlock.familyKey);
+        if (!dec.success) {
+          // Wrong-family / rotated-key blob that slipped the keyId check — clear the
+          // wrap (it can never succeed) and fall back.
+          await removePinUnlock(s.familyId, s.person.id);
+          proveError.value = t('auth.signInFailed');
+          emitOutcome(false, 'decrypt-failed');
+          return;
+        }
+        await familyStore.loadMembers();
+      }
+      // Doc open now — verify the doc hash to catch a changed-elsewhere PIN, and
+      // complete the session via the shared tail.
+      const result = await authStore.signInWithPin(s.person.id, pin);
+      if (!result.success) {
+        // Old-PIN window: the wrap opened but the doc says the PIN changed. Honest
+        // re-prompt; the wrap stays (bounded trust window) until the new PIN re-wraps.
+        proveError.value = t('pin.changedElsewhere');
+        emitOutcome(false, 'stale-pin');
+        return;
+      }
+      emitOutcome(true);
+      if (!stillProving(s.person.id)) return;
+      dispatch({ type: 'PROVE_SUCCEEDED', grant: { memberId: s.person.id, fkAvailable: true } });
     } finally {
       isBusy.value = false;
     }
@@ -689,6 +824,7 @@ export function useLoginFlow(opts: {
     onBiometric,
     onTapThrough,
     onPasswordSubmit,
+    onPinSubmit,
     onCreatePassword,
     onFellBack,
     onRecoveryRetry,
