@@ -5862,14 +5862,14 @@
       "lastUpdated": "2026-03-08"
     },
     "settings.card.security": {
-      "translation": "安全与隐私",
-      "hash": "27a53m",
-      "lastUpdated": "2026-03-08"
+      "translation": "安全与恢复",
+      "hash": "8py6nj",
+      "lastUpdated": "2026-08-28"
     },
     "settings.card.securityDesc": {
-      "translation": "加密和设备信任",
-      "hash": "wxxkpn",
-      "lastUpdated": "2026-05-16"
+      "translation": "设备信任、恢复套件、紧急情况",
+      "hash": "hm2m26",
+      "lastUpdated": "2026-08-28"
     },
     "settings.card.familyMembers": {
       "translation": "家庭成员",
@@ -14407,19 +14407,19 @@
       "lastUpdated": "2026-05-16"
     },
     "settings.card.account": {
-      "translation": "您的帐号",
-      "hash": "bjlmo",
-      "lastUpdated": "2026-05-16"
+      "translation": "帐户登录",
+      "hash": "tt1g60",
+      "lastUpdated": "2026-08-28"
     },
     "settings.card.accountDesc": {
-      "translation": "密码、密钥和注销",
-      "hash": "frkx81",
-      "lastUpdated": "2026-05-16"
+      "translation": "密码、PIN码和生物识别",
+      "hash": "nywfjy",
+      "lastUpdated": "2026-08-28"
     },
     "settings.accountModal.title": {
-      "translation": "您的帐号",
-      "hash": "bjlmo",
-      "lastUpdated": "2026-05-16"
+      "translation": "帐户登录",
+      "hash": "tt1g60",
+      "lastUpdated": "2026-08-28"
     },
     "loginV6.noPodOnAccount.title": {
       "translation": "此Google帐户尚未有pod",
