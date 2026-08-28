@@ -29,8 +29,12 @@ import type { RosterCacheMember } from '@/types/models';
 /** Where the person list was sourced from (telemetry + fallback semantics). */
 export type PersonSource = 'roster' | 'credential-records' | 'open-pod';
 
-/** One person card on the picker — the roster projection, whatever its source. */
-export type PersonCard = RosterCacheMember;
+/**
+ * One person card on the picker — the roster projection, whatever its source.
+ * `photoUrl` is populated only when the pod is already open (photos live inside the
+ * encrypted doc, so a pre-decrypt roster can never carry one).
+ */
+export type PersonCard = RosterCacheMember & { photoUrl?: string };
 
 /** Why an open attempt failed — drives which recovery panel renders. */
 export type OpenFailReason =
@@ -102,11 +106,16 @@ export type LoginFlowState =
       /** Prove-screen context, retained so 'wrong-password' can return there. */
       resume: ProveResume;
     }
-  /** Open failed for a NON-credential reason — fix the transport, never re-prove. */
+  /**
+   * Open failed for a NON-credential reason — fix the transport. `grant` is null when
+   * the failure happened BEFORE identity was proven (web cold start needs the envelope
+   * fetched before a PRF assert can run): retry then returns to prove, not to opening.
+   * Either way the user is never asked to re-answer "who are you".
+   */
   | {
       kind: 'open-recovery';
       familyId: string;
-      grant: ProveGrant;
+      grant: ProveGrant | null;
       reason: Exclude<OpenFailReason, 'wrong-password'>;
       resume: ProveResume;
     }
@@ -231,6 +240,18 @@ export function transition(state: LoginFlowState, event: LoginFlowEvent): LoginF
       return { kind: 'done', destination: LOGIN_DESTINATION };
 
     case 'OPEN_FAILED': {
+      // Also legal from `prove`: the prove effect may need the envelope staged before a
+      // web PRF assert, and that fetch can fail. Identity is not yet proven there, so
+      // recovery carries a null grant and retry re-enters prove.
+      if (state.kind === 'prove' && event.reason !== 'wrong-password') {
+        return {
+          kind: 'open-recovery',
+          familyId: state.familyId,
+          grant: null,
+          reason: event.reason,
+          resume: proveResume(state),
+        };
+      }
       if (state.kind !== 'opening') return state;
       // A wrong password is a PROVE failure, not a transport failure — return to the
       // prove screen (via prove-loading so methods are freshly re-resolved), never to
@@ -256,6 +277,18 @@ export function transition(state: LoginFlowState, event: LoginFlowEvent): LoginF
 
     case 'RECOVERY_RETRY':
       if (state.kind !== 'open-recovery') return state;
+      // Not yet proven (the transport died before the assert) → back to prove with
+      // fresh methods. Proven → straight to opening with the same grant.
+      if (!state.grant) {
+        return {
+          kind: 'prove-loading',
+          familyId: state.familyId,
+          familyName: state.resume.familyName,
+          person: state.resume.person,
+          source: state.resume.source,
+          people: state.resume.people,
+        };
+      }
       return {
         kind: 'opening',
         familyId: state.familyId,
