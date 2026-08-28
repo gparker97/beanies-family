@@ -1020,7 +1020,12 @@ async function handleDriveRefresh() {
             <circle cx="12" cy="13" r="4" />
           </svg>
           {{ t('recovery.kitScanPhoto') }}
-          <input type="file" accept="image/*" class="hidden" @change="handleKitPhotoPicked" />
+          <input
+            type="file"
+            accept="image/*,application/pdf,.pdf"
+            class="hidden"
+            @change="handleKitPhotoPicked"
+          />
         </label>
         <BaseButton
           type="submit"

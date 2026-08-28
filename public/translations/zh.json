@@ -21322,13 +21322,13 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitScanPhoto": {
-      "translation": "扫描工具包的照片",
-      "hash": "8796le",
+      "translation": "加载您的工具包PDF或其照片",
+      "hash": "z417w5",
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitScanFailed": {
-      "translation": "无法读取该照片中的二维码。请尝试更清晰的图片，或输入二维码。",
-      "hash": "8k8xyo",
+      "translation": "无法读取该文件中的二维码—请尝试保存的PDF或更清晰的图片，或键入代码。",
+      "hash": "mm9qt9",
       "lastUpdated": "2026-08-28"
     },
     "recovery.resetPinTitle": {
