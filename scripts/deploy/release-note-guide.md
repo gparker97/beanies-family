@@ -221,3 +221,14 @@ instead of rotting like the old hardcoded `v1.0.0 - MVP`.
 The release note is **distinct from** `CHANGELOG.md`: the changelog is the
 granular dev record (updated on every push); the release note is the brief,
 public, benefit-framed sibling. Keep them consistent.
+
+## Secondary updates stay SHORT (greg, 2026-08-29)
+
+For anything that is not the deploy's headline — smaller bug fixes, polish,
+side fixes that ride along — one short line is the whole entry, in the release
+note AND in `CHANGELOG.md`. "Fixed a Google Calendar sync bug." is a complete
+changelog bullet; do NOT write a paragraph explaining the mechanism, the root
+cause, or the hardening. The technical story already lives in the commit
+message — never duplicate it into user-facing surfaces. When in doubt between
+"minor bug fixes and improvements" and a technical explanation, choose the
+short line.
