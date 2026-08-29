@@ -215,6 +215,36 @@ describe('registry PUT — beanpodSizeKb (client value, preserve-on-omit, guarde
   });
 });
 
+describe('registry PUT — memberCount (client roster size, preserve-on-omit, guarded)', () => {
+  it('stores a rounded positive integer and refreshes on later writes', async () => {
+    const first = await put({ provider: 'local', memberCount: 4 });
+    expect(first.item.memberCount).toBe(4);
+    const grown = await put({ provider: 'local', memberCount: 5 }, { memberCount: 4 });
+    expect(grown.item.memberCount).toBe(5);
+  });
+
+  it('preserves the existing value when omitted (older client)', async () => {
+    const { item } = await put({ provider: 'local' }, { memberCount: 3 });
+    expect(item.memberCount).toBe(3);
+  });
+
+  it('ignores zero and negative values (a family always has at least one member)', async () => {
+    const { res, item } = await put({ provider: 'local', memberCount: 0 }, { memberCount: 2 });
+    expect(res.statusCode).toBe(200);
+    expect(item.memberCount).toBe(2);
+  });
+
+  it('ignores a non-numeric value (preserves existing)', async () => {
+    const { item } = await put({ provider: 'local', memberCount: 'many' }, { memberCount: 6 });
+    expect(item.memberCount).toBe(6);
+  });
+
+  it('yields null when omitted with no prior row', async () => {
+    const { item } = await put({ provider: 'local' });
+    expect(item.memberCount).toBeNull();
+  });
+});
+
 describe('registry PUT — backward compatibility', () => {
   it('preserves createdAt and does not disturb unrelated fields', async () => {
     const { item } = await put(

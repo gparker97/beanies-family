@@ -1553,6 +1553,9 @@ export const useSyncStore = defineStore('sync', () => {
       subscribeNewsletter: authStore.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
       beanpodSizeKb: currentBeanpodSizeKb(),
+      // Roster size from the decrypted doc — a bare count, never member data.
+      // The envelope's wrappedKeys would undercount (unclaimed beans have none).
+      memberCount: useFamilyStore().members.length || null,
       // Sent on every write, but the Lambda stamps it ONLY alongside
       // `isSignupEvent` and only when the field is still unset — so neither a
       // later login from another platform nor a disconnect/reconnect (which

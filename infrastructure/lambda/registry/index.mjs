@@ -212,6 +212,16 @@ export async function handler(event) {
           typeof body.beanpodSizeKb === 'number' && body.beanpodSizeKb >= 0
             ? Math.round(body.beanpodSizeKb)
             : (existing.beanpodSizeKb ?? null),
+        // memberCount: how many members the family roster holds — a bare integer
+        // for analytics (total users across families), never names or ids. Sent
+        // by clients from the decrypted in-memory roster (the unencrypted
+        // envelope would undercount: unclaimed beans carry no wrappedKey).
+        // Same guarded preserve-on-omit idiom as beanpodSizeKb; refreshes on
+        // every write so it tracks the roster as families grow.
+        memberCount:
+          typeof body.memberCount === 'number' && body.memberCount >= 1
+            ? Math.round(body.memberCount)
+            : (existing.memberCount ?? null),
         // Which platform the family signed up ON. Two independent conditions, and
         // BOTH are load-bearing:
         //
