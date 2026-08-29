@@ -111,14 +111,28 @@ describe('CalendarMonthStream', () => {
     expect([...dates].sort()).toEqual(dates);
   });
 
-  it('names the upcoming month in the stream so the seam is announced', () => {
+  it('names every month visibly — the header is what you land on, so it can never be hidden', () => {
     const w = mountStream();
-    // The first rendered month is visually suppressed (the command bar already
-    // names it) but later boundaries carry a visible heading.
     const headings = w.findAll('[data-month-key]');
-    expect(headings[0]!.classes()).toContain('sr-only');
-    expect(headings[1]!.classes()).not.toContain('sr-only');
-    expect(headings[1]!.text().toLowerCase()).toContain('august');
+    // The first month's header was briefly sr-only (the command bar names it
+    // anyway). It cannot be: a month landing scrolls TO this element so the
+    // month's name is in view on arrival, and you can also scroll up into it.
+    for (const h of headings) expect(h.classes()).not.toContain('sr-only');
+    expect(headings.map((h) => h.text().toLowerCase()).join(' ')).toContain('august');
+  });
+
+  it('lands a month anchor on the month header, not the 1st day card', async () => {
+    const w = mountStream({ anchor: { tick: 0, target: 'month-start' } });
+    await flushPromises();
+    // Both swipe directions land the same way now (forward and back), and the
+    // arrival point is the header so the month's name is fully visible — landing
+    // on the 1st's card alone put the name just above the fold, which read as
+    // having overshot the boundary.
+    await w.setProps({ anchor: { tick: 1, target: 'month-start' } });
+    await flushPromises();
+    // No scroller exists in jsdom, so this asserts the request is well-formed
+    // (it resolves without reporting a missing element) rather than the pixels.
+    expect(w.find('[data-month-key="2026-7"]').exists()).toBe(true);
   });
 
   it('re-renders the window when the reference month moves outside it', async () => {
