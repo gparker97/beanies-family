@@ -117,11 +117,19 @@ onBeforeUnmount(() => {
              opens the shared MobileHamburgerMenu lives here (AppHeader is hidden). -->
         <HamburgerButton v-if="headerReclaimed" :alert="saveNeedsAttention" @click="toggleMenu" />
 
-        <h1
-          class="font-outfit text-secondary-500 min-w-0 flex-1 truncate text-xl font-extrabold sm:flex-none sm:text-2xl dark:text-gray-100"
-        >
-          {{ label }}
-        </h1>
+        <!-- The label crossfades when it changes, because on the mobile month
+             stream it changes as you SCROLL past a month boundary — an instant
+             swap there reads as a glitch rather than as the calendar keeping up.
+             `mode="out-in"` so the two labels never overlap mid-fade; the
+             transition is a no-op under prefers-reduced-motion (see the CSS). -->
+        <Transition name="cal-label" mode="out-in">
+          <h1
+            :key="label"
+            class="font-outfit text-secondary-500 min-w-0 flex-1 truncate text-xl font-extrabold sm:flex-none sm:text-2xl dark:text-gray-100"
+          >
+            {{ label }}
+          </h1>
+        </Transition>
 
         <!-- Nav cluster (absorbed from CalendarNavBar) -->
         <div class="flex flex-shrink-0 items-center gap-0.5">
@@ -268,3 +276,23 @@ onBeforeUnmount(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* Month-label crossfade (see the Transition in the template). */
+.cal-label-enter-active,
+.cal-label-leave-active {
+  transition: opacity 140ms ease;
+}
+
+.cal-label-enter-from,
+.cal-label-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-label-enter-active,
+  .cal-label-leave-active {
+    transition: none;
+  }
+}
+</style>
