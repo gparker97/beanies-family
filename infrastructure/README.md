@@ -63,6 +63,8 @@ terraform apply
 
 > **Read every resource change in the plan**, not just the one you intended to touch. Manual console edits show up as drift that Terraform will silently revert.
 
+> ⚠️ **Always `source ~/.beanies-tf.env` FIRST — a plan without it lies.** The secret-bearing variables fall back to their declared defaults when unset, so the plan renders your correct live values as changes it intends to make. It reads exactly like console drift, and applying it would overwrite the live secret with a default. If a plan shows an unexpected `~ environment { variables { ... } }` on a Lambda, check the env is sourced before believing it. (Hit 2026-08-29: `content_fetch`'s `YOUTUBE_API_KEY` appeared drifted across several plans and was not — the shell simply had no `TF_VAR_youtube_api_key`.)
+
 Three of the five keys (`registry_api_key`, `log_ingest_api_key`, `ai_extract_api_key`) ship inside the public client bundle and must match their GitHub Actions secrets exactly — rotating one means updating both sides and redeploying the client. See the template for the mapping.
 
 ## State Management
