@@ -12,8 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
-- **Upcoming trips show again on the Travel Plans page.** A refactor had left the trip card component unimported, so future trips silently rendered as nothing while the data stayed safe; past trips were unaffected. A build-time guard now makes this class of mistake impossible to ship.
-- **Google Calendar sync no longer jams after editing or deleting a single session of a repeating activity.** Google rejects a technical field the sync was sending when updating one occurrence, and the sync kept retrying the same rejected update forever, leaving the connection stuck on an error. The field is no longer sent, rejected updates recover on the next cycle instead of looping, and error reports now carry Google's actual reason.
+- Upcoming trips show again on the Travel Plans page (no data was lost).
+- Fixed a Google Calendar sync bug that could leave the connection stuck on an error after editing or deleting a single session of a repeating activity.
 
 ## 2026-08-28
 
