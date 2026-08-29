@@ -26,7 +26,9 @@ describe('inviteToken', () => {
     vi.stubEnv('VITE_INVITE_BEAN_HASHES', '');
     const { features } = await import('@/config/features');
     expect(features.inviteGate).toBe(false);
-  });
+    // 20s: first dynamic import pays one-off init cost under full-suite contention —
+    // the recurring pass-in-isolation flake (see TravelPlansPage.smoke.test.ts).
+  }, 20_000);
 
   it('features.inviteGate is true when env var has hashes', async () => {
     armGate('abc123');
