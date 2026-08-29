@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>continuous month navigation — approved mockup (#58)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --orange:#F15D22; --terra:#E67E22; --sky:#AED6F1; --slate:#2C3E50; --cloud:#F8F9FA;
+    --sky-soft:#EAF4FC; --orange-soft:#FDEEE7;
+    --card-shadow:0 4px 20px rgba(44,62,80,.05);
+    --soft-shadow:0 8px 40px rgba(44,62,80,.08);
+    --sq:24px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef1f4;color:var(--slate);font-family:Inter,system-ui,sans-serif;line-height:1.5}
+  h1,h2,h3,.outfit{font-family:Outfit,sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:32px 20px 80px}
+  header.page h1{font-size:24px;font-weight:700;margin:0}
+  header.page .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--orange)}
+  header.page p{font-size:14px;color:#5b6b7a;max-width:70ch;margin:8px 0 0}
+  .cols{display:grid;grid-template-columns:430px 1fr;gap:28px;margin-top:28px;align-items:start}
+  @media(max-width:980px){.cols{grid-template-columns:1fr}}
+  .panel{background:#fff;border-radius:var(--sq);box-shadow:var(--card-shadow);padding:20px}
+  .panel h2{font-size:18px;font-weight:600;margin:0}
+  .panel .cap{font-size:12px;color:#8496a5;margin:4px 0 14px}
+  .tag{display:inline-block;font-family:Outfit;font-size:12px;font-weight:600;padding:2px 12px;border-radius:20px;background:var(--sky-soft);color:#3b7bb0;margin-left:8px;vertical-align:middle}
+
+  /* ── phone frame ─────────────────────────────────────────────── */
+  .phone{width:390px;max-width:100%;margin:0 auto;background:var(--slate);border-radius:38px;padding:10px;box-shadow:var(--soft-shadow)}
+  .screen{background:var(--cloud);border-radius:30px;overflow:hidden;display:flex;flex-direction:column;height:640px}
+  .cmdbar{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fff;border-bottom:1px solid #eef1f4;z-index:2}
+  .cmdbar .month{font-family:Outfit;font-size:18px;font-weight:700;transition:opacity .18s}
+  .cmdbar .month.swap{opacity:.25}
+  .cmdbar .arrows{display:flex;gap:6px}
+  .cmdbar button{font-family:Outfit;font-weight:600;font-size:14px;border:0;background:var(--sky-soft);color:var(--slate);border-radius:16px;padding:6px 12px;cursor:pointer}
+  .cmdbar button.today{background:var(--orange);color:#fff}
+  .stream{flex:1;overflow-y:auto;padding:10px 12px 24px;overscroll-behavior:contain;scroll-behavior:smooth}
+  @media(prefers-reduced-motion:reduce){.stream{scroll-behavior:auto}}
+
+  /* month boundary header — the signature element: the seam made visible */
+  .month-head{display:flex;align-items:center;gap:10px;padding:22px 2px 10px}
+  .month-head .name{font-family:Outfit;font-size:16px;font-weight:700;color:var(--orange);letter-spacing:.01em}
+  .month-head .rule{height:2px;flex:1;border-radius:2px;background:linear-gradient(90deg,var(--orange),var(--terra),transparent)}
+  .week-sep{display:flex;align-items:center;gap:8px;padding:8px 4px 2px;color:rgba(44,62,80,.5)}
+  .week-sep.current{color:var(--orange)}
+  .week-sep .lbl{font-family:Outfit;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+  .week-sep .rng{font-family:Outfit;font-size:12px;font-weight:500;opacity:.7}
+  .week-sep .ln{height:1px;flex:1;background:#e3e8ed}
+  .week-sep.current .ln{background:rgba(241,93,34,.3)}
+
+  .daycard{display:flex;gap:10px;background:#fff;border-radius:18px;box-shadow:var(--card-shadow);padding:10px 12px;margin-top:6px}
+  .daycard.today{outline:2px solid var(--orange);outline-offset:-2px;background:var(--orange-soft)}
+  .daycard .num{font-family:Outfit;font-weight:700;font-size:16px;width:34px;flex:none;text-align:center}
+  .daycard .num small{display:block;font-size:12px;font-weight:500;color:#8496a5;text-transform:lowercase}
+  .daycard.today .num{color:var(--orange)}
+  .daycard .evs{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .ev{font-size:12px;font-weight:500;border-radius:10px;padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ev.a{background:var(--sky-soft);color:#2d6ea6}.ev.b{background:var(--orange-soft);color:#c04f1e}.ev.c{background:#eef7f0;color:#2f7d54}
+  .ev.none{color:#b6c2cc;background:transparent;padding-left:2px;font-weight:400}
+
+  /* ── desktop variants ────────────────────────────────────────── */
+  .variants{display:flex;flex-direction:column;gap:24px}
+  .variant .vhead{display:flex;align-items:baseline;gap:8px;margin:0 0 4px}
+  .variant .vhead .k{font-family:Outfit;font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--orange)}
+  .variant h3{font-size:16px;font-weight:600;margin:0}
+  .variant .cap{font-size:12px;color:#8496a5;margin:2px 0 10px}
+  .deskdemo{position:relative;border-radius:18px;border:1px solid #eef1f4;background:var(--cloud);overflow:hidden}
+  .desk-cmd{display:flex;align-items:center;justify-content:space-between;background:#fff;padding:8px 12px;border-bottom:1px solid #eef1f4}
+  .desk-cmd .month{font-family:Outfit;font-weight:700;font-size:14px}
+  .gridwrap{height:300px;overflow:hidden;position:relative}
+  .mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e9edf1;padding:1px;transition:transform .28s cubic-bezier(.2,.8,.3,1),opacity .28s}
+  @media(prefers-reduced-motion:reduce){.mgrid{transition:none}}
+  .dow{background:var(--cloud);font-family:Outfit;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(44,62,80,.4);text-align:center;padding:4px 0}
+  .cell{background:#fff;min-height:46px;padding:3px 5px;font-family:Outfit;font-size:11px;font-weight:600}
+  .cell.out{color:#c3ccd4;background:#fbfcfd}
+  .cell.today{background:var(--orange-soft);color:var(--orange)}
+  .cell .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--sky);margin-left:2px}
+  .cell .dot.o{background:var(--orange)}
+  .hintline{font-size:11px;color:#8496a5;padding:6px 12px;background:#fff;border-top:1px solid #eef1f4}
+  footer{margin-top:36px;font-size:12px;color:#8496a5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow">beanies.family · mockup · tracker #58 · 2026-08-29</div>
+    <h1>continuous month navigation — approved design</h1>
+    <p>left: the mobile month view becomes one seamless stream — keep scrolling and september simply arrives, announced by a month header. the label up top follows along. right: the approved desktop feel — a gentle rubber-band at the grid edge, then a one-month turn. both demos are live — scroll them.</p>
+  </header>
+
+  <div class="cols">
+    <!-- ══ A · mobile continuous stream ══ -->
+    <div class="panel">
+      <h2>a · mobile stream <span class="tag">phone · pwa · narrow window</span></h2>
+      <p class="cap">scroll the phone. the seam between months is a place, not a wall.</p>
+      <div class="phone"><div class="screen">
+        <div class="cmdbar">
+          <span class="month outfit" id="mLabel">august 2026</span>
+          <span class="arrows">
+            <button type="button" aria-label="previous month">‹</button>
+            <button type="button" class="today">today</button>
+            <button type="button" aria-label="next month">›</button>
+          </span>
+        </div>
+        <div class="stream" id="stream" tabindex="0" aria-label="calendar day stream"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ B · desktop grid paging ══ -->
+    <div class="panel">
+      <h2>b · desktop grid — edge resistance, then turn (approved) <span class="tag">md and up</span></h2>
+      <p class="cap">scroll with your wheel or trackpad at the grid edge — the approved desktop feel.</p>
+      <div class="variants">
+
+        <div class="variant">
+          <div class="vhead"><span class="k">B1</span><h3>edge resistance, then turn</h3></div>
+          <p class="cap">the grid gives a little rubber-band nudge as you push at its edge, then commits — one gesture, one month, vertical slide. momentum tails are swallowed by a cooldown.</p>
+          <div class="deskdemo" id="v1">
+            <div class="desk-cmd"><span class="month" data-role="label">august 2026</span><span class="cap" style="margin:0">wheel at the edge to turn</span></div>
+            <div class="gridwrap"><div class="mgrid" data-role="grid"></div></div>
+            <div class="hintline">feel: deliberate. you sense the boundary before it gives.</div>
+          </div>
+        </div>
+      </div>
+
+        
+    </div>
+  </div>
+
+  <footer>brand-clamped mockup — heritage orange alerts, outfit/inter, squircle corners, lowercase beanie voice · interaction only, not final visual design · reduced-motion honoured</footer>
+</div>
+
+<script>
+// ─── shared fake family data ────────────────────────────────────────────────
+const EVENTS = {
+  1:[["a","school pickup · 15:00"]], 2:[["b","joey piano · 16:30"]],
+  3:[["c","swim class · 17:00"],["a","school pickup · 15:00"]],
+  4:[], 5:[["b","neil piano theory · 14:00"]], 6:[["a","football · 09:30"]],
+  0:[["c","family lunch · 12:30"]],
+};
+const TODAY = new Date(2026,7,29); // sat 29 aug 2026 — the demo's "today"
+const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+const DOWS = ["sun","mon","tue","wed","thu","fri","sat"];
+const label = (y,m)=>`${MONTHS[m]} ${y}`;
+const evFor = d => (EVENTS[d.getDay()]||[]).slice(0, (d.getDate()%3)+ (d.getDay()===0?1:0) || 1);
+
+// ─── A · mobile continuous stream ───────────────────────────────────────────
+const stream = document.getElementById('stream');
+const mLabel = document.getElementById('mLabel');
+function buildMonthStream(y,m){
+  const frag = document.createDocumentFragment();
+  const head = document.createElement('div');
+  head.className='month-head'; head.dataset.month = `${y}-${m}`;
+  head.innerHTML = `<span class="name">${label(y,m)}</span><span class="rule"></span>`;
+  frag.appendChild(head);
+  const days = new Date(y,m+1,0).getDate();
+  for(let d=1; d<=days; d++){
+    const date = new Date(y,m,d);
+    if(date.getDay()===1 || d===1){
+      const sep=document.createElement('div');
+      const isCur = TODAY>=date && TODAY-date < 7*864e5 && TODAY.getMonth()===m;
+      sep.className='week-sep'+(isCur?' current':'');
+      sep.innerHTML=`<span class="lbl">${isCur?'this week':'week'}</span><span class="rng">· ${MONTHS[m].slice(0,3)} ${d}</span><span class="ln"></span>`;
+      frag.appendChild(sep);
+    }
+    const card=document.createElement('div');
+    const isToday = date.toDateString()===TODAY.toDateString();
+    card.className='daycard'+(isToday?' today':'');
+    card.dataset.month=`${y}-${m}`;
+    const evs = evFor(date);
+    card.innerHTML = `<div class="num">${d}<small>${DOWS[date.getDay()]}</small></div>
+      <div class="evs">${evs.length? evs.map(([c,t])=>`<span class="ev ${c}">${t}</span>`).join('') : '<span class="ev none">no plans yet</span>'}</div>`;
+    frag.appendChild(card);
+  }
+  return frag;
+}
+// seed: july–october as one stream
+let first={y:2026,m:6}, last={y:2026,m:9};
+for(let mm=first.m; mm<=last.m; mm++) stream.appendChild(buildMonthStream(2026,mm));
+// jump to today's card
+requestAnimationFrame(()=>{ const t=stream.querySelector('.daycard.today'); if(t) stream.scrollTop = t.offsetTop - 120; });
+// label follows the month in view + infinite extension at the edges
+let labelNow='august 2026';
+stream.addEventListener('scroll', ()=>{
+  const probe = stream.scrollTop + 70;
+  let current=null;
+  for(const el of stream.children){ if(el.offsetTop<=probe) current=el.dataset.month||current; else break; }
+  if(current){
+    const [y,m]=current.split('-').map(Number);
+    const l=label(y,m);
+    if(l!==labelNow){ labelNow=l; mLabel.classList.add('swap');
+      setTimeout(()=>{ mLabel.textContent=l; mLabel.classList.remove('swap'); },90); }
+  }
+  // extend the stream when near either end (the "infinite" part of the demo)
+  if(stream.scrollTop + stream.clientHeight > stream.scrollHeight - 400){
+    last.m++; if(last.m>11){last.m=0;last.y++;}
+    stream.appendChild(buildMonthStream(last.y,last.m));
+  }
+  if(stream.scrollTop < 300){
+    first.m--; if(first.m<0){first.m=11;first.y--;}
+    const keep = stream.scrollHeight;
+    stream.prepend(buildMonthStream(first.y,first.m));
+    stream.scrollTop += stream.scrollHeight - keep; // no visual jump
+  }
+},{passive:true});
+
+// ─── B · desktop month grid variants ────────────────────────────────────────
+function gridHTML(y,m){
+  const days=new Date(y,m+1,0).getDate(), lead=new Date(y,m,1).getDay();
+  let h = DOWS.map(d=>`<div class="dow">${d}</div>`).join('');
+  const prevDays=new Date(y,m,0).getDate();
+  for(let i=lead-1;i>=0;i--) h+=`<div class="cell out">${prevDays-i}</div>`;
+  for(let d=1;d<=days;d++){
+    const date=new Date(y,m,d);
+    const dots = evFor(date).map((e,i)=>`<span class="dot${i===0&&d%4===0?' o':''}"></span>`).join('');
+    h+=`<div class="cell${date.toDateString()===TODAY.toDateString()?' today':''}">${d}${dots}</div>`;
+  }
+  const trail=(7-((lead+days)%7))%7;
+  for(let d=1;d<=trail;d++) h+=`<div class="cell out">${d}</div>`;
+  return h;
+}
+function makePager(rootId, opts){
+  const root=document.getElementById(rootId);
+  const grid=root.querySelector('[data-role=grid]');
+  const lab=root.querySelector('[data-role=label]');
+  let y=2026,m=7, acc=0, cooling=false;
+  grid.innerHTML=gridHTML(y,m);
+  function turn(dir){
+    cooling=true;
+    const [outT,inT] = opts.horizontal
+      ? [`translateX(${-dir*40}px)`,`translateX(${dir*40}px)`]
+      : [`translateY(${-dir*40}px)`,`translateY(${dir*40}px)`];
+    grid.style.opacity='0'; grid.style.transform=outT;
+    setTimeout(()=>{
+      m+=dir; if(m>11){m=0;y++;} if(m<0){m=11;y--;}
+      grid.innerHTML=gridHTML(y,m); lab.textContent=label(y,m);
+      grid.style.transition='none'; grid.style.transform=inT;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        grid.style.transition=''; grid.style.transform=''; grid.style.opacity='';
+      }));
+      setTimeout(()=>{cooling=false; acc=0; grid.style.transform='';},420); // swallow momentum tail
+    },200);
+  }
+  root.querySelector('.gridwrap').addEventListener('wheel',e=>{
+    e.preventDefault();
+    if(cooling) return;
+    const dir=Math.sign(e.deltaY); if(!dir) return;
+    if(opts.resist){
+      acc+=e.deltaY;
+      const stretch=Math.max(-24,Math.min(24,acc/8));
+      grid.style.transform=`translateY(${-stretch}px)`;
+      if(Math.abs(acc)>140) turn(dir);
+      clearTimeout(root._rb); root._rb=setTimeout(()=>{acc=0; if(!cooling) grid.style.transform='';},260);
+    } else {
+      if(Math.abs(e.deltaY)>18) turn(dir);
+    }
+  },{passive:false});
+}
+makePager('v1',{resist:true, horizontal:false});
+
+</script>
+</body>
+</html>
