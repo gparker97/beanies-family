@@ -22,6 +22,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Upcoming trips show again on the Travel Plans page (no data was lost).
 - Fixed a Google Calendar sync bug that could leave the connection stuck on an error after editing or deleting a single session of a repeating activity.
 
+### Changed
+
+- Diagnostic logging is leaner and log retention is capped at 90 days everywhere (no user-facing change).
+
 ## 2026-08-28
 
 ### Fixed
