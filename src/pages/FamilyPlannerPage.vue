@@ -454,7 +454,7 @@ function bumpStreamAnchor(target: AnchorTarget) {
 function handlePrev() {
   goPrev();
   focusedDate.value = null;
-  bumpStreamAnchor('month-end');
+  bumpStreamAnchor('month-start');
 }
 function handleNext() {
   goNext();

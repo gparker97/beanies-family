@@ -14,7 +14,7 @@
  * regressing a surface this change is not supposed to touch.
  *
  * Scroll position is written in exactly two places: `useMonthStream`'s window
- * compensation, and `anchorToDate` below. Nothing else may write it — see the
+ * compensation, and `anchorTo` below. Nothing else may write it — see the
  * single-write-path note in `useMonthStream`.
  */
 import { computed, ref, watch, nextTick, onMounted } from 'vue';
@@ -23,7 +23,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { formatMonthYear, toDateInputValue } from '@/utils/date';
+import { formatMonthYear } from '@/utils/date';
 import { monthCellsFrom, prepareCellData, monthSpan, type WeekRangeMeta } from '@/utils/monthCells';
 import {
   useMonthStream,
@@ -43,7 +43,16 @@ import { ALL_DAY_VISIBLE_CAP, TIMED_VISIBLE_CAP } from '@/constants/calendarCaps
 import type { HolidayOccurrence } from '@/types/models';
 
 /** Where an imperative anchor request should land the view. */
-export type AnchorTarget = 'today' | 'month-start' | 'month-end';
+/**
+ * Where an imperative anchor request should land the view.
+ *
+ * `month-start` scrolls to the month's HEADER, not to the 1st's day card, so the
+ * month's name is fully in view when you arrive — landing on the card alone put
+ * the name just above the fold, which reads as having overshot the boundary.
+ * (There was a `month-end` target for backward swipes; on device it made
+ * swiping feel unlike scrolling, so both directions now land the same way.)
+ */
+export type AnchorTarget = 'today' | 'month-start';
 
 const props = defineProps<{
   /** Controlled period — the page owns the canonical date (props down). */
@@ -51,7 +60,7 @@ const props = defineProps<{
   selectedDate?: string;
   /**
    * ONE imperative channel for every "reposition the stream" request. Replaces
-   * the old `todayTick`: bumping `tick` runs `anchorToDate` for `target`, so a
+   * the old `todayTick`: bumping `tick` runs `anchorTo` for `target`, so a
    * "Today" tap and a swipe landing can never race two separate signals.
    */
   anchor?: { tick: number; target: AnchorTarget };
@@ -158,37 +167,37 @@ useCalendarSlide(rootRef, {
 
 // ── Anchoring (the ONLY other writer of scroll position) ───────────────────
 
-/** Resolve the date an anchor request means, for the CURRENT reference month. */
-function resolveAnchorDate(target: AnchorTarget): string {
-  const ref = props.referenceDate;
-  if (target === 'month-end') {
-    return toDateInputValue(new Date(ref.getFullYear(), ref.getMonth() + 1, 0));
-  }
-  if (target === 'month-start') {
-    return toDateInputValue(new Date(ref.getFullYear(), ref.getMonth(), 1));
-  }
-  return todayStr.value;
-}
-
 /**
- * Scroll the stream to `dateStr`, pulling its month into the window first when
- * it is out of range.
+ * Scroll the stream so `target` is in view, pulling its month into the window
+ * first when it is out of range.
  *
  * The old `scrollMobileToToday` returned silently at four separate guard points
  * — so a scroll that never happened looked exactly like one that did. Here the
- * only unexplained outcome (the card genuinely isn't in the DOM) is reported.
+ * only unexplained outcome (the element genuinely isn't in the DOM) is reported.
  */
 let anchorSeq = 0;
 
-async function anchorToDate(dateStr: string, opts: { smooth?: boolean } = {}): Promise<void> {
+/** Headroom above the anchored element, so it clears the topbar with air to spare. */
+const ANCHOR_HEADROOM_PX = 80;
+
+async function anchorTo(target: AnchorTarget, opts: { smooth?: boolean } = {}): Promise<void> {
   // Last caller wins. Two anchor requests can be in flight at once (a window
   // reset costs an extra tick), and without this the SLOWER one landed last —
   // which is how "Today" ended up scrolling to the 1st of the month.
   const seq = ++anchorSeq;
-  const targetMonth: MonthKey = {
-    y: Number(dateStr.slice(0, 4)),
-    m: Number(dateStr.slice(5, 7)) - 1,
+
+  const refKey = monthKeyOf(props.referenceDate);
+  const todayKey: MonthKey = {
+    y: Number(todayStr.value.slice(0, 4)),
+    m: Number(todayStr.value.slice(5, 7)) - 1,
   };
+  const targetMonth = target === 'today' ? todayKey : refKey;
+  // A month lands on its header (name visible); today lands on its own card.
+  const selector =
+    target === 'today'
+      ? `[data-date="${todayStr.value}"]`
+      : `[data-month-key="${monthKeyId(refKey)}"]`;
+
   if (!windowContains(months.value, targetMonth)) {
     resetWindow(targetMonth);
     await nextTick();
@@ -200,21 +209,20 @@ async function anchorToDate(dateStr: string, opts: { smooth?: boolean } = {}): P
   const scroller = getAppScroller(root);
   if (!root || !scroller) return; // not mounted yet — a later anchor will land
 
-  const card = root.querySelector<HTMLElement>(`[data-date="${dateStr}"]`);
-  if (!card) {
+  const el = root.querySelector<HTMLElement>(selector);
+  if (!el) {
     reportError({
       surface: 'calendar-nav',
-      message: `[monthStream] no day card for ${dateStr} — the stream could not be positioned (month window may not have rendered)`,
+      message: `[monthStream] nothing matching ${selector} — the stream could not be positioned (the month window may not have rendered)`,
       severity: 'warning',
       context: { action: 'stream-anchor-failed' },
     });
     return;
   }
   const offsetWithinScroller =
-    card.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-  // 80px headroom so the anchored card clears the topbar.
+    el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
   scroller.scrollTo({
-    top: Math.max(0, offsetWithinScroller - 80),
+    top: Math.max(0, offsetWithinScroller - ANCHOR_HEADROOM_PX),
     behavior: opts.smooth ? 'smooth' : 'auto',
   });
   syncNow();
@@ -239,13 +247,13 @@ watch(
       anchorOwnsFlush = false;
     });
     const target = props.anchor?.target ?? 'today';
-    void anchorToDate(resolveAnchorDate(target), { smooth: true }).then(() => {
+    void anchorTo(target, { smooth: true }).then(() => {
       if (target !== 'today') {
         logEvent({
           surface: 'calendar-nav',
           level: 'info',
-          message: 'month stream swipe landing',
-          context: { action: 'swipe-landing', detail: target === 'month-start' ? 'start' : 'end' },
+          message: 'month stream month landing',
+          context: { action: 'swipe-landing', detail: 'start' },
         });
       }
     });
@@ -270,7 +278,7 @@ watch(
     if (anchorOwnsFlush) return; // an anchor bump accompanies this change and owns the scroll
     const target = monthKeyOf(props.referenceDate);
     if (sameMonth(target, monthInView.value)) return;
-    void anchorToDate(toDateInputValue(new Date(target.y, target.m, 1)), { smooth: true });
+    void anchorTo('month-start', { smooth: true });
   }
 );
 
@@ -329,14 +337,12 @@ onMounted(() => {
       y: Number(todayStr.value.slice(0, 4)),
       m: Number(todayStr.value.slice(5, 7)) - 1,
     };
-    const target = sameMonth(refKey, todayKey)
-      ? todayStr.value
-      : toDateInputValue(new Date(refKey.y, refKey.m, 1));
-    whenLayoutSettles(() => void anchorToDate(target));
+    const target: AnchorTarget = sameMonth(refKey, todayKey) ? 'today' : 'month-start';
+    whenLayoutSettles(() => void anchorTo(target));
   });
 });
 
-defineExpose({ anchorToDate });
+defineExpose({ anchorTo });
 </script>
 
 <template>
@@ -352,8 +358,8 @@ defineExpose({ anchorToDate });
              heading chrome, since the command bar already names it. -->
         <div
           :data-month-key="month.id"
-          class="flex items-center gap-2.5 px-1"
-          :class="monthIdx === 0 ? 'sr-only' : 'pt-5 pb-1.5'"
+          class="flex items-center gap-2.5 px-1 pt-5 pb-1.5"
+          :class="monthIdx === 0 ? 'pt-1' : ''"
         >
           <span class="font-outfit text-primary-500 text-base font-bold lowercase">
             {{ month.label }}
