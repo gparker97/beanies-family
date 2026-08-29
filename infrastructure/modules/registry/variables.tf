@@ -45,3 +45,9 @@ variable "dev_origins" {
     "http://localhost:4173",
   ]
 }
+
+variable "log_retention_days" {
+  description = "CloudWatch Logs retention for this module's log group. Never unset — an unset retention means logs are kept forever."
+  type        = number
+  default     = 90
+}

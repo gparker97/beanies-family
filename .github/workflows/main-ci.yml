@@ -32,6 +32,8 @@ jobs:
 
       - name: Lint
         run: npm run lint
+      - name: Log-retention guard (no unbounded CloudWatch groups)
+        run: npm run check:log-retention
 
       - name: Check formatting
         run: npm run format:check

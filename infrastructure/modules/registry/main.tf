@@ -100,6 +100,25 @@ data "archive_file" "lambda" {
   output_path = "${path.module}/../../lambda/registry/lambda.zip"
 }
 
+# ── CloudWatch Log Group ─────────────────────────────────────────────────────
+#
+# Declared explicitly rather than letting Lambda auto-create it. An auto-created
+# Lambda log group has NO retention — it keeps every line forever — which is how
+# this group quietly accumulated 1.4 MB of logs before anyone looked. Declaring
+# it pins retention and makes the lifetime a reviewable part of the infra.
+# The Lambda `depends_on` it so AWS cannot win the race and create the
+# unbounded version first.
+
+resource "aws_cloudwatch_log_group" "registry" {
+  name              = "/aws/lambda/${var.app_name}-registry-${var.environment}"
+  retention_in_days = var.log_retention_days
+
+  tags = {
+    Name        = "${var.app_name}-registry-logs"
+    Environment = var.environment
+  }
+}
+
 resource "aws_lambda_function" "registry" {
   function_name    = "${var.app_name}-registry-${var.environment}"
   runtime          = "nodejs20.x"
@@ -124,6 +143,9 @@ resource "aws_lambda_function" "registry" {
     Name        = "${var.app_name}-registry"
     Environment = var.environment
   }
+  # Ensure the retention-pinned group exists before the Lambda can trigger
+  # AWS into auto-creating an unbounded one.
+  depends_on = [aws_cloudwatch_log_group.registry]
 }
 
 # ── API Gateway HTTP API v2 ──────────────────────────────────────────────────

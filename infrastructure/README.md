@@ -48,6 +48,8 @@ source ~/.beanies-tf.env
 cd infrastructure
 
 beanies_tf_check   # preflight: right account, right region, all five vars set
+npm run check:log-retention   # every Lambda module pins its log-group retention
+npm run check:log-retention -- --live   # ...and nothing in the account is unbounded
 
 # Initialize Terraform (downloads providers, connects to state backend)
 terraform init

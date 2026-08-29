@@ -44,3 +44,9 @@ variable "native_redirect_uris" {
     "https://beanies.family/oauth/native", # verified Android App Link
   ]
 }
+
+variable "log_retention_days" {
+  description = "CloudWatch Logs retention for this module's log group. Never unset — an unset retention means logs are kept forever."
+  type        = number
+  default     = 90
+}
