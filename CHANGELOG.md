@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- App version 0.14 for the Android open-testing and iOS TestFlight builds.
+
 - **The month calendar scrolls continuously on your phone.** Keep scrolling past the end of a month and the next one carries straight on, with its name marking where it starts; the month at the top follows as you go. Swiping forward now lands you on the 1st, swiping back on the last day.
 - **On a computer, scrolling at the edge of the month grid turns the month** — one month per scroll, with the arrows and swipe working exactly as before.
 
