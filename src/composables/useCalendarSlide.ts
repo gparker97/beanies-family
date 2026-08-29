@@ -1,5 +1,6 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue';
 import { useHorizontalSwipe } from './useHorizontalSwipe';
+import { useReducedMotion } from './useReducedMotion';
 
 /**
  * iOS-Calendar-style horizontal slide transition for paginated surfaces
@@ -59,6 +60,10 @@ export function useCalendarSlide(
   options: UseCalendarSlideOptions
 ): void {
   const threshold = options.threshold ?? 60;
+  // One reduced-motion implementation for the whole app (this composable used
+  // to carry its own matchMedia copy; the guard it needed moved into the shared
+  // composable when they were consolidated).
+  const { prefersReducedMotion } = useReducedMotion();
   const isAnimating = ref(false);
   // Synchronous flag — set inside onSwipeLeft/onSwipeRight (which fire BEFORE
   // useHorizontalSwipe's terminal onProgress(0) on a committed gesture), so
@@ -91,18 +96,9 @@ export function useCalendarSlide(
     return sign * (threshold + (abs - threshold) * PAST_THRESHOLD_RESISTANCE);
   }
 
-  function prefersReducedMotion(): boolean {
-    // matchMedia is unavailable in some test environments — treat absence
-    // as "no preference set" (animations on).
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return false;
-    }
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }
-
   function canAnimate(): boolean {
     const el = getElement();
-    return !!el && typeof el.animate === 'function' && !prefersReducedMotion();
+    return !!el && typeof el.animate === 'function' && !prefersReducedMotion.value;
   }
 
   // Tracks the live Animation so cleanup-on-dispose can cancel it.

@@ -5,7 +5,11 @@ import { useRouter } from 'vue-router';
 import CalendarCommandBar from '@/components/planner/CalendarCommandBar.vue';
 import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
 import { usePlannerNavigation, type PlannerView } from '@/composables/usePlannerNavigation';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
+import CalendarMonthStream, {
+  type AnchorTarget,
+} from '@/components/planner/CalendarMonthStream.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import DailyCalendarView from '@/components/planner/DailyCalendarView.vue';
 import CalendarConnectNudge from '@/components/planner/CalendarConnectNudge.vue';
@@ -63,6 +67,8 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+// Month view has two sibling surfaces; this picks which one mounts.
+const { isMobile } = useBreakpoint();
 const { categoryLabel } = useActivityCategoryLabel();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
@@ -445,7 +451,46 @@ function handleToday() {
   goToday();
   focusedDate.value = null;
   todayTick.value++;
+  bumpStreamAnchor('today');
 }
+/**
+ * ONE imperative channel into the mobile month stream. `todayTick` still serves
+ * the week/day views (they take it directly); the stream takes this instead, so
+ * a "Today" tap and a swipe landing can never race two separate signals.
+ */
+const streamAnchor = ref<{ tick: number; target: AnchorTarget }>({ tick: 0, target: 'today' });
+function bumpStreamAnchor(target: AnchorTarget) {
+  streamAnchor.value = { tick: streamAnchor.value.tick + 1, target };
+}
+
+/**
+ * Swipe landings on the mobile stream: moving forward lands on the 1st of the
+ * new month, moving back lands on its last day — you arrive where you were
+ * heading, not at the top of a month you just scrolled past.
+ *
+ * The anchor is bumped AFTER the reference date advances, which `useCalendarSlide`
+ * calls between its two animation phases — so the re-anchor scroll happens while
+ * the outgoing month is off-screen and the landing is never visible as a snap.
+ */
+function handleStreamNext() {
+  handleNext();
+  bumpStreamAnchor('month-start');
+}
+function handleStreamPrev() {
+  handlePrev();
+  bumpStreamAnchor('month-end');
+}
+
+/**
+ * The stream scrolled into a different month — follow it with the shared
+ * reference date so the command-bar label (and everything else keyed off the
+ * period) stays honest. The stream's re-anchor rule makes this loop-safe: it
+ * ignores a reference-date change that names the month already in view.
+ */
+function handleMonthInView(firstOfMonth: Date) {
+  referenceDate.value = firstOfMonth;
+}
+
 // A calendar nav tap (center button / Planning-stack Activities) jumps to today —
 // incl. the already-on-this-page case where router.push is a no-op.
 usePlannerTodayConsumer(handleToday);
@@ -727,12 +772,29 @@ function handleActivitySwapped(newId: string) {
       @vacation-click="handleVacationClick"
     />
 
-    <!-- Calendar views (conditional on activeView), controlled by referenceDate -->
-    <CalendarGrid
-      v-if="activeView === 'month'"
+    <!-- Calendar views (conditional on activeView), controlled by referenceDate.
+         Month view has two sibling surfaces: the continuous day-stack stream on
+         mobile, the 7-column grid at md+. Mounting them here (rather than
+         branching inside CalendarGrid) keeps the grid's interface untouched. -->
+    <CalendarMonthStream
+      v-if="activeView === 'month' && isMobile"
       :reference-date="referenceDate"
       :selected-date="focusedDate ?? undefined"
-      :today-tick="todayTick"
+      :anchor="streamAnchor"
+      @select-date="handleCalendarDateClick"
+      @prev="handleStreamPrev"
+      @next="handleStreamNext"
+      @month-in-view="handleMonthInView"
+      @vacation-click="handleVacationClick"
+      @view-segment="handleViewSegment"
+      @view-activity="(id: string, date: string) => openViewModal(id, date)"
+      @holiday-click="handleHolidayClick"
+    />
+
+    <CalendarGrid
+      v-else-if="activeView === 'month'"
+      :reference-date="referenceDate"
+      :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
       @prev="handlePrev"
       @next="handleNext"
