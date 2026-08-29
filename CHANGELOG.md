@@ -25,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - Diagnostic logging is leaner and log retention is capped at 90 days everywhere (no user-facing change).
+- Version 0.14 released to the web app and submitted to the App Store, carrying the PIN and Recovery Kit changes plus the continuous month calendar.
 
 ## 2026-08-28
 
