@@ -136,7 +136,12 @@ describe('useBeanTips — first run', () => {
     expect(persisted?.schemaVersion).toBe(2);
     expect(persisted?.lastTipShownDate).toBe('2026-05-29');
     expect(persisted?.dismissedTips).toEqual([]); // downgrade mirror
-  });
+    // 20s, not vitest's default 5s: the FIRST dynamic import of the module graph in a
+    // full-suite run pays a one-off transform/init cost under harness contention. This
+    // test (with reviewDemo + inviteToken's firsts) timed out in full-suite runs on
+    // 2026-08-2x and 2026-08-29 while passing in isolation — same pattern and same fix
+    // as TravelPlansPage.smoke.test.ts.
+  }, 20_000);
 });
 
 describe('useBeanTips — idempotency', () => {

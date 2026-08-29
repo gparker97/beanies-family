@@ -47,7 +47,9 @@ describe('reviewDemo — arming matrix', () => {
     const m = await loadWith({});
     expect(m.isReviewDemoAvailable()).toBe(false);
     expect(await m.validateReviewDemoCode('anything')).toBe(false);
-  });
+    // 20s: first dynamic import pays one-off init cost under full-suite contention —
+    // the recurring pass-in-isolation flake (see TravelPlansPage.smoke.test.ts).
+  }, 20_000);
 
   it('is closed when armed but no hash is configured', async () => {
     const m = await loadWith({ demo: 'true', expires: FUTURE });
