@@ -40,7 +40,10 @@ describe('inviteToken', () => {
     vi.stubEnv('VITE_INVITE_BEAN_HASHES', '');
     const { validateInviteToken } = await import('../inviteToken');
     expect(await validateInviteToken('anything')).toBe(true);
-  });
+    // 20s: this is the first test to import `../inviteToken` (the earlier ones
+    // import `@/config/features`), so it pays its own one-off module-init cost
+    // under full-suite contention. Same flake, same fix as the first test above.
+  }, 20_000);
 
   it('validateInviteToken rejects empty token', async () => {
     armGate('abc123');

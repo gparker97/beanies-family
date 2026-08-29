@@ -5,11 +5,18 @@
  *   1. Consume condition — a wheel is only hijacked when the target's edge is
  *      visible AND the scroller is at its limit, in both directions.
  *   2. Accumulation → threshold → exactly one commit per gesture.
- *   3. Cooldown swallows the trackpad momentum tail (no second commit).
- *   4. Reduced motion commits with no transform.
- *   5. An open overlay makes the composable inert.
- *   6. `enabled: false` never attaches a listener.
- *   7. Teardown removes the listener and clears the timers.
+ *   3. Delta normalization — line and page `deltaMode`s reach the threshold
+ *      (raw Firefox line deltas would never get there).
+ *   4. Cooldown swallows the trackpad momentum tail in the committing
+ *      direction only; reversing stays free.
+ *   5. Reduced motion commits with no transform.
+ *   6. Liveness — a torn-down or superseded commit never fires a navigation
+ *      intent, and a hidden tab (no rAF) cannot strand the slide.
+ *   7. `isPaging` tracks the whole slide + cooldown window.
+ *   8. ctrl+wheel (pinch zoom) is never consumed.
+ *   9. An open overlay makes the composable inert.
+ *  10. `enabled: false` never attaches a listener.
+ *  11. Teardown removes the listener and clears the timers.
  *
  * Honest limit: jsdom cannot verify the *feel* (rubber-band physics, momentum
  * delivery, real trackpad event cadence). That is what the plan's
@@ -60,6 +67,7 @@ interface Harness {
   /** Target rect, mutable per assertion. */
   rect: { top: number; bottom: number };
   scroller: ScrollerState;
+  isPaging: Ref<boolean>;
 }
 
 const AT_BOTTOM: ScrollerState = {
@@ -87,10 +95,15 @@ function makeHarness(
     ({ top: scroller.top, bottom: scroller.bottom }) as DOMRect;
   getAppScroller.mockImplementation(() => scrollerEl);
 
+  // Assigned during `setup()`, which runs synchronously inside `mount()` below.
+  let isPaging!: Ref<boolean>;
+
   const Comp = defineComponent({
     setup() {
       const target = ref<HTMLElement | null>(null) as Ref<HTMLElement | null>;
-      useWheelMonthPaging(target, { onNext, onPrev, ...opts });
+      // The composable's own ref, handed straight to the assertions — this is
+      // exactly what CalendarGrid feeds into `useCalendarSlide`'s `enabled`.
+      isPaging = useWheelMonthPaging(target, { onNext, onPrev, ...opts }).isPaging;
       return () => h('div', { ref: target });
     },
   });
@@ -98,15 +111,23 @@ function makeHarness(
   const wrapper = mount(Comp, { attachTo: document.body });
   const el = wrapper.element as HTMLElement;
   el.getBoundingClientRect = () => ({ top: rect.top, bottom: rect.bottom }) as DOMRect;
-  return { wrapper, el, onNext, onPrev, rect, scroller };
+  return { wrapper, el, onNext, onPrev, rect, scroller, isPaging };
 }
 
 /** Dispatches a cancelable wheel event and reports whether it was consumed. */
-function wheel(el: HTMLElement, deltaY: number): boolean {
+function wheel(
+  el: HTMLElement,
+  deltaY: number,
+  init: { deltaMode?: number; ctrlKey?: boolean } = {}
+): boolean {
   const event = new Event('wheel', { bubbles: true, cancelable: true }) as Event & {
     deltaY: number;
+    deltaMode: number;
+    ctrlKey: boolean;
   };
   event.deltaY = deltaY;
+  event.deltaMode = init.deltaMode ?? 0;
+  event.ctrlKey = init.ctrlKey ?? false;
   el.dispatchEvent(event);
   return event.defaultPrevented;
 }
@@ -261,6 +282,22 @@ describe('useWheelMonthPaging — cooldown', () => {
     h1.wrapper.unmount();
   });
 
+  it('leaves the OPPOSITE direction alone during the cooldown', () => {
+    // Scroller with nothing to scroll: both edges qualify, so the only thing
+    // that can gate the wheel-up is the cooldown itself.
+    const h1 = makeHarness({}, { scrollTop: 0, clientHeight: 600, scrollHeight: 600 });
+    wheel(h1.el, 200);
+    expect(h1.onNext).toHaveBeenCalledTimes(1);
+
+    // Same direction → swallowed (momentum tail).
+    expect(wheel(h1.el, 80)).toBe(true);
+    // Reversing → untouched, so the page can scroll up to the content above
+    // instead of feeling frozen for half a second.
+    expect(wheel(h1.el, -80)).toBe(false);
+    expect(h1.onPrev).not.toHaveBeenCalled();
+    h1.wrapper.unmount();
+  });
+
   it('clears the transform once the cooldown expires', () => {
     const h1 = makeHarness();
     wheel(h1.el, 200);
@@ -308,7 +345,54 @@ describe('useWheelMonthPaging — commit slide (WAAPI present)', () => {
   });
 });
 
-describe('useWheelMonthPaging — reduced motion', () => {
+describe('useWheelMonthPaging — deltaMode normalization', () => {
+  it('commits in DOM_DELTA_PIXEL mode (deltas are already pixels)', () => {
+    const h1 = makeHarness();
+    wheel(h1.el, 150, { deltaMode: 0 });
+    expect(h1.onNext).toHaveBeenCalledTimes(1);
+    h1.wrapper.unmount();
+  });
+
+  it('commits in DOM_DELTA_LINE mode — Firefox on Windows/Linux sends ~3 per notch', () => {
+    const h1 = makeHarness();
+    // Raw, this is 3 + 3 + 3 = 9 — nowhere near 140, and the idle reset would
+    // zero it between notches: the silent dead zone this normalization fixes.
+    wheel(h1.el, 3, { deltaMode: 1 }); // 48px
+    wheel(h1.el, 3, { deltaMode: 1 }); // 96px
+    expect(h1.onNext).not.toHaveBeenCalled();
+    wheel(h1.el, 3, { deltaMode: 1 }); // 144px ≥ 140
+    expect(h1.onNext).toHaveBeenCalledTimes(1);
+    h1.wrapper.unmount();
+  });
+
+  it('commits in DOM_DELTA_PAGE mode using the scroller height', () => {
+    const h1 = makeHarness();
+    wheel(h1.el, 1, { deltaMode: 2 }); // 1 page × clientHeight 600
+    expect(h1.onNext).toHaveBeenCalledTimes(1);
+    h1.wrapper.unmount();
+  });
+
+  it('stretches by the normalized delta, not the raw line count', () => {
+    const h1 = makeHarness();
+    wheel(h1.el, 1, { deltaMode: 1 }); // 16px → 16/8 = 2px of stretch
+    expect(h1.el.style.transform).toBe('translateY(-2px)');
+    h1.wrapper.unmount();
+  });
+});
+
+describe('useWheelMonthPaging — ctrl+wheel / pinch zoom', () => {
+  it('never consumes a ctrl+wheel event (browser zoom must survive)', () => {
+    const h1 = makeHarness();
+    expect(wheel(h1.el, 400, { ctrlKey: true })).toBe(false);
+    expect(h1.onNext).not.toHaveBeenCalled();
+    // …and it does not accumulate towards a later commit either.
+    expect(wheel(h1.el, 100)).toBe(true);
+    expect(h1.onNext).not.toHaveBeenCalled();
+    h1.wrapper.unmount();
+  });
+});
+
+describe('useWheelMonthPaging — commit slide (WAAPI present)', () => {
   it('commits without applying any transform', () => {
     prefersReducedMotion.value = true;
     const h1 = makeHarness();
@@ -390,6 +474,120 @@ describe('useWheelMonthPaging — teardown', () => {
     expect(vi.getTimerCount()).toBeGreaterThan(0);
     h1.wrapper.unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+/** An `animate` stub whose `finished` promise the test resolves by hand. */
+function stubDeferredAnimate(el: HTMLElement): { settle: () => void; count: () => number } {
+  const resolvers: Array<() => void> = [];
+  let settled = false;
+  let created = 0;
+  el.animate = ((): Animation => {
+    created++;
+    if (settled) return { finished: Promise.resolve(), cancel: () => {} } as unknown as Animation;
+    let resolve!: () => void;
+    const finished = new Promise<void>((r) => {
+      resolve = r;
+    });
+    resolvers.push(resolve);
+    return { finished, cancel: () => {} } as unknown as Animation;
+  }) as HTMLElement['animate'];
+  return {
+    settle: () => {
+      settled = true;
+      resolvers.forEach((r) => r());
+    },
+    count: () => created,
+  };
+}
+
+describe('useWheelMonthPaging — liveness', () => {
+  it('never fires the navigation callback after teardown mid-slide', async () => {
+    const h1 = makeHarness();
+    const anim = stubDeferredAnimate(h1.el);
+
+    wheel(h1.el, 200);
+    await Promise.resolve();
+    expect(anim.count()).toBe(1); // phase A in flight
+    expect(h1.onNext).not.toHaveBeenCalled();
+
+    // The user switches view while the slide is running.
+    h1.wrapper.unmount();
+    anim.settle();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // A disposed scope must not emit a navigation intent — this is the bug
+    // that landed the user in Week view one month ahead.
+    expect(h1.onNext).not.toHaveBeenCalled();
+  });
+
+  it('completes the slide when requestAnimationFrame never fires (hidden tab)', async () => {
+    const h1 = makeHarness();
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(() => 0);
+    h1.el.animate = (() =>
+      ({
+        finished: Promise.resolve(),
+        cancel: () => {},
+      }) as unknown as Animation) as HTMLElement['animate'];
+
+    wheel(h1.el, 200);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // The frame timeout unblocks the between-phase await, so the grid is not
+    // stranded at opacity 0 with every wheel swallowed.
+    expect(h1.onNext).toHaveBeenCalledTimes(1);
+    expect(h1.el.style.opacity).toBe('');
+    expect(h1.isPaging.value).toBe(false);
+    expect(wheel(h1.el, 200)).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h1.onNext).toHaveBeenCalledTimes(2);
+
+    rafSpy.mockRestore();
+    h1.wrapper.unmount();
+  });
+});
+
+describe('useWheelMonthPaging — isPaging', () => {
+  it('is false at rest, true from commit until the cooldown expires', () => {
+    const h1 = makeHarness();
+    expect(h1.isPaging.value).toBe(false);
+
+    wheel(h1.el, 60); // accumulating is not paging
+    expect(h1.isPaging.value).toBe(false);
+
+    wheel(h1.el, 100); // commit
+    expect(h1.isPaging.value).toBe(true);
+
+    vi.advanceTimersByTime(419);
+    expect(h1.isPaging.value).toBe(true);
+    vi.advanceTimersByTime(2);
+    expect(h1.isPaging.value).toBe(false);
+    h1.wrapper.unmount();
+  });
+
+  it('stays true for the whole slide even past the cooldown', async () => {
+    const h1 = makeHarness();
+    const anim = stubDeferredAnimate(h1.el);
+
+    wheel(h1.el, 200);
+    await Promise.resolve();
+    expect(h1.isPaging.value).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1000); // cooldown long gone
+    expect(h1.isPaging.value).toBe(true); // slide still in flight
+
+    anim.settle();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h1.isPaging.value).toBe(false);
+    h1.wrapper.unmount();
+  });
+
+  it('is false again after teardown', () => {
+    const h1 = makeHarness();
+    wheel(h1.el, 200);
+    expect(h1.isPaging.value).toBe(true);
+    h1.wrapper.unmount();
+    expect(h1.isPaging.value).toBe(false);
   });
 });
 

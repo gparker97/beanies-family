@@ -12,6 +12,7 @@ import MonthDayCard, { type MonthDayCellData } from '@/components/planner/MonthD
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useWheelMonthPaging } from '@/composables/useWheelMonthPaging';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { ALL_DAY_VISIBLE_CAP, TIMED_VISIBLE_CAP } from '@/constants/calendarCaps';
 import { useToday } from '@/composables/useToday';
 import type { HolidayOccurrence } from '@/types/models';
 
@@ -50,8 +51,6 @@ const currentMonth = computed(() => props.referenceDate.getMonth());
 // Visible caps for each cell row. Cells grow naturally with content but
 // `+N more` overflow keeps any one day from ballooning a whole row's
 // height beyond reason on busy days.
-const ALL_DAY_VISIBLE_CAP = 2;
-const TIMED_VISIBLE_CAP = 4;
 
 const allDayLabels = [
   () => t('planner.day.sun'),
@@ -140,10 +139,11 @@ function handleDayClick(date: string) {
 // Swipe emits the navigation intent; the page advances the shared reference
 // date (one-way data flow — the grid never mutates the date itself).
 const swipeRef = ref<HTMLElement | null>(null);
-useCalendarSlide(swipeRef, {
-  onNext: () => emit('next'),
-  onPrev: () => emit('prev'),
-});
+/** The grid body — the wheel pager's own element, deliberately NOT `swipeRef`.
+ *  Both composables animate `style.transform`; sharing one element let a wheel
+ *  slide and a mouse-drag swipe overwrite each other's transform (and left the
+ *  grid stuck at `opacity: 0` when a swipe's cleanup landed after a commit). */
+const gridBodyRef = ref<HTMLElement | null>(null);
 
 // ── Desktop wheel paging ───────────────────────────────────────────────────
 // Continuing to scroll at the grid's own edge turns the month (approved mockup
@@ -151,10 +151,20 @@ useCalendarSlide(swipeRef, {
 // `CalendarMonthStream` below `md` — so the composable is gated on the same
 // breakpoint singleton rather than a second matchMedia call.
 const { isMobile } = useBreakpoint();
-useWheelMonthPaging(swipeRef, {
+const { isPaging } = useWheelMonthPaging(gridBodyRef, {
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
   enabled: computed(() => !isMobile.value),
+});
+
+// Swipe emits the navigation intent; the page advances the shared reference
+// date (one-way data flow — the grid never mutates the date itself).
+// Disabled while the wheel pager owns a transition, so a mouse drag during the
+// slide cannot emit a SECOND `next` for what the user felt as one gesture.
+useCalendarSlide(swipeRef, {
+  onNext: () => emit('next'),
+  onPrev: () => emit('prev'),
+  enabled: computed(() => !isPaging.value),
 });
 </script>
 
@@ -177,7 +187,7 @@ useWheelMonthPaging(swipeRef, {
 
     <!-- Calendar body — the desktop 7-column grid. (Below `md` the page mounts
          `CalendarMonthStream` instead, which renders the continuous day-stack.) -->
-    <div class="grid grid-cols-7 gap-0">
+    <div ref="gridBodyRef" class="grid grid-cols-7 gap-0">
       <template v-for="cell in calendarDays" :key="cell.date">
         <!-- Day card. Outside-month cells render faded to keep the grid aligned. -->
         <MonthDayCard

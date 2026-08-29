@@ -116,6 +116,11 @@ export function useMonthStream(
   const monthInView = ref<MonthKey>(anchor);
   let lastReported = monthKeyId(anchor);
   let frame: number | null = null;
+  /** True while a window mutation is in flight — a second pass mid-flight would
+   *  measure a half-applied DOM and compensate against the wrong height. */
+  let busy = false;
+  /** Set at scope dispose so the deferred attach can never bind after teardown. */
+  let disposed = false;
   let scroller: HTMLElement | null = null;
   let detach: (() => void) | null = null;
 
@@ -145,10 +150,18 @@ export function useMonthStream(
   }
 
   /**
-   * Mutate the window above the viewport and keep the visual position fixed.
-   * Measures the scroll height on both sides of the DOM update and applies the
-   * delta to `scrollTop` — the difference between "seamless" and "the calendar
-   * jumped".
+   * Apply a window change that alters content ABOVE the viewport, holding the
+   * visual position fixed.
+   *
+   * Measured around ONE mutation at a time, deliberately. An earlier version
+   * combined "prune the top month" and "append a bottom month" into a single
+   * measured block, and compensated by the NET `scrollHeight` delta — which for
+   * two months of similar height is ~0, so the guard skipped the write entirely
+   * and the content leapt a whole month under the user's finger. Worse, the
+   * extend condition still held afterwards (and a programmatic `scrollTop`
+   * write fires another `scroll` event), so the stream ran away through months
+   * until the finger stopped. Above-viewport and below-viewport mutations are
+   * now applied separately, and only the former is compensated.
    */
   async function mutateAbove(mutate: () => void): Promise<void> {
     if (!scroller) {
@@ -163,56 +176,97 @@ export function useMonthStream(
     if (delta !== 0) scroller.scrollTop = prevTop + delta;
   }
 
-  function extendAndPrune(): void {
-    if (!scroller) return;
+  /** Mutations below the viewport need no compensation — nothing shifts. */
+  function mutateBelow(mutate: () => void): void {
+    mutate();
+  }
+
+  /**
+   * Grow (and bound) the window as the user approaches either end of the
+   * STREAM — measured against the stream element's own edges, not the
+   * scroller's extent.
+   *
+   * The distinction matters: the planner renders the Google-Calendar connect
+   * nudge and the inactive-activities list BELOW the stream inside the same
+   * scroller. Measuring the scroller's `scrollHeight` meant that content ate
+   * the entire look-ahead budget, so October only appeared once the user had
+   * scrolled past September's last day and into unrelated content — the
+   * "stops dead at the month edge" behaviour this feature exists to remove,
+   * reproducing only for users who HAVE content below the calendar.
+   */
+  async function extendAndPrune(): Promise<void> {
+    const root = options.root.value;
+    if (!scroller || !root || busy) return;
     const started = performance.now();
-    const { scrollTop, scrollHeight, clientHeight } = scroller;
+    const rootRect = root.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const distanceToEnd = rootRect.bottom - scrollerRect.bottom;
+    const distanceToStart = scrollerRect.top - rootRect.top;
 
-    // Append ahead, pruning the far (top) end — a top prune removes height
-    // ABOVE the viewport, so it compensates exactly like a prepend.
-    if (scrollTop + clientHeight > scrollHeight - EXTEND_AHEAD_PX) {
+    if (distanceToEnd < EXTEND_AHEAD_PX) {
       const last = months.value[months.value.length - 1];
-      if (last) {
+      if (!last) return;
+      busy = true;
+      try {
         const next = stepMonthKey(last, 1);
-        if (months.value.length >= MAX_WINDOW_MONTHS) {
-          void mutateAbove(() => {
-            months.value = [...months.value.slice(1), next];
-          });
-        } else {
+        // Append below the viewport first (no shift), THEN prune the top as its
+        // own compensated step.
+        mutateBelow(() => {
           months.value = [...months.value, next];
-        }
-        logEvent({
-          surface: 'calendar-nav',
-          level: 'debug',
-          message: 'month stream extended',
-          context: { action: 'stream-extend', detail: 'append' },
         });
-        recordPerf('calendar.streamExtend', performance.now() - started);
-        return;
+        if (months.value.length > MAX_WINDOW_MONTHS) {
+          await nextTick();
+          await mutateAbove(() => {
+            months.value = months.value.slice(1);
+          });
+        }
+        emitExtended('append', started);
+      } finally {
+        busy = false;
       }
+      return;
     }
 
-    // Prepend behind, pruning the far (bottom) end — a bottom prune is below
-    // the viewport and needs no compensation, but the prepend itself does.
-    if (scrollTop < EXTEND_BEHIND_PX) {
+    if (distanceToStart < EXTEND_BEHIND_PX) {
       const first = months.value[0];
-      if (first) {
+      if (!first) return;
+      busy = true;
+      try {
         const prev = stepMonthKey(first, -1);
-        void mutateAbove(() => {
-          months.value =
-            months.value.length >= MAX_WINDOW_MONTHS
-              ? [prev, ...months.value.slice(0, -1)]
-              : [prev, ...months.value];
+        // Prepend above the viewport (compensated), then drop the far bottom
+        // month, which is below the fold and shifts nothing.
+        await mutateAbove(() => {
+          months.value = [prev, ...months.value];
         });
-        logEvent({
-          surface: 'calendar-nav',
-          level: 'debug',
-          message: 'month stream extended',
-          context: { action: 'stream-extend', detail: 'prepend' },
-        });
-        recordPerf('calendar.streamExtend', performance.now() - started);
+        if (months.value.length > MAX_WINDOW_MONTHS) {
+          mutateBelow(() => {
+            months.value = months.value.slice(0, -1);
+          });
+        }
+        emitExtended('prepend', started);
+      } finally {
+        busy = false;
       }
     }
+  }
+
+  /**
+   * Report the extension AFTER the DOM work has settled — timing only the
+   * synchronous slice measured ~0ms, which the 250ms telemetry floor then
+   * dropped entirely, leaving the feature's main performance risk with no data
+   * at all. The `debug` event is the floor-exempt counter that makes the RATE
+   * measurable; the timing is for the pathological case.
+   */
+  function emitExtended(detail: 'append' | 'prepend', started: number): void {
+    void nextTick().then(() => {
+      logEvent({
+        surface: 'calendar-nav',
+        level: 'debug',
+        message: 'month stream extended',
+        context: { action: 'stream-extend', detail },
+      });
+      recordPerf('calendar.streamExtend', performance.now() - started);
+    });
   }
 
   function probeMonthInView(): void {
@@ -235,7 +289,7 @@ export function useMonthStream(
       frame = null;
       try {
         probeMonthInView();
-        extendAndPrune();
+        void extendAndPrune();
       } catch (err) {
         // Never let a measurement failure wedge scrolling — report and carry on.
         reportError({
@@ -250,17 +304,43 @@ export function useMonthStream(
     });
   }
 
+  /**
+   * Bind to the app scroller.
+   *
+   * Two failure modes this guards, both previously silent:
+   *  - **Late attach after dispose.** The bind is deferred a tick, and this
+   *    component is `v-if`'d on view + breakpoint, so a mount-then-unmount
+   *    inside one flush (a deep link resolving to week view, a fast view tap, a
+   *    resize flutter across 767px) used to leave `detach` null at dispose and
+   *    then bind a PERMANENT listener to `<main>` — which, on any short page,
+   *    appended a month on every scroll frame app-wide, forever.
+   *  - **Unresolvable scroller.** Bailing quietly degraded the stream to a
+   *    static three-month list: the label froze and scrolling stopped dead,
+   *    with nothing in CloudWatch to say why.
+   */
   function attach(): void {
+    if (disposed || detach) return;
     scroller = getAppScroller(options.root.value);
-    if (!scroller) return;
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    detach = () => scroller?.removeEventListener('scroll', onScroll);
+    if (!scroller) {
+      reportError({
+        surface: 'calendar-nav',
+        message:
+          '[monthStream] could not resolve the app scroll container (<main>) — the month stream will not extend or track the month in view. Check the App.vue layout still renders <main> as the scroller.',
+        severity: 'warning',
+        context: { action: 'stream-attach-failed' },
+      });
+      return;
+    }
+    const el = scroller;
+    el.addEventListener('scroll', onScroll, { passive: true });
+    detach = () => el.removeEventListener('scroll', onScroll);
   }
 
   // The scroller OUTLIVES this component (route change, view switch, breakpoint
   // flip), so a leaked listener would keep emitting month-in-view from a dead
   // component. Teardown removes it and cancels any queued frame.
   onScopeDispose(() => {
+    disposed = true;
     detach?.();
     detach = null;
     if (frame !== null) cancelAnimationFrame(frame);
@@ -275,7 +355,7 @@ export function useMonthStream(
     monthInView,
     resetWindow,
     syncNow: () => {
-      if (!scroller) attach();
+      attach(); // idempotent; also the recovery path if the first bind missed
       onScroll();
     },
   };

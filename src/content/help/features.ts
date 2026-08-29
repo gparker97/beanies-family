@@ -1252,7 +1252,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 4,
-    updatedDate: '2026-07-12',
+    updatedDate: '2026-08-29',
     sections: [
       {
         type: 'heading',
@@ -1374,7 +1374,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Month</strong> \u2014 A full-month grid. Each day shows colour-coded chips so you can see who\u2019s got what on at a glance. Tap a day to open it in Day view. On phones the month becomes a tidy day-by-day agenda, and quiet days fold down to a thin line so the busy ones stand out.',
+          '<strong>Month</strong> \u2014 A full-month grid. Each day shows colour-coded chips so you can see who\u2019s got what on at a glance. Tap a day to open it in Day view. On phones the month becomes a tidy day-by-day agenda, and quiet days fold down to a thin line so the busy ones stand out. Keep scrolling past the end of a month and the next one carries straight on, with its name marking where it starts \u2014 the month shown at the top follows along as you go. Swiping still works too: swipe forward and you land on the 1st, swipe back and you land on the last day. On a computer, keep scrolling at the edge of the calendar and it turns to the next month, one month per scroll.',
           '<strong>Week</strong> \u2014 A timeline of the week. On phones a two-week strip across the top lets you hop between days at a glance; it tucks down to a single week as you scroll into the timeline so your events get more room.',
           '<strong>Day</strong> \u2014 A single day in detail, with a column for each family member so you can see who\u2019s doing what. The <strong>Agenda</strong> button opens a tidy, time-sorted list for that day.',
         ],

@@ -433,26 +433,6 @@ function handleSelectDay(date: string) {
   referenceDate.value = parseLocalDate(date);
 }
 
-// Period navigation (command bar + view swipe). Clearing focusedDate drops the
-// drilled-in day highlight when the user explicitly pages the period.
-function handlePrev() {
-  goPrev();
-  focusedDate.value = null;
-}
-function handleNext() {
-  goNext();
-  focusedDate.value = null;
-}
-// Bumped on every "Today" tap so the views always re-scroll to today — even
-// when the reference date doesn't change (already on the current month/day),
-// where a plain `watch(referenceDate)` would never fire.
-const todayTick = ref(0);
-function handleToday() {
-  goToday();
-  focusedDate.value = null;
-  todayTick.value++;
-  bumpStreamAnchor('today');
-}
 /**
  * ONE imperative channel into the mobile month stream. `todayTick` still serves
  * the week/day views (they take it directly); the stream takes this instead, so
@@ -464,31 +444,43 @@ function bumpStreamAnchor(target: AnchorTarget) {
 }
 
 /**
- * Swipe landings on the mobile stream: moving forward lands on the 1st of the
- * new month, moving back lands on its last day — you arrive where you were
- * heading, not at the top of a month you just scrolled past.
- *
- * The anchor is bumped AFTER the reference date advances, which `useCalendarSlide`
- * calls between its two animation phases — so the re-anchor scroll happens while
- * the outgoing month is off-screen and the landing is never visible as a snap.
- */
-function handleStreamNext() {
-  handleNext();
-  bumpStreamAnchor('month-start');
-}
-function handleStreamPrev() {
-  handlePrev();
-  bumpStreamAnchor('month-end');
-}
-
-/**
  * The stream scrolled into a different month — follow it with the shared
  * reference date so the command-bar label (and everything else keyed off the
  * period) stays honest. The stream's re-anchor rule makes this loop-safe: it
  * ignores a reference-date change that names the month already in view.
  */
+// Period navigation (command bar + view swipe). Clearing focusedDate drops the
+// drilled-in day highlight when the user explicitly pages the period.
+function handlePrev() {
+  goPrev();
+  focusedDate.value = null;
+  bumpStreamAnchor('month-end');
+}
+function handleNext() {
+  goNext();
+  focusedDate.value = null;
+  bumpStreamAnchor('month-start');
+}
+// Bumped on every "Today" tap so the views always re-scroll to today — even
+// when the reference date doesn't change (already on the current month/day),
+// where a plain `watch(referenceDate)` would never fire.
+const todayTick = ref(0);
+function handleToday() {
+  goToday();
+  focusedDate.value = null;
+  todayTick.value++;
+  bumpStreamAnchor('today');
+}
 function handleMonthInView(firstOfMonth: Date) {
-  referenceDate.value = firstOfMonth;
+  // Keep the day-of-month. `referenceDate` is SHARED with the week and day
+  // views, so writing the 1st here meant scrolling the mobile month stream and
+  // then tapping "Day" opened the 1st instead of the day you were looking at —
+  // a regression the old day-stack never had, because scrolling it never
+  // touched the shared date at all.
+  const y = firstOfMonth.getFullYear();
+  const m = firstOfMonth.getMonth();
+  const daysInTarget = new Date(y, m + 1, 0).getDate();
+  referenceDate.value = new Date(y, m, Math.min(referenceDate.value.getDate(), daysInTarget));
 }
 
 // A calendar nav tap (center button / Planning-stack Activities) jumps to today —
@@ -782,8 +774,8 @@ function handleActivitySwapped(newId: string) {
       :selected-date="focusedDate ?? undefined"
       :anchor="streamAnchor"
       @select-date="handleCalendarDateClick"
-      @prev="handleStreamPrev"
-      @next="handleStreamNext"
+      @prev="handlePrev"
+      @next="handleNext"
       @month-in-view="handleMonthInView"
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
