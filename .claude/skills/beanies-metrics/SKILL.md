@@ -35,6 +35,14 @@ schemas, identifiers, and caveats before interpreting anything.
    activity signal. Truer "last active" per family, app opens, which subsystems
    get exercised. Diagnostic stream, not clean product analytics. **Available via
    the `aws` CLI.**
+   - 💰 **Read it through `cw_cache.mjs`, never with ad-hoc Insights queries in a
+     loop.** Logs Insights bills `DataScannedBytes` against a **5 GB/month** free
+     tier, and one 30-day query over this group scans **~106 MB** — the old
+     six-query collector cost ~764 MB per run, which is what pushed the account
+     to 86% of the allowance in August 2026. The collector caches complete days
+     locally and re-queries only today, so running metrics daily is now cheap
+     (~2 MB/run). If you need a one-off investigation query, scope it to the
+     narrowest window that answers the question.
 3. **Plausible** (sites `beanies.family` + `app.beanies.family`) — traffic and
    clean product usage. Sources, channels (with a **channel x source drill-down**,
    so "Organic Social" resolves to Reddit / Pinterest), referrers, UTM, top pages,
@@ -63,14 +71,14 @@ OUT="$SCRATCH"   # your session scratchpad dir
 #    familyId join key) needed for the terminal report and the CloudWatch join.
 node $SKILL/pull_registry.mjs --raw > "$OUT/registry.json"
 
-# 2. CloudWatch activity (each ~a few seconds). last-seen at 90d (full retention)
-#    is what build_dashboard joins for true recency; the rest are 30d.
-bash $SKILL/query_cloudwatch.sh activity 30    > "$OUT/cw_activity.json"
-bash $SKILL/query_cloudwatch.sh activity 7     > "$OUT/cw_activity7.json"
-bash $SKILL/query_cloudwatch.sh by-surface 30  > "$OUT/cw_surface.json"
-bash $SKILL/query_cloudwatch.sh last-seen 90   > "$OUT/cw_lastseen.json"
-bash $SKILL/query_cloudwatch.sh opens 30       > "$OUT/cw_opens.json"
-bash $SKILL/query_cloudwatch.sh daily 30       > "$OUT/cw_daily.json"   # DAU series
+# 2. CloudWatch activity — ONE incremental collector that writes all six files.
+#    It caches a (day, family, surface) -> count atom in
+#    ~/.config/beanies/metrics-cache.json and queries only the days it is
+#    missing, so a routine run scans ~2 MB instead of the ~764 MB the six
+#    separate queries used to (Insights bills DataScannedBytes against a 5 GB
+#    monthly free tier — see the cost note below). First run backfills 90 days
+#    (~150 MB, once); add --rebuild to force a full refetch.
+node $SKILL/cw_cache.mjs "$OUT" --days 30
 
 # 3. Plausible traffic + usage (exits 3 if no token — the pipeline degrades
 #    gracefully: the dashboard hides the traffic panels with a note). Optional

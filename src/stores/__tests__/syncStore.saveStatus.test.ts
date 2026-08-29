@@ -233,16 +233,54 @@ describe('syncStore — saveStatus projection', () => {
 
     logEventMock.mockClear();
 
-    // saved → saving is a single transition.
-    stateChangeCallbackHolder.cb!({ ...CONFIGURED, isSyncing: true });
+    // Driven through a NON-routine transition on purpose. The routine
+    // saving/saved pair is sampled 1-in-N (it was ~27% of the whole firehose
+    // and carried no diagnostic information), while transitions into trouble
+    // are always emitted — so this still proves the single-owner property the
+    // test exists for, on an event that is never sampled away.
+    saveAttemptCallbackHolder.cb!(2);
     await nextTick();
+    expect(store.saveStatus).toBe('degraded');
 
     const saveStatusCalls = logEventMock.mock.calls.filter(
       (c) => (c[0] as { surface?: string })?.surface === 'save-status'
     );
     expect(saveStatusCalls).toHaveLength(1);
-    expect(
-      (saveStatusCalls[0]![0] as { context: { save_status: string } }).context.save_status
-    ).toBe('saving');
+    const ctx = (saveStatusCalls[0]![0] as { context: { save_status: string; detail: string } })
+      .context;
+    expect(ctx.save_status).toBe('degraded');
+    // Marked `full` so a reader knows this count is not scaled.
+    expect(ctx.detail).toBe('full');
+  });
+
+  it('samples the routine saving/saved pair instead of emitting every one', async () => {
+    useSyncStore();
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED });
+    saveCompleteCallbackHolder.cb!('2026-08-06T00:00:00.000Z');
+    await nextTick();
+    logEventMock.mockClear();
+
+    // Twenty healthy save cycles. Every one of these used to be two events.
+    for (let i = 0; i < 20; i++) {
+      stateChangeCallbackHolder.cb!({ ...CONFIGURED, isSyncing: true });
+      await nextTick();
+      stateChangeCallbackHolder.cb!({ ...CONFIGURED, isSyncing: false });
+      saveCompleteCallbackHolder.cb!(`2026-08-06T00:00:${String(i).padStart(2, '0')}.000Z`);
+      await nextTick();
+    }
+
+    const calls = logEventMock.mock.calls.filter(
+      (c) => (c[0] as { surface?: string })?.surface === 'save-status'
+    );
+    // 40 transitions collapse to a couple of samples...
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.length).toBeLessThan(6);
+    // ...each tagged so the true rate stays recoverable rather than being read
+    // as the raw count.
+    for (const c of calls) {
+      expect((c[0] as { context: { detail: string } }).context.detail).toMatch(
+        /^sampled-1-in-\d+$/
+      );
+    }
   });
 });

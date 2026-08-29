@@ -62,6 +62,7 @@ import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { createSampler } from '@/services/telemetry/emitPolicy';
 import { isDemoSession } from '@/utils/reviewDemo';
 import {
   bump as bumpOpenCycle,
@@ -498,13 +499,33 @@ export const useSyncStore = defineStore('sync', () => {
   // drawer) — so each transition is logged exactly once. Emits on the success
   // path too so degraded/recovery rates are measurable. `provider_type` and
   // `save_failure_level` are auto-injected by diagnosticContext.
+  // A healthy save is two transitions (saving -> saved) and families save
+  // constantly, so the routine pair was ~27% of the entire telemetry firehose
+  // while carrying no diagnostic information — the interesting transitions are
+  // the ones INTO and OUT OF trouble. Those are always emitted; the routine pair
+  // is sampled, and since the sampler is deterministic 1-in-N the true rate is
+  // still recoverable (multiply by N).
+  const ROUTINE_SAVE_SAMPLE = 20;
+  const sampleRoutineSave = createSampler(ROUTINE_SAVE_SAMPLE);
   watch(saveStatus, (next, prev) => {
     if (next === prev) return;
+    const routine =
+      (next === 'saving' || next === 'saved') &&
+      consecutiveSaveFailures.value === 0 &&
+      prev !== 'degraded' &&
+      prev !== 'critical';
+    if (routine && !sampleRoutineSave()) return;
     logEvent({
       level: 'info',
       surface: 'save-status',
       message: 'save status transition',
-      context: { save_status: next, consecutive_failures: consecutiveSaveFailures.value },
+      context: {
+        save_status: next,
+        consecutive_failures: consecutiveSaveFailures.value,
+        // Marks a sampled routine event so a rate can be scaled correctly
+        // rather than read as the raw count.
+        detail: routine ? `sampled-1-in-${ROUTINE_SAVE_SAMPLE}` : 'full',
+      },
     });
   });
 
