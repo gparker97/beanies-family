@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * early-adopter-metrics: consolidate collected JSON into the dashboard.
+ * beanies-metrics: consolidate collected JSON into the dashboard.
  *
  * Reads the raw source dumps from a directory (produced by pull_registry.mjs,
  * query_cloudwatch.sh, query_plausible.mjs), does the registry<->CloudWatch

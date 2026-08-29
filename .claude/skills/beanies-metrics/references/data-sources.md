@@ -1,4 +1,4 @@
-# Data sources — early-adopter-metrics
+# Data sources — beanies-metrics
 
 Deep reference for the three data sources this skill reads. SKILL.md points here
 when you need exact identifiers, schemas, or caveats. Everything here is

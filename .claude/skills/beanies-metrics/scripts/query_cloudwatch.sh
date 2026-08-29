@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# early-adopter-metrics: CloudWatch Logs Insights helpers (READ-ONLY).
+# beanies-metrics: CloudWatch Logs Insights helpers (READ-ONLY).
 #
 # The telemetry firehose (/aws/lambda/beanies-family-telemetry-prod) is a
 # DIAGNOSTIC stream, not product analytics — but nearly every event carries a

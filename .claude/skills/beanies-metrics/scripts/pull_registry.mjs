@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * early-adopter-metrics: registry pull + engagement computation.
+ * beanies-metrics: registry pull + engagement computation.
  *
  * READ-ONLY. Scans the prod family registry (DynamoDB) and emits a single
  * JSON blob of founder metrics on stdout: family counts, growth over time,

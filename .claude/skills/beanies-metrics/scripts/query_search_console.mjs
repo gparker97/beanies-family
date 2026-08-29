@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * early-adopter-metrics: Google Search Console Search Analytics (READ-ONLY).
+ * beanies-metrics: Google Search Console Search Analytics (READ-ONLY).
  *
  * WHY THIS EXISTS: Plausible cannot report Google search terms, and no analytics
  * tool can — Google strips the query from the referrer, so every organic Google

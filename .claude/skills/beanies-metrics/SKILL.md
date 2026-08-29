@@ -1,5 +1,5 @@
 ---
-name: early-adopter-metrics
+name: beanies-metrics
 description: >-
   Produce a founder-facing growth, usage, and engagement report for
   beanies.family — total families, engaged vs churned early adopters, who to
@@ -18,7 +18,7 @@ description: >-
   most popular page", "engagement report", "usage stats", "growth numbers".
 ---
 
-# early-adopter-metrics
+# beanies-metrics
 
 A founder's-eye read on how beanies.family is growing and being used. It answers
 "who's actually using this, who's the heaviest, who did we lose, where do new
@@ -56,7 +56,7 @@ Run the collectors (they're all read-only), save each JSON to the session
 scratchpad, then synthesize. Default window is 30 days unless greg asks otherwise.
 
 ```bash
-SKILL=.claude/skills/early-adopter-metrics/scripts
+SKILL=.claude/skills/beanies-metrics/scripts
 OUT="$SCRATCH"   # your session scratchpad dir
 
 # 1. Registry — the core. --raw includes the full per-family list (real emails +

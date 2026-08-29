@@ -1,6 +1,6 @@
 ---
 name: start-session
-description: Fresh-session ritual — sync the repo, surface project status, fetch top news + a famtech (family-technology) competitor-news sweep + today's calendar, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings.
+description: Fresh-session ritual — sync the repo, surface project status, fetch top news + a famtech (family-technology) competitor-news sweep + today's calendar, kick off the daily beanies-metrics refresh in the background, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings.
 ---
 
 # start-session — Session Start Ritual
@@ -95,9 +95,9 @@ For each candidate item from STATUS.md, ask: would this leave a fingerprint in t
 
 Run the checks in parallel (one bash call per item, batched in a single message) — most checks are fast greps. Don't ask greg before each verification — only ask after, if the verdict is genuinely ambiguous.
 
-### Step 4: Fetch news — general headlines + famtech watch
+### Step 4: Fetch news — general headlines + famtech watch — and kick off the daily metrics refresh
 
-Two independent sweeps here. They don't depend on each other, so kick them off together.
+Three independent pieces here. They don't depend on each other, so kick them off together — 4b and 4c both go to background subagents in the same message.
 
 #### 4a) General headlines
 
@@ -122,6 +122,16 @@ Search several angles, not one query — comprehensiveness is the point:
 **Freshness:** favor the last ~30 days, lead with anything from the last 7. Famtech news is lower-frequency than world news, so a wider window is correct — a competitor shutdown or raise from three weeks ago is still worth surfacing if it hasn't come up before. Dedupe within the sweep; don't list the same story twice, and don't re-run identical searches across angles.
 
 **Relevance bar:** only surface things that would actually make greg lean in — a Maple-class shutdown/migration opening, a funding round, an acquisition, a competitive-picture-changing feature, or a notable hire/departure. Skip routine app updates, "best family apps 2026" listicles, SEO spam, and anything about beanies.family itself (greg already knows his own news). If nothing clears the bar, **skip the section silently** — an empty famtech watch is honest and far better than padding.
+
+#### 4c) Daily metrics refresh — background, never blocks
+
+Every session start also refreshes the beanies growth/usage metrics so they're up to date at least once a day — but the whole point of running it HERE is that greg never waits on it. The collectors (DynamoDB registry, CloudWatch, Plausible) take minutes; the session-start report must not.
+
+**Launch a general-purpose subagent in the background** (same message as the famtech sweep) with a prompt like: "Run the beanies-metrics skill end to end (`.claude/skills/beanies-metrics/SKILL.md`): run all the read-only collectors, build the dashboard, and return a 3-5 line summary of the headline numbers (total families, new this week, engaged/churned movement, top traffic source) plus anything that moved sharply since the last run."
+
+- **Do NOT wait for it.** Compose and deliver the Step 6 report without the metrics; note in one line that the refresh is running.
+- **When its notification arrives later**, relay a SHORT update — the 3-5 headline lines, not the full report (greg's standing concision preference). If nothing moved meaningfully, one line ("metrics refreshed — no significant movement") is the right amount.
+- If the subagent fails (expired AWS creds, Plausible token), report the one-line reason and move on — the session is not blocked, and greg can run `/beanies-metrics` directly after fixing it.
 
 ### Step 5: Fetch today's calendar
 
@@ -216,7 +226,7 @@ Deliver as a single scannable message. Use bold section labels so Greg can jump 
 [etc — max 7 items]
 ```
 
-Order matters: greeting → state → news → famtech watch → calendar → pending work. State and pending work are repo-driven and always present. News, famtech watch, and calendar are best-effort — skip silently if unavailable or nothing clears the bar.
+Order matters: greeting → state → news → famtech watch → calendar → pending work. State and pending work are repo-driven and always present. News, famtech watch, and calendar are best-effort — skip silently if unavailable or nothing clears the bar. End with one line noting the background metrics refresh is running (its short summary lands later — never hold the report for it).
 
 ---
 

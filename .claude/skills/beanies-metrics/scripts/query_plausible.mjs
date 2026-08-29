@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * early-adopter-metrics: Plausible Stats API v2 helper (READ-ONLY).
+ * beanies-metrics: Plausible Stats API v2 helper (READ-ONLY).
  *
  * Plausible is the product-analytics source of truth for traffic, referral
  * sources/channels, top pages, funnels, and clean feature/goal usage — the
