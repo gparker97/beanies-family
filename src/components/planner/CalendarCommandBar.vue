@@ -117,19 +117,24 @@ onBeforeUnmount(() => {
              opens the shared MobileHamburgerMenu lives here (AppHeader is hidden). -->
         <HamburgerButton v-if="headerReclaimed" :alert="saveNeedsAttention" @click="toggleMenu" />
 
-        <!-- The label crossfades when it changes, because on the mobile month
-             stream it changes as you SCROLL past a month boundary — an instant
-             swap there reads as a glitch rather than as the calendar keeping up.
-             `mode="out-in"` so the two labels never overlap mid-fade; the
-             transition is a no-op under prefers-reduced-motion (see the CSS). -->
-        <Transition name="cal-label" mode="out-in">
-          <h1
-            :key="label"
-            class="font-outfit text-secondary-500 min-w-0 flex-1 truncate text-xl font-extrabold sm:flex-none sm:text-2xl dark:text-gray-100"
-          >
-            {{ label }}
-          </h1>
-        </Transition>
+        <!-- The label crossfades because on the mobile month stream it changes
+             as you SCROLL past a boundary — an instant swap there reads as a
+             glitch. The wrapper is load-bearing: `mode="out-in"` removes the
+             <h1> from the DOM between phases, and the <h1> WAS the row's only
+             flexible child, so without a stable wrapper the whole sticky header
+             collapsed on every boundary and the nav cluster slid left and
+             snapped back. The wrapper keeps the flex slot; only its contents
+             fade. -->
+        <div class="min-w-0 flex-1 sm:flex-none">
+          <Transition name="cal-label" mode="out-in">
+            <h1
+              :key="label"
+              class="font-outfit text-secondary-500 truncate text-xl font-extrabold sm:text-2xl dark:text-gray-100"
+            >
+              {{ label }}
+            </h1>
+          </Transition>
+        </div>
 
         <!-- Nav cluster (absorbed from CalendarNavBar) -->
         <div class="flex flex-shrink-0 items-center gap-0.5">

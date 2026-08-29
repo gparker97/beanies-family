@@ -46,9 +46,101 @@ export interface MonthCellsInput {
   /** Prefetched over a span that CONTAINS this month's grid range (see `monthSpan`). */
   occurrences: ActivityOccurrenceInput[];
   segments: TravelSegmentOccurrence[];
-  /** All vacations — filtered to the month here (the store holds few). */
+  /** All vacations — filtered to the span (the store holds few). */
   vacations: FamilyVacation[];
   holidays: HolidayOccurrence[];
+}
+
+/**
+ * Date-keyed lookups built ONCE for a whole window of months.
+ *
+ * The stream renders up to five months; partitioning the window's occurrences
+ * inside each month's build made that work O(months x span) — five passes over
+ * every occurrence, five maps each holding all of them, and a fresh day-by-day
+ * expansion of every vacation per month. All of it inside the scroll rAF, where
+ * `docs/PERFORMANCE.md` budgets a computed at <16ms. Prepare once, build many.
+ */
+export interface PreparedCellData {
+  timed: Map<string, CellTimedOccurrence[]>;
+  allDay: Array<{ activity: FamilyActivity; date: string }>;
+  segments: Map<string, TravelSegmentOccurrence[]>;
+  vacations: Map<string, CellVacation[]>;
+  vacationDates: Set<string>;
+  holidays: Map<string, HolidayOccurrence[]>;
+  holidayDates: Set<string>;
+}
+
+export interface PrepareCellDataInput {
+  occurrences: ActivityOccurrenceInput[];
+  segments: TravelSegmentOccurrence[];
+  vacations: FamilyVacation[];
+  holidays: HolidayOccurrence[];
+  /** Inclusive window bounds — vacations are clipped to this, so a trip with a
+   *  mistyped multi-decade end date cannot expand into a six-figure loop. */
+  spanStart: string;
+  spanEnd: string;
+}
+
+export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
+  const timed = new Map<string, CellTimedOccurrence[]>();
+  const allDay: Array<{ activity: FamilyActivity; date: string }> = [];
+  for (const occ of input.occurrences) {
+    // Vacation-linked activities render as the trailing vacation bar.
+    if (occ.activity.vacationId) continue;
+    if (occ.activity.isAllDay) {
+      allDay.push({ activity: occ.activity, date: occ.date });
+      continue;
+    }
+    if (!timed.has(occ.date)) timed.set(occ.date, []);
+    timed.get(occ.date)!.push({ activity: occ.activity, date: occ.date });
+  }
+  for (const list of timed.values()) {
+    list.sort((a, b) =>
+      (a.activity.startTime ?? '99:99').localeCompare(b.activity.startTime ?? '99:99')
+    );
+  }
+
+  const segments = new Map<string, TravelSegmentOccurrence[]>();
+  for (const occ of input.segments) {
+    if (!segments.has(occ.date)) segments.set(occ.date, []);
+    segments.get(occ.date)!.push(occ);
+  }
+
+  const vacations = new Map<string, CellVacation[]>();
+  const vacationDates = new Set<string>();
+  for (const v of input.vacations) {
+    if (!v.startDate || !v.endDate) continue;
+    const vStart = extractDatePart(v.startDate);
+    const vEnd = extractDatePart(v.endDate);
+    if (vEnd < input.spanStart || vStart > input.spanEnd) continue; // outside the window
+    const from = vStart < input.spanStart ? input.spanStart : vStart;
+    const to = vEnd > input.spanEnd ? input.spanEnd : vEnd;
+    const emoji = tripTypeEmoji(v.tripType, v.tripPurpose);
+    const startD = new Date(from + 'T00:00:00');
+    const endD = new Date(to + 'T00:00:00');
+    for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+      const dateStr = toDateInputValue(d);
+      if (!vacations.has(dateStr)) vacations.set(dateStr, []);
+      vacations.get(dateStr)!.push({
+        id: v.id,
+        name: v.name,
+        emoji,
+        isStart: dateStr === vStart,
+        isEnd: dateStr === vEnd,
+      });
+      vacationDates.add(dateStr);
+    }
+  }
+
+  const holidays = new Map<string, HolidayOccurrence[]>();
+  const holidayDates = new Set<string>();
+  for (const h of input.holidays) {
+    if (!holidays.has(h.date)) holidays.set(h.date, []);
+    holidays.get(h.date)!.push(h);
+    holidayDates.add(h.date);
+  }
+
+  return { timed, allDay, segments, vacations, vacationDates, holidays, holidayDates };
 }
 
 export interface MonthCellsResult {
@@ -90,67 +182,38 @@ export function monthSpan(
  */
 export function monthCells(input: MonthCellsInput): MonthCellsResult {
   const { year, month, weekStartDay, todayStr } = input;
+  const { startYmd, endYmd } = monthSpan(year, month, weekStartDay);
+  return monthCellsFrom(
+    { year, month, weekStartDay, todayStr },
+    prepareCellData({
+      occurrences: input.occurrences,
+      segments: input.segments,
+      vacations: input.vacations,
+      holidays: input.holidays,
+      spanStart: startYmd,
+      spanEnd: endYmd,
+    })
+  );
+}
+
+/**
+ * Build one month's cells from data already prepared for the whole window.
+ * This is the hot path the stream calls once per rendered month.
+ */
+export function monthCellsFrom(
+  meta: { year: number; month: number; weekStartDay: number; todayStr: string },
+  data: PreparedCellData
+): MonthCellsResult {
+  const { year, month, weekStartDay, todayStr } = meta;
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const startOffset = (firstDay.getDay() - weekStartDay + 7) % 7;
-
   const days: MonthDayCellData[] = [];
-
-  // ── Partition the prefetched occurrences ────────────────────────────────
-  const dateTimedOccurrences = new Map<string, CellTimedOccurrence[]>();
-  const allDayOccurrences: Array<{ activity: FamilyActivity; date: string }> = [];
-  for (const occ of input.occurrences) {
-    // Vacation-linked activities render as the trailing vacation bar.
-    if (occ.activity.vacationId) continue;
-    if (occ.activity.isAllDay) {
-      allDayOccurrences.push({ activity: occ.activity, date: occ.date });
-      continue;
-    }
-    if (!dateTimedOccurrences.has(occ.date)) dateTimedOccurrences.set(occ.date, []);
-    dateTimedOccurrences.get(occ.date)!.push({ activity: occ.activity, date: occ.date });
-  }
-  for (const list of dateTimedOccurrences.values()) {
-    list.sort((a, b) =>
-      (a.activity.startTime ?? '99:99').localeCompare(b.activity.startTime ?? '99:99')
-    );
-  }
-
-  const dateSegments = new Map<string, TravelSegmentOccurrence[]>();
-  for (const occ of input.segments) {
-    if (!dateSegments.has(occ.date)) dateSegments.set(occ.date, []);
-    dateSegments.get(occ.date)!.push(occ);
-  }
-
-  const dateVacations = new Map<string, CellVacation[]>();
-  const vacationDates = new Set<string>();
-  for (const v of input.vacations) {
-    if (!v.startDate || !v.endDate) continue;
-    const vStart = extractDatePart(v.startDate);
-    const vEnd = extractDatePart(v.endDate);
-    const emoji = tripTypeEmoji(v.tripType, v.tripPurpose);
-    const startD = new Date(vStart + 'T00:00:00');
-    const endD = new Date(vEnd + 'T00:00:00');
-    for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-      const dateStr = toDateInputValue(d);
-      if (!dateVacations.has(dateStr)) dateVacations.set(dateStr, []);
-      dateVacations.get(dateStr)!.push({
-        id: v.id,
-        name: v.name,
-        emoji,
-        isStart: dateStr === vStart,
-        isEnd: dateStr === vEnd,
-      });
-      vacationDates.add(dateStr);
-    }
-  }
-
-  const dateHolidays = new Map<string, HolidayOccurrence[]>();
-  const holidayDates = new Set<string>();
-  for (const h of input.holidays) {
-    if (!dateHolidays.has(h.date)) dateHolidays.set(h.date, []);
-    dateHolidays.get(h.date)!.push(h);
-    holidayDates.add(h.date);
-  }
+  const dateTimedOccurrences = data.timed;
+  const allDayOccurrences = data.allDay;
+  const dateSegments = data.segments;
+  const dateVacations = data.vacations;
+  const dateHolidays = data.holidays;
 
   const pushCell = (dateStr: string, day: number, isCurrentMonth: boolean): void => {
     days.push({
@@ -243,6 +306,12 @@ export function monthCells(input: MonthCellsInput): MonthCellsResult {
       isCurrent: labelKey === 'planner.weekThis',
     });
   }
+
+  // Tint sets are scoped to the cells this month actually rendered — the
+  // window-wide sets would tint dates belonging to a neighbouring month.
+  const cellDates = new Set(days.map((d) => d.date));
+  const vacationDates = new Set([...data.vacationDates].filter((d) => cellDates.has(d)));
+  const holidayDates = new Set([...data.holidayDates].filter((d) => cellDates.has(d)));
 
   return { days, weekSeparatorIndexes, weekRanges, vacationDates, holidayDates };
 }
