@@ -17,6 +17,74 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.08.29',
+    date: '2026-08-29',
+    month: '29 august 2026',
+    spotlight: true,
+    summary: {
+      en: 'Passwords are retired: a personal 6-digit PIN now signs you in everywhere, and a one-page Recovery Kit becomes your family\u2019s master key. Every member should create their PIN \u2014 and every family should save their Recovery Kit \u2014 today.',
+      beanie:
+        'passwords are retired: a personal 6-digit pin now signs you in everywhere, and a one-page recovery kit becomes your family\u2019s master key. every member should create their pin \u2014 and every family should save their recovery kit \u2014 today.',
+    },
+    features: [
+      {
+        title: {
+          en: 'Your PIN replaces your password',
+          beanie: 'your pin replaces your password',
+        },
+        icon: '\u{1F522}',
+        description: {
+          en: 'Every family member now signs in with their own 6-digit PIN \u2014 the same PIN on every device where your family is set up, and much quicker to type than a password. Anyone still on a password is offered a PIN at their next sign-in, and parents can set or reset a child\u2019s PIN from their bean page. Face ID and fingerprint unlock continue as before in the iPhone and Android apps.',
+          beanie:
+            'every family member now signs in with their own 6-digit pin \u2014 the same pin on every device where your family is set up, and much quicker to type than a password. anyone still on a password is offered a pin at their next sign-in, and parents can set or reset a child\u2019s pin from their bean page. face id and fingerprint unlock continue as before in the iphone and android apps.',
+        },
+        tryItRoute: '/settings?open=account',
+        tryItLabel: { en: 'Create your PIN now', beanie: 'create your pin now' },
+      },
+      {
+        title: {
+          en: 'Your family\u2019s Recovery Kit',
+          beanie: 'your family\u2019s recovery kit',
+        },
+        icon: '\u{1F5DD}\uFE0F',
+        description: {
+          en: 'The Recovery Kit is a one-page master key (a printable PDF with a QR code) that opens your family\u2019s data even if every device and PIN is ever lost. Every family should download theirs \u2014 new families create one during setup, and existing families can get theirs now from Settings \u2192 Security & Recovery. Keep it somewhere safe, outside your family\u2019s own Google Drive. An optional memorable passphrase can be added there too.',
+          beanie:
+            'the recovery kit is a one-page master key (a printable pdf with a qr code) that opens your family\u2019s data even if every device and pin is ever lost. every family should download theirs \u2014 new families create one during setup, and existing families can get theirs now from settings \u2192 security & recovery. keep it somewhere safe, outside your family\u2019s own google drive. an optional memorable passphrase can be added there too.',
+        },
+        tryItRoute: '/settings?open=security',
+        tryItLabel: { en: 'Get your Recovery Kit', beanie: 'get your recovery kit' },
+      },
+      {
+        title: {
+          en: 'Link a new device in seconds',
+          beanie: 'link a new device in seconds',
+        },
+        icon: '\u{1F517}',
+        description: {
+          en: 'Signing in on a new phone or computer? A signed-in device can now show a QR code (Settings \u2192 Security & Recovery \u2192 Link a Device) \u2014 scan it with the new device, sign in with your PIN, done. No password, no re-invite.',
+          beanie:
+            'signing in on a new phone or computer? a signed-in device can now show a qr code (settings \u2192 security & recovery \u2192 link a device) \u2014 scan it with the new device, sign in with your pin, done. no password, no re-invite.',
+        },
+        tryItRoute: '/settings?open=security',
+      },
+      {
+        title: {
+          en: 'The month calendar scrolls continuously',
+          beanie: 'the month calendar scrolls continuously',
+        },
+        icon: '\u{1F4C5}',
+        description: {
+          en: 'On your phone, keep scrolling past the end of a month and the next one carries straight on, with its name marking where it starts. Swiping either way brings you to the start of that month. On a computer, scrolling at the edge of the calendar turns the month.',
+          beanie:
+            'on your phone, keep scrolling past the end of a month and the next one carries straight on, with its name marking where it starts. swiping either way brings you to the start of that month. on a computer, scrolling at the edge of the calendar turns the month.',
+        },
+        tryItRoute: '/activities',
+        tryItLabel: { en: 'Open the planner', beanie: 'open the planner' },
+      },
+    ],
+  },
+  {
     version: '2026.08.28',
     date: '2026-08-28',
     month: '28 august 2026',
