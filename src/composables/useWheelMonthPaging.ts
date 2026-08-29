@@ -23,18 +23,27 @@
  *    event is left completely untouched — no `preventDefault`, no
  *    accumulation — so ordinary scrolling proceeds.
  *
- *  - **Resistance**: while consuming, `deltaY` accumulates and the target is
- *    translated `translateY(-clamp(acc / 8, ±24px))`. An idle timeout
- *    (260ms) springs the transform back and resets the accumulator, so a
- *    half-hearted nudge never leaves the grid displaced.
+ *  - **Delta normalization**: `deltaY` is only in pixels when
+ *    `deltaMode === DOM_DELTA_PIXEL`. Firefox on Windows/Linux reports
+ *    `DOM_DELTA_LINE` with ~±3 per notch; accumulating that raw would make
+ *    the 140px threshold unreachable while `preventDefault` still fired —
+ *    a silent dead zone that eats the wheel and does nothing. Line and page
+ *    modes are converted to pixels before accumulating.
+ *
+ *  - **Resistance**: while consuming, normalized delta accumulates and the
+ *    target is translated `translateY(-clamp(acc / 8, ±24px))`. An idle
+ *    timeout (260ms) springs the transform back and resets the accumulator,
+ *    so a half-hearted nudge never leaves the grid displaced.
  *
  *  - **Commit** at |acc| ≥ 140: a vertical two-phase slide mirroring
  *    {@link useCalendarSlide}'s pattern — phase out (220ms) in the scroll
  *    direction while fading, then `onNext`/`onPrev` (Vue re-renders), snap
  *    to the opposite offset, phase in (320ms) back to centre. A 420ms
- *    cooldown follows during which every wheel event over the target is
- *    consumed and discarded — this swallows the trackpad momentum tail so
- *    one flick is exactly one month.
+ *    cooldown follows during which further wheels **in the committing
+ *    direction** are consumed and discarded — that swallows the trackpad
+ *    momentum tail so one flick is exactly one month. Wheels in the OPPOSITE
+ *    direction are left alone, so reversing to reach content above the grid
+ *    never feels frozen.
  *
  *  - **Reduced motion**: no stretch, no slide. The commit still requires the
  *    same 140px of accumulation, it just swaps instantly.
@@ -44,10 +53,26 @@
  *    is already inert under a covering overlay — but it names the real
  *    ref-counted signal rather than inventing a parallel one.
  *
+ *  - **ctrl+wheel / pinch**: browsers deliver trackpad pinch-zoom as a
+ *    cancelable `wheel` with `ctrlKey` set. Consuming it would suppress
+ *    browser zoom — an accessibility regression — so those events are never
+ *    touched.
+ *
+ *  - **Liveness**: every commit runs under a generation token. Teardown, a
+ *    superseding commit, or a cancelled animation invalidates it, and the
+ *    run bails BEFORE calling `onNext`/`onPrev` — a disposed scope must
+ *    never emit a navigation intent (e.g. switching to Week view mid-slide
+ *    used to land the user a month ahead).
+ *
+ *  - **`isPaging`**: true from commit start until the slide and cooldown are
+ *    both finished. The caller gates its horizontal swipe on `!isPaging` so
+ *    a drag cannot emit a second `next` during the vertical slide, and so
+ *    the two composables never fight over `style.transform`.
+ *
  *  - **Teardown**: `onScopeDispose` removes the listener, clears every
  *    timer, cancels any in-flight animation and resets the transform.
  */
-import { getCurrentInstance, onMounted, onScopeDispose, watch, type Ref } from 'vue';
+import { getCurrentInstance, onMounted, onScopeDispose, ref, watch, type Ref } from 'vue';
 import { getAppScroller } from '@/utils/getAppScroller';
 import { hasOpenOverlays } from '@/utils/overlayStack';
 import { useReducedMotion } from '@/composables/useReducedMotion';
@@ -63,6 +88,15 @@ export interface UseWheelMonthPagingOptions {
   enabled?: Ref<boolean>;
 }
 
+export interface UseWheelMonthPagingReturn {
+  /**
+   * True while a commit owns the element: from the moment the threshold is
+   * crossed until the slide has finished AND the momentum cooldown expired.
+   * Gate any other transform-owning gesture (the horizontal swipe) on this.
+   */
+  isPaging: Ref<boolean>;
+}
+
 /** iOS system page-transition easing, shared with `useCalendarSlide`. */
 const EASING = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const PHASE_OUT_MS = 220;
@@ -71,7 +105,7 @@ const PHASE_IN_MS = 320;
 const COOLDOWN_MS = 420;
 /** No wheel for this long → spring back and forget the accumulation. */
 const IDLE_RESET_MS = 260;
-/** Accumulated |deltaY| that turns the month. */
+/** Accumulated |deltaY| (in CSS pixels) that turns the month. */
 const COMMIT_THRESHOLD_PX = 140;
 /** Rubber-band damping: pixels of stretch per pixel of wheel delta. */
 const STRETCH_DIVISOR = 8;
@@ -81,25 +115,44 @@ const MAX_STRETCH_PX = 24;
 const SLIDE_PX = 40;
 /** Slop for "at the scroll limit" / "edge is visible" comparisons. */
 const EPSILON_PX = 2;
+/** `DOM_DELTA_LINE` → pixels. Matches the browsers' own ~1 line ≈ 16px. */
+const LINE_HEIGHT_PX = 16;
+/** `DOM_DELTA_PAGE` fallback when the scroller has no measurable height. */
+const FALLBACK_PAGE_PX = 800;
+/** Ceiling on the wait for the between-phase frame (hidden tabs never rAF). */
+const FRAME_TIMEOUT_MS = 100;
 
 const SURFACE = 'calendar-nav';
 
 export function useWheelMonthPaging(
   target: Ref<HTMLElement | null>,
   options: UseWheelMonthPagingOptions
-): void {
+): UseWheelMonthPagingReturn {
   const { prefersReducedMotion } = useReducedMotion();
+
+  /** Public: a commit owns the element (slide in flight or cooling down). */
+  const isPaging = ref(false);
 
   /** Element the listener is currently bound to (null = detached). */
   let bound: HTMLElement | null = null;
   let acc = 0;
   /** True from commit start until the cooldown expires. */
   let cooling = false;
+  /** Direction of the commit whose momentum tail we are swallowing. */
+  let coolingDir: 1 | -1 | null = null;
   /** True while the two-phase slide is in flight. */
   let animating = false;
+  /** Invalidation token — bumped by every commit and by teardown. */
+  let generation = 0;
+  let disposed = false;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
+  let frameTimer: ReturnType<typeof setTimeout> | null = null;
   let activeAnimation: Animation | null = null;
+
+  function syncPaging(): void {
+    isPaging.value = cooling || animating;
+  }
 
   function clearIdleTimer(): void {
     if (idleTimer !== null) {
@@ -112,6 +165,13 @@ export function useWheelMonthPaging(
     if (cooldownTimer !== null) {
       clearTimeout(cooldownTimer);
       cooldownTimer = null;
+    }
+  }
+
+  function clearFrameTimer(): void {
+    if (frameTimer !== null) {
+      clearTimeout(frameTimer);
+      frameTimer = null;
     }
   }
 
@@ -135,15 +195,27 @@ export function useWheelMonthPaging(
     return typeof el.animate === 'function' && !prefersReducedMotion.value;
   }
 
-  /**
-   * Both halves of the Pass-4 consume rule. Returns false (leave the event
-   * alone) whenever the scroller cannot be resolved — never crash, never
-   * hijack on a guess.
-   */
-  function canConsume(el: HTMLElement, dir: 1 | -1): boolean {
-    const scroller = getAppScroller(el);
-    if (!scroller) return false;
+  /** A commit run is live only while it owns the newest generation. */
+  function isLive(gen: number): boolean {
+    return !disposed && gen === generation;
+  }
 
+  /**
+   * Wheel deltas are only pixels in `DOM_DELTA_PIXEL` (0). Firefox on
+   * Windows/Linux uses `DOM_DELTA_LINE` (1) with ~±3 per notch, and some
+   * configurations use `DOM_DELTA_PAGE` (2).
+   */
+  function normalizeDelta(event: WheelEvent, scroller: HTMLElement): number {
+    if (event.deltaMode === 1) return event.deltaY * LINE_HEIGHT_PX;
+    if (event.deltaMode === 2) return event.deltaY * (scroller.clientHeight || FALLBACK_PAGE_PX);
+    return event.deltaY;
+  }
+
+  /**
+   * Both halves of the Pass-4 consume rule, against an already-resolved
+   * scroller.
+   */
+  function canConsume(el: HTMLElement, scroller: HTMLElement, dir: 1 | -1): boolean {
     const scrollerRect = scroller.getBoundingClientRect();
     const rect = el.getBoundingClientRect();
 
@@ -174,14 +246,18 @@ export function useWheelMonthPaging(
     }, IDLE_RESET_MS);
   }
 
-  function startCooldown(el: HTMLElement | null): void {
+  function startCooldown(el: HTMLElement | null, dir: 1 | -1 | null): void {
     cooling = true;
+    coolingDir = dir;
+    syncPaging();
     clearCooldownTimer();
     cooldownTimer = setTimeout(() => {
       cooldownTimer = null;
       cooling = false;
+      coolingDir = null;
       acc = 0;
       if (!animating) resetTransform(el);
+      syncPaging();
     }, COOLDOWN_MS);
   }
 
@@ -195,18 +271,40 @@ export function useWheelMonthPaging(
       context: { action: 'wheel-page-error', detail },
     });
     cancelAnimation();
+    clearFrameTimer();
     animating = false;
     acc = 0;
     resetTransform(el);
-    startCooldown(el);
+    startCooldown(el, coolingDir);
+  }
+
+  /**
+   * Resolves on the next animation frame, or after `FRAME_TIMEOUT_MS` —
+   * a backgrounded tab never fires rAF, and an un-resolvable await would
+   * strand the grid at `opacity: 0` with `animating` stuck true.
+   */
+  function nextFrame(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = (): void => {
+        if (settled) return;
+        settled = true;
+        clearFrameTimer();
+        resolve();
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(finish);
+      clearFrameTimer();
+      frameTimer = setTimeout(finish, FRAME_TIMEOUT_MS);
+    });
   }
 
   async function runAnimation(
     el: HTMLElement,
+    gen: number,
     from: { transform: string; opacity: string },
     to: { transform: string; opacity: string },
     duration: number
-  ): Promise<void> {
+  ): Promise<boolean> {
     const animation = el.animate([from, to], { duration, easing: EASING, fill: 'forwards' });
     activeAnimation = animation;
     try {
@@ -215,6 +313,9 @@ export function useWheelMonthPaging(
       // Cancelled on dispose or superseded — both are expected outcomes.
     }
     if (activeAnimation === animation) activeAnimation = null;
+    // A cancelled or superseded run must not touch the element any more:
+    // the scope may be gone, or a newer commit may already own the styles.
+    if (!isLive(gen)) return false;
     // Commit the end state to inline style so a forwards-filled WAAPI can't
     // shadow the next transform we set.
     el.style.transform = to.transform;
@@ -224,6 +325,7 @@ export function useWheelMonthPaging(
     } catch {
       // Already disposed.
     }
+    return true;
   }
 
   function fire(dir: 1 | -1): void {
@@ -232,9 +334,10 @@ export function useWheelMonthPaging(
   }
 
   async function commit(el: HTMLElement, dir: 1 | -1): Promise<void> {
+    const gen = ++generation;
     clearIdleTimer();
     acc = 0;
-    startCooldown(el);
+    startCooldown(el, dir);
 
     logEvent({
       surface: SURFACE,
@@ -256,17 +359,20 @@ export function useWheelMonthPaging(
     }
 
     animating = true;
+    syncPaging();
     try {
       // Phase A — continue off in the direction of travel while fading out.
-      await runAnimation(
+      const outDone = await runAnimation(
         el,
+        gen,
         { transform: el.style.transform || 'translateY(0px)', opacity: '1' },
         { transform: `translateY(${-dir * SLIDE_PX}px)`, opacity: '0' },
         PHASE_OUT_MS
       );
+      if (!outDone) return;
 
       // Swap content while the grid is invisible — the user perceives one
-      // continuous slide.
+      // continuous slide. Guarded above: a disposed scope never gets here.
       fire(dir);
 
       // Snap to the opposite offset so the new month enters from the side the
@@ -275,23 +381,28 @@ export function useWheelMonthPaging(
       el.style.opacity = '0';
 
       // One frame for Vue's re-render to land before the inbound animation.
-      await new Promise<void>((resolve) => {
-        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-        else resolve();
-      });
+      await nextFrame();
+      if (!isLive(gen)) return;
 
       // Phase B — glide back to centre.
       await runAnimation(
         el,
+        gen,
         { transform: `translateY(${dir * SLIDE_PX}px)`, opacity: '0' },
         { transform: 'translateY(0px)', opacity: '1' },
         PHASE_IN_MS
       );
-
-      animating = false;
-      resetTransform(el);
     } catch (error) {
-      recover(el, error, 'slide');
+      if (isLive(gen)) recover(el, error, 'slide');
+    } finally {
+      // Only the owning generation resets shared state — a superseding commit
+      // or a teardown has already taken care of its own.
+      if (gen === generation) {
+        animating = false;
+        clearFrameTimer();
+        if (!disposed) resetTransform(el);
+        syncPaging();
+      }
     }
   }
 
@@ -299,33 +410,38 @@ export function useWheelMonthPaging(
     const el = target.value;
     if (!el) return;
     if (options.enabled && !options.enabled.value) return;
+    // Pinch-zoom / ctrl+wheel is browser zoom — never suppress it.
+    if (event.ctrlKey) return;
     if (hasOpenOverlays()) return;
-
-    // Momentum tail / in-flight slide: swallow everything over the target so a
-    // single flick can never turn two months.
-    if (cooling || animating) {
-      event.preventDefault();
-      return;
-    }
 
     const dir = Math.sign(event.deltaY);
     if (dir !== 1 && dir !== -1) return;
 
+    // Momentum tail / in-flight slide. Only the committing direction is
+    // swallowed: reversing must stay free so content above the grid is
+    // reachable immediately after a page turn.
+    if (cooling || animating) {
+      if (dir === coolingDir) event.preventDefault();
+      return;
+    }
+
+    let scroller: HTMLElement | null;
     let consumable: boolean;
     try {
-      consumable = canConsume(el, dir);
+      scroller = getAppScroller(el);
+      consumable = scroller ? canConsume(el, scroller, dir) : false;
     } catch (error) {
       recover(el, error, 'consume-check');
       return;
     }
-    if (!consumable) {
+    if (!scroller || !consumable) {
       // Not at the edge — leave the event completely alone so the page (and
       // anything below the grid) keeps scrolling normally.
       return;
     }
 
     event.preventDefault();
-    acc += event.deltaY;
+    acc += normalizeDelta(event, scroller);
 
     try {
       if (!prefersReducedMotion.value) applyStretch(el);
@@ -356,12 +472,18 @@ export function useWheelMonthPaging(
   }
 
   function reset(): void {
+    // Invalidate any commit in flight so it can never call onNext/onPrev or
+    // re-apply styles after this point.
+    generation++;
     clearIdleTimer();
     clearCooldownTimer();
+    clearFrameTimer();
     cancelAnimation();
     acc = 0;
     cooling = false;
+    coolingDir = null;
     animating = false;
+    syncPaging();
   }
 
   function sync(): void {
@@ -386,7 +508,10 @@ export function useWheelMonthPaging(
   );
 
   onScopeDispose(() => {
+    disposed = true;
     reset();
     detach();
   });
+
+  return { isPaging };
 }

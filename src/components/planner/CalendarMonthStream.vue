@@ -24,7 +24,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatMonthYear, toDateInputValue } from '@/utils/date';
-import { monthCells, monthSpan, type WeekRangeMeta } from '@/utils/monthCells';
+import { monthCellsFrom, prepareCellData, monthSpan, type WeekRangeMeta } from '@/utils/monthCells';
 import {
   useMonthStream,
   monthKeyOf,
@@ -39,6 +39,7 @@ import { useToday } from '@/composables/useToday';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import MonthDayCard, { type MonthDayCellData } from '@/components/planner/MonthDayCard.vue';
+import { ALL_DAY_VISIBLE_CAP, TIMED_VISIBLE_CAP } from '@/constants/calendarCaps';
 import type { HolidayOccurrence } from '@/types/models';
 
 /** Where an imperative anchor request should land the view. */
@@ -67,9 +68,6 @@ const emit = defineEmits<{
   /** The month now filling the top of the viewport — the page syncs its label. */
   'month-in-view': [firstOfMonth: Date];
 }>();
-
-const ALL_DAY_VISIBLE_CAP = 3;
-const TIMED_VISIBLE_CAP = 4;
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
@@ -106,22 +104,23 @@ const renderedMonths = computed(() => {
     weekStartDay
   ).endYmd;
 
-  const occurrences = activityStore.activitiesInRange(spanStart, spanEnd);
-  const segments = vacationStore.travelSegmentOccurrencesInRange(spanStart, spanEnd);
-  const holidays = holidayStore.holidaysInRange(spanStart, spanEnd);
-  const vacations = vacationStore.vacations;
+  // Query the stores once across the window, and partition once — then build
+  // each month from the prepared lookups. Doing the partition per month made it
+  // O(months x span) inside the scroll rAF.
+  const prepared = prepareCellData({
+    occurrences: activityStore.activitiesInRange(spanStart, spanEnd),
+    segments: vacationStore.travelSegmentOccurrencesInRange(spanStart, spanEnd),
+    vacations: vacationStore.vacations,
+    holidays: holidayStore.holidaysInRange(spanStart, spanEnd),
+    spanStart,
+    spanEnd,
+  });
 
   return list.map((key) => {
-    const cells = monthCells({
-      year: key.y,
-      month: key.m,
-      weekStartDay,
-      todayStr: todayStr.value,
-      occurrences,
-      segments,
-      vacations,
-      holidays,
-    });
+    const cells = monthCellsFrom(
+      { year: key.y, month: key.m, weekStartDay, todayStr: todayStr.value },
+      prepared
+    );
     return {
       key,
       id: monthKeyId(key),
@@ -179,7 +178,13 @@ function resolveAnchorDate(target: AnchorTarget): string {
  * — so a scroll that never happened looked exactly like one that did. Here the
  * only unexplained outcome (the card genuinely isn't in the DOM) is reported.
  */
+let anchorSeq = 0;
+
 async function anchorToDate(dateStr: string, opts: { smooth?: boolean } = {}): Promise<void> {
+  // Last caller wins. Two anchor requests can be in flight at once (a window
+  // reset costs an extra tick), and without this the SLOWER one landed last —
+  // which is how "Today" ended up scrolling to the 1st of the month.
+  const seq = ++anchorSeq;
   const targetMonth: MonthKey = {
     y: Number(dateStr.slice(0, 4)),
     m: Number(dateStr.slice(5, 7)) - 1,
@@ -189,6 +194,7 @@ async function anchorToDate(dateStr: string, opts: { smooth?: boolean } = {}): P
     await nextTick();
   }
   await nextTick();
+  if (seq !== anchorSeq) return; // superseded by a later request
 
   const root = rootRef.value;
   const scroller = getAppScroller(root);
@@ -214,10 +220,24 @@ async function anchorToDate(dateStr: string, opts: { smooth?: boolean } = {}): P
   syncNow();
 }
 
+/**
+ * An anchor bump and a `referenceDate` change arrive together for the same user
+ * action (Today, a swipe, a command-bar arrow). This watcher is registered
+ * first and claims the flush, so the `referenceDate` watcher below stands down
+ * — the anchor carries the more specific intent ("land on today", "land on the
+ * last day"), and letting both run raced two scrolls with the vaguer one
+ * landing last.
+ */
+let anchorOwnsFlush = false;
+
 watch(
   () => props.anchor?.tick,
   (tick, prev) => {
     if (tick === undefined || tick === prev) return;
+    anchorOwnsFlush = true;
+    void nextTick().then(() => {
+      anchorOwnsFlush = false;
+    });
     const target = props.anchor?.target ?? 'today';
     void anchorToDate(resolveAnchorDate(target), { smooth: true }).then(() => {
       if (target !== 'today') {
@@ -247,6 +267,7 @@ watch(
 watch(
   () => `${props.referenceDate.getFullYear()}-${props.referenceDate.getMonth()}`,
   () => {
+    if (anchorOwnsFlush) return; // an anchor bump accompanies this change and owns the scroll
     const target = monthKeyOf(props.referenceDate);
     if (sameMonth(target, monthInView.value)) return;
     void anchorToDate(toDateInputValue(new Date(target.y, target.m, 1)), { smooth: true });
@@ -265,6 +286,42 @@ watch(
  * this deferred call from fighting a navigation that lands between mount and
  * the next tick: both now aim at the same month.
  */
+/**
+ * Wait until the stack has actually laid out before measuring it.
+ *
+ * The day cards render progressively after a route nav / view switch and the
+ * beanpod hydrates afterwards, so `scrollHeight` grows over many frames — and
+ * the stream mounts THREE months where the old day-stack mounted one, so it
+ * settles strictly later. Measuring mid-render lands on a stale (often near-
+ * zero) position, and nothing re-anchors afterwards: today ends up hundreds of
+ * pixels off-screen with the card present in the DOM, so not even
+ * `stream-anchor-failed` fires. This is the `scrollToTodayWhenSettled` guard
+ * the old CalendarGrid carried, kept for the same reason.
+ */
+function whenLayoutSettles(run: () => void): void {
+  if (typeof window === 'undefined' || typeof requestAnimationFrame !== 'function') {
+    run();
+    return;
+  }
+  const deadline = performance.now() + 1500;
+  let lastHeight = -1;
+  let stableFrames = 0;
+  const tick = () => {
+    const h = getAppScroller(rootRef.value)?.scrollHeight ?? -1;
+    if (h === lastHeight) stableFrames += 1;
+    else {
+      stableFrames = 0;
+      lastHeight = h;
+    }
+    if (stableFrames >= 2 || performance.now() >= deadline) {
+      run();
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 onMounted(() => {
   void nextTick().then(() => {
     const refKey = monthKeyOf(props.referenceDate);
@@ -275,7 +332,7 @@ onMounted(() => {
     const target = sameMonth(refKey, todayKey)
       ? todayStr.value
       : toDateInputValue(new Date(refKey.y, refKey.m, 1));
-    void anchorToDate(target);
+    whenLayoutSettles(() => void anchorToDate(target));
   });
 });
 
