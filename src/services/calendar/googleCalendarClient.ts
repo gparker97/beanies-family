@@ -33,6 +33,7 @@ const MAX_EVENT_PAGES = 20;
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
 function classifyStatus(status: number): CalendarErrorKind {
+  if (status === 400) return 'invalid';
   if (status === 401) return 'auth';
   if (status === 403) return 'forbidden';
   if (status === 404 || status === 410) return 'not_found';
@@ -281,7 +282,25 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
         }
       }
 
-      const err = new CalendarApiError(kind, `Google Calendar HTTP ${res.status}`, res.status);
+      // Google's error body names the rejected field/value ("Invalid value for:
+      // recurrence"). Without it a 400 in CloudWatch says nothing actionable —
+      // this loop ran blind for a day in prod for exactly that reason.
+      let detail = '';
+      try {
+        const body = (await res.json()) as {
+          error?: { message?: string; errors?: Array<{ reason?: string }> };
+        };
+        detail = [body?.error?.errors?.[0]?.reason, body?.error?.message]
+          .filter(Boolean)
+          .join(': ');
+      } catch {
+        // Body absent or not JSON — the status alone will have to do.
+      }
+      const err = new CalendarApiError(
+        kind,
+        `Google Calendar HTTP ${res.status}${detail ? ` (${detail})` : ''}`,
+        res.status
+      );
       // Only 429 / 5xx are worth retrying; everything else is the caller's to handle.
       if (isRetryableKind(kind) && i < RETRY_BACKOFF_MS.length) {
         lastErr = err;
