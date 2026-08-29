@@ -114,10 +114,15 @@ describe('TravelPlansPage — smoke', () => {
     await w.vm.$nextTick();
 
     expect(store.upcomingVacations.length).toBe(2); // guard: the assertion below must be meaningful
-    // Counted by ELEMENT, not by component: under `shallow` the child renders as a
-    // placeholder <tripcard> element, which findAllComponents(name) does not match. The
-    // element count is what reflects the v-for, and the v-for is what this guards.
-    expect(w.findAll('tripcard').length).toBe(2);
+    // Counted as stubbed COMPONENTS. The previous version counted bare `<tripcard>`
+    // elements — which only exist when the component is NOT imported (Vue's silent
+    // unknown-element fallback). That assertion was literally pinning the missing-import
+    // bug that blanked the page in prod (2026-08-29): a resolved, stubbed TripCard
+    // renders as `trip-card-stub`, so the old count read 0 the moment the bug was fixed.
+    const stubs = w.findAll('trip-card-stub');
+    expect(stubs.length).toBe(2);
+    // And the inverse guard: an unresolved placeholder must NEVER appear.
+    expect(w.findAll('tripcard').length).toBe(0);
   }, 20_000);
 
   // NOT COVERED, deliberately, and this is a limitation worth naming rather than papering

@@ -44,6 +44,14 @@ export default [
       'vue/multi-word-component-names': 'off',
       'vue/component-api-style': ['error', ['script-setup']],
 
+      // A component used in a template but never imported is SILENT in prod:
+      // Vue falls back to rendering it as an unknown native element — no error,
+      // no telemetry, the content just vanishes. This shipped once: the TripCard
+      // extraction (f9902d56) moved the markup out of TravelPlansPage but not
+      // the import in, and every upcoming trip disappeared from the page while
+      // the store, tests and build all stayed green.
+      'vue/no-undef-components': ['error', { ignorePatterns: ['RouterView', 'RouterLink'] }],
+
       // i18n enforcement: NO hardcoded user-visible English in templates. ALL
       // user-facing text must go through `t('key')` (uiStrings.ts) so it
       // translates to Chinese + beanie mode. Covers text nodes AND the

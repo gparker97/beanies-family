@@ -5,6 +5,7 @@ import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import TimelineSegmentCard from '@/components/travel/TimelineSegmentCard.vue';
+import TripCard from '@/components/travel/TripCard.vue';
 import TripIdeasPanel from '@/components/travel/TripIdeasPanel.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
