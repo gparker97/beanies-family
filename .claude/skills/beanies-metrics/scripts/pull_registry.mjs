@@ -157,6 +157,10 @@ function enrich(row) {
     // Absent means UNKNOWN and is EXCLUDED from platform maths, never web.
     signupPlatform: row.signupPlatform || null,
     beanpodSizeKb: sizeKb,
+    // Roster size (2026-08-29). null = family hasn't written the registry since
+    // the field shipped — report COVERAGE alongside any total, never assume 1.
+    memberCount:
+      typeof row.memberCount === 'number' && row.memberCount >= 1 ? row.memberCount : null,
     daysSinceLogin: dLogin,
     daysSinceCreated: dCreated,
     lifespanDays,
@@ -253,6 +257,23 @@ async function main() {
       familiesWithSize: fam.filter((f) => f.beanpodSizeKb != null).length,
       emptyOrTinyUnder5Kb: fam.filter((f) => f.beanpodSizeKb != null && f.beanpodSizeKb < 5).length,
     },
+    // Total USERS (not families). Sum of per-family roster counts where known.
+    // Coverage ramps as families write the registry post-2026-08-29; a low
+    // coveragePct means the total is a floor, not the population.
+    users: (() => {
+      const counted = fam.filter((f) => f.memberCount != null);
+      const dist = {};
+      for (const f of counted) dist[f.memberCount] = (dist[f.memberCount] || 0) + 1;
+      return {
+        totalKnownUsers: counted.reduce((a, f) => a + f.memberCount, 0),
+        familiesReporting: counted.length,
+        coveragePct: fam.length ? Math.round((counted.length / fam.length) * 100) : 0,
+        avgMembersPerFamily: counted.length
+          ? Math.round((counted.reduce((a, f) => a + f.memberCount, 0) / counted.length) * 10) / 10
+          : null,
+        distribution: dist,
+      };
+    })(),
     geography: tally(fam, (f) => f.country),
     syncProvider: tally(fam, (f) => f.provider),
     newsletter: {
@@ -277,6 +298,7 @@ async function main() {
       provider: f.provider,
       subscribeNewsletter: f.subscribeNewsletter,
       beanpodSizeKb: f.beanpodSizeKb,
+      memberCount: f.memberCount,
       createdAt: f.createdAt,
       lastLoginAt: f.lastLoginAt,
       // Consumed by build_dashboard's web-only conversion maths. Omitting it

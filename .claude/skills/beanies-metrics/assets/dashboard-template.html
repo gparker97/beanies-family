@@ -553,8 +553,12 @@ if(D.mkt){
 
 /* ══ ACT 2 ══════════════════════════════════════════════════════════════ */
 
+const U=D.users&&D.users.familiesReporting?D.users:null;
 $('kpisFam').innerHTML=[
   {n:D.counts.realFamilies,l:'Real families',s:'+'+latestMonth[1]+' this month',c:'up',accent:true},
+  // Total USERS is a floor while coverage ramps: only families that have written
+  // the registry since the field shipped (2026-08-29) report a roster size.
+  ...(U?[{n:num(U.totalKnownUsers)+'+',l:'Total users (members)',s:U.avgMembersPerFamily+' avg · '+U.coveragePct+'% of families reporting',c:'flat',accent:true}]:[]),
   {n:D.activeReal30,l:'Active · 30 days',s:D.activeReal7+' in last 7d',c:'flat'},
   {n:D.engagedPctReal+'%',l:'Engagement rate',s:'active ÷ registered',c:'flat'},
   {n:D.neverReallyEngaged,l:'Never engaged',s:'activation gap',c:'down'},
@@ -655,5 +659,5 @@ if(D.lost.length){
 $('callouts').innerHTML=co.map(c=>`<div class="callout ${c.c}"><h3>${c.h}</h3><p>${c.p}</p></div>`).join('');
 
 // footer
-$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing)${D.searchConsoleAvailable?' · Google Search Console':''}. &nbsp; <b>Caveats:</b> members-per-family is not collected anywhere and is not shown. Registry <code>lastLoginAt</code> is date-only and login-only, so “active” here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family, so <b>overall conversion is a cross-site ratio, not a tracked per-visitor funnel</b>. Search Console reports clicks, never conversions — any “converting term” reading is inferred via the landing page. “Internal” marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
+$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing)${D.searchConsoleAvailable?' · Google Search Console':''}. &nbsp; <b>Caveats:</b> members-per-family comes from a bare roster COUNT each family reports to the registry (no names) — families quiet since 2026-08-29 report none, so total users is a floor at the stated coverage. Registry <code>lastLoginAt</code> is date-only and login-only, so “active” here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family, so <b>overall conversion is a cross-site ratio, not a tracked per-visitor funnel</b>. Search Console reports clicks, never conversions — any “converting term” reading is inferred via the landing page. “Internal” marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
 </script>

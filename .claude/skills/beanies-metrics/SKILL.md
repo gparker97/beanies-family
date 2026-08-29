@@ -111,6 +111,9 @@ signal, not every field.
    days · 24 Jul – 23 Aug 2026"). Then real families (dev/test excluded, show
    excluded count), engaged %, active families (CloudWatch 30d & 7d), new this
    month / this week, growth direction.
+   - **Total users** (`users` block): Σ `memberCount` across reporting families —
+     always with `coveragePct` ("N users across M of F families reporting"), plus
+     `avgMembersPerFamily`. A floor until coverage is high.
    - **Daily active families (DAU):** `dau.avg` / `dau.peak` and the **DAU/MAU
      stickiness** (`dau.stickiness`%). Always label the unit as *families, not
      members*, and note it's a floor (offline use flushes telemetry later) and
@@ -221,9 +224,12 @@ dashboard" option (its own `/beanies-plan`, with a threat model), not to bolt it
 ## Guardrails
 - **Read-only.** Never write to DynamoDB, never mutate logs, never touch `.beanpod`
   files. The scripts here only scan/query.
-- **State the honest gaps** every run: members-per-family is not available; registry
-  `lastLoginAt` is coarse (CloudWatch corrects it); `beanpodSizeKb` is approximate;
-  Plausible can't be joined per-family. Don't invent members-per-family numbers.
+- **State the honest gaps** every run: registry `lastLoginAt` is coarse (CloudWatch
+  corrects it); `beanpodSizeKb` is approximate; Plausible can't be joined per-family.
+  Members-per-family (registry `memberCount`, added 2026-08-29) is a bare roster
+  count with NO member data — always report **total users with its coverage %**
+  (families quiet since the field shipped report none, so the total is a floor;
+  never backfill unknowns as 1).
 - **Never** print or commit the Plausible token, AWS credentials, or beanpod contents.
 - Save raw JSON to the scratchpad, not the repo.
 - If AWS creds fail (registry/CloudWatch error), say so plainly and report whatever

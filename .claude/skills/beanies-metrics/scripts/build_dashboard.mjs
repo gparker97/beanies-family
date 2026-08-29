@@ -583,6 +583,7 @@ const data = {
   syncProvider: reg.syncProvider,
   newsletter: reg.newsletter,
   dataVolume: reg.dataVolume,
+  users: reg.users ?? null, // total-users block (2026-08-29); null on pre-field registry pulls
   churn: reg.churnTiming,
   topActive,
   lost,

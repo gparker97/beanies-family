@@ -1912,6 +1912,11 @@ export interface RegistryEntry {
   country?: CountryCode | null; // mirror of family Settings.country — denormalized for ops introspection
   lastLoginAt?: ISODateString | null; // date-only (YYYY-MM-DD), server-stamped on login/resume PUTs — usage signal
   beanpodSizeKb?: number | null; // approx .beanpod size in KB, client-rounded — coarse data-volume signal
+  // Members on the family roster — a bare count for analytics (total users),
+  // taken from the decrypted in-memory roster at registry-write time. Never
+  // names/ids. Refreshed on every write; null on rows whose family hasn't
+  // written since the field shipped (2026-08-29) — report coverage, not zero.
+  memberCount?: number | null;
   // Platform the family signed up ON — server-stamped write-once at row creation
   // (registry Lambda), so it never moves when the owner later opens a browser.
   // Uses the `getPlatform()` vocabulary shared with Plausible, NOT the coarse
