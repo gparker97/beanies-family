@@ -70,6 +70,7 @@ import { runPooled } from '@/utils/calendar/runPooled';
 import {
   activityToGoogleEvent,
   masterOccurrenceBody,
+  toInstanceBody,
   type ActivityMapContext,
   type GoogleEventResource,
 } from '@/utils/calendar/activityToGoogleEvent';
@@ -122,6 +123,7 @@ export const CALENDAR_SYNC_ERRORS = {
   conflict: 'warning',
   rate_limited: 'warning',
   transient: 'warning',
+  invalid: 'error',
   unknown: 'error',
 } as const satisfies Record<CalendarErrorKind, 'warning' | 'error'>;
 
@@ -365,9 +367,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // Unchanged → no-op (independent of verify pass).
     if (e.existingHash === e.hash) return false;
 
-    // Invariant guard: an override child is always `recurrence:'none'`. A recurring
-    // "child" is malformed data — never stamp an RRULE onto a single instance.
-    if (e.child.recurrence !== 'none') {
+    // Invariant guard: an override child is always `recurrence:'none'` AND rule-less
+    // (`OVERRIDE_INVALID_KEYS` strips both). A recurring "child" is malformed data —
+    // never stamp an RRULE onto a single instance. `rule` is checked too because
+    // `buildRecurrenceRule` honors it BEFORE `recurrence:'none'` (#70), so a leaked
+    // rule would serialize a real RRULE despite the legacy field reading 'none'.
+    if (e.child.recurrence !== 'none' || e.child.rule) {
       logEvent({
         surface: 'calendar-sync',
         level: 'warn',
@@ -445,11 +450,13 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
           status: 'cancelled',
         });
       } else {
-        await client.patchEvent(
+        // `toInstanceBody` strips `recurrence` — Google 400s on the field's PRESENCE
+        // in an instance patch, even `[]` (a well-formed child maps to exactly that).
+        await client.patchEventFields(
           connectionId,
           calendarId,
           instanceId,
-          activityToGoogleEvent(e.child, ctx)
+          toInstanceBody(activityToGoogleEvent(e.child, ctx))
         );
       }
     } catch (err) {
@@ -475,6 +482,25 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
             action: 'exception-instance-not-found',
             recur_occurrence_ymd: e.occurrenceYmd,
             recur_outcome: 'recovered',
+          },
+        });
+        return false;
+      }
+      // Google rejected the patch DETERMINISTICALLY (HTTP 400) — retrying the same
+      // body every poll can never converge; it pins the connection to `error` and
+      // pages Slack via the sustained counter (this exact loop ran in prod
+      // 2026-08-28→29). Drop the link so the next cycle re-discovers and re-patches
+      // fresh, and log the rejection with Google's reason (now in `err.message`).
+      if (err instanceof CalendarApiError && err.kind === 'invalid') {
+        await removeCalendarEventLinkById(connectionId, e.child.id);
+        logEvent({
+          surface: 'calendar-sync',
+          level: 'error',
+          message: `Exception patch rejected by Google — dropped the link and deferred: ${err.message}`,
+          context: {
+            action: 'exception-invalid',
+            recur_occurrence_ymd: e.occurrenceYmd,
+            recur_outcome: 'invalid-dropped',
           },
         });
         return false;
@@ -521,6 +547,25 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         await removeCalendarEventLinkById(connectionId, link.activityId);
         return true;
       }
+      // Deterministic rejection (HTTP 400): the restore body will never be accepted
+      // as-is, and this task re-plans identically every poll (the 2026-08-28 loop —
+      // `masterOccurrenceBody` used to carry `recurrence: []`, which Google rejects
+      // on an instance patch). Give up restoring this instance: drop the link, keep
+      // Google's stale instance state, and say why loudly with Google's own reason.
+      if (err instanceof CalendarApiError && err.kind === 'invalid') {
+        await removeCalendarEventLinkById(connectionId, link.activityId);
+        logEvent({
+          surface: 'calendar-sync',
+          level: 'error',
+          message: `Exception restore rejected by Google — dropped the link: ${err.message}`,
+          context: {
+            action: 'exception-restore-invalid',
+            recur_occurrence_ymd: occurrenceYmd,
+            recur_outcome: 'invalid-dropped',
+          },
+        });
+        return true;
+      }
       throw err;
     }
     await removeCalendarEventLinkById(connectionId, link.activityId);
@@ -562,9 +607,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // dispatching them. (The token provider also latches the failure, so the
       // already-dispatched ones fail locally without touching the network.)
       let authAborted = false;
-      const record = (e: unknown) => {
+      // `task` names the reconcile task in the propagated message ("HTTP 400" alone
+      // gave CloudWatch nothing to triage on when the exception loop hit prod).
+      const record = (e: unknown, task: string) => {
         const err = e instanceof CalendarApiError ? e : new CalendarApiError('unknown', String(e));
         if (err.kind === 'auth') authAborted = true;
+        err.message = `[${task}] ${err.message}`;
         errors.push(err);
       };
       // Whether any actual Google write happened — gates the connection status write
@@ -578,7 +626,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
               changed = true;
             }
           } catch (e) {
-            record(e);
+            record(e, 'upsert');
           }
         }),
         ...plan.deletes.map((link) => async () => {
@@ -587,7 +635,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
             await removeCalendarEventLinkById(connectionId, link.activityId);
             changed = true;
           } catch (e) {
-            record(e);
+            record(e, 'delete');
           }
         }),
       ];
@@ -610,7 +658,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
               changed = true;
             }
           } catch (err) {
-            record(err);
+            record(err, `exception-${e.mode} ${e.occurrenceYmd}`);
           }
         }),
         ...plan.exceptionRestores.map((r) => async () => {
@@ -621,7 +669,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
               changed = true;
             }
           } catch (err) {
-            record(err);
+            record(err, `exception-restore ${r.link.exceptionOriginalYmd ?? '?'}`);
           }
         }),
       ];

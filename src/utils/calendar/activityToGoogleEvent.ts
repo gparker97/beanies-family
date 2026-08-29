@@ -138,19 +138,35 @@ export function activityToGoogleEvent(
 }
 
 /**
+ * A body that PATCHes a recurring-instance id. Identical to `GoogleEventResource`
+ * minus `recurrence`: instances never carry that field, and Google rejects its
+ * PRESENCE on an instance patch with HTTP 400 "Invalid value" — even an empty
+ * array. (The empty-array-clears-stale-RRULE trick from #32 F2 applies to MASTER
+ * patches only.)
+ */
+export type GoogleInstanceBody = Omit<GoogleEventResource, 'recurrence'>;
+
+/** Strip the `recurrence` field from an event body so it can PATCH an instance id.
+ *  See {@link GoogleInstanceBody} for why the field must be absent, not `[]`. */
+export function toInstanceBody(resource: GoogleEventResource): GoogleInstanceBody {
+  const { recurrence: _neverOnAnInstance, ...body } = resource;
+  return body;
+}
+
+/**
  * The Google body for a recurring MASTER's occurrence on `occurrenceYmd`, as a
- * single instance (`recurrence:[]`, `status:'confirmed'`). Used to RESTORE a Google
- * instance to the master's generated value after an override is deleted — patched
- * onto the stored instance id (un-cancels a cancelled instance / moves a moved one
- * back). Pure.
+ * single instance (`status:'confirmed'`, no `recurrence` — see
+ * {@link GoogleInstanceBody}). Used to RESTORE a Google instance to the master's
+ * generated value after an override is deleted — patched onto the stored instance
+ * id (un-cancels a cancelled instance / moves a moved one back). Pure.
  */
 export function masterOccurrenceBody(
   master: FamilyActivity,
   occurrenceYmd: string,
   ctx: ActivityMapContext
-): GoogleEventResource {
+): GoogleInstanceBody {
   const { start, end } = startEndForDate(master, occurrenceYmd, ctx.timeZone);
-  return assembleEvent(master, start, end, [], ctx);
+  return toInstanceBody(assembleEvent(master, start, end, [], ctx));
 }
 
 /**

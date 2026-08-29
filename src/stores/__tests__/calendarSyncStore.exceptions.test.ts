@@ -10,6 +10,7 @@ import {
 import { createCalendarConnection } from '@/services/automerge/repositories/calendarRepository';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
 import { makeCalendarClientStub } from '@/services/calendar/__tests__/fakeCalendarClient';
+import { CalendarApiError } from '@/services/calendar/CalendarClient';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
 // P2 exceptions — the two-phase reconcile applies per-occurrence overrides as Google
@@ -98,9 +99,12 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
     await useCalendarSyncStore().syncNow();
 
     expect(calls.listInstances).toHaveLength(1);
-    expect(calls.patch).toHaveLength(1);
-    expect(calls.patch[0]!.eventId).toContain('__inst'); // patched the INSTANCE, not the master
-    expect(calls.patchFields).toHaveLength(0);
+    expect(calls.patchFields).toHaveLength(1);
+    expect(calls.patchFields[0]!.eventId).toContain('__inst'); // patched the INSTANCE, not the master
+    // Google 400s on the PRESENCE of `recurrence` in an instance patch (even `[]`) —
+    // the instance body must omit the key entirely (2026-08-28 prod loop).
+    expect('recurrence' in (calls.patchFields[0]!.patch as Record<string, unknown>)).toBe(false);
+    expect(calls.patch).toHaveLength(0); // full-resource patch is for MASTERS only
   });
 
   it('delete-one → cancels the instance via patchEventFields', async () => {
@@ -130,9 +134,9 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
 
     const store = useCalendarSyncStore();
     await store.syncNow();
-    const patchesAfterFirst = calls.patch.length;
+    const patchesAfterFirst = calls.patchFields.length;
     await store.syncNow();
-    expect(calls.patch.length).toBe(patchesAfterFirst); // no new writes
+    expect(calls.patchFields.length).toBe(patchesAfterFirst); // no new writes
   });
 
   it('reschedule → then delete the override → RESTORE patches by the STORED instance id (no re-discovery)', async () => {
@@ -148,7 +152,7 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
 
     const store = useCalendarSyncStore();
     await store.syncNow(); // creates the exception + stores the instance id
-    expect(calls.patch).toHaveLength(1);
+    expect(calls.patchFields).toHaveLength(1);
 
     const listCallsBefore = calls.listInstances.length;
     // Delete the override → next reconcile restores the instance.
@@ -159,6 +163,7 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
     expect(calls.listInstances.length).toBe(listCallsBefore);
     const restore = calls.patchFields.at(-1)!;
     expect(restore.eventId).toContain('__inst'); // the stored instance id, un-cancelled/moved back
+    expect('recurrence' in (restore.patch as Record<string, unknown>)).toBe(false);
   });
 
   it('deleting a session (active override → isActive:false) flips the exception to a cancel', async () => {
@@ -173,8 +178,8 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
 
     const store = useCalendarSyncStore();
     await store.syncNow(); // first sync → modify exception
-    expect(calls.patch).toHaveLength(1);
-    expect(calls.patchFields).toHaveLength(0);
+    expect(calls.patchFields).toHaveLength(1);
+    expect(calls.patch).toHaveLength(0);
 
     // "Delete this session" = mark the override inactive.
     await updateActivity(child!.id, { isActive: false });
@@ -198,5 +203,90 @@ describe('calendarSyncStore — recurring-instance exceptions', () => {
     expect(calls.patch).toHaveLength(0);
     expect(calls.patchFields).toHaveLength(0);
     expect(calls.insert).toHaveLength(0); // never a standalone top-level event for the child
+  });
+});
+
+describe('calendarSyncStore — deterministic 400 recovery (2026-08-29)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    installInlineBackend();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("a modify patch rejected with 'invalid' drops the link and re-discovers next cycle — no identical retry loop", async () => {
+    const { client, calls } = makeExceptionClient();
+    let failNext = true;
+    const original = client.patchEventFields.bind(client);
+    client.patchEventFields = async (c, cal, eventId, patch) => {
+      if (failNext && 'summary' in (patch as Record<string, unknown>)) {
+        failNext = false;
+        throw new CalendarApiError('invalid', 'Google Calendar HTTP 400 (invalidParameter)', 400);
+      }
+      return original(c, cal, eventId, patch);
+    };
+    setCalendarClientForTesting(client);
+    await seedConnection();
+    const master = await createActivity(
+      base({ recurrence: 'daily', date: addDaysYmd(localToday(), -1) })
+    );
+    await createActivity(base({ parentActivityId: master!.id, date: OCC }));
+
+    const store = useCalendarSyncStore();
+    await store.syncNow(); // patch rejected 'invalid' → link dropped, NOT thrown into `errors`
+    expect(calls.patchFields).toHaveLength(0);
+
+    const listCallsAfterFirst = calls.listInstances.length;
+    await store.syncNow(); // link is gone → re-discovers and re-patches with the (fixed) body
+    expect(calls.listInstances.length).toBe(listCallsAfterFirst + 1);
+    expect(calls.patchFields).toHaveLength(1);
+  });
+
+  it("a restore rejected with 'invalid' drops the link instead of re-planning forever", async () => {
+    const { client } = makeExceptionClient();
+    setCalendarClientForTesting(client);
+    await seedConnection();
+    const master = await createActivity(
+      base({ recurrence: 'daily', date: addDaysYmd(localToday(), -1) })
+    );
+    const child = await createActivity(
+      base({ parentActivityId: master!.id, date: addDaysYmd(OCC, 3), originalOccurrenceDate: OCC })
+    );
+    const store = useCalendarSyncStore();
+    await store.syncNow(); // exception recorded
+
+    await deleteActivity(child!.id);
+    const original = client.patchEventFields.bind(client);
+    let restoreAttempts = 0;
+    client.patchEventFields = async (c, cal, eventId, patch) => {
+      if ('summary' in (patch as Record<string, unknown>)) {
+        restoreAttempts++;
+        throw new CalendarApiError('invalid', 'Google Calendar HTTP 400 (invalidParameter)', 400);
+      }
+      return original(c, cal, eventId, patch);
+    };
+    await store.syncNow(); // restore rejected → link dropped
+    await store.syncNow(); // nothing left to restore — the loop is broken
+    expect(restoreAttempts).toBe(1);
+  });
+
+  it('a child that leaked a #70 rule is skipped by the guard — no RRULE ever reaches an instance', async () => {
+    const { client, calls } = makeExceptionClient();
+    setCalendarClientForTesting(client);
+    await seedConnection();
+    const master = await createActivity(
+      base({ recurrence: 'daily', date: addDaysYmd(localToday(), -1) })
+    );
+    const child = await createActivity(base({ parentActivityId: master!.id, date: OCC }));
+    // Malformed data: recurrence reads 'none' but a canonical rule leaked on.
+    await updateActivity(child!.id, {
+      rule: { unit: 'day', interval: 1, end: { kind: 'never' } },
+    });
+
+    await useCalendarSyncStore().syncNow();
+
+    expect(calls.patch).toHaveLength(0);
+    expect(calls.patchFields).toHaveLength(0);
   });
 });

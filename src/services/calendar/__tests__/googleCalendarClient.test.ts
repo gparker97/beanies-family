@@ -170,3 +170,56 @@ describe('googleCalendarClient authedFetch — mint-failure kind preservation (2
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('googleCalendarClient authedFetch — HTTP 400 classification + reason capture (2026-08-29)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("classifies a 400 as 'invalid', never retries, and surfaces Google's reason", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(400, {
+        error: {
+          message: 'Invalid value for: recurrence',
+          errors: [{ reason: 'invalidParameter' }],
+        },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { provider } = makeTokenProvider();
+    const client = createGoogleCalendarClient(provider);
+
+    await expect(
+      client.patchEventFields('conn-1', 'primary', 'inst_1', { status: 'cancelled' })
+    ).rejects.toMatchObject({
+      kind: 'invalid',
+      status: 400,
+      message: expect.stringContaining('invalidParameter: Invalid value for: recurrence'),
+    });
+
+    // Deterministic rejection — retrying the same body is pointless.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a 400 whose body is unreadable still classifies 'invalid' with the bare status", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 400,
+      ok: false,
+      json: async () => {
+        throw new Error('not json');
+      },
+    } as unknown as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { provider } = makeTokenProvider();
+    const client = createGoogleCalendarClient(provider);
+
+    await expect(
+      client.patchEventFields('conn-1', 'primary', 'inst_1', { status: 'cancelled' })
+    ).rejects.toMatchObject({ kind: 'invalid', message: 'Google Calendar HTTP 400' });
+  });
+});
