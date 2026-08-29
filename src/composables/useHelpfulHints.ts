@@ -23,6 +23,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
 import { computeDesiredHints, reconcileHints } from '@/utils/helpfulHints';
+import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { toAssigneePayload } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { addDaysYmd, formatDateWithDay, parseLocalDate } from '@/utils/date';
@@ -35,6 +36,16 @@ const DEBOUNCE_MS = 1000;
  *  extend it). Keeps the window sane if every lead were set very small. */
 const MIN_WINDOW_DAYS = 14;
 const SURFACE = 'helpful-hints';
+
+/**
+ * The reconcile watcher is deep on activities, members and vacations, so ANY
+ * edit re-runs it — about a dozen times a day per family, almost always with an
+ * identical outcome (nothing generated, nothing expired). Emitting all of them
+ * made this surface a third of the entire telemetry firehose while saying the
+ * same thing over and over. The gate keeps every genuine change plus a periodic
+ * heartbeat, so transitions and rates both survive.
+ */
+const emitGate = createChangeGate();
 
 let initialized = false;
 
@@ -91,20 +102,22 @@ export function useHelpfulHints(): void {
     if (!masterOn) {
       const stale = existing.filter((h) => !h.hintAcknowledged && !h.completed);
       const pruned = await removeAll(stale);
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'reconcile',
-        context: {
-          hint_flag_on: flagOn,
-          hint_master_on: false,
-          hint_generated: 0,
-          hint_expired: 0,
-          hint_pruned_stale: pruned,
-          hint_total: existing.length - pruned,
-          hint_skipped_records: 0,
-        },
-      });
+      if (emitGate(`off|${pruned}|${existing.length - pruned}`)) {
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'reconcile',
+          context: {
+            hint_flag_on: flagOn,
+            hint_master_on: false,
+            hint_generated: 0,
+            hint_expired: 0,
+            hint_pruned_stale: pruned,
+            hint_total: existing.length - pruned,
+            hint_skipped_records: 0,
+          },
+        });
+      }
       return;
     }
 
@@ -175,30 +188,44 @@ export function useHelpfulHints(): void {
     ).length;
     const removed = await removeAll(toRemove);
 
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'reconcile',
-      context: {
-        hint_flag_on: flagOn,
-        hint_master_on: true,
-        hint_generated: generated,
-        hint_expired: Math.min(expiredCount, removed),
-        hint_pruned_stale: Math.max(removed - expiredCount, 0),
-        hint_total: existing.length - removed + generated,
-        hint_skipped_records: skipped,
-      },
-    });
+    const expired = Math.min(expiredCount, removed);
+    const prunedStale = Math.max(removed - expiredCount, 0);
+    const total = existing.length - removed + generated;
+    // Signature covers every field below, so nothing can change silently.
+    const signature = `on|${generated}|${expired}|${prunedStale}|${total}|${skipped}|${Object.entries(
+      reasons
+    )
+      .sort()
+      .map(([r, c]) => `${r}:${c}`)
+      .join(',')}`;
 
-    // Per-reason "why no hint for X?" trace — a normal degradation, at debug so
-    // it doesn't add noise, but greppable by hint_reason in CloudWatch.
-    for (const [reason, count] of Object.entries(reasons)) {
+    if (emitGate(signature)) {
       logEvent({
-        level: 'debug',
+        level: 'info',
         surface: SURFACE,
-        message: 'trigger skipped',
-        context: { hint_reason: reason, hint_count: count },
+        message: 'reconcile',
+        context: {
+          hint_flag_on: flagOn,
+          hint_master_on: true,
+          hint_generated: generated,
+          hint_expired: expired,
+          hint_pruned_stale: prunedStale,
+          hint_total: total,
+          hint_skipped_records: skipped,
+        },
       });
+
+      // Per-reason "why no hint for X?" trace. Emitted only alongside the
+      // reconcile event it explains — repeating the explanation for an outcome
+      // that has not changed adds volume, not understanding.
+      for (const [reason, count] of Object.entries(reasons)) {
+        logEvent({
+          level: 'debug',
+          surface: SURFACE,
+          message: 'trigger skipped',
+          context: { hint_reason: reason, hint_count: count },
+        });
+      }
     }
   }
 
