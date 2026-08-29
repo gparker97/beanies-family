@@ -4,6 +4,8 @@ import {
   startEndForDate,
   masterOccurrenceBody,
   computeExceptionHash,
+  activityToGoogleEvent,
+  toInstanceBody,
 } from '../activityToGoogleEvent';
 
 const ctx = {
@@ -55,12 +57,25 @@ describe('startEndForDate', () => {
 });
 
 describe('masterOccurrenceBody', () => {
-  it('produces a single-instance body (recurrence:[], confirmed) anchored to the occurrence', () => {
+  it('produces a single-instance body (no recurrence key, confirmed) anchored to the occurrence', () => {
     const body = masterOccurrenceBody(makeActivity(), '2026-06-17', ctx);
-    expect(body.recurrence).toEqual([]); // NEVER an RRULE on an instance
+    // Google 400s on the PRESENCE of `recurrence` in an instance patch — even `[]`
+    // (the 2026-08-28 prod reconcile loop). The key must be absent, not empty.
+    expect('recurrence' in body).toBe(false);
     expect(body.status).toBe('confirmed');
     expect(body.summary).toBe('Piano');
     expect(body.start).toEqual({ dateTime: '2026-06-17T15:00:00', timeZone: 'Asia/Singapore' });
+  });
+});
+
+describe('toInstanceBody', () => {
+  it('strips only the recurrence key and keeps every other field', () => {
+    const resource = activityToGoogleEvent(makeActivity({ recurrence: 'weekly' }), ctx);
+    expect(resource.recurrence.length).toBeGreaterThan(0);
+    const body = toInstanceBody(resource);
+    expect('recurrence' in body).toBe(false);
+    const { recurrence: _r, ...rest } = resource;
+    expect(body).toEqual(rest);
   });
 });
 

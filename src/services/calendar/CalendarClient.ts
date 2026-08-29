@@ -40,6 +40,7 @@ export type CalendarErrorKind =
   | 'conflict' // 409 → event already exists → patch path
   | 'rate_limited' // 429 → transient, back off
   | 'transient' // 5xx / network → transient, back off
+  | 'invalid' // 400 → Google rejected the request body/params — deterministic, never retryable
   | 'unknown';
 
 /** A classified calendar API error. Carries the kind the engine branches on. */
