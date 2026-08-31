@@ -8,6 +8,12 @@
 - [the beanstalk (blog)](https://beanies.family/blog): stories, updates, philosophy from the making of beanies.family
 - [help center](https://beanies.family/help): 24+ articles across 5 categories — getting started, features, security, how it works, what's new
 - [about greg](https://beanies.family/about/greg): founder bio
+- [switching to beanies.family](https://beanies.family/from): hub for people moving from another family organizer
+
+## switching from another app
+
+- [from maple](https://beanies.family/from/maple): maple retires Dec 31, 2026 and deletes user data; feature comparison, migration steps, and what beanies does differently
+- [from cozi](https://beanies.family/from/cozi): cozi alternative without ads or a premium paywall; feature comparison and migration steps
 
 ## policies
 
