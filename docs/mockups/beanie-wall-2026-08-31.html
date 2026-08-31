@@ -1,0 +1,759 @@
+<meta charset="utf-8">
+<title>Beanie Wall Directions</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   beanie wall — mockup exploration v2 (issue #78)
+   CIG-clamped: Heritage Orange for accents (never Alert Red), Outfit/Inter/
+   Caveat, squircle radii, soft diffused shadows only.
+   The bar at the top of this PAGE is mockup furniture, not the design.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --heritage-orange:#F15D22; --terracotta:#E67E22; --deep-slate:#2C3E50;
+  --sky-silk:#AED6F1; --cloud-white:#F8F9FA; --soft-green:#27AE60;
+  --muted:#4d5d6c; --sq:26px;
+  --card-shadow:0 4px 20px rgb(44 62 80 / 6%);
+  --lift-shadow:0 10px 34px rgb(44 62 80 / 10%);
+  --c-greg:#2C3E50; --c-sofia:#E67E22; --c-leo:#F15D22; --c-milo:#3D8FD1; --c-theo:#27AE60;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#eef1f4;color:var(--deep-slate);
+  font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* ── mockup furniture ─────────────────────────────────────────────── */
+.bar{position:sticky;top:0;z-index:60;display:flex;flex-wrap:wrap;gap:16px;align-items:center;
+  padding:13px 20px;background:#fff;box-shadow:0 1px 0 rgb(44 62 80 / 8%)}
+.bar h1{font-family:'Outfit';font-size:.98rem;font-weight:800;margin:0 10px 0 0}
+.bar h1 span{color:var(--heritage-orange)}
+.grp{display:flex;align-items:center;gap:6px}
+.grp b{font-family:'Outfit';font-size:.64rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-right:3px}
+.tab{font-family:'Outfit';font-size:.78rem;font-weight:600;padding:7px 13px;border:0;cursor:pointer;
+  border-radius:999px;background:rgb(44 62 80 / 6%);color:var(--deep-slate)}
+.tab[aria-pressed="true"]{background:var(--heritage-orange);color:#fff}
+.hint{margin-left:auto;font-size:.75rem;color:var(--muted);max-width:40ch;line-height:1.45}
+.note{padding:11px 20px 0;font-size:.82rem;color:var(--muted)}
+.note b{color:var(--deep-slate)}
+.stage{display:flex;justify-content:center;padding:20px 20px 46px}
+.frame{background:#1f2d3a;border-radius:26px;padding:14px;box-shadow:0 26px 60px rgb(44 62 80 / 26%);
+  transform-origin:top center}
+.screen{overflow:hidden;border-radius:14px;background:var(--cloud-white);position:relative}
+.land .screen{width:1280px;height:800px}
+.port .screen{width:800px;height:1180px}
+
+/* ── the wall ─────────────────────────────────────────────────────── */
+.wall{position:absolute;inset:0;display:flex;flex-direction:column;
+  background:
+    radial-gradient(900px 500px at 8% -6%, rgb(241 93 34 / 7%), transparent 70%),
+    radial-gradient(800px 460px at 96% 4%, rgb(174 214 241 / 30%), transparent 72%),
+    var(--cloud-white)}
+.top{display:flex;align-items:center;gap:18px;padding:20px 28px 12px;flex:none}
+.today-date{font-family:'Outfit';font-weight:800;letter-spacing:-.02em;line-height:1;font-size:42px}
+.today-date .dow{color:var(--heritage-orange)}
+.top-sub{font-size:14.5px;color:var(--muted);margin-top:6px}
+.topright{margin-left:auto;display:flex;align-items:center;gap:14px}
+.clock{text-align:right}
+.clock .t{font-family:'Outfit';font-weight:800;font-size:38px;line-height:1;letter-spacing:-.02em}
+.clock .saved{font-size:12.5px;color:var(--muted);margin-top:5px;display:flex;align-items:center;
+  gap:6px;justify-content:flex-end}
+.clock .saved i{width:7px;height:7px;border-radius:50%;background:var(--soft-green);display:block}
+/* the lock is now an icon only — adults know it's there */
+/* compact view switcher — three glyphs, ~150px total */
+.vswitch{display:flex;background:#fff;border-radius:18px;box-shadow:var(--card-shadow);padding:4px;gap:2px;flex:none}
+.vswitch button{width:46px;height:44px;border:0;background:transparent;border-radius:14px;cursor:pointer;
+  font-size:19px;line-height:1;display:grid;place-items:center;color:var(--deep-slate);opacity:.5}
+.vsep{width:1px;background:rgb(44 62 80 / 10%);margin:6px 3px}
+.vswitch button[aria-pressed="true"]{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));
+  color:#fff;opacity:1;box-shadow:0 3px 10px rgb(241 93 34 / 30%)}
+/* lists: owned checklists with progress, distinct from per-person jobs */
+.lrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgb(44 62 80 / 6%)}
+.lrow:last-child{border-bottom:0}
+.lrow .le{font-size:22px;line-height:1}
+.lrow .lt{font-family:'Outfit';font-size:15.5px;font-weight:600;line-height:1.2}
+.lrow .lo{font-size:11.5px;color:var(--muted);margin-top:1px}
+.lrow .lp{margin-left:auto;text-align:right;flex:none}
+.lrow .lp b{font-family:'Outfit';font-size:14px;font-weight:700}
+.lrow .track{width:62px;height:7px;border-radius:999px;background:rgb(44 62 80 / 9%);margin-top:4px;overflow:hidden}
+.lrow .track i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--heritage-orange),var(--terracotta))}
+.pill-r{display:inline-block;font-family:'Outfit';font-size:9.5px;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;background:rgb(241 93 34 / 12%);color:var(--heritage-orange);
+  border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:2px}
+/* trip: decorative header + real segment detail */
+.triphead{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.triphead .tge{font-size:30px;line-height:1}
+.triphead .tgn{font-family:'Outfit';font-size:19px;font-weight:700}
+.triphead .tgd{font-size:12.5px;color:#bdc3c7;margin-top:1px}
+.leg{display:flex;align-items:center;gap:9px;font-size:13px;color:#dfe6ec;padding:4px 0}
+.leg b{font-family:'Outfit';font-weight:700;font-size:13.5px;color:#fff}
+.leg .arw{color:var(--sky-silk);opacity:.8}
+.leg .fno{margin-left:auto;font-size:11.5px;color:#9fb3c4}
+.lockbtn{width:52px;height:52px;border-radius:18px;background:#fff;box-shadow:var(--card-shadow);
+  display:grid;place-items:center;font-size:22px;cursor:pointer;flex:none;position:relative}
+.lockmenu{position:absolute;top:64px;right:0;width:264px;background:#fff;border-radius:20px;
+  box-shadow:var(--lift-shadow);padding:8px;display:none;z-index:20;text-align:left}
+.lockmenu.on{display:block}
+.lockmenu i{display:block;font-style:normal;font-family:'Outfit';font-size:11px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.lockmenu a{display:flex;gap:11px;align-items:center;padding:11px 12px;border-radius:14px;
+  font-size:15.5px;font-weight:500;text-decoration:none;color:var(--deep-slate)}
+.lockmenu a:hover{background:rgb(44 62 80 / 5%)}
+.lockmenu a em{font-style:normal;font-size:19px}
+
+.body{flex:1;display:flex;gap:16px;padding:2px 28px 0;min-height:0;overflow:hidden}
+.port .body{flex-direction:column}
+.main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:11px}
+.rail{width:296px;flex:none;display:flex;flex-direction:column;gap:11px;min-height:0;overflow:hidden}
+.port .rail{width:auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:none}
+
+/* the bottom band — A uses the space under short day columns */
+.band{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+
+
+.card{background:#fff;border-radius:var(--sq);box-shadow:var(--card-shadow);padding:15px 17px;
+  cursor:pointer;transition:transform .18s,box-shadow .18s}
+.card:hover{transform:translateY(-2px);box-shadow:var(--lift-shadow)}
+.card h3{font-family:'Outfit';font-size:12.5px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--heritage-orange);margin:0 0 10px;
+  display:flex;align-items:center;gap:6px}
+.card h3 u{margin-left:auto;text-decoration:none;color:var(--muted);font-size:15px;opacity:.5}
+.card.dark{background:linear-gradient(160deg,#33475b,var(--deep-slate));color:#ecf0f1}
+.card.dark h3{color:var(--sky-silk)}
+.port .card{padding:12px 13px}
+.port .today-date{font-size:33px}
+.port .top{gap:12px;padding:16px 22px 10px}
+.port .topright{gap:10px}
+.port .clock .t{font-size:31px}
+.port .clock .saved{white-space:nowrap;font-size:11.5px}
+.port .vswitch button{width:40px;height:38px;font-size:17px}
+.port .lockbtn{width:44px;height:44px;font-size:19px}
+.port .band .jt{font-size:14.5px}
+.port .band .lrow .lt{font-size:14px}
+.port .band .lrow .le{font-size:19px}
+.port .band .meal .n{font-size:17px}
+.port .band .triphead .tgn{font-size:16px}
+.port .band .stars{font-size:11.5px}
+.port .band .leg{display:none}
+.port .band .triphead{margin-bottom:4px}
+.port .band .triphead .tge{font-size:24px}
+.port .band .triphead .tgd{font-size:11px}
+.port .band .meal{gap:9px}
+.port .band .meal .emoji{font-size:24px}
+.port .band .meal .who{font-size:11px}
+.port .tripline{display:block;font-size:11.5px;color:#9fb3c4;margin-top:2px}
+.tripline{display:none}
+
+.job{display:flex;align-items:center;gap:11px;padding:8px 0;
+  border-bottom:1px solid rgb(44 62 80 / 6%);cursor:pointer;user-select:none;position:relative}
+.job:last-child{border-bottom:0}
+.tick{width:29px;height:29px;border-radius:50%;border:2.5px solid rgb(44 62 80 / 18%);flex:none;
+  display:grid;place-items:center;color:#fff;font-size:15px;
+  transition:background .16s,border-color .16s,transform .16s}
+.job.done .tick{background:var(--soft-green);border-color:var(--soft-green);transform:scale(1.06)}
+.job.done .jt{text-decoration:line-through;opacity:.42}
+.jt{font-size:16.5px;font-weight:500;line-height:1.25}
+.who{font-size:12px;color:var(--muted);margin-top:1px}
+.owner{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:1px}
+.meal{display:flex;align-items:center;gap:13px}
+.meal .emoji{font-size:32px;line-height:1}
+.meal .n{font-family:'Outfit';font-size:21px;font-weight:700}
+.trip .bar-days{display:block;height:10px;border-radius:999px;background:rgb(255 255 255 / 18%);overflow:hidden}
+.trip .bar-days i{display:block;height:100%;width:62%;border-radius:999px;
+  background:linear-gradient(90deg,var(--heritage-orange),var(--terracotta))}
+
+/* ── A: week grid ─────────────────────────────────────────────────── */
+.week{flex:1;display:grid;grid-template-columns:repeat(7,1fr);gap:9px;min-height:0}
+.port .week{grid-template-columns:1fr 1fr;grid-template-rows:1.62fr 1fr 1fr 1fr;gap:7px}
+.port .day{flex-direction:column}
+
+.port .dbody{flex-direction:column;flex-wrap:nowrap;gap:4px;padding:7px}
+.port .ev{flex:none;padding:5px 8px 5px 10px}
+.evmore{flex:0 0 74px;display:flex;align-items:center;justify-content:center;border-radius:12px;
+  background:rgb(241 93 34 / 9%);color:var(--heritage-orange);font-family:'Outfit';
+  font-weight:700;font-size:13px;cursor:pointer;text-align:center;line-height:1.2}
+.day{background:#fff;border-radius:20px;box-shadow:var(--card-shadow);display:flex;
+  flex-direction:column;overflow:hidden;min-height:0}
+.day.today{box-shadow:0 0 0 3px var(--heritage-orange),var(--lift-shadow)}
+.dhead{padding:10px 11px 8px;text-align:center;border-bottom:1px solid rgb(44 62 80 / 6%)}
+.port .dhead{display:flex;align-items:baseline;justify-content:center;gap:9px;padding:7px 11px 5px}
+.day.today .dhead{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));
+  color:#fff;border:0}
+.dow-s{font-family:'Outfit';font-size:12px;font-weight:700;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted)}
+.day.today .dow-s{color:rgb(255 255 255 / 88%)}
+.dnum{font-family:'Outfit';font-size:26px;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+.dbody{padding:7px;display:flex;flex-direction:column;gap:5px;overflow:hidden;flex:1}
+
+.ev{border-radius:12px;padding:6px 8px 6px 10px;background:rgb(44 62 80 / 4%);
+  border-left:5px solid var(--c-greg)}
+
+.ev .tm{font-size:11px;font-weight:600;color:var(--muted)}
+.ev .ti{font-family:'Outfit';font-size:14.5px;font-weight:600;line-height:1.2;margin-top:1px}
+.ev.allday{background:rgb(241 93 34 / 9%);border-left-color:var(--heritage-orange)}
+.more{font-size:12px;color:var(--heritage-orange);padding:3px 4px;font-weight:700;cursor:pointer}
+
+/* ── A: three days in full, the rest as a strip ───────────────────── */
+.days3{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;min-height:0}
+
+.restweek{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.rday{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:9px 12px;
+  display:flex;align-items:center;gap:9px;cursor:pointer}
+.rday .rd{font-family:'Outfit';font-size:14.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em}
+.rday .rn{margin-left:auto;font-family:'Outfit';font-size:13px;font-weight:700;
+  color:var(--heritage-orange);background:rgb(241 93 34 / 10%);border-radius:999px;
+  min-width:26px;text-align:center;padding:2px 7px}
+.rday .pips{margin:0}
+
+/* ── the jobs board (a peer screen, not a drawer) ──────────────────── */
+.jobhead{flex:none;display:flex;align-items:center;gap:16px}
+.backbtn{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:16px;
+  box-shadow:var(--card-shadow);padding:11px 18px;font-family:'Outfit';font-weight:700;
+  font-size:15px;color:var(--deep-slate);cursor:pointer;flex:none}
+.backbtn:hover{box-shadow:var(--lift-shadow)}
+.jobhead h2{font-family:'Outfit';font-size:27px;font-weight:800;margin:0}
+.jobsum{font-size:15px;color:var(--muted)}
+.jobbar{flex:1;height:11px;border-radius:999px;background:rgb(44 62 80 / 8%);overflow:hidden;
+  max-width:340px}
+.jobbar i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--heritage-orange),var(--terracotta))}
+.jbeans{flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;min-height:0}
+.port .jbeans{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-auto-rows:1fr}
+.jbean{background:#fff;border-radius:22px;box-shadow:var(--card-shadow);display:flex;
+  flex-direction:column;overflow:hidden;min-height:0}
+.jbean.allDone{box-shadow:0 0 0 2.5px var(--soft-green),var(--card-shadow)}
+.jb-h{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 10px 10px;
+  text-align:center;border-bottom:1px solid rgb(44 62 80 / 6%)}
+.av.big{width:58px;height:58px;font-size:23px}
+.jb-body{flex:1;padding:8px 12px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.jb-body .chore{padding:9px 0;border-bottom:1px solid rgb(44 62 80 / 5%)}
+.jb-body .chore:last-child{border-bottom:0}
+.jb-body .tick{width:32px;height:32px;font-size:16px}
+.jb-body .jt{font-size:16.5px}
+.jb-stars{flex:none;padding:8px 12px 11px;font-size:15px;letter-spacing:2px;color:#d7dee5}
+.shared{flex:none;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+
+/* ── B: bean lanes (now carrying each bean's chores) ──────────────── */
+.lanes{flex:1;display:grid;gap:9px;min-height:0}
+.land .lanes{grid-template-columns:repeat(5,1fr)}
+.port .lanes{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  grid-auto-rows:1fr;align-content:stretch}
+.lane{background:#fff;border-radius:20px;box-shadow:var(--card-shadow);display:flex;
+  overflow:hidden;min-height:0}
+.land .lane{flex-direction:column}
+.port .lane{flex-direction:column}
+.lhead{display:flex;align-items:center;gap:9px;padding:12px 13px}
+.land .lhead{flex-direction:column;gap:6px;padding:13px 9px 10px;
+  border-bottom:1px solid rgb(44 62 80 / 6%)}
+.port .lhead{flex-direction:column;gap:6px;padding:12px 9px 9px;text-align:center;
+  border-bottom:1px solid rgb(44 62 80 / 6%)}
+.av{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none;
+  font-family:'Outfit';font-weight:800;font-size:19px;box-shadow:0 3px 10px rgb(44 62 80 / 16%)}
+.lname{font-family:'Outfit';font-size:17px;font-weight:700}
+.lcount{font-size:12px;color:var(--muted)}
+.lbody{flex:1 1 auto;min-height:78px;padding:9px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.port .lbody{flex-direction:column;gap:6px}
+.lanechores{flex:none;margin-top:auto;padding:8px 9px 9px;border-top:1px dashed rgb(44 62 80 / 12%)}
+.port .lanechores{margin-top:auto;border-top:1px dashed rgb(44 62 80 / 12%);border-left:0;width:auto}
+.lc-h{font-family:'Outfit';font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.chore{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;user-select:none}
+.chore .tick{width:24px;height:24px;font-size:13px;border-width:2px}
+.chore .jt{font-size:14.5px}
+.free-note{font-family:'Caveat';font-size:22px;color:var(--muted);opacity:.7;margin:auto}
+
+/* ── C: today first ───────────────────────────────────────────────── */
+.hero{flex:1;display:flex;flex-direction:column;gap:10px;min-height:0}
+.now-list{flex:1;background:#fff;border-radius:var(--sq);box-shadow:var(--card-shadow);
+  padding:4px 18px;display:flex;flex-direction:column;overflow:hidden}
+.slot{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid rgb(44 62 80 / 6%);
+  align-items:center}
+.slot:last-child{border-bottom:0}
+.slot .when{font-family:'Outfit';font-weight:800;font-size:22px;width:92px;flex:none}
+.slot .when em{display:block;font-family:'Inter';font-size:11.5px;font-weight:600;font-style:normal;
+  color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.slot .what{flex:1;min-width:0}
+.slot .what .h{font-family:'Outfit';font-size:22px;font-weight:700;line-height:1.2}
+.slot .what .s{font-size:14px;color:var(--muted);margin-top:2px}
+.faces{display:flex;flex:none}
+.faces .av{width:38px;height:38px;font-size:15px;margin-left:-10px;border:3px solid #fff}
+.faces .av:first-child{margin-left:0}
+.slot.now{background:linear-gradient(90deg,rgb(241 93 34 / 9%),transparent 70%);
+  border-radius:16px;padding-left:13px;padding-right:13px;margin:3px -13px}
+.nowtag{font-family:'Outfit';font-size:10.5px;font-weight:800;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--heritage-orange)}
+.strip{flex:none;display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.sday{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:9px 7px;
+  text-align:center;cursor:pointer}
+.sday.on{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:#fff}
+.sday .sd{font-family:'Outfit';font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+.sday.on .sd{color:rgb(255 255 255 / 88%)}
+.sday .sn{font-family:'Outfit';font-size:20px;font-weight:800;line-height:1.15}
+.pips{display:flex;gap:3px;justify-content:center;margin-top:5px;min-height:7px}
+.pips i{width:7px;height:7px;border-radius:50%;display:block}
+.sday.on .pips i{box-shadow:0 0 0 1.5px rgb(255 255 255 / 55%)}
+
+.foot{flex:none;display:flex;align-items:center;gap:9px;padding:12px 28px 18px}
+.pfilter{display:flex;gap:8px}
+.pf{display:inline-flex;align-items:center;gap:7px;background:#fff;border-radius:999px;
+  padding:5px 14px 5px 5px;box-shadow:var(--card-shadow);font-family:'Outfit';font-weight:600;
+  font-size:14.5px;cursor:pointer}
+.pf .av{width:30px;height:30px;font-size:12.5px;box-shadow:none}
+.pf.all{padding-left:14px}
+.pf[aria-pressed="true"]{background:var(--deep-slate);color:#fff}
+.brand{margin-left:auto;font-family:'Outfit';font-weight:700;font-size:13px;color:var(--muted);
+  opacity:.7}
+.brand span{color:var(--heritage-orange)}
+
+/* ── drill-in sheet ───────────────────────────────────────────────── */
+.sheet{position:absolute;inset:0;background:rgb(44 62 80 / 42%);display:none;z-index:30;
+  align-items:flex-end}
+.sheet.on{display:flex}
+.sheet-in{background:var(--cloud-white);width:100%;height:84%;border-radius:30px 30px 0 0;
+  padding:24px 28px 26px;overflow:hidden;display:flex;flex-direction:column}
+.port .sheet-in{height:78%}
+.jgrp{display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid rgb(44 62 80 / 6%)}
+.jgrp:last-of-type{border-bottom:0}
+.av.sm{width:32px;height:32px;font-size:13px;box-shadow:none}
+.srctag{margin-left:auto;font-size:15px;opacity:.65;flex:none}
+.sheet-h{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex:none}
+.sheet-h h2{font-family:'Outfit';font-size:28px;font-weight:800;margin:0}
+.sheet-h .x{margin-left:auto;width:46px;height:46px;border-radius:16px;background:#fff;
+  box-shadow:var(--card-shadow);display:grid;place-items:center;font-size:20px;cursor:pointer}
+.choreboard{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px;overflow:hidden;
+  align-content:start;flex:1;min-height:0}
+.cb{overflow:hidden}
+.port .choreboard{grid-template-columns:repeat(2,1fr)}
+.port .cb .jt{font-size:15px}
+.cb{background:#fff;border-radius:20px;box-shadow:var(--card-shadow);padding:14px 15px}
+.cb-h{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.cb-h .av{width:36px;height:36px;font-size:14px}
+.cb-h b{font-family:'Outfit';font-size:16px}
+.stars{font-size:13px;color:var(--muted);margin-top:8px}
+
+/* ── celebration ──────────────────────────────────────────────────── */
+.pop{position:absolute;pointer-events:none;font-size:26px;z-index:40;
+  animation:pop-up 1100ms cubic-bezier(.22,.9,.3,1) forwards}
+@keyframes pop-up{
+  0%{opacity:0;transform:translate(0,0) scale(.4) rotate(0deg)}
+  18%{opacity:1;transform:translate(var(--dx,0),-18px) scale(1.15) rotate(var(--r,0deg))}
+  100%{opacity:0;transform:translate(calc(var(--dx,0px) * 2.4),-108px) scale(.85)
+       rotate(calc(var(--r,0deg) * 2.2))}}
+.cheer{position:absolute;z-index:41;pointer-events:none;font-family:'Caveat';font-size:30px;
+  font-weight:700;color:var(--heritage-orange);white-space:nowrap;
+  animation:cheer 1400ms ease-out forwards}
+@keyframes cheer{
+  0%{opacity:0;transform:translateY(6px) scale(.86)}
+  20%{opacity:1;transform:translateY(-6px) scale(1.06)}
+  70%{opacity:1;transform:translateY(-14px) scale(1)}
+  100%{opacity:0;transform:translateY(-30px) scale(.98)}}
+
+/* ── night: dim + clock, warm ─────────────────────────────────────── */
+.night{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 30%,#16202c,#0d141d);
+  color:#e7edf3;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:50}
+.night.on{display:flex}
+.night .brandmark{position:absolute;left:34px;bottom:30px;display:flex;align-items:center;gap:11px;
+  opacity:.55}
+.night .brandmark .m{font-size:30px;line-height:1}
+.night .brandmark .w{font-family:'Outfit';font-weight:700;font-size:15px;color:#8ea3b8}
+.night .brandmark .w span{color:var(--heritage-orange)}
+.night .brandmark small{display:block;font-family:'Inter';font-size:9px;color:#4d6376;margin-top:2px}
+.night .nt{font-family:'Outfit';font-weight:800;font-size:138px;line-height:.95;letter-spacing:-.04em}
+.night .nd{font-family:'Outfit';font-size:22px;font-weight:600;color:#8ea3b8;margin-top:4px}
+.night .nx{margin-top:22px;font-size:14.5px;color:#63798f}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="bar">
+  <h1>beanie<span>.wall</span> — v2</h1>
+  <div class="grp"><b>direction</b>
+    <button class="tab" data-dir="A" aria-pressed="true">A · week wall</button>
+    <button class="tab" data-dir="B" aria-pressed="false">B · bean lanes</button>
+    <button class="tab" data-dir="C" aria-pressed="false">C · today first</button>
+    <button class="tab" data-dir="J" aria-pressed="false">the jobs board</button>
+  </div>
+  <div class="grp"><b>orientation</b>
+    <button class="tab" data-or="land" aria-pressed="true">landscape</button>
+    <button class="tab" data-or="port" aria-pressed="false">portrait</button>
+  </div>
+  <div class="grp"><b>states</b>
+    <button class="tab" id="lockBtn2" aria-pressed="false">lock menu</button>
+    <button class="tab" id="sheetBtn" aria-pressed="false">chore board</button>
+    <button class="tab" id="nightBtn" aria-pressed="false">night</button>
+    <button class="tab" id="sparseBtn" aria-pressed="false">no meals / no to-dos</button>
+  </div>
+  <p class="hint">Tick a chore to see the celebration. Tap the lock icon, a card header, or "+N more".</p>
+</div>
+<p class="note" id="blurb"></p>
+<div class="stage"><div class="frame land" id="frame"><div class="screen" id="screenEl"></div></div></div>
+
+<script>
+const FAM=[
+  {id:'greg', n:'greg', s:'G', c:'var(--c-greg)'},
+  {id:'sofia',n:'sofia',s:'S', c:'var(--c-sofia)'},
+  {id:'leo',  n:'leo',  s:'L', c:'var(--c-leo)'},
+  {id:'milo', n:'milo', s:'M', c:'var(--c-milo)'},
+  {id:'theo', n:'theo', s:'T', c:'var(--c-theo)'}];
+const byId=Object.fromEntries(FAM.map(m=>[m.id,m]));
+const DAYS=[
+  {dow:'mon',num:31,today:true,ev:[
+    {t:'all day',ti:'KL trip',who:'greg',allday:true},
+    {t:'8:05am',ti:'school run',who:'sofia'},
+    {t:'3:45pm',ti:'reading club',who:'milo'},
+    {t:'4:00pm',ti:'swim',who:'theo'},
+    {t:'5:30pm',ti:'football training',who:'leo'},
+    {t:'6:30pm',ti:'pasta night',who:'sofia'}]},
+  {dow:'tue',num:1,ev:[
+    {t:'all day',ti:'KL trip',who:'greg',allday:true},
+    {t:'3:00pm',ti:'dentist',who:'sofia'},
+    {t:'5:00pm',ti:'football',who:'milo'}]},
+  {dow:'wed',num:2,ev:[
+    {t:'4:30pm',ti:'piano',who:'leo'},
+    {t:'6:30pm',ti:'taco night',who:'sofia'},
+    {t:'7:40pm',ti:'greg lands',who:'greg'}]},
+  {dow:'thu',num:3,ev:[
+    {t:'9:00am',ti:'school assembly',who:'milo'},
+    {t:'3:30pm',ti:'playdate',who:'theo'}]},
+  {dow:'fri',num:4,ev:[
+    {t:'5:00pm',ti:'football match',who:'leo'},
+    {t:'6:30pm',ti:'pizza + movie',who:'sofia'}]},
+  {dow:'sat',num:5,ev:[
+    {t:'10:00am',ti:'big shop',who:'sofia'},
+    {t:'2:00pm',ti:"milo's party",who:'milo'}]},
+  {dow:'sun',num:6,ev:[
+    {t:'9:00am',ti:'pancakes',who:'theo'},
+    {t:'2:00pm',ti:'reset day',who:'greg'}]}];
+/* JOBS map to TodoItem: assigneeIds + a due date. This is the only thing in the
+   model that is per-person AND per-day, so it is what a lane can show. */
+const CHORES=[
+  {t:'homework',        w:'leo',  done:true},
+  {t:'tidy the toys',   w:'theo', done:false},
+  {t:'shoes away',      w:'theo', done:false},
+  {t:'load dishwasher', w:'sofia',done:false}];
+/* LISTS map to FamilyList: ONE ownerId, items have no assignee, and a list is
+   either one-off (dueDate) or recurring (cadence). The "chores list" is just a
+   recurring list. Categories are home/out/kids/health/celebrations/trips/projects/me. */
+const LISTS=[
+  {e:'🧹',t:"leo's jobs",  own:'leo',  cat:'kids',life:'recurring',
+   items:[{t:'bins out',done:false},{t:'hoover the stairs',done:false},{t:'homework in the bag',done:true}]},
+  {e:'🐟',t:"milo's jobs", own:'milo', cat:'kids',life:'recurring',
+   items:[{t:'feed the fish',done:true},{t:'swim bag packed',done:false}]},
+  {e:'🛒',t:'grocery run',  own:'sofia',cat:'out', life:'oneoff',
+   items:[{t:'milk',done:true},{t:'pasta',done:true},{t:'bananas',done:false},{t:'bread',done:false},
+          {t:'washing powder',done:false},{t:'apples',done:false}]},
+  {e:'🧳',t:'KL packing',   own:'greg', cat:'trips',life:'oneoff',
+   items:[{t:'passport',done:true},{t:'charger',done:true},{t:'shirts',done:false}]}];
+const listDone=l=>l.items.filter(i=>i.done).length;
+/* A list has ONE owner, so an owned list behaves like that person's jobs even
+   though its items carry no assignee. Recurring lists (the chore lists) lead;
+   a long one-off list is capped so a grocery run can't flood a lane. */
+function jobsFor(mid){
+  const out=CHORES.map((c,i)=>({...c,src:'todo',i})).filter(j=>j.w===mid);
+  LISTS.filter(l=>l.own===mid && l.life==='recurring').forEach(l=>{
+    const li=LISTS.indexOf(l);
+    l.items.forEach((it,ii)=>out.push({t:it.t,done:it.done,src:l.e,list:l.t,li,ii}));});
+  return out;
+}
+const sharedLists=()=>LISTS.filter(l=>l.life==='oneoff');
+const allJobs=()=>FAM.flatMap(m=>jobsFor(m.id));
+const TODOS=[
+  {t:"book theo's dentist",w:'sofia',done:false},
+  {t:'renew passports',    w:'greg', done:false}];
+/* toggled from the mockup bar to show the layout giving space back */
+let HAS_MEALS=true, HAS_TODOS=true, HAS_LISTS=true;
+const CHEERS=['nice one!','boom 💥','get in!','chore = beaned','look at you go','one down!'];
+const BLURB={
+ J:'<b>the jobs board.</b> A peer of the calendar, not a drawer: chores are half the reason the wall exists. One column per bean, big tick targets, a star per job done, and a green ring when a bean finishes. Shared one-off lists (the grocery run, the packing list) sit along the bottom, separate from anybody\'s jobs.',
+ A:'<b>A · the days.</b> Three days in full, every event visible with no truncation, and the rest of the week as a tappable strip beneath. Trades the seven-day overview for actually being able to read today, tomorrow and the day after from across the room.',
+ B:'<b>B · bean lanes.</b> One lane per bean. Each lane now carries that person\'s chores under their events, which is how chores actually get assigned at home. A child finds their own column and sees their whole day: what they have on, and what they owe.',
+ C:'<b>C · today first.</b> Today at full size with a "happening now" marker, the week as a strip beneath. Best legibility at three metres; the week is a summary, so planning further out costs a tap on a day.'};
+
+const av=(m,cls='av')=>`<span class="${cls}" style="background:${m.c}">${m.s}</span>`;
+const evHtml=e=>`<div class="ev ${e.allday?'allday':''}" style="border-left-color:${byId[e.who].c}">
+  <div class="tm">${e.t}</div><div class="ti">${e.ti}</div></div>`;
+const jobRow=(j,i,kind)=>`<div class="job ${j.done?'done':''}" data-kind="${kind}" data-i="${i}">
+  <span class="tick">✓</span><span><span class="jt">${j.t}</span>
+  <span class="who"><i class="owner" style="background:${byId[j.w].c}"></i>${byId[j.w].n}</span></span></div>`;
+const choreRow=(j,i)=>`<div class="chore job ${j.done?'done':''}" data-kind="chore" data-i="${i}">
+  <span class="tick">✓</span><span class="jt">${j.t}</span></div>`;
+const anyRow=j=>j.src==='todo'
+  ? `<div class="chore job ${j.done?'done':''}" data-kind="chore" data-i="${j.i}">
+      <span class="tick">✓</span><span class="jt">${j.t}</span></div>`
+  : `<div class="chore job ${j.done?'done':''}" data-kind="li" data-l="${j.li}" data-i="${j.ii}">
+      <span class="tick">✓</span><span class="jt">${j.t}</span><span class="srctag">${j.src}</span></div>`;
+
+const cardJobs=()=>{
+  const all=FAM.flatMap(m=>jobsFor(m.id)), done=all.filter(j=>j.done).length;
+  const beans=FAM.filter(m=>jobsFor(m.id).some(j=>!j.done)).slice(0,ori==='port'?2:3);
+  return `<div class="card" data-view="J"><h3>today's jobs <u>›</u></h3>
+    ${beans.map(m=>{const mine=jobsFor(m.id).filter(j=>!j.done);
+      return `<div class="jgrp">${av(m,'av sm')}<span><span class="jt">${mine[0].t}</span>
+        <span class="who">${m.n}${mine.length>1?` · +${mine.length-1} more`:''}</span></span></div>`;}).join('')}
+    <div class="stars">${done} of ${all.length} done${HAS_TODOS&&TODOS.length?` · ${TODOS.length} undated`:''} · tap for the board</div></div>`;};
+const cardLists=()=>`<div class="card" data-sheet="lists"><h3>the lists <u>›</u></h3>
+  ${LISTS.slice(0,ori==='port'?2:4).map(l=>`<div class="lrow"><span class="le">${l.e}</span>
+    <span><span class="lt">${l.t}${l.life==='recurring'?'<span class="pill-r">repeats</span>':''}</span>
+      <span class="lo"><i class="owner" style="background:${byId[l.own].c}"></i>${byId[l.own].n}'s list</span></span>
+    <span class="lp"><b>${listDone(l)}/${l.items.length}</b>
+      <span class="track"><i style="width:${Math.round(listDone(l)/l.items.length*100)}%"></i></span></span></div>`).join('')}
+  </div>`;
+const cardMeal=()=>`<div class="card" data-sheet="meals"><h3>tonight <u>›</u></h3>
+  <div class="meal"><span class="emoji">🍝</span><div><div class="n">pasta night</div>
+  <div class="who">sofia is cooking</div></div></div></div>`;
+const cardTodo=()=>`<div class="card" data-sheet="todo"><h3>family to-do <u>›</u></h3>
+  ${TODOS.map((j,i)=>jobRow(j,i,'todo')).join('')}</div>`;
+const cardTrip=()=>`<div class="card dark" data-sheet="trip"><h3>the trip <u>›</u></h3>
+  <div class="triphead"><span class="tge">🛫</span>
+    <div><div class="tgn">kuala lumpur</div>
+      <div class="tgd">greg · 31 aug – 2 sep · 2 nights</div></div></div>
+  <div class="leg"><span class="arw">out</span><b>SIN</b><span class="arw">→</span><b>KUL</b>
+    <span>09:15</span><span class="fno">MH 606</span></div>
+  <div class="leg"><span class="arw">back</span><b>KUL</b><span class="arw">→</span><b>SIN</b>
+    <span>18:20</span><span class="fno">MH 613 · wed</span></div>
+  <div class="tripline">out 09:15 MH606 · back wed 18:20 MH613</div>
+  <div class="trip" style="margin-top:9px"><span class="bar-days"><i></i></span></div></div>`;
+function activeCards(){
+  const out=[];
+  if (allJobs().length) out.push(cardJobs());
+  if (HAS_MEALS) out.push(cardMeal());
+  out.push(cardTrip());
+  return out;
+}
+const band=()=>{const c=activeCards(); if(!c.length) return '';
+  const cols = c.length;
+  return `<div class="band" style="grid-template-columns:repeat(${cols},1fr)">${c.join('')}</div>`;};
+const cards=()=>activeCards().join('');
+
+const topBar=()=>`<div class="top">
+  <div><div class="today-date"><span class="dow">monday</span> 31 august</div>
+    <div class="top-sub">week of 31 aug · 6 things on today</div></div>
+  <div class="topright">
+    <div class="vswitch">
+      <button data-view="A" aria-pressed="${dir==='A'}" title="the week">▦</button>
+      <button data-view="B" aria-pressed="${dir==='B'}" title="each bean">👥</button>
+      <button data-view="C" aria-pressed="${dir==='C'}" title="today">☀</button>
+      <span class="vsep"></span>
+      <button data-view="J" aria-pressed="${dir==='J'}" title="the jobs board">✅</button>
+    </div>
+    <div class="clock"><div class="t">7:42<span style="font-size:19px"> am</span></div>
+      <div class="saved"><i></i>saved 2 min ago</div></div>
+    <div class="lockbtn" id="lock">🔒
+      <div class="lockmenu" id="lockmenu">
+        <i>the wall is locked</i>
+        <a><em>🔓</em>unlock edits with your PIN</a>
+        <a><em>🌙</em>start night mode now</a>
+        <a><em>↩️</em>leave the beanie wall</a>
+      </div></div>
+  </div></div>`;
+const foot=()=>`<div class="foot"><div class="pfilter">
+  <span class="pf all" aria-pressed="true">everyone</span>
+  ${FAM.map(m=>`<span class="pf" aria-pressed="false">${av(m)}${m.n}</span>`).join('')}
+  </div><span class="brand">beanies<span>.family</span></span></div>`;
+
+function viewA(){
+  const n = ori==='land' ? 7 : 3;
+  const show=DAYS.slice(0,n), rest=DAYS.slice(n);
+  return `<div class="wall">${topBar()}<div class="body"><div class="main">
+    <div class="days3" style="grid-template-columns:repeat(${n},1fr)">${show.map(d=>`
+      <div class="day ${d.today?'today':''}">
+        <div class="dhead"><div class="dow-s">${d.dow}</div><div class="dnum">${d.num}</div></div>
+        <div class="dbody">${(()=>{const cap=ori==='port'?8:6;
+          if(!d.ev.length) return '<span class="free-note" style="font-size:19px;margin:auto">nothing on 🫘</span>';
+          return d.ev.slice(0,cap).map(evHtml).join('')
+            + (d.ev.length>cap?`<div class="more" data-sheet="day">+${d.ev.length-cap} more ›</div>`:'');})()}</div>
+      </div>`).join('')}</div>
+    ${rest.length?`<div class="restweek" style="grid-template-columns:repeat(${rest.length},1fr)">${
+      rest.map(d=>`<div class="rday" data-sheet="day">
+      <span class="rd">${d.dow} ${d.num}</span>
+      <span class="pips">${d.ev.slice(0,4).map(e=>`<i style="background:${byId[e.who].c}"></i>`).join('')}</span>
+      <span class="rn">${d.ev.length}</span></div>`).join('')}</div>`:''}
+    ${band()}
+  </div></div>${foot()}</div>`;
+}
+/* the jobs board is a peer of the calendar, not a drawer: it is half the reason
+   the wall exists, so it gets the whole screen */
+function viewJ(){
+  const all=allJobs(), done=all.filter(j=>j.done).length;
+  return `<div class="wall">${topBar()}<div class="body"><div class="main">
+    <div class="jobhead"><span class="backbtn" data-view="${prevCal}">‹ back to ${
+      ({A:'the days',B:'the beans',C:'today'})[prevCal]}</span>
+      <h2>the jobs board</h2>
+      <span class="jobsum">${done} of ${all.length} done today</span>
+      <span class="jobbar"><i style="width:${Math.round(done/all.length*100)}%"></i></span></div>
+    <div class="jbeans">${FAM.map(m=>{
+      const mine=jobsFor(m.id), d=mine.filter(j=>j.done).length;
+      return `<div class="jbean ${mine.length&&d===mine.length?'allDone':''}">
+        <div class="jb-h">${av(m,'av big')}<div><div class="lname">${m.n}</div>
+          <div class="lcount">${mine.length?d+' of '+mine.length:'nothing today'}</div></div></div>
+        <div class="jb-body">${mine.length?mine.map(anyRow).join('')
+          :'<span class="free-note" style="font-size:19px;margin:auto">free as a bean 🫘</span>'}</div>
+        ${mine.length?`<div class="jb-stars">${'⭐'.repeat(d)}${'·'.repeat(Math.max(0,mine.length-d))}</div>`:''}
+      </div>`;}).join('')}</div>
+    <div class="shared">${sharedLists().map((l,i)=>{const li=LISTS.indexOf(l);
+      return `<div class="card" data-sheet="lists"><h3>${l.e} ${l.t} <u>›</u></h3>
+        <div class="lrow" style="border:0;padding:0">
+          <span><span class="lo"><i class="owner" style="background:${byId[l.own].c}"></i>${byId[l.own].n}'s list</span></span>
+          <span class="lp"><b>${listDone(l)}/${l.items.length}</b>
+            <span class="track"><i style="width:${Math.round(listDone(l)/l.items.length*100)}%"></i></span></span>
+        </div></div>`;}).join('')}</div>
+  </div></div>${foot()}</div>`;
+}
+function viewB(){
+  return `<div class="wall">${topBar()}<div class="body"><div class="main">
+    <div class="lanes">${FAM.map(m=>{
+      const evs=DAYS[0].ev.filter(e=>e.who===m.id);
+      const tom=DAYS[1].ev.filter(e=>e.who===m.id).length;
+      const mine=jobsFor(m.id);
+      return `<div class="lane">
+        <div class="lhead">${av(m)}<div><div class="lname">${m.n}</div>
+          <div class="lcount">${evs.length?evs.length+' today':'nothing on'}${tom?' · '+tom+' tomorrow':''}</div>
+        </div></div>
+        <div class="lbody">${evs.length?evs.map(evHtml).join('')
+          :'<span class="free-note">free as a bean 🫘</span>'}</div>
+        ${mine.length?`<div class="lanechores"><div class="lc-h">jobs · ${
+          mine.filter(j=>j.done).length}/${mine.length}</div>
+          ${mine.slice(0,2).map(anyRow).join('')}
+          ${mine.length>2?`<div class="more" data-sheet="chores">+${mine.length-2} more ›</div>`:''}</div>`:''}
+      </div>`;}).join('')}</div>
+    ${band()}
+  </div></div>${foot()}</div>`;
+}
+function viewC(){
+  const slots=[
+    {w:'7:40',e:'now',h:'breakfast + school run',s:'leave by 8:05',who:['sofia','milo','theo'],now:true},
+    {w:'9:00',e:'am', h:'greg flies to KL',s:'back wednesday evening',who:['greg']},
+    {w:'3:45',e:'pm', h:'reading club',s:'milo · pick up at 4:45',who:['milo']},
+    {w:'4:00',e:'pm', h:'swim',s:'the leisure centre · kit is by the door',who:['theo']},
+    {w:'5:30',e:'pm', h:'football training',s:'leo · boots in the hall',who:['leo']},
+    {w:'6:30',e:'pm', h:'pasta night',s:'sofia is cooking',who:['sofia','leo','milo','theo']}];
+  return `<div class="wall">${topBar()}<div class="body">
+    <div class="main"><div class="hero">
+      <div class="now-list">${slots.map(s=>`<div class="slot ${s.now?'now':''}">
+        <div class="when">${s.w}<em>${s.e}</em></div>
+        <div class="what">${s.now?'<div class="nowtag">happening now</div>':''}
+          <div class="h">${s.h}</div><div class="s">${s.s}</div></div>
+        <div class="faces">${s.who.map(id=>av(byId[id])).join('')}</div></div>`).join('')}</div>
+      <div class="strip">${DAYS.map(d=>`<div class="sday ${d.today?'on':''}" data-sheet="day">
+        <div class="sd">${d.dow}</div><div class="sn">${d.num}</div>
+        <div class="pips">${d.ev.slice(0,4).map(e=>`<i style="background:${byId[e.who].c}"></i>`).join('')}</div>
+      </div>`).join('')}</div>
+    </div></div>
+    <div class="rail">${cards()}</div></div>${foot()}</div>`;
+}
+const sheetJobs=()=>`<div class="sheet-h"><h2>the jobs board</h2>
+    <span class="who" style="font-size:15px">to-dos due today, plus each bean's own lists</span>
+    <span class="x" id="sheetX">✕</span></div>
+  <div class="choreboard">${FAM.map(m=>{
+    const mine=jobsFor(m.id), done=mine.filter(j=>j.done).length;
+    return `<div class="cb"><div class="cb-h">${av(m)}<b>${m.n}</b></div>
+      ${mine.length?mine.map(anyRow).join('')
+        :'<span class="free-note" style="font-size:18px">nothing today 🫘</span>'}
+      ${mine.length?`<div class="stars">${'⭐'.repeat(done)}${'·'.repeat(Math.max(0,mine.length-done))} ${done}/${mine.length}</div>`:''}
+    </div>`;}).join('')}</div>`;
+const sheetLists=()=>`<div class="sheet-h"><h2>the lists</h2>
+    <span class="who" style="font-size:15px">every active list · tap an item to tick it</span>
+    <span class="x" id="sheetX">✕</span></div>
+  <div class="choreboard">${LISTS.map((l,li)=>`<div class="cb">
+    <div class="cb-h"><span style="font-size:26px">${l.e}</span>
+      <b>${l.t}</b>${l.life==='recurring'?'<span class="pill-r">repeats</span>':''}</div>
+    <div class="who" style="margin:-4px 0 8px"><i class="owner" style="background:${byId[l.own].c}"></i>${byId[l.own].n}'s list</div>
+    ${l.items.map((it,ii)=>`<div class="chore job ${it.done?'done':''}" data-kind="li" data-l="${li}" data-i="${ii}">
+      <span class="tick">✓</span><span class="jt">${it.t}</span></div>`).join('')}
+    <div class="stars">${listDone(l)} of ${l.items.length} done</div></div>`).join('')}</div>`;
+const sheet=()=>`<div class="sheet" id="sheet"><div class="sheet-in">
+  ${sheetType==='lists'?sheetLists():sheetJobs()}</div></div>`;
+const night=()=>`<div class="night" id="night">
+  <div class="nt">7:42</div><div class="nd">monday 31 august</div>
+  <div class="nx">6 things on tomorrow · touch to wake the wall</div>
+  <div class="brandmark"><span class="m">🫘🤝🫘</span>
+    <span><span class="w">beanies<span>.family</span></span>
+      <small>[ hugging-beanies webp goes here ]</small></span></div></div>`;
+
+let dir='A', ori='land', prevCal='A', isNight=false, isSheet=false, isLock=false, sheetType='chores';
+const stageEl=document.getElementById('screenEl'), frame=document.getElementById('frame');
+
+function celebrate(el){
+  const box=stageEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+  const x=r.left-box.left+14, y=r.top-box.top;
+  const beans=['🫘','🫘','⭐','🎉','🫘'];
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    beans.forEach((b,i)=>{
+      const s=document.createElement('span'); s.className='pop'; s.textContent=b;
+      s.style.left=x+'px'; s.style.top=y+'px';
+      s.style.setProperty('--dx',(i-2)*22+'px');
+      s.style.setProperty('--r',((i%2)?-1:1)*24+'deg');
+      s.style.animationDelay=(i*45)+'ms';
+      stageEl.appendChild(s); setTimeout(()=>s.remove(),1300);
+    });
+  }
+  const c=document.createElement('span'); c.className='cheer';
+  c.textContent=CHEERS[Math.floor(Math.random()*CHEERS.length)];
+  c.style.left=(x+34)+'px'; c.style.top=(y-6)+'px';
+  stageEl.appendChild(c); setTimeout(()=>c.remove(),1500);
+}
+function render(keep){
+  stageEl.innerHTML=({A:viewA,B:viewB,C:viewC,J:viewJ})[dir]()+sheet()+night();
+  frame.className='frame '+ori;
+  document.getElementById('night').classList.toggle('on',isNight);
+  document.getElementById('sheet').classList.toggle('on',isSheet);
+  document.getElementById('lockmenu').classList.toggle('on',isLock);
+  document.getElementById('blurb').innerHTML=BLURB[dir];
+  fit(); wire();
+}
+function wire(){
+  stageEl.querySelectorAll('[data-kind]').forEach(el=>el.addEventListener('click',ev=>{
+    ev.stopPropagation();
+    const k=el.dataset.kind;
+    const item = k==='li' ? LISTS[+el.dataset.l].items[+el.dataset.i]
+               : k==='todo' ? TODOS[+el.dataset.i] : CHORES[+el.dataset.i];
+    item.done=!item.done;
+    const tick=el.getBoundingClientRect();
+    render(); if(item.done) celebrate({getBoundingClientRect:()=>tick});
+  }));
+  stageEl.querySelectorAll('[data-sheet]').forEach(el=>el.addEventListener('click',ev=>{
+    ev.stopPropagation();
+    sheetType = el.dataset.sheet==='lists' ? 'lists' : 'chores';
+    isSheet=true; render();
+  }));
+  stageEl.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',ev=>{
+    ev.stopPropagation();
+    if (dir!=='J') prevCal=dir;
+    dir=el.dataset.view; isSheet=isLock=false;
+    document.querySelectorAll('[data-dir]').forEach(x=>
+      x.setAttribute('aria-pressed', x.dataset.dir===dir));
+    render();
+  }));
+  const lock=document.getElementById('lock');
+  if(lock) lock.addEventListener('click',ev=>{ev.stopPropagation(); isLock=!isLock; render();});
+  const x=document.getElementById('sheetX');
+  if(x) x.addEventListener('click',ev=>{ev.stopPropagation(); isSheet=false; render();});
+  const n=document.getElementById('night');
+  if(n) n.addEventListener('click',()=>{isNight=false;
+    document.getElementById('nightBtn').setAttribute('aria-pressed',false); render();});
+}
+function fit(){
+  const avail=window.innerWidth-56, w=ori==='land'?1308:828;
+  frame.style.transform='scale('+Math.max(.25,Math.min(1,avail/w))+')';
+}
+document.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>{
+  if (dir!=='J') prevCal=dir;
+  dir=b.dataset.dir; isSheet=isLock=false;
+  document.querySelectorAll('[data-dir]').forEach(x=>x.setAttribute('aria-pressed',x===b)); render();}));
+document.querySelectorAll('[data-or]').forEach(b=>b.addEventListener('click',()=>{
+  ori=b.dataset.or;
+  document.querySelectorAll('[data-or]').forEach(x=>x.setAttribute('aria-pressed',x===b)); render();}));
+document.getElementById('sparseBtn').addEventListener('click',e=>{
+  const on = e.target.getAttribute('aria-pressed')!=='true';
+  HAS_MEALS=!on; HAS_TODOS=!on; e.target.setAttribute('aria-pressed',on); render();});
+document.getElementById('nightBtn').addEventListener('click',e=>{
+  isNight=!isNight; e.target.setAttribute('aria-pressed',isNight); render();});
+document.getElementById('sheetBtn').addEventListener('click',e=>{
+  isSheet=!isSheet; e.target.setAttribute('aria-pressed',isSheet); render();});
+document.getElementById('lockBtn2').addEventListener('click',e=>{
+  isLock=!isLock; e.target.setAttribute('aria-pressed',isLock); render();});
+window.addEventListener('resize',fit);
+render();
+</script>
