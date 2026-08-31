@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **New pages for families moving over from another app.** If you're coming from Maple (which shuts down on December 31, 2026) or from Cozi, there's now a page for each at beanies.family/from, with a side-by-side comparison, the steps to bring your family across, and an honest word about what the other app does well.
 
+### Fixed
+
+- Fixed a date-dependent bug in the planner's automated tests that made them fail on the last day of any month.
+
 ## 2026-08-29
 
 ### Added

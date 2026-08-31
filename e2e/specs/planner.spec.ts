@@ -67,13 +67,22 @@ test.describe('Family Planner', () => {
    * So: use tomorrow when start+7 still fits in the month, otherwise fall back
    * to the 1st. A start in the past is fine here — every one of these tests
    * asserts against IndexedDB, and the month grid renders past days normally.
+   *
+   * Every month calculation below anchors on TODAY's month, never tomorrow's:
+   * on the last day of a month `tomorrow` has already rolled into the next one,
+   * and a series started there renders nothing in the grid the planner is
+   * showing. That made both recurring-scope tests fail on 2026-08-31.
    */
   function recurringSeriesStartStr(): string {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const lastDayOfMonth = new Date(tomorrow.getFullYear(), tomorrow.getMonth() + 1, 0).getDate();
-    const useFirst = tomorrow.getDate() + 7 > lastDayOfMonth;
-    const target = useFirst ? new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1) : tomorrow;
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    const tomorrowIsThisMonth = tomorrow.getFullYear() === year && tomorrow.getMonth() === month;
+    const useFirst = !tomorrowIsThisMonth || tomorrow.getDate() + 7 > lastDayOfMonth;
+    const target = useFirst ? new Date(year, month, 1) : tomorrow;
     return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(
       target.getDate()
     ).padStart(2, '0')}`;
