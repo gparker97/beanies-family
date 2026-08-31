@@ -35,7 +35,7 @@ A couple months into the project, [family organization-type apps](/guides/family
 
 One of the biggest is an app called C*ozi*, which has been around since 2005. The general commentary is that it feels dated. Cozi was acquired a few years back, and users appear to be pissed off that they started charging. Case in point are these [scathing trustpilot reviews](https://www.trustpilot.com/review/cozi.com). The app had been completely free since its inception.
 
-**_I_** would have been pissed off that _Cozi_ was harvesting and selling my family's data for all those years, so some random company could show me ads (and who knows what else), and now they were both charging me _and_ harvesting my data. But that's just me. **Remember, if you're not paying for the product, you _are_ the product.** Or, in some cases, you're both. If that makes sense.
+**_I_** would have been pissed off that _Cozi_ was harvesting and selling my family's data for all those years, so some random company could show me ads (and who knows what else), and now they were both charging me _and_ harvesting my data. But that's just me. **Remember, if you're not paying for the product, you _are_ the product.** (If you've had enough of that, here's [the cozi alternative, and how to move your family across](/from/cozi).) Or, in some cases, you're both. If that makes sense.
 
 That being said, here is way more information than I ever cared to know about family and financial planning products. Interestingly, there aren't many that actually do both family _and_ financial planning (or do both well, I should say).
 

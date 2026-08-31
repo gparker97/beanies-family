@@ -29,6 +29,12 @@ _the facts, for those in a hurry. laid out in beanie form._
 
 ## For Maple users: First things first - get your data out
 
+<div class="post-alert">
+
+**Thinking of moving to beanies? The step-by-step lives here.** [The maple moving guide](/from/maple) has the deadline, a feature-by-feature comparison, and the three steps to get your family set up.
+
+</div>
+
 If you're a Maple user, here's what matters right now:
 
 - Your account (and Maple itself) is up until December 31, 2026
