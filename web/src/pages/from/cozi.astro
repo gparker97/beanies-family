@@ -1,0 +1,285 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { APP_URL } from '@beanies/brand/nav';
+// Caveat — the CIG handwritten accent face. Imported per-page rather than in
+// BaseLayout for the same reason WorldsBeanstalk.astro imports it: only the
+// pages that actually use the accent should pay for the font.
+import '@fontsource-variable/caveat';
+import '../../styles/switch-page.css';
+
+const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
+---
+
+<BaseLayout
+  title="cozi alternative - switching to beanies.family"
+  description="looking for a cozi alternative without ads? beanies.family does the same job - calendars, to-dos, meals, and even finances - with no ads, nothing behind a paywall, and your family's data in your own encrypted file."
+  canonicalPath="/from/cozi"
+  lcpImage={MASCOT}
+>
+  <div class="welcome-page">
+    <header class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <Breadcrumbs
+            items={[
+              { label: 'home', href: '/' },
+              { label: 'switching', href: '/from' },
+              { label: 'from cozi', href: '/from/cozi' },
+            ]}
+          />
+          <p class="kicker kicker-pill"><i aria-hidden="true">🗓️</i> switching from cozi</p>
+          <h1>your family calendar<br /><em>shouldn't show you ads.</em></h1>
+          <p class="sub">
+            Cozi has been the default family organizer for years, and its free plan pays for itself by
+            putting ads in front of your family's schedule. So we're rolling out the welcome mat instead.
+            beanies.family captures all the same stuff - calendars, to-dos, meals, and more (even finances)
+            - but your data lives with <em>you</em>, on <em>your</em> storage. I never see it, so I can't
+            read it, lose it, or delete it. Which is, IMHO, the way it should be.
+          </p>
+          <div class="btns">
+            <a
+              href={APP_URL}
+              data-cta="CTA: Create Pod"
+              data-cta-loc="from-cozi-hero"
+              class="btn btn-primary">start counting beans 🫘</a
+            >
+            <a href="#side-by-side" class="btn btn-ghost">see the side-by-side ↓</a>
+          </div>
+          <ul class="trust">
+            <li>🔒 end-to-end encrypted</li>
+            <li>📂 your file, your storage</li>
+            <li>🚫 no ads, ever</li>
+            <li>🆓 free (for now)</li>
+          </ul>
+        </div>
+
+        <div class="scene" aria-hidden="true">
+          <div class="doorframe">
+            <div class="door">
+              <span class="door-glow"></span>
+              <img class="door-mascot" src={MASCOT} width="150" height="150" alt="" decoding="async" />
+            </div>
+          </div>
+          <div class="mat"><span>oh hi, cozi friends 👋</span></div>
+          <div class="path">
+            <span class="leaf">🗓️</span>
+            <span class="bean b1"></span><span class="bean b2"></span>
+            <span class="bean b3"></span><span class="bean b4"></span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="section">
+      <div class="wrap">
+        <p class="section-label">the short version</p>
+        <h2 class="section-title">the facts, for those in a hurry</h2>
+        <div class="handout">
+          <h3>🗓️ → 🫘 the cozi moving guide</h3>
+          <div class="facts">
+            <p class="fact">
+              <b>the ad thing</b>Free-with-ads means the app's real customer is the advertiser. beanies has
+              no ads and no advertisers, so you're the customer, full stop.
+            </p>
+            <p class="fact">
+              <b>the paywall thing</b>There are two paid tiers now: Gold at $39/year and Max at $79/year.
+              The month view on your phone is one of the paid bits. In beanies, everything's included.
+              There is no gold tier. There's barely a bronze one.
+            </p>
+            <p class="fact">
+              <b>where beanies keeps your data</b>In one encrypted file on your own storage (Google Drive
+              or local). Not on my servers. I don't have servers with your data on them.
+            </p>
+            <p class="fact">
+              <b>what it costs</b>It's free. Yes, really. Probably not forever, but no ads for life is the
+              beanies guarantee. And that one I mean.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="side-by-side" class="section section-tight">
+      <div class="wrap">
+        <p class="section-label">side by side</p>
+        <h2 class="section-title">cozi vs beanies, honestly</h2>
+        <p class="section-subtitle">Now, here comes the pitch, so get ready. You knew this was coming.</p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">feature</span></th>
+                <th scope="col" class="mk">🗓️ cozi</th>
+                <th scope="col" class="mk">🫘 beanies</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">shared family calendar</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">shopping lists &amp; meals</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">to-dos &amp; chores</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">family finances &amp; budgets</th><td class="meh">no</td><td class="good">✓</td></tr>
+              <tr><th scope="row">ads in the free app</th><td class="warn">yes</td><td class="good">no ads at any price</td></tr>
+              <tr><th scope="row">month view on your phone</th><td class="meh">paid tiers only</td><td class="good">✓</td></tr>
+              <tr><th scope="row">premium paywall</th><td class="meh">gold $39/yr, max $79/yr</td><td class="good">everything's included</td></tr>
+              <tr><th scope="row">where your data lives</th><td class="meh">their servers</td><td class="good">your storage</td></tr>
+              <tr><th scope="row">can the company read it?</th><td class="meh">yes</td><td class="good">no. can't. encrypted.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-fade section-fade-to-story"></div>
+    <section class="section letter">
+      <div class="wrap narrow">
+        <p class="section-label">the part where i'm honest</p>
+        <h2 class="section-title">i'm not here to dunk on cozi</h2>
+        <p>
+          Cozi has been around forever, it's stable, and millions of families run on it, and you don't last
+          that long by being bad at this. If the ads genuinely don't bother you and paying to remove them
+          feels fair, carry on. No hard feelings.
+        </p>
+        <p>
+          But a family calendar knows a lot about you: where your kids are after school, when the house is
+          empty, what you're saving for. That always felt like the wrong thing to build an ad audience
+          around. So I built the version where nobody's watching, including me.
+        </p>
+        <blockquote class="pull">
+          "why do we allow one person to carry all the mental load at home, when we wouldn't accept that at
+          work?" - me,
+          <a href="https://dadmag.substack.com/p/vibe-coding-dad-of-three" rel="noopener">in an actual interview</a>,
+          sounding smarter than usual
+        </blockquote>
+        <p>
+          The whole point of a shared family organizer is sharing the load. beanies just does it without an
+          ad department in the room.
+        </p>
+      </div>
+    </section>
+    <div class="section-fade section-fade-to-dark"></div>
+
+    <section class="section dark">
+      <div class="wrap">
+        <p class="section-label section-label-light">have your cake, and eat it too</p>
+        <h2 class="section-title">private doesn't mean less anymore</h2>
+        <p class="section-subtitle">
+          the bit most family apps ask you to give up, and the bit you don't have to give up here.
+        </p>
+        <div class="cakegrid">
+          <div class="cakecard">
+            <h3>🙈 encrypted means encrypted</h3>
+            <p>
+              Most apps encrypt your data <span class="em">on their servers</span>, with their keys, which
+              is a security feature. beanies encrypts it <span class="em">before it leaves your device</span>,
+              with your key, which is a privacy feature. I can't read it, sell it, or lose it, because I
+              never had it in the first place.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>📂 one file, yours</h3>
+            <p>
+              Everything lives in a single encrypted <span class="em">.beanpod</span> file on your Google
+              Drive or device. Lose your password? I can't help you. That's kinda the whole point.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>🤷 nothing to steal</h3>
+            <p>
+              Even if a hacker wanted to poke around our dark corner of the internet, there's nothing there
+              except code and app configuration. Good luck finding anything to leak.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <p class="section-label">moving day</p>
+        <h2 class="section-title">three boxes and you're in</h2>
+        <div class="boxes">
+          <div class="box">
+            <span class="tape">box #1</span>
+            <span class="emoji" aria-hidden="true">📦</span>
+            <h3>get your stuff out of cozi</h3>
+            <p>
+              Bring your calendar and lists across. It's your data, so take it with you, and the guide
+              covers the fiddly bits.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">box #2</span>
+            <span class="emoji" aria-hidden="true">🚚</span>
+            <h3>set up your pod</h3>
+            <p>
+              Create your family pod in about two minutes: pick a PIN, save your Recovery Kit, add your
+              beans. No password. No account on my servers.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">box #3</span>
+            <span class="emoji" aria-hidden="true">🎉</span>
+            <h3>unpack &amp; put the kettle on</h3>
+            <p>
+              Invite the family, connect Google Calendar if you use it, and get on with your week. You're
+              home. And nobody's showing you ads about it.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap">
+        <p class="section-label">fair questions</p>
+        <h2 class="section-title">things cozi folks actually ask</h2>
+        <details open>
+          <summary>no ads really means no ads?</summary>
+          <p>
+            Really. There are no advertisers to answer to, because there are no advertisers. The business
+            model is you, someday, paying a fair price if you want more, not your attention sliced up and
+            sold.
+          </p>
+        </details>
+        <details>
+          <summary>okay but what if YOU shut down?</summary>
+          <p>
+            No matter what happens to beanies.family in the future, your data is <em>always</em> yours. It
+            belongs to you, and it's sitting on your own device or storage. Which is kind of the whole point.
+          </p>
+        </details>
+        <details>
+          <summary>is it hard to switch?</summary>
+          <p>
+            It's just a few minutes to set up. You can go through the onboarding, which makes importing your
+            data dead simple. Our wizard walks you through every step.
+          </p>
+        </details>
+        <details>
+          <summary>why is it free?</summary>
+          <p>
+            Right now, I cover the costs myself; someday there'll be a fair price for families who want
+            more, and I promise it won't burn a hole in your wallet. What there won't be, ever: ads. Or
+            popups. Or anybody reading your family's data besides you, and your family. Which is the way it
+            should be for your precious beans.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final">
+      <p class="kicker">the welcome mat is out</p>
+      <h2 class="final-title">every. bean. <em>counts.</em></h2>
+      <p class="section-subtitle">even the ones arriving from cozi.</p>
+      <a
+        href={APP_URL}
+        data-cta="CTA: Create Pod"
+        data-cta-loc="from-cozi-footer"
+        class="btn btn-primary">start counting beans 🫘</a
+      >
+      <p class="signoff">peace out, my beans.<br /><span class="g">greg</span></p>
+      <p class="ps">ps. stuck mid-move? come yell at me (nicely) on the <a href="/discord">discord</a>.</p>
+    </section>
+  </div>
+</BaseLayout>

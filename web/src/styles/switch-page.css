@@ -1,0 +1,756 @@
+/**
+ * Shared styling for the /from/* switching pages (maple, cozi, and skylight
+ * when the tablet weekly view ships).
+ *
+ * Every selector is namespaced under `.welcome-page` because a page-level CSS
+ * import is global in Astro — unprefixed `table`, `details` and `summary` rules
+ * would otherwise reach the help center. Keep the prefix on anything added here.
+ *
+ * Class names are kebab-case, not BEM: stylelint lints standalone .css (it does
+ * not lint the style blocks inside .astro), and `selector-class-pattern` rejects
+ * `__` / `--`. Rules are also ordered by ascending specificity per selector
+ * target to satisfy `no-descending-specificity`.
+ *
+ * The hub at /from is deliberately NOT on this sheet: it is a signpost with a
+ * different layout (cards, no doorway) and keeps its own scoped styles.
+ */
+
+.welcome-page {
+  --deep-slate: #2c3e50;
+  --heritage-orange: #f15d22;
+  --sky-silk: #aed6f1;
+  --terracotta: #e67e22;
+  --cloud-white: #f8f9fa;
+  --soft-green: #27ae60;
+  --body-text: #4a5568;
+
+  /* Same AA-safe muted shade the homepage settled on. The lighter slate it
+     replaced measured ~2.9:1 on cloud-white and failed the contrast audit. */
+  --muted-text: #4d5d6c;
+  --story-cream: #fdf8f5;
+  --sq: 24px;
+  --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+  --card-hover-shadow: 0 8px 32px rgb(44 62 80 / 10%);
+
+  background: var(--cloud-white);
+  color: var(--body-text);
+  font-family: 'Inter Variable', Inter, sans-serif;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+.welcome-page .sr-only {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.welcome-page .wrap {
+  margin: 0 auto;
+  max-width: 1040px;
+  padding: 0 24px;
+}
+
+.welcome-page .narrow {
+  max-width: 680px;
+}
+
+/* Low-specificity element rules first, so the class rules below can override
+   them without tripping no-descending-specificity. */
+.welcome-page details p {
+  color: var(--muted-text);
+  font-size: 0.93rem;
+  margin: 0.8rem 0 0;
+}
+
+.welcome-page .final-title em {
+  color: var(--heritage-orange);
+  font-style: italic;
+}
+
+/* ── hero: copy left, the arrival scene right ─────────────────────────── */
+.welcome-page .hero {
+  background:
+    radial-gradient(700px 440px at 10% 2%, rgb(241 93 34 / 10%), transparent 68%),
+    radial-gradient(600px 400px at 90% 24%, rgb(174 214 241 / 34%), transparent 70%),
+    radial-gradient(520px 340px at 64% 102%, rgb(230 126 34 / 10%), transparent 70%),
+    var(--cloud-white);
+  overflow: hidden;
+  padding: 104px 24px 66px;
+  position: relative;
+}
+
+.welcome-page .hero-grid {
+  align-items: center;
+  display: grid;
+  gap: 52px;
+  grid-template-columns: 1.04fr 0.96fr;
+  margin: 0 auto;
+  max-width: 1060px;
+}
+
+.welcome-page .kicker {
+  color: var(--heritage-orange);
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.welcome-page .kicker-pill {
+  align-items: center;
+  background: rgb(241 93 34 / 10%);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 7px 16px 7px 12px;
+}
+
+.welcome-page .kicker-pill i {
+  font-size: 0.95rem;
+  font-style: normal;
+  line-height: 1;
+}
+
+.welcome-page .hero h1 {
+  color: var(--deep-slate);
+  font-size: clamp(2.5rem, 5.3vw, 3.85rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.03;
+  margin: 0.9rem 0 0;
+  text-wrap: balance;
+}
+
+.welcome-page .hero h1 em {
+  color: var(--heritage-orange);
+  font-style: italic;
+}
+
+.welcome-page .hero .sub {
+  color: var(--muted-text);
+  margin: 1.15rem 0 0;
+  max-width: 47ch;
+}
+
+.welcome-page .hero .sub em {
+  font-style: italic;
+  font-weight: 600;
+}
+
+.welcome-page .btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px;
+  margin-top: 32px;
+}
+
+.welcome-page .btn {
+  border-radius: 16px;
+  display: inline-block;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 14px 26px;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.welcome-page .btn:hover {
+  transform: translateY(-2px);
+}
+
+.welcome-page .btn-primary {
+  background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  box-shadow: 0 8px 24px rgb(241 93 34 / 32%);
+  color: #fff;
+}
+
+.welcome-page .btn-primary:hover {
+  box-shadow: 0 14px 32px rgb(241 93 34 / 38%);
+}
+
+.welcome-page .btn-ghost {
+  background: #fff;
+  box-shadow: var(--card-shadow);
+  color: var(--deep-slate);
+}
+
+.welcome-page .btn-ghost:hover {
+  box-shadow: var(--card-hover-shadow);
+}
+
+.welcome-page .trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+}
+
+.welcome-page .trust li {
+  align-items: center;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: var(--card-shadow);
+  color: var(--muted-text);
+  display: inline-flex;
+  font-size: 0.78rem;
+  gap: 7px;
+  padding: 8px 15px;
+}
+
+/* ── signature: the lit doorway, the mat, the pod path leading in ──────── */
+.welcome-page .scene {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  position: relative;
+}
+
+.welcome-page .scene::before {
+  background: radial-gradient(closest-side, rgb(241 93 34 / 26%), transparent 72%);
+  border-radius: 50%;
+  content: '';
+  height: 80%;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 2%;
+  transform: translateX(-50%);
+  width: min(430px, 112%);
+}
+
+.welcome-page .doorframe {
+  animation: rise-in 600ms ease-out both;
+  background: linear-gradient(180deg, #39506a, var(--deep-slate));
+  border-radius: 130px 130px 26px 26px;
+  box-shadow: 0 28px 56px rgb(44 62 80 / 26%);
+  padding: 12px 12px 0;
+  position: relative;
+}
+
+.welcome-page .door {
+  align-items: flex-end;
+  background: linear-gradient(180deg, #fffaf4 0%, #ffefdc 60%, #ffe3c8 100%);
+  border-radius: 118px 118px 15px 15px;
+  display: flex;
+  height: clamp(212px, 26vw, 256px);
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  width: clamp(170px, 21vw, 208px);
+}
+
+.welcome-page .door-glow {
+  background: radial-gradient(closest-side, rgb(241 93 34 / 38%), transparent 76%);
+  bottom: -34%;
+  height: 74%;
+  left: -22%;
+  pointer-events: none;
+  position: absolute;
+  right: -22%;
+}
+
+.welcome-page .door-mascot {
+  height: auto;
+  margin-bottom: 6px;
+  position: relative;
+  width: clamp(112px, 14vw, 150px);
+}
+
+.welcome-page .mat {
+  animation: mat-in 550ms ease-out 300ms both;
+  background: repeating-linear-gradient(90deg, #e8b98a 0 10px, #e2ad78 10px 20px);
+  border: 6px solid #c98d55;
+  border-radius: 12px;
+  box-shadow: 0 20px 30px rgb(44 62 80 / 20%);
+  margin-top: -6px;
+  padding: 15px 12px 17px;
+  position: relative;
+  text-align: center;
+  transform: perspective(560px) rotateX(43deg);
+  width: min(300px, 92%);
+  z-index: 2;
+}
+
+.welcome-page .mat span {
+  color: #7a4a1d;
+  font-family: 'Caveat Variable', Caveat, Outfit, cursive;
+  font-size: 1.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.welcome-page .path {
+  align-items: center;
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.welcome-page .path .leaf {
+  animation: rise-in 400ms ease-out 500ms both;
+  filter: grayscale(0.5);
+  font-size: 1rem;
+  opacity: 0.32;
+}
+
+/* The Pod, in its mandated order: slate, terracotta, orange, sky silk. */
+.welcome-page .bean {
+  animation: bean-pop 380ms ease-out both;
+  border-radius: 50% 50% 48% 48% / 62% 62% 38% 38%;
+  flex: none;
+  height: 19px;
+  width: 15px;
+}
+
+.welcome-page .b1 {
+  animation-delay: 580ms;
+  background: var(--deep-slate);
+}
+
+.welcome-page .b2 {
+  animation-delay: 660ms;
+  background: var(--terracotta);
+}
+
+.welcome-page .b3 {
+  animation-delay: 740ms;
+  background: var(--heritage-orange);
+}
+
+.welcome-page .b4 {
+  animation-delay: 820ms;
+  background: var(--sky-silk);
+}
+
+/* One orchestrated entrance, not scattered effects. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mat-in {
+  from {
+    opacity: 0;
+    transform: perspective(560px) rotateX(43deg) translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: perspective(560px) rotateX(43deg);
+  }
+}
+
+@keyframes bean-pop {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.65);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── sections ──────────────────────────────────────────────────────────── */
+.welcome-page .section {
+  padding: 72px 0;
+}
+
+.welcome-page .section-tight {
+  padding-top: 0;
+}
+
+.welcome-page .section-label {
+  color: var(--heritage-orange);
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.welcome-page .section-label-light {
+  color: var(--sky-silk);
+}
+
+.welcome-page .section-title {
+  color: var(--deep-slate);
+  font-size: clamp(1.7rem, 3.6vw, 2.4rem);
+  font-weight: 800;
+  margin: 0.4rem 0 0.6rem;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.welcome-page .section-subtitle {
+  color: var(--muted-text);
+  margin: 0 auto 2.4rem;
+  max-width: 560px;
+  text-align: center;
+}
+
+.welcome-page .section-fade {
+  height: 80px;
+}
+
+.welcome-page .section-fade-to-story {
+  background: linear-gradient(var(--cloud-white), var(--story-cream));
+}
+
+.welcome-page .section-fade-to-dark {
+  background: linear-gradient(var(--story-cream), #243342);
+}
+
+/* handout */
+.welcome-page .handout {
+  background: #fff;
+  border-radius: var(--sq);
+  border-top: 6px solid var(--heritage-orange);
+  box-shadow: var(--card-shadow);
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 36px;
+}
+
+.welcome-page .handout h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.welcome-page .facts {
+  display: grid;
+  gap: 18px 28px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 22px;
+}
+
+.welcome-page .fact {
+  color: var(--deep-slate);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.welcome-page .fact b {
+  color: var(--heritage-orange);
+  display: block;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+/* comparison table */
+.welcome-page .tablewrap {
+  background: #fff;
+  border-radius: var(--sq);
+  box-shadow: var(--card-shadow);
+  margin: 0 auto;
+  max-width: 760px;
+  overflow-x: auto;
+}
+
+.welcome-page table {
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  min-width: 520px;
+  width: 100%;
+}
+
+.welcome-page th,
+.welcome-page td {
+  border-bottom: 1px solid rgb(44 62 80 / 7%);
+  padding: 13px 18px;
+  text-align: left;
+}
+
+.welcome-page thead th {
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.welcome-page tbody th {
+  color: var(--deep-slate);
+  font-weight: 500;
+}
+
+.welcome-page tbody td {
+  text-align: center;
+}
+
+.welcome-page tbody tr:last-child th,
+.welcome-page tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.welcome-page .mk {
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.welcome-page .good {
+  color: var(--soft-green);
+  font-weight: 600;
+}
+
+.welcome-page .meh {
+  color: var(--muted-text);
+}
+
+.welcome-page .warn {
+  color: var(--heritage-orange);
+  font-weight: 600;
+}
+
+/* the honest section */
+.welcome-page .letter {
+  background: var(--story-cream);
+}
+
+.welcome-page .letter p {
+  margin: 0 0 1.15rem;
+}
+
+.welcome-page .letter .section-label,
+.welcome-page .letter .section-title {
+  margin-bottom: 1.4rem;
+}
+
+.welcome-page .pull {
+  border-left: 4px solid var(--sky-silk);
+  color: var(--heritage-orange);
+  font-family: 'Caveat Variable', Caveat, Outfit, cursive;
+  font-size: 1.4rem;
+  line-height: 1.4;
+  margin: 1.8rem 0;
+  padding: 0.2rem 0 0.2rem 1.2rem;
+}
+
+.welcome-page .pull a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgb(241 93 34 / 45%);
+  text-underline-offset: 3px;
+}
+
+/* dark privacy band */
+.welcome-page .dark {
+  background: linear-gradient(180deg, #243342, var(--deep-slate));
+  color: #ecf0f1;
+}
+
+.welcome-page .dark .section-title {
+  color: #fff;
+}
+
+.welcome-page .dark .section-subtitle {
+  color: #bdc3c7;
+}
+
+.welcome-page .cakegrid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 0 auto;
+  max-width: 860px;
+}
+
+.welcome-page .cakecard {
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid #4a6274;
+  border-radius: var(--sq);
+  padding: 26px;
+}
+
+.welcome-page .cakecard h3 {
+  color: #fff;
+  font-size: 1.02rem;
+  margin: 0 0 8px;
+}
+
+.welcome-page .cakecard p {
+  color: #bdc3c7;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.welcome-page .cakecard .em {
+  color: var(--sky-silk);
+  font-weight: 600;
+}
+
+/* moving day */
+.welcome-page .boxes {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin: 0 auto;
+  max-width: 900px;
+}
+
+.welcome-page .box {
+  background: #fff;
+  border-radius: var(--sq);
+  box-shadow: var(--card-shadow);
+  padding: 26px;
+  position: relative;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.welcome-page .box:hover {
+  box-shadow: var(--card-hover-shadow);
+  transform: translateY(-2px);
+}
+
+.welcome-page .tape {
+  background: rgb(174 214 241 / 65%);
+  border-radius: 3px;
+  color: var(--deep-slate);
+  font-family: 'Caveat Variable', Caveat, Outfit, cursive;
+  font-size: 1.15rem;
+  left: 50%;
+  padding: 2px 18px;
+  position: absolute;
+  top: -14px;
+  transform: translateX(-50%) rotate(-2deg);
+}
+
+.welcome-page .box h3 {
+  font-size: 1.05rem;
+  margin: 10px 0 8px;
+}
+
+.welcome-page .box p {
+  color: var(--muted-text);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.welcome-page .box .emoji {
+  font-size: 1.9rem;
+}
+
+/* faq */
+.welcome-page details {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--card-shadow);
+  margin: 0 auto 14px;
+  max-width: 720px;
+  padding: 18px 24px;
+}
+
+.welcome-page summary {
+  color: var(--deep-slate);
+  cursor: pointer;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-weight: 600;
+}
+
+/* final cta */
+.welcome-page .final {
+  background:
+    radial-gradient(480px 300px at 50% 0%, rgb(241 93 34 / 8%), transparent 70%), var(--cloud-white);
+  padding: 88px 24px;
+  text-align: center;
+}
+
+.welcome-page .final-title {
+  color: var(--deep-slate);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.welcome-page .signoff {
+  color: var(--deep-slate);
+  font-family: 'Caveat Variable', Caveat, Outfit, cursive;
+  font-size: 1.6rem;
+  margin-top: 44px;
+}
+
+.welcome-page .signoff .g {
+  color: var(--heritage-orange);
+}
+
+.welcome-page .ps {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.welcome-page .ps a {
+  color: var(--heritage-orange);
+}
+
+@media (width <= 860px) {
+  .welcome-page .hero {
+    padding-top: 88px;
+  }
+
+  .welcome-page .hero-grid {
+    gap: 38px;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .welcome-page .hero .sub {
+    margin-inline: auto;
+  }
+
+  .welcome-page .btns,
+  .welcome-page .trust {
+    justify-content: center;
+  }
+
+  .welcome-page .scene {
+    order: 2;
+  }
+}
+
+@media (width <= 640px) {
+  .welcome-page .facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-page .box,
+  .welcome-page .btn {
+    transition: none;
+  }
+
+  .welcome-page .doorframe,
+  .welcome-page .mat,
+  .welcome-page .path .leaf,
+  .welcome-page .bean {
+    animation: none;
+  }
+}

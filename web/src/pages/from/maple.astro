@@ -1,0 +1,275 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { APP_URL } from '@beanies/brand/nav';
+// Caveat — the CIG handwritten accent face. Imported per-page rather than in
+// BaseLayout for the same reason WorldsBeanstalk.astro imports it: only the
+// pages that actually use the accent should pay for the font.
+import '@fontsource-variable/caveat';
+import '../../styles/switch-page.css';
+
+const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
+---
+
+<BaseLayout
+  title="maple alternative - switching to beanies.family"
+  description="maple is shutting down on december 31, 2026. beanies.family does the same job - calendars, to-dos, meals, and even finances - except your family's data lives in your own encrypted file, on your own storage."
+  canonicalPath="/from/maple"
+  lcpImage={MASCOT}
+>
+  <div class="welcome-page">
+    <header class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <Breadcrumbs
+            items={[
+              { label: 'home', href: '/' },
+              { label: 'switching', href: '/from/maple' },
+              { label: 'from maple', href: '/from/maple' },
+            ]}
+          />
+          <p class="kicker kicker-pill"><i aria-hidden="true">🍁</i> switching from maple</p>
+          <h1>maple's going away,<br /><em>but you're welcome here.</em></h1>
+          <p class="sub">
+            Maple is shutting down on December 31, 2026, and your family's data goes with it. So we're
+            rolling out the welcome mat for you to become a beanie. beanies.family captures all the same
+            stuff - calendars, to-dos, meals, and more (even finances) - but your data lives with
+            <em>you</em>, on <em>your</em> storage. I never see it, so I can't read it, lose it, or delete
+            it. Which is, IMHO, the way it should be.
+          </p>
+          <div class="btns">
+            <a
+              href={APP_URL}
+              data-cta="CTA: Create Pod"
+              data-cta-loc="welcome-maple-hero"
+              class="btn btn-primary">start counting beans 🫘</a
+            >
+            <a href="#moving-guide" class="btn btn-ghost">first, get your data out of maple ↓</a>
+          </div>
+          <ul class="trust">
+            <li>🔒 end-to-end encrypted</li>
+            <li>📂 your file, your storage</li>
+            <li>🚫 no ads, ever</li>
+            <li>🆓 free (for now)</li>
+          </ul>
+        </div>
+
+        <div class="scene" aria-hidden="true">
+          <div class="doorframe">
+            <div class="door">
+              <span class="door-glow"></span>
+              <img class="door-mascot" src={MASCOT} width="150" height="150" alt="" decoding="async" />
+            </div>
+          </div>
+          <div class="mat"><span>oh hi, maple friends 👋</span></div>
+          <div class="path">
+            <span class="leaf">🍁</span>
+            <span class="bean b1"></span><span class="bean b2"></span>
+            <span class="bean b3"></span><span class="bean b4"></span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section id="moving-guide" class="section">
+      <div class="wrap">
+        <p class="section-label">the short version</p>
+        <h2 class="section-title">the facts, for those in a hurry</h2>
+        <div class="handout">
+          <h3>🍁 → 🫘 the maple moving guide</h3>
+          <div class="facts">
+            <p class="fact">
+              <b>what happened</b>Maple's team was acqui-hired by Wander. The app retires Dec 31, 2026, and
+              then your data is deleted, with no recovery.
+            </p>
+            <p class="fact">
+              <b>your deadline</b>Get your calendar and lists out of Maple before Dec 31, 2026. Do it soon;
+              your future you will thank you.
+            </p>
+            <p class="fact">
+              <b>where beanies keeps your data</b>In one encrypted file on your own storage (Google Drive
+              or local). Not on my servers. I don't have servers with your data on them.
+            </p>
+            <p class="fact">
+              <b>what it costs</b>It's free. Yes, really. Probably not forever, but no ads for life is the
+              beanies guarantee. And that one I mean.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap">
+        <p class="section-label">side by side</p>
+        <h2 class="section-title">maple vs beanies, honestly</h2>
+        <p class="section-subtitle">Now, here comes the pitch, so get ready. You knew this was coming.</p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">feature</span></th>
+                <th scope="col" class="mk">🍁 maple</th>
+                <th scope="col" class="mk">🫘 beanies</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">shared family calendar</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">meal planning &amp; recipes</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">to-dos &amp; lists</th><td class="good">✓</td><td class="good">✓</td></tr>
+              <tr><th scope="row">family finances &amp; budgets</th><td class="meh">no</td><td class="good">✓</td></tr>
+              <tr><th scope="row">where your data lives</th><td class="meh">their servers</td><td class="good">your storage</td></tr>
+              <tr><th scope="row">can the company read it?</th><td class="meh">yes</td><td class="good">no. can't. encrypted.</td></tr>
+              <tr><th scope="row">shutdown risk to your data</th><td class="warn">deleted dec 31</td><td class="good">it's your file, so none</td></tr>
+              <tr><th scope="row">ads</th><td class="meh">no</td><td class="good">no, and never</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-fade section-fade-to-story"></div>
+    <section class="section letter">
+      <div class="wrap narrow">
+        <p class="section-label">the part where i'm honest</p>
+        <h2 class="section-title">i actually liked maple</h2>
+        <p>
+          Maple seemed to be a genuinely nice app, and I think it deserved better than to be shut down, but
+          this is the reality of the cruel world we live in. I think beanies is a great alternative to
+          maple, but that's just my opinion. If you want to try something else, go ahead. No hard feelings.
+        </p>
+        <p>
+          But if the Maple news made your stomach drop a little (all those years of family logistics, gone
+          on a date someone else picked), then that feeling is the entire reason beanies exists.
+        </p>
+        <blockquote class="pull">
+          "having a comprehensive set of awesome family organization and finance planning related features
+          while also being fully private are two things that are no longer mutually exclusive." - me,
+          <a href="https://dadmag.substack.com/p/vibe-coding-dad-of-three" rel="noopener">in an actual interview</a>,
+          sounding smarter than usual
+        </blockquote>
+        <p>
+          Your family's data shouldn't have a deletion date. It was always yours. beanies just makes that
+          literally true.
+        </p>
+      </div>
+    </section>
+    <div class="section-fade section-fade-to-dark"></div>
+
+    <section class="section dark">
+      <div class="wrap">
+        <p class="section-label section-label-light">have your cake, and eat it too</p>
+        <h2 class="section-title">private doesn't mean less anymore</h2>
+        <p class="section-subtitle">
+          the bit most family apps ask you to give up, and the bit you don't have to give up here.
+        </p>
+        <div class="cakegrid">
+          <div class="cakecard">
+            <h3>🙈 encrypted means encrypted</h3>
+            <p>
+              Most apps encrypt your data <span class="em">on their servers</span>, with their keys, which
+              is a security feature. beanies encrypts it <span class="em">before it leaves your device</span>,
+              with your key, which is a privacy feature. I can't read it, sell it, or lose it, because I
+              never had it in the first place.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>📂 one file, yours</h3>
+            <p>
+              Everything lives in a single encrypted <span class="em">.beanpod</span> file on your Google
+              Drive or device. Lose your password? I can't help you. That's kinda the whole point.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>🤷 nothing to steal</h3>
+            <p>
+              Even if a hacker wanted to poke around our dark corner of the internet, there's nothing there
+              except code and app configuration. Good luck finding anything to leak.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <p class="section-label">moving day</p>
+        <h2 class="section-title">three boxes and you're in</h2>
+        <div class="boxes">
+          <div class="box">
+            <span class="tape">box #1</span>
+            <span class="emoji" aria-hidden="true">📦</span>
+            <h3>get your stuff out of maple</h3>
+            <p>
+              Get your calendar and lists out of Maple before Dec 31, 2026. Even if you don't pick beanies,
+              do this part.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">box #2</span>
+            <span class="emoji" aria-hidden="true">🚚</span>
+            <h3>set up your pod</h3>
+            <p>
+              Create your family pod in about two minutes: pick a PIN, save your Recovery Kit, add your
+              beans. No password. No account on my servers.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">box #3</span>
+            <span class="emoji" aria-hidden="true">🎉</span>
+            <h3>unpack &amp; put the kettle on</h3>
+            <p>
+              Bring your calendar in, invite the family, connect Google Calendar if you use it. You're home.
+              There's a step-by-step guide if you want company.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap">
+        <p class="section-label">fair questions</p>
+        <h2 class="section-title">things maple folks actually ask</h2>
+        <details open>
+          <summary>okay but what if YOU shut down?</summary>
+          <p>
+            No matter what happens to beanies.family in the future, your data is <em>always</em> yours. It
+            belongs to you, and it's sitting on your own device or storage. Which is kind of the whole point.
+          </p>
+        </details>
+        <details>
+          <summary>is it hard to switch?</summary>
+          <p>
+            It's just a few minutes to set up. You can go through the onboarding, which makes importing your
+            data dead simple. Our wizard walks you through every step.
+          </p>
+        </details>
+        <details>
+          <summary>why is it free?</summary>
+          <p>
+            Right now, I cover the costs myself; someday there'll be a fair price for families who want
+            more, and I promise it won't burn a hole in your wallet. What there won't be, ever: ads. Or
+            popups. Or anybody reading your family's data besides you, and your family. Which is the way it
+            should be for your precious beans.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final">
+      <p class="kicker">the welcome mat is out</p>
+      <h2 class="final-title">every. bean. <em>counts.</em></h2>
+      <p class="section-subtitle">even the ones arriving from maple.</p>
+      <a
+        href={APP_URL}
+        data-cta="CTA: Create Pod"
+        data-cta-loc="welcome-maple-footer"
+        class="btn btn-primary">start counting beans 🫘</a
+      >
+      <p class="signoff">peace out, my beans.<br /><span class="g">greg</span></p>
+      <p class="ps">ps. stuck mid-move? come yell at me (nicely) on the <a href="/discord">discord</a>.</p>
+    </section>
+  </div>
+</BaseLayout>
+
