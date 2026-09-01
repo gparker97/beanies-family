@@ -2,12 +2,12 @@
   "meta": {
     "country": "PE",
     "name": "Peru",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "es",
     "types": [
       "public"
@@ -45,10 +45,22 @@
       "name_local": "Día del Trabajador"
     },
     {
+      "date": "2025-06-07",
+      "name": "Battle of Arica and Flag Day",
+      "type": "public",
+      "name_local": "Batalla de Arica y Día de la Bandera"
+    },
+    {
       "date": "2025-06-29",
       "name": "Saints Peter and Paul",
       "type": "public",
       "name_local": "San Pedro y San Pablo"
+    },
+    {
+      "date": "2025-07-23",
+      "name": "Peruvian Air Force Day",
+      "type": "public",
+      "name_local": "Día de la Fuerza Aérea del Perú"
     },
     {
       "date": "2025-07-28",
@@ -61,6 +73,12 @@
       "name": "Independence Day",
       "type": "public",
       "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2025-08-06",
+      "name": "Battle of Junín",
+      "type": "public",
+      "name_local": "Batalla de Junín"
     },
     {
       "date": "2025-08-30",
@@ -85,6 +103,12 @@
       "name": "Immaculate Conception",
       "type": "public",
       "name_local": "La inmaculada concepción"
+    },
+    {
+      "date": "2025-12-09",
+      "name": "Battle of Ayacucho",
+      "type": "public",
+      "name_local": "Batalla de Ayacucho"
     },
     {
       "date": "2025-12-25",
@@ -123,10 +147,22 @@
       "name_local": "Día del Trabajador"
     },
     {
+      "date": "2026-06-07",
+      "name": "Battle of Arica and Flag Day",
+      "type": "public",
+      "name_local": "Batalla de Arica y Día de la Bandera"
+    },
+    {
       "date": "2026-06-29",
       "name": "Saints Peter and Paul",
       "type": "public",
       "name_local": "San Pedro y San Pablo"
+    },
+    {
+      "date": "2026-07-23",
+      "name": "Peruvian Air Force Day",
+      "type": "public",
+      "name_local": "Día de la Fuerza Aérea del Perú"
     },
     {
       "date": "2026-07-28",
@@ -139,6 +175,12 @@
       "name": "Independence Day",
       "type": "public",
       "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2026-08-06",
+      "name": "Battle of Junín",
+      "type": "public",
+      "name_local": "Batalla de Junín"
     },
     {
       "date": "2026-08-30",
@@ -163,6 +205,12 @@
       "name": "Immaculate Conception",
       "type": "public",
       "name_local": "La inmaculada concepción"
+    },
+    {
+      "date": "2026-12-09",
+      "name": "Battle of Ayacucho",
+      "type": "public",
+      "name_local": "Batalla de Ayacucho"
     },
     {
       "date": "2026-12-25",
@@ -201,10 +249,22 @@
       "name_local": "Día del Trabajador"
     },
     {
+      "date": "2027-06-07",
+      "name": "Battle of Arica and Flag Day",
+      "type": "public",
+      "name_local": "Batalla de Arica y Día de la Bandera"
+    },
+    {
       "date": "2027-06-29",
       "name": "Saints Peter and Paul",
       "type": "public",
       "name_local": "San Pedro y San Pablo"
+    },
+    {
+      "date": "2027-07-23",
+      "name": "Peruvian Air Force Day",
+      "type": "public",
+      "name_local": "Día de la Fuerza Aérea del Perú"
     },
     {
       "date": "2027-07-28",
@@ -217,6 +277,12 @@
       "name": "Independence Day",
       "type": "public",
       "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2027-08-06",
+      "name": "Battle of Junín",
+      "type": "public",
+      "name_local": "Batalla de Junín"
     },
     {
       "date": "2027-08-30",
@@ -241,6 +307,12 @@
       "name": "Immaculate Conception",
       "type": "public",
       "name_local": "La inmaculada concepción"
+    },
+    {
+      "date": "2027-12-09",
+      "name": "Battle of Ayacucho",
+      "type": "public",
+      "name_local": "Batalla de Ayacucho"
     },
     {
       "date": "2027-12-25",
@@ -279,10 +351,22 @@
       "name_local": "Día del Trabajador"
     },
     {
+      "date": "2028-06-07",
+      "name": "Battle of Arica and Flag Day",
+      "type": "public",
+      "name_local": "Batalla de Arica y Día de la Bandera"
+    },
+    {
       "date": "2028-06-29",
       "name": "Saints Peter and Paul",
       "type": "public",
       "name_local": "San Pedro y San Pablo"
+    },
+    {
+      "date": "2028-07-23",
+      "name": "Peruvian Air Force Day",
+      "type": "public",
+      "name_local": "Día de la Fuerza Aérea del Perú"
     },
     {
       "date": "2028-07-28",
@@ -295,6 +379,12 @@
       "name": "Independence Day",
       "type": "public",
       "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2028-08-06",
+      "name": "Battle of Junín",
+      "type": "public",
+      "name_local": "Batalla de Junín"
     },
     {
       "date": "2028-08-30",
@@ -319,6 +409,12 @@
       "name": "Immaculate Conception",
       "type": "public",
       "name_local": "La inmaculada concepción"
+    },
+    {
+      "date": "2028-12-09",
+      "name": "Battle of Ayacucho",
+      "type": "public",
+      "name_local": "Batalla de Ayacucho"
     },
     {
       "date": "2028-12-25",
@@ -357,10 +453,22 @@
       "name_local": "Día del Trabajador"
     },
     {
+      "date": "2029-06-07",
+      "name": "Battle of Arica and Flag Day",
+      "type": "public",
+      "name_local": "Batalla de Arica y Día de la Bandera"
+    },
+    {
       "date": "2029-06-29",
       "name": "Saints Peter and Paul",
       "type": "public",
       "name_local": "San Pedro y San Pablo"
+    },
+    {
+      "date": "2029-07-23",
+      "name": "Peruvian Air Force Day",
+      "type": "public",
+      "name_local": "Día de la Fuerza Aérea del Perú"
     },
     {
       "date": "2029-07-28",
@@ -373,6 +481,12 @@
       "name": "Independence Day",
       "type": "public",
       "name_local": "Día de la Independencia"
+    },
+    {
+      "date": "2029-08-06",
+      "name": "Battle of Junín",
+      "type": "public",
+      "name_local": "Batalla de Junín"
     },
     {
       "date": "2029-08-30",
@@ -397,6 +511,12 @@
       "name": "Immaculate Conception",
       "type": "public",
       "name_local": "La inmaculada concepción"
+    },
+    {
+      "date": "2029-12-09",
+      "name": "Battle of Ayacucho",
+      "type": "public",
+      "name_local": "Batalla de Ayacucho"
     },
     {
       "date": "2029-12-25",

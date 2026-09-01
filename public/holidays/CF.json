@@ -2,12 +2,12 @@
   "meta": {
     "country": "CF",
     "name": "Central African Republic",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "fr",
     "types": [
       "public"
@@ -72,7 +72,7 @@
       "date": "2025-08-13",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2025-08-15",
@@ -156,7 +156,7 @@
       "date": "2026-08-13",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2026-08-15",
@@ -240,7 +240,7 @@
       "date": "2027-08-13",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2027-08-15",
@@ -324,7 +324,7 @@
       "date": "2028-08-13",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2028-08-15",
@@ -408,7 +408,7 @@
       "date": "2029-08-13",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2029-08-15",
