@@ -445,6 +445,8 @@
 >
 > Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
 
+> **Last updated:** 2026-09-02 (**Session: THREE STREAMS SHIPPED TO `main` AS ONE REVIEWED CHANGESET (`e5f2651d`) — UNDEPLOYED. 5366 tests, type-check + lint clean.** (1) **#80 session integrity + step-up**: persisted sessions HMAC-sealed with a device key; the four irreversible actions (remove a bean, reset another member's PIN, transfer ownership, clear data) gained a step-up behind one `useReauth` host. ⚠️ A restored pre-#80 session is accepted once but **not re-sealed until the roster vouches for it** — `open()` accepts any bare JSON object with a string `memberId`, so sealing at restore time would have HMAC'd a hand-written localStorage blob into a permanently-valid session outliving the sunset. `invalidateSession` now also drops the device's trusted auto-open key (keyed on `familyId` alone, so it survived a rejection and let the next launch re-escalate), and a failed session write clears the stored session rather than leaving an older higher-privilege envelope authoritative. Removing a bean now checks `canManagePod`: the step-up proves _who you are_, which is not the same as proving the removal is yours to make. (2) **Repeating-list cycle history**: new `listCycles` collection, archived in the SAME Automerge change that resets the live list, on a read-only recency-banded shelf, swept at ~90 days. ⚠️ The sweep cursor is **reserved before** the delete — `MAX_SWEEP_DELETES` is a per-DAY cap and is only that if the day is claimed up front, since maintenance re-runs on every /lists visit and every remote merge. `clockVerdict` gained `skip-corrupt` because a flat-battery RTC reading 2027 once jammed retention until the real calendar caught up, silently. Per ADR-032 deleting reclaims nothing from the `.beanpod`; retention bounds memory, not file size, and the help copy says so. (3) **Shared-event convention**: an event with 2+ owners shows in each of THEIR columns, one with no owner shows for everybody; style and placement are deliberately separate predicates. ⭐ **The real find**: `assigneeIds` is a CRDT array nothing prunes, so it accumulates ids naming nobody (removed members, pets, duplicates from a merge) — and every shared/solo decision counted those RAW ids and resolved them afterwards, which is why a one-owner trumpet lesson wore the multi-person treatment while its edit form showed one owner. `effectiveAssignees` resolves before counting and `isSharedEvent` now takes the resolver as a REQUIRED parameter so no call site can forget it. This predates the wall — `classifyActivityChip`, documented as the single source of truth, has had it since it was written. **Display only: the dead ids are still in the records and a prune on member removal has not been planned.** (4) A `/code-review max` over the whole range returned 16 findings + runners-up, all resolved; the worst was a **UTC/local date mismatch** — `completedAt` is UTC and `todayYmd` is local, so slicing one to compare with the other dropped a just-ticked to-do for most of the world's waking hours, and every fixture was UTC-aligned so CI could never catch it. **NEXT:** greg picks a shared-event visual style (three directions at `docs/mockups/2026-09-02-shared-event-style.html`; recommendation A), then the calendar time-grid discussion.**)
+
 > **Last updated:** 2026-08-31 (**Session: COMPETITOR SWITCHING PAGES — `/from/maple` + `/from/cozi` + the `/from` hub built, linked across the site, and DEPLOYED to the marketing site (`57fd06e6`, deploy-web run `33357149532`). Web only — no Vue, mobile or infra change.** (1) **A third content type.** The blog covers the Maple shutdown as _news_ and news dates; guides are the evergreen fact layer and must not sell. A conversion page welcomes rather than reports, so it earns its own section. Each page carries a comparison table, migration steps, an "the part where i'm honest" section conceding what the rival does better, the have-your-cake privacy band, and an FAQ, in greg's voice. (2) ⭐ **The namespace is `/from`, NOT `/welcome`** — `/welcome` already redirects to `app.beanies.family/welcome` (`astro.config.mjs:53`), so a page under it would have sat beneath a parent that bounces visitors into the app. Caught at build time, before the URL was published. (3) **Design**: the hero is an _arrival_, not a headline with a prop — a lit arched doorway with the real mascot standing in it, the welcome mat at the threshold, and the four Pod beans (slate → terracotta → orange → sky silk, the mandated order) as a path leading in from a faded rival glyph. The doorway belongs to the destination pages; the hub gets the mat only, so the two read as a hierarchy rather than the same page twice. Mockups: `docs/mockups/2026-08-31-switch-landing-{maple,cozi,skylight}.html`. (4) ⚠️ **Extracting shared CSS exposed it to lint it had never faced.** `web/src/styles/switch-page.css` is namespaced under `.welcome-page` because a page-level CSS import is GLOBAL in Astro — bare `table`/`details`/`summary` rules would have reached the help center. Class names are kebab-case, not BEM: stylelint lints standalone `.css` but NOT `<style>` blocks inside `.astro`, so the pre-commit hook rejected 67 problems the same CSS had passed while inline. (5) ⭐ **Two fact corrections before publishing.** Cozi verified against `cozi.com/compare-plans`, not third-party blogs: there are **two** paid tiers now (Gold $39/yr, Max $79/yr) and the mobile month view is paid. The widely-repeated "free calendar capped at 30 days" claim is NOT on Cozi's own page and was deliberately left off — ⚠️ **but `content/blog/2026-04-24-best-cozi-maple-alternatives-in-2026.md` asserts it as fact and was left untouched per the blog-integrity rule; greg to verify.** Also re-fetched the Dad Mag interview and found the pull-quote I had was a _summariser's_ mangling, not greg's sentence; replaced with the verbatim line. (6) ⭐ **`post-alert` divs cannot round-trip through Notion** — it escapes the HTML to literal `\<div\>` and rewrites relative links to `app.notion.com/...`. Both blog posts were updated in Notion FIRST (golden source) with a plain bold paragraph + absolute link, then mirrored to the repo with the styled div. Implication: the existing banners on the 04-24 post live only in the repo and would vanish if that post were ever regenerated from Notion. (7) **Linking**: footer `switching?` → hub (sitewide), banner in the Maple post, inline link in the cozi roundup, the FAQ app-comparison answer, and two guides. `llms.txt` gained a `## switching from another app` section. **`relatedPosts` deliberately NOT widened** to accept `/from/*`: the aside is titled "from the beanstalk" and promises greg's writing, and inline body links outrank a sidebar anyway. (8) **Held back**: skylight (its hero claims the tablet weekly view works today — ship that first), and the handout PDF (the download button is out until a real file exists; a 404 on a deadline page is worse than no button). **NEXT:** greg to verify the 30-day Cozi claim in the old post; build the tablet-friendly weekly calendar, then `/from/skylight` (flip `href: null` → `/from/skylight` in the hub's `SOURCES` array).**)
 
 > **Last updated:** 2026-08-28 (**Session: the LOGIN/AUTH RETHINK COMPLETED END-TO-END — Phase 4 planned (4-pass gauntlet, 23 revisions), implemented across 7 work packages, code-review-max'd (15 findings, all fixed), locally verified by greg, and FULL-SHIPPED as 0.13R2 (`25aafc2f`): Vue live+verified, Astro deployed, Android → open testing (Google review auto-submitted), iOS → TestFlight. Spotlight release note ships in-app with "Create your PIN now" / "Get your Recovery Kit" deep-link CTAs.** Highlights: passwordless creation wizard (PIN + mandatory kit; kit-born envelopes with `wrappedKeys:{}`), PIN-based join claims, device linking (`lk=1`, 15-min), web WebAuthn+PRF deleted, `authPrompts.ts` nag sequencer, registry-v6 wrapped `trustedAutoOpen` store replacing plaintext `cachedFamilyKeys`, `signOutSteps.ts` tier lists, ADR-034 + 5 amendments + help-center rewrite. Post-ship polish from greg's testing: biometric settings card explains the web retirement (never "no authenticator detected"), all fallback copy says PIN not password, bean-page reset reads "Reset {name}'s PIN", detail-page "Invite {name}" button (shared wizard, prefilled). **Then greg's iOS field test caught a REAL native bug, root-caused from the firehose in minutes**: the iOS keychain presence probe used `kSecUseAuthenticationUISkip`, which silently EXCLUDES biometry-gated items — healthy Face ID keys read as absent, the self-heal deleted enrolments, "your biometrics changed" on every unlock (Android unaffected by design, field-confirmed). Fixed with `LAContext(interactionNotAllowed)` + two UX fixes (What's New CTA first-tap guard-cancellation retry+telemetry; signing-out progress in both sign-out surfaces) shipped quietly as **0.13R3** (`46c45776`, no release note per greg). 0.13R3 shipped before close: Vue live+verified (`92a0437b`), iOS TestFlight build green — greg re-enrols Face ID once on the new build.**)
@@ -1690,6 +1692,105 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > **Previous update (2026-04-15):** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
 ## Pending / Next Session
+
+**Validated 2026-09-02:** every existing block below re-checked against the repo; **none**
+were stale. #66 still has no `weeklyAgenda`/`agendaShare` fingerprint in `src/`; the
+#65/#61 open-guard validation is a CloudWatch query nobody has run yet (the code IS
+deployed); #27's on-device meal-planner pass is still owed; travel decomposition is still
+roughly half done. Nothing removed.
+
+### ⭐ Session 2026-09-01/02 — three streams shipped to `main` (UNDEPLOYED) ⭐
+
+Commit `e5f2651d`, on `main`, **not deployed**. 5366 tests green, type-check + lint clean.
+Everything below is one reviewed changeset (a `/code-review max` over the whole range
+returned 16 findings + a runners-up list; all were resolved or consciously deferred — see
+"Open questions" at the end of this block).
+
+**1. #80 session integrity + step-up.** Persisted sessions are HMAC-sealed with a device
+key (`src/services/auth/sessionSeal.ts`, `deviceSecret.ts`); the four irreversible actions
+(remove a bean, reset another member's PIN, transfer ownership, clear all data) gained a
+step-up via `useReauth` + `ReauthGateModal` (one host in App.vue, mirroring `useConfirm`).
+Plan: `docs/plans/2026-09-01-session-integrity-and-step-up.md`.
+
+⚠️ **The load-bearing subtleties, so nobody "simplifies" them back:**
+
+- A restored pre-#80 session is accepted once but **NOT re-sealed at restore time** — only
+  `confirmSessionMember()`, called from familyStore once the roster contains the member,
+  seals it. `open()` accepts any bare JSON object with a string `memberId` (no signature
+  checked), so sealing at restore would HMAC a hand-written localStorage blob into a
+  permanently-valid session outliving `LEGACY_SESSION_SUNSET`.
+- `sessionRejected` is sticky until a real sign-in, because otherwise the next
+  `loadMembers` takes the "no session member" branch and hands out the owner's row.
+- `invalidateSession` also drops the trusted auto-open key (`revokeUnattendedReopen`).
+  That wrap is keyed on `familyId` alone — device-scoped, not member-scoped — so without
+  this the next launch silently re-opens the pod and re-escalates.
+- `router/index.ts` reads the session `role` to **block**; `usePermissions` deliberately
+  no longer reads it to **grant** once a roster exists. Do not "align" these two.
+- `INTEGRITY_REJECTIONS` excludes `key-changed`/`roster-switched`/`self-removed` from
+  `reportError` on purpose — folding them in drowns the one metric that means somebody
+  edited a session.
+- A client-side seal is **not** a cryptographic boundary (devtools shares the origin).
+  The PIN step-up is the real boundary; the seal raises the cost and makes tampering
+  visible in CloudWatch. Do not oversell it.
+
+**2. Repeating-list cycle history.** New `listCycles` collection; a finished cycle is
+archived in the SAME Automerge change that resets the live list (`listCycleRepository.ts`,
+write-once — do not add an update path). Read-only shelf banded by recency. Plan:
+`docs/plans/2026-09-01-recurring-list-cycle-history.md`.
+
+⚠️ **Retention is irreversible and unattended — the guards are the design:**
+
+- `expiredCycleIds(cycles, today)` takes exactly TWO arguments. An earlier draft also took
+  the live list ids, which meant an empty or partially-loaded `lists` collection marked
+  EVERY cycle for deletion. A test pins the arity.
+- The sweep cursor is **reserved before** the delete. `MAX_SWEEP_DELETES = 50` is a
+  per-DAY cap and is only that if the day is claimed up front — maintenance re-runs on
+  every visit to /lists and every remote merge, so recording afterwards degrades it to
+  50-per-invocation and a whole archive can go in one session.
+- `clockVerdict` has five skip verdicts, not two. `skip-same-day` is silent (the normal
+  path); `skip-corrupt` exists because a flat-battery RTC that reads 2027 once used to
+  jam retention until the real calendar caught up, silently and with zero telemetry.
+- Per ADR-032 deleting reclaims **nothing** from the `.beanpod` (append-only). Retention
+  bounds memory and page usability, not file size. The help copy says so.
+
+**3. Shared-event convention + the wall/list fixes.** An event with 2+ owners now shows in
+each of THEIR columns (not everyone's); one with no owner at all shows for everybody.
+
+⚠️ **`isSharedEvent` (style) and `belongsInMemberColumn` (placement) answer different
+questions and must stay separate** — collapsing them is what pushed a multi-owner event
+into every lane in the family.
+
+⚠️ **The `assigneeIds` dead-id problem is only half fixed.** `assigneeIds` is a CRDT array
+no write path prunes, so it accumulates ids that name nobody (removed members, pets, the
+same id written twice by two devices merging). Every shared/solo decision used to count
+those RAW ids and resolve them afterwards — which is why a one-owner trumpet lesson wore
+the multi-person treatment while its edit form showed one owner. `effectiveAssignees` now
+resolves BEFORE counting, and `isSharedEvent` takes the resolver as a **required**
+parameter so no call site can forget it. **This corrects the display only — the dead ids
+are still in the records and will keep accumulating. A prune on member removal is the real
+fix and has not been planned.**
+
+Note this defect predates the wall: `classifyActivityChip` (documented as "the single
+source of truth for the chip rule") has had it since it was written, so monthly chips and
+weekly blocks were mis-classifying too.
+
+**Open questions for the next session:**
+
+- **Shared-event visual style.** Three directions mocked at
+  `docs/mockups/2026-09-02-shared-event-style.html` (A hand-holding beans / B shared
+  ticket / C confetti banner). greg has not picked one; the shipped style is still the
+  plain orange dashed edge, which he called "a bit plain". Recommendation on file: A.
+- **Time grid for the calendar views** — greg asked to discuss whether it becomes an
+  option or the standard convention for all views. Not started, not planned.
+- **Deferred from the #80 review, consciously:** the legacy-session branch stays
+  bypassable until `LEGACY_SESSION_SUNSET` (2026-12-01) by design; a member with NO
+  credential is still hard-gated out of remove-bean / reset-PIN / transfer-ownership
+  (only clear-data has the `canStepUp()` escape hatch) — the lockout is now _reported_
+  as `no-credential` rather than looking like an ordinary cancel, but whether to extend
+  the escape hatch to the other three is greg's product call.
+- **Skylight switch page** was reworked this session and published as an artifact; the
+  file is `docs/mockups/2026-09-01-switch-landing-skylight-v2.html`. Not on the live
+  marketing site.
 
 ### ⭐ Login/auth rethink — SHIPPED (0.13R2 full shipment + 0.13R3 iOS-biometric hotfix) ⭐
 
