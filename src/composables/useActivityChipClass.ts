@@ -50,24 +50,39 @@ export function classifyActivityChip(
   memberById: (id: string) => FamilyMember | undefined,
   memberColor: (id: string) => string
 ): ActivityChipClass {
+  // RESOLVE FIRST, then count. Counting raw ids and resolving afterwards meant a record
+  // carrying one real member plus one dead id — a removed member, a pet, or the same id
+  // written twice by two devices merging — was classified 'shared' and shown with the
+  // multi-person treatment, while the edit form showed its single owner. `assigneeIds` is
+  // a CRDT array no write path prunes, so those extra ids accumulate silently and only
+  // ever surface as a chip that looks wrong.
   const ids = normalizeAssignees(activity);
+  const members = [
+    ...new Map(
+      ids
+        .map((id) => memberById(id))
+        .filter((m): m is FamilyMember => Boolean(m))
+        .map((m) => [m.id, m] as const)
+    ).values(),
+  ];
 
+  // No owner at all: the whole family's.
   if (ids.length === 0) {
     return { kind: 'family', color: HERITAGE_ORANGE, members: humans };
   }
 
-  if (ids.length === 1) {
-    return {
-      kind: 'solo',
-      color: memberColor(ids[0]!),
-      members: [],
-    };
-  }
-
-  const members = ids.map((id) => memberById(id)).filter((m): m is FamilyMember => Boolean(m));
-
+  // Every id was a dead reference. Solo semantics with the neutral colour rather than
+  // claiming this is either a family event or a multi-person one.
   if (members.length === 0) {
     return { kind: 'solo', color: NEUTRAL_FALLBACK, members: [] };
+  }
+
+  if (members.length === 1) {
+    return {
+      kind: 'solo',
+      color: memberColor(members[0]!.id),
+      members: [],
+    };
   }
 
   return { kind: 'shared', color: HERITAGE_ORANGE, members };

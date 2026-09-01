@@ -24,3 +24,16 @@ export const MEMBER_COLORS: MemberColor[] = [
 
 /** Just the hex values, for code that assigns a color (not a swatch selector). */
 export const MEMBER_COLOR_VALUES: string[] = MEMBER_COLORS.map((c) => c.value);
+
+/**
+ * The colour for a thing that belongs to no single member — a family-wide event, or one
+ * shared by several people.
+ *
+ * Heritage Orange, re-exported from `useActivityChipClass`, which already shipped this
+ * exact 0/1/2+ rule and is documented as its single source of truth. An earlier draft used
+ * Deep Slate here, which gave the SAME event three different colours across the wall, the
+ * planner and the chip — and Deep Slate sits at roughly 1.2:1 on a dark surface, so a
+ * shared event lost both its colour and its dashed border in dark mode. Orange reads on
+ * both grounds and is provably not one of the six member hues above.
+ */
+export { HERITAGE_ORANGE as SHARED_EVENT_COLOR } from '@/composables/useActivityChipClass';

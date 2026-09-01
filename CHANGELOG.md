@@ -8,6 +8,35 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-02
+
+### Added
+
+- **Repeating lists now keep a history.** When a repeating list rolls over, the finished cycle is saved to a "history" shelf on the lists page, grouped by this week, last week, then by month. Saved cycles are read-only, and are removed automatically once they are around three months old.
+- **Shared events look shared.** An event with two or more owners now shows in each of their columns on the wall and in the planner, in the shared colour with a dashed outline, instead of quietly disappearing from the bean lanes view. An event with no owner at all shows for everybody.
+
+### Changed
+
+- **Tapping a day on the wall's today view moves the view to that day**, meals card included, rather than opening a sheet over it.
+- The step-up prompt now says so plainly when a bean has no PIN or password to prove with, instead of looking like an ordinary cancel.
+
+### Fixed
+
+- A to-do ticked in the evening (or the early morning, depending on where you live) could vanish from the wall instantly instead of staying crossed out for the rest of the day. Completed lists could also land in the wrong week.
+- Filtering the to-do page to one bean hid every unassigned to-do, including everything added at the wall.
+- An event with a single owner could be shown as if it were shared, on the wall and on the calendar, when its record still referenced somebody who had since been removed from the pod.
+- Removing a bean now checks that you are allowed to before asking you to confirm.
+- Deleting a list that had already been removed on another device reported success; it now says what happened.
+- History clean-up no longer stops working on a device whose clock was wrong once, and no longer warns about a clock jump every eighth day on families with no history yet.
+
+### Security
+
+- A pre-existing saved sign-in is no longer signed as trusted until the family file itself confirms the member it names.
+- Ending a session for integrity reasons now also drops this device's permission to re-open the family file unattended.
+- A failed session write no longer leaves the previous, higher-privilege session in place.
+
+---
+
 ## 2026-09-01
 
 ### Added

@@ -36,6 +36,7 @@ import type {
 } from '@/types/wall';
 import { normalizeAssignees } from '@/utils/assignees';
 import { isFiled, isRecurring } from '@/utils/listLifecycle';
+import { extractDatePart } from '@/utils/date';
 
 /**
  * Dedupe key. The same task legitimately exists as both a dated to-do and an
@@ -72,17 +73,31 @@ function dedupeKey(ownerId: string, title: string): string {
  * Which bucket a to-do falls in, or `null` when it does not belong on the wall
  * at all.
  *
- * A finished item that was due on some OTHER day is history, not work, so it
- * drops off. Today's and undated completions stay: those are the two buckets a
- * person can actually tick from on this screen, and a row that deletes itself
- * out from under the finger — mid-animation, with the celebration firing over
- * an empty slot — reads as a glitch, not as progress.
+ * A completion stays until the end of the day it was made, in every bucket, so the row
+ * never deletes itself out from under the finger and a mis-tick can be undone. Yesterday's
+ * completions are history and drop off.
  */
 function todoBucket(todo: TodoItem, todayYmd: string): WallTodoBucket | null {
+  // A completion stays put for the rest of the day it happened, whatever bucket it is in,
+  // struck through and still tappable so a mis-tick can be undone. It drops off tomorrow,
+  // when it is history rather than work.
+  //
+  // This used to key on the DUE date, so ticking an overdue job made the row vanish under
+  // the finger while the celebration fired over an empty slot, whereas today's and undated
+  // ones stayed and crossed out. Same gesture, two different outcomes.
+  //
+  // `completedAt` is always written by `todoStore.toggleTodo`, so a completed to-do
+  // without one is pre-field history and correctly drops.
+  // `extractDatePart`, NOT `.slice(0, 10)`: `completedAt` is a UTC ISO timestamp
+  // (`toISODateString` is `toISOString()`) while `todayYmd` is the LOCAL day. Slicing
+  // compares a UTC date to a local one, so east of UTC every morning tick and west of it
+  // every evening tick reads as a different day — reinstating, for most of the world's
+  // waking hours, the exact vanish-under-the-finger glitch this branch exists to remove.
+  if (todo.completed && extractDatePart(todo.completedAt ?? '') !== todayYmd) return null;
+
   const due = todo.dueDate?.slice(0, 10);
   if (!due) return 'undated';
   if (due === todayYmd) return 'today';
-  if (todo.completed) return null;
   return due < todayYmd ? 'overdue' : 'upcoming';
 }
 

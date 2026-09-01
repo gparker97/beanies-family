@@ -6,16 +6,20 @@ import { useListStore } from '@/stores/listStore';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { LIST_CATEGORIES } from '@/constants/listCategories';
+import { groupByRecency, groupCompletedByRecency } from '@/utils/completedListBands';
+import { useToday } from '@/composables/useToday';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import ListShelf from '@/components/lists/ListShelf.vue';
+import ListCycleShelf from '@/components/lists/ListCycleShelf.vue';
+import ListCycleModal from '@/components/lists/ListCycleModal.vue';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import NewListSheet from '@/components/lists/NewListSheet.vue';
 import type { FamilyList, ListCategory } from '@/types/models';
 
-const { t } = useTranslation();
+const { t, currentLanguage } = useTranslation();
 const listStore = useListStore();
 const { categoryLabel } = useListCategoryLabel();
 const route = useRoute();
@@ -29,6 +33,8 @@ const selectedCategory = ref<ListCategory | null>(null);
 const selectedListId = ref<string | null>(null);
 const showNew = ref(false);
 const completedCollapsed = ref(true);
+const historyCollapsed = ref(true);
+const selectedCycleId = ref<string | null>(null);
 
 // Open a list deep-linked via ?view=<id> (e.g. from a notification).
 watch(
@@ -76,6 +82,33 @@ const completed = computed(() =>
   listStore.completedLists.filter(
     (l) => !selectedCategory.value || l.category === selectedCategory.value
   )
+);
+
+/**
+ * The completed shelf is the one that grows without bound (a daily chore list files a copy
+ * every day), so it is banded by recency rather than shown as one flat grid. The store
+ * already sorts newest-first; banding preserves that inside each band.
+ */
+const { today } = useToday();
+// The month headings are formatted by the platform, so they must be told which language
+// the rest of the shelf's headings are in — otherwise 「本周」 sits above "August 2026".
+const completedBands = computed(() =>
+  groupCompletedByRecency(completed.value, today.value, currentLanguage.value)
+);
+
+/**
+ * Archived cycles get their OWN banded section rather than being interleaved with
+ * completed one-off lists. They are different things with different lifetimes — a list a
+ * person finished and the app keeps, versus a snapshot the app generated — and mixing
+ * them would hide that difference at exactly the moment it matters.
+ */
+const cycles = computed(() =>
+  listStore.archivedCycles.filter(
+    (c) => !selectedCategory.value || c.category === selectedCategory.value
+  )
+);
+const cycleBands = computed(() =>
+  groupByRecency(cycles.value, today.value, (c) => c.endedOn, currentLanguage.value)
 );
 
 const isEmpty = computed(
@@ -134,12 +167,23 @@ function closeDetail(): void {
         @open="openList"
       />
 
+      <!-- Repeating list history (collapsible) -->
+      <ListCycleShelf
+        v-if="cycles.length"
+        v-model:collapsed="historyCollapsed"
+        :title="t('lists.history.title')"
+        :bands="cycleBands"
+        :count="cycles.length"
+        @open="selectedCycleId = $event"
+      />
+
       <!-- Completed (collapsible) -->
       <ListShelf
         v-if="completed.length"
         v-model:collapsed="completedCollapsed"
         :title="t('lists.shelf.completed')"
         :lists="completed"
+        :bands="completedBands"
         label-class="text-green-600"
         collapsible
         @open="openList"
@@ -147,6 +191,7 @@ function closeDetail(): void {
     </template>
 
     <!-- Modals -->
+    <ListCycleModal :cycle-id="selectedCycleId" @close="selectedCycleId = null" />
     <NewListSheet :open="showNew" @close="showNew = false" @created="onCreated" />
     <ListDetailModal :list-id="selectedListId" @close="closeDetail" />
   </div>

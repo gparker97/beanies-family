@@ -16,7 +16,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { normalizeAssignees } from '@/utils/assignees';
+import { matchesAssigneeFilter, normalizeAssignees } from '@/utils/assignees';
 import {
   toDateInputValue,
   extractDatePart,
@@ -393,8 +393,9 @@ function handleEmptySlotClick(dateStr: string, hour: number) {
 const mobileDayActivities = computed(() => {
   const occs = weekActivities.value.get(selectedMobileDay.value) ?? [];
   if (memberFilterStore.isAllSelected) return occs;
+  // See DailyCalendarView: an ownerless activity must survive a member filter.
   return occs.filter((o) =>
-    normalizeAssignees(o.activity).some((id) => memberFilterStore.isMemberSelected(id))
+    matchesAssigneeFilter(o.activity, (id) => memberFilterStore.isMemberSelected(id))
   );
 });
 

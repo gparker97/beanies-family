@@ -35,6 +35,37 @@ export async function importHKDFBaseKey(secret: ArrayBuffer | Uint8Array): Promi
 }
 
 /**
+ * Derive an HMAC-SHA256 signing key from an HKDF base key.
+ *
+ * Sibling of `deriveWrappingKeyFromBaseKey` — same `HKDF_HASH`, same salt/info contract,
+ * so the HKDF parameter block lives in exactly one module. Used by `sessionSeal.ts` to
+ * sign the persisted session (#80); the distinct `info` keeps that key useless for
+ * unwrapping anything.
+ *
+ * @param baseKey - non-extractable `'HKDF'` CryptoKey (the per-device secret)
+ * @param hkdfSalt - 32-byte salt
+ * @param info - domain-separation string; immutable once shipped
+ */
+export async function deriveHmacKeyFromBaseKey(
+  baseKey: CryptoKey,
+  hkdfSalt: Uint8Array,
+  info: string
+): Promise<CryptoKey> {
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: HKDF_HASH,
+      salt: hkdfSalt.buffer as ArrayBuffer,
+      info: new TextEncoder().encode(info),
+    },
+    baseKey,
+    { name: 'HMAC', hash: HKDF_HASH },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+/**
  * Derive an AES-KW wrapping key from an HKDF base key.
  *
  * @param baseKey - non-extractable `'HKDF'` CryptoKey (device secret, or imported PRF output)

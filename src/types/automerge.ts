@@ -26,6 +26,7 @@ import type {
   CalendarEventLink,
   DriveConnection,
   OverlapAck,
+  ListCycle,
   Settings,
 } from './models';
 
@@ -81,6 +82,13 @@ export interface FamilyDocument {
    * entry per unique key). See OverlapAck in models.ts.
    */
   overlapAcknowledgments: Record<string, OverlapAck>;
+  /**
+   * Finished cycles of recurring lists, keyed `${listId}:${endedOn}`. Write-once history:
+   * never patched, deleted wholesale by the retention sweep. Deliberately NOT `lists` —
+   * a cycle is not a list, so nothing that reads `lists` (the wall, notifications, badges,
+   * linked-list embeds) can ever see one.
+   */
+  listCycles: Record<string, ListCycle>;
   settings: Settings | null;
 }
 
@@ -126,5 +134,6 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   calendarEventLinks: 0,
   driveConnections: 0,
   overlapAcknowledgments: 0,
+  listCycles: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];

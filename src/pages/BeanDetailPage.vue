@@ -38,7 +38,7 @@ import { useInviteFlow } from '@/composables/useInviteFlow';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
+import { removeMember } from '@/composables/useMemberRemoval';
 import type { CreateFamilyMemberInput, UpdateFamilyMemberInput } from '@/types/models';
 
 const route = useRoute();
@@ -91,16 +91,10 @@ async function handleSave(
 
 async function handleDelete(id: string): Promise<void> {
   showEditModal.value = false;
-  const target = familyStore.members.find((m) => m.id === id);
-  if (target?.role === 'owner') {
-    await showAlert({
-      title: 'confirm.cannotDeleteOwnerTitle',
-      message: 'family.cannotDeleteOwner',
-    });
-    return;
-  }
-  if (await showConfirm({ title: 'confirm.deleteMemberTitle', message: 'family.deleteConfirm' })) {
-    await familyStore.deleteMember(id);
+  // Owner-check, confirm, PIN step-up and the delete itself all live in one place now
+  // (#80). Navigate ONLY on a real removal — this used to bounce even when the delete
+  // silently returned false.
+  if (await removeMember(id)) {
     // Member is gone — bounce back to the Pod grid rather than sitting on
     // a detail page with a "missing bean" empty state.
     await router.push('/pod');

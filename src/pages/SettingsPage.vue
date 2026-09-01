@@ -36,6 +36,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
+import { requireReauth, canStepUp } from '@/composables/useReauth';
+import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
@@ -576,11 +578,31 @@ function handleExportAsJson() {
 }
 
 async function handleClearData() {
-  await settingsStore.clearCachedFamilyKey();
-  await settingsStore.setTrustedDevice(false);
-  const familyId = useFamilyContextStore().activeFamilyId;
-  if (familyId) {
-    await deleteFamilyDatabase(familyId);
+  // #80: a fresh PIN before wiping. Also the first error handling this destructive action
+  // has ever had — any throw previously left the confirm panel open with no message and
+  // no reload, i.e. a silent failure sitting directly on "delete everything".
+  // Gated only when a step-up is actually possible. This is the recovery escape hatch:
+  // people reach for it when the pod is broken, which is the same state where there may
+  // be no resolved member or no credential to prove with. Failing closed here would trap
+  // them. Low stakes anyway — this clears LOCAL data; the .beanpod on Drive survives.
+  if (canStepUp() && !(await requireReauth())) return;
+  try {
+    await settingsStore.clearCachedFamilyKey();
+    await settingsStore.setTrustedDevice(false);
+    const familyId = useFamilyContextStore().activeFamilyId;
+    if (familyId) {
+      await deleteFamilyDatabase(familyId);
+    }
+  } catch (e) {
+    showToast('error', t('settings.clearDataFailed'));
+    reportError({
+      surface: 'settings-clear-data',
+      message: 'clear all data failed',
+      error: e,
+      severity: 'error',
+      context: { action: 'clear_data_failed' },
+    });
+    return;
   }
   showClearConfirm.value = false;
   window.location.reload();

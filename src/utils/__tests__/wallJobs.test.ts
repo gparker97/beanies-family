@@ -202,22 +202,45 @@ describe('to-do buckets', () => {
   });
 
   it("keeps today's completions visible, so a tick does not vanish", () => {
-    expect(bucketOf({ completed: true })).toBe('today');
+    expect(bucketOf({ completed: true, completedAt: `${TODAY}T09:00:00.000Z` })).toBe('today');
   });
 
-  it('hides completed work from other days — that is history, not work', () => {
-    expect(bucketOf({ completed: true, dueDate: '2026-08-24T00:00:00.000Z' })).toBeUndefined();
-    expect(bucketOf({ completed: true, dueDate: '2026-09-20T00:00:00.000Z' })).toBeUndefined();
+  it('keeps an OVERDUE completion visible too — the same gesture, the same outcome', () => {
+    // This is the inconsistency users hit: ticking an overdue job made the row vanish
+    // under the finger, while ticking today's or an undated one crossed it out.
+    expect(
+      bucketOf({
+        completed: true,
+        completedAt: `${TODAY}T09:00:00.000Z`,
+        dueDate: '2026-08-20T00:00:00.000Z',
+      })
+    ).toBe('overdue');
+  });
+
+  it('drops a completion made on an EARLIER day, in every bucket', () => {
+    // Built from a LOCAL time, not a hand-written `Z` literal. `completedAt` is a UTC
+    // timestamp compared against the local day, so a fixture written as `…T18:00:00.000Z`
+    // is yesterday only for a machine at or near UTC — under CI it passed while the
+    // shipped code was dropping today's completions for most of the world.
+    const yesterday = new Date('2026-08-30T18:00:00').toISOString();
+    // `bucketOf` optional-chains, so a dropped to-do reads as undefined.
+    expect(bucketOf({ completed: true, completedAt: yesterday })).toBeUndefined();
+    expect(
+      bucketOf({ completed: true, completedAt: yesterday, dueDate: undefined })
+    ).toBeUndefined();
+    expect(
+      bucketOf({ completed: true, completedAt: yesterday, dueDate: '2026-08-20T00:00:00.000Z' })
+    ).toBeUndefined();
   });
 
   /**
-   * Today and undated are the two buckets you can tick FROM on this screen, so
-   * both keep their completions. A row that deletes itself out from under the
-   * finger — mid-animation, celebration firing over an empty slot — reads as a
-   * glitch rather than as progress.
+   * Every bucket keeps its completions for the rest of the day, so a tick behaves the same
+   * wherever it happens and a mis-tick can be undone.
    */
   it('keeps an undated to-do visible after it is ticked', () => {
-    expect(bucketOf({ completed: true, dueDate: undefined })).toBe('undated');
+    expect(
+      bucketOf({ completed: true, completedAt: `${TODAY}T09:00:00.000Z`, dueDate: undefined })
+    ).toBe('undated');
   });
 
   it('ignores work assigned to somebody who is not a family member', () => {
@@ -230,7 +253,10 @@ describe('to-do buckets', () => {
 describe('sortJobs / jobsProgress', () => {
   /** Both helpers are generic over any job array — a lane mixes the two sets. */
   function leosWork() {
-    const built = build([todo({ completed: true })], [list()]);
+    const built = build(
+      [todo({ completed: true, completedAt: `${TODAY}T09:00:00.000Z` })],
+      [list()]
+    );
     return [...todosOf(built, 'leo'), ...choresOf(built, 'leo')];
   }
 

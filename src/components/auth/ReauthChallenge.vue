@@ -30,17 +30,34 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
 import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const props = defineProps<{
   /** Member whose identity must be verified (typically the current session user). */
   member: FamilyMember;
   /** Whether the host is showing the challenge — drives passkey-availability detection. */
   open: boolean;
+  /**
+   * Copy overrides, as translation KEYS rather than sentences (#80) — the component keeps
+   * calling `t()` itself, so the text follows a language change and the `UIStringKey`
+   * convention that useConfirm and BaseModal already follow is preserved.
+   *
+   * They exist because this component is no longer transfer-ownership-only: the default
+   * copy is action-neutral, and TransferOwnership passes its own wording to stay identical.
+   */
+  descriptionKey?: UIStringKey;
+  noCredentialKey?: UIStringKey;
 }>();
 
 const emit = defineEmits<{
   verified: [];
-  cancelled: [];
+  /**
+   * `reason` distinguishes a user changing their mind from a member who has NO way to
+   * prove who they are. Without it the caller records both as an ordinary cancel, so a
+   * member permanently locked out of an action is indistinguishable in the firehose from
+   * one who simply tapped away.
+   */
+  cancelled: [reason?: 'no-credential'];
 }>();
 
 const { t } = useTranslation();
@@ -247,7 +264,7 @@ function handlePasswordClose() {
 }
 
 function cancel() {
-  emit('cancelled');
+  emit('cancelled', noCredential.value ? 'no-credential' : undefined);
 }
 </script>
 
@@ -255,7 +272,7 @@ function cancel() {
   <div class="space-y-4">
     <!-- Description -->
     <p class="text-sm text-gray-600 dark:text-gray-400">
-      {{ t('transferOwnership.reauthDescription') }}
+      {{ t(props.descriptionKey ?? 'reauth.description') }}
     </p>
 
     <!-- No-credential state — clear recovery guidance -->
@@ -265,7 +282,7 @@ function cancel() {
       data-testid="reauth-no-credential"
     >
       <p class="text-sm text-amber-800 dark:text-amber-200">
-        {{ t('transferOwnership.reauthNoCredential') }}
+        {{ t(props.noCredentialKey ?? 'reauth.noCredential') }}
       </p>
       <div class="mt-3 flex justify-end">
         <BaseButton variant="ghost" size="sm" @click="cancel">
