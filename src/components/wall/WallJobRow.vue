@@ -34,6 +34,12 @@ const props = defineProps<{
   pending?: boolean;
   /** Whose job this is, when the surrounding list mixes people. */
   ownerLabel?: string;
+  /**
+   * That person's colour. Renders the name as a tinted pill, the same way a bean's
+   * column header is washed in their colour — on a mixed list the owner is then
+   * readable at a glance instead of being decoded from a line of grey text.
+   */
+  ownerColor?: string;
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 
@@ -145,7 +151,9 @@ function onTick() {
     </span>
     <span
       v-if="ownerLabel"
-      class="font-inter wall-job-done-at shrink-0 text-[var(--muted-text,#4d5d6c)]"
+      class="font-inter wall-job-done-at text-secondary-500 max-w-[7.5rem] shrink-0 truncate rounded-full px-2 py-0.5 font-semibold dark:text-gray-100"
+      :class="ownerColor ? '' : 'bg-[var(--tint-slate-10)]'"
+      :style="ownerColor ? { background: `${ownerColor}2e` } : undefined"
     >
       {{ ownerLabel }}
     </span>

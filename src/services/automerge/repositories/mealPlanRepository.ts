@@ -1,4 +1,4 @@
-import { createAutomergeRepository } from '../automergeRepository';
+import { createAutomergeRepository, stripUndefined, toPlain } from '../automergeRepository';
 import type { MealPlanEntry } from '@/types/models';
 import { list } from '../projection';
 import { mutate } from '../worker/docClient';
@@ -11,13 +11,6 @@ export const getMealPlanById = mealRepo.getById;
 export const createMealPlan = mealRepo.create;
 export const updateMealPlan = mealRepo.update;
 export const deleteMealPlan = mealRepo.remove;
-
-/** Strip `undefined` values — Automerge rejects them (mirrors the repo factory). */
-function clean(entity: MealPlanEntry): MealPlanEntry {
-  return JSON.parse(
-    JSON.stringify(Object.fromEntries(Object.entries(entity).filter(([, v]) => v !== undefined)))
-  ) as MealPlanEntry;
-}
 
 /**
  * Overwrite an entire week in ONE atomic batch (single Automerge.change): delete
@@ -37,7 +30,7 @@ export async function replaceWeek(weekDates: string[], entries: MealPlanEntry[])
       op: 'set',
       collection: 'mealPlans',
       id: e.id,
-      entity: clean(e),
+      entity: toPlain(stripUndefined(e)),
     })),
   ];
   await mutate({ op: 'batch', ops });

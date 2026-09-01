@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-01",
-    "translationCount": 4393
+    "translationCount": 4409
   },
   "translations": {
     "app.name": {
@@ -21969,6 +21969,86 @@
     "celebration.listComplete": {
       "translation": "全部完成！帽子在欢呼！",
       "hash": "46e9ya",
+      "lastUpdated": "2026-09-01"
+    },
+    "reauth.description": {
+      "translation": "在继续操作之前，请确认您的身份。",
+      "hash": "mjvnl0",
+      "lastUpdated": "2026-09-01"
+    },
+    "reauth.noCredential": {
+      "translation": "您需要先设置PIN或密码，然后才能执行此操作。打开设置→安全添加一个，然后重试。",
+      "hash": "fm9y3x",
+      "lastUpdated": "2026-09-01"
+    },
+    "settings.clearDataFailed": {
+      "translation": "无法清除您的数据。未删除任何内容，请稍后重试。",
+      "hash": "sznmgx",
+      "lastUpdated": "2026-09-01"
+    },
+    "family.deleteFailed": {
+      "translation": "该bean无法删除。请稍后重试。",
+      "hash": "ryd0z3",
+      "lastUpdated": "2026-09-01"
+    },
+    "reauth.unavailableTitle": {
+      "translation": "未准备好",
+      "hash": "fuj81q",
+      "lastUpdated": "2026-09-01"
+    },
+    "reauth.unavailable": {
+      "translation": "您的家人还在加载中，暂时无法验证身份。请稍后再试。",
+      "hash": "lsgyrx",
+      "lastUpdated": "2026-09-01"
+    },
+    "lists.cycle.archiveFailed": {
+      "translation": "无法保存此心愿单的历史记录。下次打开应用时，系统会重试。",
+      "hash": "xuoku7",
+      "lastUpdated": "2026-09-01"
+    },
+    "lists.history.title": {
+      "translation": "重复列表历史记录",
+      "hash": "c4bkqd",
+      "lastUpdated": "2026-09-01"
+    },
+    "lists.completed.thisWeek": {
+      "translation": "这个星期",
+      "hash": "mwvrbq",
+      "lastUpdated": "2026-09-01"
+    },
+    "lists.completed.lastWeek": {
+      "translation": "上周",
+      "hash": "5jx336",
+      "lastUpdated": "2026-09-01"
+    },
+    "lists.completed.earlier": {
+      "translation": "较早",
+      "hash": "4za5eo",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.today.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.today.backToToday": {
+      "translation": "回到今天",
+      "hash": "979417",
+      "lastUpdated": "2026-09-01"
+    },
+    "lists.history.retention": {
+      "translation": "保存3个月",
+      "hash": "7137x5",
+      "lastUpdated": "2026-09-01"
+    },
+    "confirm.notAllowedTitle": {
+      "translation": "不允许含有",
+      "hash": "q743qd",
+      "lastUpdated": "2026-09-01"
+    },
+    "family.removeNotAllowed": {
+      "translation": "只有Pod管理器可以删除Bean。请业主或经理帮忙。",
+      "hash": "x1wn74",
       "lastUpdated": "2026-09-01"
     }
   }

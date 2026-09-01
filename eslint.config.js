@@ -96,6 +96,9 @@ export default [
             '×',
             '✕',
             '✓',
+            '○',
+            // Archived-cycle tile: history is filed, not active (#cycle-history).
+            '🗂',
             '✗',
             '⠿',
             '✎',

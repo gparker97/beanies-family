@@ -5,7 +5,8 @@
  * copies of "which events does this bean see" is three chances to disagree —
  * and two of them had already drifted apart by the time this file existed.
  */
-import { normalizeAssignees } from '@/utils/assignees';
+import { effectiveAssignees, matchesAssigneeFilter } from '@/utils/assignees';
+import { SHARED_EVENT_COLOR } from '@/constants/memberColors';
 import { getActivityColor } from '@/stores/activityStore';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
@@ -27,10 +28,10 @@ export function matchesWallFilter(
   visibleMemberIds: string[] | null
 ): boolean {
   if (!visibleMemberIds) return true;
-  const assignees = normalizeAssignees(activity);
-  if (assignees.length === 0) return true;
   const allowed = new Set(visibleMemberIds);
-  return assignees.some((id) => allowed.has(id));
+  // The "no assignees means everyone's" rule lives in matchesAssigneeFilter, shared with
+  // the planner's filters so the convention has exactly one definition.
+  return matchesAssigneeFilter(activity, (id) => allowed.has(id));
 }
 
 /**
@@ -72,6 +73,13 @@ export function wallActivityColour(
   activity: FamilyActivity,
   membersById: Map<string, FamilyMember>
 ): string {
-  const [first] = normalizeAssignees(activity);
-  return membersById.get(first ?? '')?.color || getActivityColor(activity);
+  // A shared event wears the shared colour, not the first assignee's. Picking the first
+  // of several owners made a joint event look like one person's, and made a family-wide
+  // event indistinguishable from an unassigned one.
+  //
+  // The roster IS the resolver: an id that names nobody here is not a second owner. Before
+  // this, a record carrying one real member plus one stale id read as shared.
+  const owners = effectiveAssignees(activity, (id) => membersById.has(id));
+  if (owners.length !== 1) return SHARED_EVENT_COLOR;
+  return membersById.get(owners[0]!)?.color || getActivityColor(activity);
 }

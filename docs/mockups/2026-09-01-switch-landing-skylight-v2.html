@@ -1,0 +1,617 @@
+<title>keep the wall, bring your own tablet</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;600&family=Caveat:wght@500;700&display=swap">
+<style>
+  /* ══ beanies.family · /from/skylight v2 ══════════════════════════════════
+     Palette + type are the CIG's, not this page's invention. The freedom is
+     spent on ONE thing: the kitchen-wall scene, which is the page's argument.
+
+     DELIBERATELY SINGLE-THEME. beanies.family's marketing site is light-only,
+     and this page has to sit beside /from/maple and /from/cozi without looking
+     like a different site, so there is no dark variant by design. Every colour
+     (body ground included) is therefore painted explicitly from a token rather
+     than inherited, so the page holds on any host background.
+     ════════════════════════════════════════════════════════════════════ */
+  :root{
+    --heritage-orange:#F15D22; --terracotta:#E67E22; --deep-slate:#2C3E50;
+    --sky-silk:#AED6F1; --cloud-white:#F8F9FA; --story-cream:#fdf8f5;
+    --soft-green:#27AE60; --ink:#2C3E50; --muted:rgb(44 62 80 / 68%);
+    --faint:rgb(44 62 80 / 40%);
+    --card-shadow:0 4px 20px rgb(44 62 80 / 5%); --hover-shadow:0 8px 32px rgb(44 62 80 / 10%);
+    --sq:24px;
+    /* the room: the only tokens this page adds, and they exist for the scene */
+    --plaster:#f1e9e0; --plaster-lit:#f7f1ea; --floor:#e3d5c6;
+    --wood:#e0ab74; --wood-dark:#c1874c;
+    --note:#fff8d8; --note-edge:#f2e4a8; --note-ink:#6b5a1e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cloud-white);color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.65}
+  h1,h2,h3{font-family:'Outfit',system-ui,sans-serif;text-wrap:balance}
+  .hand{font-family:'Caveat','Outfit',cursive}
+  a{color:var(--heritage-orange)}
+  img{max-width:100%}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  .narrow{max-width:680px;margin:0 auto}
+  :focus-visible{outline:3px solid var(--sky-silk);outline-offset:3px;border-radius:6px}
+
+  /* ── nav ───────────────────────────────────────────────────────────── */
+  .nav{display:flex;align-items:center;gap:22px;padding:18px 28px;background:#fff;
+    box-shadow:0 1px 0 rgb(44 62 80 / 6%);font-family:'Outfit';font-size:.9rem;position:relative;z-index:5}
+  .nav .brand{font-weight:700;font-size:1.05rem;color:var(--deep-slate)}
+  .nav .brand span{color:var(--heritage-orange)}
+  .nav .links{margin-left:auto;display:flex;gap:20px;color:var(--muted)}
+  .nav .cta{background:var(--heritage-orange);color:#fff;padding:8px 18px;border-radius:16px;font-weight:600}
+  @media(max-width:760px){.nav .links{display:none}}
+
+  /* ── shared section furniture ──────────────────────────────────────── */
+  section{padding:76px 0}
+  .kicker{font-family:'Outfit';font-weight:700;font-size:.78rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--heritage-orange);text-align:center}
+  .stitle{font-size:clamp(1.7rem,3.6vw,2.4rem);font-weight:800;color:var(--deep-slate);
+    text-align:center;margin:.4rem 0 .6rem}
+  .ssub{text-align:center;color:var(--muted);max-width:600px;margin:0 auto 2.6rem}
+  .fade-cream{height:80px;background:linear-gradient(var(--cloud-white),var(--story-cream))}
+  .fade-back{height:80px;background:linear-gradient(var(--story-cream),var(--cloud-white))}
+  .btn{font-family:'Outfit';font-weight:700;font-size:.95rem;padding:14px 26px;border-radius:16px;
+    text-decoration:none;display:inline-block;border:0;cursor:pointer}
+  .btn-primary{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:#fff;
+    box-shadow:0 8px 24px rgb(241 93 34 / 32%)}
+  .btn-ghost{background:#fff;color:var(--deep-slate);box-shadow:var(--card-shadow)}
+
+  /* ══ HERO · the room ══════════════════════════════════════════════════
+     The thesis, not a headline with a prop beside it. Maple and Cozi open on a
+     doorway because their pitch is "come in"; this page's pitch is a thing on a
+     wall, so the wall is the hero. The mat stays, on the floor, so the three
+     /from pages still read as one family.
+
+     The tablet must read as MOUNTED, not pasted on top. Four cues do that work:
+     a bracket plate behind it, a contact shadow on the plaster, a cord running
+     down to a socket drawn on the same wall, and a shelf that keeps well clear
+     of the tablet instead of passing behind it. */
+  .hero{padding:64px 24px 0;text-align:center;background:
+    radial-gradient(600px 380px at 18% 6%,rgb(241 93 34 / 8%),transparent 70%),
+    radial-gradient(560px 360px at 84% 12%,rgb(174 214 241 / 30%),transparent 70%),
+    var(--cloud-white)}
+  .hero h1{font-size:clamp(2.3rem,6vw,3.9rem);font-weight:800;line-height:1.06;margin:.5rem 0 0;
+    color:var(--deep-slate)}
+  .hero h1 em{color:var(--heritage-orange);font-style:italic}
+  .hero .sub{max-width:620px;margin:1.2rem auto 0;color:var(--muted)}
+
+  .room{margin:46px auto 0;max-width:900px;border-radius:var(--sq) var(--sq) 0 0;overflow:hidden}
+  /* the wall face: everything mounted lives here */
+  .wallface{position:relative;padding:52px 24px 118px;
+    background:radial-gradient(620px 300px at 50% 22%,var(--plaster-lit),var(--plaster) 72%)}
+  .shelf{position:absolute;right:3.5%;top:64px;width:104px;text-align:center;font-size:1.45rem;line-height:1}
+  .shelf .plank{height:7px;border-radius:3px;background:linear-gradient(var(--wood),var(--wood-dark));
+    box-shadow:0 5px 10px rgb(44 62 80 / 16%);margin-top:3px}
+  @media(max-width:900px){.shelf{display:none}}
+
+  .mount{position:relative;width:min(560px,100%);margin:0 auto;z-index:2}
+  /* bracket plate: a slightly larger slab behind the glass, plus its own shadow */
+  .mount::before{content:'';position:absolute;inset:-9px -9px -14px;border-radius:26px;
+    background:linear-gradient(180deg,#3a4a58,#2b3845);
+    box-shadow:0 30px 50px -12px rgb(44 62 80 / 45%)}
+  /* contact shadow where the plate meets the plaster */
+  .mount::after{content:'';position:absolute;left:8%;right:8%;bottom:-22px;height:16px;border-radius:50%;
+    background:rgb(44 62 80 / 18%);filter:blur(9px)}
+  .tablet{position:relative;background:#1f2d3a;border-radius:20px;padding:12px;
+    box-shadow:0 2px 0 rgb(255 255 255 / 12%) inset}
+  .tablet .cam{width:5px;height:5px;border-radius:50%;background:#42555f;margin:0 auto 8px}
+  .screen{background:var(--cloud-white);border-radius:11px;padding:11px;text-align:left;
+    aspect-ratio:16/10;overflow:hidden;display:flex;flex-direction:column}
+  /* Cord and socket are BOTH positioned against .mount, sharing one `right`
+     value, so the cable always meets the socket at any width. */
+  .cord{position:absolute;right:var(--cordx,16%);top:100%;width:3px;height:58px;z-index:1;
+    background:linear-gradient(rgb(44 62 80 / 30%),rgb(44 62 80 / 22%));border-radius:0 0 2px 2px}
+  .socket{position:absolute;right:var(--cordx,16%);top:calc(100% + 58px);
+    width:26px;height:30px;margin-right:-11.5px;border-radius:4px;background:#fff;
+    box-shadow:0 1px 3px rgb(44 62 80 / 18%);display:grid;grid-auto-flow:column;
+    place-items:center;gap:4px}
+  .socket i{width:3px;height:9px;border-radius:1px;background:rgb(44 62 80 / 42%)}
+  @media(max-width:900px){.cord,.socket{display:none}}
+
+  /* ── the wall UI, reconstructed ───────────────────────────────────── */
+  .wbar{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;flex:none}
+  .wbar b{font-family:'Outfit';font-size:.82rem;color:var(--deep-slate)}
+  .wbar span{font-size:.6rem;color:var(--faint)}
+  .stage{flex:1;min-height:0;position:relative}
+  .view{position:absolute;inset:0;opacity:0;transition:opacity .5s ease;pointer-events:none}
+  .view[data-on]{opacity:1}
+
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;height:100%}
+  .col{background:#fff;border-radius:7px;padding:4px 3px;box-shadow:0 1px 4px rgb(44 62 80 / 6%);
+    display:flex;flex-direction:column;gap:3px;min-width:0}
+  .col.now{box-shadow:0 0 0 2px var(--heritage-orange)}
+  .col b{font-family:'Outfit';font-size:.5rem;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--faint);text-align:center;flex:none}
+  .chip{border-radius:4px;font-size:.5rem;line-height:1.3;padding:2px 3px;color:var(--deep-slate);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .c-o{background:rgb(241 93 34 / 16%)} .c-s{background:rgb(174 214 241 / 50%)}
+  .c-g{background:rgb(39 174 96 / 16%)} .c-t{background:rgb(230 126 34 / 18%)}
+  .c-p{background:rgb(155 89 182 / 15%)}
+
+  .lanes{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;height:100%}
+  .lane{background:#fff;border-radius:7px;box-shadow:0 1px 4px rgb(44 62 80 / 6%);
+    display:flex;flex-direction:column;padding:4px 3px;min-width:0}
+  .lane .who,.bcol .who{display:flex;align-items:center;gap:3px;font-family:'Outfit';font-size:.52rem;
+    font-weight:700;color:var(--deep-slate);margin-bottom:3px}
+  .dot{width:12px;height:12px;border-radius:50%;flex:none;font-size:.4rem;color:#fff;
+    display:grid;place-items:center;font-family:'Outfit'}
+  .lane .chores{margin-top:auto;border-top:1px dashed rgb(44 62 80 / 14%);padding-top:3px}
+  .lane .chores i{font-style:normal;font-size:.46rem;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--faint);display:block;margin-bottom:2px}
+  .todo{font-size:.5rem;color:var(--deep-slate);display:flex;gap:3px;align-items:center}
+  .todo s{color:var(--faint)}
+
+  .today{display:grid;grid-template-rows:1fr auto;gap:5px;height:100%}
+  .bigday{background:#fff;border-radius:8px;padding:7px 9px;box-shadow:0 1px 4px rgb(44 62 80 / 6%);
+    display:flex;flex-direction:column;gap:4px;min-height:0}
+  .bigday .hd{font-family:'Outfit';font-weight:700;font-size:.66rem;color:var(--deep-slate)}
+  .bigrow{display:flex;gap:6px;align-items:center;font-size:.56rem;color:var(--deep-slate)}
+  .bigrow time{font-family:'Outfit';font-weight:700;color:var(--faint);width:34px;flex:none}
+  .bigrow.live{background:rgb(241 93 34 / 10%);border-radius:5px;padding:2px 4px;margin:0 -4px}
+  .bigrow.live time{color:var(--heritage-orange)}
+  .strip{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .strip span{background:#fff;border-radius:5px;text-align:center;font-size:.46rem;padding:3px 0;
+    color:var(--faint);font-family:'Outfit';box-shadow:0 1px 3px rgb(44 62 80 / 5%)}
+  .strip span.on{background:var(--heritage-orange);color:#fff}
+
+  .board{display:grid;grid-template-rows:1fr auto;gap:5px;height:100%}
+  .bcols{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;min-height:0}
+  .bcol{background:#fff;border-radius:7px;padding:5px 4px;box-shadow:0 1px 4px rgb(44 62 80 / 6%);
+    display:flex;flex-direction:column;gap:3px}
+  .bcol.done{box-shadow:0 0 0 2px var(--soft-green)}
+  .job{display:flex;align-items:center;gap:4px;font-size:.5rem;color:var(--deep-slate)}
+  .tick{width:11px;height:11px;border-radius:50%;border:1.5px solid rgb(44 62 80 / 22%);flex:none}
+  .tick.on{background:var(--soft-green);border-color:var(--soft-green);position:relative}
+  .tick.on::after{content:'';position:absolute;left:3px;top:1px;width:3px;height:6px;
+    border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(42deg)}
+  .prog{background:#fff;border-radius:6px;padding:4px 7px;box-shadow:0 1px 4px rgb(44 62 80 / 6%)}
+  .prog i{font-style:normal;font-size:.5rem;color:var(--faint);font-family:'Outfit'}
+  .bar{height:5px;border-radius:3px;background:rgb(44 62 80 / 8%);margin-top:3px;overflow:hidden}
+  .bar>b{display:block;height:100%;width:72%;border-radius:3px;
+    background:linear-gradient(90deg,var(--heritage-orange),var(--terracotta))}
+
+  /* ── the floor: the family gathered under the wall ────────────────── */
+  .floor{position:relative;background:linear-gradient(180deg,var(--floor),#d8c8b6);
+    padding:0 24px 26px;box-shadow:0 -1px 0 rgb(44 62 80 / 6%)}
+  .fam{display:flex;justify-content:center;align-items:flex-end;gap:6px;
+    margin-top:-34px;position:relative;z-index:3}
+  .bean{width:var(--w,52px);text-align:center;transform:translateY(var(--y,0)) rotate(var(--rot,0deg));
+    animation:sway 5s ease-in-out infinite;animation-delay:var(--d,0s)}
+  .bean .body{width:100%;aspect-ratio:1/1.22;border-radius:50% 50% 46% 46%/54% 54% 46% 46%;
+    background:var(--c);box-shadow:0 7px 16px rgb(44 62 80 / 22%);position:relative}
+  .bean .body::before,.bean .body::after{content:'';position:absolute;top:36%;width:13%;height:13%;
+    border-radius:50%;background:rgb(255 255 255 / 92%)}
+  .bean .body::before{left:27%} .bean .body::after{right:27%}
+  .bean .smile{position:absolute;left:50%;top:55%;width:32%;height:15%;transform:translateX(-50%);
+    border-bottom:2px solid rgb(255 255 255 / 80%);border-radius:0 0 40px 40px}
+  .bean small{display:block;font-family:'Caveat';font-size:.9rem;color:rgb(44 62 80 / 70%);margin-top:3px}
+  @keyframes sway{0%,100%{transform:translateY(var(--y,0)) rotate(var(--rot,0deg))}
+    50%{transform:translateY(calc(var(--y,0px) - 5px)) rotate(calc(var(--rot,0deg) + 2deg))}}
+  .mat{position:relative;z-index:1;margin:6px auto 0;width:min(300px,72%);padding:13px 12px 15px;
+    background:repeating-linear-gradient(90deg,var(--wood) 0 10px,#d79f68 10px 20px);
+    border:5px solid var(--wood-dark);border-radius:8px;
+    transform:perspective(500px) rotateX(44deg);box-shadow:0 14px 22px rgb(44 62 80 / 18%)}
+  .mat span{display:block;font-size:1.45rem;font-weight:700;color:#7a4a1d}
+
+  /* the switcher: a real control, and it drives the screen */
+  .switcher{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:26px auto 0}
+  .switcher button{font-family:'Outfit';font-size:.78rem;font-weight:600;padding:7px 15px;border-radius:14px;
+    border:1px solid rgb(44 62 80 / 10%);background:#fff;color:var(--muted);cursor:pointer;
+    transition:background .18s,color .18s}
+  .switcher button[aria-pressed=true]{background:var(--deep-slate);color:#fff;border-color:var(--deep-slate)}
+  .roomcap{font-family:'Caveat';font-size:1.28rem;color:var(--muted);text-align:center;margin:16px auto 0;max-width:620px}
+  .hero .btns{margin:34px 0 0;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .trust{margin-top:24px;padding-bottom:70px;font-size:.8rem;color:var(--muted);
+    display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
+
+  /* ══ the comparison, promoted to second on the page ═══════════════════ */
+  .compare{background:var(--story-cream);padding:76px 0}
+  .tablewrap{overflow-x:auto;background:#fff;border-radius:var(--sq);max-width:820px;margin:0 auto;
+    box-shadow:0 14px 44px rgb(44 62 80 / 10%)}
+  table{width:100%;border-collapse:collapse;font-size:.95rem;min-width:560px}
+  th,td{padding:15px 20px;text-align:left;border-bottom:1px solid rgb(44 62 80 / 7%)}
+  thead th{font-family:'Outfit';font-weight:800;font-size:1rem;padding-top:22px;padding-bottom:14px}
+  thead th.mk{text-align:center}
+  thead th.mk i{display:block;font-style:normal;font-size:1.5rem;line-height:1.2}
+  thead th.us{color:var(--heritage-orange)}
+  tbody th{font-family:'Inter';font-weight:600;font-size:.93rem;color:var(--ink)}
+  td.c{text-align:center}
+  tbody tr:last-child td,tbody tr:last-child th{border-bottom:none}
+  tbody tr:hover td,tbody tr:hover th{background:rgb(174 214 241 / 12%)}
+  .good{color:var(--soft-green);font-weight:600}
+  .meh{color:var(--muted)}
+  .warn{color:var(--heritage-orange);font-weight:600}
+
+  /* ══ the notes on the wall ═══════════════════════════════════════════ */
+  .notes{background:var(--plaster);padding:76px 0}
+  .notes .kicker{color:var(--terracotta)}
+  .notelist{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  .pair{display:grid;grid-template-columns:288px 1fr;gap:28px;align-items:center}
+  @media(max-width:740px){.pair{grid-template-columns:1fr;gap:12px}}
+  .note{background:var(--note);border:1px solid var(--note-edge);border-radius:3px;padding:15px 17px;
+    box-shadow:0 6px 16px rgb(44 62 80 / 12%);font-family:'Caveat';font-size:1.2rem;line-height:1.4;
+    color:var(--note-ink);transform:rotate(var(--r,-1.2deg))}
+  .note cite{display:block;font-family:'Inter';font-style:normal;font-size:.66rem;
+    color:rgb(107 90 30 / 68%);margin-top:7px}
+  .answer h3{margin:0 0 3px;font-size:1.06rem;color:var(--deep-slate)}
+  .answer p{margin:0;font-size:.92rem;color:var(--muted)}
+
+  /* ══ what's on the wall ══════════════════════════════════════════════ */
+  .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px;max-width:940px;margin:0 auto}
+  .fcard{background:#fff;border-radius:var(--sq);box-shadow:var(--card-shadow);padding:24px;
+    transition:transform .2s,box-shadow .2s}
+  .fcard:hover{transform:translateY(-2px);box-shadow:var(--hover-shadow)}
+  .fcard .g{font-size:1.7rem;line-height:1}
+  .fcard h3{margin:10px 0 6px;font-size:1.02rem}
+  .fcard p{margin:0;font-size:.9rem;color:var(--muted)}
+  .fcard .soon{display:inline-block;margin-top:8px;font-family:'Outfit';font-size:.62rem;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--terracotta);
+    background:rgb(230 126 34 / 12%);padding:2px 8px;border-radius:8px}
+
+  /* ══ letter / privacy / boxes / faq / final ══════════════════════════ */
+  .letter{background:var(--story-cream)}
+  .letter p{margin:0 0 1.15rem}
+  .pull{font-family:'Caveat';font-size:1.4rem;line-height:1.4;color:var(--heritage-orange);
+    border-left:4px solid var(--sky-silk);padding:.2rem 0 .2rem 1.2rem;margin:1.8rem 0}
+  .pull a{color:inherit;text-decoration:underline;text-decoration-color:rgb(241 93 34 / 45%);text-underline-offset:3px}
+  .dark{background:linear-gradient(180deg,#243342,var(--deep-slate));color:#ECF0F1}
+  .dark .stitle{color:#fff} .dark .ssub{color:#BDC3C7} .dark .kicker{color:var(--sky-silk)}
+  .cakegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;max-width:880px;margin:0 auto}
+  .cakecard{background:rgb(255 255 255 / 5%);border:1px solid #4A6274;border-radius:var(--sq);padding:26px}
+  .cakecard h3{margin:0 0 8px;font-size:1.02rem;color:#fff}
+  .cakecard p{margin:0;font-size:.9rem;color:#BDC3C7}
+  .cakecard .em{color:var(--sky-silk);font-weight:600}
+  .boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;max-width:900px;margin:0 auto}
+  .box{background:#fff;border-radius:var(--sq);box-shadow:var(--card-shadow);padding:26px;position:relative;
+    transition:transform .2s}
+  .box:hover{transform:translateY(-2px);box-shadow:var(--hover-shadow)}
+  .tape{position:absolute;top:-14px;left:50%;transform:translateX(-50%) rotate(-2deg);
+    background:rgb(174 214 241 / 65%);padding:2px 18px;font-family:'Caveat';font-size:1.15rem;
+    color:var(--deep-slate);border-radius:3px}
+  .box h3{margin:10px 0 8px;font-size:1.05rem}
+  .box p{margin:0;font-size:.9rem;color:var(--muted)}
+  .box .emoji{font-size:1.9rem}
+  details{background:#fff;border-radius:18px;box-shadow:var(--card-shadow);padding:18px 24px;
+    max-width:720px;margin:0 auto 14px}
+  summary{font-family:'Outfit';font-weight:600;cursor:pointer;color:var(--deep-slate)}
+  details p{color:var(--muted);font-size:.93rem;margin:.8rem 0 0}
+  .final{text-align:center;padding:88px 24px;background:
+    radial-gradient(480px 300px at 50% 0%,rgb(241 93 34 / 8%),transparent 70%),var(--cloud-white)}
+  .final .stitle{font-size:clamp(2rem,5vw,3rem)}
+  .final .stitle em{color:var(--heritage-orange);font-style:italic}
+  .signoff{margin-top:44px;font-family:'Caveat';font-size:1.6rem;color:var(--deep-slate)}
+  .signoff .g{color:var(--heritage-orange)}
+  .ps{font-size:.85rem;color:var(--muted);margin-top:6px}
+
+  @media(prefers-reduced-motion:reduce){
+    .bean{animation:none}
+    .view,.fcard,.box,.switcher button{transition:none}
+  }
+  @media(max-width:640px){
+    .days{grid-template-columns:repeat(4,1fr)}
+    .col:nth-child(n+5){display:none}
+    .lanes,.bcols{grid-template-columns:repeat(2,1fr)}
+    .lane:nth-child(n+3),.bcol:nth-child(n+3){display:none}
+    .bean small{display:none}
+  }
+</style>
+
+<nav class="nav">
+  <span class="brand">beanies<span>.family</span></span>
+  <span class="links"><span>what's inside</span><span>my story</span><span>security</span><span>beanstalk</span><span>family library</span></span>
+  <span class="cta">sign in</span>
+</nav>
+
+<!-- ══ HERO ══════════════════════════════════════════════════════════════ -->
+<header class="hero">
+  <p class="kicker">switching from skylight</p>
+  <h1>keep the wall.<br><em>bring your own tablet.</em></h1>
+  <p class="sub">Skylight got the big idea right: the family week belongs on the wall. Buying their screen to see it is the part I'd skip. beanie wall mode does the same job on a tablet you already own, for one low price with everything included, and your family's data stays in your hands.</p>
+
+  <div class="room">
+    <div class="wallface">
+      <div class="shelf" aria-hidden="true">🪴<div class="plank"></div></div>
+
+      <div class="mount">
+        <div class="tablet">
+          <div class="cam" aria-hidden="true"></div>
+          <div class="screen">
+            <div class="wbar"><b>the parker family 🫘</b><span>updated just now · week of 7 sep</span></div>
+            <div class="stage">
+
+              <!-- A · the days -->
+              <div class="view" data-view="days" data-on>
+                <div class="days">
+                  <div class="col"><b>mon</b><span class="chip c-s">🏊 swim 4:00</span><span class="chip c-o">🍝 pasta</span></div>
+                  <div class="col"><b>tue</b><span class="chip c-g">⚽ football 5:00</span><span class="chip c-p">📚 library</span></div>
+                  <div class="col now"><b>wed</b><span class="chip c-t">🎹 piano 4:30</span><span class="chip c-o">🌮 tacos</span><span class="chip c-s">🧺 washing</span></div>
+                  <div class="col"><b>thu</b><span class="chip c-s">🦷 dentist 3:00</span></div>
+                  <div class="col"><b>fri</b><span class="chip c-o">🍕 pizza night</span><span class="chip c-g">🎬 movie</span></div>
+                  <div class="col"><b>sat</b><span class="chip c-g">🎂 milo's party</span><span class="chip c-s">🛒 big shop</span></div>
+                  <div class="col"><b>sun</b><span class="chip c-t">🥞 pancakes</span><span class="chip c-p">✈️ lisbon 6am</span></div>
+                </div>
+              </div>
+
+              <!-- B · bean lanes -->
+              <div class="view" data-view="lanes">
+                <div class="lanes">
+                  <div class="lane"><span class="who"><i class="dot" style="background:#2C3E50">G</i>greg</span>
+                    <span class="chip c-s">🦷 dentist 3:00</span><span class="chip c-o">🍝 cook</span>
+                    <div class="chores"><i>chores</i><span class="todo">◻ bins out</span></div></div>
+                  <div class="lane"><span class="who"><i class="dot" style="background:#E67E22">A</i>amy</span>
+                    <span class="chip c-t">🎹 piano run</span>
+                    <div class="chores"><i>chores</i><span class="todo"><s>✓ pack bags</s></span></div></div>
+                  <div class="lane"><span class="who"><i class="dot" style="background:#F15D22">O</i>ollie</span>
+                    <span class="chip c-g">⚽ football 5:00</span>
+                    <div class="chores"><i>chores</i><span class="todo">◻ tidy room</span><span class="todo">◻ reading</span></div></div>
+                  <div class="lane"><span class="who"><i class="dot" style="background:#7FB3D5">M</i>milo</span>
+                    <span class="chip c-s">🏊 swim 4:00</span>
+                    <div class="chores"><i>chores</i><span class="todo"><s>✓ feed cat</s></span></div></div>
+                </div>
+              </div>
+
+              <!-- C · today first -->
+              <div class="view" data-view="today">
+                <div class="today">
+                  <div class="bigday">
+                    <span class="hd">wednesday 10 september</span>
+                    <span class="bigrow"><time>3:00</time>🦷 dentist · greg</span>
+                    <span class="bigrow live"><time>now</time>🎹 piano lesson · amy</span>
+                    <span class="bigrow"><time>5:00</time>⚽ football training · ollie</span>
+                    <span class="bigrow"><time>6:30</time>🌮 taco night</span>
+                    <span class="bigrow"><time>7:30</time>🧺 washing on</span>
+                  </div>
+                  <div class="strip"><span>mon</span><span>tue</span><span class="on">wed</span><span>thu</span><span>fri</span><span>sat</span><span>sun</span></div>
+                </div>
+              </div>
+
+              <!-- J · the chores board -->
+              <div class="view" data-view="chores">
+                <div class="board">
+                  <div class="bcols">
+                    <div class="bcol"><span class="who"><i class="dot" style="background:#2C3E50">G</i>greg</span>
+                      <span class="job"><i class="tick on"></i>bins out</span><span class="job"><i class="tick"></i>book dentist</span></div>
+                    <div class="bcol done"><span class="who"><i class="dot" style="background:#E67E22">A</i>amy</span>
+                      <span class="job"><i class="tick on"></i>pack bags</span><span class="job"><i class="tick on"></i>passports ⭐</span></div>
+                    <div class="bcol"><span class="who"><i class="dot" style="background:#F15D22">O</i>ollie</span>
+                      <span class="job"><i class="tick on"></i>tidy room</span><span class="job"><i class="tick"></i>reading</span></div>
+                    <div class="bcol done"><span class="who"><i class="dot" style="background:#7FB3D5">M</i>milo</span>
+                      <span class="job"><i class="tick on"></i>feed cat ⭐</span></div>
+                  </div>
+                  <div class="prog"><i>the family is 72% done today 🫘</i><div class="bar"><b></b></div></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <span class="cord" aria-hidden="true"></span>
+        <span class="socket" aria-hidden="true"><i></i><i></i></span>
+      </div>
+    </div>
+
+    <div class="floor">
+      <div class="fam" aria-hidden="true">
+        <div class="bean" style="--c:#2C3E50;--w:58px;--y:14px;--rot:4deg;--d:0s"><div class="body"><span class="smile"></span></div><small>greg</small></div>
+        <div class="bean" style="--c:#F15D22;--w:40px;--y:0px;--rot:1deg;--d:1.2s"><div class="body"><span class="smile"></span></div><small>ollie</small></div>
+        <div class="bean" style="--c:#7FB3D5;--w:34px;--y:-6px;--rot:-1deg;--d:1.8s"><div class="body"><span class="smile"></span></div><small>milo</small></div>
+        <div class="bean" style="--c:#E67E22;--w:56px;--y:14px;--rot:-4deg;--d:.6s"><div class="body"><span class="smile"></span></div><small>amy</small></div>
+      </div>
+      <div class="mat"><span class="hand">oh hi, skylight friends 👋</span></div>
+    </div>
+  </div>
+
+  <div class="switcher" role="group" aria-label="wall views">
+    <button type="button" data-go="days" aria-pressed="true">the days</button>
+    <button type="button" data-go="lanes" aria-pressed="false">bean lanes</button>
+    <button type="button" data-go="today" aria-pressed="false">today first</button>
+    <button type="button" data-go="chores" aria-pressed="false">the chores board</button>
+  </div>
+  <p class="roomcap">four screens, one tap apart. that's a 2019 ipad from the drawer, and it's thrilled to have a job again.</p>
+
+  <div class="btns">
+    <a class="btn btn-primary" href="#">start counting beans 🫘</a>
+    <a class="btn btn-ghost" href="#compare">how it compares ↓</a>
+  </div>
+  <p class="trust"><span>🔒 end-to-end encrypted</span><span>📂 your file, your storage</span><span>🚫 no ads, ever</span><span>💷 one price, everything in</span></p>
+</header>
+
+<!-- ══ COMPARISON ════════════════════════════════════════════════════════ -->
+<section class="compare" id="compare">
+  <div class="wrap">
+    <p class="kicker">side by side</p>
+    <h2 class="stitle">skylight vs beanies, honestly</h2>
+    <p class="ssub">Same job on the wall. The difference is what it costs to get there, and who ends up holding your family's week.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col" class="mk"><i aria-hidden="true">🖼️</i>skylight</th>
+            <th scope="col" class="mk us"><i aria-hidden="true">🫘</i>beanies</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">hardware to buy</th><td class="c warn">$250 to $280</td><td class="c good">none, use a tablet you already own</td></tr>
+          <tr><th scope="row">what the subscription covers</th><td class="c warn">$79/yr for meals, chores and more</td><td class="c good">one low price, everything included</td></tr>
+          <tr><th scope="row">wall-mounted family calendar</th><td class="c good">✓ their screen</td><td class="c good">✓ your screen, any size</td></tr>
+          <tr><th scope="row">on everyone's phones too</th><td class="c good">✓</td><td class="c good">✓</td></tr>
+          <tr><th scope="row">chores, lists and meals</th><td class="c meh">on the paid tier</td><td class="c good">✓ included</td></tr>
+          <tr><th scope="row">family finances and budgets</th><td class="c meh">not offered</td><td class="c good">✓ and never on the wall</td></tr>
+          <tr><th scope="row">works with the wifi down</th><td class="c meh">needs their cloud</td><td class="c good">✓ local-first</td></tr>
+          <tr><th scope="row">where your data lives</th><td class="c meh">their cloud</td><td class="c good">your own storage</td></tr>
+          <tr><th scope="row">can the company read it?</th><td class="c meh">yes</td><td class="c good">no. can't. encrypted.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══ THE NOTES ═════════════════════════════════════════════════════════ -->
+<section class="notes" id="notes">
+  <div class="wrap">
+    <p class="kicker">the sticky notes</p>
+    <h2 class="stitle">what skylight owners complain about</h2>
+    <p class="ssub">Not my opinion. These come up again and again in Skylight reviews, in the reviewers' own words.</p>
+
+    <div class="notelist">
+
+      <div class="pair">
+        <div class="note" style="--r:-1.4deg">"the subscription was my biggest complaint."<cite>$79/yr gates meals, chore rewards and the screensaver</cite></div>
+        <div class="answer"><h3>nothing is behind a tier</h3>
+          <p>One low price, and chores, meals, lists, travel and the whole wall are simply in it.</p></div>
+      </div>
+
+      <div class="pair">
+        <div class="note" style="--r:1.1deg">"$279.99 for the 15.4in, before the subscription."<cite>skylight calendar pricing, 2026</cite></div>
+        <div class="answer"><h3>no hardware to buy</h3>
+          <p>The old iPad in the drawer already works. A wall mount is the whole shopping list.</p></div>
+      </div>
+
+      <div class="pair">
+        <div class="note" style="--r:-.8deg">"it has to be plugged in. you need a spot near a socket."<cite>the supplied cable is 1.6m, so the socket picks the spot</cite></div>
+        <div class="answer"><h3>you pick the wall first</h3>
+          <p>Choose the tablet whose battery and cable suit the spot. It runs unplugged when you need the socket back.</p></div>
+      </div>
+
+      <div class="pair">
+        <div class="note" style="--r:1.6deg">"a large delay before it appears on the skylight. sometimes an hour."<cite>reviewer on sync lag, 2026</cite></div>
+        <div class="answer"><h3>instant, and honest when it isn't</h3>
+          <p>Ticks land immediately because the data is on the device. A "last updated" stamp means a stale wall can never quietly lie to you.</p></div>
+      </div>
+
+      <div class="pair">
+        <div class="note" style="--r:-1.1deg">"not really big enough to engage with from across the room."<cite>reviewer on the fixed screen size, 2026</cite></div>
+        <div class="answer"><h3>your screen, your size</h3>
+          <p>Built to read from three metres, with buttons sized for small hands. Mount a 13in iPad if that's what you have.</p></div>
+      </div>
+
+      <div class="pair">
+        <div class="note" style="--r:.9deg">"the what's-new notifications felt disruptive."<cite>skylight, responding to owner feedback</cite></div>
+        <div class="answer"><h3>the wall shows your week, and nothing else</h3>
+          <p>No announcements, no prompts, no upsells on the kitchen wall. It is a family calendar, not a channel.</p></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ WHAT'S ON THE WALL ════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <p class="kicker">wall mode</p>
+    <h2 class="stitle">the whole family, on one screen</h2>
+    <p class="ssub">Not just a calendar. Everything a weekday actually contains, on a screen the family walks past forty times a day.</p>
+    <div class="grid4">
+      <div class="fcard"><div class="g" aria-hidden="true">📅</div><h3>activities</h3><p>Everyone's week, reading down the day the way time actually runs. Clubs, lessons, appointments, the lot.</p></div>
+      <div class="fcard"><div class="g" aria-hidden="true">✅</div><h3>chores</h3><p>Each bean gets a column and big ticks. A star per chore done, a green ring when someone finishes, and a family progress bar.</p></div>
+      <div class="fcard"><div class="g" aria-hidden="true">📝</div><h3>lists and to-dos</h3><p>Shared lists stay whole at the foot of the board. Repeating lists become that person's chores. Kids only ever see "my chores".</p></div>
+      <div class="fcard"><div class="g" aria-hidden="true">✈️</div><h3>travel</h3><p>The next trip with real detail: flight legs, dates, how many nights. The thing everyone asks about at breakfast.</p></div>
+      <div class="fcard"><div class="g" aria-hidden="true">🍽️</div><h3>meals</h3><p>What's for dinner, on the wall, so nobody has to ask. Breakfast through snacks.</p><span class="soon">shipping soon</span></div>
+      <div class="fcard"><div class="g" aria-hidden="true">🌙</div><h3>night mode</h3><p>Dim to a big clock face after bedtime, or keep the schedule up all night. Your call, per wall.</p></div>
+      <div class="fcard"><div class="g" aria-hidden="true">🔒</div><h3>safe to touch</h3><p>Locked by default: anyone can tick a chore, nobody can delete your week. A grown-up's PIN unlocks editing, then it relocks itself.</p></div>
+      <div class="fcard"><div class="g" aria-hidden="true">💷</div><h3>money stays off the wall</h3><p>Finances can't reach wall mode at all, whoever is signed in. The kitchen screen is family logistics. Your accounts are not on it.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="fade-cream"></div>
+<section class="letter" style="padding-top:24px">
+  <div class="wrap narrow">
+    <p class="kicker">the part where i'm honest</p>
+    <h2 class="stitle">more expensive doesn't mean better</h2>
+    <p>A purpose-built device isn't automatically the better device. The iPad in your drawer was a flagship once. It very likely has a sharper screen, a faster chip and a better touch response than a $280 calendar appliance, and you already paid for it. Giving it a second life on the wall is not a compromise, it's a promotion.</p>
+    <p>What you do give up is the setup. Skylight arrives ready: no auto-lock to disable, no Guided Access to configure, no notifications to silence. That's ten minutes of fiddling on your side, once, and the setup helper walks you through all of it. After that the tablet does one job and never interrupts you to announce a feature.</p>
+    <div class="pull">"having a comprehensive set of awesome family organization and finance planning related features while also being fully private are two things that are no longer mutually exclusive." - me, <a href="https://dadmag.substack.com/p/vibe-coding-dad-of-three" target="_blank" rel="noopener">in an actual interview</a>, sounding smarter than usual</div>
+    <p>Skylight does deserve the credit for the idea. They got families to look up from six phones and at one shared wall, and that genuinely works. Keep the idea. Point it at a screen you already own.</p>
+  </div>
+</section>
+<div class="fade-back"></div>
+
+<section class="dark">
+  <div class="wrap">
+    <p class="kicker">have your cake, and eat it too</p>
+    <h2 class="stitle">private doesn't mean less anymore</h2>
+    <p class="ssub">the same three cards as the homepage security section, because the answer doesn't change.</p>
+    <div class="cakegrid">
+      <div class="cakecard"><h3>🙈 encrypted means encrypted</h3><p>Most apps encrypt your data <span class="em">on their servers</span>, with their keys, which is a security feature. beanies encrypts it <span class="em">before it leaves your device</span>, with your key, which is a privacy feature. I can't read it, sell it, or lose it, because I never had it.</p></div>
+      <div class="cakecard"><h3>📂 one file, yours</h3><p>Everything lives in a single encrypted <span class="em">.beanpod</span> file on your Google Drive or device. Lose your PIN and your Recovery Kit? I can't help you. That's kinda the whole point.</p></div>
+      <div class="cakecard"><h3>🤷 nothing to steal</h3><p>Even if someone wanted to poke around our dark corner of the internet, there's nothing there but code and app config. Good luck finding anything to leak.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">moving day</p>
+    <h2 class="stitle">three boxes and it's on the wall</h2>
+    <div class="boxes">
+      <div class="box"><span class="tape">box #1</span><div class="emoji" aria-hidden="true">📦</div><h3>bring your calendar</h3><p>If you sync Skylight with Google Calendar, this part mostly does itself. The step-by-step guide covers the rest.</p></div>
+      <div class="box"><span class="tape">box #2</span><div class="emoji" aria-hidden="true">🚚</div><h3>set up your pod</h3><p>About two minutes: pick a PIN, save your Recovery Kit, add your beans. No password, and no account on my servers.</p></div>
+      <div class="box"><span class="tape">box #3</span><div class="emoji" aria-hidden="true">🔨</div><h3>hang it up</h3><p>Mount the tablet, open beanies, turn on wall mode. The setup helper handles auto-lock, Guided Access and orientation.</p></div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <p class="kicker">fair questions</p>
+    <h2 class="stitle">things skylight folks actually ask</h2>
+    <details open><summary>do i need to buy anything?</summary><p>A wall mount, if you want it to look tidy. That's the whole shopping list. Any tablet with a browser works: iPad, Android, Fire, the one with the cracked corner.</p></details>
+    <details><summary>will the tablet fall asleep on me?</summary><p>Wall mode holds the screen awake while it's on, and the setup helper walks you through the two device settings that matter: auto-lock set to never, and Guided Access so a small person can't wander into YouTube.</p></details>
+    <details><summary>can the kids mess it up?</summary><p>Not really. The wall is locked by default: anyone can tick their chores, nobody can delete anything. Editing needs a grown-up's PIN, and it relocks itself afterwards.</p></details>
+    <details><summary>can the kids see our money?</summary><p>No. Finances are structurally excluded from wall mode, whoever happens to be signed in. There's no setting to get that wrong.</p></details>
+    <details><summary>what if my wifi goes down?</summary><p>The wall keeps showing your week. Everything is stored on the device, so it renders offline and catches up when the connection comes back. It never goes blank.</p></details>
+    <details><summary>okay but what if YOU shut down?</summary><p>Your data is <em>always</em> yours. It's an encrypted file sitting on your own storage. Whatever happens to me, it's still there, and it's still yours. Which is kind of the whole point.</p></details>
+    <details><summary>what does it cost?</summary><p>One price, with everything in it. No hardware, no tier that unlocks the features you actually wanted, and no ads. Ever.</p></details>
+  </div>
+</section>
+
+<section class="final">
+  <p class="kicker">the welcome mat is out</p>
+  <h2 class="stitle">every. bean. <em>counts.</em></h2>
+  <p class="ssub">even the ones arriving from skylight.</p>
+  <a class="btn btn-primary" href="#">start counting beans 🫘</a>
+  <p class="signoff">peace out, my beans.<br><span class="g">greg</span></p>
+  <p class="ps">ps. stuck mid-move? come yell at me (nicely) on the discord.</p>
+</section>
+
+<script>
+  /* The tablet cycles the four real wall views. It is the page's argument, so it
+     runs on its own, but the switcher is a real control: touch it and the page
+     stops deciding for you. Reduced motion holds it on "the days". */
+  (function () {
+    var views = [].slice.call(document.querySelectorAll('.view'));
+    var btns = [].slice.call(document.querySelectorAll('.switcher button'));
+    var order = ['days', 'lanes', 'today', 'chores'];
+    var i = 0, timer = null;
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    function show(name) {
+      views.forEach(function (v) {
+        if (v.dataset.view === name) v.setAttribute('data-on', '');
+        else v.removeAttribute('data-on');
+      });
+      btns.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.go === name));
+      });
+      i = order.indexOf(name);
+    }
+    function tick() { show(order[(i + 1) % order.length]); }
+    function start() { if (!still.matches && !timer) timer = setInterval(tick, 3600); }
+    function stop() { clearInterval(timer); timer = null; }
+
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () { stop(); show(b.dataset.go); });
+    });
+    /* Don't animate a screen nobody is looking at. */
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stop(); else start();
+    });
+    still.addEventListener('change', function () { stop(); if (!still.matches) start(); });
+    start();
+  })();
+</script>

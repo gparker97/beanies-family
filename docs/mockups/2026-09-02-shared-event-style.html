@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shared event style — three directions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Caveat:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --muted: #4d5d6c;
+        --card: #ffffff;
+        --line: #e4e9ee;
+        --ink: var(--slate);
+        --ground: var(--cloud);
+      }
+      .dark {
+        --card: #1e293b;
+        --line: #31415a;
+        --ink: #e8edf3;
+        --muted: #9db0c4;
+        --ground: #131c29;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: var(--ground);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, .of { font-family: Outfit, system-ui, sans-serif; }
+      .wrap { max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+      header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .35rem; }
+      h1 { font-size: 1.9rem; margin: 0; letter-spacing: -0.01em; }
+      .sub { color: var(--muted); max-width: 62ch; line-height: 1.55; margin: .5rem 0 2rem; font-size: .95rem; }
+      .toggle {
+        border: 1px solid var(--line); background: var(--card); color: var(--ink);
+        border-radius: 999px; padding: .5rem 1rem; font: inherit; font-size: .85rem; cursor: pointer;
+      }
+      .toggle:hover { border-color: var(--orange); }
+
+      section.opt { margin-bottom: 3rem; }
+      .opt-head { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; margin-bottom: .25rem; }
+      .badge {
+        font-family: Outfit, sans-serif; font-weight: 700; font-size: .7rem; letter-spacing: .09em;
+        text-transform: uppercase; color: var(--orange); border: 1.5px solid var(--orange);
+        border-radius: 999px; padding: .18rem .55rem;
+      }
+      .opt-head h2 { font-size: 1.25rem; margin: 0; }
+      .why { color: var(--muted); font-size: .88rem; line-height: 1.55; margin: .45rem 0 1.1rem; max-width: 70ch; }
+
+      .lanes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; }
+      @media (max-width: 780px) { .lanes { grid-template-columns: repeat(2, 1fr); } }
+      .lane { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: .7rem; min-height: 210px; }
+      .lane-head { display: flex; align-items: center; gap: .45rem; margin-bottom: .6rem; }
+      .face { width: 22px; height: 22px; border-radius: 999px; flex: none; }
+      .lane-name { font-family: Outfit, sans-serif; font-weight: 600; font-size: .9rem; }
+      .lane-sub { color: var(--muted); font-size: .7rem; margin-left: auto; }
+
+      /* base chip = today's shipped look */
+      .chip {
+        display: block; width: 100%; text-align: left; cursor: pointer;
+        border: 0; border-left: 5px solid var(--c, var(--orange));
+        border-radius: 12px; padding: .42rem .6rem; margin-bottom: .5rem;
+        background: rgba(44, 62, 80, .05); color: inherit; font: inherit; position: relative;
+      }
+      .dark .chip { background: rgba(255,255,255,.06); }
+      .chip .t { display: block; font-size: .66rem; font-weight: 600; color: var(--muted); }
+      .chip .n { display: block; font-family: Outfit, sans-serif; font-weight: 600; font-size: .82rem; line-height: 1.2; }
+
+      /* ---------- A: hand-holding beans ---------- */
+      .a-shared {
+        border-left-color: transparent;
+        background:
+          linear-gradient(var(--card), var(--card)) padding-box,
+          linear-gradient(120deg, var(--orange), var(--terracotta) 55%, var(--sky)) border-box;
+        border: 2px solid transparent;
+        border-radius: 14px;
+        box-shadow: 0 1px 0 rgba(44,62,80,.04);
+      }
+      .dark .a-shared { box-shadow: none; }
+      .hands { display: flex; align-items: center; margin-top: .38rem; }
+      .hands i {
+        width: 15px; height: 15px; border-radius: 999px; display: block;
+        border: 2px solid var(--card); margin-right: -5px;
+      }
+      .hands .link { width: 14px; height: 2px; border-radius: 2px; background: var(--orange); margin: 0 .3rem 0 .1rem; opacity: .55; }
+      .hands span { font-size: .64rem; color: var(--muted); font-weight: 600; }
+
+      /* ---------- B: ticket / raffle stub ---------- */
+      .b-shared {
+        border-left: 0;
+        background: linear-gradient(180deg, rgba(241,93,34,.11), rgba(230,126,34,.07));
+        border-radius: 12px;
+        padding-left: 1.15rem;
+        -webkit-mask:
+          radial-gradient(6px at 0 50%, transparent 98%, #000) left/100% 100% no-repeat;
+        mask: radial-gradient(6px at 0 50%, transparent 98%, #000) left/100% 100% no-repeat;
+      }
+      .b-rail {
+        position: absolute; left: .42rem; top: .45rem; bottom: .45rem; width: 4px; border-radius: 4px;
+        background: repeating-linear-gradient(180deg, var(--orange) 0 5px, transparent 5px 9px);
+      }
+      .b-pill {
+        display: inline-flex; align-items: center; gap: .25rem; margin-top: .35rem;
+        font-family: Outfit, sans-serif; font-size: .6rem; font-weight: 700; letter-spacing: .05em;
+        text-transform: uppercase; color: var(--orange);
+        background: rgba(241,93,34,.13); border-radius: 999px; padding: .12rem .45rem;
+      }
+
+      /* ---------- C: confetti banner ---------- */
+      .c-shared {
+        border-left-color: var(--orange);
+        border-radius: 12px;
+        background-color: rgba(241,93,34,.10);
+        background-image:
+          radial-gradient(circle at 12% 22%, var(--terracotta) 1.6px, transparent 1.7px),
+          radial-gradient(circle at 62% 74%, var(--sky) 1.9px, transparent 2px),
+          radial-gradient(circle at 88% 30%, var(--orange) 1.5px, transparent 1.6px),
+          radial-gradient(circle at 36% 82%, var(--orange) 1.3px, transparent 1.4px);
+        background-size: 46px 34px;
+      }
+      .c-tag {
+        position: absolute; top: -7px; right: 8px;
+        font-family: Caveat, cursive; font-size: .82rem; color: var(--orange);
+        background: var(--card); padding: 0 .3rem; border-radius: 6px; line-height: 1.1;
+      }
+
+      .note { display: flex; gap: .55rem; align-items: flex-start; margin-top: 1rem; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+      .note b { color: var(--ink); font-weight: 600; }
+      .rule { height: 1px; background: var(--line); border: 0; margin: 0 0 2.4rem; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>Shared event style</h1>
+        <button class="toggle" onclick="document.body.classList.toggle('dark')">
+          light / dark
+        </button>
+      </header>
+      <p class="sub">
+        Three directions for an event that belongs to more than one bean, shown in the wall's
+        bean-lane view. Every direction keeps the meaning readable without colour alone, and
+        keeps the shared marker legible at three metres. Same four lanes each time: Leo has a
+        solo lesson, and swim club is shared between Leo and Milo.
+      </p>
+
+      <!-- A -->
+      <section class="opt">
+        <div class="opt-head">
+          <span class="badge">A</span>
+          <h2>Hand-holding beans</h2>
+        </div>
+        <p class="why">
+          The chip gets a warm gradient outline instead of a colour rail, and a row of little
+          beans holding hands underneath — the brand's own golden rule, used literally. The
+          faces say <em>who</em> without a second line of text, so a parent reads the sharing at
+          a glance rather than opening the event.
+        </p>
+        <div class="lanes">
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#8b5cf6"></span><span class="lane-name">Leo</span><span class="lane-sub">2 today</span></div>
+            <button class="chip" style="--c:#8b5cf6"><span class="t">15:45</span><span class="n">Trumpet lesson</span></button>
+            <button class="chip a-shared">
+              <span class="t">17:30</span><span class="n">Swim club</span>
+              <span class="hands"><i style="background:#8b5cf6"></i><i style="background:#3D8FD1"></i><span class="link"></span><span>Leo &amp; Milo</span></span>
+            </button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#3D8FD1"></span><span class="lane-name">Milo</span><span class="lane-sub">1 today</span></div>
+            <button class="chip a-shared">
+              <span class="t">17:30</span><span class="n">Swim club</span>
+              <span class="hands"><i style="background:#8b5cf6"></i><i style="background:#3D8FD1"></i><span class="link"></span><span>Leo &amp; Milo</span></span>
+            </button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#22c55e"></span><span class="lane-name">Ada</span><span class="lane-sub">1 today</span></div>
+            <button class="chip" style="--c:#22c55e"><span class="t">16:00</span><span class="n">Ballet</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#ec4899"></span><span class="lane-name">Mum</span><span class="lane-sub">nothing on</span></div>
+          </div>
+        </div>
+        <p class="note"><b>Trade-off:</b> the gradient border is the most work to get right on a dark ground, and the bean row costs about 14px of chip height.</p>
+      </section>
+      <hr class="rule" />
+
+      <!-- B -->
+      <section class="opt">
+        <div class="opt-head">
+          <span class="badge">B</span>
+          <h2>Shared ticket</h2>
+        </div>
+        <p class="why">
+          A raffle-stub shape: a notch punched out of the left edge and a perforated orange
+          rail, like one ticket torn for two people. Warm, tactile, and instantly different in
+          silhouette — it reads as shared from across the kitchen even out of focus.
+        </p>
+        <div class="lanes">
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#8b5cf6"></span><span class="lane-name">Leo</span><span class="lane-sub">2 today</span></div>
+            <button class="chip" style="--c:#8b5cf6"><span class="t">15:45</span><span class="n">Trumpet lesson</span></button>
+            <button class="chip b-shared"><span class="b-rail"></span><span class="t">17:30</span><span class="n">Swim club</span><span class="b-pill">🤝 shared</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#3D8FD1"></span><span class="lane-name">Milo</span><span class="lane-sub">1 today</span></div>
+            <button class="chip b-shared"><span class="b-rail"></span><span class="t">17:30</span><span class="n">Swim club</span><span class="b-pill">🤝 shared</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#22c55e"></span><span class="lane-name">Ada</span><span class="lane-sub">1 today</span></div>
+            <button class="chip" style="--c:#22c55e"><span class="t">16:00</span><span class="n">Ballet</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#ec4899"></span><span class="lane-name">Mum</span><span class="lane-sub">nothing on</span></div>
+          </div>
+        </div>
+        <p class="note"><b>Trade-off:</b> the notch needs a CSS mask, which loses the chip's shadow; and the pill's word has to be translated, unlike the bean faces in A.</p>
+      </section>
+      <hr class="rule" />
+
+      <!-- C -->
+      <section class="opt">
+        <div class="opt-head">
+          <span class="badge">C</span>
+          <h2>Confetti banner</h2>
+        </div>
+        <p class="why">
+          The lightest touch: keep today's rail, tint the chip Heritage Orange, and scatter a
+          faint confetti pattern behind the title with a handwritten "together" tag on the
+          corner. Playful, cheap to build, and it leaves the chip's height untouched.
+        </p>
+        <div class="lanes">
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#8b5cf6"></span><span class="lane-name">Leo</span><span class="lane-sub">2 today</span></div>
+            <button class="chip" style="--c:#8b5cf6"><span class="t">15:45</span><span class="n">Trumpet lesson</span></button>
+            <button class="chip c-shared"><span class="c-tag">together!</span><span class="t">17:30</span><span class="n">Swim club</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#3D8FD1"></span><span class="lane-name">Milo</span><span class="lane-sub">1 today</span></div>
+            <button class="chip c-shared"><span class="c-tag">together!</span><span class="t">17:30</span><span class="n">Swim club</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#22c55e"></span><span class="lane-name">Ada</span><span class="lane-sub">1 today</span></div>
+            <button class="chip" style="--c:#22c55e"><span class="t">16:00</span><span class="n">Ballet</span></button>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><span class="face" style="background:#ec4899"></span><span class="lane-name">Mum</span><span class="lane-sub">nothing on</span></div>
+          </div>
+        </div>
+        <p class="note"><b>Trade-off:</b> the handwritten tag is decorative and can clip on a narrow lane; the confetti is the least legible of the three at three metres.</p>
+      </section>
+    </div>
+  </body>
+</html>

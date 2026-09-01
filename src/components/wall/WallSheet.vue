@@ -240,6 +240,12 @@ function todoOwnerName(job: WallJob): string {
   return familyStore.members.find((m) => m.id === job.ownerId)?.name ?? t('wall.todo.anyone');
 }
 
+/** The owner's colour, so the name reads as a pill rather than grey text. */
+function todoOwnerColour(job: WallJob): string | undefined {
+  if (job.ownerId === UNASSIGNED) return undefined;
+  return familyStore.members.find((m) => m.id === job.ownerId)?.color;
+}
+
 function dateLabel(ymd: string): string {
   return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, {
     weekday: 'long',
@@ -471,6 +477,7 @@ function listOwnerName(list: FamilyList): string {
                 :jobs="group.jobs"
                 :is-pending="isPending"
                 :owner-label="todoOwnerName"
+                :owner-color="todoOwnerColour"
                 @toggle="emit('toggle', $event)"
               />
             </div>

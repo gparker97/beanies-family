@@ -5,6 +5,7 @@ import {
   wallActivityColour,
   wallEvents,
 } from '@/utils/wallActivities';
+import { SHARED_EVENT_COLOR, MEMBER_COLOR_VALUES } from '@/constants/memberColors';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 const stamp = '2026-09-01T00:00:00.000Z';
@@ -84,18 +85,26 @@ describe('wallEvents', () => {
 
 describe('wallActivityColour', () => {
   const members = new Map([
-    ['leo', member('leo', '#F15D22')],
+    ['leo', member('leo', '#8b5cf6')],
+    // A REAL member hue. Heritage Orange (the shared-event colour) is deliberately not one
+    // of them, and a fixture that used it here would make this suite pass or fail on a
+    // collision that cannot occur in the app.
     ['milo', member('milo', '#3D8FD1')],
   ]);
 
   it("uses the owner's colour, so two beans' football look different", () => {
-    expect(wallActivityColour(activity({ assigneeIds: ['leo'] }), members)).toBe('#F15D22');
+    expect(wallActivityColour(activity({ assigneeIds: ['leo'] }), members)).toBe('#8b5cf6');
     expect(wallActivityColour(activity({ assigneeIds: ['milo'] }), members)).toBe('#3D8FD1');
   });
 
-  it('falls back to the category colour when nobody owns it', () => {
+  it('gives an unowned event the shared colour, not a category one', () => {
+    // Supersedes the category fallback deliberately: an event nobody owns is the whole
+    // family's, shows in every lane, and must read as shared rather than borrowing a hue
+    // that could be mistaken for a person's. Asserted against the constant so the two
+    // cannot drift apart.
     const colour = wallActivityColour(activity({ assigneeIds: [] }), members);
-    expect(colour).toBeTruthy();
-    expect(colour).not.toBe('#F15D22');
+    expect(colour).toBe(SHARED_EVENT_COLOR);
+    // The point of the constant: it can never collide with a real member's colour.
+    expect(MEMBER_COLOR_VALUES).not.toContain(colour);
   });
 });

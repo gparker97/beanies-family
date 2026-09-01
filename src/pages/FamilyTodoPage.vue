@@ -5,7 +5,7 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSounds } from '@/composables/useSounds';
-import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
+import { matchesAssigneeFilter, toAssigneePayload } from '@/utils/assignees';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,10 +55,14 @@ const sortedMembers = computed(() => familyStore.sortedHumans);
 // by the Open and Someday sections — the Completed list has its own filter
 // (it also matches `completedBy`).
 function withMemberFilterAndSort(items: TodoItem[]): TodoItem[] {
+  // `matchesAssigneeFilter`, not `.includes()`: an UNASSIGNED to-do is the family's work
+  // and belongs to whoever you lens on, and `.includes()` on an empty array is false, so
+  // the plain form hid every wall quick-add (which creates to-dos unassigned by design)
+  // the moment you tapped a bean. Every other surface routes through this predicate.
   const filtered =
     memberFilter.value === 'all'
       ? items
-      : items.filter((t) => normalizeAssignees(t).includes(memberFilter.value));
+      : items.filter((t) => matchesAssigneeFilter(t, (id) => id === memberFilter.value));
   return sortTodos(filtered, sortBy.value);
 }
 
@@ -84,7 +88,8 @@ const displayedCompletedTodos = computed(() => {
   if (memberFilter.value !== 'all') {
     items = items.filter(
       (t) =>
-        normalizeAssignees(t).includes(memberFilter.value) || t.completedBy === memberFilter.value
+        matchesAssigneeFilter(t, (id) => id === memberFilter.value) ||
+        t.completedBy === memberFilter.value
     );
   }
 
