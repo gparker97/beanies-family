@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-08-28",
-    "translationCount": 4295
+    "lastUpdated": "2026-09-01",
+    "translationCount": 4391
   },
   "translations": {
     "app.name": {
@@ -21480,6 +21480,486 @@
       "translation": "正在退出",
       "hash": "t1639p",
       "lastUpdated": "2026-08-28"
+    },
+    "header.accountMenu": {
+      "translation": "您的帐号",
+      "hash": "r7jp28",
+      "lastUpdated": "2026-09-01"
+    },
+    "pin.backspace": {
+      "translation": "删除最后一位数字",
+      "hash": "j9z060",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.name": {
+      "translation": "Beanie Wall",
+      "hash": "2yn90i",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.view.days": {
+      "translation": "本周",
+      "hash": "i8pnc3",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.view.lanes": {
+      "translation": "每个豆子",
+      "hash": "y6ppan",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.view.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.view.jobs": {
+      "translation": "家务板",
+      "hash": "fqspv0",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobsBoard.title": {
+      "translation": "家务板",
+      "hash": "fqspv0",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobsBoard.back": {
+      "translation": "返回{view}",
+      "hash": "2auxqh",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobsBoard.progress": {
+      "translation": "今日已完成{done}项，共{total}项",
+      "hash": "ca0h88",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobs.heading": {
+      "translation": "待办事项",
+      "hash": "tjgfey",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.chores.heading": {
+      "translation": "家務",
+      "hash": "xd8kpi",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.sheet.todos": {
+      "translation": "家庭待办事项",
+      "hash": "ug978u",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.sheet.noTodos": {
+      "translation": "今天没有练习",
+      "hash": "4l521q",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.doneAt": {
+      "translation": "完成时间： {time}",
+      "hash": "qw2hot",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobs.none": {
+      "translation": "今天没有练习",
+      "hash": "m6h242",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobs.allDone": {
+      "translation": "包装好啦！",
+      "hash": "1m2tts",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.sharedLists": {
+      "translation": "Beanie Lists",
+      "hash": "kyt6m7",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.day.nothingOn": {
+      "translation": "无开启",
+      "hash": "a9u7m",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.tonight": {
+      "translation": "今晚",
+      "hash": "8npisd",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.trip": {
+      "translation": "旅程",
+      "hash": "i8o044",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.trip.booked": {
+      "translation": "已预订{booked}个，共{total}个",
+      "hash": "ewqntj",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.trip.allBooked": {
+      "translation": "全部预订",
+      "hash": "lyqszd",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.trip.unbookedLeg": {
+      "translation": "如果尚未预订",
+      "hash": "5ntavp",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.trip.gaps.one": {
+      "translation": "{count}晚没有床",
+      "hash": "ucxsqz",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.trip.gaps.other": {
+      "translation": "{count}晚无床住宿",
+      "hash": "z5he5g",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lock.locked": {
+      "translation": "墙壁已锁定",
+      "hash": "kr1oyh",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lock.unlock": {
+      "translation": "解锁编辑",
+      "hash": "jbvsgs",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lock.relock": {
+      "translation": "再次锁定墙壁",
+      "hash": "dhhiq",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lock.nightNow": {
+      "translation": "立即开始夜间模式",
+      "hash": "mnnla9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lock.leave": {
+      "translation": "离开豆墙",
+      "hash": "f2ct22",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lock.unlocked": {
+      "translation": "编辑已解锁",
+      "hash": "y4dfg5",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.exiting": {
+      "translation": "正在离开墙壁……",
+      "hash": "c07q1t",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.night.wake": {
+      "translation": "触摸以唤醒墙壁",
+      "hash": "y77y0f",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.night.tomorrow.one": {
+      "translation": "明天有{count}件事",
+      "hash": "cjaktf",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.night.tomorrow.other": {
+      "translation": "明天有{count}件事",
+      "hash": "jk8tz6",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.header.weekOf": {
+      "translation": "{date}的周",
+      "hash": "eiqp4f",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.header.things.one": {
+      "translation": "今天有{count}件事",
+      "hash": "xfxyhj",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.header.things.other": {
+      "translation": "今天有{count}件事",
+      "hash": "cz3gpo",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.chores": {
+      "translation": "家務",
+      "hash": "xd8kpi",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.choresProgress": {
+      "translation": "已完成{done}项，共{total}项·点击查看版面",
+      "hash": "egz77z",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.todos": {
+      "translation": "家庭待办事项",
+      "hash": "ug978u",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.todosProgress": {
+      "translation": "今日已完成{done}项，共{total}项",
+      "hash": "ca0h88",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.more": {
+      "translation": "+ 另外 %{count} 个",
+      "hash": "xdbj93",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.cooking": {
+      "translation": "{name}正在烹饪",
+      "hash": "qjfv71",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.list.repeats": {
+      "translation": "重复",
+      "hash": "peiciw",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.list.ownerList": {
+      "translation": "{name}的列表",
+      "hash": "rb7rsr",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.list.progress": {
+      "translation": "已完成{done}项，共{total}项",
+      "hash": "3r6s7r",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lane.today": {
+      "translation": "今天有{count}个",
+      "hash": "qiml1y",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.lane.tomorrow": {
+      "translation": "明天{count}",
+      "hash": "tk75j0",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.today.now": {
+      "translation": "即时消息--",
+      "hash": "sl3kkq",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.filter.everyone": {
+      "translation": "所有人",
+      "hash": "5qdaq3",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.sheet.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.sheet.meals": {
+      "translation": "今日餐点",
+      "hash": "g3t6wt",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.sheet.noMeals": {
+      "translation": "未计划",
+      "hash": "5bdvm9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.unlock.title": {
+      "translation": "输入{name}的PIN码",
+      "hash": "bmjgbk",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.unlock.anyGrownUp": {
+      "translation": "输入成年人的PIN码",
+      "hash": "o20k7f",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.unlock.leaveHint": {
+      "translation": "离开后，应用将以您的身份重新打开，因此此应用必须是您自己的PIN码。",
+      "hash": "ksc53z",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.unlock.tooMany": {
+      "translation": "尝试次数过多—等待{seconds}秒",
+      "hash": "wyljfh",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.unlock.failed": {
+      "translation": "无效，请重试",
+      "hash": "1dcno5",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.cheer.1": {
+      "translation": "不错",
+      "hash": "5o72yq",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.cheer.2": {
+      "translation": "碰！ ",
+      "hash": "smnfp9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.cheer.3": {
+      "translation": "收集",
+      "hash": "q9fyya",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.cheer.4": {
+      "translation": "看看您",
+      "hash": "j547p1",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.cheer.5": {
+      "translation": "搞定一个",
+      "hash": "z8s21x",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.status.saved": {
+      "translation": "{when}已保存",
+      "hash": "36ljnl",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.status.offline": {
+      "translation": "离线—显示上次已知",
+      "hash": "c2wrp9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.status.stale": {
+      "translation": "{when}上次更新",
+      "hash": "vdfx5j",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.status.blocked": {
+      "translation": "无法访问您的家庭文件",
+      "hash": "n7w91",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobFailed.title": {
+      "translation": "不儲存",
+      "hash": "7w6k1k",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.jobFailed.message": {
+      "translation": "它可能已在其他设备上更改。下次同步时，墙壁将迎头赶上。",
+      "hash": "tct28b",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.addFailed.title": {
+      "translation": "没有添加",
+      "hash": "18bz7v",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.addFailed.message": {
+      "translation": "列表可能已在其他设备上更改。请稍后重试。",
+      "hash": "mvhm3t",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.hero.when": {
+      "translation": "何时",
+      "hash": "1lrh6",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.orphanLists": {
+      "translation": "其他心愿单",
+      "hash": "ordg2j",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todo.overdue": {
+      "translation": "晚期",
+      "hash": "1els6",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todo.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todo.upcoming": {
+      "translation": "上升",
+      "hash": "6nm33u",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todo.undated": {
+      "translation": "按日期",
+      "hash": "9kjdyr",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todo.anyone": {
+      "translation": "任何人",
+      "hash": "wimfbu",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.notes": {
+      "translation": "注 意 事 项",
+      "hash": "18xach",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.card.choresAndLists": {
+      "translation": "家务和清单",
+      "hash": "lbhjdb",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.meals.slot.breakfast": {
+      "translation": "早餐",
+      "hash": "1rfliz",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.meals.slot.lunch": {
+      "translation": "午餐",
+      "hash": "17xekq",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.meals.slot.dinner": {
+      "translation": "晚餐",
+      "hash": "xut9qq",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.meals.slot.snack": {
+      "translation": "小吃",
+      "hash": "1bn86m",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todoAddFailed.message": {
+      "translation": "该待办事项未保存。请稍后重试。",
+      "hash": "swhff2",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.list.addItem": {
+      "translation": "+ 新增项目",
+      "hash": "5yfc6x",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.todo.add": {
+      "translation": "添加任务",
+      "hash": "tffa4f",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.setup.title": {
+      "translation": "Beanie Wall",
+      "hash": "2yn90i",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.setup.description": {
+      "translation": "将备用平板电脑变成家庭墙面显示器：一周一目了然，每个人都可以随时轻触。",
+      "hash": "9q6oy0",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.setup.start": {
+      "translation": "开始",
+      "hash": "ievnt",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.setup.setPinAndStart": {
+      "translation": "设置PIN并开始",
+      "hash": "rpxxm7",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.setup.needsPin.title": {
+      "translation": "请先设置PIN码",
+      "hash": "wekqzc",
+      "lastUpdated": "2026-09-01"
+    },
+    "wall.setup.needsPin.message": {
+      "translation": "离开墙壁需要您的PIN码，因此您在开始之前需要一个PIN码。在账号中设置。",
+      "hash": "z1ik1t",
+      "lastUpdated": "2026-09-01"
+    },
+    "celebration.listComplete": {
+      "translation": "全部完成！帽子在欢呼！",
+      "hash": "46e9ya",
+      "lastUpdated": "2026-09-01"
     }
   }
 }
