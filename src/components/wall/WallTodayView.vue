@@ -9,7 +9,7 @@
  * The "happening now" marker is the point of this view over view A — it
  * answers "are we late?" without anybody doing arithmetic.
  */
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import WallMemberFace from '@/components/wall/WallMemberFace.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { useActivityStore } from '@/stores/activityStore';
@@ -40,8 +40,11 @@ const props = defineProps<{
   orphanLists: WallListGroup[];
   visibleMemberIds: string[] | null;
 }>();
+// `openDay` is deliberately NOT declared here. The three wall views share one parent
+// binding (`<component :is>`), and in THIS view tapping a day moves the view to that day
+// rather than opening a sheet over it — so the emit stays with the two views that still
+// mean "open a sheet", and the shared listener simply never fires for this one.
 const emit = defineEmits<{
-  openDay: [string];
   open: [WallSheetTarget];
   openChores: [];
 }>();
@@ -55,8 +58,25 @@ function colourFor(activity: FamilyActivity) {
   return wallActivityColour(activity, membersById.value);
 }
 
+/**
+ * The day the big panel is showing. Tapping the week strip moves this rather than opening
+ * a drawer: the drawer covered the very panel that already renders a day in full, so it
+ * was a second, smaller copy of this view sitting on top of it.
+ *
+ * Follows `todayYmd` when that changes, so the midnight rollover pulls the wall back to
+ * the real today instead of stranding it on yesterday.
+ */
+const focusYmd = ref(props.todayYmd);
+watch(
+  () => props.todayYmd,
+  (ymd) => {
+    focusYmd.value = ymd;
+  }
+);
+const isToday = computed(() => focusYmd.value === props.todayYmd);
+
 const events = computed(() =>
-  wallEvents(activityStore.activitiesForDate(props.todayYmd), props.visibleMemberIds)
+  wallEvents(activityStore.activitiesForDate(focusYmd.value), props.visibleMemberIds)
 );
 
 function minutesOf(hhmm: string): number {
@@ -101,6 +121,17 @@ const stripByDay = computed(() => {
 function eventsOn(ymd: string) {
   return stripByDay.value.get(ymd) ?? [];
 }
+/** Names the day on screen. With the drawer gone, this is what tells you where you are. */
+const focusLabel = computed(() =>
+  isToday.value
+    ? t('wall.today.today')
+    : new Date(`${focusYmd.value}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      })
+);
+
 function dayLabel(ymd: string) {
   return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
 }
@@ -115,13 +146,28 @@ function dayNumber(ymd: string) {
       <div
         class="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[26px] bg-white px-5 py-1 shadow-[var(--card-shadow)] dark:bg-slate-800"
       >
+        <div
+          class="sticky top-0 z-[1] flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(44,62,80,0.06)] bg-white py-2 dark:border-slate-700 dark:bg-slate-800"
+        >
+          <p class="font-outfit text-secondary-500 wall-slot-title font-bold dark:text-gray-100">
+            {{ focusLabel }}
+          </p>
+          <button
+            v-if="!isToday"
+            type="button"
+            class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1 font-bold"
+            @click="focusYmd = todayYmd"
+          >
+            {{ t('wall.today.backToToday') }}
+          </button>
+        </div>
         <button
           v-for="entry in events"
           :key="entry.activity.id + entry.date"
           type="button"
           class="flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0 dark:border-slate-700"
           :class="
-            entry.activity.id === nowId
+            isToday && entry.activity.id === nowId
               ? 'rounded-2xl border-b-0 bg-gradient-to-r from-[var(--tint-orange-8)] to-transparent px-3'
               : ''
           "
@@ -136,7 +182,7 @@ function dayNumber(ymd: string) {
           </span>
           <span class="min-w-0 flex-1">
             <span
-              v-if="entry.activity.id === nowId"
+              v-if="isToday && entry.activity.id === nowId"
               class="font-outfit wall-nowtag text-primary-500 block font-extrabold tracking-[0.11em] uppercase"
             >
               {{ t('wall.today.now') }}
@@ -175,11 +221,12 @@ function dayNumber(ymd: string) {
           type="button"
           class="rounded-2xl px-2 py-2 text-center shadow-[var(--card-shadow)]"
           :class="
-            ymd === todayYmd
+            ymd === focusYmd
               ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
               : 'bg-white dark:bg-slate-800'
           "
-          @click="emit('openDay', ymd)"
+          :aria-pressed="ymd === focusYmd"
+          @click="focusYmd = ymd"
         >
           <span
             class="font-outfit wall-strip-day block font-bold tracking-[0.1em] uppercase opacity-70"
@@ -194,7 +241,7 @@ function dayNumber(ymd: string) {
               v-for="entry in eventsOn(ymd).slice(0, 4)"
               :key="entry.activity.id + entry.date"
               class="block h-1.5 w-1.5 rounded-full"
-              :class="ymd === todayYmd ? 'ring-[1.5px] ring-white/55' : ''"
+              :class="ymd === focusYmd ? 'ring-[1.5px] ring-white/55' : ''"
               :style="{ background: colourFor(entry.activity) }"
             />
           </span>
@@ -206,7 +253,7 @@ function dayNumber(ymd: string) {
       <WallPeripheralCards
         :variant="portrait ? 'band' : 'rail'"
         :portrait="portrait"
-        :today-ymd="todayYmd"
+        :meals-ymd="focusYmd"
         :todos-for="todosFor"
         :unassigned-todos="unassignedTodos"
         :lists-for="listsFor"

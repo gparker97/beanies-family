@@ -16,7 +16,12 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { normalizeAssignees } from '@/utils/assignees';
+import {
+  belongsInMemberColumn,
+  isSharedEvent,
+  matchesAssigneeFilter,
+  normalizeAssignees,
+} from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
@@ -93,14 +98,34 @@ const dayActivities = computed<Occurrence[]>(() => {
 // the desktop column hiding) so the in-view filter isn't duplicated.
 const mobileDayActivities = computed<Occurrence[]>(() => {
   if (memberFilterStore.isAllSelected) return dayActivities.value;
+  // A family-wide activity has NO assignees, and `.some()` on an empty array is always
+  // false — so this used to delete family dinner from the timeline whenever a filter was
+  // on. The shared predicate keeps ownerless events visible to everyone.
   return dayActivities.value.filter((o) =>
-    normalizeAssignees(o.activity).some((id) => memberFilterStore.isMemberSelected(id))
+    matchesAssigneeFilter(o.activity, (id) => memberFilterStore.isMemberSelected(id))
   );
 });
 
-// Activities for a specific member
+// Activities for a specific member. A SHARED activity — several owners, or none at all —
+// belongs in everyone's column: a two-owner event already appears in both, and one with
+// no owner is owned by everybody. The shared style is what keeps a duplicated card from
+// reading as a separate personal obligation in each column.
+/**
+ * Shared events now appear in every member column, so they need to read as one shared
+ * thing rather than a separate obligation per person. The planner colours by CATEGORY
+ * (not by member), so hue cannot carry that meaning here — the dashed edge does, and it
+ * matches the wall's treatment.
+ */
+/** Roster ids as a set: `isShared` is called once per block per render, per column. */
+const memberIds = computed(() => new Set(familyStore.members.map((m) => m.id)));
+function isShared(activity: { assigneeIds?: string[]; assigneeId?: string }): boolean {
+  // Resolved against the roster, so a stale or duplicated id in `assigneeIds` cannot
+  // dress a one-owner event as shared.
+  return isSharedEvent(activity, (id) => memberIds.value.has(id));
+}
+
 function memberActivities(memberId: string): Occurrence[] {
-  return dayActivities.value.filter((o) => normalizeAssignees(o.activity).includes(memberId));
+  return dayActivities.value.filter((o) => belongsInMemberColumn(o.activity, memberId));
 }
 
 function memberTimedActivities(memberId: string): FamilyActivity[] {
@@ -361,6 +386,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               v-for="occ in memberUntimedActivities(member.id)"
               :key="occ.activity.id"
               class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+              :class="isShared(occ.activity) ? 'border-dashed' : ''"
               :style="{
                 borderLeftColor: getActivityColor(occ.activity),
                 background: getActivityColor(occ.activity) + '15',
@@ -460,6 +486,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                 v-for="(activity, ai) in group"
                 :key="activity.id"
                 class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
+                :class="isShared(activity) ? 'border-dashed' : ''"
                 :style="{
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,

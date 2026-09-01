@@ -190,8 +190,12 @@ function handleClose() {
     </div>
 
     <!-- Step 2: re-authenticate -->
+    <!-- Keeps the transfer-specific wording now that ReauthChallenge defaults to
+         action-neutral copy for the shared gate (#80). -->
     <ReauthChallenge
       v-else-if="step === 'reauth' && currentOwner"
+      description-key="transferOwnership.reauthDescription"
+      no-credential-key="transferOwnership.reauthNoCredential"
       :member="currentOwner"
       :open="step === 'reauth'"
       @verified="handleVerified"

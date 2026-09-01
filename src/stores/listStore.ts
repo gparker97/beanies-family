@@ -1,21 +1,28 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, shallowRef, computed, watch } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
+import * as cycleRepo from '@/services/automerge/repositories/listCycleRepository';
+import { buildCycleSnapshot, expiredCycleIds, CYCLE_SWEEP_ENABLED } from '@/utils/listCycles';
+import { clockVerdict, readSweepDay, recordSweepDay } from '@/utils/cycleSweepClock';
+import { list as projectionList } from '@/services/automerge/projection';
 import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/listLifecycle';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { useTranslationStore } from '@/stores/translationStore';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
+import { showToast } from '@/composables/useToast';
 import { generateUUID } from '@/utils/id';
 import { trackFeature } from '@/services/analytics/plausible';
 import type {
   FamilyList,
   FamilyListItem,
+  ListCycle,
   CreateFamilyListInput,
   UpdateFamilyListInput,
   ListCategory,
@@ -96,7 +103,21 @@ export const useListStore = defineStore('lists', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  const { today } = useToday();
+  /**
+   * Archived cycles of recurring lists. A `shallowRef` on purpose: the records are
+   * immutable by contract (write-once, never patched), so the 2-3x Vue deep-proxy cost
+   * documented in PERFORMANCE.md buys nothing. Every update REPLACES the array —
+   * `.push`/`.splice` on a shallowRef are non-reactive and must not appear.
+   */
+  const cycles = shallowRef<ListCycle[]>([]);
+  /** True only after a successful `loadCycles`. */
+  const cyclesLoaded = ref(false);
+  // Deliberately NOT the shared isLoading/error: a history read must never blank or
+  // error the live-lists shelf, and `wrapAsync` toasts on whatever refs it is handed.
+  const cyclesLoading = ref(false);
+  const cyclesError = ref<string | null>(null);
+
+  const { today, isVisible } = useToday();
 
   // ========== GETTERS ==========
 
@@ -112,6 +133,15 @@ export const useListStore = defineStore('lists', () => {
   );
   const completedLists = computed(() =>
     filteredLists.value.filter((l) => isFiled(l)).sort(byCompletedDesc)
+  );
+
+  /**
+   * Archived cycles, newest first, narrowed by the same global member filter as lists so
+   * history behaves identically to the live shelf.
+   */
+  const filteredCycles = createMemberFiltered(cycles, (c) => c.ownerId);
+  const archivedCycles = computed(() =>
+    [...filteredCycles.value].sort((a, b) => b.endedOn.localeCompare(a.endedOn))
   );
 
   /** Active lists that are due today or overdue (built on the shared predicate). */
@@ -155,9 +185,193 @@ export const useListStore = defineStore('lists', () => {
       },
       { action: 'listStore:loadLists' }
     );
-    // Reconcile only AFTER the collection is populated, so a watcher race can't
-    // run against an empty set. Idempotent — a same-day re-run is a no-op.
-    await reconcileRecurringLists();
+    await loadCycles();
+    // Only AFTER the collections are populated, so a watcher race can't run against an
+    // empty set. Idempotent — a same-day re-run is a no-op.
+    await runDailyMaintenance();
+  }
+
+  /**
+   * Archived cycles. Its OWN loading/error refs, deliberately: sharing the store's would
+   * let a history read blank or error the live-lists shelf, and `wrapAsync` toasts on
+   * whatever refs it is given.
+   */
+  async function loadCycles(): Promise<void> {
+    if (!isDocLoaded()) return;
+    await wrapAsync(
+      cyclesLoading,
+      cyclesError,
+      async () => {
+        cycles.value = await cycleRepo.getAllCycles();
+        cyclesLoaded.value = true;
+      },
+      // History is a secondary read on a page whose PRIMARY content is the live lists.
+      // A failure must not throw a toast over a working page at boot; the shelf renders
+      // its own empty state and `cyclesError` records the reason.
+      { action: 'listStore:loadCycles', errorToast: false }
+    );
+    if (cyclesError.value) {
+      cycles.value = [];
+      cyclesLoaded.value = false;
+    }
+  }
+
+  /**
+   * The ONE daily pass. Re-entrancy-guarded because `loadLists`, the `today` watcher and
+   * a PWA resume can overlap, and two concurrent passes over the same list would both
+   * read its pre-reset state.
+   *
+   * Called from BOTH `loadLists` and the watcher, and both are required: `watch(today)`
+   * is not `immediate` and `today` is set at module load, so for a user who opens the app
+   * fresh each day the watcher never fires in that session.
+   */
+  let maintaining = false;
+  async function runDailyMaintenance(): Promise<void> {
+    if (maintaining) return;
+    maintaining = true;
+    try {
+      await reconcileRecurringLists();
+      await sweepExpiredCycles();
+    } finally {
+      maintaining = false;
+    }
+  }
+
+  /**
+   * Delete archived cycles past the keep window.
+   *
+   * Deliberately its own function rather than a tail of `reconcileRecurringLists`, whose
+   * docstring reads "the ONE write path for the clock advanced": hiding an irreversible
+   * delete behind a benign name is the kind of thing that survives ten reviews and then
+   * surprises somebody. It is named for what it does.
+   *
+   * Never throws. A sweep failure must not affect tomorrow's reset.
+   */
+  async function sweepExpiredCycles(): Promise<void> {
+    // 1. Kill switch — a data-loss report is answered with a one-line release.
+    if (!CYCLE_SWEEP_ENABLED) return;
+
+    // 2. Never sweep a document whose load has not provably completed. `isDocLoaded()` is
+    //    the real guard here: the projection arrives in per-collection chunks and this
+    //    flips only on the last one. `cyclesLoaded` is a cheap forward-compat check —
+    //    what actually stops a mass delete is that the predicate is per-record.
+    if (!isDocLoaded() || !cyclesLoaded.value) {
+      logSweepSkip('not-loaded');
+      return;
+    }
+
+    // 3. The clock. A wrong clock can only ever DELAY a deletion.
+    const verdict = clockVerdict(today.value, readSweepDay());
+    if (verdict !== 'sweep') {
+      // Each skip decides for itself whether to advance the cursor, because the two
+      // answers have opposite failure modes and one rule cannot serve both:
+      //
+      //   first-run  — advance. Nothing was deleted; tomorrow is a real sweep.
+      //   corrupt    — advance. Advancing IS the repair: it overwrites the bad reading,
+      //                which is the only way a poisoned cursor ever unsticks itself.
+      //   jumped     — advance. The reading is untrusted for DELETING, but leaving the
+      //                cursor behind would re-warn on every app open forever. If the
+      //                reading was garbage, `skip-corrupt` repairs it on the correction.
+      //   regressed  — do NOT advance. Moving the high-water mark backwards is exactly
+      //                the write that would let a wrong clock accelerate a deletion.
+      //   same-day   — nothing to do, and deliberately silent: this is the normal path.
+      if (verdict !== 'skip-regressed' && verdict !== 'skip-same-day') {
+        recordSweepDay(today.value);
+      }
+      if (verdict === 'skip-first-run') logSweepSkip('first-run');
+      else if (verdict === 'skip-jumped') logSweepSkip('clock-jumped');
+      else if (verdict === 'skip-corrupt') logSweepSkip('clock-corrupt');
+      else if (verdict === 'skip-regressed') logSweepSkip('clock-regressed');
+      return;
+    }
+
+    try {
+      // 4. Read the PROJECTION, not the reactive array: a stale array must never be able
+      //    to widen a deletion.
+      const stored = projectionList('listCycles');
+      // A completed sweep with nothing to do — and it MUST advance the cursor. Leaving it
+      // frozen (as an earlier draft did) means every family with no history yet re-reaches
+      // the trusted-jump bound every eighth day and fires a false `clock-jumped` warning
+      // forever, drowning the one signal that detects a genuinely bad clock.
+      if (!stored.length) {
+        recordSweepDay(today.value);
+        return;
+      }
+
+      // 5. The pure predicate — keep-on-doubt, capped, oldest first.
+      const ids = expiredCycleIds(stored, today.value);
+      if (!ids.length) {
+        recordSweepDay(today.value);
+        return;
+      }
+
+      // 6. RESERVE the day BEFORE deleting anything. `MAX_SWEEP_DELETES` is a per-DAY cap,
+      //    and it is only that if the day is actually claimed: recording afterwards means
+      //    a failed write (or a kill in the window between the two) leaves the cursor on
+      //    yesterday, and maintenance re-runs on every visit and every remote merge — so
+      //    the cap degrades into 50-per-invocation and a whole archive can go in one
+      //    session. Failing to reserve costs one day of retention; not reserving can cost
+      //    the history.
+      if (!recordSweepDay(today.value)) {
+        logSweepSkip('cursor-write-failed');
+        return;
+      }
+
+      await cycleRepo.deleteCycles(ids);
+
+      // 7. Only mirror into the store AFTER the write resolved, so a failure leaves the
+      //    UI showing what is actually still stored.
+      const gone = new Set(ids);
+      cycles.value = cycles.value.filter((c) => !gone.has(c.id));
+
+      // 8. The count is the load-bearing signal: a run at or near the cap, sustained over
+      //    days, is the fingerprint of a bad clock or a broken predicate — and the only
+      //    way this feature's worst failure surfaces before a user reports it.
+      logEvent({
+        level: 'info',
+        surface: 'recurrence',
+        message: 'cycle-swept',
+        context: {
+          recur_surface: 'list',
+          recur_outcome: 'swept',
+          recur_children_removed: ids.length,
+          recur_children_expected: stored.length,
+        },
+      });
+    } catch (e) {
+      logEvent({
+        level: 'warn',
+        surface: 'recurrence',
+        message: 'cycle-sweep-failed',
+        context: { recur_surface: 'list', recur_outcome: 'write-failed' },
+      });
+      reportError({
+        surface: 'listStore.sweepExpiredCycles',
+        message:
+          'cycle retention sweep failed — nothing was deleted and the high-water day was not advanced, so it retries on the next app load or day advance',
+        error: e,
+        severity: 'warning',
+        context: { recur_surface: 'list', recur_outcome: 'write-failed' },
+      });
+    }
+  }
+
+  /** A sweep that never runs is as much a bug as one that runs too eagerly. */
+  function logSweepSkip(
+    kind:
+      | 'first-run'
+      | 'clock-jumped'
+      | 'clock-regressed'
+      | 'clock-corrupt'
+      | 'cursor-write-failed'
+      | 'not-loaded'
+  ): void {
+    logEvent({
+      level: 'warn',
+      surface: 'recurrence',
+      message: 'cycle-sweep-skipped',
+      context: { recur_surface: 'list', recur_outcome: kind },
+    });
   }
 
   async function createList(input: CreateFamilyListInput): Promise<FamilyList | null> {
@@ -234,11 +448,26 @@ export const useListStore = defineStore('lists', () => {
       isLoading,
       error,
       async () => {
-        const success = await listRepo.deleteList(id);
-        if (success) {
-          lists.value = lists.value.filter((l) => l.id !== id);
+        // A `delete` on an id that is already gone is a silent no-op in the worker, and
+        // `deleteListWithCycles` resolves to `undefined` either way — so without this the
+        // action reported success for a list it never touched (the exact silent-failure
+        // class `useMemberRemoval` was written to close). Check the PROJECTION, not the
+        // reactive array, so a stale array cannot fake either answer.
+        if (!projectionList('lists').some((l) => l.id === id)) {
+          reportError({
+            surface: 'lists',
+            message: 'deleteList called for a list that is no longer in the document',
+            severity: 'warning',
+            context: { action: 'delete_missing_list' },
+          });
+          return false;
         }
-        return success;
+        // Deletes the list AND its whole history in one change, so no orphan window
+        // exists. The intentional path, taken by a user who is present.
+        await cycleRepo.deleteListWithCycles(id);
+        lists.value = lists.value.filter((l) => l.id !== id);
+        cycles.value = cycles.value.filter((c) => c.listId !== id);
+        return true;
       },
       { action: 'listStore:deleteList' }
     );
@@ -446,7 +675,8 @@ export const useListStore = defineStore('lists', () => {
       if (!isRecurring(list)) continue;
       const { shouldReset, nextResetDate } = computeRecurringReset(list, todayStr);
       if (!shouldReset) continue;
-      const written = await updateList(list.id, {
+
+      const resetPatch = {
         items: list.items.map((i) => ({
           ...i,
           completed: false,
@@ -455,7 +685,65 @@ export const useListStore = defineStore('lists', () => {
         })),
         lastResetDate: nextResetDate,
         cycleCelebrated: false,
-      });
+      };
+
+      // Snapshot the cycle from the list AS IT IS, before the reset. `null` means the
+      // list has no items at all — "0 of 0" is noise, not history — so that case falls
+      // through to the plain reset below, exactly as before this feature existed.
+      const snapshot = buildCycleSnapshot(list, nextResetDate, toISODateString(new Date()));
+      if (snapshot) {
+        try {
+          // Archive + reset as ONE atomic change: a cycle can never be archived without
+          // its list being reset, nor a list reset without its cycle being kept.
+          await cycleRepo.archiveCycleAndReset(
+            snapshot,
+            list.id,
+            resetPatch,
+            toISODateString(new Date())
+          );
+          // A batch mutation resolves to `undefined`, so success cannot be read from the
+          // return value. Verify against the projection instead — otherwise a write that
+          // resolves while changing nothing would be recorded as an archive.
+          const after = await listRepo.getListById(list.id);
+          if (after?.lastResetDate !== nextResetDate) {
+            throw new Error('archive+reset verify failed: lastResetDate did not advance');
+          }
+          cycles.value = [...cycles.value, snapshot];
+          if (after) lists.value = lists.value.map((l) => (l.id === after.id ? after : l));
+          logEvent({
+            level: 'info',
+            surface: 'recurrence',
+            message: 'cycle-archived',
+            context: { recur_surface: 'list', recur_outcome: 'archived' },
+          });
+        } catch (e) {
+          // One list's failure must never abort the loop.
+          logEvent({
+            level: 'warn',
+            surface: 'recurrence',
+            message: 'cycle-archive-failed',
+            context: { recur_surface: 'list', recur_outcome: 'write-failed' },
+          });
+          reportError({
+            surface: 'listStore.reconcileRecurringLists',
+            message:
+              'archive+reset batch failed — the cycle was NOT archived and the list was NOT reset (the batch is atomic, so state is consistent); it retries on the next app load or day advance',
+            error: e,
+            severity: 'error',
+            context: { recur_surface: 'list', recur_outcome: 'write-failed' },
+          });
+          // Only toast when somebody is actually looking; this runs unattended at
+          // midnight and on PWA resume, where a toast would be queued for nobody.
+          // Optional-chained deliberately: this is inside a catch on an unattended
+          // path, and an error handler that throws is worse than a missing toast.
+          if (isVisible?.value) {
+            showToast('error', useTranslationStore().t('lists.cycle.archiveFailed'));
+          }
+        }
+        continue;
+      }
+
+      const written = await updateList(list.id, resetPatch);
       // #70: this ran on a background wake (midnight / PWA resume), so a failed
       // write had no user present to see a toast — the list silently kept its
       // stale ticks and `lastResetDate` was never stamped, so it would try again
@@ -475,12 +763,16 @@ export const useListStore = defineStore('lists', () => {
     lists.value = [];
     isLoading.value = false;
     error.value = null;
+    cycles.value = [];
+    cyclesLoaded.value = false;
+    cyclesLoading.value = false;
+    cyclesError.value = null;
   }
 
   // Reset recurring lists when the local day advances (PWA wake / midnight /
   // tab restore). Guarded against an empty set; idempotent on same-day re-runs.
   watch(today, () => {
-    void reconcileRecurringLists();
+    void runDailyMaintenance();
   });
 
   return {
@@ -488,6 +780,10 @@ export const useListStore = defineStore('lists', () => {
     lists,
     isLoading,
     error,
+    cycles,
+    cyclesLoaded,
+    archivedCycles,
+    sweepExpiredCycles,
     // Getters (member-filtered, except dueListsCount which is whole-family)
     activeLists,
     completedLists,

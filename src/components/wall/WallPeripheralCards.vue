@@ -32,7 +32,13 @@ const props = defineProps<{
   variant: 'band' | 'rail';
   /** A portrait band gets two columns; four across 800px truncates every label. */
   portrait?: boolean;
-  todayYmd: string;
+  /**
+   * The day the MEALS card opens. Named for its one job, not for "today": the today view
+   * lets the family page through the week strip, and this rail must open the day they are
+   * looking at rather than always the current one. Nothing else here is date-bound — the
+   * chore and list cards are today's work by construction and carry no date label.
+   */
+  mealsYmd: string;
   todosFor: (memberId: string) => WallJob[];
   /** Due-now work nobody has claimed — counted and shown like anyone else's. */
   unassignedTodos: WallJob[];
@@ -284,7 +290,7 @@ const tripDates = computed(() => {
     <WallCard
       v-if="tonight"
       :title="t('wall.tonight')"
-      @open="emit('open', { kind: 'meals', ymd: todayYmd })"
+      @open="emit('open', { kind: 'meals', ymd: mealsYmd })"
     >
       <span class="flex items-center gap-3">
         <span class="wall-card-emoji leading-none" aria-hidden="true">{{ tonight.emoji }}</span>

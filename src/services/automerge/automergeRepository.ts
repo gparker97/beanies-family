@@ -9,7 +9,13 @@ import { reportError } from '@/utils/errorReporter';
  * Strip keys whose value is `undefined` from a plain object.
  * Automerge rejects `undefined` — only valid JSON types are allowed.
  */
-function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+export function stripUndefined<T extends object>(obj: T): T {
+  // Record-shaped entities ONLY. `Object.fromEntries(Object.entries(...))` would silently
+  // turn an array into `{ '0': …, '1': … }` and a Map/Set into `{}` with every entry
+  // dropped. The bound was widened from `Record<string, unknown>` so interface-typed
+  // entities (which lack an index signature) could be passed; that widening also let
+  // arrays through, so they are returned untouched rather than mangled.
+  if (Array.isArray(obj) || obj instanceof Map || obj instanceof Set) return obj;
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
 
@@ -17,7 +23,7 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
  * Deep-clone a value to a plain JS object, stripping Vue reactive proxies.
  * Automerge change functions fail if they receive Vue proxy-wrapped objects.
  */
-function toPlain<T>(obj: T): T {
+export function toPlain<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 

@@ -12,7 +12,7 @@
  * allows; the extractable-bytes fallback is flagged in telemetry by deviceUnlock).
  *
  * Reuses `keyWrap.ts` + the SAME per-device secret the PIN wraps use
- * (`getOrCreateDeviceSecret`) — one secret, two info-domains.
+ * (`getOrCreateDeviceSecret`, now in deviceSecret.ts) — one secret, several info-domains.
  *
  * Honest threat model (same as the PIN wrap's): profile malware/XSS running in the
  * origin remains game-over, exactly as it was with the plaintext cache.
@@ -20,7 +20,7 @@
 
 import type { TrustedAutoOpenRecord } from '@/types/models';
 import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
-import { getOrCreateDeviceSecret } from '@/services/auth/deviceUnlock';
+import { getOrCreateDeviceSecret } from '@/services/auth/deviceSecret';
 import {
   deriveWrappingKeyFromBaseKey,
   generateHKDFSalt,

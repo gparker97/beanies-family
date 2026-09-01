@@ -2332,6 +2332,30 @@ const STRING_DEFS = {
       'no eligible recipients. adults must join your pod (set up their account) before they can become owner.',
   },
   'transferOwnership.continue': { en: 'Continue', beanie: 'continue' },
+  // #80 step-up gate: action-neutral defaults for ReauthChallenge, which is no longer
+  // transfer-ownership-only. TransferOwnership passes its own keys to keep its wording.
+  'reauth.description': {
+    en: 'Confirm it’s really you before continuing.',
+    beanie: 'confirm it’s really you before continuing.',
+  },
+  'reauth.noCredential': {
+    en: 'You need a PIN or a password set up before you can do this. Open Settings → Security to add one, then try again.',
+    beanie:
+      'you need a pin or a password set up before you can do this. open settings → security to add one, then try again.',
+  },
+  'settings.clearDataFailed': {
+    en: 'Your data couldn’t be cleared. Nothing was removed — try again in a moment.',
+    beanie: 'your data couldn’t be cleared. nothing was removed — try again in a moment.',
+  },
+  'family.deleteFailed': {
+    en: 'That bean couldn’t be removed. Try again in a moment.',
+    beanie: 'that bean couldn’t be removed. try again in a moment.',
+  },
+  'reauth.unavailableTitle': { en: 'Not Ready Yet', beanie: 'not ready yet' },
+  'reauth.unavailable': {
+    en: 'Your family is still loading, so we can’t check it’s you yet. Give it a moment and try again.',
+    beanie: 'your beans are still loading, so we can’t check it’s you yet. try again in a moment.',
+  },
   'transferOwnership.reauthTitle': { en: 'Verify Identity', beanie: 'verify identity' },
   'transferOwnership.reauthDescription': {
     en: 'Confirm it’s really you before transferring ownership.',
@@ -3669,6 +3693,11 @@ const STRING_DEFS = {
   'confirm.deleteMemberTitle': { en: 'Remove Family Member', beanie: 'remove beanie' },
   'confirm.removePasskeyTitle': { en: 'Remove Passkey', beanie: 'remove passkey' },
   'confirm.cannotDeleteOwnerTitle': { en: 'Cannot Delete Owner', beanie: 'cannot delete owner' },
+  'confirm.notAllowedTitle': { en: 'Not Allowed', beanie: 'not allowed' },
+  'family.removeNotAllowed': {
+    en: 'Only a pod manager can remove a bean. Ask an owner or manager to do it.',
+    beanie: 'only a pod manager can remove a bean. ask an owner or manager to do it.',
+  },
 
   // Confirmation dialog messages
   'accounts.deleteConfirm': {
@@ -5563,6 +5592,17 @@ const STRING_DEFS = {
   'wall.lane.today': { en: '{count} today', beanie: '{count} today' },
   'wall.lane.tomorrow': { en: '{count} tomorrow', beanie: '{count} tomorrow' },
   'wall.today.now': { en: 'Happening now', beanie: 'happening now' },
+  'lists.cycle.archiveFailed': {
+    en: 'Couldn’t save this list’s history. It’ll try again next time you open the app.',
+    beanie: 'couldn’t save this list’s history. it’ll try again next time you open beanies.',
+  },
+  'lists.history.retention': { en: 'Kept for 3 months', beanie: 'kept for 3 months' },
+  'lists.history.title': { en: 'Repeating list history', beanie: 'repeating list history' },
+  'lists.completed.thisWeek': { en: 'This week', beanie: 'this week' },
+  'lists.completed.lastWeek': { en: 'Last week', beanie: 'last week' },
+  'lists.completed.earlier': { en: 'Earlier', beanie: 'earlier' },
+  'wall.today.today': { en: 'Today', beanie: 'today' },
+  'wall.today.backToToday': { en: 'Back to today', beanie: 'back to today' },
   'wall.filter.everyone': { en: 'Everyone', beanie: 'everyone' },
   'wall.sheet.activity': { en: 'Activity', beanie: 'the activity' },
   'wall.sheet.meals': { en: "Today's meals", beanie: "today's meals" },

@@ -693,6 +693,67 @@ export interface FamilyListItem {
 }
 
 /**
+ * One item's state at the moment a recurring list's cycle ended (#cycle-history).
+ *
+ * Deliberately terse — every byte here is permanent (ADR-032: history is never
+ * truncated) — but NOT cryptic. Single-letter keys (`t`/`d`) were rejected: they save a
+ * few percent of this feature's annual growth in exchange for a `.beanpod` nobody can
+ * read during a support incident, and a `t` field in a codebase where `t` is the i18n
+ * function everywhere else. What IS omitted is what costs and buys nothing: no item id
+ * (nothing references it) and no per-item timestamp (the cycle's own dates are the
+ * timeline).
+ */
+export interface ListCycleMark {
+  /** The title as it read that cycle — history must not change when a list is renamed. */
+  title: string;
+  done: boolean;
+  /** Who ticked it, where recorded. Absent on an unticked item. */
+  by?: UUID;
+}
+
+/**
+ * A finished cycle of a recurring list.
+ *
+ * Written ONCE at rollover with a single `set` and NEVER patched — retention deletes it
+ * outright rather than rewriting it. Write-once is load-bearing: it is why two devices
+ * archiving the same cycle converge on one record with one intact `items` array, and why
+ * there is no delete-vs-update resurrection hazard. Do not add an update path.
+ */
+export interface ListCycle {
+  /**
+   * `${listId}:${endedOn}` — DETERMINISTIC. Re-running the rollover overwrites rather
+   * than duplicating, and two devices waking at the same midnight converge on one record.
+   * NEVER parse this id: `listId` and `endedOn` are their own fields precisely so no
+   * consumer has to split a string.
+   */
+  id: string;
+  listId: UUID;
+  /** ymd — the previous `lastResetDate`. */
+  startedOn: ISODateString;
+  /** ymd — the rollover day. Drives banding, sort and expiry. */
+  endedOn: ISODateString;
+  // Denormalised for display: renaming a list must not retroactively rename its history,
+  // and the archive must stay readable after the parent list is gone.
+  title: string;
+  emoji: string;
+  category: ListCategory;
+  ownerId: UUID;
+  done: number;
+  total: number;
+  /** Required. A cycle always carries its marks; there is no summary tier. */
+  items: ListCycleMark[];
+  /**
+   * Wall-clock write time, kept ALONGSIDE `endedOn` so a record with ONE corrupt or
+   * truncated date is still provably un-expired by the other. A malformed-record guard,
+   * not a wrong-clock guard: both fields come from the same device clock.
+   */
+  createdAt: ISODateString;
+  /** Always equals `createdAt` — a cycle is never updated. Present only so the record
+   *  matches every other collection's shape. Nothing reads it. */
+  updatedAt: ISODateString;
+}
+
+/**
  * A named family checklist. The fields below are split by lifecycle —
  * read them ONLY through the predicates in `@/utils/listLifecycle.ts`, never
  * via inline `lifecycle === …` checks, so the rule lives in one place:

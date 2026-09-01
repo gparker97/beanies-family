@@ -194,54 +194,128 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  /**
+   * How the persisted session's memberId resolves against a freshly-loaded roster.
+   *
+   * ONE reader of that session (#80). Both `loadMembers` branches used to carry their own
+   * copy of this lookup, which meant adding a rejection would have produced four copies of
+   * a security decision nested three deep.
+   */
+  type MemberResolution =
+    | { kind: 'use'; id: string }
+    | { kind: 'none' } // no session member — the legitimate signup / pre-login bootstrap
+    | { kind: 'reject' }; // an authenticated session names a member who is not here
+
+  async function resolveSessionMember(roster: FamilyMember[]): Promise<MemberResolution> {
+    try {
+      const { useAuthStore } = await import('@/stores/authStore');
+      const authStore = useAuthStore();
+      const sessionMemberId = authStore.currentUser?.memberId;
+      if (!sessionMemberId) return { kind: 'none' };
+      // An EMPTY roster is "the doc did not load", not "your member was removed". App.vue's
+      // path-3 fallback deliberately renders an empty doc when the cache is unavailable or
+      // Drive permission was lost, and the user recovers from Settings. Rejecting here
+      // would sign them out mid-boot on a recoverable error.
+      if (roster.length === 0) return { kind: 'none' };
+      if (roster.some((m) => m.id === sessionMemberId)) {
+        // The pod itself now vouches for this member, which is the ONLY point at which a
+        // restored pre-#80 session is worth sealing. Sealing it at restore time would
+        // have signed an unverified blob (#80 review).
+        //
+        // Its own try: the outer catch treats a throw as "no session member", so without
+        // this a failure in an optional re-seal would cost the member their session.
+        try {
+          authStore.confirmSessionMember();
+        } catch (e) {
+          console.warn('[familyStore] could not re-seal a restored legacy session', e);
+        }
+        return { kind: 'use', id: sessionMemberId };
+      }
+      // Present, authenticated, and naming somebody who is not in the pod. Never fall
+      // through to the owner — that IS the escalation this exists to stop.
+      return authStore.isAuthenticated ? { kind: 'reject' } : { kind: 'none' };
+    } catch {
+      // authStore not constructed yet (boot ordering) — same as "no session member".
+      return { kind: 'none' };
+    }
+  }
+
+  /** Has a session been rejected for integrity reasons? Blocks the owner fallback. */
+  async function sessionWasRejected(): Promise<boolean> {
+    try {
+      const { useAuthStore } = await import('@/stores/authStore');
+      return useAuthStore().sessionRejected;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * This session names nobody real. State the fact and let authStore act on it — this
+   * store does not clear storage or hand-roll a sign-out tail.
+   *
+   * `reason` separates the two ROUTINE ways to reach here from the one alarming way.
+   * Loading a different family's pod file, and removing your own bean, both legitimately
+   * leave an authenticated session naming somebody who is not in the new roster; reporting
+   * those as integrity rejections drowns the single metric that means somebody edited a
+   * session. Both still end the session — they just say why.
+   */
+  async function rejectSession(
+    reason: 'unknown-member' | 'roster-switched' | 'self-removed' = 'unknown-member'
+  ): Promise<void> {
+    currentMemberId.value = null;
+    const { useAuthStore } = await import('@/stores/authStore');
+    useAuthStore().invalidateSession(reason);
+  }
+
   // Actions
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
       const prevMemberId = currentMemberId.value;
       const loaded = await familyRepo.getAllFamilyMembers();
-      members.value = await normalizeRoles(loaded);
+      const roster = await normalizeRoles(loaded);
+      // Resolve the session member BEFORE publishing the roster. Assigning members.value
+      // first left a tick where the roster existed but currentMemberId was still null,
+      // and usePermissions (which now refuses to read the session `role` once a roster
+      // exists) reported the owner as a non-owner for that tick — the Piggy Bank nav
+      // vanished and the canViewFinances true->false diagnostic fired on every boot.
+      const resolvedForRoster = currentMemberId.value ? null : await resolveSessionMember(roster);
+      members.value = roster;
       logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
       if (!currentMemberId.value) {
-        // Try restoring from authStore session (survives page refresh via localStorage)
-        try {
-          const { useAuthStore } = await import('@/stores/authStore');
-          const authStore = useAuthStore();
-          const sessionMemberId = authStore.currentUser?.memberId;
-          if (sessionMemberId && members.value.some((m) => m.id === sessionMemberId)) {
-            currentMemberId.value = sessionMemberId;
-            return;
-          }
-        } catch {
-          // authStore not available yet — fall through
+        const resolved = resolvedForRoster ?? (await resolveSessionMember(members.value));
+        if (resolved.kind === 'use') {
+          currentMemberId.value = resolved.id;
+          return;
         }
-        // Fallback to owner
-        if (owner.value) {
+        if (resolved.kind === 'reject') {
+          await rejectSession('roster-switched');
+          return;
+        }
+        // No session member at all: the legitimate signup / pre-login bootstrap.
+        // NOT reachable after a rejection — `sessionRejected` stays true until a real
+        // sign-in, so a rejected session cannot be handed the owner's row on the next
+        // reload and read as owner again.
+        if (owner.value && !(await sessionWasRejected())) {
           currentMemberId.value = owner.value.id;
         }
       } else if (!members.value.some((m) => m.id === currentMemberId.value)) {
-        // currentMemberId no longer in members array — this shouldn't happen
-        console.warn(
-          '[familyStore] currentMemberId not found in members after reload:',
-          currentMemberId.value,
-          'members:',
-          members.value.map((m) => m.id)
-        );
-        // Try authStore session
-        try {
-          const { useAuthStore } = await import('@/stores/authStore');
-          const authStore = useAuthStore();
-          const sessionMemberId = authStore.currentUser?.memberId;
-          if (sessionMemberId && members.value.some((m) => m.id === sessionMemberId)) {
-            currentMemberId.value = sessionMemberId;
-            return;
-          }
-        } catch {
-          // fall through
+        const resolved = await resolveSessionMember(members.value);
+        if (resolved.kind === 'use') {
+          currentMemberId.value = resolved.id;
+          return;
         }
-        // Last resort: owner
-        currentMemberId.value = owner.value?.id ?? prevMemberId;
+        if (resolved.kind === 'reject') {
+          await rejectSession('roster-switched');
+          return;
+        }
+        // Last resort. The old code fell back to the OWNER here, which silently promoted
+        // a member whose record had vanished (#80). Reuse the previous id only if it is
+        // still real; otherwise this session names nobody.
+        currentMemberId.value =
+          prevMemberId && members.value.some((m) => m.id === prevMemberId) ? prevMemberId : null;
       }
     });
   }
@@ -328,7 +402,19 @@ export const useFamilyStore = defineStore('family', () => {
       if (success) {
         members.value = members.value.filter((m) => m.id !== id);
         if (currentMemberId.value === id) {
-          currentMemberId.value = owner.value?.id ?? null;
+          // Self-removal. Do NOT inherit the owner's row (#80): deletion is gated on
+          // canManagePod, and the call-site guard only blocks deleting THE OWNER — so a
+          // non-owner manager who removed their own bean used to land on the owner's
+          // record and read as owner. This session is simply over.
+          currentMemberId.value = null;
+          const { useAuthStore } = await import('@/stores/authStore');
+          const authStore = useAuthStore();
+          // Unauthenticated self-delete is the signup-time CreateMembersStep path — it
+          // just clears, exactly as before, minus the owner inheritance.
+          // `self-removed`, not `unknown-member`: the member chose this. Reporting a
+          // deliberate departure as an integrity rejection is what makes the tamper
+          // metric unreadable.
+          if (authStore.isAuthenticated) authStore.invalidateSession('self-removed');
         }
         await invalidateDeviceCredentials(id);
       }

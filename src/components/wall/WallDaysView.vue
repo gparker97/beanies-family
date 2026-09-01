@@ -136,6 +136,7 @@ function timeLabel(entry: { activity: { startTime?: string } }) {
             :key="entry.activity.id + entry.date"
             :activity="entry.activity"
             :colour="colourFor(entry.activity)"
+            :members-by-id="membersById"
             :time="timeLabel(entry)"
             @open="
               emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
@@ -197,7 +198,7 @@ function timeLabel(entry: { activity: { startTime?: string } }) {
     <WallPeripheralCards
       variant="band"
       :portrait="portrait"
-      :today-ymd="todayYmd"
+      :meals-ymd="todayYmd"
       :todos-for="todosFor"
       :unassigned-todos="unassignedTodos"
       :lists-for="listsFor"

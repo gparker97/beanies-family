@@ -16,6 +16,14 @@
  * so we hit the actual changeDoc() call. Only mock infrastructure (IndexedDB, crypto, etc).
  */
 import { setActivePinia, createPinia, type Pinia } from 'pinia';
+
+// #80: mock the seal so the restore tests exercise authStore's handling of each outcome
+// rather than the crypto, and never lean on the dated legacy branch.
+vi.mock('@/services/auth/sessionSeal', () => ({
+  seal: vi.fn(async () => 'sealed-envelope'),
+  open: vi.fn(async () => null),
+}));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -332,6 +340,8 @@ vi.mock('@/stores/syncHighlightStore', () => ({
 // ---------------------------------------------------------------------------
 // Import REAL stores and services AFTER mocks are set up
 // ---------------------------------------------------------------------------
+import * as sessionSeal from '@/services/auth/sessionSeal';
+import { reportError } from '@/utils/errorReporter';
 import { useAuthStore, DEFERRED_PASSWORD_HASH } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -1072,18 +1082,29 @@ describe('authStore.initializeAuth — session restore vs registry (B5, iOS ITP 
     role: 'owner',
   };
 
+  /**
+   * These assert authStore's HANDLING of each seal outcome, so the seal itself is mocked
+   * (#80). Deliberately NOT written as bare pre-#80 sessions: that would ride the dated
+   * legacy branch and turn this suite into a time bomb on LEGACY_SESSION_SUNSET.
+   */
+  function seed(result: Record<string, unknown>) {
+    localStorage.setItem(SESSION_KEY, 'sealed-envelope');
+    vi.mocked(sessionSeal.open).mockResolvedValue(result as never);
+  }
+
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     localStorage.clear();
+    vi.mocked(sessionSeal.seal).mockResolvedValue('sealed-envelope');
   });
 
-  it('(i) common case: registry has families + a session → restores the session (unchanged path)', async () => {
+  it('(i) common case: registry has families + a valid sealed session → restores it', async () => {
     const registryDb = await import('@/services/indexeddb/registryDatabase');
     vi.mocked(registryDb.getRegistryDatabase).mockResolvedValueOnce({
       getAll: vi.fn(async () => [{ id: 'fam-1', name: 'Fam' }]),
     } as never);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sampleUser));
+    seed({ ok: true, user: sampleUser, legacy: false });
 
     const authStore = useAuthStore();
     await authStore.initializeAuth();
@@ -1093,7 +1114,6 @@ describe('authStore.initializeAuth — session restore vs registry (B5, iOS ITP 
   });
 
   it('(ii) common case: empty registry + NO session → stays unauthenticated (WelcomeGate)', async () => {
-    // default mock: getAll → []
     const authStore = useAuthStore();
     await authStore.initializeAuth();
 
@@ -1102,9 +1122,8 @@ describe('authStore.initializeAuth — session restore vs registry (B5, iOS ITP 
     expect(authStore.isInitialized).toBe(true);
   });
 
-  it('(iii) ITP case: empty registry BUT a localStorage session survives → restores instead of WelcomeGate-as-new', async () => {
-    // default mock: getAll → [] (registry evicted), but the session persists.
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sampleUser));
+  it('(iii) ITP case: empty registry BUT a VALID sealed session survives → restores it', async () => {
+    seed({ ok: true, user: sampleUser, legacy: false });
 
     const authStore = useAuthStore();
     await authStore.initializeAuth();
@@ -1112,5 +1131,77 @@ describe('authStore.initializeAuth — session restore vs registry (B5, iOS ITP 
     expect(authStore.isAuthenticated).toBe(true);
     expect(authStore.currentUser?.email).toBe('returning@example.com');
     expect(authStore.hasFamilies).toBe(true);
+  });
+
+  it('(iv) ITP case, device secret gone: key-changed → NOT authenticated, but not treated as new', async () => {
+    // The accepted regression of #80, pinned explicitly: an evicted registry takes the
+    // signing key with it, so the session can no longer be verified and must not be
+    // honoured. hasFamilies still records that a returning user exists here.
+    seed({ ok: false, reason: 'key-changed' });
+
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    expect(authStore.isAuthenticated).toBe(false);
+    expect(authStore.currentUser).toBeNull();
+    expect(authStore.hasFamilies).toBe(true);
+  });
+
+  it('(v) a tampered session is rejected and reported', async () => {
+    seed({ ok: false, reason: 'bad-signature' });
+
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    expect(authStore.isAuthenticated).toBe(false);
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'session-integrity',
+        context: expect.objectContaining({ kind: 'bad-signature' }),
+      })
+    );
+  });
+
+  it('(vi) no signing key available is NOT tampering: no session, no accusation', async () => {
+    seed({ ok: false, reason: 'unavailable' });
+
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    expect(authStore.isAuthenticated).toBe(false);
+    expect(reportError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'session-integrity' })
+    );
+  });
+
+  it('(vii) a legacy unsigned session is accepted but NOT sealed until the roster vouches', async () => {
+    const registryDb = await import('@/services/indexeddb/registryDatabase');
+    vi.mocked(registryDb.getRegistryDatabase).mockResolvedValueOnce({
+      getAll: vi.fn(async () => [{ id: 'fam-1', name: 'Fam' }]),
+    } as never);
+    seed({ ok: true, user: sampleUser, legacy: true });
+
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    // Nobody is logged out by the upgrade.
+    expect(authStore.isAuthenticated).toBe(true);
+    // But sealing here would HMAC an UNVERIFIED payload: `open` accepts any bare JSON
+    // object with a string memberId, no signature checked. An earlier cut re-sealed at
+    // this point, which turned a hand-written localStorage blob into a permanently valid
+    // session that outlived LEGACY_SESSION_SUNSET — the exact escalation the seal exists
+    // to stop.
+    expect(sessionSeal.seal).not.toHaveBeenCalled();
+    expect(authStore.sessionIsLegacy).toBe(true);
+
+    // The roster is what vouches for it. Only then is it worth committing.
+    authStore.confirmSessionMember();
+    expect(sessionSeal.seal).toHaveBeenCalledWith(expect.objectContaining({ memberId: 'm-1' }));
+    expect(authStore.sessionIsLegacy).toBe(false);
+
+    // Idempotent: a second roster load must not re-seal.
+    vi.mocked(sessionSeal.seal).mockClear();
+    authStore.confirmSessionMember();
+    expect(sessionSeal.seal).not.toHaveBeenCalled();
   });
 });

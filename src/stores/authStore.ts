@@ -10,6 +10,11 @@ import {
   type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
 import { isChildMember } from '@/services/auth/proveMethods';
+import {
+  seal as sealSession,
+  open as openSession,
+  type SealResult,
+} from '@/services/auth/sessionSeal';
 import type { FamilyMember, PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { bufferToBase64 } from '@/utils/encoding';
 import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
@@ -388,6 +393,32 @@ async function healStaleWrappedKey(memberId: string, password: string): Promise<
   }
 }
 
+/**
+ * Why a persisted session was rejected. Defined here because `invalidateSession` is the
+ * one place a session dies; `familyStore` imports it with `import type` so the vocabulary
+ * has a single definition without a runtime dependency. (#80)
+ */
+export type SessionRejectionKind =
+  | 'malformed'
+  | 'bad-signature'
+  | 'key-changed'
+  | 'unknown-member'
+  /** The pod file was swapped for another family's — expected, not an integrity event. */
+  | 'roster-switched'
+  /** The member deliberately removed their own bean — expected, not an integrity event. */
+  | 'self-removed';
+
+/**
+ * The kinds that mean "somebody edited a session", as opposed to the routine ways a
+ * session can stop naming a real member. Only these are worth a `reportError`; folding the
+ * routine ones in would make the tamper metric unusable.
+ */
+const INTEGRITY_REJECTIONS: ReadonlySet<SessionRejectionKind> = new Set([
+  'malformed',
+  'bad-signature',
+  'unknown-member',
+]);
+
 export interface AuthUser {
   memberId: string;
   email: string;
@@ -421,15 +452,91 @@ const SESSION_KEY = 'beanies_auth_session';
 // existed, and the moment of `signIn`/`joinFamily` into an already-built pod).
 const POD_CREATED_KEY = 'beanies_pod_created';
 
-function persistSession(user: AuthUser): void {
+/**
+ * Bumped by every `clearSession()`. `persistSession` captures it before awaiting the
+ * seal and refuses to write if it moved, so a sign-out can never be undone by an
+ * in-flight seal. This is what makes the three SYNCHRONOUS call sites
+ * (`createSessionForVerifiedMember`, `updateCurrentUserRole`,
+ * `updateSessionWithMemberData`) safe to leave fire-and-forget rather than rippling an
+ * `async` signature change through familyStore and useBiometricSignIn (#80).
+ */
+let sessionGeneration = 0;
+/**
+ * Monotonic per-write ticket. The generation counter above orders writes against CLEARS;
+ * this orders writes against each other. Two fire-and-forget callers share a generation
+ * but seal via independent `crypto.subtle.sign` promises, so without this an older payload
+ * could resolve last and persist a stale role (e.g. a post-transfer role update overtaken
+ * by an earlier session write).
+ */
+let sessionWriteSeq = 0;
+let lastCommittedWrite = 0;
+
+/**
+ * Persist the session, sealed (#80).
+ *
+ * NEVER REJECTS — by contract, not by luck. Three callers invoke this from synchronous
+ * store actions and cannot `await` it; a rejecting promise would surface as an unhandled
+ * rejection, and `no-floating-promises` is not enabled to catch it.
+ */
+async function persistSession(user: AuthUser): Promise<void> {
+  const generation = sessionGeneration;
+  const ticket = ++sessionWriteSeq;
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    const sealed = await sealSession(user);
+    if (sealed === null) {
+      // No device key (private browsing, blocked IndexedDB). Degrades exactly as before,
+      // but is now COUNTED: without this a browser with working localStorage and blocked
+      // IndexedDB would sign users out on every reload with no trace anywhere.
+      logEvent({
+        level: 'warn',
+        surface: 'session-integrity',
+        message: 'session_seal_unavailable',
+        context: { action: 'session_rejected', kind: 'unavailable' },
+      });
+      // Drop the stored session rather than leaving it. Every caller writes to CHANGE the
+      // session, and one of them (`updateCurrentUserRole`) writes to DOWNGRADE a role. The
+      // previous envelope is sealed with the same still-valid device key, so returning
+      // early leaves it authoritative and the next boot restores the ex-owner AS owner.
+      // Signing out is the safe failure; silently keeping the higher privilege is not.
+      dropStoredSession();
+      return;
+    }
+    // The session was cleared while we were sealing — do not resurrect it.
+    if (generation !== sessionGeneration) return;
+    // A newer write already landed — do not overwrite it with our older payload.
+    if (ticket < lastCommittedWrite) return;
+    lastCommittedWrite = ticket;
+    localStorage.setItem(SESSION_KEY, sealed);
+  } catch (e) {
+    // Same reasoning as the unavailable branch: a write that did not land must not leave
+    // the previous, higher-privilege envelope behind.
+    dropStoredSession();
+    logEvent({
+      level: 'warn',
+      surface: 'session-integrity',
+      message: 'session_persist_failed',
+      context: { action: 'session_rejected', kind: 'persist-failed' },
+      error: e,
+    });
+  }
+}
+
+/**
+ * Remove the stored session without bumping the generation.
+ *
+ * Distinct from `clearSession`: this is the failure tail of a WRITE, so it must not
+ * invalidate concurrent in-flight writes the way a real sign-out does.
+ */
+function dropStoredSession(): void {
+  try {
+    localStorage.removeItem(SESSION_KEY);
   } catch {
-    // localStorage unavailable (e.g. private browsing) — silent fail
+    // Nothing further to try — localStorage is gone in both directions.
   }
 }
 
 function clearSession(): void {
+  sessionGeneration += 1;
   try {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(POD_CREATED_KEY);
@@ -438,13 +545,20 @@ function clearSession(): void {
   }
 }
 
-function restoreSession(): AuthUser | null {
+/**
+ * Read the persisted session. Returns the full `SealResult` so the caller can act on
+ * WHY it failed — flattening it to `null` would erase the difference between tampering
+ * and an evicted registry.
+ */
+async function restoreSession(): Promise<SealResult | null> {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    raw = localStorage.getItem(SESSION_KEY);
   } catch {
     return null;
   }
+  if (!raw) return null;
+  return openSession(raw);
 }
 
 /** Read the persisted "pod file exists" flag. Absent ⇒ true (see above). */
@@ -469,6 +583,16 @@ function persistPodCreated(value: boolean): void {
 export const useAuthStore = defineStore('auth', () => {
   // State
   const isInitialized = ref(false);
+  /**
+   * A persisted session was rejected for integrity reasons this page load (#80). Blocks
+   * familyStore's owner fallback, which would otherwise resurrect the escalation.
+   */
+  const sessionRejected = ref(false);
+  /**
+   * The restored session came from an UNSEALED pre-#80 blob, so nothing about it has been
+   * verified yet. Cleared by `confirmSessionMember` once the roster vouches for it.
+   */
+  const sessionIsLegacy = ref(false);
   const isAuthenticated = ref(false);
   const hasFamilies = ref(false);
   const currentUser = ref<AuthUser | null>(null);
@@ -539,14 +663,36 @@ export const useAuthStore = defineStore('auth', () => {
 
       hasFamilies.value = families.length > 0;
 
+      /**
+       * ONE consumer of the seal result, shared by both restore sites below, so the
+       * iOS-ITP path can never drift from the normal one. Returns whether a session was
+       * adopted. (#80)
+       */
+      const adoptRestoredSession = async (result: SealResult | null): Promise<boolean> => {
+        if (!result) return false;
+        if (result.ok) {
+          currentUser.value = result.user;
+          isAuthenticated.value = true;
+          sessionRejected.value = false;
+          podCreated.value = restorePodCreated();
+          // A legacy blob is UNVERIFIED — `open()` accepts any bare JSON object with a
+          // string memberId, no signature checked. Sealing it here would HMAC a forgery
+          // with the real device key and mint a permanently-valid session that outlives
+          // LEGACY_SESSION_SUNSET, which is exactly the escalation the seal exists to
+          // stop. The re-seal is deferred to `confirmSessionMember`, which familyStore
+          // calls only once the loaded roster actually contains this member.
+          sessionIsLegacy.value = result.legacy;
+          return true;
+        }
+        // 'unavailable' is not a rejection: there is no key to verify WITH, so there is
+        // nothing to accuse. persistSession already counted it.
+        if (result.reason !== 'unavailable') invalidateSession(result.reason);
+        return false;
+      };
+
       if (families.length > 0) {
         // Try restoring a previous session (survives page refresh)
-        const saved = restoreSession();
-        if (saved) {
-          currentUser.value = saved;
-          isAuthenticated.value = true;
-          podCreated.value = restorePodCreated();
-        }
+        await adoptRestoredSession(await restoreSession());
         isInitialized.value = true;
         return;
       }
@@ -560,16 +706,20 @@ export const useAuthStore = defineStore('auth', () => {
       // dumped on the WelcomeGate as brand-new. Guarded so a restore failure can
       // never throw out of boot (a thrown boot is worse than a mis-route).
       try {
-        const saved = restoreSession();
-        if (saved) {
-          currentUser.value = saved;
-          isAuthenticated.value = true;
+        const result = await restoreSession();
+        const adopted = await adoptRestoredSession(result);
+        if (adopted) {
           hasFamilies.value = true;
-          // Don't over-trust the (possibly-evicted) podCreated flag — the
-          // authoritative value is established by the load attempt
-          // (markPodCreated on success); the recovery flow handles a pod that
-          // can't be loaded.
-          podCreated.value = restorePodCreated();
+        } else if (result && !result.ok && result.reason !== 'unavailable') {
+          // #80: the blob was present but unverifiable. It still proves a returning user
+          // exists on this device, and that fact grants no authority, so record it — but
+          // do NOT authenticate on it, which is what this branch used to do.
+          //
+          // Note `hasFamilies` has no consumer outside this store; the real user-visible
+          // outcome of an evicted registry is WelcomeGate -> Sign In -> Drive chooser,
+          // which finds their pod. One extra tap, on a path where their PIN wrap was
+          // evicted too, so they had to re-prove regardless.
+          hasFamilies.value = true;
         }
       } catch (e) {
         console.warn('[authStore] session restore on empty registry failed:', e);
@@ -637,8 +787,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       familyStore.setCurrentMember(member.id);
 
       // Track last login timestamp
@@ -725,8 +876,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       familyStore.setCurrentMember(member.id);
 
       const now = toISODateString(new Date());
@@ -998,8 +1150,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       // The session now exists but no `.beanpod` file does yet — that's
       // written later by `syncStore.createNewFile` (step 2 of the wizard).
       // Until then, the routing guard treats this as "resume setup", not
@@ -1447,8 +1600,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       familyStore.setCurrentMember(member.id);
       familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
       track('login', { props: { method: 'recovery-reset' } });
@@ -1521,8 +1675,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       familyStore.setCurrentMember(member.id);
       familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
       track('login', { props: { method: 'pin' } });
@@ -1684,8 +1839,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       familyStoreForPin.setCurrentMember(params.memberId);
 
       // Create UserFamilyMapping in registry DB
@@ -1779,8 +1935,9 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      sessionRejected.value = false;
       freshSignIn.value = true;
-      persistSession(user);
+      await persistSession(user);
       track('login', { props: { method: 'passkey' } });
 
       return {
@@ -1812,7 +1969,15 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser.value = user;
     isAuthenticated.value = true;
     freshSignIn.value = true;
-    persistSession(user);
+    // A real sign-in clears the rejection, exactly as the other seven sign-in sites do.
+    // Without it a member who was rejected earlier this page load, then signed in with a
+    // passkey, stayed blocked from familyStore's owner fallback for the rest of the load.
+    sessionRejected.value = false;
+    // Fire-and-forget by design (#80): this action is SYNCHRONOUS and is called
+    // synchronously from familyStore / useBiometricSignIn. persistSession never
+    // rejects, and the generation counter makes ordering safe, so an await here
+    // would only ripple an async signature through two other modules.
+    void persistSession(user);
     if (member) {
       familyStore.setCurrentMember(member.id);
       familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
@@ -1828,7 +1993,11 @@ export const useAuthStore = defineStore('auth', () => {
   function updateCurrentUserRole(role: 'owner' | 'admin' | 'member'): void {
     if (!currentUser.value) return;
     currentUser.value = { ...currentUser.value, role };
-    persistSession(currentUser.value);
+    // Fire-and-forget by design (#80): this action is SYNCHRONOUS and is called
+    // synchronously from familyStore / useBiometricSignIn. persistSession never
+    // rejects, and the generation counter makes ordering safe, so an await here
+    // would only ripple an async signature through two other modules.
+    void persistSession(currentUser.value);
   }
 
   /**
@@ -1845,7 +2014,11 @@ export const useAuthStore = defineStore('auth', () => {
         email: member.email,
         role: member.role,
       };
-      persistSession(currentUser.value);
+      // Fire-and-forget by design (#80): this action is SYNCHRONOUS and is called
+      // synchronously from familyStore / useBiometricSignIn. persistSession never
+      // rejects, and the generation counter makes ordering safe, so an await here
+      // would only ripple an async signature through two other modules.
+      void persistSession(currentUser.value);
       familyStore.setCurrentMember(member.id);
 
       // Track last login timestamp
@@ -1971,10 +2144,97 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Shared session-clear tail (all three tiers + switchMember).
    */
+  /**
+   * End the session because it could not be trusted.
+   *
+   * THE one exit for every integrity rejection — restore-time, roster-time and
+   * self-removal alike — so the clear/report pair exists once and every kind is
+   * classified identically. Anything that wants to reject a session calls this; nothing
+   * hand-rolls `clearSession()` + a report of its own. (#80)
+   *
+   * `warning`, never `critical`: a rejection is the system working as designed, and
+   * paging Slack for one would be noise. The kinds OUTSIDE `INTEGRITY_REJECTIONS`
+   * (`key-changed`, `roster-switched`, `self-removed`) are deliberately not `reportError`
+   * at all — an evicted registry, a swapped pod file and a deliberate departure are all
+   * expected churn, and folding them in would drown the one metric that means somebody
+   * edited a session.
+   */
+  /**
+   * The roster vouched for this session's member. Only now is a restored pre-#80 blob
+   * worth sealing (#3): its contents have been checked against the pod, so sealing it
+   * commits a fact rather than laundering an unverified claim into a permanent one.
+   *
+   * Idempotent — the flag is cleared before the write, so a second roster load is a no-op.
+   */
+  function confirmSessionMember(): void {
+    if (!sessionIsLegacy.value || !currentUser.value) return;
+    sessionIsLegacy.value = false;
+    void persistSession(currentUser.value);
+    logEvent({
+      level: 'info',
+      surface: 'session-integrity',
+      message: 'session_resealed',
+      context: { action: 'session_resealed' },
+    });
+  }
+
+  /**
+   * Drop the device's standing permission to re-open this pod unattended.
+   *
+   * `finalizeSession` alone declares a session dead without ENDING anything: the trusted
+   * auto-open wrap is keyed on `familyId` (device-scoped, not member-scoped), so it
+   * survives, and the next launch silently decrypts the pod and takes familyStore's owner
+   * fallback — `sessionRejected` being page-local, it is false again by then. Clearing the
+   * wrap is what makes an invalidation outlive the tab. (#80)
+   *
+   * Best-effort and never throws: failing to clear a key must not block the rejection.
+   */
+  async function revokeUnattendedReopen(): Promise<void> {
+    try {
+      const { useFamilyContextStore } = await import('@/stores/familyContextStore');
+      const familyId = useFamilyContextStore().activeFamilyId ?? undefined;
+      await useSettingsStore().clearCachedFamilyKey(familyId);
+    } catch (e) {
+      reportError({
+        surface: 'session-integrity',
+        message:
+          'could not drop the trusted auto-open key after invalidating a session — this device may re-open the pod unattended until the next full sign-out',
+        severity: 'warning',
+        error: e,
+        context: { action: 'session_rejected', kind: 'revoke-failed' },
+      });
+    }
+  }
+
+  function invalidateSession(kind: SessionRejectionKind): void {
+    // Sticky until a real sign-in. Without it the NEXT loadMembers sees a null session,
+    // takes the legitimate "no session member" branch, and hands out the owner's row —
+    // restoring the exact escalation this rejection exists to stop, one sync tick later.
+    sessionRejected.value = true;
+    if (!INTEGRITY_REJECTIONS.has(kind)) {
+      logEvent({
+        level: 'warn',
+        surface: 'session-integrity',
+        message: 'session_ended_expectedly',
+        context: { action: 'session_rejected', kind },
+      });
+    } else {
+      reportError({
+        surface: 'session-integrity',
+        message: 'persisted session rejected',
+        severity: 'warning',
+        context: { action: 'session_rejected', kind },
+      });
+    }
+    finalizeSession();
+    void revokeUnattendedReopen();
+  }
+
   function finalizeSession(): void {
     currentUser.value = null;
     isAuthenticated.value = false;
     newsletterOptIn.value = null;
+    sessionIsLegacy.value = false;
     clearSession();
   }
 
@@ -2226,6 +2486,10 @@ export const useAuthStore = defineStore('auth', () => {
     createRecoveryKit,
     setRecoveryPassphrase,
     signInWithPasskey,
+    sessionRejected,
+    sessionIsLegacy,
+    confirmSessionMember,
+    invalidateSession,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,
     updateCurrentUserRole,

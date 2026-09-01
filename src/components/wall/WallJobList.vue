@@ -23,6 +23,8 @@ defineProps<{
   isPending: (job: WallJob) => boolean;
   /** Optional per-row owner label, for lists that mix people. */
   ownerLabel?: (job: WallJob) => string;
+  /** That owner's colour, for the pill on a mixed list. */
+  ownerColor?: (job: WallJob) => string | undefined;
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 </script>
@@ -35,6 +37,7 @@ const emit = defineEmits<{ toggle: [WallJob] }>();
       :job="job"
       :pending="isPending(job)"
       :owner-label="ownerLabel?.(job)"
+      :owner-color="ownerColor?.(job)"
       @toggle="emit('toggle', $event)"
     />
   </TransitionGroup>

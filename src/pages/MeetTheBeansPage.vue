@@ -9,7 +9,7 @@ import InviteWizardModal from '@/components/family/InviteWizardModal.vue';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
-import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
+import { removeMember } from '@/composables/useMemberRemoval';
 import { isUnshareableEmail } from '@/utils/email';
 import { toDateInputValue } from '@/utils/date';
 import {
@@ -340,21 +340,9 @@ async function handleAddBeanFromWizard() {
 
 async function handleMemberDelete(id: string) {
   closeEditModal();
-  await deleteMember(id);
-}
-
-async function deleteMember(id: string) {
-  const member = familyStore.members.find((m) => m.id === id);
-  if (member?.role === 'owner') {
-    await showAlert({
-      title: 'confirm.cannotDeleteOwnerTitle',
-      message: 'family.cannotDeleteOwner',
-    });
-    return;
-  }
-  if (await showConfirm({ title: 'confirm.deleteMemberTitle', message: 'family.deleteConfirm' })) {
-    await familyStore.deleteMember(id);
-  }
+  // Owner-check, confirm, PIN step-up and the delete all live in useMemberRemoval now
+  // (#80) — this page and BeanDetailPage used to carry identical copies.
+  await removeMember(id);
 }
 
 function startEditFamilyName() {
@@ -474,7 +462,7 @@ function cancelEditFamilyName() {
             :can-manage="canManagePod"
             :class="syncHighlightClass(member.id)"
             @edit="openEditModal(member)"
-            @delete="deleteMember(member.id)"
+            @delete="removeMember(member.id)"
             @share-invite="openShareModal(member)"
           />
         </div>

@@ -19,13 +19,20 @@ export function usePermissions() {
   const authStore = useAuthStore();
 
   // When currentMember is resolved, use its role and permission flags.
-  // Fallback: if currentMember is transiently null (e.g. during signup before
-  // stores finish loading), check authStore.currentUser.role so the owner
-  // isn't locked out of the UI.
+  /**
+   * A loaded pod ALWAYS contains its owner (`normalizeRoles` guarantees exactly one; the
+   * single exception, a pets-only pod, has no human to confer owner on anyway), so an
+   * empty roster means "not loaded yet" — never "a pod with no owner".
+   */
+  const rosterLoaded = computed(() => familyStore.members.length > 0);
+
   const isOwner = computed(
     () =>
       familyStore.currentMember?.role === 'owner' ||
-      (!familyStore.currentMember && authStore.currentUser?.role === 'owner')
+      // Pre-load ONLY. Once a roster exists, an absent currentMember is a REJECTION (see
+      // familyStore's session handling), not a fallback — otherwise forging just the
+      // `role` field in the stored session confers owner outright (#80).
+      (!rosterLoaded.value && authStore.currentUser?.role === 'owner')
   );
 
   const canManagePod = computed(() => isOwner.value || !!familyStore.currentMember?.canManagePod);

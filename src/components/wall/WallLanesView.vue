@@ -20,7 +20,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { normalizeAssignees } from '@/utils/assignees';
+import { belongsInMemberColumn } from '@/utils/assignees';
 import { wallActivityColour, sortByTime } from '@/utils/wallActivities';
 import { jobsProgress } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
@@ -80,30 +80,37 @@ function colourFor(activity: Parameters<typeof wallActivityColour>[0]) {
  */
 const todosByMember = computed(() => {
   const map = new Map<string, WallJob[]>();
-  for (const member of members.value) map.set(member.id, todosOf(member.id));
+  // MUST call the prop, not `todosOf` — reading the memo from inside its own getter makes
+  // the computed self-referential, which Vue bails out of. That threw during render and
+  // blanked the entire lanes view (every bean disappeared), rather than merely losing the
+  // memoisation it was added for.
+  for (const member of members.value) map.set(member.id, props.todosFor(member.id));
   return map;
 });
 function todosOf(memberId: string): WallJob[] {
-  return todosByMember.value.get(memberId) ?? [];
+  // Recompute on a miss rather than returning empty, matching WallChoreBoard: a silently
+  // empty lane is indistinguishable from "nothing to do", which is the failure this view
+  // just had.
+  return todosByMember.value.get(memberId) ?? props.todosFor(memberId);
 }
 
 const todayEvents = computed(() => activityStore.activitiesForDate(props.todayYmd));
 const tomorrowEvents = computed(() => activityStore.activitiesForDate(props.tomorrowYmd));
 
 /**
- * A lane is a person's column, so the rule here is genuinely "assigned to this
- * bean" — a family-wide event belongs to nobody's lane. That is deliberately
- * NOT `matchesWallFilter`, which answers the different question of what the
- * whole wall is showing.
+ * A lane is a person's column, and a SHARED event belongs in everyone's: an event with
+ * two owners already appears in both their lanes, and one with no owner is owned by
+ * everybody, so it appears in all of them. The shared style is what stops a duplicated
+ * chip reading as five separate personal obligations.
+ *
+ * Still deliberately NOT `matchesWallFilter`, which answers the different question of
+ * what the whole wall is showing.
  */
 function eventsFor(memberId: string) {
-  return sortByTime(
-    todayEvents.value.filter((e) => normalizeAssignees(e.activity).includes(memberId))
-  );
+  return sortByTime(todayEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)));
 }
 function tomorrowCount(memberId: string) {
-  return tomorrowEvents.value.filter((e) => normalizeAssignees(e.activity).includes(memberId))
-    .length;
+  return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
 }
 /** "2 today · 1 tomorrow" — the second half is what makes a lane worth reading tonight. */
 function subtitleFor(memberId: string) {
@@ -147,6 +154,7 @@ function jobsHeading(memberId: string) {
           :key="entry.activity.id + entry.date"
           :activity="entry.activity"
           :colour="colourFor(entry.activity)"
+          :members-by-id="membersById"
           :time="entry.activity.startTime || t('planner.allDay')"
           @open="emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })"
         />
@@ -193,7 +201,7 @@ function jobsHeading(memberId: string) {
     <WallPeripheralCards
       variant="band"
       :portrait="portrait"
-      :today-ymd="todayYmd"
+      :meals-ymd="todayYmd"
       :todos-for="todosFor"
       :unassigned-todos="unassignedTodos"
       :lists-for="listsFor"

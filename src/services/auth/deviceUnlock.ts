@@ -33,10 +33,10 @@ import * as repo from '@/services/indexeddb/repositories/deviceUnlockRepository'
 import {
   deriveWrappingKeyFromBaseKey,
   generateHKDFSalt,
-  importHKDFBaseKey,
   wrapDEK,
   unwrapDEK,
 } from '@/services/crypto/keyWrap';
+import { getOrCreateDeviceSecret } from '@/services/auth/deviceSecret';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -61,55 +61,6 @@ export type PinUnlockResult =
 
 export function isValidPin(pin: string): boolean {
   return new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin);
-}
-
-// ── Device secret ─────────────────────────────────────────────────────────────
-
-/**
- * Get (or create, first use) the per-device secret. Prefers a non-extractable HKDF base
- * CryptoKey stored via structured clone; where that write fails (older WebViews), falls
- * back to extractable base64 bytes — flagged to telemetry so the fleet share of the
- * weaker mode is measurable.
- */
-export async function getOrCreateDeviceSecret(): Promise<{
-  baseKey: CryptoKey;
-  kdf: 'hkdf' | 'hkdf+pbkdf2';
-}> {
-  const existing = await repo.getDeviceSecret();
-  if (existing?.key) return { baseKey: existing.key, kdf: 'hkdf' };
-  if (existing?.rawSecret) {
-    return {
-      baseKey: await importHKDFBaseKey(new Uint8Array(base64ToBuffer(existing.rawSecret))),
-      kdf: 'hkdf+pbkdf2',
-    };
-  }
-
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const nonExtractable = await importHKDFBaseKey(bytes);
-  try {
-    await repo.saveDeviceSecret({
-      id: 'device_secret',
-      key: nonExtractable,
-      kdf: 'hkdf',
-      createdAt: toISODateString(new Date()),
-    });
-    return { baseKey: nonExtractable, kdf: 'hkdf' };
-  } catch {
-    // Structured clone of CryptoKeys unsupported here — extractable-bytes fallback.
-    logEvent({
-      level: 'warn',
-      surface: 'login-flow',
-      message: 'device_secret_fallback',
-      context: { action: 'secret_fallback', kind: 'hkdf+pbkdf2' },
-    });
-    await repo.saveDeviceSecret({
-      id: 'device_secret',
-      rawSecret: bufferToBase64(bytes),
-      kdf: 'hkdf+pbkdf2',
-      createdAt: toISODateString(new Date()),
-    });
-    return { baseKey: nonExtractable, kdf: 'hkdf+pbkdf2' };
-  }
 }
 
 /**

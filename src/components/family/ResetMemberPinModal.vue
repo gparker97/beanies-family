@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { showToast } from '@/composables/useToast';
+import { requireReauth } from '@/composables/useReauth';
 import { reportError } from '@/utils/errorReporter';
 import { isValidPin, PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import type { FamilyMember } from '@/types/models';
@@ -80,6 +81,10 @@ async function handleSave() {
 
   isSubmitting.value = true;
   try {
+    // #80: `assertCanResetMember` in the store is AUTHORIZATION and reads the (forgeable)
+    // session. This is AUTHENTICATION — they are not substitutes, so both stay. Placed
+    // after validation so a malformed PIN never costs the user a step-up.
+    if (!(await requireReauth())) return;
     const result = await authStore.adminResetMemberPin(props.member.id, newPin.value);
     if (result.success) {
       showToast(

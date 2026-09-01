@@ -1408,7 +1408,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     icon: '\u{1F9FE}',
     readTime: 6,
     popular: true,
-    updatedDate: '2026-06-20',
+    updatedDate: '2026-09-01',
     sections: [
       { type: 'heading', content: 'Why Beanie Lists?', level: 2, id: 'why' },
       {
@@ -1541,6 +1541,28 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         icon: '\u{1F517}',
       },
 
+      { type: 'heading', content: 'History for repeating lists', level: 2, id: 'history' },
+      {
+        type: 'paragraph',
+        content:
+          'When a repeating list starts a fresh cycle, the finished one isn’t thrown away — it’s kept exactly as you left it, <strong>including anything that never got ticked</strong>. You’ll find them on the Beanie Lists page under <strong>Repeating list history</strong>, newest first, grouped by this week, last week and then by month. So if you want to know whether the bins actually went out last Tuesday, you can go and look.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'A cycle is saved <strong>even if nothing was ticked</strong> — “0 of 5” on a Tuesday is a real record, not a glitch.',
+          'If a list wasn’t opened for a while, you get <strong>one entry covering the whole gap</strong> (dated from–to) rather than one for every day.',
+          'Saved cycles are <strong>read-only</strong>. You can look back at them, but you can’t tick something in last week’s list.',
+        ],
+      },
+      {
+        type: 'callout',
+        icon: '\u{1F5C2}',
+        title: 'These are kept for about 3 months, then removed',
+        content:
+          'Once a saved cycle is around three months old, beanies removes it the next time you open the app on a device you use regularly. The removal is <strong>permanent</strong>: there is no undo, and no copy kept anywhere else. It applies <strong>only to these automatic snapshots of repeating lists</strong> — a list you made and completed yourself is never deleted automatically, however old it gets. If you want to keep a particular cycle, open it and note down what you need before it ages out. We do this to keep the page useful to look through, and so beanies isn’t holding on to your family’s data for longer than it’s useful.',
+      },
       { type: 'heading', content: 'Where your lists show up', level: 2, id: 'where' },
       {
         type: 'list',

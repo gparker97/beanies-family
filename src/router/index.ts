@@ -502,7 +502,9 @@ router.beforeEach((to) => {
       }
     } else if (authStore.isAuthenticated && authStore.currentUser?.role !== 'owner') {
       // currentMember is undefined but user is authenticated and not owner —
-      // block access defensively (matches usePermissions fallback behavior)
+      // block access defensively. NOTE this reads the session `role` to BLOCK, which is
+      // safe in the fail-closed direction; usePermissions deliberately no longer reads it
+      // to GRANT once a roster exists (#80). Do not "align" these two by widening either.
       return { name: 'NoAccess' };
     }
   }
