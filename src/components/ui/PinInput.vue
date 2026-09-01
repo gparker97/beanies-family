@@ -21,6 +21,13 @@ const props = defineProps<{
   autofocus?: boolean;
   /** Accessible label for the hidden input (applied as aria-label). */
   label: string;
+  /**
+   * Render the boxes WITHOUT the hidden input, for surfaces that supply their
+   * own on-screen keypad (the beanie wall). A wall-mounted tablet has no
+   * keyboard to raise, and raising the OS one covers half the screen — so the
+   * caller drives `modelValue` and this stays a pure display.
+   */
+  keypad?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -58,15 +65,34 @@ watch(
 );
 
 function focusInput() {
+  if (props.keypad) return;
   inputEl.value?.focus();
 }
+
+/** With no hidden input there is no blur, so the caret is always live. */
+const caretActive = computed(() => props.keypad || focused.value);
 
 defineExpose({ focus: focusInput });
 </script>
 
 <template>
-  <div class="relative" :class="{ 'pin-shake': hasError }" @click="focusInput">
+  <div
+    class="relative"
+    :class="{ 'pin-shake': hasError }"
+    :role="keypad ? 'group' : undefined"
+    :aria-label="keypad ? label : undefined"
+    @click="focusInput"
+  >
+    <!--
+      With no hidden input there is no focusable element and no accessible name,
+      and the boxes are aria-hidden — a screen-reader user would get silence
+      while typing on the on-screen keypad. This announces progress instead.
+    -->
+    <p v-if="keypad" class="sr-only" role="status" aria-live="polite">
+      {{ modelValue.length }}/{{ PIN_LENGTH }}
+    </p>
     <input
+      v-if="!keypad"
       ref="inputEl"
       type="password"
       inputmode="numeric"
@@ -90,7 +116,7 @@ defineExpose({ focus: focusInput });
             ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-900/20'
             : digit
               ? 'border-[#F15D22]/60 bg-white dark:bg-slate-700'
-              : focused && i === modelValue.length
+              : caretActive && i === modelValue.length
                 ? 'border-[#AED6F1] bg-white ring-2 ring-[#AED6F1]/40 dark:bg-slate-700'
                 : 'border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700',
           disabled ? 'opacity-50' : '',

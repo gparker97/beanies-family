@@ -16,6 +16,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
+import { isFlagEnabled } from '@/config/flags';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import { useAuthStore } from '@/stores/authStore';
@@ -164,6 +165,26 @@ function handleOpenSettings() {
   router.push('/settings');
 }
 
+/**
+ * The wall lives beside "Switch member" rather than in the header proper: both
+ * change what THIS DEVICE is doing, not what the family's data says, and the
+ * wall is a set-it-once mode that does not deserve permanent header real
+ * estate. Settings keeps the full card — that is where the mode is explained
+ * and where the PIN prerequisite is surfaced — and this is the shortcut for
+ * anyone already set up, so the item is hidden rather than dead-ending someone
+ * who has no credential to leave the wall with.
+ */
+const canStartWall = computed(
+  () =>
+    isFlagEnabled('beanieWall') &&
+    !!(currentMember.value?.pinHash || currentMember.value?.passwordHash)
+);
+
+function handleStartWall() {
+  showProfileDropdown.value = false;
+  router.push('/wall');
+}
+
 function handleOpenHelp() {
   showProfileDropdown.value = false;
   openExternal(`${MARKETING_URL}/help`);
@@ -293,6 +314,8 @@ async function confirmSignOutAndClearData() {
             v-if="currentMember || authStore.isAuthenticated"
             type="button"
             class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+            :aria-label="t('header.accountMenu')"
+            :aria-expanded="showProfileDropdown"
             @click="showProfileDropdown = !showProfileDropdown"
             @blur="closeProfileDropdown"
           >
@@ -427,6 +450,27 @@ async function confirmSignOutAndClearData() {
 
               <!-- Divider -->
               <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
+
+              <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
+              <button
+                v-if="canStartWall"
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleStartWall"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8" />
+                  <path d="M12 17v4" />
+                </svg>
+                {{ t('wall.setup.start') }}
+              </button>
 
               <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
               <button
@@ -666,6 +710,8 @@ async function confirmSignOutAndClearData() {
           <button
             v-if="currentMember || authStore.isAuthenticated"
             class="flex items-center gap-1 rounded-[14px] py-1 pr-1 pl-1 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08]"
+            :aria-label="t('header.accountMenu')"
+            :aria-expanded="showProfileDropdown"
             @click="showProfileDropdown = !showProfileDropdown"
             @blur="closeProfileDropdown"
           >
@@ -801,6 +847,27 @@ async function confirmSignOutAndClearData() {
 
               <!-- Divider -->
               <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
+
+              <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
+              <button
+                v-if="canStartWall"
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleStartWall"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8" />
+                  <path d="M12 17v4" />
+                </svg>
+                {{ t('wall.setup.start') }}
+              </button>
 
               <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
               <button

@@ -7,6 +7,7 @@ import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import PinSettings from '@/components/settings/PinSettings.vue';
 import RecoverySettings from '@/components/settings/RecoverySettings.vue';
 import DeviceLinkCard from '@/components/settings/DeviceLinkCard.vue';
+import WallSetupCard from '@/components/settings/WallSetupCard.vue';
 import GoogleDisconnectCard from '@/components/settings/GoogleDisconnectCard.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
@@ -89,6 +90,10 @@ const { canManagePod, isOwner } = usePermissions();
 // so the card AND its write transport are dead-code-eliminated from the prod
 // bundle (same mechanism main.ts uses for the e2e dataBridge). In prod this is
 // `undefined`, so the template `v-if` renders nothing.
+// The beanie wall's only entry point. Flag-gated, so it is invisible until
+// `beanieWall` is on; the card itself gates entry on the member having a PIN.
+const showWallCard = computed(() => isFlagEnabled('beanieWall'));
+
 const DevFlagsCard = import.meta.env.DEV
   ? defineAsyncComponent(() => import('@/components/settings/DevFeatureFlagsCard.vue'))
   : undefined;
@@ -862,6 +867,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
          this renders nothing and ships no flag-editing code to users. -->
+    <WallSetupCard v-if="showWallCard" />
+
     <component :is="DevFlagsCard" v-if="DevFlagsCard && (isOwner || canManagePod)" />
 
     <!-- ── Discord CTA ─────────────────────────────────────────────────────

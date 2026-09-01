@@ -527,3 +527,32 @@ include the `text/plain` flavour too, and fall back to selecting the payload nod
 clipboard API is blocked.
 
 Codified in `.claude/skills/beanies-blog/SKILL.md` § 7.
+
+## A test that derives "today" differently from the code under test is a time bomb
+
+**Pattern:** two failures in one day (2026-08-31 → 09-01), same shape, different files.
+`planner.spec.ts`'s `recurringSeriesStartStr()` computed its month bounds from
+**tomorrow**, so on the last day of any month it picked the 1st of the _next_ month and
+the series rendered outside the visible grid — both recurring-scope E2E tests failed on
+every browser. Hours later `transactionsStore.test.ts` built its fixture month with
+`new Date().toISOString().slice(0, 7)` (**UTC**) while `thisMonthTransactions` filters
+with `getStartOfMonth(new Date())` (**local**), so at 00:14 in UTC+8 on the 1st the
+seeded rows landed in the previous month and the aggregates read 0.
+
+**Why it breaks:** both pass ~28 days a month, and CI runs in UTC where the second one
+can never fail at all. So they look green for weeks, then fail on a date nobody chose,
+and the failure lands on whoever pushed that day — who reasonably suspects their own diff
+first. Correlating against the diff finds nothing, because the trigger is the calendar.
+
+**Rule:** a test must derive dates **the same way the code under test does**. If the code
+reads a local calendar (`getStartOfMonth`, `localToday`, `.slice(0, 10)` on a local ymd),
+the fixture must too — never `toISOString()`. When a helper picks a date that has to land
+inside a rendered window, anchor every calculation on **today's** month, never on a
+derived date that may have rolled over, and prove it by simulating all 365 days before
+believing it. The repo already had the correct pattern in `tomorrowOrTodayStr()`
+(`e2e/helpers/test-dates.ts`), which guards the rollover explicitly — look for the
+existing guarded helper before writing a new date calculation.
+
+**Also:** when a suite fails on a day your diff touched nothing relevant, check the date
+before the diff. Both of these were initially assumed to be regressions from that day's
+push; neither was.

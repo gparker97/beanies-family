@@ -153,6 +153,8 @@ export default [
             // reviewed). Wrap purely-decorative glyphs in aria-hidden where they
             // sit next to real (translated) text.
             '‹', // meal-planner nav prev arrow (aria-labelled button)
+            '⌫', // PIN keypad backspace (aria-labelled button)
+            '🛫', // beanie wall trip card
             '⧉', // meal-planner copy-week action glyph
             '🍲', // meal planner
             '👥', // "who's eating" guests glyph
@@ -207,6 +209,7 @@ export default [
             '🔄',
             '🔍',
             '🔒',
+            '🔓',
             '🔗',
             '🔻',
             '🕐',
@@ -307,6 +310,54 @@ export default [
       '@microsoft/sdl/no-inner-html': 'error',
       '@microsoft/sdl/no-insecure-url': 'error',
       '@microsoft/sdl/no-postmessage-star-origin': 'error',
+    },
+  },
+  {
+    // FINANCE EXCLUSION for the beanie wall.
+    //
+    // The wall hangs on a kitchen wall where children, guests and visitors can
+    // read it, so no financial figure may EVER appear there — for any signed-in
+    // member. That promise is structural rather than a permission check: the
+    // wall's component tree simply cannot import a finance store or page.
+    //
+    // Enforced with a lint zone rather than a bespoke import-graph test, which
+    // would need alias resolution, SFC parsing and dynamic-import handling —
+    // hundreds of lines nobody would maintain. Known limit, stated openly: this
+    // catches DIRECT imports only, so a finance import reached transitively
+    // through a shared component would pass. Every wall leaf is presentational
+    // and store-free (see the plan's data-flow rule), which is what keeps that
+    // gap closed in practice.
+    // The composables and utils are IN the zone too. They are where the wall's
+    // store access actually lives (`useWallPeripherals` alone reaches four
+    // stores), so a zone covering only components and the page left the one
+    // place a finance import would plausibly be written unguarded.
+    files: [
+      'src/components/wall/**',
+      'src/composables/useWall*.ts',
+      'src/utils/wall*.ts',
+      'src/pages/BeanieWallPage.vue',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/stores/accountsStore',
+                '**/stores/transactionsStore',
+                '**/stores/budgetStore',
+                '**/stores/goalsStore',
+                '**/stores/assetsStore',
+                '**/stores/recurringStore',
+                '**/components/dashboard/**',
+              ],
+              message:
+                'The beanie wall must never show money. It is a shared screen kids and guests can read, so finance imports are banned here by design — surface the data on a private route instead.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

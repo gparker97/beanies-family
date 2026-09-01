@@ -1,12 +1,47 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, watch } from 'vue';
+import CelebrationShower from '@/components/ui/CelebrationShower.vue';
 import { useCelebration } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
-const { toasts, activeModal, dismissModal } = useCelebration();
+const { toasts, activeModal, mode, dismissModal } = useCelebration();
+
+/**
+ * Undo is an EDIT. On a locked shared screen a child must not be able to
+ * un-complete a sibling's chore, so the surface's mode governs the button —
+ * the same control the shower uses.
+ */
+const modalAllowsUndo = computed(() => mode.value.allowUndo);
+
+/**
+ * A modal celebration must never camp on an unattended screen. When a surface
+ * asks for auto-dismiss, arm it per-celebration (never on mount — this overlay
+ * mounts once at boot and never unmounts).
+ */
+let modalTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  () => activeModal.value?.id,
+  (id) => {
+    if (modalTimer) clearTimeout(modalTimer);
+    modalTimer = undefined;
+    const ms = mode.value.autoDismissMs;
+    if (id === undefined || ms === null) return;
+    modalTimer = setTimeout(() => {
+      if (activeModal.value?.id === id) dismissModal();
+    }, ms);
+  },
+  { immediate: true }
+);
+onBeforeUnmount(() => {
+  if (modalTimer) clearTimeout(modalTimer);
+});
 </script>
 
 <template>
+  <!-- Full-list completion: non-blocking, self-dismissing (see CelebrationShower). -->
+  <CelebrationShower />
+
   <Teleport to="body">
     <!-- Modal celebration -->
     <Transition
@@ -48,7 +83,7 @@ const { toasts, activeModal, dismissModal } = useCelebration();
               {{ t('celebration.letsGo') }}
             </button>
             <button
-              v-if="activeModal.onUndo"
+              v-if="activeModal.onUndo && modalAllowsUndo"
               type="button"
               class="font-outfit mt-3 block w-full text-xs font-medium text-gray-400 transition-colors hover:text-[var(--heritage-orange)] dark:text-gray-500"
               @click="

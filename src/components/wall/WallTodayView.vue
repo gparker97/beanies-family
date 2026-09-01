@@ -1,0 +1,220 @@
+<script setup lang="ts">
+/**
+ * View C — today at full size.
+ *
+ * Built for the glance you actually take walking past, which is why this is
+ * the most legible of the layouts: one day, large type, and the rest of the
+ * week reduced to a strip you can tap.
+ *
+ * The "happening now" marker is the point of this view over view A — it
+ * answers "are we late?" without anybody doing arithmetic.
+ */
+import { computed } from 'vue';
+import WallMemberFace from '@/components/wall/WallMemberFace.vue';
+import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import { useActivityStore } from '@/stores/activityStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { useTranslation } from '@/composables/useTranslation';
+import { normalizeAssignees } from '@/utils/assignees';
+import { wallActivityColour, wallEvents } from '@/utils/wallActivities';
+import type { FamilyActivity, FamilyMember } from '@/types/models';
+import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
+
+/** How long an untimed-end activity is assumed to run, for the "now" marker. */
+const ASSUMED_DURATION_MIN = 90;
+
+// The page renders all four views through one `<component :is>` with a single
+// prop bag, so every view receives props it does not declare. Without this they
+// would land on the root element as stray DOM attributes.
+defineOptions({ inheritAttrs: false });
+
+const props = defineProps<{
+  weekDays: string[];
+  todayYmd: string;
+  portrait: boolean;
+  /** Ticks with the page clock, so "happening now" moves through the day. */
+  now: Date;
+  todosFor: (memberId: string) => WallJob[];
+  unassignedTodos: WallJob[];
+  listsFor: (memberId: string) => WallListGroup[];
+  orphanLists: WallListGroup[];
+  visibleMemberIds: string[] | null;
+}>();
+const emit = defineEmits<{
+  openDay: [string];
+  open: [WallSheetTarget];
+  openChores: [];
+}>();
+
+const activityStore = useActivityStore();
+const familyStore = useFamilyStore();
+const { t } = useTranslation();
+
+const membersById = computed(() => new Map(familyStore.members.map((m) => [m.id, m])));
+function colourFor(activity: FamilyActivity) {
+  return wallActivityColour(activity, membersById.value);
+}
+
+const events = computed(() =>
+  wallEvents(activityStore.activitiesForDate(props.todayYmd), props.visibleMemberIds)
+);
+
+function minutesOf(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+const nowMinutes = computed(() => props.now.getHours() * 60 + props.now.getMinutes());
+
+/**
+ * The activity currently running. Only one is marked, and a later start wins,
+ * so overlapping events resolve to the one you most recently should have been
+ * at rather than lighting up two rows.
+ */
+const nowId = computed(() => {
+  let best: { id: string; start: number } | null = null;
+  for (const { activity } of events.value) {
+    if (!activity.startTime) continue;
+    const start = minutesOf(activity.startTime);
+    const end = activity.endTime ? minutesOf(activity.endTime) : start + ASSUMED_DURATION_MIN;
+    if (nowMinutes.value < start || nowMinutes.value >= end) continue;
+    if (!best || start > best.start) best = { id: activity.id, start };
+  }
+  return best?.id ?? null;
+});
+
+function subtitleFor(activity: FamilyActivity): string {
+  return activity.location || activity.description || '';
+}
+function membersFor(activity: FamilyActivity): FamilyMember[] {
+  return normalizeAssignees(activity)
+    .map((id) => familyStore.members.find((m) => m.id === id))
+    .filter((m): m is FamilyMember => !!m);
+}
+/** Memoised for the same reason as view A — see `eventsByDay` there. */
+const stripByDay = computed(() => {
+  const map = new Map<string, ReturnType<typeof wallEvents>>();
+  for (const ymd of props.weekDays) {
+    map.set(ymd, wallEvents(activityStore.activitiesForDate(ymd), props.visibleMemberIds));
+  }
+  return map;
+});
+function eventsOn(ymd: string) {
+  return stripByDay.value.get(ymd) ?? [];
+}
+function dayLabel(ymd: string) {
+  return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
+}
+function dayNumber(ymd: string) {
+  return new Date(`${ymd}T00:00:00`).getDate();
+}
+</script>
+
+<template>
+  <div class="flex min-h-0 flex-1 gap-4" :class="portrait ? 'flex-col' : 'flex-row'">
+    <div class="flex min-h-0 flex-1 flex-col gap-2.5">
+      <div
+        class="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[26px] bg-white px-5 py-1 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      >
+        <button
+          v-for="entry in events"
+          :key="entry.activity.id + entry.date"
+          type="button"
+          class="flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0 dark:border-slate-700"
+          :class="
+            entry.activity.id === nowId
+              ? 'rounded-2xl border-b-0 bg-gradient-to-r from-[var(--tint-orange-8)] to-transparent px-3'
+              : ''
+          "
+          @click="
+            emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
+          "
+        >
+          <span class="w-24 shrink-0">
+            <span class="font-outfit wall-slot-time block font-extrabold">
+              {{ entry.activity.startTime || t('planner.allDay') }}
+            </span>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span
+              v-if="entry.activity.id === nowId"
+              class="font-outfit wall-nowtag text-primary-500 block font-extrabold tracking-[0.11em] uppercase"
+            >
+              {{ t('wall.today.now') }}
+            </span>
+            <span
+              class="font-outfit text-secondary-500 wall-slot-title block font-bold dark:text-gray-100"
+            >
+              {{ entry.activity.title }}
+            </span>
+            <span
+              v-if="subtitleFor(entry.activity)"
+              class="font-inter wall-slot-sub block truncate text-[var(--muted-text,#4d5d6c)]"
+            >
+              {{ subtitleFor(entry.activity) }}
+            </span>
+          </span>
+          <span class="flex shrink-0">
+            <WallMemberFace
+              v-for="person in membersFor(entry.activity)"
+              :key="person.id"
+              :member="person"
+              size="sm"
+              class="-ml-2.5 ring-2 ring-white first:ml-0 dark:ring-slate-800"
+            />
+          </span>
+        </button>
+        <p v-if="!events.length" class="font-caveat m-auto text-[var(--muted-text,#4d5d6c)]">
+          {{ t('wall.day.nothingOn') }}
+        </p>
+      </div>
+
+      <div class="grid shrink-0 gap-2" style="grid-template-columns: repeat(7, 1fr)">
+        <button
+          v-for="ymd in weekDays"
+          :key="ymd"
+          type="button"
+          class="rounded-2xl px-2 py-2 text-center shadow-[var(--card-shadow)]"
+          :class="
+            ymd === todayYmd
+              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
+              : 'bg-white dark:bg-slate-800'
+          "
+          @click="emit('openDay', ymd)"
+        >
+          <span
+            class="font-outfit wall-strip-day block font-bold tracking-[0.1em] uppercase opacity-70"
+          >
+            {{ dayLabel(ymd) }}
+          </span>
+          <span class="font-outfit wall-strip-num block leading-tight font-extrabold">
+            {{ dayNumber(ymd) }}
+          </span>
+          <span class="mt-1 flex min-h-[7px] justify-center gap-1" aria-hidden="true">
+            <i
+              v-for="entry in eventsOn(ymd).slice(0, 4)"
+              :key="entry.activity.id + entry.date"
+              class="block h-1.5 w-1.5 rounded-full"
+              :class="ymd === todayYmd ? 'ring-[1.5px] ring-white/55' : ''"
+              :style="{ background: colourFor(entry.activity) }"
+            />
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <div :class="portrait ? 'shrink-0' : 'w-[296px] shrink-0 overflow-y-auto'">
+      <WallPeripheralCards
+        :variant="portrait ? 'band' : 'rail'"
+        :portrait="portrait"
+        :today-ymd="todayYmd"
+        :todos-for="todosFor"
+        :unassigned-todos="unassignedTodos"
+        :lists-for="listsFor"
+        :orphan-lists="orphanLists"
+        :visible-member-ids="visibleMemberIds"
+        @open="emit('open', $event)"
+        @open-chores="emit('openChores')"
+      />
+    </div>
+  </div>
+</template>

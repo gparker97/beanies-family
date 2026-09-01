@@ -42,3 +42,74 @@ export function reportRecurringItemActionFailed(): void {
     surface: 'recurring-item-scope',
   });
 }
+
+/**
+ * A beanie-wall job tick the store REFUSED (`listStore.toggleItem` /
+ * `todoStore.toggleComplete` return `null` when the id is not found, and
+ * neither toasts on that path — `wrapAsync` only toasts on a throw).
+ *
+ * On a wall this is the worst failure the feature has: a child ticks a chore,
+ * the row looks done, and nothing was written. It must never be silent.
+ */
+export function reportJobToggleFailed(source: 'todo' | 'list', id: string): void {
+  const { t } = useTranslationStore();
+  // Developer-facing cause + fix, since the user-facing toast cannot carry it.
+  //
+  // A null return has TWO causes and we cannot tell them apart here: the record
+  // was not found (a genuine refusal), OR `wrapAsync` caught a write failure,
+  // toasted, and returned undefined. Say both rather than asserting the wrong
+  // one — a triager reading only the first hypothesis chases a phantom.
+  console.error(
+    `[beanie-wall] ${source} "${id}" was not toggled. Either the record is gone ` +
+      '(deleted on another device since this screen last synced) or the write ' +
+      'failed and wrapAsync already reported it. Check for a preceding ' +
+      'store-write error on the same surface before assuming a missing record.'
+  );
+  // `silent` because `useWallJobs.toggle` fires its own `reportError` at
+  // `critical` right after this. Without it every refused tick produced TWO
+  // CloudWatch records with different message strings — translated user copy vs
+  // the code's own — which `normalizeMessage` buckets separately, so neither
+  // rate-limited the other and the failure rate read double.
+  showToast('error', t('wall.jobFailed.title'), t('wall.jobFailed.message'), {
+    surface: 'beanie-wall',
+    silent: true,
+  });
+}
+
+/**
+ * A beanie-wall list add the store REFUSED. Same shape and reasoning as
+ * `reportJobToggleFailed`: `silent` because the caller fires its own critical
+ * `reportError`, and a wall has no console for anyone to read.
+ */
+export function reportListAddFailed(listId: string): void {
+  const { t } = useTranslationStore();
+  console.error(
+    `[beanie-wall] could not add an item to list "${listId}". The list may have ` +
+      'been deleted on another device since this screen last synced, or the ' +
+      'write failed and wrapAsync already reported it.'
+  );
+  showToast('error', t('wall.addFailed.title'), t('wall.addFailed.message'), {
+    surface: 'beanie-wall',
+    silent: true,
+  });
+}
+
+/**
+ * A beanie-wall to-do add the store REFUSED.
+ *
+ * Its own function rather than reusing `reportListAddFailed`: that one names a
+ * LIST in both the toast copy and the console line, so a failed to-do told the
+ * family the wrong thing and sent a triager hunting for a list id that was
+ * actually the user's typed title.
+ */
+export function reportTodoAddFailed(): void {
+  const { t } = useTranslationStore();
+  console.error(
+    '[beanie-wall] a to-do could not be created. The write failed and wrapAsync ' +
+      'has already reported it; check for a preceding store-write error on this surface.'
+  );
+  showToast('error', t('wall.addFailed.title'), t('wall.todoAddFailed.message'), {
+    surface: 'beanie-wall',
+    silent: true,
+  });
+}

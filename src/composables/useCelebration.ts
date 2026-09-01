@@ -3,7 +3,13 @@ import { playChime, playFanfare } from '@/composables/useSounds';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
-type CelebrationType = 'toast' | 'modal';
+/**
+ * `shower` is a full-viewport, `pointer-events: none`, self-dismissing
+ * celebration. Unlike `modal` it can never sit unattended waiting for a
+ * dismissal that never comes, and it never blocks a tap — which is what makes
+ * it the right shape for a shared screen (the beanie wall) as well as a phone.
+ */
+type CelebrationType = 'toast' | 'modal' | 'shower';
 
 export type CelebrationTrigger =
   | 'setup-complete'
@@ -13,7 +19,8 @@ export type CelebrationTrigger =
   | 'goal-milestone'
   | 'first-save'
   | 'debt-free'
-  | 'recipe-5star';
+  | 'recipe-5star'
+  | 'list-complete';
 
 interface Celebration {
   id: number;
@@ -28,6 +35,45 @@ let nextId = 0;
 // Module-level state — shared across all callers so stores can trigger celebrations
 const toasts = ref<Celebration[]>([]);
 const activeModal = ref<Celebration | null>(null);
+const activeShower = ref<Celebration | null>(null);
+
+/**
+ * How the CURRENT surface wants celebrations to behave. Two neutral options,
+ * no per-trigger special-casing and no knowledge of any particular screen, so
+ * any future unattended surface (kiosk, presentation, cook mode) can reuse it.
+ *
+ * `<CelebrationOverlay>` renders in `App.vue`, OUTSIDE any feature's component
+ * tree, so a feature cannot hide or time-out a celebration from its own
+ * components — it has to ask the owner. That is what this is for.
+ */
+const mode = ref<{
+  autoDismissMs: number | null;
+  allowUndo: boolean;
+  suppressRoutine: boolean;
+}>({
+  autoDismissMs: null,
+  allowUndo: true,
+  suppressRoutine: false,
+});
+
+const DEFAULT_MODE = { autoDismissMs: null, allowUndo: true, suppressRoutine: false } as const;
+/** Duration a shower stays on screen when the surface does not override it. */
+export const SHOWER_DURATION_MS = 4200;
+/**
+ * A shower carrying an Undo stays up longer. Swapping list completion from the
+ * indefinite modal to the self-dismissing shower silently cut the undo window
+ * for every user from "until you dismiss it" to 4.2 seconds — long enough to
+ * enjoy the beans, not long enough to notice you ticked the wrong list.
+ */
+export const SHOWER_UNDO_DURATION_MS = 9000;
+
+export function setCelebrationMode(next: Partial<typeof mode.value>): void {
+  mode.value = { ...mode.value, ...next };
+}
+
+export function resetCelebrationMode(): void {
+  mode.value = { ...DEFAULT_MODE };
+}
 
 const configs: Record<
   CelebrationTrigger,
@@ -68,6 +114,11 @@ const configs: Record<
     messageKey: 'celebration.recipe5Star',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
+  'list-complete': {
+    type: 'shower',
+    messageKey: 'celebration.listComplete',
+    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
+  },
   'goal-milestone': {
     type: 'toast',
     messageKey: 'celebration.goalMilestone',
@@ -78,6 +129,15 @@ const configs: Record<
 export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () => void }): void {
   const config = configs[trigger];
   if (!config) return;
+
+  /**
+   * A surface that gives its own per-action feedback opts out of the routine
+   * ones. The beanie wall pops beans out of the tick itself, so the app-level
+   * `goal-reached` MODAL on every chore tick was pure harm: a full-viewport
+   * black scrim over a shared always-on screen, swallowing the next child's
+   * tap. Showers still fire — finishing a whole list is not routine.
+   */
+  if (mode.value.suppressRoutine && config.type !== 'shower') return;
 
   // Resolve translation at call time (store is initialized by this point)
   const translationStore = useTranslationStore();
@@ -97,6 +157,12 @@ export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () =
     setTimeout(() => {
       toasts.value = toasts.value.filter((c) => c.id !== celebration.id);
     }, 4000);
+  } else if (config.type === 'shower') {
+    // Self-dismissing by design: nothing on an unattended screen should wait
+    // for a human to close it. The overlay clears the timer on unmount so a
+    // timer never outlives the celebration it belongs to.
+    activeShower.value = celebration;
+    playFanfare();
   } else {
     activeModal.value = celebration;
     playFanfare();
@@ -108,5 +174,12 @@ export function useCelebration() {
     activeModal.value = null;
   }
 
-  return { toasts, activeModal, dismissModal };
+  function dismissShower(id?: number) {
+    // Guard on id so a stale timer cannot clear a NEWER celebration that
+    // started while the previous one was still fading out.
+    if (id !== undefined && activeShower.value?.id !== id) return;
+    activeShower.value = null;
+  }
+
+  return { toasts, activeModal, activeShower, mode, dismissModal, dismissShower };
 }
