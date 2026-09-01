@@ -17,18 +17,38 @@
  * Phase 4 probes: device biometric (native keystore ONLY — the web WebAuthn+PRF
  * path is retired; a lingering web registration surfaces as `prf_withheld` on the
  * resolved event, never as a method), deviceUnlock PIN, tap-through (credential-less
- * member on an open pod), and password (LEGACY members only — suppressed for
- * PIN-only members and for kit-born families cold, where no password wrap exists).
+ * member on an open pod — returning EITHER `tap-through` for a child OR the
+ * `invite-needed` explanation for an adult, because both answer the same single
+ * question and must never be able to disagree), and password (LEGACY members only —
+ * suppressed for PIN-only members and for kit-born families cold, where no password
+ * wrap exists).
  * The unconditional terminal is now `recovery` (kit / passphrase / bootstrap), so
  * the never-blank guarantee no longer rests on the retiring password method.
  */
 
-import type { PasskeyRegistration } from '@/types/models';
+import type { AgeGroup, PasskeyRegistration } from '@/types/models';
 import { resolveDeviceKeys } from '@/services/auth/passkeyService';
 import { getPinUnlockRecord, removePinUnlock } from '@/services/auth/deviceUnlock';
 import { isNative } from '@/services/sync/capabilities';
 import { emitProveMethodsResolved } from '@/services/telemetry/loginFlowEvents';
 import { reportError } from '@/utils/errorReporter';
+
+/**
+ * AUTHORIZATION predicate: may this member enter WITHOUT proving anything?
+ *
+ * The single definition of the tap-through age rule, shared by this engine (what to
+ * OFFER) and `authStore.signInPasswordless` (what to ALLOW) so the two enforcement
+ * points cannot drift apart. Fails closed — anything but a definite `'child'` is an
+ * adult, including a missing `ageGroup` on a cold roster card.
+ *
+ * NOT a general age helper. The other `ageGroup === 'child'` comparisons in the app
+ * all choose a LABEL ("Little bean" / "Parent bean"); sweeping them into this would
+ * couple user-facing copy to a security predicate, so a wording change could move the
+ * auth boundary. Leave them alone.
+ */
+export function isChildMember(m: { ageGroup?: AgeGroup }): boolean {
+  return m.ageGroup === 'child';
+}
 
 export interface ProveContext {
   familyId: string;
@@ -42,6 +62,17 @@ export interface ProveContext {
    * password from a passwordless member merely falls through to the create-password path.
    */
   hasCredential: boolean | null;
+  /**
+   * Whether this member is a child (`isChildMember`). Only a child may tap through; an
+   * unclaimed ADULT must be claimed out-of-band via an invite (#79).
+   *
+   * Deliberately a plain `boolean`, not the `boolean | null` tri-state its siblings use:
+   * there, "unknown" and "false" imply different offers, so the third state carries
+   * behaviour. Here "unknown" and "not a child" are the SAME outcome (adult → no
+   * tap-through), so a tri-state would add a branch with nothing behind it. Required
+   * rather than optional so the compiler points at every call site.
+   */
+  isChild: boolean;
   /**
    * Whether the member has a doc-side PIN hash (Phase 2). Only knowable when the pod is
    * open — `null` when cold, where the device-wrap record alone decides the PIN offer.
@@ -72,8 +103,15 @@ export type ProveMethod =
    * verify against the doc hash, then silently enrol this device's wrap).
    */
   | { kind: 'pin'; hasDeviceWrap: boolean }
-  /** Credential-less member on an already-open pod — one tap, no ceremony. */
+  /** Credential-less CHILD on an already-open pod — one tap, no ceremony. */
   | { kind: 'tap-through' }
+  /**
+   * An unclaimed ADULT on an open pod (#79). Claiming must go out-of-band through a
+   * 24h invite sent by a signed-in member, so this offers no action at all — it is an
+   * EXPLANATORY PANE the user lands on, not a prove method and not the `recovery`
+   * escape (which routes straight out of the screen).
+   */
+  | { kind: 'invite-needed' }
   /**
    * LEGACY members' password prove. A conditional probe since Phase 4: suppressed
    * where a PIN is verifiably usable instead (warm + hasPin), and cold for
@@ -131,10 +169,17 @@ const PROBES: Probe[] = [
     },
   },
   {
+    // Name kept as 'tap-through' on purpose: it is the `context.kind` on the loop's
+    // existing `probe_failed` report, and renaming would break that signal's continuity.
     name: 'tap-through',
+    // ONE probe answers "may this credential-less member enter here?" — a child taps
+    // through, an adult gets the invite explanation (#79). Splitting them in two would
+    // duplicate this precondition and let a future edit offer both or neither.
     // Strict equality on `false`: `null` (unknown) must NOT tap through — see ProveContext.
-    run: async (ctx) =>
-      ctx.podOpen && ctx.hasCredential === false ? { kind: 'tap-through' } : null,
+    run: async (ctx) => {
+      if (!ctx.podOpen || ctx.hasCredential !== false) return null;
+      return ctx.isChild ? { kind: 'tap-through' } : { kind: 'invite-needed' };
+    },
   },
   {
     name: 'password',

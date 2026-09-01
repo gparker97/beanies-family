@@ -22,7 +22,7 @@ import {
   type PersonCard,
   type PersonSource,
 } from '@/services/auth/loginFlow';
-import { resolveProveMethods } from '@/services/auth/proveMethods';
+import { isChildMember, resolveProveMethods } from '@/services/auth/proveMethods';
 import { useBiometricSignIn } from '@/composables/useBiometricSignIn';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -341,6 +341,9 @@ export function useLoginFlow(opts: {
         memberId: livePerson.id,
         podOpen: podOpen(),
         hasCredential: livePerson.hasCredential ?? null,
+        // #79: only a child may tap through. A cold card without `ageGroup` yields
+        // false → adult → fails closed, and the store guard uses the same predicate.
+        isChild: isChildMember(livePerson),
         hasPin: liveMember !== undefined ? !!liveMember.pinHash : null,
         hasPassword:
           liveMember !== undefined ? !!liveMember.passwordHash : (livePerson.hasPassword ?? null),

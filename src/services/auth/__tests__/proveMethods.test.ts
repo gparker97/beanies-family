@@ -28,7 +28,7 @@ vi.mock('@/services/telemetry/loginFlowEvents', () => ({
   emitProveMethodsResolved: (...args: unknown[]) => emitProveMethodsResolved(...args),
 }));
 
-import { resolveProveMethods } from '@/services/auth/proveMethods';
+import { isChildMember, resolveProveMethods } from '@/services/auth/proveMethods';
 
 function reg(memberId: string): PasskeyRegistration {
   return {
@@ -49,6 +49,8 @@ function ctx(overrides: Partial<ProveContext> = {}): ProveContext {
     memberId: 'm-1',
     podOpen: false,
     hasCredential: true,
+    // Fail-closed default (#79): a test that wants tap-through must opt in explicitly.
+    isChild: false,
     hasPin: null,
     hasPassword: null,
     envelopeHasPasswordWraps: null,
@@ -91,10 +93,14 @@ describe('resolveProveMethods', () => {
   });
 
   it('offers tap-through only for a credential-less member on an OPEN pod', async () => {
-    const open = await resolveProveMethods(ctx({ podOpen: true, hasCredential: false }));
+    const open = await resolveProveMethods(
+      ctx({ podOpen: true, hasCredential: false, isChild: true })
+    );
     expect(open.map((m) => m.kind)).toEqual(['tap-through', 'password', 'recovery']);
 
-    const closed = await resolveProveMethods(ctx({ podOpen: false, hasCredential: false }));
+    const closed = await resolveProveMethods(
+      ctx({ podOpen: false, hasCredential: false, isChild: true })
+    );
     expect(closed.map((m) => m.kind)).toEqual(['password', 'recovery']);
   });
 
@@ -106,7 +112,9 @@ describe('resolveProveMethods', () => {
   it('a throwing probe degrades its method away, reports, and never blanks the screen', async () => {
     isNative.mockReturnValue(true);
     resolveDeviceKeys.mockRejectedValue(new Error('registry broken'));
-    const methods = await resolveProveMethods(ctx({ podOpen: true, hasCredential: false }));
+    const methods = await resolveProveMethods(
+      ctx({ podOpen: true, hasCredential: false, isChild: true })
+    );
     // biometric degraded away; tap-through, password, and the terminal survive
     expect(methods.map((m) => m.kind)).toEqual(['tap-through', 'password', 'recovery']);
     expect(reportError).toHaveBeenCalledWith(
@@ -149,10 +157,54 @@ describe('resolveProveMethods', () => {
   it('self-heals a stale PIN wrap when the OPEN doc has no pinHash (review F9)', async () => {
     getPinUnlockRecord.mockResolvedValueOnce({ id: 'fam-1:m-1' } as never);
     const methods = await resolveProveMethods(
-      ctx({ podOpen: true, hasPin: false, hasCredential: false })
+      ctx({ podOpen: true, hasPin: false, hasCredential: false, isChild: true })
     );
     expect(methods.map((m) => m.kind)).toEqual(['tap-through', 'password', 'recovery']);
     expect(removePinUnlock).toHaveBeenCalledWith('fam-1', 'm-1');
+  });
+
+  describe('unclaimed-adult age gate (#79)', () => {
+    it('offers invite-needed, never tap-through, for a credential-less ADULT', async () => {
+      const methods = await resolveProveMethods(
+        ctx({ podOpen: true, hasCredential: false, isChild: false })
+      );
+      expect(methods.map((m) => m.kind)).toContain('invite-needed');
+      expect(methods.map((m) => m.kind)).not.toContain('tap-through');
+    });
+
+    it('resolves a WARM unclaimed adult to exactly the explanation + terminal', async () => {
+      // hasPassword:false suppresses the password probe, so no side door remains.
+      const methods = await resolveProveMethods(
+        ctx({ podOpen: true, hasCredential: false, isChild: false, hasPassword: false })
+      );
+      expect(methods.map((m) => m.kind)).toEqual(['invite-needed', 'recovery']);
+    });
+
+    it('offers neither kind for a credentialed member of either age', async () => {
+      for (const isChild of [true, false]) {
+        const methods = await resolveProveMethods(
+          ctx({ podOpen: true, hasCredential: true, isChild })
+        );
+        expect(methods.map((m) => m.kind)).not.toContain('tap-through');
+        expect(methods.map((m) => m.kind)).not.toContain('invite-needed');
+      }
+    });
+
+    it('offers neither kind on a CLOSED pod, whatever the age', async () => {
+      for (const isChild of [true, false]) {
+        const methods = await resolveProveMethods(
+          ctx({ podOpen: false, hasCredential: false, isChild })
+        );
+        expect(methods.map((m) => m.kind)).not.toContain('tap-through');
+        expect(methods.map((m) => m.kind)).not.toContain('invite-needed');
+      }
+    });
+
+    it('isChildMember fails closed on a missing or adult ageGroup', () => {
+      expect(isChildMember({ ageGroup: 'child' })).toBe(true);
+      expect(isChildMember({ ageGroup: 'adult' })).toBe(false);
+      expect(isChildMember({})).toBe(false);
+    });
   });
 
   describe('password as a conditional probe (Phase 4)', () => {

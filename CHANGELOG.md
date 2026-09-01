@@ -18,6 +18,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Finishing a whole list is now a full-screen celebration** rather than a pop-up, with a longer window to undo it if you ticked the wrong one.
 
+### Security
+
+- **Little beans no longer see the family money by default.** A bean added as a child in the setup wizard could open Accounts and Transactions from their own bean. A grown-up can still turn it on for any child in that bean's settings, and any child a grown-up had already given access to keeps it.
+- **A grown-up bean can no longer be opened with one tap.** On a shared family device, a grown-up who has not set a PIN yet must now be invited from The Pod before their bean can be opened, so their side of the app is not reachable by whoever picks the tablet up. Little beans still sign in with one tap, exactly as before.
+
 ### Fixed
 
 - Fixed a bug where confetti was invisible on some celebrations.

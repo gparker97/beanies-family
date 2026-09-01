@@ -4420,6 +4420,11 @@ const STRING_DEFS = {
     beanie:
       'no sign-in method is set up on this device yet — use your recovery kit, passphrase, or a link from another family device.',
   },
+  'loginFlow.inviteNeededBody': {
+    en: "This grown-up bean needs its own invite before it can be opened. Ask someone in your family to invite you from The Pod, and they'll send you a link that lets you set your own PIN.",
+    beanie:
+      "this grown-up bean needs its own invite first. ask someone in your family to invite you from the pod, and they'll send you a link so you can set your own pin.",
+  },
   'loginFlow.recoveryTitleUnproven': { en: "Let's Reconnect", beanie: "let's reconnect" },
   'loginFlow.recoveryAuthBodyUnproven': {
     en: 'We need to reconnect to Google before you can sign in — one tap, then pick up right where you were.',
@@ -4435,6 +4440,11 @@ const STRING_DEFS = {
   'auth.memberHasPassword': {
     en: 'This member has a password — please sign in with it.',
     beanie: 'this bean has a password — please sign in with it.',
+  },
+  'auth.memberNeedsInvite': {
+    en: 'This grown-up bean needs an invite before it can be opened. Ask someone in your family to invite you from The Pod.',
+    beanie:
+      'this grown-up bean needs an invite first. ask someone in your family to invite you from the pod.',
   },
   'loginFlow.recoveryReconnect': { en: 'Reconnect Google', beanie: 'reconnect google' },
   'loginFlow.recoveryGrant': { en: 'Grant Access', beanie: 'grant access' },

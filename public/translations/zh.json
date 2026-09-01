@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-01",
-    "translationCount": 4391
+    "translationCount": 4393
   },
   "translations": {
     "app.name": {
@@ -21489,6 +21489,16 @@
     "pin.backspace": {
       "translation": "删除最后一位数字",
       "hash": "j9z060",
+      "lastUpdated": "2026-09-01"
+    },
+    "loginFlow.inviteNeededBody": {
+      "translation": "这颗大人豆子需要自己的邀请才能打开。请您的家人在 The Pod 页面邀请您，他们会给您发送一个链接，让您设置自己的PIN码。",
+      "hash": "30yj3l",
+      "lastUpdated": "2026-09-01"
+    },
+    "auth.memberNeedsInvite": {
+      "translation": "这颗大人豆子需要先收到邀请，然后才能打开。请您的家人在 The Pod 页面邀请您。",
+      "hash": "k325sc",
       "lastUpdated": "2026-09-01"
     },
     "wall.name": {
