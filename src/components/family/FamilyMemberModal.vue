@@ -173,6 +173,17 @@ watch(canManagePod, (val) => {
   }
 });
 
+/**
+ * Switching a NEW bean to "child" drops the finance toggle, matching the same default
+ * `applyDefaults` applies to wizard-created children (#79 review). Only while creating:
+ * editing an existing bean must never silently rewrite a permission a grown-up chose.
+ * The toggle stays visible and can be turned straight back on.
+ */
+watch(beanRole, (role, prev) => {
+  if (props.member || role === prev) return;
+  if (role === 'child') canViewFinances.value = false;
+});
+
 function onAvatarUploaded(photoId: UUID) {
   uploadedButNotSaved.value.push(photoId);
 }

@@ -84,25 +84,16 @@ function roleLabel(person: PersonCard): string {
         class="group flex w-[88px] flex-col items-center gap-2 transition-transform hover:-translate-y-0.5"
         @click="emit('pick', person)"
       >
-        <div class="relative">
-          <BeanieAvatar
-            :variant="getMemberAvatarVariant(person)"
-            :color="person.color"
-            :photo-url="person.photoUrl ?? null"
-            size="xl"
-          />
-          <!-- Status: green dot = has a credential; orange + = first sign-in sets one -->
-          <div
-            v-if="person.hasCredential"
-            class="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-white bg-green-400 dark:border-slate-800"
-          ></div>
-          <div
-            v-else
-            class="bg-primary-500 absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-slate-800"
-          >
-            +
-          </div>
-        </div>
+        <!--
+          No credential badge (#79): the picker must not advertise which beans are
+          unclaimed. The age-derived role label below is the only distinction drawn.
+        -->
+        <BeanieAvatar
+          :variant="getMemberAvatarVariant(person)"
+          :color="person.color"
+          :photo-url="person.photoUrl ?? null"
+          size="xl"
+        />
         <div class="text-center">
           <p
             class="font-outfit max-w-[88px] truncate text-sm font-semibold text-gray-900 dark:text-gray-100"

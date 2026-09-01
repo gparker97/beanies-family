@@ -21,6 +21,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { PersonCard } from '@/services/auth/loginFlow';
 import type { ProveMethod } from '@/services/auth/proveMethods';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const props = defineProps<{
   familyName: string;
@@ -142,16 +143,42 @@ function switchTo(method: ActiveKind) {
   activeMethod.value = method;
 }
 
+/**
+ * Kinds that must NEVER render as a switch link. `switchLabel`'s `default` branch
+ * returns "Use password", so a leak here shows a password affordance on a member who
+ * has none — the reason this filter, not a `switchLabel` case, is the guard.
+ */
+const NON_SWITCHABLE: readonly ActiveKind[] = [
+  // Renders as the standalone recovery-kit chip below (always visible, warm included).
+  'recovery',
+  // An explanation, not a choice — nothing for the user to switch TO (#79).
+  'invite-needed',
+];
+
 /** The switch links: every offered method except the active one, in offer order. */
 const switchTargets = computed<ActiveKind[]>(() => {
   const targets: ActiveKind[] = props.methods
     .filter((m) => m.kind !== activeMethod.value)
     .map((m) => m.kind)
-    // The recovery terminal renders as the standalone kit chip below (always
-    // visible now, warm included) — never as a switch link too.
-    .filter((k) => k !== 'recovery');
+    .filter((k) => !NON_SWITCHABLE.includes(k));
   if (props.recoveryMode && activeMethod.value !== 'reset-pin') targets.unshift('reset-pin');
   return targets;
+});
+
+/**
+ * Panes that are just a centred paragraph — no input, no action. One map so a future
+ * explanatory pane is one entry rather than another template branch. `recovery` and
+ * `invite-needed` share ONLY this; everywhere else they behave differently (recovery is
+ * an escape that routes out, invite-needed is a pane you land on), so do not merge them
+ * into one "terminal" concept.
+ */
+const MESSAGE_ONLY_BODY: Partial<Record<ActiveKind, UIStringKey>> = {
+  recovery: 'loginFlow.recoveryOnlyBody',
+  'invite-needed': 'loginFlow.inviteNeededBody',
+};
+const messageOnlyBody = computed(() => {
+  const key = MESSAGE_ONLY_BODY[activeMethod.value];
+  return key ? t(key) : null;
 });
 
 function switchLabel(method: ActiveKind): string {
@@ -306,10 +333,15 @@ function handleSubmit() {
         {{ `${t('loginV6.signInAs')} ${person.name}` }}
       </BaseButton>
 
-      <!-- Recovery-only (no local method at all): the escape IS the screen -->
-      <div v-else-if="activeMethod === 'recovery'" class="space-y-3 text-center">
+      <!--
+        Message-only panes (recovery terminal; unclaimed-adult invite explanation).
+        MUST stay ahead of the password `v-else` below — that branch is the chain's
+        catch-all, so falling past here would render a password form for a member who
+        has no password.
+      -->
+      <div v-else-if="messageOnlyBody" class="space-y-3 text-center">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('loginFlow.recoveryOnlyBody') }}
+          {{ messageOnlyBody }}
         </p>
       </div>
 

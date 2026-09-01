@@ -9,6 +9,7 @@ import {
   WRONG_FAMILY_CREDENTIAL,
   type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
+import { isChildMember } from '@/services/auth/proveMethods';
 import type { FamilyMember, PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { bufferToBase64 } from '@/utils/encoding';
 import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb/registryDatabase';
@@ -40,6 +41,7 @@ import {
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from './translationStore';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { track } from '@/services/analytics/plausible';
 
 /**
@@ -653,13 +655,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** Closed vocabulary for `signInPasswordless`'s refusal telemetry — kept tight so the
+   * `kind` dimension in CloudWatch cannot sprawl as guards are added. */
+  type PasswordlessRefusal = 'not-found' | 'credentialed' | 'adult';
+
   /**
-   * Tap-through sign-in for a member with NO credential, on an already-open pod
+   * Tap-through sign-in for a CHILD with NO credential, on an already-open pod
    * (2026-08-28 login rethink — the prove engine's 'tap-through' method; today's
-   * passwordless kids). Fail-closed guards: the member must exist in the LOADED doc and
-   * must genuinely have no hash — a credentialed member can never enter this way, and a
-   * closed pod has no roster to check against so it refuses too. Mirrors `signIn`'s
-   * session tail exactly (one drift point fewer than a hand-rolled copy in a view).
+   * passwordless kids). Fail-closed guards: the member must exist in the LOADED doc,
+   * must genuinely have no hash, and must be a child — a credentialed member and an
+   * unclaimed adult can never enter this way, and a closed pod has no roster to check
+   * against so it refuses too. Mirrors `signIn`'s session tail exactly (one drift point
+   * fewer than a hand-rolled copy in a view).
+   *
+   * This is defence in depth, NOT the primary gate: the prove engine decides what to
+   * OFFER, and this decides what to ALLOW, so a caller that bypasses the engine is
+   * still refused. Both sides share ONE definition of "child" (`isChildMember`).
    */
   async function signInPasswordless(
     memberId: string
@@ -671,18 +682,38 @@ export const useAuthStore = defineStore('auth', () => {
       const familyStore = useFamilyStore();
       const member = familyStore.members.find((m) => m.id === memberId);
 
-      if (!member) {
-        error.value = translationStore.t('auth.memberNotFound');
+      /**
+       * Every refusal, one shape: translated copy for the user (it reaches ProveView's
+       * role=alert box) plus one `reportError` so the reason is greppable in CloudWatch.
+       * Before this helper the two existing guards reported NOTHING, so a wrongly-refused
+       * sign-in was invisible in production. A refusal is the system working, so
+       * `warning` — never `critical`, which would page Slack for correct behaviour.
+       */
+      const refuse = (kind: PasswordlessRefusal, messageKey: UIStringKey) => {
+        error.value = translationStore.t(messageKey);
+        reportError({
+          surface: 'login-flow',
+          message: 'passwordless sign-in refused',
+          severity: 'warning',
+          context: { action: 'passwordless_refused', kind },
+        });
         return { success: false, error: error.value };
-      }
+      };
+
+      // Guard order is load-bearing: not-found → credentialed → adult.
+      if (!member) return refuse('not-found', 'auth.memberNotFound');
       if (member.passwordHash || member.pinHash) {
         // A credentialed member must prove — never tap through. "Credentialed" means
         // password OR PIN, matching the prove engine's definition (review F6: a
         // PIN-only member could previously be minted a session with zero proof via a
-        // stale card or a sync race). Translated: this string reaches ProveView's
-        // role=alert box (repo i18n rule for script-level strings).
-        error.value = translationStore.t('auth.memberHasPassword');
-        return { success: false, error: error.value };
+        // stale card or a sync race).
+        return refuse('credentialed', 'auth.memberHasPassword');
+      }
+      if (!isChildMember(member)) {
+        // #79: an unclaimed ADULT must be claimed out-of-band via a 24h invite, never by
+        // whoever picks up the tablet while the pod happens to be open. Reaching here
+        // means the engine was bypassed or a race occurred.
+        return refuse('adult', 'auth.memberNeedsInvite');
       }
 
       const familyContextStore = useFamilyContextStore();
@@ -704,7 +735,18 @@ export const useAuthStore = defineStore('auth', () => {
 
       return { success: true };
     } catch (e) {
-      error.value = e instanceof Error ? e.message : translationStore.t('auth.signInFailed');
+      // A throw here (blocked IndexedDB in private mode, a failed projection write)
+      // must not be silent either: the refusal helper above covers the deliberate
+      // rejections, this covers the unexpected ones. Translated, so a raw exception
+      // string never lands in the prove screen's role=alert box.
+      error.value = translationStore.t('auth.signInFailed');
+      reportError({
+        surface: 'login-flow',
+        message: 'passwordless sign-in threw',
+        error: e,
+        severity: 'error',
+        context: { action: 'passwordless_failed' },
+      });
       return { success: false, error: error.value };
     } finally {
       isLoading.value = false;
@@ -1097,44 +1139,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
     track('admin_password_reset');
     return { success: true };
-  }
-
-  /**
-   * Set password for an existing member (used during joiner onboarding).
-   */
-  async function setPassword(
-    memberId: string,
-    password: string
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const passwordHashValue = await hashPassword(password);
-      const familyStore = useFamilyStore();
-      // `requiresPassword` is DERIVED from credential presence on every read
-      // (familyMemberRepository.applyDefaults) — never written here.
-      await familyStore.updateMember(memberId, {
-        passwordHash: passwordHashValue,
-      });
-
-      const familyContextStore = useFamilyContextStore();
-      const member = familyStore.members.find((m) => m.id === memberId);
-
-      const user: AuthUser = {
-        memberId,
-        email: member?.email ?? '',
-        familyId: familyContextStore.activeFamilyId ?? undefined,
-        role: member?.role,
-      };
-      currentUser.value = user;
-      isAuthenticated.value = true;
-      freshSignIn.value = true;
-      persistSession(user);
-      familyStore.setCurrentMember(memberId);
-
-      return { success: true };
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to set password';
-      return { success: false, error: message };
-    }
   }
 
   // ── Member PIN (Phase 2 of the 2026-08-28 login rethink) ──────────────────
@@ -1669,7 +1673,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!pinResult.success) return pinResult;
       const joiningMember = pinResult.member;
 
-      // Sign the member in (same session shape `setPassword` used to mint).
+      // Sign the member in — the shared session shape (see `signIn`'s tail).
       const familyStoreForPin = useFamilyStore();
       const familyContextStoreForPin = useFamilyContextStore();
       const user: AuthUser = {
@@ -2228,7 +2232,6 @@ export const useAuthStore = defineStore('auth', () => {
     registerPasskeyForCurrentUser,
     resolveDeviceKeysForFamily,
     signUp,
-    setPassword,
     changePassword,
     resetMemberPassword,
     joinFamily,
