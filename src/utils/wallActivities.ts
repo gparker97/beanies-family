@@ -1,0 +1,77 @@
+/**
+ * How the wall filters, orders and colours a day's activities.
+ *
+ * Pure and shared by all four screens plus the drill-in sheet, because three
+ * copies of "which events does this bean see" is three chances to disagree —
+ * and two of them had already drifted apart by the time this file existed.
+ */
+import { normalizeAssignees } from '@/utils/assignees';
+import { getActivityColor } from '@/stores/activityStore';
+import type { FamilyActivity, FamilyMember } from '@/types/models';
+
+export interface WallOccurrence {
+  activity: FamilyActivity;
+  date: string;
+}
+
+/**
+ * Does this activity survive the wall's person filter?
+ *
+ * An activity with NO assignees is family-wide and always shows. That is the
+ * app's canonical rule (`useMemberFiltered`), and the naive `.some()` broke it:
+ * tapping "Leo" silently removed the family dinner, the school holiday and the
+ * trip — the very things everyone standing at the wall needs to see.
+ */
+export function matchesWallFilter(
+  activity: FamilyActivity,
+  visibleMemberIds: string[] | null
+): boolean {
+  if (!visibleMemberIds) return true;
+  const assignees = normalizeAssignees(activity);
+  if (assignees.length === 0) return true;
+  const allowed = new Set(visibleMemberIds);
+  return assignees.some((id) => allowed.has(id));
+}
+
+/**
+ * Chronological, all-day first.
+ *
+ * `activitiesForDate` returns repository order, so nothing on the wall was
+ * sorted: a day capped at six could hide the 8:05 school run behind "+2 more"
+ * while showing bin night, and view C — whose whole job is "what is next" —
+ * could list 6:30pm above 8:05am.
+ */
+export function sortByTime(entries: readonly WallOccurrence[]): WallOccurrence[] {
+  return [...entries].sort((a, b) => {
+    const at = a.activity.startTime;
+    const bt = b.activity.startTime;
+    if (!at && !bt) return a.activity.title.localeCompare(b.activity.title);
+    if (!at) return -1;
+    if (!bt) return 1;
+    return at.localeCompare(bt);
+  });
+}
+
+/** Filter + sort in the one order every screen wants. */
+export function wallEvents(
+  entries: readonly WallOccurrence[],
+  visibleMemberIds: string[] | null
+): WallOccurrence[] {
+  return sortByTime(entries.filter((e) => matchesWallFilter(e.activity, visibleMemberIds)));
+}
+
+/**
+ * Whose event this is, by colour.
+ *
+ * The mockup colours every chip, stripe and pip by the OWNER, not the category:
+ * a row of pips is meant to say whose day is busy at a glance, and category
+ * colour made Leo's football and Milo's football identical. Falls back to the
+ * category colour for a family-wide activity, which has no owner to show.
+ */
+export function wallActivityColour(
+  activity: FamilyActivity,
+  membersById: Map<string, FamilyMember>
+): string {
+  const [first] = normalizeAssignees(activity);
+  return membersById.get(first ?? '')?.color || getActivityColor(activity);
+}

@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
+import { restoreWallOrientation } from '@/composables/useWallOrientation';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
@@ -261,6 +262,20 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.budgets', requiresAuth: true, requiresFinance: true },
   },
   {
+    // The beanie wall: chrome-free by design (no sidebar, header or bottom nav)
+    // so a mounted tablet shows the family's week, not the app's furniture.
+    path: '/wall',
+    name: 'BeanieWall',
+    component: () => import('@/pages/BeanieWallPage.vue'),
+    meta: {
+      titleKey: 'wall.name',
+      requiresAuth: true,
+      noChrome: true,
+      hideQuickAdd: true,
+      requiresFlag: 'beanieWall',
+    },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/pages/SettingsPage.vue'),
@@ -501,6 +516,30 @@ router.beforeEach((to) => {
   }
 });
 
+/**
+ * Where "leave the beanie wall" should return to.
+ *
+ * Captured on the way IN, because by the time the wall wants it the current
+ * route is the wall itself. Without this the exit hard-coded `/settings`, which
+ * dropped anyone who started the wall from the account menu somewhere they had
+ * never been — and made them wait on the heaviest page in the app to compile.
+ *
+ * Registered AFTER the feature-flag guard, so a navigation to `/wall` that gets
+ * redirected away cannot leave a return path behind for a visit that never
+ * happened.
+ */
+let wallReturnPath = '/nook';
+
+export function getWallReturnPath(): string {
+  return wallReturnPath;
+}
+
+router.beforeEach((to, from) => {
+  if (to.name === 'BeanieWall' && from.name && from.name !== 'BeanieWall') {
+    wallReturnPath = from.fullPath;
+  }
+});
+
 // Orphan quick-add intent guard: if a `?action=...` query arrives on a
 // route that hides the FAB (stale bookmark, cross-device share of a
 // deep link), strip the intent keys and surface a warning toast so the
@@ -527,11 +566,23 @@ router.beforeEach((to) => {
 });
 
 // Update document title on route change
-router.afterEach((to) => {
+router.afterEach((to, from) => {
   const titleKey = to.meta.titleKey as UIStringKey | undefined;
   const translationStore = useTranslationStore();
   const title = titleKey ? translationStore.t(titleKey) : undefined;
   document.title = title ? `${title} | beanies.family` : 'beanies.family';
+
+  // The beanie wall is the one route allowed to rotate. Restore the portrait
+  // default when LEAVING it — the component's own scope dispose covers a clean
+  // unmount, but a back button, deep link, session expiry or error-boundary
+  // navigation may not run it.
+  //
+  // Guarded on `from`, not `to`: keying off `to.name !== 'BeanieWall'` fired on
+  // boot and on every route change for every user, locking portrait even for
+  // the ~100% who never enable the wall — which is exactly the regression
+  // (manifest orientation overriding the user's rotation lock) that made us
+  // choose release/restore over lock-at-boot in the first place.
+  if (from.name === 'BeanieWall' && to.name !== 'BeanieWall') restoreWallOrientation();
 });
 
 // Auto-recover from stale-chunk failures after a deploy. The PWA's

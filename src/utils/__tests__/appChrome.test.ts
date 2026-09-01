@@ -77,3 +77,14 @@ describe('isNavigationCancelled', () => {
     expect(isNavigationCancelled({ type: 'x' })).toBe(false);
   });
 });
+
+describe('the beanie wall route', () => {
+  it('renders WITHOUT app chrome — a wall shows the family, not the app furniture', () => {
+    expect(
+      shouldShowAppLayout(
+        { meta: { noChrome: true } },
+        { isAuthenticated: true, needsPodSetup: false }
+      )
+    ).toBe(false);
+  });
+});

@@ -34,6 +34,7 @@ describe('config/featureFlagWrite', () => {
     expect(result.nextState).toEqual({
       aiPhotoExtract: true,
       aiTravelExtract: false,
+      beanieWall: false,
       calendarClashNudge: false,
       docWorker: false,
       familyLists: false,
@@ -69,6 +70,7 @@ describe('config/featureFlagWrite', () => {
     expect(result.nextState).toEqual({
       aiPhotoExtract: false,
       aiTravelExtract: true,
+      beanieWall: false,
       calendarClashNudge: false,
       docWorker: false,
       familyLists: false,

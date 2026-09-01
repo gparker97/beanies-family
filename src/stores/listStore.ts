@@ -78,7 +78,7 @@ function deriveCompletion(
  * Beanie Lists store (#33) — mirrors `todoStore`: same state triple, the same
  * `wrapAsync` error discipline (toast + `reportError`, returns result-or-null),
  * `createMemberFiltered` for the global member filter, and the shared
- * `celebrate('goal-reached')` on completion. All lifecycle-conditional reads go
+ * `celebrate('list-complete')` on completion (the full-screen bean shower). All lifecycle-conditional reads go
  * through `@/utils/listLifecycle` predicates — never inline `lifecycle === …`.
  *
  * Write invariants: list-level completion/filing is derived ONLY via
@@ -277,7 +277,7 @@ export const useListStore = defineStore('lists', () => {
     if (updated && shouldCelebrate) {
       const originalItems = list.items;
       const wasRecurring = isRecurring(list);
-      celebrate('goal-reached', {
+      celebrate('list-complete', {
         onUndo: () => {
           void updateList(listId, {
             items: originalItems,
