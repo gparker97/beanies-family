@@ -235,7 +235,13 @@ describe('transactionsStore — aggregates exclude balance_adjustment', () => {
 
   it('thisMonthIncome / thisMonthExpenses ignore balance_adjustment rows', () => {
     const store = useTransactionsStore();
-    const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    // LOCAL month, not `toISOString()`. `thisMonthTransactions` filters with
+    // `getStartOfMonth(new Date())`, which is local — so on the 1st of a month
+    // anywhere east of UTC (and the last day anywhere west) the UTC string named
+    // the PREVIOUS month and every seeded row fell outside the window, failing
+    // for hours at a time on a developer machine while CI (UTC) stayed green.
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     store.transactions.push(
       tx({ type: 'income', amount: 100, date: `${thisMonth}-10`, currency: 'USD' }),
       tx({ type: 'expense', amount: 30, date: `${thisMonth}-11`, currency: 'USD' }),

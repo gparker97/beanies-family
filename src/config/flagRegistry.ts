@@ -12,6 +12,11 @@
 
 export const FLAG_REGISTRY = [
   {
+    id: 'beanieWall',
+    label: 'Beanie wall',
+    description: 'Tablet wall/table display mode: the family plan and the jobs board, chrome-free.',
+  },
+  {
     id: 'aiPhotoExtract',
     label: 'AI photo extract',
     description: 'Magic beans reader: invitation / photo → calendar activity.',

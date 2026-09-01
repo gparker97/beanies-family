@@ -8,6 +8,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-01
+
+### Added
+
+- **The beanie wall.** A display mode for a tablet on the kitchen wall: the week, each bean's day, today at full size, and a chore board where every list sits under the person whose list it is. Ticking always works; a PIN from any grown-up unlocks adding. Not switched on yet.
+
+### Changed
+
+- **Finishing a whole list is now a full-screen celebration** rather than a pop-up, with a longer window to undo it if you ticked the wrong one.
+
+### Fixed
+
+- Fixed a bug where confetti was invisible on some celebrations.
+- Fixed a date-dependent bug in the transactions tests that made them fail on the first of the month outside UTC.
+- The account menu button now announces itself properly to screen readers.
+
 ## 2026-08-31
 
 ### Added
