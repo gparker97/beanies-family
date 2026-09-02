@@ -16,7 +16,7 @@ export interface BeanieIconDef {
 
 // ─── Navigation / Page Icons (9) ───────────────────────────────────────────
 
-const NAV_ICONS: Record<string, BeanieIconDef> = {
+const NAV_ICONS = {
   home: {
     paths: [
       'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
@@ -64,11 +64,11 @@ const NAV_ICONS: Record<string, BeanieIconDef> = {
       'M15 12a3 3 0 11-6 0 3 3 0 016 0z',
     ],
   },
-};
+} satisfies Record<string, BeanieIconDef>;
 
 // ─── Action Icons ──────────────────────────────────────────────────────────
 
-const ACTION_ICONS: Record<string, BeanieIconDef> = {
+const ACTION_ICONS = {
   plus: {
     paths: ['M12 4v16m8-8H4'],
   },
@@ -103,11 +103,11 @@ const ACTION_ICONS: Record<string, BeanieIconDef> = {
   check: {
     paths: ['M5 13l4 4L19 7'],
   },
-};
+} satisfies Record<string, BeanieIconDef>;
 
 // ─── Summary Card Icons ────────────────────────────────────────────────────
 
-const SUMMARY_ICONS: Record<string, BeanieIconDef> = {
+const SUMMARY_ICONS = {
   'dollar-circle': {
     paths: [
       'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -136,11 +136,11 @@ const SUMMARY_ICONS: Record<string, BeanieIconDef> = {
       'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     ],
   },
-};
+} satisfies Record<string, BeanieIconDef>;
 
 // ─── Utility Icons ─────────────────────────────────────────────────────────
 
-const UTILITY_ICONS: Record<string, BeanieIconDef> = {
+const UTILITY_ICONS = {
   calendar: {
     paths: [
       'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
@@ -227,11 +227,11 @@ const UTILITY_ICONS: Record<string, BeanieIconDef> = {
       'M15 4l5 5m0-5l-5 5',
     ],
   },
-};
+} satisfies Record<string, BeanieIconDef>;
 
 // ─── Status Icons ──────────────────────────────────────────────────────────
 
-const STATUS_ICONS: Record<string, BeanieIconDef> = {
+const STATUS_ICONS = {
   'pause-circle': {
     paths: ['M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z'],
   },
@@ -252,11 +252,11 @@ const STATUS_ICONS: Record<string, BeanieIconDef> = {
   'exclamation-circle': {
     paths: ['M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
   },
-};
+} satisfies Record<string, BeanieIconDef>;
 
 // ─── Category Icons (transaction categories) ───────────────────────────────
 
-const CATEGORY_ICONS: Record<string, BeanieIconDef> = {
+const CATEGORY_ICONS = {
   briefcase: {
     paths: [
       'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
@@ -389,7 +389,7 @@ const CATEGORY_ICONS: Record<string, BeanieIconDef> = {
       'M15 12a3 3 0 11-6 0 3 3 0 016 0z',
     ],
   },
-};
+} satisfies Record<string, BeanieIconDef>;
 
 // ─── Account Type Icons ────────────────────────────────────────────────────
 
@@ -538,9 +538,35 @@ export const ASSET_TYPE_ICONS: Record<string, AssetTypeIconDef> = {
   },
 };
 
+// ─── Added 2026-09-02 for the activity detail rows ─────────────────────────
+// `map-pin` existed only as an inline SVG in ActivityViewEditModal and a 📍 emoji
+// literal in two planner views; `clock` and `tag` had no equivalent at all.
+const DETAIL_ICONS = {
+  'map-pin': {
+    paths: [
+      'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z',
+      'M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+    ],
+  },
+  clock: {
+    paths: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 7v5l3 2'],
+  },
+  tag: {
+    paths: [
+      'M20.6 3.4A2 2 0 0 0 19.2 2.8H13L3 12.8a2 2 0 0 0 0 2.8l4.4 4.4a2 2 0 0 0 2.8 0L21 10V4.8a2 2 0 0 0-.4-1.4Z',
+      'M16.5 8.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
+    ],
+  },
+} satisfies Record<string, BeanieIconDef>;
+
 // ─── Merged Icon Registry ──────────────────────────────────────────────────
 
-export const BEANIE_ICONS: Record<string, BeanieIconDef> = {
+/**
+ * `satisfies`, not a `Record<string, …>` annotation — that widened `keyof` to `string`,
+ * so `BeanieIcon` silently substituted a three-dot circle for any typo and a missing
+ * icon could only be found in production. Narrowing makes it a compile error.
+ */
+export const BEANIE_ICONS = {
   ...NAV_ICONS,
   ...ACTION_ICONS,
   ...SUMMARY_ICONS,
@@ -549,26 +575,33 @@ export const BEANIE_ICONS: Record<string, BeanieIconDef> = {
   ...CATEGORY_ICONS,
   ...ACCOUNT_TYPE_ICONS,
   ...ASSET_TYPE_ICONS,
-};
+  ...DETAIL_ICONS,
+} satisfies Record<string, BeanieIconDef>;
+
+/** Every icon name the registry actually defines. */
+export type BeanieIconName = keyof typeof BEANIE_ICONS;
 
 /**
  * Get an icon definition by name.
  * Returns undefined if not found.
  */
 export function getIconDef(name: string): BeanieIconDef | undefined {
-  return BEANIE_ICONS[name];
+  // One contained cast, in the module that owns the registry. `satisfies` drops the
+  // index signature, and these accessors are deliberately `(name: string)` because
+  // CategoryIcon resolves data-driven names and BeanieIcon needs a runtime fallback.
+  return (BEANIE_ICONS as Record<string, BeanieIconDef>)[name];
 }
 
 /**
  * Get an account type icon with its color metadata.
  */
 export function getAccountTypeIcon(type: string): AccountTypeIconDef | undefined {
-  return ACCOUNT_TYPE_ICONS[`account-${type}`];
+  return (ACCOUNT_TYPE_ICONS as Record<string, AccountTypeIconDef>)[`account-${type}`];
 }
 
 /**
  * Get an asset type icon with its color metadata.
  */
 export function getAssetTypeIcon(type: string): AssetTypeIconDef | undefined {
-  return ASSET_TYPE_ICONS[`asset-${type}`];
+  return (ASSET_TYPE_ICONS as Record<string, AssetTypeIconDef>)[`asset-${type}`];
 }

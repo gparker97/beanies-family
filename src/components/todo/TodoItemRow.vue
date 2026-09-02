@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { normalizeAssignees } from '@/utils/assignees';
+import { effectiveAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
 import { isHint, HINT_TYPE_META } from '@/utils/helpfulHints';
 import { MARKETING_URL } from '@/utils/marketing';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import type { TodoItem } from '@/types/models';
 
@@ -109,6 +110,19 @@ const timeAgo = computed(() => {
   if (diffDays === 1) return t('todo.addedYesterday');
   return t('todo.addedDaysAgo').replace('{days}', String(diffDays));
 });
+
+const { getMemberById } = useMemberInfo();
+
+/**
+ * Owners as members, resolved and deduped. A to-do card is not a bean lane, so it
+ * shows everyone on it — and the face replaces the full-name pill because on a card
+ * the member annotates the task, where in a picker they ARE the content being chosen.
+ */
+function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
+  return effectiveAssignees(entity, (id) => Boolean(getMemberById(id)))
+    .map((id) => getMemberById(id)!)
+    .filter(Boolean);
+}
 </script>
 
 <template>
@@ -206,7 +220,7 @@ const timeAgo = computed(() => {
         </span>
 
         <!-- Assignee chips -->
-        <MemberChip v-for="mid in normalizeAssignees(todo)" :key="mid" :member-id="mid" />
+        <ActivityOwnerStack :members="ownersOf(todo)" size="xs" />
 
         <!-- Time ago (full mode, desktop only) -->
         <span v-if="!compact" class="hidden text-xs opacity-35 md:inline">{{ timeAgo }}</span>

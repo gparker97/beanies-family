@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { FamilyActivity } from '@/types/models';
 /**
  * View A — the week.
  *
@@ -15,10 +16,10 @@ import { computed } from 'vue';
 import WallEventChip from '@/components/wall/WallEventChip.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { useActivityStore } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { wallActivityColour, wallEvents } from '@/utils/wallActivities';
+import { wallEvents } from '@/utils/wallActivities';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
 // The page renders all four views through one `<component :is>` with a single
@@ -43,12 +44,16 @@ const emit = defineEmits<{
 }>();
 
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
-const membersById = computed(() => new Map(familyStore.members.map((m) => [m.id, m])));
-function colourFor(activity: Parameters<typeof wallActivityColour>[0]) {
-  return wallActivityColour(activity, membersById.value);
+/** Columns here are DAYS, not bean lanes, so nothing names an owner — every one shows. */
+function identityOf(activity: FamilyActivity) {
+  return identityFor(activity);
+}
+
+/** The dot pips still need a single colour. */
+function colourFor(activity: FamilyActivity) {
+  return identityFor(activity).color;
 }
 
 /** Portrait cannot hold seven readable columns; three plus a strip is the honest fit. */
@@ -93,6 +98,8 @@ function dayNumber(ymd: string) {
 function timeLabel(entry: { activity: { startTime?: string } }) {
   return entry.activity.startTime || t('planner.allDay');
 }
+
+const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
@@ -135,8 +142,7 @@ function timeLabel(entry: { activity: { startTime?: string } }) {
             v-for="entry in shownFor(ymd)"
             :key="entry.activity.id + entry.date"
             :activity="entry.activity"
-            :colour="colourFor(entry.activity)"
-            :members-by-id="membersById"
+            :identity="identityOf(entry.activity)"
             :time="timeLabel(entry)"
             @open="
               emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })

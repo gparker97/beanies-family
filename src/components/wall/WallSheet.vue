@@ -14,6 +14,8 @@ import { useActivityChipClass } from '@/composables/useActivityChipClass';
 import { computed, inject, onMounted, onBeforeUnmount, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import { activityEmoji } from '@/utils/activityEmoji';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
@@ -288,6 +290,11 @@ function listOwnerName(list: FamilyList): string {
 const { classify } = useActivityChipClass();
 
 const { memberAvatarBindings } = useMemberAvatarBindings();
+
+/** Resolve a row's `memberId` so the row can wear that bean's face. */
+function rowMember(id: string) {
+  return familyStore.members.find((m) => m.id === id);
+}
 </script>
 
 <template>
@@ -369,16 +376,26 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
                 </p>
                 <p class="font-inter wall-hero-sub">{{ dateLabel(target.ymd) }}</p>
               </div>
-              <div v-if="activity.location" class="wall-hero-cell wall-hero-grow">
+              <!--
+                Location ALWAYS means location. It used to hand its cell to the category
+                when there was no location — so one slot meant two unrelated things, and
+                the category appeared as a word ("Music") that the app writes nowhere
+                else. The planner's own modal never did this; the wall was the odd one.
+              -->
+              <div class="wall-hero-cell wall-hero-grow">
                 <p class="wall-hero-cap font-outfit">{{ t('planner.field.location') }}</p>
-                <p class="font-outfit wall-hero-value font-extrabold">{{ activity.location }}</p>
-                <p v-if="activity.category" class="font-inter wall-hero-sub">
-                  {{ categoryLabel(activity.category) }}
+                <p v-if="activity.location" class="font-outfit wall-hero-value font-extrabold">
+                  {{ activity.location }}
+                </p>
+                <p v-else class="font-outfit wall-hero-value wall-hero-empty font-extrabold">
+                  {{ t('planner.field.noLocation') }}
                 </p>
               </div>
-              <div v-else-if="activity.category" class="wall-hero-cell">
+              <!-- Category gets its own cell, shown as the emoji the rest of the app uses. -->
+              <div v-if="activity.category" class="wall-hero-cell">
                 <p class="wall-hero-cap font-outfit">{{ t('form.category') }}</p>
                 <p class="font-outfit wall-hero-value font-extrabold">
+                  <span aria-hidden="true">{{ activityEmoji(activity) }}</span>
                   {{ categoryLabel(activity.category) }}
                 </p>
               </div>
@@ -389,13 +406,35 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
               somebody actually walked over to ask.
             -->
             <dl v-if="detailRows.length" class="mt-3 grid gap-1.5">
-              <div v-for="row in detailRows" :key="row.labelKey" class="flex gap-3">
+              <div v-for="row in detailRows" :key="row.labelKey" class="flex items-center gap-3">
+                <!--
+                  Icon first, so a row is findable by SHAPE before it is read — which is
+                  the whole point at wall distance. The glyph comes from the shared row
+                  definition, so this sheet and the planner's modal cannot disagree
+                  about which icon means "pickup".
+                -->
+                <span
+                  class="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] text-[var(--color-primary-500,#F15D22)]"
+                  style="background: var(--tint-orange-8)"
+                  aria-hidden="true"
+                >
+                  <BeanieIcon :name="row.icon" size="sm" />
+                </span>
                 <dt
-                  class="font-outfit wall-sheet-label w-28 shrink-0 font-bold tracking-[0.08em] text-[var(--muted-text,#4d5d6c)] uppercase"
+                  class="font-outfit wall-sheet-label w-24 shrink-0 font-bold tracking-[0.08em] text-[var(--muted-text,#4d5d6c)] uppercase"
                 >
                   {{ t(row.labelKey) }}
                 </dt>
-                <dd class="font-inter wall-sheet-line text-secondary-500 dark:text-gray-200">
+                <dd
+                  class="font-inter wall-sheet-line text-secondary-500 flex items-center gap-2 dark:text-gray-200"
+                >
+                  <!-- `memberId` has been on the row type all along; the wall ignored it. -->
+                  <BeanieAvatar
+                    v-if="row.memberId && rowMember(row.memberId)"
+                    v-bind="memberAvatarBindings(rowMember(row.memberId)!)"
+                    fallback="initials"
+                    size="xs"
+                  />
                   {{ row.value }}
                 </dd>
               </div>
@@ -760,6 +799,11 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 .wall-hero-value {
   font-size: 1.6rem;
   line-height: 1.1;
+}
+
+.wall-hero-empty {
+  font-style: italic;
+  opacity: 0.45;
 }
 
 .wall-hero-sub {
