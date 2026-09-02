@@ -91,6 +91,10 @@ test.describe('Family Planner', () => {
   /** Helper to create a recurring activity and dismiss the confirmation. */
   async function createRecurringActivity(page: import('@playwright/test').Page, title: string) {
     await openAddActivity(page);
+    // Recurring is chosen EXPLICITLY — the form defaults to one-time as of 2026-09-02.
+    // Every recurring-scope test below routes through this helper, so the choice lives
+    // here rather than being repeated in four places.
+    await page.getByRole('button', { name: /recurring/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill(title);
     await selectAssignee(page);
     await selectBeanieDate(page.locator('div[role="dialog"]'), recurringSeriesStartStr());
@@ -157,7 +161,12 @@ test.describe('Family Planner', () => {
     // --- CREATE: recurring activity ---
     await openAddActivity(page);
 
-    // Fill in form — recurrence defaults to "Recurring"
+    // Recurrence must be chosen EXPLICITLY. The form defaults to one-time as of
+    // 2026-09-02 — repeating is the more consequential option and the harder to undo,
+    // so it is no longer what you get by not touching the control.
+    await page.getByRole('button', { name: /recurring/i }).click();
+
+    // Fill in form
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Piano Lesson');
     await selectAssignee(page);
     await selectBeanieDate(page.locator('div[role="dialog"]'), '2026-03-04');
@@ -167,7 +176,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: '3:00 PM' }).click();
 
     // End time auto-updates to startTime + 1hr = 4:00 PM — no action needed
-    // Recurrence stays at default (Recurring + Weekly)
+    // Weekly is the default CADENCE once recurring is chosen.
 
     // Save
     await submitActivity(page);
