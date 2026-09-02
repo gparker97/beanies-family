@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Share to beanies — recipe capture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /*
+       * A five-beat story: a PDF, the share sheet, the tap, the read, the recipe.
+       *
+       * The phone chrome and the share sheet are ILLUSTRATED — an OS share sheet is not
+       * something a browser can render, and drawing one is the normal way this is shown.
+       * The final frame is a REAL screenshot of the app, because that is the frame the
+       * reader is actually being promised, and a drawing of it would be a claim rather
+       * than a demonstration.
+       *
+       * Timeline is driven by one `--t` duration so the whole thing can be retimed from
+       * a single value.
+       */
+      :root {
+        --t: 11s;
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --ink: #2c3e50;
+        --muted: #5b6b7a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 50% 0%, #fdf3ec, #f2f4f7 60%);
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--ink);
+      }
+
+      .stage {
+        width: 440px;
+        height: 990px;
+        display: grid;
+        place-items: center;
+      }
+
+      /* ---------- phone ---------- */
+      .phone {
+        position: relative;
+        width: 390px;
+        height: 868px;
+        border-radius: 46px;
+        background: #0d141d;
+        padding: 12px;
+        box-shadow:
+          0 30px 70px rgba(44, 62, 80, 0.28),
+          0 0 0 2px rgba(44, 62, 80, 0.08);
+      }
+
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 34px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      /* ---------- layer 1: the PDF ---------- */
+      .pdf {
+        position: absolute;
+        inset: 0;
+        background: #eceff3;
+        display: flex;
+        flex-direction: column;
+        animation: pdfOut var(--t) linear infinite;
+      }
+
+      .pdf-bar {
+        height: 84px;
+        background: #fff;
+        border-bottom: 1px solid #e2e8ee;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding: 0 18px 12px;
+        font: 600 0.82rem Inter, sans-serif;
+        color: var(--muted);
+      }
+
+      .pdf-share {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: #2f6fed;
+      }
+
+      .paper {
+        margin: 18px;
+        background: #fff;
+        border-radius: 6px;
+        box-shadow: 0 4px 18px rgba(44, 62, 80, 0.1);
+        padding: 22px 20px;
+        flex: 1;
+      }
+
+      .paper h3 {
+        font: 700 1.05rem Outfit, sans-serif;
+        margin: 0 0 2px;
+      }
+      .paper .src {
+        font: 0.72rem Inter, sans-serif;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .line {
+        height: 7px;
+        border-radius: 3px;
+        background: #e6eaef;
+        margin-bottom: 8px;
+      }
+      .line.s {
+        width: 62%;
+      }
+      .line.m {
+        width: 84%;
+      }
+      .line.hd {
+        width: 40%;
+        background: #d5dce4;
+        height: 9px;
+        margin: 16px 0 10px;
+      }
+
+      /* ---------- layer 2: the share sheet ---------- */
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 32, 0.42);
+        opacity: 0;
+        animation: scrim var(--t) linear infinite;
+      }
+
+      .sheet {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        border-radius: 26px;
+        background: #f6f7f9;
+        padding: 16px 14px 22px;
+        transform: translateY(115%);
+        animation: sheet var(--t) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        z-index: 20;
+      }
+
+      .sheet-title {
+        font: 600 0.78rem Inter, sans-serif;
+        color: var(--muted);
+        text-align: center;
+        margin-bottom: 14px;
+      }
+
+      .targets {
+        display: flex;
+        gap: 14px;
+        padding: 0 4px 6px;
+      }
+
+      .target {
+        width: 74px;
+        text-align: center;
+        font: 0.66rem Inter, sans-serif;
+        color: var(--muted);
+        flex: none;
+      }
+
+      .tile {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        margin: 0 auto 6px;
+        display: grid;
+        place-items: center;
+        font-size: 1.6rem;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.12);
+      }
+
+      /* The beanies target — the one the eye should land on. */
+      .target.bean .tile {
+        background: linear-gradient(140deg, var(--orange), var(--terracotta));
+        color: #fff;
+        font-size: 1.5rem;
+        font-weight: 800;
+      }
+      .target.bean {
+        color: var(--slate);
+        font-weight: 600;
+      }
+
+      /* The tap: a ring that fires once, at the right moment. */
+      .tap {
+        position: absolute;
+        left: 51px;
+        bottom: 96px;
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        border: 3px solid var(--orange);
+        opacity: 0;
+        z-index: 25;
+        animation: tap var(--t) ease-out infinite;
+      }
+
+      /* ---------- layer 3: reading ---------- */
+      .reading {
+        position: absolute;
+        inset: 0;
+        background: var(--cloud);
+        display: grid;
+        place-items: center;
+        text-align: center;
+        opacity: 0;
+        z-index: 28;
+        animation: reading var(--t) linear infinite;
+      }
+
+      .pot {
+        font-size: 2.6rem;
+        animation: bob 1.6s ease-in-out infinite;
+      }
+
+      .reading b {
+        display: block;
+        font: 700 1.05rem Outfit, sans-serif;
+        margin-top: 0.8rem;
+      }
+      .reading span {
+        display: block;
+        font: 0.85rem Inter, sans-serif;
+        color: var(--muted);
+        margin-top: 0.3rem;
+      }
+
+      .bar {
+        width: 168px;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(44, 62, 80, 0.1);
+        margin: 1.1rem auto 0;
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        animation: fill var(--t) linear infinite;
+      }
+
+      /* ---------- layer 4: the real app ---------- */
+      .app {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        z-index: 30;
+        animation: app var(--t) linear infinite;
+      }
+      .app img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+      }
+
+      /* ---------- caption ---------- */
+      .cap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -40px;
+        text-align: center;
+        font: 600 0.9rem Outfit, sans-serif;
+        color: var(--muted);
+      }
+      .cap span {
+        position: absolute;
+        left: 0;
+        right: 0;
+        opacity: 0;
+      }
+      .cap span:nth-child(1) {
+        animation: cap1 var(--t) linear infinite;
+      }
+      .cap span:nth-child(2) {
+        animation: cap2 var(--t) linear infinite;
+      }
+      .cap span:nth-child(3) {
+        animation: cap3 var(--t) linear infinite;
+      }
+      .cap span:nth-child(4) {
+        animation: cap4 var(--t) linear infinite;
+      }
+
+      /* ---------- timeline ----------
+         0–14%   the PDF
+         14–30%  share sheet up
+         30–36%  tap
+         36–56%  reading
+         56–96%  the recipe
+         96–100% reset
+      */
+      @keyframes pdfOut {
+        0%,
+        52% {
+          opacity: 1;
+        }
+        58%,
+        96% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      @keyframes scrim {
+        0%,
+        13% {
+          opacity: 0;
+        }
+        20%,
+        34% {
+          opacity: 1;
+        }
+        40%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      @keyframes sheet {
+        0%,
+        13% {
+          transform: translateY(115%);
+        }
+        24%,
+        34% {
+          transform: translateY(0);
+        }
+        41%,
+        100% {
+          transform: translateY(115%);
+        }
+      }
+
+      @keyframes tap {
+        0%,
+        29% {
+          opacity: 0;
+          transform: scale(1);
+        }
+        31% {
+          opacity: 1;
+          transform: scale(0.92);
+        }
+        36% {
+          opacity: 0;
+          transform: scale(1.25);
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+
+      @keyframes reading {
+        0%,
+        36% {
+          opacity: 0;
+        }
+        40%,
+        54% {
+          opacity: 1;
+        }
+        58%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      @keyframes fill {
+        0%,
+        38% {
+          width: 0;
+        }
+        54% {
+          width: 100%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+
+      @keyframes app {
+        0%,
+        55% {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        60%,
+        96% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+      }
+
+      @keyframes bob {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-7px);
+        }
+      }
+
+      @keyframes cap1 {
+        0%,
+        12% {
+          opacity: 1;
+        }
+        16%,
+        100% {
+          opacity: 0;
+        }
+      }
+      @keyframes cap2 {
+        0%,
+        16% {
+          opacity: 0;
+        }
+        20%,
+        34% {
+          opacity: 1;
+        }
+        38%,
+        100% {
+          opacity: 0;
+        }
+      }
+      @keyframes cap3 {
+        0%,
+        38% {
+          opacity: 0;
+        }
+        42%,
+        54% {
+          opacity: 1;
+        }
+        58%,
+        100% {
+          opacity: 0;
+        }
+      }
+      @keyframes cap4 {
+        0%,
+        58% {
+          opacity: 0;
+        }
+        63%,
+        94% {
+          opacity: 1;
+        }
+        98%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+        }
+        .app {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="phone">
+        <div class="screen">
+          <!-- 1. a PDF, open in a reader -->
+          <div class="pdf">
+            <div class="pdf-bar">
+              <span>Done</span>
+              <span>school-fair-recipes.pdf</span>
+              <span class="pdf-share"
+                ><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg
+                ></span>
+            </div>
+            <div class="paper">
+              <h3>Slow-Cooked Beef Ragu</h3>
+              <p class="src">From the school fair pamphlet · page 4</p>
+              <div class="line m"></div>
+              <div class="line s"></div>
+              <div class="line hd"></div>
+              <div class="line"></div>
+              <div class="line m"></div>
+              <div class="line s"></div>
+              <div class="line"></div>
+              <div class="line hd"></div>
+              <div class="line m"></div>
+              <div class="line"></div>
+              <div class="line s"></div>
+            </div>
+          </div>
+
+          <!-- 2. the OS share sheet (illustrated) -->
+          <div class="scrim"></div>
+          <div class="sheet">
+            <p class="sheet-title">Share “school-fair-recipes.pdf”</p>
+            <div class="targets">
+              <div class="target bean">
+                <div class="tile">🫘</div>
+                beanies
+              </div>
+              <div class="target"><div class="tile">💬</div>Messages</div>
+              <div class="target"><div class="tile">✉️</div>Mail</div>
+              <div class="target"><div class="tile">📝</div>Notes</div>
+            </div>
+          </div>
+          <div class="tap"></div>
+
+          <!-- 3. reading it -->
+          <div class="reading">
+            <div>
+              <div class="pot">🍲</div>
+              <b>reading the recipe…</b>
+              <span>ingredients, steps and times</span>
+              <div class="bar"><i></i></div>
+            </div>
+          </div>
+
+          <!-- 4. the real app -->
+          <div class="app"><img id="appshot" alt="The captured recipe in beanies.family" /></div>
+
+        </div>
+
+        <div class="cap">
+          <span>Open the PDF</span>
+          <span>Share it to beanies</span>
+          <span>It reads the recipe</span>
+          <span>Saved to your cookbook</span>
+        </div>
+      </div>
+    </div>
+    <script>
+      // The final frame is a real screenshot, injected so this file stays readable.
+      var s = document.getElementById('shot');
+      if (s) document.getElementById('appshot').src = s.textContent.trim();
+    </script>
+  </body>
+</html>
