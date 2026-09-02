@@ -11,6 +11,7 @@ import { computed } from 'vue';
 import type { FamilyActivity } from '@/types/models';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import AllDayChip from '@/components/planner/AllDayChip.vue';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 
 interface Props {
@@ -58,6 +59,11 @@ const bgColor = computed(() => `${identity.value.color}22`);
     testid="all-day-activity-chip"
     @click="(e: MouseEvent) => $emit('click', e)"
   >
+    <CelebrationConfetti
+      v-if="identity.celebration.celebrating"
+      :activity-id="activity.id"
+      density="month"
+    />
     <span>{{ activity.title }}<PhotoIndicator :photo-ids="activity.photoIds" /></span>
   </AllDayChip>
 </template>
