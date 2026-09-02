@@ -13,6 +13,8 @@ import { useActivityChipClass } from '@/composables/useActivityChipClass';
  */
 import { computed, inject, onMounted, onBeforeUnmount, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
@@ -20,7 +22,6 @@ import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { fillTemplate } from '@/utils/fillTemplate';
 
@@ -285,6 +286,8 @@ function listOwnerName(list: FamilyList): string {
 }
 
 const { classify } = useActivityChipClass();
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -335,17 +338,7 @@ const { classify } = useActivityChipClass();
                 {{ entry.activity.title }}
               </span>
             </span>
-            <span class="flex shrink-0">
-              <BeanieAvatar
-                v-for="person in membersForActivity(entry.activity)"
-                :key="person.id"
-                :variant="getMemberAvatarVariant(person)"
-                :color="person.color"
-                size="sm"
-                class="-ml-2 first:ml-0"
-                :aria-label="person.name"
-              />
-            </span>
+            <ActivityOwnerStack :members="membersForActivity(entry.activity)" size="sm" />
           </button>
           <p v-if="!dayEvents.length" class="font-caveat wall-sheet-empty py-8 text-center">
             {{ t('wall.day.nothingOn') }}
@@ -430,12 +423,7 @@ const { classify } = useActivityChipClass();
                 :key="person.id"
                 class="flex items-center gap-2 rounded-full bg-[var(--tint-slate-5)] px-3 py-1"
               >
-                <BeanieAvatar
-                  :variant="getMemberAvatarVariant(person)"
-                  :color="person.color"
-                  size="sm"
-                  :aria-label="person.name"
-                />
+                <BeanieAvatar v-bind="memberAvatarBindings(person)" fallback="initials" size="sm" />
                 <span class="font-inter wall-sheet-line">{{ person.name }}</span>
               </span>
             </div>
@@ -702,12 +690,7 @@ const { classify } = useActivityChipClass();
                 :key="person.id"
                 class="flex items-center gap-2 rounded-full bg-[var(--tint-slate-5)] px-3 py-1"
               >
-                <BeanieAvatar
-                  :variant="getMemberAvatarVariant(person)"
-                  :color="person.color"
-                  size="sm"
-                  :aria-label="person.name"
-                />
+                <BeanieAvatar v-bind="memberAvatarBindings(person)" fallback="initials" size="sm" />
                 <span class="font-inter wall-sheet-line">{{ person.name }}</span>
               </span>
             </div>

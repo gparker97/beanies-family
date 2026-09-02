@@ -51,9 +51,33 @@ const anySelectable = computed(() =>
   props.colors.some((c) => c.value === props.modelValue || !holderOf(c.value))
 );
 
+/**
+ * True when the palette is exhausted and the lock has come off — so a caller can say
+ * so. Unlocking without explaining is the worst of both: an ordinary-looking picker
+ * that quietly creates a duplicate. The holder badges stay visible in this state for
+ * the same reason (they key off `holderOf`, not `isTaken`).
+ */
+const allTaken = computed(() => !anySelectable.value);
+defineExpose({ allTaken });
+
 function isTaken(value: string): boolean {
   if (!anySelectable.value) return false;
   return value !== props.modelValue && Boolean(holderOf(value));
+}
+
+/**
+ * The uniqueness rule lives HERE, not only in the `disabled` attribute.
+ *
+ * A DOM attribute is presentation: swap it for `aria-disabled` (so the swatch stays
+ * focusable and its tooltip renders) or for `pointer-events-none`, and duplicate
+ * assignment silently comes back. Worse, the test that was supposed to catch that
+ * could not: @vue/test-utils no-ops `trigger()` on a disabled BUTTON
+ * (`vue-test-utils.cjs.js:7215`), so the assertion was satisfied by the library rather
+ * than by this component.
+ */
+function select(value: string): void {
+  if (isTaken(value)) return;
+  emit('update:modelValue', value);
 }
 
 function titleFor(value: string): string {
@@ -81,7 +105,7 @@ function titleFor(value: string): string {
         :aria-disabled="isTaken(color.value)"
         :title="titleFor(color.value)"
         :aria-label="titleFor(color.value) || undefined"
-        @click="emit('update:modelValue', color.value)"
+        @click="select(color.value)"
       />
       <!--
         The holder's own face on the swatch, so "taken" needs no sentence to explain
@@ -95,7 +119,7 @@ function titleFor(value: string): string {
         swatch behind it.
       -->
       <span
-        v-if="isTaken(color.value) && holderOf(color.value)"
+        v-if="holderOf(color.value) && color.value !== modelValue"
         class="pointer-events-none absolute -right-1 -bottom-1 rounded-full ring-2 ring-white dark:ring-slate-800"
       >
         <BeanieAvatar

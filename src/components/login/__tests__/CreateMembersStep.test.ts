@@ -110,7 +110,9 @@ describe('CreateMembersStep', () => {
     mockCreateMember.mockResolvedValueOnce({
       id: 'm-2',
       name: 'Kiddo',
-      color: '#ef4444',
+      // A colour `nextFreeMemberColor` can actually return — #ef4444 is retired and is
+      // only ever seen on beans that already held it, never handed to a new one.
+      color: '#14b8a6',
       ageGroup: 'adult',
     });
     const wrapper = mount(CreateMembersStep);
