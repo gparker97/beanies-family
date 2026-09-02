@@ -88,13 +88,54 @@ export function useWallLock() {
     relockTimer = setTimeout(() => lock('timeout'), RELOCK_AFTER_MS);
   }
 
-  function requestUnlock() {
-    if (!canUnlock.value) return;
+  /**
+   * Open the challenge for a specific INTENT, and gate it on that intent's own predicate.
+   *
+   * The two capabilities have different predicates (see the header) and this used to gate
+   * both on `canUnlock` while `WallLockMenu` decided whether to ask using
+   * `canVerifyIdentity`. When the two disagreed — a child with a PIN, both parents legacy
+   * password-only — `WallSetupCard` let the child start the wall, `canVerifyIdentity` said
+   * "ask them to prove it", and this returned without ever opening the challenge. Leave
+   * became a permanent no-op on a `noChrome` route with no sidebar, header or nav, that a
+   * reload returns you to: no way out short of clearing site data (#80 review).
+   */
+  function requestUnlock(intent: 'unlock' | 'leave' = 'unlock') {
+    const permitted = intent === 'leave' ? canVerifyIdentity.value : canUnlock.value;
+    if (!permitted) {
+      // Not silently. A refused request means the caller's predicate and this one
+      // disagree, which is the defect above rather than an ordinary user action.
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'wall_challenge_refused',
+        context: { action: 'unlock', kind: intent },
+      });
+      return false;
+    }
     challengeOpen.value = true;
+    return true;
   }
 
-  function onVerified(by?: FamilyMember | null) {
+  /**
+   * A challenge succeeded. `intent` decides what it BUYS.
+   *
+   * Proving identity in order to leave must not also unlock editing. This used to set
+   * `isLocked = false` unconditionally with no knowledge of the intent, so on the leave
+   * path — whose candidate list is the session member alone, not `unlockCandidates` — a
+   * child's own PIN unlocked the wall for editing, which the `ageGroup === 'adult'` filter
+   * exists precisely to prevent, and the wall is still mounted to exercise it (#80 review).
+   */
+  function onVerified(by?: FamilyMember | null, intent: 'unlock' | 'leave' = 'unlock') {
     challengeOpen.value = false;
+    if (intent === 'leave') {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'wall_identity_verified',
+        context: { action: 'unlock', kind: 'leave', member_id_tail: member.value?.id.slice(-8) },
+      });
+      return;
+    }
     isLocked.value = false;
     unlockedBy.value = by ?? member.value;
     noteActivity();

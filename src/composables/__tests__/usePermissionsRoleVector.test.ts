@@ -51,6 +51,29 @@ describe('usePermissions — the forged-role vector', () => {
     expect(usePermissions().isOwner.value).toBe(true);
   });
 
+  /**
+   * The steady-state escalation (#80 review). App.vue's path 3 renders an EMPTY doc as a
+   * persistent recoverable state — cache unavailable, or Drive permission lost — and
+   * `resolveSessionMember` deliberately refuses to sign the user out of it. Keyed on
+   * `members.length` alone, the signup fallback above stopped being a pre-load window and
+   * became an indefinite grant: forge `role: 'owner'` in a bare legacy session, revoke
+   * Drive permission, and pod management unlocks for the whole session.
+   *
+   * `rosterResolved` is what separates "not loaded yet" from "loaded, and empty".
+   */
+  it('does NOT confer owner from the session role once a load has completed, even on an empty roster', () => {
+    const familyStore = useFamilyStore();
+    const authStore = useAuthStore();
+    familyStore.members = [];
+    familyStore.rosterResolved = true; // a load ran; the doc really is empty
+    familyStore.currentMemberId = null;
+    authStore.currentUser = { memberId: 'ghost', email: 'x@y.z', role: 'owner' };
+
+    expect(usePermissions().isOwner.value).toBe(false);
+    expect(usePermissions().canManagePod.value).toBe(false);
+    expect(usePermissions().canViewFinances.value).toBe(false);
+  });
+
   it('reads owner from the loaded doc, not the session', () => {
     const familyStore = useFamilyStore();
     const authStore = useAuthStore();

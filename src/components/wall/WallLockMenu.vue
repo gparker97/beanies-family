@@ -29,9 +29,12 @@ const props = defineProps<{
   member: FamilyMember | null;
 }>();
 const emit = defineEmits<{
-  requestUnlock: [];
+  // The INTENT travels with both events. The host gates on a different predicate per
+  // intent, and grants a different capability per intent — neither of which it can infer
+  // from lock state (#80 review).
+  requestUnlock: ['unlock' | 'leave'];
   relock: [];
-  verified: [FamilyMember | null];
+  verified: [FamilyMember | null, 'unlock' | 'leave'];
   cancelled: [];
   nightNow: [];
   leave: [];
@@ -66,7 +69,7 @@ function choose(action: 'unlock' | 'relock' | 'night' | 'leave') {
   open.value = false;
   if (action === 'unlock') {
     pendingAction.value = 'unlock';
-    emit('requestUnlock');
+    emit('requestUnlock', 'unlock');
   }
   // Locking again needs no challenge — giving up a capability never does, and
   // an adult who unlocked to add one item should not have to wait out the
@@ -82,9 +85,19 @@ function choose(action: 'unlock' | 'relock' | 'night' | 'leave') {
     // only exit behind an unsatisfiable prompt would strand them in it. Note
     // this is `canVerifyIdentity`, not `canUnlock` — another adult having a PIN
     // does not help you prove that you are you.
-    if (props.isLocked && props.canVerifyIdentity) {
+    //
+    // Deliberately NOT conditioned on `isLocked`. Unlocking edits is a FAMILY
+    // capability any grown-up's PIN opens; leaving is an IDENTITY one that
+    // resumes the session member's privileges. Tying the challenge to the lock
+    // meant that once either parent unlocked to add a job, anyone at the wall
+    // — including the children it exists to gate — could tap Leave and land in
+    // the full app as the signed-in member, with transfer-ownership,
+    // remove-member and clear-all-data reachable. The 2-minute relock never
+    // intervened either, because every tick the children are allowed to make
+    // re-arms it (#80 review).
+    if (props.canVerifyIdentity) {
       pendingAction.value = 'leave';
-      emit('requestUnlock');
+      emit('requestUnlock', 'leave');
     } else {
       emit('leave');
     }
@@ -94,7 +107,7 @@ function choose(action: 'unlock' | 'relock' | 'night' | 'leave') {
 function onVerified(by?: FamilyMember) {
   const action = pendingAction.value;
   pendingAction.value = 'unlock';
-  emit('verified', by ?? null);
+  emit('verified', by ?? null, action);
   if (action === 'leave') emit('leave');
 }
 

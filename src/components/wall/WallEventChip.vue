@@ -7,19 +7,16 @@
  * and the parent has already computed it to lay the chip out. Deriving here
  * would classify per chip per render and could disagree with its own parent.
  */
-import { computed } from 'vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import type { ActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
 
-const props = defineProps<{
+defineProps<{
   activity: FamilyActivity;
   identity: ActivityIdentity;
   time: string;
 }>();
 defineEmits<{ open: [] }>();
-
-const isAllDay = computed(() => !props.activity.startTime);
 </script>
 
 <template>
@@ -42,7 +39,11 @@ const isAllDay = computed(() => !props.activity.startTime);
         -->
         <span aria-hidden="true">{{ identity.emoji }}</span>
         {{ time }}
-        <span v-if="isAllDay" class="sr-only">{{ activity.title }}</span>
+        <!--
+          No `sr-only` title here. One used to sit on the all-day branch, but the title
+          is rendered as visible text immediately below, so a screen reader announced it
+          twice on every all-day chip.
+        -->
       </span>
       <span
         class="font-outfit text-secondary-500 wall-chip-title block truncate leading-tight font-semibold dark:text-gray-100"

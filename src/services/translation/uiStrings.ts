@@ -4399,6 +4399,10 @@ const STRING_DEFS = {
     beanie: "this bean hasn't set a pin yet.",
   },
   'pin.incorrect': { en: "That PIN isn't right.", beanie: "that pin isn't right." },
+  'pin.tooManyAttempts': {
+    en: 'Too many tries. Wait {seconds}s and have another go.',
+    beanie: 'too many tries. wait {seconds}s and have another go.',
+  },
   'pin.attemptsLeft': {
     en: "That PIN isn't right — {count} attempts left before PIN unlock is turned off on this device.",
     beanie: "that pin isn't right — {count} tries left before pin unlock turns off on this device.",
@@ -5628,6 +5632,10 @@ const STRING_DEFS = {
   'wall.unlock.failed': {
     en: "That didn't work — try again",
     beanie: "that didn't work — try again",
+  },
+  'wall.leave.busy': {
+    en: 'Still saving. Give it a moment, then try leaving again.',
+    beanie: 'still saving. give it a moment, then try leaving again.',
   },
   'wall.cheer.1': { en: 'Nice one!', beanie: 'nice one!' },
   'wall.cheer.2': { en: 'Boom 💥', beanie: 'boom 💥' },

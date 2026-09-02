@@ -478,7 +478,10 @@ let lastCommittedWrite = 0;
  * store actions and cannot `await` it; a rejecting promise would surface as an unhandled
  * rejection, and `no-floating-promises` is not enabled to catch it.
  */
-async function persistSession(user: AuthUser): Promise<void> {
+async function persistSession(
+  user: AuthUser,
+  opts: { keepStoredOnFailure?: boolean } = {}
+): Promise<void> {
   const generation = sessionGeneration;
   const ticket = ++sessionWriteSeq;
   try {
@@ -493,12 +496,20 @@ async function persistSession(user: AuthUser): Promise<void> {
         message: 'session_seal_unavailable',
         context: { action: 'session_rejected', kind: 'unavailable' },
       });
-      // Drop the stored session rather than leaving it. Every caller writes to CHANGE the
+      // Drop the stored session rather than leaving it. MOST callers write to CHANGE the
       // session, and one of them (`updateCurrentUserRole`) writes to DOWNGRADE a role. The
       // previous envelope is sealed with the same still-valid device key, so returning
       // early leaves it authoritative and the next boot restores the ex-owner AS owner.
       // Signing out is the safe failure; silently keeping the higher privilege is not.
-      dropStoredSession();
+      //
+      // `keepStoredOnFailure` is the one exception, and it inverts the reasoning rather
+      // than waiving it: `confirmSessionMember` re-seals a payload that is ALREADY the
+      // stored one, so there is no stale higher privilege to strand. `open()` serves a
+      // bare legacy session without ever needing the device key, so boot can succeed
+      // while the registry IndexedDB is momentarily unavailable — and dropping here
+      // signed a returning user out on the next reload for a write that changed nothing
+      // (#80 review). The caller cannot catch it either; persistSession is `void`-ed.
+      if (!opts.keepStoredOnFailure) dropStoredSession();
       return;
     }
     // The session was cleared while we were sealing — do not resurrect it.
@@ -508,9 +519,10 @@ async function persistSession(user: AuthUser): Promise<void> {
     lastCommittedWrite = ticket;
     localStorage.setItem(SESSION_KEY, sealed);
   } catch (e) {
-    // Same reasoning as the unavailable branch: a write that did not land must not leave
-    // the previous, higher-privilege envelope behind.
-    dropStoredSession();
+    // Same reasoning as the unavailable branch, including its one exception: a write that
+    // did not land must not leave the previous, higher-privilege envelope behind — unless
+    // this write was an optional re-seal of that very envelope.
+    if (!opts.keepStoredOnFailure) dropStoredSession();
     logEvent({
       level: 'warn',
       surface: 'session-integrity',
@@ -2164,12 +2176,40 @@ export const useAuthStore = defineStore('auth', () => {
    * worth sealing (#3): its contents have been checked against the pod, so sealing it
    * commits a fact rather than laundering an unverified claim into a permanent one.
    *
+   * `vouched` carries what the POD says about that member, and those values — not the
+   * stored blob's — are what get sealed. A bare legacy session is an unauthenticated
+   * shape in every field, and `resolveSessionMember` only ever checked `memberId`, so
+   * re-sealing the blob verbatim signed a hand-edited `role`/`email`/`familyId` with the
+   * real device key and made it valid forever, including past `LEGACY_SESSION_SUNSET`
+   * (#80 review). `familyId` is left as-is deliberately: the roster row does not carry
+   * one, and `classifyRosterRejection` reads it, so overwriting it here would erase the
+   * signal that tells a switched pod from a forged member.
+   *
    * Idempotent — the flag is cleared before the write, so a second roster load is a no-op.
    */
-  function confirmSessionMember(): void {
+  function confirmSessionMember(vouched: {
+    memberId: string;
+    email: string;
+    role?: string;
+    displayName?: string;
+  }): void {
     if (!sessionIsLegacy.value || !currentUser.value) return;
+    // Defensive: only the member the roster actually vouched for may be sealed.
+    if (vouched.memberId !== currentUser.value.memberId) return;
     sessionIsLegacy.value = false;
-    void persistSession(currentUser.value);
+    const confirmed: AuthUser = {
+      ...currentUser.value,
+      memberId: vouched.memberId,
+      email: vouched.email,
+      role: vouched.role,
+      displayName: vouched.displayName,
+    };
+    currentUser.value = confirmed;
+    // `keepStoredOnFailure`: this is an OPTIONAL upgrade of a payload already in storage,
+    // not a change to it. persistSession's usual drop-on-failure exists to stop a stale
+    // higher-privilege envelope outliving a downgrade; here the stored envelope IS this
+    // payload, so a transient missing device key must not sign the user out (#80 review).
+    void persistSession(confirmed, { keepStoredOnFailure: true });
     logEvent({
       level: 'info',
       surface: 'session-integrity',
@@ -2189,10 +2229,26 @@ export const useAuthStore = defineStore('auth', () => {
    *
    * Best-effort and never throws: failing to clear a key must not block the rejection.
    */
-  async function revokeUnattendedReopen(): Promise<void> {
+  async function revokeUnattendedReopen(hintFamilyId?: string): Promise<void> {
     try {
       const { useFamilyContextStore } = await import('@/stores/familyContextStore');
-      const familyId = useFamilyContextStore().activeFamilyId ?? undefined;
+      // `hintFamilyId` is captured from the session BEFORE it is torn down. Without it
+      // this ran after `finalizeSession()` had already nulled `currentUser`, and at boot
+      // `activeFamilyId` is null too — so `clearCachedFamilyKey(undefined)` took its
+      // clear-ALL branch and wiped trusted auto-open for every unrelated family on the
+      // device (#80 review). Narrow to the rejected session's own pod where we can.
+      const familyId = hintFamilyId ?? useFamilyContextStore().activeFamilyId ?? undefined;
+      if (!familyId) {
+        // Still unidentifiable. Clearing everything is the fail-closed choice — an
+        // over-broad revoke costs a re-prove, an under-broad one leaves the rejected
+        // pod re-openable unattended — but it is collateral, so it is counted.
+        logEvent({
+          level: 'warn',
+          surface: 'session-integrity',
+          message: 'unattended_reopen_revoked_for_all_families',
+          context: { action: 'session_rejected', kind: 'revoke-unscoped' },
+        });
+      }
       await useSettingsStore().clearCachedFamilyKey(familyId);
     } catch (e) {
       reportError({
@@ -2211,6 +2267,9 @@ export const useAuthStore = defineStore('auth', () => {
     // takes the legitimate "no session member" branch, and hands out the owner's row —
     // restoring the exact escalation this rejection exists to stop, one sync tick later.
     sessionRejected.value = true;
+    // Capture before `finalizeSession()` nulls it — the revoke below needs to know WHICH
+    // pod is being invalidated, and afterwards nothing does.
+    const rejectedFamilyId = currentUser.value?.familyId;
     if (!INTEGRITY_REJECTIONS.has(kind)) {
       logEvent({
         level: 'warn',
@@ -2227,7 +2286,7 @@ export const useAuthStore = defineStore('auth', () => {
       });
     }
     finalizeSession();
-    void revokeUnattendedReopen();
+    void revokeUnattendedReopen(rejectedFamilyId);
   }
 
   function finalizeSession(): void {

@@ -33,15 +33,22 @@ interface Props {
   isEnd: boolean;
   /** data-testid for the root button — adapters override it (e.g. 'holiday-chip'). */
   testid?: string;
-  /** Tier 3: a genuine celebration. Draws the gradient border and corner sticker. */
+  /**
+   * Tier 3: a genuine celebration. Draws the gradient border — and ONLY that.
+   *
+   * No corner sticker here, for the reason `MonthChip` already records: this chip is
+   * `truncate` (overflow-hidden) so the title can ellipsis, while `.is-celebration::after`
+   * overhangs the corner at `right: -6px; top: -9px`, so it was clipped away entirely.
+   * There is deliberately no `sticker` prop either: one existed, `AllDayActivityChip`
+   * passed it, and it could never render — an accepted-and-discarded prop is the shape of
+   * a defect, not a feature. The gradient border and the leading emoji carry the
+   * celebration at this size.
+   */
   celebrating?: boolean;
-  /** The corner sticker glyph, when celebrating. */
-  sticker?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   testid: 'all-day-chip',
   celebrating: false,
-  sticker: '',
 });
 // Pass the native MouseEvent through so consumers can apply `.stop` etc. on the listener.
 defineEmits<{ click: [event: MouseEvent] }>();
@@ -69,7 +76,6 @@ const safeBg = computed(() => props.bgColor || 'rgb(100 116 139 / 8%)');
       italic,
       'is-celebration': celebrating,
     }"
-    :data-sticker="celebrating && isEnd ? sticker : ''"
     :style="
       celebrating
         ? { color: safeColor }

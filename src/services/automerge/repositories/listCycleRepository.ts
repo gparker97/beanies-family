@@ -56,8 +56,14 @@ export async function archiveCycleAndReset(
       // would abort the whole batch — on a background midnight or PWA-resume wake, and
       // with two error toasts (the worker's own plus the store's catch). The path this
       // replaced went through `repo.update`, which tolerated exactly this race silently.
-      // Skipping is correct: no live list means there is nothing to reset, and the atomic
-      // batch means the cycle is not archived either.
+      //
+      // ⚠️ `skip` MAKES THIS BATCH NON-ATOMIC, and the caller must clean up after it.
+      // Skipping only no-ops THIS op: the `listCycles` set above still commits, so the
+      // race leaves a cycle archived against a list that no longer exists. Nothing else
+      // reaps it either — `deleteListWithCycles` has already run on the other device, and
+      // `expiredCycleIds` prunes by age alone — so the orphan survives its full 90 days
+      // and renders on the history shelf under a deleted list. `reconcileRecurringLists`
+      // detects the skip (its verify read returns `undefined`) and deletes the cycle.
       onMissing: 'skip',
     },
   ];

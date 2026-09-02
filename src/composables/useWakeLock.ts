@@ -29,6 +29,43 @@ export function useWakeLock(surface: string) {
   let sentinel: WakeLockLike | null = null;
   let releasedAt = 0;
 
+  // Declared here rather than beside the watch below: the release handler and the backoff
+  // both read it, and both are defined above that point.
+  const { isVisible } = useToday();
+
+  /**
+   * Backoff for an unprompted re-acquire.
+   *
+   * The platform drops the lock for reasons it does not tell us, and some of them (low
+   * battery, an OS power-save mode) will refuse every retry. Retrying flat-out would spin
+   * a request loop on the one device that is least able to afford it, so the delay doubles
+   * to a ceiling and only a SUCCESS resets it.
+   */
+  const REACQUIRE_BASE_MS = 2_000;
+  const REACQUIRE_MAX_MS = 60_000;
+  let reacquireDelay = REACQUIRE_BASE_MS;
+  let reacquireTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function scheduleReacquire(): void {
+    if (reacquireTimer) return;
+    reacquireTimer = setTimeout(() => {
+      reacquireTimer = undefined;
+      // Conditions may have changed while we waited — a hidden document is the browser's
+      // to re-arm, not ours.
+      if (!isVisible.value || active.value) return;
+      reacquireDelay = Math.min(reacquireDelay * 2, REACQUIRE_MAX_MS);
+      void acquire().then(() => {
+        if (!active.value && isVisible.value) scheduleReacquire();
+      });
+    }, reacquireDelay);
+  }
+
+  function cancelReacquire(): void {
+    if (reacquireTimer) clearTimeout(reacquireTimer);
+    reacquireTimer = undefined;
+    reacquireDelay = REACQUIRE_BASE_MS;
+  }
+
   async function acquire(): Promise<void> {
     if (!supported || active.value) return;
     try {
@@ -51,16 +88,28 @@ export function useWakeLock(surface: string) {
         if (sentinel !== granted) return;
         active.value = false;
         releasedAt = Date.now();
+        sentinel = null;
         logEvent({
           level: 'info',
           surface,
           message: 'wall_wakelock_released',
           context: { action: 'wakelock_released', kind: 'browser' },
         });
+        // Re-acquire if the document is STILL VISIBLE. Re-acquisition used to be driven
+        // solely by `isVisible` transitions, which never fire on a wall-mounted tablet
+        // whose document never hides — so when the platform dropped the lock for its own
+        // reasons (Android power-save, low battery, a WebView reattach) nothing took it
+        // back and the kitchen wall slept permanently, with a lone `wall_wakelock_released`
+        // and no matching reacquire in telemetry (#78 review). A hidden document is the
+        // ordinary case and is left to the watch below.
+        if (isVisible.value) scheduleReacquire();
       });
       sentinel = granted;
       active.value = !granted.released;
       lastError.value = null;
+      // Only a real re-acquisition resets the backoff. A request that resolved against an
+      // already-released sentinel is not one, and must keep the delay growing.
+      if (active.value) cancelReacquire();
       if (releasedAt) {
         logEvent({
           level: 'info',
@@ -96,15 +145,18 @@ export function useWakeLock(surface: string) {
     }
   }
 
-  const { isVisible } = useToday();
-
   watch(
     isVisible,
     (visible) => {
       if (visible) {
+        // A fresh visible transition is a new chance, not a continuation of the old
+        // backoff — reset before asking.
+        cancelReacquire();
         void acquire();
       } else if (active.value) {
-        // The browser drops it for us; record so re-acquire can be reported.
+        // The browser drops it for us; record so re-acquire can be reported. Any pending
+        // retry is pointless while hidden — the watch re-arms on the way back.
+        cancelReacquire();
         releasedAt = Date.now();
         active.value = false;
         sentinel = null;
@@ -114,6 +166,7 @@ export function useWakeLock(surface: string) {
   );
 
   onScopeDispose(() => {
+    cancelReacquire();
     void release();
   });
 

@@ -11,7 +11,7 @@
  * wall off leaves nothing behind.
  */
 import { computed, onScopeDispose, provide, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { isNavigationFailure, useRouter } from 'vue-router';
 import WallFooter from '@/components/wall/WallFooter.vue';
 import WallLockMenu from '@/components/wall/WallLockMenu.vue';
 import WallNightScreen from '@/components/wall/WallNightScreen.vue';
@@ -34,6 +34,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getWallReturnPath } from '@/router';
+import { useToast } from '@/composables/useToast';
 import { addDaysYmd } from '@/utils/date';
 import type { WallJob, WallSheetTarget, WallViewId } from '@/types/wall';
 
@@ -44,6 +45,7 @@ const WALL_CELEBRATION_MS = 6000;
 const router = useRouter();
 const { today } = useToday();
 const { t } = useTranslation();
+const { showToast } = useToast();
 const activityStore = useActivityStore();
 
 const activeView = ref<WallViewId>(DEFAULT_WALL_VIEW);
@@ -150,11 +152,26 @@ async function leaveWall() {
   isExiting.value = true;
   orientation.restore();
   try {
-    await router.push(getWallReturnPath());
+    const failure = await router.push(getWallReturnPath());
+    // `push` RESOLVES with a NavigationFailure — it does not throw one. The catch below
+    // only ever sees an error thrown inside a guard, so an ABORTED navigation left
+    // `isExiting` true forever: the router's own `beforeEach` returns false while a
+    // critical write is in flight, and the "leaving the wall" screen is `absolute inset-0
+    // z-[70]` with no dismiss control, over an `overflow-hidden h-[100dvh]` root. Tapping
+    // Leave mid-save covered the wall permanently (#80 review).
+    if (isNavigationFailure(failure)) {
+      isExiting.value = false;
+      showToast('info', t('wall.leave.busy'));
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'wall_leave_blocked',
+        context: { action: 'leave', kind: 'navigation_failed' },
+      });
+    }
   } catch {
-    // A redirect or a guard rewrote the navigation; the wall is going away
-    // either way, so there is nothing to recover — just don't strand the
-    // "leaving" screen if we somehow stay.
+    // A guard threw. The wall is going away either way, so there is nothing to
+    // recover — just don't strand the "leaving" screen if we somehow stay.
     isExiting.value = false;
   }
 }

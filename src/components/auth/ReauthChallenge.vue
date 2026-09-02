@@ -26,6 +26,8 @@ import {
 import PinInput from '@/components/ui/PinInput.vue';
 import { isNative } from '@/services/sync/capabilities';
 import { verifyPassword } from '@/services/auth/passwordService';
+import { usePinAttemptLimit, PIN_COOLDOWN_MS } from '@/composables/usePinAttemptLimit';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
 import { reportError } from '@/utils/errorReporter';
@@ -79,17 +81,46 @@ const pinValue = ref('');
 const pinError = ref<string | null>(null);
 const showPinEntry = ref(false);
 
+/**
+ * Brute-force limit on the step-up PIN.
+ *
+ * `useReauth` calls this challenge "the actual security boundary of #80" — it is the one
+ * control between a forged or borrowed session and transfer-ownership, remove-member,
+ * reset-another-member's-PIN and clear-all-data. It nonetheless verified a six-digit PIN
+ * with no attempt counter, no cooldown and no failure telemetry, while `deviceUnlock` and
+ * the far less critical wall pad both enforced one (#80 review).
+ *
+ * Scoped PER MEMBER so the budget cannot be reset by closing the challenge, switching
+ * target and coming back; module-scoped so unmounting cannot reset it either.
+ */
+const pinLimit = usePinAttemptLimit(
+  computed(() => `reauth:${props.member.id}`),
+  'reauth-challenge',
+  'reauth'
+);
+
 async function handlePinComplete(pin: string) {
   if (!props.member.pinHash) return;
+  if (pinLimit.inCooldown.value) {
+    pinValue.value = '';
+    pinError.value = fillTemplate(t('pin.tooManyAttempts'), {
+      seconds: pinLimit.cooldownSeconds.value,
+    });
+    return;
+  }
   isVerifying.value = true;
   pinError.value = null;
   try {
     const ok = await verifyPassword(pin, props.member.pinHash);
     if (ok) {
+      pinLimit.recordSuccess();
       emit('verified');
     } else {
       pinValue.value = '';
-      pinError.value = t('pin.incorrect');
+      // `recordFailure` counts, persists and emits the telemetry; this only picks wording.
+      pinError.value = pinLimit.recordFailure()
+        ? fillTemplate(t('pin.tooManyAttempts'), { seconds: PIN_COOLDOWN_MS / 1000 })
+        : t('pin.incorrect');
     }
   } catch (e) {
     pinError.value = t('transferOwnership.reauthPasskeyFailed');
@@ -310,13 +341,18 @@ function cancel() {
         <PinInput
           v-model="pinValue"
           :has-error="!!pinError"
-          :disabled="isVerifying"
+          :disabled="isVerifying || pinLimit.inCooldown.value"
           autofocus
           :label="t('pin.enterPin')"
           @complete="handlePinComplete"
         />
-        <p v-if="pinError" class="text-center text-sm text-red-600 dark:text-red-400">
-          {{ pinError }}
+        <p v-if="pinError" class="text-center text-sm text-red-600 dark:text-red-400" role="alert">
+          <!-- Live-counting while the cooldown runs, so the wait is visibly finite. -->
+          {{
+            pinLimit.inCooldown.value
+              ? fillTemplate(t('pin.tooManyAttempts'), { seconds: pinLimit.cooldownSeconds.value })
+              : pinError
+          }}
         </p>
       </div>
       <BaseButton

@@ -705,11 +705,31 @@ export const useListStore = defineStore('lists', () => {
           // return value. Verify against the projection instead — otherwise a write that
           // resolves while changing nothing would be recorded as an archive.
           const after = await listRepo.getListById(list.id);
-          if (after?.lastResetDate !== nextResetDate) {
+          if (!after) {
+            // The list was deleted on another device and the merge landed mid-loop. The
+            // reset op carries `onMissing: 'skip'`, so it no-opped while the cycle `set`
+            // COMMITTED — the batch is not atomic in this one case. Reap the orphan here:
+            // nothing else will, since the other device's `deleteListWithCycles` has
+            // already been and gone and `expiredCycleIds` prunes only by age, so it would
+            // otherwise sit on the history shelf under a deleted list for 90 days.
+            //
+            // This is an ordinary race, not a failure: no toast, no reportError. It used
+            // to fall into the catch below and tell the user the archive had failed and
+            // that state was consistent, neither of which was true.
+            await cycleRepo.deleteCycles([snapshot.id]);
+            logEvent({
+              level: 'info',
+              surface: 'recurrence',
+              message: 'cycle-archive-skipped-list-deleted',
+              context: { recur_surface: 'list', recur_outcome: 'list-deleted' },
+            });
+            continue;
+          }
+          if (after.lastResetDate !== nextResetDate) {
             throw new Error('archive+reset verify failed: lastResetDate did not advance');
           }
           cycles.value = [...cycles.value, snapshot];
-          if (after) lists.value = lists.value.map((l) => (l.id === after.id ? after : l));
+          lists.value = lists.value.map((l) => (l.id === after.id ? after : l));
           logEvent({
             level: 'info',
             surface: 'recurrence',
@@ -727,7 +747,7 @@ export const useListStore = defineStore('lists', () => {
           reportError({
             surface: 'listStore.reconcileRecurringLists',
             message:
-              'archive+reset batch failed — the cycle was NOT archived and the list was NOT reset (the batch is atomic, so state is consistent); it retries on the next app load or day advance',
+              'archive+reset batch failed — the list did not reset; it retries on the next app load or day advance. State may be SPLIT: the cycle `set` and the list `patch` are separate ops, so the cycle can be present without the reset having landed',
             error: e,
             severity: 'error',
             context: { recur_surface: 'list', recur_outcome: 'write-failed' },
