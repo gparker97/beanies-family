@@ -19,6 +19,7 @@
  */
 import type { FamilyActivity } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { BeanieIconName } from '@/constants/icons';
 
 export interface ActivityDetailRow {
   /** Label key — callers translate, so this stays pure and testable. */
@@ -26,6 +27,12 @@ export interface ActivityDetailRow {
   value: string;
   /** Set when the row names a person, so a renderer can show their avatar. */
   memberId?: string;
+  /**
+   * Registry icon for the row, so every renderer shows the SAME glyph for the same
+   * row rather than each picking its own. Typed against the registry, so a name that
+   * does not exist is a compile error rather than a placeholder circle in production.
+   */
+  icon: BeanieIconName;
 }
 
 export interface ActivityDetailInput {
@@ -54,6 +61,7 @@ export function activityDetailRows({
       labelKey: 'planner.field.dropoff',
       value: dropoff,
       memberId: activity.dropoffMemberId,
+      icon: 'car',
     });
   }
 
@@ -63,14 +71,23 @@ export function activityDetailRows({
       labelKey: 'planner.field.pickup',
       value: pickup,
       memberId: activity.pickupMemberId,
+      icon: 'car',
     });
   }
 
   if (activity.instructorName) {
-    rows.push({ labelKey: 'planner.field.instructor', value: activity.instructorName });
+    rows.push({
+      labelKey: 'planner.field.instructor',
+      value: activity.instructorName,
+      icon: 'user',
+    });
   }
   if (activity.instructorContact) {
-    rows.push({ labelKey: 'planner.field.instructorContact', value: activity.instructorContact });
+    rows.push({
+      labelKey: 'planner.field.instructorContact',
+      value: activity.instructorContact,
+      icon: 'link',
+    });
   }
 
   return rows;
