@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 /**
  * Compact member-filter dropdown for the calendar command bar on mobile.
  *
@@ -41,6 +43,8 @@ function selectAll() {
 function selectMember(id: string) {
   emit('select-member', id);
 }
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -104,12 +108,7 @@ function selectMember(id: string) {
           "
           @click="selectMember(member.id)"
         >
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white"
-            :style="{ backgroundColor: member.color }"
-          >
-            {{ member.name.charAt(0).toUpperCase() }}
-          </span>
+          <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="xs" />
           {{ member.name }}
         </button>
       </div>
