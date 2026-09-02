@@ -127,7 +127,15 @@ const endTime = ref('');
  * cadence is the desync class docs/lessons.md warns about. The legacy shadow is
  * derived once, at the payload boundary, in `buildPayload`.
  */
-const mode = ref<'one-off' | 'recurring'>('recurring');
+/**
+ * ONE-OFF is the default. Recurring is an explicit choice the user makes.
+ *
+ * It defaulted to `recurring`, which meant every activity created without touching the
+ * control became a repeating series — the more consequential of the two, and the harder
+ * to undo once occurrences exist. Defaults should fall on the side that is cheap to
+ * change, and "make this repeat" is one tap away.
+ */
+const mode = ref<'one-off' | 'recurring'>('one-off');
 const rule = ref<RecurrenceRule | null>(null);
 const isRecurring = computed(() => mode.value === 'recurring');
 const category = ref<ActivityCategory>('' as ActivityCategory);
@@ -344,7 +352,8 @@ const { isEditing, isSubmitting } = useFormModal(
       isAllDay.value = false;
       startTime.value = props.defaultStartTime ?? '09:00';
       endTime.value = addHourToTime(startTime.value);
-      mode.value = 'recurring';
+      // Matches the initial value above: a fresh form is a one-off until asked otherwise.
+      mode.value = 'one-off';
       rule.value = null;
       seriesAnchorReady.value = false;
       seriesAnchor.value = date.value;
