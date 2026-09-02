@@ -844,21 +844,76 @@
  * decorative is saved for here, so a birthday actually looks like one.
  */
 .is-celebration {
-  background:
-    linear-gradient(var(--celebration-surface, #fff), var(--celebration-surface, #fff)) padding-box,
-    linear-gradient(115deg, #f15d22, #e67e22 60%, #aed6f1) border-box !important;
-  border: 2px solid transparent;
-  border-left-color: transparent !important;
-  box-shadow: 0 3px 14px rgb(241 93 34 / 16%);
+  /*
+   * NO gradient border, deliberately — and this is the second cut of this tier.
+   *
+   * The first used a Heritage-Orange gradient edge, which collided with three meanings the
+   * edge already carries: `border-primary-500` is TODAY (MonthDayCard), `ring-primary-500`
+   * is SELECTED, and a Heritage-Orange wash is overdue / due-today (TodoItemRow). Orange is
+   * the CIG's alert colour precisely because red is reserved for destructive actions, so a
+   * fourth meaning on the same channel reads as "this needs attention", not "this is a
+   * party".
+   *
+   * Worse, it set `border-left-color: transparent !important` — the left edge is where the
+   * OWNER'S colour lives, so the celebration style erased the one thing the identity change
+   * exists to say. A birthday was the single card that could not tell you whose it was.
+   *
+   * Every colour in this palette is already spoken for, so recolouring the border only moves
+   * the collision. SHAPE is unclaimed: nothing else in the app has a non-rectangular edge.
+   * Tier 3 is therefore bunting (below) plus confetti on wide surfaces, and the card keeps
+   * the ordinary owner-coloured edge every other card has.
+   *
+   * Deliberately NOT `overflow: hidden`: the sticker below sits outside the box at
+   * `right: -6px; top: -9px`, so clipping here would erase it. The confetti layer clips
+   * ITSELF instead (see `CelebrationConfetti.vue`).
+   */
   position: relative;
 }
 
-.dark .is-celebration {
-  --celebration-surface: #1e293b;
+/*
+ * Bunting — semicircles bitten out of the top edge, a party banner in silhouette.
+ *
+ * The UNIVERSAL tier-3 marker: it costs one pseudo-element and no vertical space beyond its
+ * own height, so unlike confetti it works on a month chip as well as a wall card. That is
+ * what lets dense surfaces still say "celebration" now that the border is gone.
+ *
+ * `--celebration-behind` is the colour BEHIND the card, because the scallops are punched in
+ * the surrounding ground, not painted on the card. Surfaces that sit on a tint (the wall's
+ * day columns) must set it or the notches show the wrong colour. It defaults to the page
+ * ground, which is right for every ordinary list and grid.
+ */
+.is-celebration::before {
+  background: radial-gradient(
+      circle var(--celebration-scallop, 4px) at calc(var(--celebration-scallop, 4px) * 1.75) 0,
+      var(--celebration-behind, var(--cloud-white, #f8f9fa)) 0 var(--celebration-scallop, 4px),
+      transparent calc(var(--celebration-scallop, 4px) + 0.5px)
+    )
+    repeat-x;
+  background-size: calc(var(--celebration-scallop, 4px) * 3.5) var(--celebration-scallop, 4px);
+  content: '';
+  height: var(--celebration-scallop, 4px);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 4;
+}
+
+.dark .is-celebration::before {
+  --celebration-behind: #1a252f;
+}
+
+/* Wide surfaces carry a larger scallop so the shape still reads at wall distance. */
+.is-celebration-lg {
+  --celebration-scallop: 5px;
 }
 
 /* The sticker overhangs the corner, which is what makes it read as applied rather
-   than printed. `pointer-events: none` so it never eats a tap on the card. */
+   than printed. `pointer-events: none` so it never eats a tap on the card.
+   NOTE it sits OUTSIDE the card's box, so any surface showing it must not clip —
+   `MonthChip` and `AllDayChip` are `overflow-hidden` for truncation and deliberately
+   pass no `data-sticker`. */
 .is-celebration::after {
   background: var(--celebration-surface, #fff);
   border-radius: 999px;
@@ -871,4 +926,9 @@
   position: absolute;
   right: -6px;
   top: -9px;
+  z-index: 5;
+}
+
+.dark .is-celebration {
+  --celebration-surface: #1e293b;
 }
