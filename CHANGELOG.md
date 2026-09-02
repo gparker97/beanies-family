@@ -21,7 +21,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The step-up prompt now says so plainly when a bean has no PIN or password to prove with, instead of looking like an ordinary cancel.
 - **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red is no longer given to new beans — it is reserved for delete buttons, not for people — though a bean that already has it keeps it.
 - Two beans whose names start with the same letter now show enough letters on their face to tell them apart, so they no longer depend on colour alone.
-- **Colours on the planner now say who, not what.** A card is coloured by the bean it belongs to rather than by the kind of activity, and the activity's own emoji says what it is. An event shared by two beans blends both their colours; one that belongs to nobody stays orange. Every bean's face now appears on the month view too, which it never did on a computer before.
+- **Colours now say who, not what.** Everywhere a card appears — the planner, the wall, to-dos and lists — it is coloured by the bean it belongs to rather than by the kind of activity, and the activity's own emoji says what it is. An event shared by two beans blends both their colours; one that belongs to nobody stays orange. Every bean's face now appears on the month view too, which it never did on a computer before.
+- **Cards show a bean's face instead of their full name**, which leaves room for the thing you actually wanted to read. Where you are _choosing_ a bean rather than reading about one — assigning a to-do, filtering the wall — the name stays.
 
 ### Fixed
 
@@ -34,6 +35,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - A bean with no colour set could show as a blank circle instead of a neutral one.
 - A photo on the beanie wall could be rate-limited by Google and fail to appear; it now loads the same way photos do everywhere else in the app, and the bean's initial stays visible while it loads.
 - An event that named the same person twice (which can happen when two devices sync) drew that person's face twice.
+- **An activity with no location showed its category in the location's place**, spelled out as a word the app uses nowhere else. Location now always means location, and says so plainly when there isn't one; the category has its own spot with its emoji.
+- The wall's activity details now show an icon beside each row, and the bean's face beside whoever is doing the drop-off or pick-up.
 
 ### Security
 
