@@ -9,7 +9,7 @@
  */
 import { computed } from 'vue';
 import type { FamilyActivity } from '@/types/models';
-import { getActivityColor } from '@/stores/activityStore';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import AllDayChip from '@/components/planner/AllDayChip.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 
@@ -20,29 +20,24 @@ interface Props {
   /** Last cell of the run. true for single-day; true on the last day of multi-day. */
   isEnd: boolean;
 }
+const { identityFor } = useActivityIdentity();
+
 const props = defineProps<Props>();
 defineEmits<{ click: [event: MouseEvent] }>();
 
-// Defensive — a corrupted activity (unknown category, missing colour) never
-// produces invalid CSS. Falls back to neutral slate and warns once per render
-// so a real data corruption is diagnosable in production telemetry.
-const NEUTRAL_FALLBACK = 'rgb(100, 116, 139)'; // slate-500
-const color = computed(() => {
-  const c = getActivityColor(props.activity);
-  if (!c) {
-    console.warn(
-      `[AllDayActivityChip] No color resolved for activity ${props.activity.id} ` +
-        `(category="${props.activity.category}"). Falling back to neutral slate.`
-    );
-    return NEUTRAL_FALLBACK;
-  }
-  return c;
-});
-// 8% alpha tinted background — `${color}15` (15 hex = 21 dec ≈ 8%). Category
-// colours are always hex, so this concatenation is safe.
-const bgColor = computed(() =>
-  color.value.startsWith('#') ? `${color.value}15` : 'rgb(100 116 139 / 8%)'
-);
+/**
+ * Colour now says WHOSE, not what category. `getActivityColor` returned the category
+ * hue, and there are 95 categories across 86 colours — the Appointments group alone is
+ * five shades of red — so hue could never distinguish them. It is spent on the small
+ * closed set instead: the beans.
+ *
+ * The old local NEUTRAL_FALLBACK and its per-render `console.warn` are gone. A member
+ * with no usable colour is now resolved centrally by `resolveMemberColor`, and reported
+ * once per roster change from `familyStore` rather than once per paint.
+ */
+const identity = computed(() => identityFor(props.activity));
+const color = computed(() => identity.value.color);
+const bgColor = computed(() => identity.value.style.background ?? 'transparent');
 </script>
 
 <template>
