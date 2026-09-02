@@ -2761,6 +2761,14 @@ const STRING_DEFS = {
   'form.balance': { en: 'Balance', beanie: 'balance' },
   'form.date': { en: 'Date', beanie: 'date' },
   'form.category': { en: 'Category', beanie: 'category' },
+  'family.colorTakenBy': {
+    en: "Already {name}'s colour",
+    beanie: "already {name}'s colour",
+  },
+  'family.colorAllTaken': {
+    en: 'All colours are taken — {name} will share with {other}.',
+    beanie: 'all colours are taken — {name} will share with {other}.',
+  },
   'form.description': { en: 'Description', beanie: 'description' },
   'form.account': { en: 'Account', beanie: 'account' },
   'form.selectAccount': { en: 'Select an account', beanie: 'select an account' },
