@@ -13,6 +13,9 @@ import { useFormModal } from '@/composables/useFormModal';
 import { confirm } from '@/composables/useConfirm';
 import { isTemporaryEmail } from '@/utils/email';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { nextFreeMemberColor, takenColors } from '@/constants/memberColors';
+import { useFamilyStore } from '@/stores/familyStore';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
 import { MEMBER_COLORS } from '@/constants/memberColors';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -24,6 +27,8 @@ import type {
   UpdateFamilyMemberInput,
   UUID,
 } from '@/types/models';
+
+const familyStore = useFamilyStore();
 
 const props = defineProps<{
   open: boolean;
@@ -120,6 +125,16 @@ const avatarVariant = computed(() =>
   getMemberAvatarVariant({ gender: gender.value, ageGroup: ageGroup.value, isPet: isPet.value })
 );
 
+/** Someone else already holds this bean's colour (only possible once all six are taken). */
+const colorSharedWith = ref<string | null>(null);
+
+/**
+ * Colours held by OTHER beans. `props.member?.id` is excluded so a bean created
+ * before uniqueness was enforced — when colours were assigned at random — can still
+ * be opened and saved with the colour it already has.
+ */
+const takenSwatches = computed(() => takenColors(familyStore.members, props.member?.id));
+
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
   () => props.member,
@@ -143,13 +158,16 @@ const { isEditing, isSubmitting } = useFormModal(
       initialSnapshot.value = takeSnapshot();
     },
     onNew: () => {
-      const randomColor =
-        MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)]?.value ?? '#3b82f6';
+      // Was `Math.random()`, which could collide with an existing bean on the very
+      // first try — and a colour identifies a person now, so a collision makes the
+      // whole system ambiguous. `reused` is non-null only when all six are held.
+      const next = nextFreeMemberColor(familyStore.members);
       name.value = '';
       email.value = '';
       gender.value = 'male';
       beanRole.value = 'parent';
-      color.value = randomColor;
+      color.value = next.color;
+      colorSharedWith.value = next.reused?.name ?? null;
       dobMonth.value = '1';
       dobDay.value = '1';
       dobYear.value = '';
@@ -353,7 +371,25 @@ function handleDelete() {
 
     <!-- 2. Color selector -->
     <div v-if="!readOnly" class="flex justify-center">
-      <ColorCircleSelector v-model="color" :colors="MEMBER_COLORS" />
+      <div class="flex flex-col items-center gap-2">
+        <ColorCircleSelector v-model="color" :colors="MEMBER_COLORS" :taken="takenSwatches" />
+        <!--
+          Exhaustion is said out loud rather than silently reusing a colour: with six
+          hues and a seventh bean there is nothing left to give, and a family that
+          cannot see that would just think the app got it wrong.
+        -->
+        <p
+          v-if="colorSharedWith"
+          class="font-inter text-center text-xs text-[var(--color-text-muted)]"
+        >
+          {{
+            fillTemplate(t('family.colorAllTaken'), {
+              name: name || t('modal.memberName'),
+              other: colorSharedWith,
+            })
+          }}
+        </p>
+      </div>
     </div>
 
     <!-- 3. Name -->

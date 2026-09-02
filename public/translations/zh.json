@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-01",
-    "translationCount": 4409
+    "lastUpdated": "2026-09-02",
+    "translationCount": 4411
   },
   "translations": {
     "app.name": {
@@ -22050,6 +22050,16 @@
       "translation": "只有Pod管理器可以删除Bean。请业主或经理帮忙。",
       "hash": "x1wn74",
       "lastUpdated": "2026-09-01"
+    },
+    "family.colorTakenBy": {
+      "translation": "已经是{name}的颜色",
+      "hash": "4x6qo1",
+      "lastUpdated": "2026-09-02"
+    },
+    "family.colorAllTaken": {
+      "translation": "所有颜色均已采用— {name}将与{other}共享。",
+      "hash": "51hw8f",
+      "lastUpdated": "2026-09-02"
     }
   }
 }

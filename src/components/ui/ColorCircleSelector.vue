@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
+import type { FamilyMember } from '@/types/models';
+
 interface ColorOption {
   value: string;
   gradient?: string;
@@ -7,31 +13,73 @@ interface ColorOption {
 interface Props {
   modelValue: string;
   colors: ColorOption[];
+  /**
+   * Colours already held by another bean, mapped to their holder.
+   *
+   * A colour identifies a person now, so two beans sharing one makes the whole
+   * system ambiguous. Pass `takenColors(members, editingId)` — the `excludeId`
+   * matters: without it, a bean created before uniqueness was enforced would see
+   * its OWN swatch as taken and could never be saved.
+   */
+  taken?: Map<string, FamilyMember>;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { taken: undefined });
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
 }>();
+
+const { t } = useTranslation();
+const { memberAvatarBindings } = useMemberAvatarBindings();
+
+function holderOf(value: string): FamilyMember | undefined {
+  return props.taken?.get(value);
+}
+
+/** Its own colour is always selectable; only someone else's is barred. */
+function isTaken(value: string): boolean {
+  return value !== props.modelValue && Boolean(holderOf(value));
+}
+
+function titleFor(value: string): string {
+  const holder = holderOf(value);
+  return holder && isTaken(value)
+    ? fillTemplate(t('family.colorTakenBy'), { name: holder.name })
+    : '';
+}
 </script>
 
 <template>
   <div class="flex flex-wrap gap-2.5">
-    <button
-      v-for="color in colors"
-      :key="color.value"
-      type="button"
-      class="h-8 w-8 rounded-full transition-all duration-150 hover:scale-115"
-      :class="
-        modelValue === color.value
-          ? 'shadow-[0_0_0_2px_white,0_0_0_4px_var(--color-secondary)]'
-          : ''
-      "
-      :style="{
-        background: color.gradient || color.value,
-      }"
-      @click="emit('update:modelValue', color.value)"
-    />
+    <div v-for="color in colors" :key="color.value" class="relative">
+      <button
+        type="button"
+        class="h-8 w-8 rounded-full transition-all duration-150"
+        :class="[
+          isTaken(color.value) ? 'cursor-not-allowed opacity-40' : 'hover:scale-115',
+          modelValue === color.value
+            ? 'shadow-[0_0_0_2px_white,0_0_0_4px_var(--color-secondary)]'
+            : '',
+        ]"
+        :style="{ background: color.gradient || color.value }"
+        :disabled="isTaken(color.value)"
+        :aria-disabled="isTaken(color.value)"
+        :title="titleFor(color.value)"
+        :aria-label="titleFor(color.value) || undefined"
+        @click="emit('update:modelValue', color.value)"
+      />
+      <!--
+        The holder's own face on the swatch, so "taken" needs no sentence to explain
+        itself. A disabled swatch with no explanation reads as a bug.
+      -->
+      <BeanieAvatar
+        v-if="isTaken(color.value) && holderOf(color.value)"
+        v-bind="memberAvatarBindings(holderOf(color.value)!)"
+        fallback="initials"
+        size="xs"
+        class="pointer-events-none absolute -right-1 -bottom-1"
+      />
+    </div>
   </div>
 </template>
