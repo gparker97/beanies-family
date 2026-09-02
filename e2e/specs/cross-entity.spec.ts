@@ -298,15 +298,19 @@ test.describe('Loan & Activity Linking', () => {
     await openAddActivity(page);
     await expect(page.getByText(/new activity/i)).toBeVisible();
 
+    // Choose recurring EXPLICITLY, and do it FIRST — the form defaults to one-time as of
+    // 2026-09-02, and the fee-schedule chips this test needs only render in recurring mode.
+    // Order matters: switching modes adds the cadence + fee controls, which pushes the date
+    // grid down. Done later in the flow it moved the calendar out of the viewport mid-test
+    // and the day button became unclickable.
+    await page.getByRole('button', { name: /recurring/i }).click();
+
     // Fill title
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill(title);
 
     // Select assignee
     await selectAssignee(page);
 
-    // Choose recurring EXPLICITLY — the form defaults to one-time as of 2026-09-02, and the
-    // fee-schedule chips this test needs are only visible in recurring mode.
-    await page.getByRole('button', { name: /recurring/i }).click();
     // Fill start date
     const dialog = page.locator('div[role="dialog"]');
     await selectBeanieDate(dialog, '2026-04-15');
