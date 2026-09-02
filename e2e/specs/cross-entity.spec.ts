@@ -304,7 +304,9 @@ test.describe('Loan & Activity Linking', () => {
     // Select assignee
     await selectAssignee(page);
 
-    // Stay in recurring mode (default) — fee schedule chips are only visible in recurring mode.
+    // Choose recurring EXPLICITLY — the form defaults to one-time as of 2026-09-02, and the
+    // fee-schedule chips this test needs are only visible in recurring mode.
+    await page.getByRole('button', { name: /recurring/i }).click();
     // Fill start date
     const dialog = page.locator('div[role="dialog"]');
     await selectBeanieDate(dialog, '2026-04-15');
