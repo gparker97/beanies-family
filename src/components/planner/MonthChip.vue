@@ -133,6 +133,6 @@ function onClick(event: MouseEvent) {
       where the most events are visible at once. And no longer skipped for solo — the
       month grid is not a bean lane, so nothing else here names the owner.
     -->
-    <ActivityOwnerStack :members="identity.stackMembers" size="xs" class="ml-0.5" />
+    <ActivityOwnerStack :members="identity.stackMembers" size="xs" dense class="ml-0.5" />
   </button>
 </template>

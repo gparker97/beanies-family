@@ -33,8 +33,16 @@ interface Props {
   isEnd: boolean;
   /** data-testid for the root button — adapters override it (e.g. 'holiday-chip'). */
   testid?: string;
+  /** Tier 3: a genuine celebration. Draws the gradient border and corner sticker. */
+  celebrating?: boolean;
+  /** The corner sticker glyph, when celebrating. */
+  sticker?: string;
 }
-const props = withDefaults(defineProps<Props>(), { testid: 'all-day-chip' });
+const props = withDefaults(defineProps<Props>(), {
+  testid: 'all-day-chip',
+  celebrating: false,
+  sticker: '',
+});
 // Pass the native MouseEvent through so consumers can apply `.stop` etc. on the listener.
 defineEmits<{ click: [event: MouseEvent] }>();
 
@@ -54,8 +62,19 @@ const safeBg = computed(() => props.bgColor || 'rgb(100 116 139 / 8%)');
   <button
     type="button"
     class="font-outfit min-w-0 cursor-pointer truncate px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-    :class="{ 'rounded-l-md': isStart, 'rounded-r-md': isEnd, 'border-l-2': isStart, italic }"
-    :style="{ borderLeftColor: safeColor, background: safeBg, color: safeColor }"
+    :class="{
+      'rounded-l-md': isStart,
+      'rounded-r-md': isEnd,
+      'border-l-2': isStart,
+      italic,
+      'is-celebration': celebrating,
+    }"
+    :data-sticker="celebrating && isEnd ? sticker : ''"
+    :style="
+      celebrating
+        ? { color: safeColor }
+        : { borderLeftColor: safeColor, background: safeBg, color: safeColor }
+    "
     :title="title"
     :data-testid="testid"
     @click="(e: MouseEvent) => $emit('click', e)"

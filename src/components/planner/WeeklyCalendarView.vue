@@ -866,7 +866,11 @@ function onStripDayClick(dateStr: string) {
                   >
                     · 📍 {{ activity.location }}
                   </span>
-                  <ActivityOwnerStack :members="identityFor(activity).stackMembers" size="xs" />
+                  <ActivityOwnerStack
+                    :members="identityFor(activity).stackMembers"
+                    size="xs"
+                    dense
+                  />
                 </div>
               </div>
             </template>
