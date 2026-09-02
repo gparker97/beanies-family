@@ -1,0 +1,684 @@
+<title>Celebration Surfaces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+/>
+
+<style>
+  :root {
+    --orange: #f15d22;
+    --terracotta: #e67e22;
+    --silk: #aed6f1;
+    --slate: #2c3e50;
+    --cloud: #f8f9fa;
+
+    --ink: #2c3e50;
+    --ink-soft: #4d5d6c;
+    --ink-faint: #8496a6;
+    --ground: #f2f5f7;
+    --panel: #fff;
+    --rule: #dce4ea;
+    --shadow: 0 2px 10px rgb(44 62 80 / 8%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ink: #ecf0f1;
+      --ink-soft: #bdc3c7;
+      --ink-faint: #8496a6;
+      --ground: #16202a;
+      --panel: #243342;
+      --rule: #3a4a5a;
+      --shadow: 0 2px 12px rgb(0 0 0 / 30%);
+    }
+  }
+  :root[data-theme='dark'] {
+    --ink: #ecf0f1;
+    --ink-soft: #bdc3c7;
+    --ink-faint: #8496a6;
+    --ground: #16202a;
+    --panel: #243342;
+    --rule: #3a4a5a;
+    --shadow: 0 2px 12px rgb(0 0 0 / 30%);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: Inter, system-ui, sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  .wrap {
+    margin: 0 auto;
+    max-width: 76rem;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: Outfit, system-ui, sans-serif;
+    text-wrap: balance;
+  }
+  h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.4rem;
+  }
+  h2 {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0 0 0.3rem;
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0.3rem 0 0.25rem;
+  }
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.0625rem;
+    margin: 0 0 0.5rem;
+    max-width: 48rem;
+  }
+  .note {
+    color: var(--ink-soft);
+    font-size: 0.9375rem;
+    margin: 0 0 1.35rem;
+    max-width: 48rem;
+  }
+  .sec {
+    border-top: 1px solid var(--rule);
+    margin-top: 3rem;
+    padding-top: 1.6rem;
+  }
+  .eyebrow {
+    color: var(--ink-faint);
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    margin: 0 0 0.15rem;
+    text-transform: uppercase;
+  }
+  code {
+    background: color-mix(in srgb, var(--slate) 8%, transparent);
+    border-radius: 5px;
+    font-size: 0.875em;
+    padding: 0.1em 0.35em;
+  }
+  .pill {
+    border-radius: 20px;
+    display: inline-block;
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.6rem;
+    text-transform: uppercase;
+  }
+  .pill-rec {
+    background: color-mix(in srgb, var(--orange) 14%, transparent);
+    color: var(--orange);
+  }
+  .pill-bad {
+    background: color-mix(in srgb, var(--slate) 10%, transparent);
+    color: var(--ink-soft);
+  }
+  ul.tight {
+    margin: 0.4rem 0 0;
+    padding-left: 1.1rem;
+  }
+  ul.tight li {
+    color: var(--ink-soft);
+    font-size: 0.9375rem;
+    margin-bottom: 0.3rem;
+  }
+  ul.tight b {
+    color: var(--ink);
+  }
+
+  .stage {
+    background: #f8f9fa;
+    border: 1px solid var(--rule);
+    border-radius: 22px;
+    padding: 1.5rem 1.25rem;
+  }
+  .stage-dark {
+    background: #1a252f;
+  }
+  .cap {
+    color: var(--ink-faint);
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    margin: 0 0 0.85rem;
+    text-transform: uppercase;
+  }
+  .grid2 {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  }
+  .grid3 {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  }
+  .col {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 1.15rem 1.25rem 1.4rem;
+  }
+  .verdict {
+    border-left: 3px solid var(--orange);
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    margin-top: 1rem;
+    padding-left: 0.8rem;
+  }
+
+  /* ── The shipped celebration primitives, reproduced exactly ─────────── */
+  .cel {
+    --s: 4px;
+    --behind: #f8f9fa;
+    --wash: 0.13;
+
+    background: rgb(241 93 34 / calc(var(--wash) * 100%));
+    border-left: 3px solid #f15d22;
+    border-radius: 12px;
+    isolation: isolate;
+    position: relative;
+  }
+  .stage-dark .cel {
+    --behind: #1a252f;
+    --wash: 0.24;
+  }
+  .cel.white {
+    background: #fff;
+  }
+  .stage-dark .cel.white {
+    background: #1e293b;
+  }
+  .cel::before {
+    background-image: radial-gradient(
+        circle var(--s) at calc(var(--s) * 1.75) 0,
+        var(--behind) 0 var(--s),
+        transparent calc(var(--s) + 0.5px)
+      ),
+      radial-gradient(
+        circle var(--s) at calc(var(--s) * 1.75) 100%,
+        var(--behind) 0 var(--s),
+        transparent calc(var(--s) + 0.5px)
+      );
+    background-position:
+      top left,
+      bottom left;
+    background-repeat: repeat-x, repeat-x;
+    background-size: calc(var(--s) * 3.5) var(--s);
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 4;
+  }
+  .cel-lg {
+    --s: 5px;
+  }
+
+  .body {
+    padding: 0.6rem 0.75rem;
+    position: relative;
+  }
+  .t {
+    align-items: center;
+    color: var(--ink);
+    display: flex;
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    gap: 0.3rem;
+  }
+  .stage-dark .t {
+    color: #ecf0f1;
+  }
+  .sub {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    margin-top: 0.1rem;
+  }
+  .stage-dark .sub {
+    color: #bdc3c7;
+  }
+
+  /* ── Confetti ─────────────────────────────────────────────────────── */
+  .conf {
+    border-radius: inherit;
+    inset: 0;
+    opacity: 0.35;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    z-index: -1;
+  }
+  .bean {
+    border-radius: 50% 50% 48% 52% / 60% 58% 42% 40%;
+    height: 7px;
+    position: absolute;
+    width: 10px;
+  }
+  .conf-45 {
+    opacity: 0.45;
+  }
+  /* Halo: a hairline in the card's own surface colour, so a bean separates
+     from ANY hue behind it without changing the Pod colours. */
+  .conf-halo .bean {
+    box-shadow: 0 0 0 1.25px rgb(255 255 255 / 85%);
+  }
+  .stage-dark .conf-halo .bean {
+    box-shadow: 0 0 0 1.25px rgb(30 41 59 / 85%);
+  }
+
+  .drawer {
+    border-radius: 24px;
+    min-height: 15rem;
+    padding: 0;
+  }
+  .drawer-head {
+    padding: 1.1rem 1.25rem 0.5rem;
+    position: relative;
+    z-index: 2;
+  }
+  .drawer-title {
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 1.375rem;
+    font-weight: 800;
+  }
+  .drawer-rows {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem 1.4rem;
+    position: relative;
+    z-index: 2;
+  }
+  .row {
+    align-items: center;
+    color: var(--ink-soft);
+    display: flex;
+    font-size: 0.875rem;
+    gap: 0.6rem;
+  }
+  .stage-dark .row {
+    color: #bdc3c7;
+  }
+  .row b {
+    color: var(--ink);
+    font-family: Outfit, system-ui, sans-serif;
+  }
+  .stage-dark .row b {
+    color: #ecf0f1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rain .bean {
+      animation: fall 3.6s linear infinite;
+    }
+  }
+  @keyframes fall {
+    0% {
+      opacity: 0;
+      transform: translateY(-14px) rotate(0deg);
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(15rem) rotate(220deg);
+    }
+  }
+
+  .swatchrow {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+  }
+  .month-chip {
+    width: 9rem;
+  }
+  .month-chip .body {
+    padding: 0.16rem 0.4rem;
+  }
+  .month-chip .t {
+    font-size: 0.6875rem;
+  }
+  .week-block {
+    height: 3.6rem;
+    width: 8rem;
+  }
+  .week-block .t {
+    font-size: 0.75rem;
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">beanies.family · tier 3 · revision 3</p>
+  <h1>Celebration surfaces</h1>
+  <p class="lede">
+    Six things from your review of the live build. One is a real bug with an exact cause, one
+    confirms a choice that turned out to be load-bearing, and the rest are calls to make.
+  </p>
+
+  <!-- 1. THE BUG -->
+  <section class="sec">
+    <p class="eyebrow">1 · The bug, shown rather than described</p>
+    <h2>Bunting is invisible on any card that stayed white</h2>
+    <p class="note">
+      The scallops are <b>notches punched in the colour behind the card</b>, not marks painted on
+      it. Against a member wash they read; against a white card they are white on white. Identical
+      CSS in both cards below — the only difference is the background.
+    </p>
+    <div class="stage">
+      <p class="cap">Same markup · same CSS · different background</p>
+      <div class="swatchrow">
+        <div class="cel" style="width: 22rem">
+          <div class="body">
+            <div class="t"><span>🎂</span> Member wash — MonthChip, wall chip, timeline</div>
+            <div class="sub">bunting reads clearly</div>
+          </div>
+        </div>
+        <div class="cel white" style="width: 22rem">
+          <div class="body">
+            <div class="t"><span>🎂</span> White card — agenda card, wall drawer</div>
+            <div class="sub">bunting is there, and invisible</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="tight" style="margin-top: 1.1rem">
+      <li>
+        <b>MonthChip / WallEventChip / DayTimeline</b> bind <code>identity.style</code>, which sets
+        the wash as the background. Bunting works.
+      </li>
+      <li>
+        <b>ActivityListCard</b> binds <code>identity.edgeStyle</code> and keeps
+        <code>bg-white</code>; <b>WallSheet</b> is <code>bg-white</code> outright. Bunting is
+        painted and cannot be seen.
+      </li>
+      <li>
+        <b>Fix:</b> a celebrating card takes the wash on every surface. That is one line per
+        surface, and it makes the tier consistent instead of special-casing two components.
+      </li>
+    </ul>
+  </section>
+
+  <!-- 2. BACKGROUND -->
+  <section class="sec">
+    <p class="eyebrow">2 · Your question about the background</p>
+    <h2>Deliberate — and it turns out to be structural</h2>
+    <p class="note">
+      Honest answer: the white in the last mockup was inherited from the old style, which forced
+      <code>--celebration-surface: #fff</code> to sit inside its gradient border. Removing the border
+      removed the forced white, so the card kept its own wash. That fell out of the change rather
+      than being decided separately — but it is the right outcome and I would not undo it now,
+      because your reasoning is exactly right: hue means <i>whose</i>, and a white birthday card is
+      the one card that stops saying so. The bug above makes it more than a preference: the bunting
+      only exists because the card is not white.
+    </p>
+  </section>
+
+  <!-- 3. CONTRAST -->
+  <section class="sec">
+    <p class="eyebrow">3 · Your proposal: make the confetti easier to see</p>
+    <h2>Three ways, and I would not take the one that dims the wash</h2>
+    <p class="note">
+      Reducing the wash does make the beans pop, but it spends the identity signal to do it — a
+      celebration would be the one card whose owner-colour is weakest, which is the same mistake the
+      orange border made. These keep the wash and change the beans instead.
+    </p>
+    <div class="grid3">
+      <div class="col">
+        <p class="eyebrow">A · Today</p>
+        <h3>35%, no halo <span class="pill pill-bad">too quiet</span></h3>
+        <div class="stage" style="padding: 1.1rem 0.9rem">
+          <div class="cel">
+            <div class="conf">
+              <span class="bean" style="background: #2c3e50; left: 8%; top: 18%"></span>
+              <span class="bean" style="background: #e67e22; left: 26%; top: 62%"></span>
+              <span class="bean" style="background: #f15d22; left: 44%; top: 26%"></span>
+              <span class="bean" style="background: #aed6f1; left: 62%; top: 70%"></span>
+              <span class="bean" style="background: #2c3e50; left: 78%; top: 34%"></span>
+              <span class="bean" style="background: #e67e22; left: 90%; top: 62%"></span>
+            </div>
+            <div class="body">
+              <div class="t"><span>🎂</span> Mia's birthday</div>
+              <div class="sub">2:00pm · The Green Room</div>
+            </div>
+          </div>
+        </div>
+        <p class="verdict">What you are seeing now. On an orange wash the orange beans disappear.</p>
+      </div>
+
+      <div class="col">
+        <p class="eyebrow">B · Recommended</p>
+        <h3>45% + hairline halo <span class="pill pill-rec">pick this</span></h3>
+        <div class="stage" style="padding: 1.1rem 0.9rem">
+          <div class="cel">
+            <div class="conf conf-45 conf-halo">
+              <span class="bean" style="background: #2c3e50; left: 8%; top: 18%"></span>
+              <span class="bean" style="background: #e67e22; left: 26%; top: 62%"></span>
+              <span class="bean" style="background: #f15d22; left: 44%; top: 26%"></span>
+              <span class="bean" style="background: #aed6f1; left: 62%; top: 70%"></span>
+              <span class="bean" style="background: #2c3e50; left: 78%; top: 34%"></span>
+              <span class="bean" style="background: #e67e22; left: 90%; top: 62%"></span>
+            </div>
+            <div class="body">
+              <div class="t"><span>🎂</span> Mia's birthday</div>
+              <div class="sub">2:00pm · The Green Room</div>
+            </div>
+          </div>
+        </div>
+        <p class="verdict">
+          A 1.25px ring in the card's own surface colour. Separates a bean from <i>any</i> hue
+          without touching the Pod colours or the wash — so it works identically on all six member
+          colours, which a hand-tuned opacity per hue never would.
+        </p>
+      </div>
+
+      <div class="col">
+        <p class="eyebrow">C · Your suggestion</p>
+        <h3>Wash dimmed to 8% <span class="pill pill-bad">costs identity</span></h3>
+        <div class="stage" style="padding: 1.1rem 0.9rem">
+          <div class="cel" style="--wash: 0.08">
+            <div class="conf">
+              <span class="bean" style="background: #2c3e50; left: 8%; top: 18%"></span>
+              <span class="bean" style="background: #e67e22; left: 26%; top: 62%"></span>
+              <span class="bean" style="background: #f15d22; left: 44%; top: 26%"></span>
+              <span class="bean" style="background: #aed6f1; left: 62%; top: 70%"></span>
+              <span class="bean" style="background: #2c3e50; left: 78%; top: 34%"></span>
+              <span class="bean" style="background: #e67e22; left: 90%; top: 62%"></span>
+            </div>
+            <div class="body">
+              <div class="t"><span>🎂</span> Mia's birthday</div>
+              <div class="sub">2:00pm · The Green Room</div>
+            </div>
+          </div>
+        </div>
+        <p class="verdict">
+          Works, but a birthday now reads as the least-owned card on the board, and the bunting
+          notches lose contrast too.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. DENSE SURFACES -->
+  <section class="sec">
+    <p class="eyebrow">4 · Confetti on the dense cards too</p>
+    <h2>Agreed — with the count scaled, not the rule dropped</h2>
+    <p class="note">
+      You are right that "some cards celebrate and some do not" reads as broken. The reason to scale
+      rather than paste twenty beans everywhere: a month cell can hold four celebrations at once, and
+      at that size twenty each is a texture. Count follows area — 4 on a month chip, 8 on a week
+      block, 14 on an agenda card, 20 on the wall.
+    </p>
+    <div class="stage">
+      <p class="cap">Month chip · week block · agenda card — all celebrating, all legible</p>
+      <div class="swatchrow">
+        <div class="cel month-chip">
+          <div class="conf conf-45 conf-halo">
+            <span class="bean" style="background: #e67e22; left: 16%; top: 22%"></span>
+            <span class="bean" style="background: #aed6f1; left: 46%; top: 58%"></span>
+            <span class="bean" style="background: #2c3e50; left: 72%; top: 26%"></span>
+            <span class="bean" style="background: #f15d22; left: 88%; top: 62%"></span>
+          </div>
+          <div class="body"><span class="t"><span>🎂</span> Mia's birthday</span></div>
+        </div>
+
+        <div class="cel week-block">
+          <div class="conf conf-45 conf-halo">
+            <span class="bean" style="background: #2c3e50; left: 10%; top: 14%"></span>
+            <span class="bean" style="background: #e67e22; left: 30%; top: 54%"></span>
+            <span class="bean" style="background: #f15d22; left: 50%; top: 20%"></span>
+            <span class="bean" style="background: #aed6f1; left: 68%; top: 66%"></span>
+            <span class="bean" style="background: #2c3e50; left: 84%; top: 32%"></span>
+            <span class="bean" style="background: #e67e22; left: 20%; top: 80%"></span>
+            <span class="bean" style="background: #f15d22; left: 60%; top: 86%"></span>
+            <span class="bean" style="background: #aed6f1; left: 92%; top: 74%"></span>
+          </div>
+          <div class="body">
+            <div class="t"><span>🎂</span> Mia's</div>
+            <div class="sub">2:00pm</div>
+          </div>
+        </div>
+
+        <div class="cel" style="width: 20rem">
+          <div class="conf conf-45 conf-halo">
+            <span class="bean" style="background: #2c3e50; left: 5%; top: 16%"></span>
+            <span class="bean" style="background: #e67e22; left: 15%; top: 62%"></span>
+            <span class="bean" style="background: #f15d22; left: 24%; top: 30%"></span>
+            <span class="bean" style="background: #aed6f1; left: 34%; top: 74%"></span>
+            <span class="bean" style="background: #2c3e50; left: 43%; top: 22%"></span>
+            <span class="bean" style="background: #e67e22; left: 52%; top: 66%"></span>
+            <span class="bean" style="background: #f15d22; left: 61%; top: 34%"></span>
+            <span class="bean" style="background: #aed6f1; left: 70%; top: 78%"></span>
+            <span class="bean" style="background: #2c3e50; left: 79%; top: 26%"></span>
+            <span class="bean" style="background: #e67e22; left: 88%; top: 62%"></span>
+            <span class="bean" style="background: #f15d22; left: 95%; top: 40%"></span>
+            <span class="bean" style="background: #aed6f1; left: 10%; top: 88%"></span>
+            <span class="bean" style="background: #2c3e50; left: 47%; top: 90%"></span>
+            <span class="bean" style="background: #e67e22; left: 66%; top: 10%"></span>
+          </div>
+          <div class="body">
+            <div class="t"><span>🎂</span> Mia's birthday party</div>
+            <div class="sub">2:00pm – 5:00pm · The Green Room</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. DRAWER -->
+  <section class="sec">
+    <p class="eyebrow">5 · The drawer — full surface, clean title, and it moves</p>
+    <h2>Confetti everywhere except behind the words</h2>
+    <p class="note">
+      You are right that putting it behind the title was backwards: the title is the one thing that
+      must stay readable, and the drawer is mostly empty space that could carry the celebration
+      instead. The beans now fall across the whole panel and the title sits on clear ground.
+      Falling, not static, because a drawer is a moment you opened — the calendar cards stay still,
+      so the movement means "you just arrived", not "this is always wiggling".
+    </p>
+    <div class="grid2">
+      <div>
+        <div class="stage">
+          <p class="cap">Light · raining</p>
+          <div class="cel cel-lg drawer">
+            <div class="conf conf-45 conf-halo rain">
+              <span class="bean" style="animation-delay: 0s; background: #2c3e50; left: 6%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 0.5s; background: #e67e22; left: 18%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 1.4s; background: #f15d22; left: 29%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 2.2s; background: #aed6f1; left: 41%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 0.9s; background: #2c3e50; left: 53%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 2.8s; background: #e67e22; left: 64%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 1.8s; background: #f15d22; left: 76%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 0.3s; background: #aed6f1; left: 87%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 3.2s; background: #2c3e50; left: 94%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 2.5s; background: #e67e22; left: 12%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 1.1s; background: #f15d22; left: 35%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 3.6s; background: #aed6f1; left: 70%; top: -8%"></span>
+            </div>
+            <div class="drawer-head">
+              <div class="drawer-title">Mia's birthday party</div>
+            </div>
+            <div class="drawer-rows">
+              <div class="row">🕐 <b>2:00pm – 5:00pm</b></div>
+              <div class="row">📍 <b>The Green Room</b></div>
+              <div class="row">🎂 <b>Birthday</b></div>
+              <div class="row">🚗 <b>Dad</b> drops off</div>
+              <div class="row">🏠 <b>Mum</b> picks up</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="stage stage-dark">
+          <p class="cap" style="color: #8496a6">Dark · the kitchen tablet at night</p>
+          <div class="cel cel-lg drawer">
+            <div class="conf conf-45 conf-halo rain">
+              <span class="bean" style="animation-delay: 0.2s; background: #4a6274; left: 8%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 1.2s; background: #e67e22; left: 20%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 2.4s; background: #f15d22; left: 32%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 0.6s; background: #aed6f1; left: 45%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 3.1s; background: #4a6274; left: 57%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 1.7s; background: #e67e22; left: 68%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 2.9s; background: #f15d22; left: 80%; top: -8%"></span>
+              <span class="bean" style="animation-delay: 0.9s; background: #aed6f1; left: 91%; top: -8%"></span>
+            </div>
+            <div class="drawer-head">
+              <div class="drawer-title" style="color: #ecf0f1">Mia's birthday party</div>
+            </div>
+            <div class="drawer-rows">
+              <div class="row">🕐 <b>2:00pm – 5:00pm</b></div>
+              <div class="row">📍 <b>The Green Room</b></div>
+              <div class="row">🎂 <b>Birthday</b></div>
+              <div class="row">🚗 <b>Dad</b> drops off</div>
+              <div class="row">🏠 <b>Mum</b> picks up</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top: 1.1rem">
+      The rain loops here so you can watch it. In the app it runs <b>once on open</b> and settles —
+      an ambient loop on a wall tablet that never sleeps would be movement in the corner of the
+      kitchen all evening. <code>prefers-reduced-motion</code> gets the settled state with no fall.
+    </p>
+  </section>
+
+  <!-- 6. BUILD -->
+  <section class="sec">
+    <p class="eyebrow">6 · What gets built</p>
+    <h2>If this is the call</h2>
+    <ul class="tight">
+      <li><b>Celebrating cards take the wash</b> on every surface, which is what makes the bunting visible. One line each in <code>ActivityListCard</code> and <code>WallSheet</code>.</li>
+      <li><b>Confetti opacity 35% → 45%, plus a 1.25px halo</b> in the card's surface colour. One rule in <code>CelebrationConfetti</code>, no per-hue tuning.</li>
+      <li><b>Bean count scales with surface</b>: 4 month · 8 week · 14 agenda · 20 wall and drawer. The <code>density</code> prop already exists; it gains two more steps.</li>
+      <li><b>Confetti on month and week chips</b>, removing the "dense surfaces get none" rule that made the board look half-finished.</li>
+      <li><b>Drawer: full-surface confetti, clean title band</b>, on the wall sheet and the activity modal.</li>
+      <li><b>Fall-in animation on drawers only</b>, once per open, settling at the end. Cards keep the existing settle.</li>
+    </ul>
+  </section>
+</div>

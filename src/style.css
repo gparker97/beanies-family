@@ -845,99 +845,35 @@
  */
 .is-celebration {
   /*
-   * NO gradient border, deliberately — and this is the second cut of this tier.
+   * Tier 3 — the third and final cut, and the smallest.
    *
-   * The first used a Heritage-Orange gradient edge, which collided with three meanings the
-   * edge already carries: `border-primary-500` is TODAY (MonthDayCard), `ring-primary-500`
-   * is SELECTED, and a Heritage-Orange wash is overdue / due-today (TodoItemRow). Orange is
-   * the CIG's alert colour precisely because red is reserved for destructive actions, so a
-   * fourth meaning on the same channel reads as "this needs attention", not "this is a
-   * party".
+   * Cut 1 was a Heritage-Orange gradient border. It collided with three meanings the edge
+   * already carries (`border-primary-500` is today, `ring-primary-500` is selected, an
+   * orange wash is overdue) and its `border-left-color: transparent !important` erased the
+   * OWNER'S colour — making a birthday the one card that could not say whose it was.
    *
-   * Worse, it set `border-left-color: transparent !important` — the left edge is where the
-   * OWNER'S colour lives, so the celebration style erased the one thing the identity change
-   * exists to say. A birthday was the single card that could not tell you whose it was.
+   * Cut 2 replaced it with a bunting edge: semicircles bitten out of the top and bottom.
+   * Sound in principle — shape is the one channel this palette has not already spent — but
+   * it did not survive contact with the real app. It only rendered where the card carried a
+   * member wash (the notches are punched in the colour BEHIND the card, so on a white card
+   * they were white on white), and where it did render greg's read was that it did not
+   * carry its weight.
    *
-   * Every colour in this palette is already spoken for, so recolouring the border only moves
-   * the collision. SHAPE is unclaimed: nothing else in the app has a non-rectangular edge.
-   * Tier 3 is therefore bunting (below) plus confetti on wide surfaces, and the card keeps
-   * the ordinary owner-coloured edge every other card has.
+   * So tier 3 is now confetti and the corner sticker, and nothing structural at all. The
+   * card keeps the ordinary owner-coloured edge every other card has, and no surface needs
+   * to know what colour sits behind it. Fewer moving parts than either previous cut.
    *
-   * Deliberately NOT `overflow: hidden`: the sticker below sits outside the box at
+   * Deliberately NOT `overflow: hidden`: the sticker sits outside the box at
    * `right: -6px; top: -9px`, so clipping here would erase it. The confetti layer clips
-   * ITSELF instead (see `CelebrationConfetti.vue`).
+   * ITSELF (see `CelebrationConfetti.vue`).
    *
-   * `isolation: isolate` creates a stacking context so the confetti layer can sit at
-   * `z-index: -1` — above the card's own background but BENEATH every child — without any
-   * card having to wrap or re-index its content. Without it, a `-1` layer would escape
-   * behind the card entirely and vanish.
+   * `isolation: isolate` creates a stacking context so the confetti can sit at
+   * `z-index: -1` — above the card's background, beneath every child — without any card
+   * having to wrap or re-index its content. Without it a `-1` layer escapes behind the card
+   * entirely and vanishes.
    */
   isolation: isolate;
   position: relative;
-}
-
-/*
- * Bunting — semicircles bitten out of the top AND bottom edges.
- *
- * BOTH edges, deliberately. Top-only read as a rendering fault rather than a decoration:
- * one scalloped edge on an otherwise square card looks like something failed to paint.
- * Scalloping both makes it symmetrical, and symmetry is what makes it legible as intent —
- * the silhouette of a ticket stub or a party plate.
- *
- * Not the left or right edges: the LEFT carries the owner's colour as a solid border, and
- * biting notches out of it would destroy the identity signal this tier was redesigned to
- * stop erasing in the first place.
- *
- * ONE pseudo-element with TWO background layers, not two pseudo-elements — `::after` is
- * already the corner sticker, and an element has only one of each.
- *
- * The UNIVERSAL tier-3 marker: it costs no vertical space beyond the scallop height, so
- * unlike confetti it works on a month chip as well as a wall card. That is what lets dense
- * surfaces still say "celebration" now that the border is gone.
- *
- * `--celebration-behind` is the colour BEHIND the card, because the scallops are punched in
- * the surrounding ground, not painted on the card. Surfaces sitting on a tint (the wall's
- * day columns) must set it or the notches show the wrong colour. It defaults to the page
- * ground, which is right for every ordinary list and grid.
- */
-.is-celebration::before {
-  --celebration-s: var(--celebration-scallop, 4px);
-
-  /*
-   * Two rows of bites, mirrored. The bottom gradient is anchored at 100% rather than 0 so
-   * the two edges curve toward each other — the same gradient repeated would read as a
-   * pattern rather than as a pair of edges.
-   */
-  background-image:
-    radial-gradient(
-      circle var(--celebration-s) at calc(var(--celebration-s) * 1.75) 0,
-      var(--celebration-behind, #f8f9fa) 0 var(--celebration-s),
-      transparent calc(var(--celebration-s) + 0.5px)
-    ),
-    radial-gradient(
-      circle var(--celebration-s) at calc(var(--celebration-s) * 1.75) 100%,
-      var(--celebration-behind, #f8f9fa) 0 var(--celebration-s),
-      transparent calc(var(--celebration-s) + 0.5px)
-    );
-  background-position:
-    top left,
-    bottom left;
-  background-repeat: repeat-x, repeat-x;
-  background-size: calc(var(--celebration-s) * 3.5) var(--celebration-s);
-  content: '';
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  z-index: 4;
-}
-
-.dark .is-celebration::before {
-  --celebration-behind: #1a252f;
-}
-
-/* Wide surfaces carry a larger scallop so the shape still reads at wall distance. */
-.is-celebration-lg {
-  --celebration-scallop: 5px;
 }
 
 /* The sticker overhangs the corner, which is what makes it read as applied rather

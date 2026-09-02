@@ -12,6 +12,7 @@
 import { computed, ref, watch } from 'vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -176,15 +177,25 @@ const { identityFor } = useActivityIdentity();
           :key="entry.activity.id + entry.date"
           type="button"
           class="flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0 dark:border-slate-700"
-          :class="
+          :class="[
             isToday && entry.activity.id === nowId
               ? 'rounded-2xl border-b-0 bg-gradient-to-r from-[var(--tint-orange-8)] to-transparent px-3'
-              : ''
-          "
+              : '',
+            // Today's list is rows rather than cards, so it had no celebration treatment at
+            // all — the one wall view that stayed plain while the others celebrated.
+            identityFor(entry.activity).celebration.celebrating
+              ? 'is-celebration rounded-2xl border-b-0 px-3'
+              : '',
+          ]"
           @click="
             emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
           "
         >
+          <CelebrationConfetti
+            v-if="identityFor(entry.activity).celebration.celebrating"
+            :activity-id="entry.activity.id"
+            density="week"
+          />
           <span class="w-24 shrink-0">
             <span class="font-outfit wall-slot-time block font-extrabold">
               {{ entry.activity.startTime || t('planner.allDay') }}

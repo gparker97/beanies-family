@@ -373,16 +373,13 @@ const { identityFor } = useActivityIdentity();
           <div
             v-if="activity"
             class="rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
-            :class="
-              identityFor(activity).celebration.celebrating
-                ? 'is-celebration is-celebration-lg'
-                : ''
-            "
+            :class="identityFor(activity).celebration.celebrating ? 'is-celebration' : ''"
           >
             <CelebrationConfetti
               v-if="identityFor(activity).celebration.celebrating"
               :activity-id="activity.id"
               density="wall"
+              variant="drawer"
             />
             <!--
               Time and place are the hero. They are the only two things anybody

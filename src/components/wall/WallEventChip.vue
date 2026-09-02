@@ -35,7 +35,7 @@ defineEmits<{ open: [] }>();
     <CelebrationConfetti
       v-if="identity.celebration.celebrating"
       :activity-id="activity.id"
-      density="card"
+      density="week"
     />
     <span class="min-w-0 flex-1">
       <span class="font-inter wall-chip-time block font-semibold text-[var(--muted-text,#4d5d6c)]">
