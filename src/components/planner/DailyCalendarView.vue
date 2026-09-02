@@ -304,7 +304,12 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               two rows above correctly showed "MA" and "MI", so the one place the rule
               mattered most was the one place that ignored it.
             -->
-            <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
+            <BeanieAvatar
+              v-bind="memberAvatarBindings(member)"
+              fallback="initials"
+              size="sm"
+              aria-hidden="true"
+            />
             <span
               class="font-outfit text-secondary-500/55 text-xs font-semibold lowercase dark:text-gray-400"
             >
@@ -488,6 +493,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                   class="font-outfit flex items-center truncate text-xs font-semibold"
                   style="color: var(--color-text)"
                 >
+                  <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
                   <span class="truncate">{{ activity.title }}</span>
                   <ClashIndicator :clash="clashFor(activity.id, currentDay.dateStr)" class="ml-1" />
                 </div>

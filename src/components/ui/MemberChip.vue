@@ -57,6 +57,7 @@ const color = computed(() => resolveMemberColor(member.value?.color));
       v-bind="memberAvatarBindings(member)"
       fallback="initials"
       size="xs"
+      :title="name"
       class="ring-1 ring-white dark:ring-slate-800"
     />
     <span

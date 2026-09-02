@@ -58,6 +58,28 @@ describe('useActivityIdentity', () => {
     expect(identityFor(activity()).stackMembers).toHaveLength(2);
   });
 
+  it('classifies ONCE even when a template asks several times', () => {
+    // Real templates need the identity in four or five bindings (wash, dashed class,
+    // emoji, stack). Without the memo each one re-ran `classify()` — a Set build plus
+    // linear roster scans — so a month grid paid for hundreds of redundant
+    // classifications per paint.
+    classify.mockReturnValue({ kind: 'solo', color: '#111', members: [member('a', '#111')] });
+    const { identityFor } = useActivityIdentity();
+    const a = activity();
+    identityFor(a);
+    identityFor(a);
+    identityFor(a);
+    expect(classify).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-classifies when the activity changes', () => {
+    classify.mockReturnValue({ kind: 'solo', color: '#111', members: [member('a', '#111')] });
+    const { identityFor } = useActivityIdentity();
+    identityFor(activity());
+    identityFor(activity({ updatedAt: '2026-09-09T00:00:00Z' }));
+    expect(classify).toHaveBeenCalledTimes(2);
+  });
+
   it('calls the classifier exactly once per activity, not once per face', () => {
     classify.mockReturnValue({
       kind: 'shared',
@@ -90,11 +112,49 @@ describe('useActivityIdentity', () => {
     expect(id.dashed).toBe(false);
   });
 
-  it('uses ONE wash alpha, expressed as rgba rather than a hex suffix', () => {
-    // Seven call sites used four different alpha suffixes for this same wash.
+  it('uses ONE wash alpha, themeable via a custom property', () => {
+    // Seven call sites used four different alpha suffixes for this same wash. The alpha
+    // rides on `--wash-a` rather than being baked in, because these are INLINE styles
+    // and an inline style cannot be overridden by a `.dark` rule — the migrated
+    // surfaces gave up theme-aware `var(--tint-*)` classes to get one consistent rule,
+    // and 13% on a dark surface is close to invisible.
     classify.mockReturnValue({ kind: 'solo', color: '#3b82f6', members: [member('a', '#3b82f6')] });
     const { identityFor } = useActivityIdentity();
     expect(identityFor(activity()).style.background).toBe('rgba(59, 130, 246, 0.13)');
+  });
+
+  it('deepens the wash in dark mode, where 13% all but disappears', () => {
+    classify.mockReturnValue({ kind: 'solo', color: '#3b82f6', members: [member('a', '#3b82f6')] });
+    document.documentElement.classList.add('dark');
+    try {
+      const { identityFor } = useActivityIdentity();
+      expect(identityFor(activity()).style.background).toBe('rgba(59, 130, 246, 0.24)');
+    } finally {
+      document.documentElement.classList.remove('dark');
+    }
+  });
+
+  it('gives cards that own their surface an edge-only style', () => {
+    // `background` is a shorthand and beats any class, so binding the full style on a
+    // card carrying `bg-white dark:bg-slate-800` silently replaced that surface.
+    classify.mockReturnValue({ kind: 'solo', color: '#3b82f6', members: [member('a', '#3b82f6')] });
+    const { identityFor } = useActivityIdentity();
+    const id = identityFor(activity());
+    expect(id.edgeStyle).toEqual({ borderLeftColor: '#3b82f6' });
+    expect(id.edgeStyle.background).toBeUndefined();
+  });
+
+  it('shows no faces for an unowned event INSIDE a lane', () => {
+    // It is already in every bean's column; repeating the whole family in each one says
+    // nothing and costs the title its width.
+    classify.mockReturnValue({
+      kind: 'family',
+      color: '#F15D22',
+      members: [member('a', '#111'), member('b', '#222')],
+    });
+    const { identityFor } = useActivityIdentity();
+    expect(identityFor(activity(), { laneMemberId: 'a' }).stackMembers).toEqual([]);
+    expect(identityFor(activity()).stackMembers).toHaveLength(2);
   });
 
   it('resolves a blank member colour rather than emitting a transparent wash', () => {

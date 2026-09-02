@@ -74,3 +74,6 @@ scripts/store-screenshots/.tmp/
 *.aab
 *.p8
 *.p12
+
+# Design-review screenshots (rendered artifacts — see CLAUDE.md: these belong on Drive)
+screenshots/
