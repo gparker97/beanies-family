@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Family member card identity — three directions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --purple: #9b59b6;
+        --green: #27ae60;
+
+        --muted: #5b6b7a;
+        --card: #ffffff;
+        --ground: #f2f4f7;
+        --panel: #ffffff;
+        --line: #e2e8ee;
+        --ink: var(--slate);
+
+        /* real MEMBER_COLORS palette — src/constants/memberColors.ts */
+        --m-blue: #3b82f6;
+        --m-red: #ef4444;
+        --m-green: #22c55e;
+        --m-amber: #f59e0b;
+        --m-violet: #8b5cf6;
+        --m-pink: #ec4899;
+
+        /* demo bean assignments */
+        --b-sofia: var(--m-violet);
+        --b-max: var(--m-blue);
+        --b-leo: var(--m-green);
+        --b-greg: var(--m-amber);
+      }
+      .dark {
+        --muted: #9db0c4;
+        --card: #1e293b;
+        --ground: #101823;
+        --panel: #17212e;
+        --line: #31415a;
+        --ink: #e8edf3;
+        --cloud: #17212e;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: var(--ground);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
+      }
+      h1, h2, h3, h4, .of { font-family: Outfit, system-ui, sans-serif; }
+      .wrap { max-width: 1240px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+
+      /* ---------- page chrome ---------- */
+      header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+      h1 { font-size: clamp(1.6rem, 3.4vw, 2.1rem); margin: 0; letter-spacing: -0.015em; font-weight: 700; }
+      .kicker {
+        font-family: Outfit, sans-serif; font-size: .7rem; font-weight: 700; letter-spacing: .13em;
+        text-transform: uppercase; color: var(--orange); margin: 0 0 .5rem;
+      }
+      .lede { color: var(--muted); max-width: 68ch; margin: 1rem 0 0; font-size: .95rem; }
+      .toggle {
+        border: 1px solid var(--line); background: var(--card); color: var(--ink);
+        border-radius: 999px; padding: .5rem 1rem; font: inherit; font-size: .82rem; cursor: pointer;
+        font-family: Outfit, sans-serif; font-weight: 600; white-space: nowrap;
+      }
+      .toggle:hover { border-color: var(--orange); color: var(--orange); }
+      .toggle:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+
+      nav.jump { display: flex; gap: .4rem; flex-wrap: wrap; margin: 1.6rem 0 0; }
+      nav.jump a {
+        font-family: Outfit, sans-serif; font-size: .78rem; font-weight: 600; text-decoration: none;
+        color: var(--muted); border: 1px solid var(--line); background: var(--card);
+        border-radius: 999px; padding: .3rem .75rem;
+      }
+      nav.jump a:hover { color: var(--orange); border-color: var(--orange); }
+
+      hr.rule { height: 1px; background: var(--line); border: 0; margin: 2.6rem 0; }
+
+      section { margin-top: 3.2rem; }
+      .sec-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
+      .sec-head h2 { font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
+      .badge {
+        font-family: Outfit, sans-serif; font-weight: 700; font-size: .66rem; letter-spacing: .1em;
+        text-transform: uppercase; color: var(--orange); border: 1.5px solid var(--orange);
+        border-radius: 999px; padding: .16rem .55rem; white-space: nowrap;
+      }
+      .badge.rec { background: var(--orange); color: #fff; }
+      .badge.neutral { color: var(--muted); border-color: var(--line); }
+      .why { color: var(--muted); font-size: .9rem; margin: .6rem 0 1.4rem; max-width: 76ch; }
+      .why b, .note b { color: var(--ink); font-weight: 600; }
+
+      .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+      @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+
+      .panel {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 1.1rem;
+      }
+      .panel-label {
+        font-family: Outfit, sans-serif; font-size: .66rem; font-weight: 700; letter-spacing: .1em;
+        text-transform: uppercase; color: var(--muted); margin: 0 0 .85rem;
+      }
+      .panel-label.bad { color: #c0392b; }
+      .dark .panel-label.bad { color: #ff8f7d; }
+      .panel-label.good { color: var(--green); }
+
+      .note { display: flex; gap: .5rem; margin-top: .9rem; color: var(--muted); font-size: .83rem; }
+      .note .mark { color: var(--orange); font-weight: 700; flex: none; }
+
+      /* ---------- shared avatar ---------- */
+      .av {
+        border-radius: 50%; display: grid; place-items: center; color: #fff; flex: none;
+        font-family: Outfit, sans-serif; font-weight: 800; letter-spacing: 0;
+        width: 26px; height: 26px; font-size: .72rem;
+        background: var(--c, var(--slate));
+      }
+      .av.xs { width: 20px; height: 20px; font-size: .6rem; }
+      .av.lg { width: 40px; height: 40px; font-size: 1rem; }
+      .stack { display: flex; align-items: center; }
+      .stack .av + .av { margin-left: -7px; }
+      .stack .av { box-shadow: 0 0 0 2px var(--card); }
+
+      /* ---------- lane scaffolding (wall bean-lanes) ---------- */
+      .lanes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
+      @media (max-width: 780px) { .lanes { grid-template-columns: repeat(2, 1fr); } }
+      .lane {
+        background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+        padding: .65rem; min-height: 205px; display: flex; flex-direction: column;
+      }
+      .lane-head { display: flex; align-items: center; gap: .45rem; margin-bottom: .65rem; }
+      .lane-name { font-family: Outfit, sans-serif; font-weight: 700; font-size: .88rem; }
+      .lane-count { color: var(--muted); font-size: .68rem; margin-left: auto; }
+      .lane-body { display: flex; flex-direction: column; gap: .42rem; }
+
+      /* ---------- today strip (no lane context) ---------- */
+      .today { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: .8rem; }
+      .today-head {
+        font-family: Outfit, sans-serif; font-weight: 700; font-size: .8rem;
+        display: flex; align-items: center; gap: .4rem; margin-bottom: .7rem;
+      }
+      .today-head span { color: var(--muted); font-weight: 500; font-size: .7rem; margin-left: auto; }
+      .today-body { display: flex; flex-direction: column; gap: .45rem; }
+
+      /* ---------- BASE card (shared by all directions) ---------- */
+      .ev {
+        position: relative; display: block; width: 100%; text-align: left; cursor: pointer;
+        border: 0; font: inherit; color: inherit;
+        border-radius: 14px; padding: .45rem .6rem;
+        background: rgba(44, 62, 80, .05);
+      }
+      .dark .ev { background: rgba(255, 255, 255, .06); }
+      .ev .time { display: block; font-size: .66rem; font-weight: 600; color: var(--muted); }
+      .ev .title { display: block; font-family: Outfit, sans-serif; font-weight: 600; font-size: .82rem; line-height: 1.25; }
+      .ev .row { display: flex; align-items: center; gap: .35rem; margin-top: .3rem; }
+      .ev .who { font-size: .64rem; color: var(--muted); font-weight: 600; }
+      .ev:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+
+      /* ===== TODAY'S SHIPPED LOOK (the problem) ===== */
+      .ev.now { border-left: 5px solid var(--c, var(--orange)); border-radius: 12px; padding-left: .55rem; }
+
+      /* ===== DIRECTION A — bean wash ===== */
+      .a .ev {
+        background:
+          linear-gradient(color-mix(in srgb, var(--c) 13%, transparent), color-mix(in srgb, var(--c) 13%, transparent)),
+          var(--card);
+        border-radius: 14px;
+        padding: .45rem .55rem;
+        display: flex; gap: .5rem; align-items: flex-start;
+      }
+      .dark .a .ev {
+        background:
+          linear-gradient(color-mix(in srgb, var(--c) 24%, transparent), color-mix(in srgb, var(--c) 24%, transparent)),
+          var(--card);
+      }
+      .a .ev .body { min-width: 0; flex: 1 1 auto; }
+      .a .ev.shared {
+        background:
+          linear-gradient(105deg,
+            color-mix(in srgb, var(--c) 15%, transparent),
+            color-mix(in srgb, var(--c2) 15%, transparent)),
+          var(--card);
+        box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 32%, transparent);
+      }
+      .dark .a .ev.shared {
+        background:
+          linear-gradient(105deg,
+            color-mix(in srgb, var(--c) 26%, transparent),
+            color-mix(in srgb, var(--c2) 26%, transparent)),
+          var(--card);
+      }
+      .a .ev.everyone {
+        background: linear-gradient(105deg, rgba(174,214,241,.30), rgba(241,93,34,.13)), var(--card);
+        box-shadow: inset 0 0 0 1.5px rgba(241, 93, 34, .28);
+      }
+
+      /* ===== DIRECTION B — name tape ===== */
+      .b .ev { background: var(--card); border: 1px solid var(--line); padding: .42rem .55rem .5rem; }
+      .b .tape {
+        display: inline-flex; align-items: center; gap: .3rem;
+        background: var(--c, var(--slate)); color: #fff;
+        border-radius: 999px; padding: .1rem .5rem .1rem .12rem;
+        font-family: Outfit, sans-serif; font-weight: 700; font-size: .62rem;
+        margin-bottom: .3rem; max-width: 100%;
+      }
+      .b .tape .av { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 100%, transparent); }
+      .b .tape.duo { background: linear-gradient(100deg, var(--c), var(--c2)); padding-left: .12rem; }
+      .b .tape.all { background: linear-gradient(100deg, var(--orange), var(--terracotta)); }
+
+      /* ===== DIRECTION C — sticker ===== */
+      .c .ev {
+        background: color-mix(in srgb, var(--c) 16%, var(--card));
+        border: 2px solid var(--card);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--c) 22%, transparent);
+        border-radius: 16px;
+        padding: .5rem .6rem .45rem 1.55rem;
+        margin-left: .55rem;
+      }
+      .dark .c .ev { background: color-mix(in srgb, var(--c) 30%, var(--card)); }
+      .c .ev .peel {
+        position: absolute; left: -.55rem; top: 50%; transform: translateY(-50%);
+        box-shadow: 0 0 0 2.5px var(--card), 0 2px 6px rgba(44,62,80,.2);
+      }
+      .c .ev .peel2 { position: absolute; left: .05rem; top: 50%; transform: translateY(-50%);
+        box-shadow: 0 0 0 2.5px var(--card), 0 2px 6px rgba(44,62,80,.18); }
+      .c .ev.shared { padding-left: 2.2rem; }
+
+      /* ===== SPECIAL tier (all directions share it) ===== */
+      .ev.special {
+        background:
+          linear-gradient(var(--card), var(--card)) padding-box,
+          linear-gradient(115deg, var(--orange), var(--terracotta) 60%, var(--sky)) border-box;
+        border: 2px solid transparent;
+        border-radius: 16px;
+        box-shadow: 0 3px 14px rgba(241, 93, 34, .16);
+      }
+      .a .ev.special, .b .ev.special, .c .ev.special { margin-left: 0; padding-left: .6rem; }
+      .ev.special::after {
+        content: attr(data-sticker);
+        position: absolute; top: -9px; right: -6px;
+        font-size: 1rem; line-height: 1;
+        background: var(--card); border-radius: 999px; padding: .16rem;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, .18);
+      }
+      .ev.special .conf {
+        position: absolute; inset: 0; border-radius: 14px; pointer-events: none; opacity: .5;
+        background-image:
+          radial-gradient(circle at 14% 26%, var(--terracotta) 1.5px, transparent 1.6px),
+          radial-gradient(circle at 66% 72%, var(--sky) 1.8px, transparent 1.9px),
+          radial-gradient(circle at 90% 34%, var(--orange) 1.4px, transparent 1.5px);
+        background-size: 52px 38px;
+      }
+      .ev.special .kicker-note {
+        font-family: Caveat, cursive; font-size: .82rem; font-weight: 700; color: var(--orange);
+        display: block; margin-top: .1rem; line-height: 1.1;
+      }
+
+      /* ---------- legend ---------- */
+      .legend-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+      .lg-old {
+        display: inline-flex; align-items: center; gap: .4rem;
+        border: 1px solid var(--line); border-radius: 999px; padding: .28rem .7rem;
+        font-family: Outfit, sans-serif; font-size: .75rem; font-weight: 600; background: var(--card);
+      }
+      .lg-new {
+        display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+        border: 1.5px solid color-mix(in srgb, var(--c) 45%, transparent);
+        background: color-mix(in srgb, var(--c) 11%, var(--card));
+        border-radius: 999px; padding: .22rem .7rem .22rem .22rem;
+        font-family: Outfit, sans-serif; font-size: .75rem; font-weight: 600;
+      }
+      .dark .lg-new { background: color-mix(in srgb, var(--c) 22%, var(--card)); }
+      .lg-new .n { color: var(--muted); font-weight: 500; font-size: .68rem; }
+
+      /* ---------- colour picker ---------- */
+      .sw-grid { display: flex; gap: .55rem; flex-wrap: wrap; }
+      .sw {
+        position: relative; width: 40px; height: 40px; border-radius: 14px;
+        background: var(--c); border: 0; cursor: pointer;
+      }
+      .sw.sel { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--c); }
+      .sw.taken { cursor: not-allowed; opacity: .38; }
+      .sw.taken::after {
+        content: ''; position: absolute; inset: 0; border-radius: 14px;
+        background: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,.7) 4px 6px);
+      }
+      .sw-owner {
+        position: absolute; bottom: -6px; right: -6px;
+        box-shadow: 0 0 0 2px var(--panel);
+      }
+      .sw-wrap { position: relative; }
+
+      /* ---------- details drawer ---------- */
+      .drawer {
+        background: var(--card); border: 1px solid var(--line); border-radius: 22px;
+        padding: 1rem 1.05rem 1.1rem; max-width: 400px;
+      }
+      .drawer h4 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; }
+      .drawer .dsub { color: var(--muted); font-size: .76rem; margin-top: .12rem; }
+      .fields { margin-top: 1rem; display: flex; flex-direction: column; gap: .1rem; }
+      .field { display: flex; gap: .7rem; align-items: flex-start; padding: .52rem 0; }
+      .field + .field { border-top: 1px solid var(--line); }
+      .fi {
+        width: 30px; height: 30px; border-radius: 10px; flex: none;
+        display: grid; place-items: center; color: var(--orange);
+        background: rgba(241, 93, 34, .1);
+      }
+      .fi svg { width: 15px; height: 15px; }
+      .fl {
+        font-family: Outfit, sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .09em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .fv { font-size: .84rem; margin-top: .05rem; }
+      .fv.empty { color: var(--muted); font-style: italic; }
+      .fv .link { color: var(--orange); font-weight: 600; cursor: pointer; text-decoration: none; }
+      .cat-pill {
+        display: inline-flex; align-items: center; gap: .3rem;
+        background: rgba(174, 214, 241, .3); border-radius: 999px; padding: .1rem .5rem;
+        font-size: .74rem; font-weight: 600;
+      }
+      .dark .cat-pill { background: rgba(174, 214, 241, .16); }
+
+      /* ---------- phone frame ---------- */
+      .phones { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+      .phone {
+        width: 268px; border: 1px solid var(--line); border-radius: 26px; padding: .7rem;
+        background: var(--cloud);
+      }
+      .dark .phone { background: #0d141d; }
+      .phone-label {
+        font-family: Outfit, sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .1em;
+        text-transform: uppercase; color: var(--muted); margin-bottom: .5rem; text-align: center;
+      }
+
+      .inline-link { color: var(--orange); font-weight: 600; }
+
+      /* ---------- hue evidence ---------- */
+      .sub-h { font-size: 1rem; margin: 2rem 0 .9rem; letter-spacing: -.005em; }
+      .figure { font-size: .95rem; margin: 0; font-family: Outfit, sans-serif; }
+      .figure b { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; }
+      .figure span { color: var(--muted); margin: 0 .3rem; }
+      .swatch-run { display: flex; gap: .4rem; flex-wrap: wrap; }
+      .swatch-run span {
+        display: inline-flex; align-items: center; gap: .32rem;
+        font-size: .7rem; font-family: Outfit, sans-serif; font-weight: 600; color: var(--muted);
+      }
+      .swatch-run i { width: 22px; height: 10px; border-radius: 3px; background: var(--c); display: block; }
+
+      /* ---------- time-grid demo ---------- */
+      .grid-demo { display: flex; gap: .35rem; }
+      .grid-demo .hours { width: 22px; flex: none; display: flex; flex-direction: column; }
+      .grid-demo .hours span {
+        height: 58px; font-size: .6rem; color: var(--muted); text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .gcol {
+        position: relative; flex: 1 1 auto; height: 232px;
+        background-image: linear-gradient(var(--line) 1px, transparent 1px);
+        background-size: 100% 58px;
+      }
+      .blk {
+        position: absolute; left: 3px; right: 3px; border-radius: 10px;
+        padding: .3rem .45rem; overflow: hidden; border-left: 4px solid var(--c);
+      }
+      .blk.cat { background: color-mix(in srgb, var(--c) 15%, var(--card)); }
+      .blk.mem { background: color-mix(in srgb, var(--c) var(--wash-solo), var(--card)); }
+      .blk.mem.shared2 {
+        background: linear-gradient(105deg,
+          color-mix(in srgb, var(--c) var(--wash-shared), var(--card)),
+          color-mix(in srgb, var(--c2) var(--wash-shared), var(--card)));
+      }
+      .blk.dash { border-left-style: dashed; }
+      .blk .bt { display: block; font-size: .62rem; font-weight: 600; color: var(--muted); }
+      .blk .bem { font-size: .72rem; }
+      .blk .bn { display: block; font-family: Outfit, sans-serif; font-weight: 600; font-size: .78rem; line-height: 1.2; }
+      .blk .bfaces { position: absolute; right: .35rem; bottom: .3rem; display: flex; }
+      .blk .bfaces .av + .av { margin-left: -6px; }
+      .blk .bfaces .av { box-shadow: 0 0 0 2px var(--card); }
+
+      /* ---------- todo rows ---------- */
+      .todo-list { display: flex; flex-direction: column; gap: .4rem; }
+      .todo {
+        display: flex; align-items: center; gap: .55rem;
+        background: var(--card); border: 1px solid var(--line);
+        border-radius: 14px; padding: .5rem .6rem;
+      }
+      .todo .tick { width: 19px; height: 19px; border-radius: 7px; border: 2px solid var(--line); flex: none; }
+      .todo .t { flex: 1 1 auto; font-size: .84rem; min-width: 0; }
+      .mini-cap {
+        font-family: Outfit, sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .09em;
+        text-transform: uppercase; color: var(--muted); margin: 0 0 .5rem;
+      }
+      .face-demo { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+      .face-demo > span {
+        display: flex; flex-direction: column; align-items: center; gap: .35rem;
+        font-family: Outfit, sans-serif; font-size: .72rem; font-weight: 600; color: var(--muted);
+      }
+      .av.two { font-size: .8rem; letter-spacing: -.02em; }
+
+      /* ---------- alignment demo ---------- */
+      .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+      @media (max-width: 900px) { .opt-grid { grid-template-columns: 1fr; } }
+      .rail { position: relative; }
+      .rail::after {
+        content: ''; position: absolute; top: -.25rem; bottom: -.25rem; left: var(--guide);
+        border-left: 1.5px dashed var(--orange); opacity: .55; pointer-events: none;
+      }
+
+      /* option 2 — faces anchored right */
+      .a .today-body.right .ev { align-items: center; }
+      .a .today-body.right .ev .body { order: 1; }
+      .a .today-body.right .ev .stack { order: 2; margin-left: auto; padding-left: .4rem; }
+
+      /* option 3 — fixed gutter */
+      .a .today-body.gutter .ev .stack { width: 54px; flex: none; }
+
+      /* option 4 — faces on their own row */
+      .a .today-body.stackrow .ev .stack { margin-top: .3rem; }
+
+      .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; }
+      @media (max-width: 780px) { .tiers { grid-template-columns: 1fr; } }
+      .tier-cap {
+        font-family: Outfit, sans-serif; font-size: .64rem; font-weight: 700; letter-spacing: .1em;
+        text-transform: uppercase; color: var(--muted); margin: .55rem 0 0;
+      }
+
+      ul.pts { margin: .5rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: .85rem; }
+      ul.pts li { margin-bottom: .3rem; }
+      ul.pts b { color: var(--ink); font-weight: 600; }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .ev { transition: transform 160ms ease, box-shadow 160ms ease; }
+        .ev:hover { transform: translateY(-1px); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div>
+          <p class="kicker">beanies.family · wall + planner</p>
+          <h1>Who does this belong to?</h1>
+        </div>
+        <button class="toggle" onclick="document.body.classList.toggle('dark')">light / dark</button>
+      </header>
+
+      <p class="lede">
+        Three directions for family-member identity on event cards, plus the two supporting fixes
+        (legend and colour uniqueness) and the details-drawer clean-up. Every direction keeps the
+        meaning readable without relying on colour alone.
+      </p>
+
+      <nav class="jump">
+        <a href="#problem">the problem</a>
+        <a href="#rule">the rule</a>
+        <a href="#a">A · bean wash</a>
+        <a href="#b">B · name tape</a>
+        <a href="#c">C · sticker</a>
+        <a href="#tiers">three tiers</a>
+        <a href="#align">alignment</a>
+        <a href="#celebrate">celebrations</a>
+        <a href="#hue">colour = bean</a>
+        <a href="#faces">faces vs names</a>
+        <a href="#legend">legend</a>
+        <a href="#colour">colour uniqueness</a>
+        <a href="#drawer">details drawer</a>
+      </nav>
+
+      <!-- ══════════════ PROBLEM ══════════════ -->
+      <section id="problem">
+        <div class="sec-head">
+          <span class="badge neutral">today</span>
+          <h2>What ships now</h2>
+        </div>
+        <p class="why">
+          A 5px coloured edge on the left of each card. On the wall it is the member's colour for a
+          solo event and Heritage Orange, dashed, for a shared one. It is the only thing carrying
+          identity, and it fails four ways at once.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label bad">the shipped card</p>
+            <div class="today-body">
+              <button class="ev now" style="--c: var(--b-sofia)">
+                <span class="time">15:30</span>
+                <span class="title">Trumpet lesson</span>
+              </button>
+              <button class="ev now" style="--c: var(--b-max)">
+                <span class="time">16:00</span>
+                <span class="title">Swimming</span>
+              </button>
+              <button class="ev now" style="--c: var(--orange); border-left-style: dashed">
+                <span class="time">18:30</span>
+                <span class="title">Pizza night</span>
+              </button>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Two of these edges name a person. The third names a <i>relationship</i>. Nothing on the card says which kind of edge you are looking at.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label bad">why it doesn't land</p>
+            <ul class="pts">
+              <li><b>Unlabelled.</b> A colour means nothing until the mapping is memorised, and nothing on the card teaches it.</li>
+              <li><b>Duplicable.</b> Six colours, and the member modal assigns a <b>random</b> one — two beans can collide on the first try, so the mapping can be genuinely ambiguous rather than merely unlearned.</li>
+              <li><b>Two meanings, one device.</b> The wall's left edge means <i>who</i>; the planner's day and week grids use the same 5px edge for the <i>category</i> colour. The same signal answers two different questions in two places.</li>
+              <li><b>Colour-only.</b> Roughly 1 in 12 men cannot separate several of these hues at a 5px width. The dashed edge is the only non-colour cue, and it only marks shared.</li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="note">
+          <span class="mark">→</span>
+          <span>
+            <b>The bottom bar isn't a legend.</b> It is a person filter, and the face on each pill does
+            carry the member's colour — but the active state repaints the pill, and nothing pairs a
+            swatch to a bean. The one surface that could teach the mapping never states it.
+          </span>
+        </p>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ THE RULE ══════════════ -->
+      <section id="rule">
+        <div class="sec-head">
+          <span class="badge rec">the idea</span>
+          <h2>A face identifies, colour reinforces</h2>
+        </div>
+        <p class="why">
+          The fix underneath all three directions is the same swap: <b>the bean's face becomes the
+          identifier and colour becomes the reinforcement</b>, instead of colour carrying the whole
+          job alone. A face is self-teaching, survives duplication, and reads without colour vision.
+        </p>
+        <p class="why" style="margin-top: -.7rem">
+          That gives one structural rule worth stating plainly, because it also solves the
+          shared-versus-solo question for free:
+        </p>
+
+        <div class="panel" style="border-color: var(--orange); border-width: 1.5px">
+          <p class="panel-label good">the rule</p>
+          <p style="margin: 0; font-size: .95rem">
+            <b>A card shows the beans the surrounding context has not already named.</b>
+          </p>
+          <ul class="pts" style="margin-top: .7rem">
+            <li>In the wall's <b>bean lanes</b>, the lane header already is the bean, so a solo card shows no face. A <b>shared</b> card shows the <i>other</i> beans, because that is the new information.</li>
+            <li>In <b>today</b>, <b>agenda</b> and <b>month</b> views there is no lane, so every card shows its owners.</li>
+          </ul>
+          <p class="note" style="margin-top: .9rem">
+            <span class="mark">→</span>
+            <span>A face on a card inside a lane therefore always means <b>“someone else is in this too.”</b> Shared events differentiate themselves without a decorative treatment, which leaves the loud treatment free for genuinely special days.</span>
+          </p>
+        </div>
+
+        <div class="panel" style="margin-top: 1rem">
+          <p class="panel-label good">the decision this forced — now made</p>
+          <p style="margin: 0; font-size: .88rem; color: var(--muted)">
+            The planner's day and week grids used to colour by <b>category</b> while the wall coloured
+            by <b>member</b>, so one device answered two questions. That is settled: hue means the
+            <b>bean</b> on every surface, and category moves to the emoji it already owns. See
+            <a href="#hue" class="inline-link">colour means the bean</a> for the evidence — 95
+            categories cannot fit in a hue channel, and never could.
+          </p>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ DIRECTION A ══════════════ -->
+      <section id="a" class="a">
+        <div class="sec-head">
+          <span class="badge rec">A · recommended</span>
+          <h2>Bean wash</h2>
+        </div>
+        <p class="why">
+          The edge sliver becomes a soft wash of the bean's colour across the whole card, and the
+          avatar sits inline as the anchor. More colour area than a 5px edge, and it is always
+          attached to a face. Shared cards blend both owners' hues left to right and carry a hairline
+          in the first owner's colour.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label">wall · bean lanes</p>
+            <div class="lanes">
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="lane-name">sofia</span><span class="lane-count">3</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev" style="--c: var(--b-sofia)">
+                    <span class="body"><span class="time">15:30</span><span class="title">Trumpet lesson</span></span>
+                  </button>
+                  <button class="ev shared" style="--c: var(--b-sofia); --c2: var(--b-max)">
+                    <span class="stack" style="margin-top:.1rem"><span class="av xs" style="--c: var(--b-max)">M</span></span>
+                    <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-max)">M</span>
+                  <span class="lane-name">max</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                    <span class="stack" style="margin-top:.1rem"><span class="av xs" style="--c: var(--b-sofia)">S</span></span>
+                    <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                  </button>
+                  <button class="ev" style="--c: var(--b-max)">
+                    <span class="body"><span class="time">19:00</span><span class="title">Reading</span></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-leo)">L</span>
+                  <span class="lane-name">leo</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev" style="--c: var(--b-leo)">
+                    <span class="body"><span class="time">16:15</span><span class="title">Dentist</span></span>
+                  </button>
+                  <button class="ev everyone">
+                    <span class="stack" style="margin-top:.1rem">
+                      <span class="av xs" style="--c: var(--b-sofia)">S</span>
+                      <span class="av xs" style="--c: var(--b-max)">M</span>
+                      <span class="av xs" style="--c: var(--b-greg)">G</span>
+                    </span>
+                    <span class="body"><span class="time">18:30</span><span class="title">Pizza night</span></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-greg)">G</span>
+                  <span class="lane-name">greg</span><span class="lane-count">1</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev" style="--c: var(--b-greg)">
+                    <span class="body"><span class="time">20:40</span><span class="title">Flight home</span></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Only the shared cards carry faces. “Swim run” shows the same pairing from both sides.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label">today · no lane context</p>
+            <div class="today">
+              <div class="today-head">
+                <span>Wednesday</span><span>2 September</span>
+              </div>
+              <div class="today-body">
+                <button class="ev" style="--c: var(--b-sofia)">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="body"><span class="time">15:30</span><span class="title">Trumpet lesson</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-sofia); --c2: var(--b-max)">
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-sofia)">S</span>
+                    <span class="av" style="--c: var(--b-max)">M</span>
+                  </span>
+                  <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                </button>
+                <button class="ev everyone">
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-sofia)">S</span>
+                    <span class="av" style="--c: var(--b-max)">M</span>
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                  <span class="body"><span class="time">18:30</span><span class="title">Pizza night</span><span class="who">everyone</span></span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Same component, faces switched on. The stacked avatars are exactly the today-view treatment already shipped.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ DIRECTION B ══════════════ -->
+      <section id="b" class="b">
+        <div class="sec-head">
+          <span class="badge">B</span>
+          <h2>Name tape</h2>
+        </div>
+        <p class="why">
+          The card body stays white and neutral; identity lives in a small label-maker tape at the
+          top carrying the avatar and the name at full colour saturation. The most literal and the
+          easiest to read across a kitchen, but it costs a line of vertical space on every card and
+          repeats the name the lane header already gives.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label">wall · bean lanes</p>
+            <div class="lanes">
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="lane-name">sofia</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev">
+                    <span class="time">15:30</span><span class="title">Trumpet lesson</span>
+                  </button>
+                  <button class="ev">
+                    <span class="tape duo" style="--c: var(--b-sofia); --c2: var(--b-max)">
+                      <span class="av xs" style="--c: var(--b-max)">M</span> with max
+                    </span>
+                    <span class="time">17:00</span><span class="title">Swim run</span>
+                  </button>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-max)">M</span>
+                  <span class="lane-name">max</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev">
+                    <span class="tape duo" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                      <span class="av xs" style="--c: var(--b-sofia)">S</span> with sofia
+                    </span>
+                    <span class="time">17:00</span><span class="title">Swim run</span>
+                  </button>
+                  <button class="ev"><span class="time">19:00</span><span class="title">Reading</span></button>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-leo)">L</span>
+                  <span class="lane-name">leo</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev"><span class="time">16:15</span><span class="title">Dentist</span></button>
+                  <button class="ev">
+                    <span class="tape all">everyone</span>
+                    <span class="time">18:30</span><span class="title">Pizza night</span>
+                  </button>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-greg)">G</span>
+                  <span class="lane-name">greg</span><span class="lane-count">1</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev"><span class="time">20:40</span><span class="title">Flight home</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label">today · no lane context</p>
+            <div class="today">
+              <div class="today-head"><span>Wednesday</span><span>2 September</span></div>
+              <div class="today-body">
+                <button class="ev">
+                  <span class="tape" style="--c: var(--b-sofia)"><span class="av xs" style="--c: var(--b-sofia)">S</span> sofia</span>
+                  <span class="time">15:30</span><span class="title">Trumpet lesson</span>
+                </button>
+                <button class="ev">
+                  <span class="tape duo" style="--c: var(--b-sofia); --c2: var(--b-max)">
+                    <span class="av xs" style="--c: var(--b-sofia)">S</span>
+                    <span class="av xs" style="--c: var(--b-max); margin-left: -6px">M</span>
+                    &nbsp;sofia + max
+                  </span>
+                  <span class="time">17:00</span><span class="title">Swim run</span>
+                </button>
+                <button class="ev">
+                  <span class="tape all">everyone</span>
+                  <span class="time">18:30</span><span class="title">Pizza night</span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Strongest at a distance. Weakest in a dense lane: three tapes stacked is a lot of chrome for three events.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ DIRECTION C ══════════════ -->
+      <section id="c" class="c">
+        <div class="sec-head">
+          <span class="badge">C</span>
+          <h2>Sticker</h2>
+        </div>
+        <p class="why">
+          Each card is a die-cut sticker filled in the bean's colour, with the avatar as a raised
+          badge overhanging the left edge. The most decorative and the most fun at two metres, which
+          is the wall's real viewing distance. The trade-off is density: the overhang needs a gutter,
+          and a fully saturated lane gets loud.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label">wall · bean lanes</p>
+            <div class="lanes">
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="lane-name">sofia</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev" style="--c: var(--b-sofia)">
+                    <span class="time">15:30</span><span class="title">Trumpet</span>
+                  </button>
+                  <button class="ev shared" style="--c: var(--b-sofia)">
+                    <span class="av xs peel" style="--c: var(--b-max)">M</span>
+                    <span class="time">17:00</span><span class="title">Swim run</span>
+                  </button>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-max)">M</span>
+                  <span class="lane-name">max</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev shared" style="--c: var(--b-max)">
+                    <span class="av xs peel" style="--c: var(--b-sofia)">S</span>
+                    <span class="time">17:00</span><span class="title">Swim run</span>
+                  </button>
+                  <button class="ev" style="--c: var(--b-max)">
+                    <span class="time">19:00</span><span class="title">Reading</span>
+                  </button>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-leo)">L</span>
+                  <span class="lane-name">leo</span><span class="lane-count">2</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev" style="--c: var(--b-leo)">
+                    <span class="time">16:15</span><span class="title">Dentist</span>
+                  </button>
+                  <button class="ev shared" style="--c: var(--orange)">
+                    <span class="av xs peel" style="--c: var(--b-sofia)">S</span>
+                    <span class="av xs peel2" style="--c: var(--b-greg)">G</span>
+                    <span class="time">18:30</span><span class="title">Pizza night</span>
+                  </button>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-head">
+                  <span class="av" style="--c: var(--b-greg)">G</span>
+                  <span class="lane-name">greg</span><span class="lane-count">1</span>
+                </div>
+                <div class="lane-body">
+                  <button class="ev" style="--c: var(--b-greg)">
+                    <span class="time">20:40</span><span class="title">Flight home</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label">today · no lane context</p>
+            <div class="today">
+              <div class="today-head"><span>Wednesday</span><span>2 September</span></div>
+              <div class="today-body">
+                <button class="ev" style="--c: var(--b-sofia)">
+                  <span class="av peel" style="--c: var(--b-sofia)">S</span>
+                  <span class="time">15:30</span><span class="title">Trumpet lesson</span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max)">
+                  <span class="av peel" style="--c: var(--b-sofia)">S</span>
+                  <span class="av peel2" style="--c: var(--b-max)">M</span>
+                  <span class="time">17:00</span><span class="title">Swim run</span>
+                </button>
+                <button class="ev shared" style="--c: var(--orange)">
+                  <span class="av peel" style="--c: var(--b-leo)">L</span>
+                  <span class="av peel2" style="--c: var(--b-greg)">G</span>
+                  <span class="time">18:30</span><span class="title">Pizza night</span><span class="who">everyone</span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Highest charm, highest cost. Overlapping peel badges get fiddly past two owners.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ TIERS ══════════════ -->
+      <section id="tiers" class="a">
+        <div class="sec-head">
+          <span class="badge rec">A</span>
+          <h2>Three tiers, in order of loudness</h2>
+        </div>
+        <p class="why">
+          Solo and shared are separated only by the blend and the faces, which is the subtle
+          difference asked for. Everything decorative is saved for the third tier, so a birthday
+          actually looks like one.
+        </p>
+
+        <div class="tiers">
+          <div class="panel">
+            <div class="today-body">
+              <button class="ev" style="--c: var(--b-sofia)">
+                <span class="av" style="--c: var(--b-sofia)">S</span>
+                <span class="body"><span class="time">15:30</span><span class="title">Trumpet lesson</span></span>
+              </button>
+            </div>
+            <p class="tier-cap">1 · solo — one wash, one face</p>
+          </div>
+
+          <div class="panel">
+            <div class="today-body">
+              <button class="ev shared" style="--c: var(--b-sofia); --c2: var(--b-max)">
+                <span class="stack">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="av" style="--c: var(--b-max)">M</span>
+                </span>
+                <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+              </button>
+            </div>
+            <p class="tier-cap">2 · shared — blended wash, hairline, two faces</p>
+          </div>
+
+          <div class="panel">
+            <div class="today-body">
+              <button class="ev special" data-sticker="🎂">
+                <span class="conf"></span>
+                <span class="stack">
+                  <span class="av" style="--c: var(--b-leo)">L</span>
+                </span>
+                <span class="body">
+                  <span class="time">all day</span>
+                  <span class="title">Leo turns 8</span>
+                  <span class="kicker-note">happy birthday!</span>
+                </span>
+              </button>
+            </div>
+            <p class="tier-cap">3 · special — gradient border, sticker, confetti</p>
+          </div>
+        </div>
+
+        <p class="note">
+          <span class="mark">→</span>
+          <span>
+            Tier 3 is opt-in per event type — birthdays, milestones, holidays, celebrations — not
+            something an ordinary shared event can wander into. That is what keeps it special.
+          </span>
+        </p>
+
+        <div class="phones" style="margin-top: 1.6rem">
+          <div class="phone a">
+            <p class="phone-label">phone · agenda</p>
+            <div class="today-body">
+              <button class="ev" style="--c: var(--b-sofia)">
+                <span class="av" style="--c: var(--b-sofia)">S</span>
+                <span class="body"><span class="time">15:30</span><span class="title">Trumpet lesson</span></span>
+              </button>
+              <button class="ev shared" style="--c: var(--b-sofia); --c2: var(--b-max)">
+                <span class="stack">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="av" style="--c: var(--b-max)">M</span>
+                </span>
+                <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+              </button>
+              <button class="ev special" data-sticker="🎂">
+                <span class="conf"></span>
+                <span class="stack"><span class="av" style="--c: var(--b-leo)">L</span></span>
+                <span class="body"><span class="time">all day</span><span class="title">Leo turns 8</span></span>
+              </button>
+              <button class="ev everyone">
+                <span class="stack">
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                  <span class="av" style="--c: var(--b-max)">M</span>
+                  <span class="av" style="--c: var(--b-greg)">G</span>
+                </span>
+                <span class="body"><span class="time">18:30</span><span class="title">Pizza night</span></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="phone a">
+            <p class="phone-label">phone · one lane</p>
+            <div class="lane" style="min-height: 0">
+              <div class="lane-head">
+                <span class="av" style="--c: var(--b-max)">M</span>
+                <span class="lane-name">max</span><span class="lane-count">3</span>
+              </div>
+              <div class="lane-body">
+                <button class="ev" style="--c: var(--b-max)">
+                  <span class="body"><span class="time">08:00</span><span class="title">School run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                  <span class="stack"><span class="av xs" style="--c: var(--b-sofia)">S</span></span>
+                  <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                </button>
+                <button class="ev" style="--c: var(--b-max)">
+                  <span class="body"><span class="time">19:00</span><span class="title">Reading</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <hr class="rule" />
+
+      <!-- ══════════════ ALIGNMENT ══════════════ -->
+      <section id="align" class="a">
+        <div class="sec-head">
+          <span class="badge rec">A · refinement</span>
+          <h2>Where the faces go</h2>
+        </div>
+        <p class="why">
+          Faces inline on the left push the title right by a different amount on every card, so a
+          column of titles no longer starts at one x. That is the single thing a scanning eye needs.
+          The dashed rule below marks where the first card's title starts; watch it drift.
+        </p>
+
+        <div class="opt-grid">
+          <div class="panel">
+            <p class="panel-label bad">1 · inline left — as drawn</p>
+            <div class="rail" style="--guide: 43px">
+              <div class="today-body">
+                <button class="ev" style="--c: var(--b-max)">
+                  <span class="body"><span class="time">08:00</span><span class="title">School run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                  <span class="stack"><span class="av" style="--c: var(--b-sofia)">S</span></span>
+                  <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-leo)">
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                  <span class="body"><span class="time">18:00</span><span class="title">Cricket nets</span></span>
+                </button>
+                <button class="ev everyone">
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-sofia)">S</span>
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                  <span class="body"><span class="time">18:30</span><span class="title">Pizza night</span></span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">✕</span>
+              <span>Four cards, four different left edges. The title column is gone.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label good">2 · anchored right — recommended</p>
+            <div class="rail" style="--guide: 9px">
+              <div class="today-body right">
+                <button class="ev" style="--c: var(--b-max)">
+                  <span class="body"><span class="time">08:00</span><span class="title">School run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                  <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                  <span class="stack"><span class="av" style="--c: var(--b-sofia)">S</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-leo)">
+                  <span class="body"><span class="time">18:00</span><span class="title">Cricket nets</span></span>
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                </button>
+                <button class="ev everyone">
+                  <span class="body"><span class="time">18:30</span><span class="title">Pizza night</span></span>
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-sofia)">S</span>
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">✓</span>
+              <span>One left edge, and the right edge becomes a “who else” column you can scan on its own.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label">3 · fixed gutter</p>
+            <div class="rail" style="--guide: 63px">
+              <div class="today-body gutter">
+                <button class="ev" style="--c: var(--b-max)">
+                  <span class="stack"></span>
+                  <span class="body"><span class="time">08:00</span><span class="title">School run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                  <span class="stack"><span class="av" style="--c: var(--b-sofia)">S</span></span>
+                  <span class="body"><span class="time">17:00</span><span class="title">Swim run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-leo)">
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                  <span class="body"><span class="time">18:00</span><span class="title">Cricket nets</span></span>
+                </button>
+                <button class="ev everyone">
+                  <span class="stack">
+                    <span class="av" style="--c: var(--b-sofia)">S</span>
+                    <span class="av" style="--c: var(--b-leo)">L</span>
+                    <span class="av" style="--c: var(--b-greg)">G</span>
+                  </span>
+                  <span class="body"><span class="time">18:30</span><span class="title">Pizza night</span></span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">~</span>
+              <span>Aligned, but it reserves 54px of every card for something most cards don't have — and in a lane, solo cards carry no faces at all, so the gutter is empty far more often than it is used.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label">4 · own row, under the title</p>
+            <div class="rail" style="--guide: 9px">
+              <div class="today-body stackrow">
+                <button class="ev" style="--c: var(--b-max)">
+                  <span class="body"><span class="time">08:00</span><span class="title">School run</span></span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-sofia)">
+                  <span class="body">
+                    <span class="time">17:00</span><span class="title">Swim run</span>
+                    <span class="stack"><span class="av xs" style="--c: var(--b-sofia)">S</span></span>
+                  </span>
+                </button>
+                <button class="ev shared" style="--c: var(--b-max); --c2: var(--b-leo)">
+                  <span class="body">
+                    <span class="time">18:00</span><span class="title">Cricket nets</span>
+                    <span class="stack">
+                      <span class="av xs" style="--c: var(--b-leo)">L</span>
+                      <span class="av xs" style="--c: var(--b-greg)">G</span>
+                    </span>
+                  </span>
+                </button>
+                <button class="ev everyone">
+                  <span class="body">
+                    <span class="time">18:30</span><span class="title">Pizza night</span>
+                    <span class="stack">
+                      <span class="av xs" style="--c: var(--b-sofia)">S</span>
+                      <span class="av xs" style="--c: var(--b-leo)">L</span>
+                      <span class="av xs" style="--c: var(--b-greg)">G</span>
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">~</span>
+              <span>Perfect alignment and no width limit, but every shared card grows a line — costly in a dense lane, comfortable in the sheet.</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.4rem; border-color: var(--orange); border-width: 1.5px">
+          <p class="panel-label good">recommendation</p>
+          <p style="margin: 0 0 .6rem; font-size: .95rem">
+            <b>Anchor the faces right, and let only the right padding vary.</b>
+          </p>
+          <ul class="pts">
+            <li><b>The left edge never moves.</b> The stack is positioned against the card's right edge, so the title always starts at one x no matter how many beans are on it.</li>
+            <li><b>Only the wrap point changes.</b> A card with three faces reserves more room on the right, so a long title wraps a little earlier. That is a far smaller readability cost than a shifting left edge, and it degrades gracefully.</li>
+            <li><b>Cap at three plus a count.</b> Four or more shows three faces and <b>+2</b>, so the reserved width has a hard ceiling and a family of eight can't blow the card apart.</li>
+            <li><b>It earns a second read.</b> Down a lane, the right margin becomes a column of “who else is in this” that can be scanned without reading a single title.</li>
+            <li><b>Use option 4 where there is room</b> — the details sheet and the today view at full size — since those are read one at a time, not scanned as a column.</li>
+          </ul>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ CELEBRATIONS ══════════════ -->
+      <section id="celebrate" class="a">
+        <div class="sec-head">
+          <span class="badge rec">A · tier 3</span>
+          <h2>What counts as a celebration</h2>
+        </div>
+        <p class="why">
+          The category is the reliable signal and should always win. Title matching is the safety net
+          for the events nobody categorised, which in practice is most of them. It needs to be a net,
+          not a dragnet.
+        </p>
+
+        <div class="opt-grid">
+          <div class="panel">
+            <p class="panel-label good">matches — celebrates</p>
+            <div class="today-body right">
+              <button class="ev special" data-sticker="🎂">
+                <span class="conf"></span>
+                <span class="body"><span class="time">all day</span><span class="title">Leo's birthday</span></span>
+                <span class="stack"><span class="av" style="--c: var(--b-leo)">L</span></span>
+              </button>
+              <button class="ev special" data-sticker="🎉">
+                <span class="conf"></span>
+                <span class="body"><span class="time">19:00</span><span class="title">Our anniversary</span></span>
+                <span class="stack">
+                  <span class="av" style="--c: var(--b-greg)">G</span>
+                  <span class="av" style="--c: var(--b-sofia)">S</span>
+                </span>
+              </button>
+              <button class="ev special" data-sticker="🎂">
+                <span class="conf"></span>
+                <span class="body"><span class="time">14:00</span><span class="title">Max's bday party 🎂</span></span>
+                <span class="stack"><span class="av" style="--c: var(--b-max)">M</span></span>
+              </button>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>An emoji in the title is the strongest signal there is, and the only one that works in every language.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label bad">must not match — stays ordinary</p>
+            <div class="today-body right">
+              <button class="ev" style="--c: var(--b-greg)">
+                <span class="body"><span class="time">10:00</span><span class="title">Anniversary review with the board</span></span>
+                <span class="stack"><span class="av" style="--c: var(--b-greg)">G</span></span>
+              </button>
+              <button class="ev" style="--c: var(--b-sofia)">
+                <span class="body"><span class="time">11:00</span><span class="title">Buy birthday present for Leo</span></span>
+                <span class="stack"><span class="av" style="--c: var(--b-sofia)">S</span></span>
+              </button>
+              <button class="ev" style="--c: var(--b-max)">
+                <span class="body"><span class="time">16:00</span><span class="title">Party wall repair quote</span></span>
+                <span class="stack"><span class="av" style="--c: var(--b-max)">M</span></span>
+              </button>
+            </div>
+            <p class="note">
+              <span class="mark">✕</span>
+              <span>Errands <i>about</i> a celebration are not celebrations. A naive substring match confetti-bombs all three.</span>
+            </p>
+          </div>
+        </div>
+
+        <ul class="pts" style="margin-top: 1.2rem; max-width: 78ch">
+          <li><b>Category first, always.</b> An explicit celebration category wins outright and needs no guessing. Title matching runs only when the category is absent or generic.</li>
+          <li><b>Match on whole words, not substrings.</b> Otherwise “partygoer”, “Anniversary Road” and half the words containing “bday” light up.</li>
+          <li><b>Suppress on errand verbs.</b> A title starting <i>buy</i>, <i>book</i>, <i>order</i>, <i>collect</i>, <i>wrap</i>, <i>plan</i> or <i>pay</i> is preparation, not the day itself. This one rule kills most false positives.</li>
+          <li><b>Emoji is the best signal and the only universal one.</b> 🎂 🎉 🎈 🥳 🎊 in a title is near-certain intent, and it survives Chinese, beanie mode and every future language.</li>
+          <li><b>Word lists must be translated.</b> The app already ships Chinese; an English-only list means a Chinese family never sees a birthday card. The list belongs in the translation layer beside every other user-facing string, not hardcoded.</li>
+          <li><b>Give it an off switch.</b> A guess that cannot be corrected is worse than no guess. The activity form should show the celebration state as a toggle, so a wrong guess is one tap to fix and a missed one is one tap to add.</li>
+        </ul>
+      </section>
+
+
+      <hr class="rule" />
+
+      <!-- ══════════════ ONE MEANING FOR COLOUR ══════════════ -->
+      <section id="hue" class="a">
+        <div class="sec-head">
+          <span class="badge rec">decided</span>
+          <h2>Colour means the bean. Everywhere.</h2>
+        </div>
+        <p class="why">
+          The deferred question is answered: hue encodes <b>who</b> on every surface, and category
+          moves to the emoji it already owns. This is not consistency for its own sake — the numbers
+          say hue was never able to do the category job.
+        </p>
+
+        <div class="opt-grid">
+          <div class="panel">
+            <p class="panel-label bad">what category hue was being asked to do</p>
+            <p class="figure"><b>95</b> categories <span>·</span> <b>86</b> unique colours <span>·</span> <b>14</b> groups</p>
+            <p style="margin: .3rem 0 .8rem; font-size: .87rem; color: var(--muted)">
+              Nobody separates 86 hues. It is worse than the average suggests — the Appointments
+              group alone is five shades of red, rendered as a 5px edge:
+            </p>
+            <div class="swatch-run">
+              <span style="--c: #dc2626"><i></i>dentist</span>
+              <span style="--c: #ef4444"><i></i>doctor</span>
+              <span style="--c: #b91c1c"><i></i>eye exam</span>
+              <span style="--c: #f87171"><i></i>haircut</span>
+              <span style="--c: #fca5a5"><i></i>therapy</span>
+            </div>
+            <p class="note">
+              <span class="mark">✕</span>
+              <span>A signal this crowded is not a signal. We are not giving one up; we are retiring one that never worked.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label good">what member hue is asked to do</p>
+            <p class="figure"><b>6</b> colours <span>·</span> <b>4–8</b> beans <span>·</span> unique per family</p>
+            <p style="margin: .3rem 0 .8rem; font-size: .87rem; color: var(--muted)">
+              A small closed set, one colour each, reinforced by a face that names it outright:
+            </p>
+            <div class="swatch-run">
+              <span style="--c: var(--b-sofia)"><i></i>sofia</span>
+              <span style="--c: var(--b-max)"><i></i>max</span>
+              <span style="--c: var(--b-leo)"><i></i>leo</span>
+              <span style="--c: var(--b-greg)"><i></i>greg</span>
+            </div>
+            <p class="note">
+              <span class="mark">✓</span>
+              <span>Spend the low-cardinality channel on the low-cardinality dimension. Category takes the emoji, which has 95 of 95 coverage and 84 distinct glyphs.</span>
+            </p>
+          </div>
+        </div>
+
+        <h3 class="sub-h">The day and week grids, under the new rule</h3>
+        <div class="opt-grid">
+          <div class="panel">
+            <p class="panel-label bad">now — hue is the category</p>
+            <div class="grid-demo">
+              <div class="hours"><span>15</span><span>16</span><span>17</span><span>18</span></div>
+              <div class="gcol">
+                <div class="blk cat" style="--c: #dc2626; top: 4px; height: 52px">
+                  <span class="bt">15:30</span><span class="bn">Dentist</span>
+                </div>
+                <div class="blk cat" style="--c: #7c3aed; top: 62px; height: 52px">
+                  <span class="bt">16:30</span><span class="bn">Trumpet lesson</span>
+                </div>
+                <div class="blk cat dash" style="--c: #0ea5e9; top: 120px; height: 52px">
+                  <span class="bt">17:30</span><span class="bn">Swim run</span>
+                </div>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">✕</span>
+              <span>Three hues, none of which say whose afternoon this is. The dashed edge is the only owner-ish cue, and it only means “more than one”.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label good">proposed — hue is the bean, emoji is the category</p>
+            <div class="grid-demo">
+              <div class="hours"><span>15</span><span>16</span><span>17</span><span>18</span></div>
+              <div class="gcol">
+                <div class="blk mem" style="--c: var(--b-leo); top: 4px; height: 52px">
+                  <span class="bt">15:30 <span class="bem">🦷</span></span>
+                  <span class="bn">Dentist</span>
+                  <span class="bfaces"><span class="av xs" style="--c: var(--b-leo)">L</span></span>
+                </div>
+                <div class="blk mem" style="--c: var(--b-sofia); top: 62px; height: 52px">
+                  <span class="bt">16:30 <span class="bem">🎺</span></span>
+                  <span class="bn">Trumpet lesson</span>
+                  <span class="bfaces"><span class="av xs" style="--c: var(--b-sofia)">S</span></span>
+                </div>
+                <div class="blk mem dash shared2" style="--c: var(--b-sofia); --c2: var(--b-max); top: 120px; height: 52px">
+                  <span class="bt">17:30 <span class="bem">🏊</span></span>
+                  <span class="bn">Swim run</span>
+                  <span class="bfaces">
+                    <span class="av xs" style="--c: var(--b-sofia)">S</span>
+                    <span class="av xs" style="--c: var(--b-max)">M</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">✓</span>
+              <span>Whose is readable at a glance; what it is survives in the emoji; shared keeps its dashed edge as the cue that needs no colour vision.</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.4rem">
+          <p class="panel-label">three consequences worth stating</p>
+          <ul class="pts">
+            <li><b><code>activity.color</code> stops being written.</b> There is no colour picker in the activity form — the field is only ever assigned from <code>getActivityCategoryColor(newCategory)</code> and saved back, so it is a denormalised copy of the category colour, not a user choice. Retiring it costs nothing and stops a stale copy drifting from its category.</li>
+            <li><b>Heritage Orange keeps one job here.</b> A blended wash means <i>these specific beans</i>; Heritage Orange means <i>everybody</i>. Orange does not become a third kind of owner.</li>
+            <li><b>The dashed edge stays.</b> It is now redundant with hue and faces — and worth keeping anyway, as the one shared-state cue that survives colour blindness and does not require reading a face.</li>
+          </ul>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ FACE VS NAME ══════════════ -->
+      <section id="faces" class="a">
+        <div class="sec-head">
+          <span class="badge rec">decided</span>
+          <h2>Faces on cards, names in pickers</h2>
+        </div>
+        <p class="why">
+          The same member can be drawn two ways, and which one is right depends on what the member is
+          doing in that piece of UI. On a card the member <i>annotates</i> something else and is
+          double-encoded by hue, so an initial is enough. In a picker the member <b>is</b> the
+          content being chosen, and initials make it a guessing game.
+        </p>
+
+        <div class="opt-grid">
+          <div class="panel">
+            <p class="panel-label good">cards — face only</p>
+            <div class="today-body right" style="margin-bottom: .8rem">
+              <button class="ev" style="--c: var(--b-sofia)">
+                <span class="body"><span class="time">15:30 🎺</span><span class="title">Trumpet lesson</span></span>
+                <span class="stack"><span class="av" style="--c: var(--b-sofia)">S</span></span>
+              </button>
+            </div>
+            <div class="todo-list">
+              <div class="todo">
+                <span class="tick"></span>
+                <span class="t">Pack swimming kit</span>
+                <span class="stack"><span class="av xs" style="--c: var(--b-max)">M</span></span>
+              </div>
+              <div class="todo">
+                <span class="tick"></span>
+                <span class="t">Return library books</span>
+                <span class="stack">
+                  <span class="av xs" style="--c: var(--b-leo)">L</span>
+                  <span class="av xs" style="--c: var(--b-greg)">G</span>
+                </span>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Todo cards follow the same rule as event cards — the space saved is the point. Celebration styling does <b>not</b> extend to todos: a task about a birthday is preparation, not the day.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label good">pickers and filters — face plus name</p>
+            <p class="mini-cap">assigning a todo</p>
+            <div class="legend-row" style="margin-bottom: 1rem">
+              <button class="lg-new" style="--c: var(--b-sofia)"><span class="av xs" style="--c: var(--b-sofia)">S</span> sofia</button>
+              <button class="lg-new" style="--c: var(--b-max)"><span class="av xs" style="--c: var(--b-max)">M</span> max</button>
+              <button class="lg-new" style="--c: var(--b-leo)"><span class="av xs" style="--c: var(--b-leo)">L</span> leo</button>
+            </div>
+            <p class="mini-cap">filtering the wall</p>
+            <div class="legend-row">
+              <button class="lg-new" style="--c: var(--b-greg)"><span class="av xs" style="--c: var(--b-greg)">G</span> greg</button>
+              <button class="lg-new" style="--c: var(--b-leo)"><span class="av xs" style="--c: var(--b-leo)">L</span> leo</button>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Covers <code>FamilyChipPicker</code>, <code>TodoMemberFilter</code>, <code>MemberChipFilter</code> and <code>WallFooter</code> — every surface where you are choosing a person rather than reading about one.</span>
+            </p>
+          </div>
+        </div>
+
+        <h3 class="sub-h">When two beans share an initial</h3>
+        <div class="opt-grid">
+          <div class="panel">
+            <p class="panel-label bad">single letter — ambiguous</p>
+            <div class="face-demo">
+              <span><span class="av lg" style="--c: var(--b-max)">M</span>max</span>
+              <span><span class="av lg" style="--c: #ec4899">M</span>mia</span>
+            </div>
+            <p class="note">
+              <span class="mark">✕</span>
+              <span>Only colour tells them apart, so the face has stopped being self-sufficient — the exact dependency this whole change is trying to remove.</span>
+            </p>
+          </div>
+          <div class="panel">
+            <p class="panel-label good">two letters, only where they collide</p>
+            <div class="face-demo">
+              <span><span class="av lg two" style="--c: var(--b-max)">Ma</span>max</span>
+              <span><span class="av lg two" style="--c: #ec4899">Mi</span>mia</span>
+              <span><span class="av lg" style="--c: var(--b-leo)">L</span>leo</span>
+            </div>
+            <p class="note">
+              <span class="mark">✓</span>
+              <span>Applied per family and only on collision, so most beans keep a single clean letter. Photos, where set, always win over both.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ LEGEND ══════════════ -->
+      <section id="legend">
+        <div class="sec-head">
+          <span class="badge">supporting fix</span>
+          <h2>The legend should be the key it claims to be</h2>
+        </div>
+        <p class="why">
+          The wall's bottom bar is a person filter whose pills carry a coloured face — but the pill
+          itself is painted by selection state, so the colour that matters sits in a 32px circle
+          while a slate or white field surrounds it. Nothing pairs a swatch to a bean. Give each
+          entry the same wash the cards use and the pill becomes the key it was assumed to be, while
+          staying the filter it already is.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label bad">now — selection state outshouts the colour</p>
+            <div class="legend-row">
+              <span class="lg-old" style="background: var(--slate); color: #fff; border-color: transparent">
+                <span class="av xs" style="--c: var(--b-sofia)">S</span> sofia
+              </span>
+              <span class="lg-old"><span class="av xs" style="--c: var(--b-max)">M</span> max</span>
+              <span class="lg-old"><span class="av xs" style="--c: var(--b-leo)">L</span> leo</span>
+              <span class="lg-old"><span class="av xs" style="--c: var(--b-greg)">G</span> greg</span>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>The selected pill's own colour is gone. Two devices — face colour and fill state — competing in one 28px pill.</span>
+            </p>
+          </div>
+          <div class="panel">
+            <p class="panel-label good">proposed — face + wash, tap to filter</p>
+            <div class="legend-row">
+              <button class="lg-new" style="--c: var(--b-sofia)">
+                <span class="av xs" style="--c: var(--b-sofia)">S</span> sofia <span class="n">3</span>
+              </button>
+              <button class="lg-new" style="--c: var(--b-max)">
+                <span class="av xs" style="--c: var(--b-max)">M</span> max <span class="n">2</span>
+              </button>
+              <button class="lg-new" style="--c: var(--b-leo)">
+                <span class="av xs" style="--c: var(--b-leo)">L</span> leo <span class="n">2</span>
+              </button>
+              <button class="lg-new" style="--c: var(--b-greg)">
+                <span class="av xs" style="--c: var(--b-greg)">G</span> greg <span class="n">1</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ COLOUR ══════════════ -->
+      <section id="colour">
+        <div class="sec-head">
+          <span class="badge">supporting fix</span>
+          <h2>One colour, one bean</h2>
+        </div>
+        <p class="why">
+          No visual system survives two beans holding the same colour, and today the member modal
+          assigns one <b>at random</b> from six. Colours already taken are shown as taken and cannot
+          be picked, with the owner's face on the swatch so the reason needs no sentence. New beans
+          take the next free colour instead of a random one, so a family never has to think about
+          this at all.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label good">leo's colour — taken colours are out</p>
+            <div class="sw-grid">
+              <span class="sw-wrap"><button class="sw taken" style="--c: var(--m-blue)"></button><span class="av xs sw-owner" style="--c: var(--m-blue)">M</span></span>
+              <button class="sw" style="--c: var(--m-red)"></button>
+              <button class="sw sel" style="--c: var(--m-green)"></button>
+              <span class="sw-wrap"><button class="sw taken" style="--c: var(--m-amber)"></button><span class="av xs sw-owner" style="--c: var(--m-amber)">G</span></span>
+              <span class="sw-wrap"><button class="sw taken" style="--c: var(--m-violet)"></button><span class="av xs sw-owner" style="--c: var(--m-violet)">S</span></span>
+              <button class="sw" style="--c: var(--m-pink)"></button>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>Hatched and dimmed means taken. The face says by whom.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label">two things worth deciding here</p>
+            <ul class="pts">
+              <li><b>Six colours is the ceiling on unique beans.</b> Fine for most families, tight for a big one. Either extend the palette to eight or nine, or let the seventh bean reuse a colour and lean on the face to disambiguate — which the face treatment now makes safe.</li>
+              <li><b>Red is in the member palette.</b> The brand reserves red for destructive actions and hard validation errors, so a bean wearing <span style="color:#ef4444;font-weight:600">#ef4444</span> puts an alarm colour on a child's swimming lesson. Worth swapping for a warmer hue — a rose or coral that reads as a person, not a warning.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <hr class="rule" />
+
+      <!-- ══════════════ DRAWER ══════════════ -->
+      <section id="drawer">
+        <div class="sec-head">
+          <span class="badge">separate change</span>
+          <h2>Details drawer — one field, one job</h2>
+        </div>
+        <p class="why">
+          In the wall's sheet, when an event has no location the category takes over that hero cell
+          and prints its name as a word — so one slot means two unrelated things, and the category
+          appears as prose the app never uses anywhere else. The planner's own activity modal has no
+          such fallback: it shows location only when there is one, and gives the category its own
+          coloured badge with its emoji. Fixing the wall aligns the two and frees the category to be
+          shown the way the rest of the app already speaks about it.
+        </p>
+
+        <div class="cols">
+          <div class="panel">
+            <p class="panel-label bad">now</p>
+            <div class="drawer">
+              <h4>Trumpet lesson</h4>
+              <p class="dsub">Wednesday 2 September</p>
+              <div class="fields">
+                <div class="field">
+                  <div class="fi" style="background: rgba(44,62,80,.07); color: var(--muted)">·</div>
+                  <div><p class="fl">When</p><p class="fv">15:30 – 16:15</p></div>
+                </div>
+                <div class="field">
+                  <div class="fi" style="background: rgba(44,62,80,.07); color: var(--muted)">·</div>
+                  <div><p class="fl">Location</p><p class="fv">Music</p></div>
+                </div>
+                <div class="field">
+                  <div class="fi" style="background: rgba(44,62,80,.07); color: var(--muted)">·</div>
+                  <div><p class="fl">Who's going</p><p class="fv">Sofia</p></div>
+                </div>
+              </div>
+            </div>
+            <p class="note">
+              <span class="mark">→</span>
+              <span>“Music” is a category wearing a location's label. No icons, so every row scans the same.</span>
+            </p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-label good">proposed</p>
+            <div class="drawer">
+              <h4>Trumpet lesson</h4>
+              <p class="dsub">Wednesday 2 September</p>
+              <div class="fields">
+                <div class="field">
+                  <div class="fi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                  </div>
+                  <div><p class="fl">When</p><p class="fv">Wed 2 Sep · 15:30 – 16:15</p></div>
+                </div>
+                <div class="field">
+                  <div class="fi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  </div>
+                  <div><p class="fl">Location</p><p class="fv empty">No location — <a class="link">add one</a></p></div>
+                </div>
+                <div class="field">
+                  <div class="fi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 3.4a2 2 0 0 0-1.4-.6H13L3 12.8a2 2 0 0 0 0 2.8l4.4 4.4a2 2 0 0 0 2.8 0L21 10V4.8a2 2 0 0 0-.4-1.4Z"/><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+                  </div>
+                  <div><p class="fl">Category</p><p class="fv"><span class="cat-pill">🎺 Music</span></p></div>
+                </div>
+                <div class="field">
+                  <div class="fi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                  </div>
+                  <div>
+                    <p class="fl">Who's going</p>
+                    <p class="fv" style="display:flex;align-items:center;gap:.35rem">
+                      <span class="av xs" style="--c: var(--b-sofia)">S</span> Sofia
+                    </p>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="fi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2v6M21 5h-8M3 12a9 9 0 0 0 15 6.7M21 12a9 9 0 0 0-3-6.7"/><path d="M3 17v-5h5"/></svg>
+                  </div>
+                  <div><p class="fl">Repeats</p><p class="fv">Every Wednesday</p></div>
+                </div>
+                <div class="field">
+                  <div class="fi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12l-4 4H4Z"/><path d="M16 20v-4h4M8 9h8M8 13h5"/></svg>
+                  </div>
+                  <div><p class="fl">Notes</p><p class="fv empty">None yet</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ul class="pts" style="margin-top: 1.1rem; max-width: 76ch">
+          <li><b>Location means location.</b> When there is none, the row says so and offers the action, rather than borrowing another field's value.</li>
+          <li><b>Category gets its own row</b> with its emoji and pill — the vocabulary the picker and the chips already use.</li>
+          <li><b>Icons in tinted squircles</b> at 30px, matching the 44px form icon boxes elsewhere, so every row is findable by shape before it is read. These should come from <code>BeanieIcon</code> and the <code>src/constants/icons.ts</code> registry rather than fresh inline SVG — the planner's location pin is currently inline and would move to the registry with them.</li>
+          <li><b>Empty rows stay visible</b> so the drawer's shape is stable between events, and each one is a place to add rather than a blank.</li>
+          <li><b>Free win while we're in here:</b> the sheet builds its rows from <code>activityDetailRows</code>, whose entries already carry an optional <code>memberId</code> "so a renderer can show their avatar" — and the wall currently ignores it. Dropoff and pickup can wear the bean's face for nothing.</li>
+        </ul>
+      </section>
+    </div>
+  </body>
+</html>

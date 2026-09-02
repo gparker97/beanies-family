@@ -17,7 +17,8 @@
  * loudest complaint about the first cut of this screen.
  */
 import { computed } from 'vue';
-import WallMemberFace from '@/components/wall/WallMemberFace.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import WallCard from '@/components/wall/WallCard.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -171,6 +172,8 @@ const tripDates = computed(() => {
   );
   return `${start} – ${end}`;
 });
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -254,7 +257,12 @@ const tripDates = computed(() => {
         :key="entry.member?.id ?? 'unassigned'"
         class="flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0 dark:border-slate-700"
       >
-        <WallMemberFace v-if="entry.member" :member="entry.member" size="sm" />
+        <BeanieAvatar
+          v-if="entry.member"
+          v-bind="memberAvatarBindings(entry.member)"
+          fallback="initials"
+          size="sm"
+        />
         <span
           v-else
           class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#95a5a6] text-xs font-bold text-white"

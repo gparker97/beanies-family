@@ -5,6 +5,7 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { useAccountMemberInfo } from '@/composables/useAccountMemberInfo';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -52,7 +53,8 @@ const assetsStore = useAssetsStore();
 const activityStore = useActivityStore();
 const goalsStore = useGoalsStore();
 const recurringStore = useRecurringStore();
-const { getMemberNameByAccountId, getMemberName } = useMemberInfo();
+const { getMemberNameByAccountId } = useAccountMemberInfo();
+const { getMemberName } = useMemberInfo();
 
 // Live-lookup from store so display stays reactive after inline edits
 const transaction = computed(() =>

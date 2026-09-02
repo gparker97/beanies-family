@@ -8,6 +8,9 @@ import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { refreshRosterCache } from '@/services/auth/rosterCache';
+import { computeInitials } from '@/utils/memberInitials';
+import { isBlankMemberColor } from '@/constants/memberColors';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
@@ -70,6 +73,39 @@ export const useFamilyStore = defineStore('family', () => {
 
   /** True when at least one pet exists — handy for conditional UI. */
   const hasPets = computed(() => members.value.some((m) => m.isPet));
+
+  /**
+   * Display initials per member id — one letter, or two where two beans in this
+   * family share a first letter.
+   *
+   * Computed once for the whole roster rather than per face: collision is a
+   * property of the SET, so a per-member helper would rescan the roster on every
+   * face on every render (O(n²) per card stack, on a month grid painting 100+
+   * faces). Every avatar is a map read.
+   */
+  const initialsById = computed(() => computeInitials(members.value));
+
+  /**
+   * A bean with no usable colour renders a neutral face wherever hue is the
+   * identity signal, which is a data defect worth counting — but `resolveMemberColor`
+   * runs on the render path, so it cannot be the thing that reports it (it would be
+   * rate-capped inside a single paint, and would need mutable state in a constants
+   * file). Reported here instead: once per roster change, O(n), off the render path.
+   */
+  watch(
+    members,
+    (list) => {
+      const blank = list.filter((m) => !m.isPet && isBlankMemberColor(m.color));
+      if (blank.length === 0) return;
+      logEvent({
+        level: 'warn',
+        surface: 'member-colour',
+        message: 'member has no usable colour',
+        context: { action: 'missing-colour', count: blank.length },
+      });
+    },
+    { immediate: true }
+  );
 
   // Keep the device-local pre-decrypt roster cache current (2026-08-28 login rethink).
   // Every mutation path replaces `members.value` wholesale, so a shallow watch on the
@@ -711,6 +747,7 @@ export const useFamilyStore = defineStore('family', () => {
     humans,
     sortedHumans,
     hasPets,
+    initialsById,
     // Actions
     loadMembers,
     createMember,

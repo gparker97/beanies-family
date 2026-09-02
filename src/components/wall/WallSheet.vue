@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActivityChipClass } from '@/composables/useActivityChipClass';
 /**
  * The drill-in sheet — the wall's ONE answer to "what happens when I touch it".
  *
@@ -22,7 +23,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { normalizeAssignees } from '@/utils/assignees';
+
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
 import { wallActivityColour, wallEvents } from '@/utils/wallActivities';
 import { activityDetailRows } from '@/utils/activityDetails';
@@ -35,7 +36,7 @@ import {
   tripTypeEmoji,
 } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { FamilyList, FamilyMember } from '@/types/models';
+import type { FamilyList, FamilyMember, FamilyActivity } from '@/types/models';
 import { UNASSIGNED } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup, WallSheetTarget, WallTodoBucket } from '@/types/wall';
 
@@ -267,15 +268,20 @@ const detailRows = computed(() => {
   });
 });
 
-function membersFor(ids: string[]): FamilyMember[] {
-  return ids
-    .map((id) => familyStore.members.find((m) => m.id === id))
-    .filter((m): m is FamilyMember => !!m);
+/**
+ * Whose activity this is. Delegates to `classifyActivityChip` rather than mapping
+ * raw ids through `.find()` — the old version had no dedupe, so a duplicated
+ * assignee id from a CRDT merge rendered the same bean twice.
+ */
+function membersForActivity(activity: FamilyActivity): FamilyMember[] {
+  return classify(activity).members;
 }
 /** Whose list this is — blank when the owner is not a member we know. */
 function listOwnerName(list: FamilyList): string {
   return familyStore.members.find((m) => m.id === list.ownerId)?.name ?? '';
 }
+
+const { classify } = useActivityChipClass();
 </script>
 
 <template>
@@ -328,7 +334,7 @@ function listOwnerName(list: FamilyList): string {
             </span>
             <span class="flex shrink-0">
               <BeanieAvatar
-                v-for="person in membersFor(normalizeAssignees(entry.activity))"
+                v-for="person in membersForActivity(entry.activity)"
                 :key="person.id"
                 :variant="getMemberAvatarVariant(person)"
                 :color="person.color"
@@ -417,7 +423,7 @@ function listOwnerName(list: FamilyList): string {
             </div>
             <div class="mt-4 flex flex-wrap items-center gap-2">
               <span
-                v-for="person in membersFor(normalizeAssignees(activity))"
+                v-for="person in membersForActivity(activity)"
                 :key="person.id"
                 class="flex items-center gap-2 rounded-full bg-[var(--tint-slate-5)] px-3 py-1"
               >

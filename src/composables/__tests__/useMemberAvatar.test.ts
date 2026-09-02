@@ -1,3 +1,4 @@
+import { NEUTRAL_MEMBER_COLOR } from '@/constants/memberColors';
 import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import {
@@ -57,7 +58,10 @@ describe('useMemberAvatar', () => {
     const memberRef = ref<FamilyMember | null>(null);
     const { variant, color } = useMemberAvatar(memberRef);
     expect(variant.value).toBe('adult-other');
-    expect(color.value).toBe('#3b82f6');
+    // Neutral grey, not blue. This was a FOURTH member-colour fallback and the only one
+    // that was a real palette hue — so a colourless bean looked like a genuine blue bean
+    // here and grey everywhere else. All four now go through `resolveMemberColor`.
+    expect(color.value).toBe(NEUTRAL_MEMBER_COLOR);
   });
 
   it('returns correct variant and color for a member', () => {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -75,6 +77,8 @@ function toggle(id: string) {
 }
 
 const avatarSize = computed(() => (props.compact ? 'h-6 w-6 text-xs' : 'h-7 w-7 text-xs'));
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -115,13 +119,7 @@ const avatarSize = computed(() => (props.compact ? 'h-6 w-6 text-xs' : 'h-7 w-7 
       "
       @click="toggle(member.id)"
     >
-      <span
-        class="flex items-center justify-center rounded-full font-semibold text-white"
-        :class="avatarSize"
-        :style="{ background: `linear-gradient(135deg, ${member.color}, ${member.color}dd)` }"
-      >
-        {{ member.name.charAt(0).toUpperCase() }}
-      </span>
+      <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="xs" />
       <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200">
         {{ member.name }}
       </span>

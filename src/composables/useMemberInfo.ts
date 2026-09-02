@@ -1,37 +1,25 @@
 import { useFamilyStore } from '@/stores/familyStore';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { usePhotoStore } from '@/stores/photoStore';
+import { NEUTRAL_MEMBER_COLOR } from '@/constants/memberColors';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { FamilyMember, UUID } from '@/types/models';
+import type { FamilyMember } from '@/types/models';
 
-const DEFAULT_COLOR = '#6b7280';
+/**
+ * This module deliberately does NOT import a finance store.
+ *
+ * It used to import `useAccountsStore` for two account-keyed helpers, which put
+ * `accountsStore` into the import graph of everything that touched a member
+ * name or colour — including the beanie wall, whose lint fence
+ * (`eslint.config.js`, FINANCE EXCLUSION) catches direct imports only and could
+ * never have seen it. Those two helpers now live in `useAccountMemberInfo`.
+ * Keep this module finance-free.
+ */
+const DEFAULT_COLOR = NEUTRAL_MEMBER_COLOR;
+
+// Re-exported from `useMemberAvatar` (which is store-light and photo-only) so the
+// existing import sites here keep working. See that module for why they moved.
+export { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberAvatar';
 
 type TranslateFn = (key: UIStringKey) => string;
-
-/**
- * Public Drive CDN URL for a member's avatar photo, or `null` if the
- * member has no photo or the photo has been flagged unresolved.
- * Shared helper for the dozen-ish avatar call sites across the app —
- * previously each site either skipped `photo-url` entirely (breaking
- * rendering) or re-implemented the same 2-line lookup.
- *
- * Sync. Deterministic from `driveFileId` via `photoStore.getPublicUrl`.
- */
-export function getMemberAvatarUrl(member: { avatarPhotoId?: UUID }): string | null {
-  if (!member.avatarPhotoId) return null;
-  return usePhotoStore().getPublicUrl(member.avatarPhotoId, 'thumb');
-}
-
-/**
- * Flag a member's avatar photo as unresolved when the `<img>` load
- * errors (typically a genuine Drive 404 for a deleted file). Call from
- * the `@photo-error` handler on `<BeanieAvatar>`. No-op when the
- * member has no photo set.
- */
-export function markMemberAvatarError(member: { avatarPhotoId?: UUID }): void {
-  if (!member.avatarPhotoId) return;
-  usePhotoStore().markUnresolved(member.avatarPhotoId);
-}
 
 /**
  * Whether a member is a grown-up (a "Parent" bean): a human whose
@@ -87,29 +75,19 @@ export function useMemberInfo() {
     return getMemberById(memberId)?.name ?? fallback;
   }
 
+  /**
+   * `?? fallback` let an EMPTY STRING through, so a member whose colour was `''`
+   * rendered a transparent chip. Harmless while hue was decorative; a blank card
+   * now that hue is the identity signal.
+   */
   function getMemberColor(memberId: string | null | undefined, fallback = DEFAULT_COLOR): string {
-    return getMemberById(memberId)?.color ?? fallback;
-  }
-
-  function getMemberNameByAccountId(accountId: string, fallback = 'Unknown'): string {
-    const accountsStore = useAccountsStore();
-    const account = accountsStore.accounts.find((a) => a.id === accountId);
-    if (!account) return fallback;
-    return getMemberName(account.memberId, fallback);
-  }
-
-  function getMemberColorByAccountId(accountId: string, fallback = DEFAULT_COLOR): string {
-    const accountsStore = useAccountsStore();
-    const account = accountsStore.accounts.find((a) => a.id === accountId);
-    if (!account) return fallback;
-    return getMemberColor(account.memberId, fallback);
+    const c = getMemberById(memberId)?.color;
+    return c && c.trim() ? c : fallback;
   }
 
   return {
     getMemberById,
     getMemberName,
     getMemberColor,
-    getMemberNameByAccountId,
-    getMemberColorByAccountId,
   };
 }
