@@ -109,6 +109,44 @@ test.describe('design screenshots', () => {
             createdAt: stamp,
             updatedAt: stamp,
           })),
+          todos: [
+            {
+              id: 't1',
+              title: 'Pack swimming kit',
+              assigneeIds: ['m-max'],
+              isCompleted: false,
+              priority: 'medium',
+              createdAt: stamp,
+              updatedAt: stamp,
+            },
+            {
+              id: 't2',
+              title: 'Return library books',
+              assigneeIds: ['m-leo', 'm-greg'],
+              isCompleted: false,
+              priority: 'low',
+              createdAt: stamp,
+              updatedAt: stamp,
+            },
+            {
+              id: 't3',
+              title: 'Sign permission slip',
+              assigneeIds: [],
+              isCompleted: false,
+              priority: 'high',
+              createdAt: stamp,
+              updatedAt: stamp,
+            },
+            {
+              id: 't4',
+              title: 'Book dentist follow-up',
+              assigneeIds: ['m-sofia'],
+              isCompleted: true,
+              priority: 'medium',
+              createdAt: stamp,
+              updatedAt: stamp,
+            },
+          ],
           activities: activities.map((a, i) => ({
             id: `act-${i}`,
             title: a.t,
@@ -211,6 +249,24 @@ test.describe('design screenshots', () => {
     // Automerge doc, so navigating back leaves an empty family and the app-content wait
     // never resolves.
     await page.evaluate(() => document.getElementById('tier-closeup')?.remove());
+
+    // To-dos: face chips replace the old full-name pills on CARDS.
+    await gotoRoute(page, '/todo');
+    await page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
+    await page.waitForTimeout(1800);
+    await shoot('08-todos');
+
+    // The beanie wall, which ships behind an off flag — forced on locally so the
+    // surface this whole design was drawn for can actually be reviewed.
+    await page.evaluate(() => localStorage.setItem('beanies:flag:beanieWall', 'true'));
+    await gotoRoute(page, '/wall');
+    await page.waitForTimeout(3000);
+    await shoot('09-wall', 1600, 1000);
+
+    await gotoRoute(page, '/activities');
+    await page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
+    await page.getByRole('button', { name: 'All Members' }).click();
+    await page.waitForTimeout(1200);
 
     // Dark mode on the densest surface.
     await page.setViewportSize({ width: 1440, height: 950 });

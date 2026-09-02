@@ -26,7 +26,11 @@ const isAllDay = computed(() => !props.activity.startTime);
   <button
     type="button"
     class="wall-chip flex shrink-0 items-center gap-2 rounded-xl border-l-[5px] px-2.5 py-1.5 text-left"
-    :class="identity.dashed ? 'border-dashed' : ''"
+    :class="[
+      identity.dashed ? 'border-dashed' : '',
+      identity.celebration.celebrating ? 'is-celebration' : '',
+    ]"
+    :data-sticker="identity.sticker"
     :style="identity.style"
     @click="$emit('open')"
   >

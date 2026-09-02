@@ -832,3 +832,43 @@
   clip-path: polygon(0 0, 100% 0, 70% 20%, 100% 40%, 70% 60%, 100% 80%, 100% 100%, 0 100%);
   right: -0.375rem;
 }
+
+/*
+ * Tier 3 of the card system: a genuine celebration (a birthday, an anniversary).
+ *
+ * Defined once, in CSS, because four surfaces render it and the whole point of the
+ * tier is that it is the ONLY loud thing on the board — four hand-rolled versions
+ * would drift and the loudness would stop meaning anything.
+ *
+ * Solo and shared cards are separated only by a blend and a face; everything
+ * decorative is saved for here, so a birthday actually looks like one.
+ */
+.is-celebration {
+  background:
+    linear-gradient(var(--celebration-surface, #fff), var(--celebration-surface, #fff)) padding-box,
+    linear-gradient(115deg, #f15d22, #e67e22 60%, #aed6f1) border-box !important;
+  border: 2px solid transparent;
+  border-left-color: transparent !important;
+  box-shadow: 0 3px 14px rgb(241 93 34 / 16%);
+  position: relative;
+}
+
+.dark .is-celebration {
+  --celebration-surface: #1e293b;
+}
+
+/* The sticker overhangs the corner, which is what makes it read as applied rather
+   than printed. `pointer-events: none` so it never eats a tap on the card. */
+.is-celebration::after {
+  background: var(--celebration-surface, #fff);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgb(44 62 80 / 18%);
+  content: attr(data-sticker);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.16rem;
+  pointer-events: none;
+  position: absolute;
+  right: -6px;
+  top: -9px;
+}
