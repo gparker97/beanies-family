@@ -3,7 +3,11 @@ import { useActivityChipClass, type ActivityChipClass } from '@/composables/useA
 import { useTranslationStore } from '@/stores/translationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { activityEmoji } from '@/utils/activityEmoji';
-import { isCelebrationActivity, type CelebrationVerdict } from '@/utils/activityCelebration';
+import {
+  celebrationSticker,
+  isCelebrationActivity,
+  type CelebrationVerdict,
+} from '@/utils/activityCelebration';
 import { resolveMemberColor } from '@/constants/memberColors';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
@@ -44,6 +48,8 @@ export interface ActivityIdentity {
   /** The category glyph — what the activity IS, now that hue says whose it is. */
   emoji: string;
   celebration: CelebrationVerdict;
+  /** Corner sticker for a celebrating card; empty string when it is not one. */
+  sticker: string;
   /**
    * Wash + edge, for surfaces whose background IS the wash (grid blocks, chips).
    *
@@ -191,13 +197,16 @@ export function useActivityIdentity() {
         : { borderLeftColor: color, background: wash(color) };
 
     const edgeStyle: Record<string, string> = { borderLeftColor: style.borderLeftColor! };
+    const emoji = activityEmoji(activity);
+    const celebration = celebrationFor(activity, opts.celebrationOverride);
 
     return {
       color,
       kind: c.kind,
       stackMembers,
-      emoji: activityEmoji(activity),
-      celebration: celebrationFor(activity, opts.celebrationOverride),
+      emoji,
+      celebration,
+      sticker: celebration.celebrating ? celebrationSticker(emoji) : '',
       style,
       edgeStyle,
       dashed,

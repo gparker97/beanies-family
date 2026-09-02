@@ -52,7 +52,11 @@ const identity = computed(() => identityFor(props.activity));
   <button
     type="button"
     class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-800"
-    :class="identity.dashed ? 'border-dashed' : ''"
+    :class="[
+      identity.dashed ? 'border-dashed' : '',
+      identity.celebration.celebrating ? 'is-celebration' : '',
+    ]"
+    :data-sticker="identity.sticker"
     :style="identity.edgeStyle"
     @click="$emit('click')"
   >

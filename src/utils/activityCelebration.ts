@@ -136,3 +136,16 @@ export function isCelebrationActivity(
 
   return { celebrating: true, rule: 'keyword', suppressed: null };
 }
+
+/**
+ * The glyph that overhangs a celebrating card's corner.
+ *
+ * Derived from the activity's own emoji when that already reads as celebratory (a
+ * birthday category gives 🎂), so the sticker echoes the card rather than contradicting
+ * it; 🎉 otherwise.
+ */
+const CELEBRATORY_GLYPHS = new Set(['🎂', '🎉', '🎈', '🥳', '🍰', '💍', '🎓', '💒', '🍼']);
+
+export function celebrationSticker(emoji: string): string {
+  return CELEBRATORY_GLYPHS.has(emoji) ? emoji : '🎉';
+}
