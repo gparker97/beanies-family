@@ -97,7 +97,13 @@ function onClick(event: MouseEvent) {
   <button
     type="button"
     class="font-inter text-secondary-500 flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80 dark:text-gray-200"
-    :class="identity.dashed ? 'border-dashed' : ''"
+    :class="[
+      identity.dashed ? 'border-dashed' : '',
+      // No `data-sticker` here: the chip is `overflow-hidden` for title truncation, so
+      // an overhanging sticker would be clipped away. The gradient border plus the
+      // category emoji already inline carry it at this size.
+      identity.celebration.celebrating ? 'is-celebration' : '',
+    ]"
     :style="identity.style"
     :aria-label="ariaLabel"
     data-testid="month-chip"
