@@ -274,7 +274,10 @@ const detailRows = computed(() => {
  * assignee id from a CRDT merge rendered the same bean twice.
  */
 function membersForActivity(activity: FamilyActivity): FamilyMember[] {
-  return classify(activity).members;
+  const c = classify(activity);
+  // See WallTodayView: an unowned event is everyone's, but the uncapped stack this
+  // renders would put the whole family in a row sized for two. Phase 2 adds the cap.
+  return c.kind === 'family' ? [] : c.members;
 }
 /** Whose list this is — blank when the owner is not a member we know. */
 function listOwnerName(list: FamilyList): string {

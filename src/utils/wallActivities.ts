@@ -6,8 +6,7 @@
  * and two of them had already drifted apart by the time this file existed.
  */
 import { effectiveAssignees, matchesAssigneeFilter } from '@/utils/assignees';
-import { SHARED_EVENT_COLOR } from '@/constants/memberColors';
-import { getActivityColor } from '@/stores/activityStore';
+import { SHARED_EVENT_COLOR, resolveMemberColor } from '@/constants/memberColors';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 export interface WallOccurrence {
@@ -81,5 +80,12 @@ export function wallActivityColour(
   // this, a record carrying one real member plus one stale id read as shared.
   const owners = effectiveAssignees(activity, (id) => membersById.has(id));
   if (owners.length !== 1) return SHARED_EVENT_COLOR;
-  return membersById.get(owners[0]!)?.color || getActivityColor(activity);
+  // Falls back to NEUTRAL, not the category colour. `|| getActivityColor(activity)` sent
+  // a colourless bean's event to a CATEGORY hue — and nine category colours are
+  // byte-identical to member hues (`drum` and `after_school` are both #3B82F6, the pod
+  // owner's default). So a colourless child's after-school club rendered as Dad's event
+  // on the one screen where hue is the sole identity signal, while the face beside it
+  // showed neutral grey. `resolveMemberColor` also absorbs the empty string the `||`
+  // was silently covering for.
+  return resolveMemberColor(membersById.get(owners[0]!)?.color);
 }
