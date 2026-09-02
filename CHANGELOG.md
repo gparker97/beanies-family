@@ -17,7 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- **A birthday now looks like one.** A celebration is marked by a bunting edge, like a row of party flags along the top of the card, with a scatter of beans across the wider ones. The orange border it used to have has gone: orange already means today, selected, and needs-attention elsewhere, so a birthday read as an alert, and that border was covering up the colour that says whose card it is.
+- **A birthday now looks like one.** A celebration is marked by a scatter of beans across the card, on every surface that shows it: the month, the week, the day, the beanie wall and the details drawer. Opening the drawer rains them in once and lets them settle. The orange border it used to have has gone: orange already means today, selected, and needs-attention elsewhere, so a birthday read as an alert, and that border was covering up the colour that says whose card it is.
 - **New activities are one-off by default.** Repeating is now something you choose, rather than something you have to turn off.
 - **The wall's activity details lead with the two things you walk over to check.** When and where now carry icons, like the rows beneath them, and the category has moved up beside the title as its emoji rather than being spelled out as a word in a box of its own.
 - **Tapping a day on the wall's today view moves the view to that day**, meals card included, rather than opening a sheet over it.

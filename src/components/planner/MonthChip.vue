@@ -20,6 +20,7 @@
  */
 import { computed } from 'vue';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { formatNameList, normalizeAssignees } from '@/utils/assignees';
@@ -109,6 +110,11 @@ function onClick(event: MouseEvent) {
     data-testid="month-chip"
     @click="onClick"
   >
+    <CelebrationConfetti
+      v-if="identity.celebration.celebrating"
+      :activity-id="occurrence.activity.id"
+      density="month"
+    />
     <span aria-hidden="true" class="flex-shrink-0 text-[0.6875rem] leading-none">{{ emoji }}</span>
 
     <!-- Time — hidden on the cramped 7-column desktop grid, shown on the

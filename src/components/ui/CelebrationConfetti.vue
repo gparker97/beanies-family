@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * Tier 3's texture layer: a low-opacity scatter of beans across a celebrating card.
+ * Tier 3, entire: a low-opacity scatter of beans across a celebrating surface.
  *
- * ONE component, used by every wide celebration surface. The wash drifted across seven
- * hand-rolled call sites before the identity change consolidated it; the same thing would
- * happen to a decoration copied into three views, so this exists from the start.
+ * After three cuts this is the whole treatment — a gradient border and then a bunting edge
+ * were both tried and both removed (see `.is-celebration` in `style.css` for why). The
+ * confetti and the corner sticker carry it, so this component IS the tier and there is
+ * exactly one implementation of it.
  *
- * WIDE SURFACES ONLY. A month chip or a week-grid block is too small for a scatter to read
- * as anything but noise, and a month cell can hold four celebrations at once. Those
- * surfaces get the bunting edge (`.is-celebration::before`) and nothing else — which is
- * exactly why the bunting, not the confetti, is the universal marker.
+ * EVERY celebration surface renders it, dense ones included. Showing it on some cards and
+ * not others read as half-finished; the count scales with area instead, so a month cell
+ * holding four celebrations gets four beans each rather than twenty.
  *
  * Clips ITSELF rather than relying on the card: the corner sticker sits outside the card's
  * box, so `.is-celebration` cannot be `overflow: hidden`.
@@ -22,10 +22,22 @@ const props = withDefaults(
   defineProps<{
     /** The activity this belongs to — the key for the once-per-session claim. */
     activityId: string;
-    /** Bean count. Scales with the surface so density stays constant as width grows. */
-    density?: 'card' | 'wall';
+    /**
+     * Bean count, by surface area. Density stays constant as cards grow instead of the
+     * scatter thinning out on a wall card or crowding a month chip.
+     */
+    density?: 'month' | 'week' | 'card' | 'wall';
+    /**
+     * Drawers rain the beans in from above; cards settle them in place.
+     *
+     * A drawer is a moment you opened, so movement there means "you just arrived". Cards are
+     * always on screen — a fall on every one would be the board twitching. Either way it runs
+     * ONCE and stops on a static scatter; nothing loops, because the wall tablet never sleeps
+     * and ambient motion in the corner of a kitchen all evening is not a celebration.
+     */
+    variant?: 'card' | 'drawer';
   }>(),
-  { density: 'card' }
+  { density: 'card', variant: 'card' }
 );
 
 const { prefersReducedMotion } = useReducedMotion();
@@ -34,69 +46,69 @@ const { prefersReducedMotion } = useReducedMotion();
  * Pod order is mandated by the CIG and must never be reordered or recoloured.
  *
  * Deep Slate is lifted on dark: at #2C3E50 on a #1e293b surface a quarter of the Pod is
- * invisible, and the wall at night is the surface this tier matters most on. #4A6274 is
- * the border token the dark theme already uses, so this introduces no new value.
+ * invisible, and the wall at night is the surface this tier matters most on. #4A6274 is the
+ * border token the dark theme already uses, so this introduces no new value.
  */
 const POD_LIGHT = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
 const POD_DARK = ['#4A6274', '#E67E22', '#F15D22', '#AED6F1'];
 
+const COUNT = { month: 4, week: 8, card: 14, wall: 20 } as const;
+
 /**
  * Fixed scatter, not `Math.random()`.
  *
- * A random layout would differ between two renders of the same card — and, worse, between
- * a server-free re-mount and its predecessor — so the same birthday would visibly reshuffle
- * on every scroll. These offsets are hand-placed to avoid the title's left edge and the
- * sticker's corner.
+ * A random layout would differ between two renders of the same card, so the same birthday
+ * would visibly reshuffle on every scroll. Ordered so that truncating the list for a smaller
+ * surface still leaves an even spread rather than clustering in one corner.
  */
 const SCATTER = [
-  [3, 12, -38],
-  [11, 62, 20],
-  [18, 28, -12],
-  [25, 78, 46],
-  [32, 40, -56],
-  [39, 8, 30],
-  [46, 70, -24],
-  [53, 34, 64],
-  [60, 84, -8],
-  [67, 18, 38],
-  [74, 56, -48],
-  [81, 26, 16],
-  [88, 72, -30],
-  [94, 44, 58],
-  [7, 88, -14],
-  [43, 92, 42],
-  [22, 4, -62],
-  [57, 2, 26],
-  [85, 6, -44],
-  [70, 96, 50],
+  [8, 18, -38],
+  [46, 74, 20],
+  [78, 26, -12],
+  [26, 58, 46],
+  [92, 62, -56],
+  [16, 84, 30],
+  [60, 12, -24],
+  [36, 34, 64],
+  [70, 88, -8],
+  [4, 46, 38],
+  [52, 44, -48],
+  [86, 8, 16],
+  [22, 8, -30],
+  [64, 62, 58],
+  [40, 92, -14],
+  [96, 38, 42],
+  [12, 66, -62],
+  [74, 48, 26],
+  [30, 22, -44],
+  [56, 78, 50],
 ] as const;
 
 /**
- * The SCATTER always renders; only its entrance ANIMATION is once-per-session.
+ * The scatter always renders; only the entrance ANIMATION is once-per-session.
  *
- * These are two different things and conflating them was a bug: gating the whole layer on
- * the claim meant that once a card had mounted anywhere — a view passed through, a list
- * scrolled past — the confetti was gone for the rest of the session and the card looked
- * plainly broken. The scatter is a persistent 35% decoration, not an effect; it belongs on
- * the card for as long as the card is a celebration. What must not repeat is the beans
- * dropping in, which is what turns a once-a-year moment into a twitch on every scroll.
+ * Gating the whole layer on the claim was a bug: once a card had mounted anywhere the
+ * confetti was gone for the rest of the session and the card looked broken. The scatter is a
+ * persistent decoration; what must not repeat is the beans arriving.
  */
 const animate = ref(false);
 onMounted(() => {
   animate.value = claimConfetti(props.activityId);
 });
 
-const beans = computed(() => {
-  const count = props.density === 'wall' ? SCATTER.length : 14;
-  return SCATTER.slice(0, count).map(([left, top, rotate], i) => ({
+const beans = computed(() =>
+  SCATTER.slice(0, COUNT[props.density]).map(([left, top, rotate], i) => ({
     i,
     left,
     top,
     rotate,
     light: POD_LIGHT[i % POD_LIGHT.length],
     dark: POD_DARK[i % POD_DARK.length],
-  }));
-});
+  }))
+);
+
+/** Drawers stagger further apart, so the rain reads as falling rather than as one blink. */
+const delayStep = computed(() => (props.variant === 'drawer' ? 60 : 18));
 </script>
 
 <template>
@@ -105,14 +117,17 @@ const beans = computed(() => {
       v-for="b in beans"
       :key="b.i"
       class="confetti-bean"
-      :class="{ 'confetti-still': prefersReducedMotion || !animate }"
+      :class="[
+        variant === 'drawer' ? 'confetti-rain' : 'confetti-drop',
+        { 'confetti-still': prefersReducedMotion || !animate },
+      ]"
       :style="{
         '--bean-light': b.light,
         '--bean-dark': b.dark,
+        '--bean-rotate': `${b.rotate}deg`,
         left: `${b.left}%`,
         top: `${b.top}%`,
-        transform: `rotate(${b.rotate}deg)`,
-        animationDelay: `${b.i * 18}ms`,
+        animationDelay: `${b.i * delayStep}ms`,
       }"
     />
   </div>
@@ -121,49 +136,73 @@ const beans = computed(() => {
 <style scoped>
 /*
  * Clips itself, and inherits the card's radius so beans cannot square off the squircle.
- *
- * `z-index: -1` inside the card's `isolation: isolate` context (see `.is-celebration`)
- * places it above the card's background and beneath every child — so no consuming card has
- * to wrap or re-index its content to stay readable.
+ * `z-index: -1` inside the card's `isolation: isolate` context sits above the card's
+ * background and beneath every child, so no consuming card re-indexes its content.
  */
 .celebration-confetti {
   border-radius: inherit;
   inset: 0;
-  opacity: 0.35;
+  opacity: 0.45;
   overflow: hidden;
   pointer-events: none;
   position: absolute;
   z-index: -1;
 }
 
-/* Bean-shaped, never rectangular — the CIG's rule for every confetti surface. */
+/*
+ * Bean-shaped, never rectangular — the CIG's rule for every confetti surface.
+ *
+ * The hairline ring is what makes a bean legible on ANY member colour. Every card carries
+ * its owner's wash, so an orange bean on an orange wash was invisible; a ring in the card's
+ * own surface colour separates it without touching the Pod colours and without dimming the
+ * wash, which would have made a birthday the least-owned card on the board.
+ */
 .confetti-bean {
   background: var(--bean-light);
   border-radius: 50% 50% 48% 52% / 60% 58% 42% 40%;
+  box-shadow: 0 0 0 1.25px rgb(255 255 255 / 85%);
   height: 7px;
   position: absolute;
+  transform: rotate(var(--bean-rotate));
   width: 10px;
 }
 
 :global(.dark) .confetti-bean {
   background: var(--bean-dark);
+  box-shadow: 0 0 0 1.25px rgb(30 41 59 / 85%);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .confetti-bean:not(.confetti-still) {
-    animation: confetti-settle 460ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+  .confetti-drop:not(.confetti-still) {
+    animation: confetti-drop 460ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+  }
+
+  .confetti-rain:not(.confetti-still) {
+    animation: confetti-rain 900ms cubic-bezier(0.25, 0.65, 0.35, 1) backwards;
   }
 }
 
 /*
- * Reduced motion keeps the beans and drops only the movement. Removing them entirely would
- * take the celebration away from the people most likely to have asked for less motion, not
- * less meaning.
+ * Both END on the bean's resting position and stop there — `backwards` fills the stagger
+ * delay, and neither is `infinite`. Reduced motion keeps the beans and drops only the
+ * movement: removing them would take the celebration away from the people who asked for
+ * less motion, not less meaning.
  */
-@keyframes confetti-settle {
+@keyframes confetti-drop {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.6);
+    transform: translateY(-10px) rotate(var(--bean-rotate)) scale(0.6);
+  }
+}
+
+@keyframes confetti-rain {
+  0% {
+    opacity: 0;
+    transform: translateY(-140%) rotate(calc(var(--bean-rotate) - 180deg));
+  }
+
+  25% {
+    opacity: 1;
   }
 }
 </style>
