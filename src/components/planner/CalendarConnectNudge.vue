@@ -31,15 +31,6 @@ function connect(): void {
 
 <template>
   <div v-if="showNudge" class="cal-nudge" data-testid="calendar-connect-nudge">
-    <button
-      type="button"
-      class="cal-nudge-dismiss"
-      :aria-label="t('planner.calendarNudge.dismiss')"
-      @click="dismiss"
-    >
-      <span aria-hidden="true">&#x2715;</span>
-    </button>
-
     <span class="cal-nudge-icon">
       <span aria-hidden="true">&#x1F4C5;</span>
       <span class="cal-nudge-bean" aria-hidden="true">&#x1FAD8;</span>
@@ -50,9 +41,21 @@ function connect(): void {
       <span class="cal-nudge-sub">{{ t('planner.calendarNudge.subtitle') }}</span>
     </span>
 
-    <button type="button" class="cal-nudge-connect" @click="connect">
-      {{ t('planner.calendarNudge.connect') }}
-    </button>
+    <!--
+      Dismiss is a LABELLED button in normal flow, not a floating glyph.
+      It used to be an absolutely-positioned ✕ pinned to the top-right — the exact spot the
+      Connect button occupies once the banner narrows, so the orange pill covered it and the
+      banner read as undismissable. A word also beats a glyph here: this is a suggestion, and
+      "no thanks" should be as easy to find as "yes".
+    -->
+    <span class="cal-nudge-actions">
+      <button type="button" class="cal-nudge-dismiss" @click="dismiss">
+        {{ t('planner.calendarNudge.dismiss') }}
+      </button>
+      <button type="button" class="cal-nudge-connect" @click="connect">
+        {{ t('planner.calendarNudge.connect') }}
+      </button>
+    </span>
   </div>
 </template>
 
@@ -151,21 +154,29 @@ function connect(): void {
   outline-offset: 2px;
 }
 
-.cal-nudge-dismiss {
+.cal-nudge-actions {
   align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.4rem;
+}
+
+/*
+ * Quiet, but a real control: same pill shape and type as Connect so the pair reads as two
+ * choices, with weight and colour making clear which is primary.
+ */
+.cal-nudge-dismiss {
   background: rgb(44 62 80 / 6%);
   border: none;
-  border-radius: 50%;
-  color: rgb(44 62 80 / 45%);
+  border-radius: 999px;
+  color: rgb(44 62 80 / 62%);
   cursor: pointer;
-  display: flex;
-  font-size: 0.72rem;
-  height: 1.15rem;
-  justify-content: center;
-  position: absolute;
-  right: 0.45rem;
-  top: 0.45rem;
-  width: 1.15rem;
+  flex-shrink: 0;
+  font-family: Outfit, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.44rem 0.85rem;
+  transition: background 0.15s ease-out;
 }
 
 .cal-nudge-dismiss:hover {
@@ -179,6 +190,6 @@ function connect(): void {
 
 :global(.dark) .cal-nudge-dismiss {
   background: rgb(255 255 255 / 10%);
-  color: rgb(241 242 244 / 55%);
+  color: rgb(241 242 244 / 72%);
 }
 </style>

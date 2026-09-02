@@ -71,10 +71,19 @@ const SCATTER = [
   [70, 96, 50],
 ] as const;
 
-/** Confetti plays ONCE per activity per session — see `useCelebrationSeen`. */
-const show = ref(false);
+/**
+ * The SCATTER always renders; only its entrance ANIMATION is once-per-session.
+ *
+ * These are two different things and conflating them was a bug: gating the whole layer on
+ * the claim meant that once a card had mounted anywhere — a view passed through, a list
+ * scrolled past — the confetti was gone for the rest of the session and the card looked
+ * plainly broken. The scatter is a persistent 35% decoration, not an effect; it belongs on
+ * the card for as long as the card is a celebration. What must not repeat is the beans
+ * dropping in, which is what turns a once-a-year moment into a twitch on every scroll.
+ */
+const animate = ref(false);
 onMounted(() => {
-  show.value = claimConfetti(props.activityId);
+  animate.value = claimConfetti(props.activityId);
 });
 
 const beans = computed(() => {
@@ -91,12 +100,12 @@ const beans = computed(() => {
 </script>
 
 <template>
-  <div v-if="show" class="celebration-confetti" aria-hidden="true">
+  <div class="celebration-confetti" aria-hidden="true">
     <span
       v-for="b in beans"
       :key="b.i"
       class="confetti-bean"
-      :class="{ 'confetti-still': prefersReducedMotion }"
+      :class="{ 'confetti-still': prefersReducedMotion || !animate }"
       :style="{
         '--bean-light': b.light,
         '--bean-dark': b.dark,
@@ -112,7 +121,10 @@ const beans = computed(() => {
 <style scoped>
 /*
  * Clips itself, and inherits the card's radius so beans cannot square off the squircle.
- * `z-index: 1` keeps it under the card's own content (`z-index: 2`) and under the sticker.
+ *
+ * `z-index: -1` inside the card's `isolation: isolate` context (see `.is-celebration`)
+ * places it above the card's background and beneath every child — so no consuming card has
+ * to wrap or re-index its content to stay readable.
  */
 .celebration-confetti {
   border-radius: inherit;
@@ -121,7 +133,7 @@ const beans = computed(() => {
   overflow: hidden;
   pointer-events: none;
   position: absolute;
-  z-index: 1;
+  z-index: -1;
 }
 
 /* Bean-shaped, never rectangular — the CIG's rule for every confetti surface. */

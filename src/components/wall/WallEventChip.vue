@@ -8,6 +8,7 @@
  * would classify per chip per render and could disagree with its own parent.
  */
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import type { ActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
 
@@ -31,6 +32,11 @@ defineEmits<{ open: [] }>();
     :style="identity.style"
     @click="$emit('open')"
   >
+    <CelebrationConfetti
+      v-if="identity.celebration.celebrating"
+      :activity-id="activity.id"
+      density="card"
+    />
     <span class="min-w-0 flex-1">
       <span class="font-inter wall-chip-time block font-semibold text-[var(--muted-text,#4d5d6c)]">
         <!--

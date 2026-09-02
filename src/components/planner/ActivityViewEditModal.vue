@@ -16,6 +16,8 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import { endSeriesPatch } from '@/utils/activitySeriesEnd';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
@@ -83,6 +85,10 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { describeActivity } = useRecurrenceLabel();
 const { categoryLabel } = useActivityCategoryLabel();
+const { identityFor } = useActivityIdentity();
+const isCelebration = computed(
+  () => !!props.activity && identityFor(props.activity).celebration.celebrating
+);
 const router = useRouter();
 
 // Open a linked Beanie List as a drawer stacked ON TOP of this one — no route
@@ -892,63 +898,76 @@ async function confirmReschedule() {
         <BaseButton variant="ghost" size="sm" @click="handleReset">{{ resetLabel }}</BaseButton>
       </div>
 
-      <!-- Title — inline editable -->
-      <InlineEditField
-        :editing="editingField === 'title'"
-        tint-color="orange"
-        @start-edit="startEdit('title')"
+      <!--
+        The drawer celebrates too, so opening a celebratory card does not land on a plain
+        panel. Scoped to the title + badges band rather than the whole modal: this sheet is
+        long and mostly form controls, and a scatter behind an editable field would fight
+        the thing the user came here to read.
+      -->
+      <div
+        class="-mx-2 rounded-2xl px-2 py-2"
+        :class="isCelebration ? 'is-celebration is-celebration-lg' : ''"
       >
-        <template #view>
-          <span class="font-outfit text-xl font-bold text-[var(--color-text)] dark:text-gray-100">
-            {{ activity.title }}
-          </span>
-        </template>
-        <template #edit>
-          <div class="flex items-center gap-2">
-            <input
-              ref="titleInputRef"
-              v-model="draftTitle"
-              type="text"
-              class="font-outfit w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-orange-500/30 outline-none dark:text-gray-100"
-              @keydown="handleTitleKeydown"
-            />
-            <button
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-              @click.stop="saveField('title')"
-            >
-              <svg
-                class="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                viewBox="0 0 24 24"
-              >
-                <path d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-          </div>
-        </template>
-      </InlineEditField>
+        <CelebrationConfetti v-if="isCelebration" :activity-id="activity.id" density="card" />
 
-      <!-- Category + Recurrence badges -->
-      <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white"
-          :style="{ background: activityColor }"
+        <!-- Title — inline editable -->
+        <InlineEditField
+          :editing="editingField === 'title'"
+          tint-color="orange"
+          @start-edit="startEdit('title')"
         >
-          {{ activity.icon }}
-          {{ categoryLabel(activity.category) }}
-        </span>
-        <span
-          class="font-outfit inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-          :class="
-            activity.recurrence === 'none'
-              ? 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400'
-              : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-          "
-        >
-          {{ recurrenceLabel }}
-        </span>
+          <template #view>
+            <span class="font-outfit text-xl font-bold text-[var(--color-text)] dark:text-gray-100">
+              {{ activity.title }}
+            </span>
+          </template>
+          <template #edit>
+            <div class="flex items-center gap-2">
+              <input
+                ref="titleInputRef"
+                v-model="draftTitle"
+                type="text"
+                class="font-outfit w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-orange-500/30 outline-none dark:text-gray-100"
+                @keydown="handleTitleKeydown"
+              />
+              <button
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                @click.stop="saveField('title')"
+              >
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+            </div>
+          </template>
+        </InlineEditField>
+
+        <!-- Category + Recurrence badges -->
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <span
+            class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white"
+            :style="{ background: activityColor }"
+          >
+            {{ activity.icon }}
+            {{ categoryLabel(activity.category) }}
+          </span>
+          <span
+            class="font-outfit inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+            :class="
+              activity.recurrence === 'none'
+                ? 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400'
+                : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+            "
+          >
+            {{ recurrenceLabel }}
+          </span>
+        </div>
       </div>
 
       <!-- External-calendar clash (#34): active callout (this-is-OK / reschedule /
