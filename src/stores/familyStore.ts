@@ -24,6 +24,19 @@ export const useFamilyStore = defineStore('family', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  /**
+   * Has `loadMembers` completed at least once this page load, whatever it found?
+   *
+   * Distinct from `members.length > 0`, and the distinction is a privilege boundary.
+   * App.vue's path 3 renders an EMPTY doc as a persistent, recoverable state (no file
+   * configured, cache unavailable, Drive permission lost), so "roster is empty" is not
+   * "roster has not loaded yet" — it is a steady state a user can sit in for a whole
+   * session. `usePermissions` falls back to the stored session's `role` only while the
+   * roster is genuinely unresolved; keying that on emptiness left the forgeable role
+   * authoritative indefinitely in exactly that state (#80 review).
+   */
+  const rosterResolved = ref(false);
+
   // Getters
   const currentMember = computed(() => members.value.find((m) => m.id === currentMemberId.value));
 
@@ -253,15 +266,28 @@ export const useFamilyStore = defineStore('family', () => {
       // Drive permission was lost, and the user recovers from Settings. Rejecting here
       // would sign them out mid-boot on a recoverable error.
       if (roster.length === 0) return { kind: 'none' };
-      if (roster.some((m) => m.id === sessionMemberId)) {
+      const vouched = roster.find((m) => m.id === sessionMemberId);
+      if (vouched) {
         // The pod itself now vouches for this member, which is the ONLY point at which a
         // restored pre-#80 session is worth sealing. Sealing it at restore time would
         // have signed an unverified blob (#80 review).
         //
+        // The ROSTER ROW is passed, not just the fact that it matched. A bare legacy
+        // session is an unauthenticated shape in every field, and only `memberId` was
+        // ever checked — so sealing the blob as-is laundered a hand-edited `role`,
+        // `email` and `familyId` into a permanently signature-valid session that outlived
+        // the sunset the legacy branch is time-boxed by. Sealing the pod's own values
+        // instead commits a verified fact, which is the whole point of confirming.
+        //
         // Its own try: the outer catch treats a throw as "no session member", so without
         // this a failure in an optional re-seal would cost the member their session.
         try {
-          authStore.confirmSessionMember();
+          authStore.confirmSessionMember({
+            memberId: vouched.id,
+            email: vouched.email,
+            role: vouched.role,
+            displayName: vouched.name,
+          });
         } catch (e) {
           console.warn('[familyStore] could not re-seal a restored legacy session', e);
         }
@@ -304,10 +330,37 @@ export const useFamilyStore = defineStore('family', () => {
     useAuthStore().invalidateSession(reason);
   }
 
+  /**
+   * Which of the two roster-time rejections is this?
+   *
+   * Both call sites used to hard-code `'roster-switched'`, which made `'unknown-member'`
+   * — the only `INTEGRITY_REJECTIONS` kind this store can produce — unreachable, so the
+   * #80 tamper alarm could never fire from the roster path at all (#80 review). The fact
+   * that separates them is whether we are looking at a DIFFERENT pod: a session naming
+   * somebody absent from the pod it belongs to is the alarming case; the same session
+   * against a pod it was never part of is ordinary file-switching churn.
+   *
+   * Unknown family on either side degrades to `'roster-switched'` — the quiet
+   * classification — so an ambiguous case can never manufacture a false tamper alert.
+   */
+  async function classifyRosterRejection(): Promise<'unknown-member' | 'roster-switched'> {
+    try {
+      const [{ useAuthStore }, { useFamilyContextStore }] = await Promise.all([
+        import('@/stores/authStore'),
+        import('@/stores/familyContextStore'),
+      ]);
+      const sessionFamilyId = useAuthStore().currentUser?.familyId;
+      const activeFamilyId = useFamilyContextStore().activeFamilyId;
+      if (!sessionFamilyId || !activeFamilyId) return 'roster-switched';
+      return sessionFamilyId === activeFamilyId ? 'unknown-member' : 'roster-switched';
+    } catch {
+      return 'roster-switched';
+    }
+  }
+
   // Actions
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
-      const prevMemberId = currentMemberId.value;
       const loaded = await familyRepo.getAllFamilyMembers();
       const roster = await normalizeRoles(loaded);
       // Resolve the session member BEFORE publishing the roster. Assigning members.value
@@ -317,6 +370,10 @@ export const useFamilyStore = defineStore('family', () => {
       // vanished and the canViewFinances true->false diagnostic fired on every boot.
       const resolvedForRoster = currentMemberId.value ? null : await resolveSessionMember(roster);
       members.value = roster;
+      // Set BEFORE the resolution tail below: every `return` in it is a completed load,
+      // and a rejection path that left this false would hand the forgeable session role
+      // back to usePermissions on the way out.
+      rosterResolved.value = true;
       logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
@@ -327,7 +384,7 @@ export const useFamilyStore = defineStore('family', () => {
           return;
         }
         if (resolved.kind === 'reject') {
-          await rejectSession('roster-switched');
+          await rejectSession(await classifyRosterRejection());
           return;
         }
         // No session member at all: the legitimate signup / pre-login bootstrap.
@@ -344,14 +401,29 @@ export const useFamilyStore = defineStore('family', () => {
           return;
         }
         if (resolved.kind === 'reject') {
-          await rejectSession('roster-switched');
+          await rejectSession(await classifyRosterRejection());
           return;
         }
+        // An EMPTY roster is "the doc did not load", not "your member was removed" — the
+        // same reasoning `resolveSessionMember` uses to return `none` rather than reject.
+        // Nulling here anyway cost a signed-in non-owner `canEditActivities` and
+        // `canViewFinances` for the rest of the session on a recoverable error (#80
+        // review). Hold the id; the next successful load re-resolves it.
+        if (members.value.length === 0) return;
         // Last resort. The old code fell back to the OWNER here, which silently promoted
-        // a member whose record had vanished (#80). Reuse the previous id only if it is
-        // still real; otherwise this session names nobody.
-        currentMemberId.value =
-          prevMemberId && members.value.some((m) => m.id === prevMemberId) ? prevMemberId : null;
+        // a member whose record had vanished (#80). This session now names nobody.
+        //
+        // There is deliberately no "reuse the previous id" fallback: `prevMemberId` is
+        // captured as `currentMemberId` and this branch is entered precisely BECAUSE that
+        // id is absent from the roster, so the check could only ever be false. The
+        // version that pretended otherwise read as a safety net and was dead code.
+        logEvent({
+          level: 'warn',
+          surface: 'session-integrity',
+          message: 'current_member_cleared',
+          context: { action: 'session_rejected', kind: 'member-vanished' },
+        });
+        currentMemberId.value = null;
       }
     });
   }
@@ -736,6 +808,7 @@ export const useFamilyStore = defineStore('family', () => {
     // State
     members,
     currentMemberId,
+    rosterResolved,
     isLoading,
     error,
     // Getters

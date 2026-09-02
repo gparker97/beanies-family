@@ -37,12 +37,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - An event that named the same person twice (which can happen when two devices sync) drew that person's face twice.
 - **An activity with no location showed its category in the location's place**, spelled out as a word the app uses nowhere else. Location now always means location, and says so plainly when there isn't one; the category has its own spot with its emoji.
 - The wall's activity details now show an icon beside each row, and the bean's face beside whoever is doing the drop-off or pick-up.
+- **Switching to dark mode now deepens the colour on every card**, instead of leaving them washed out until the page was reloaded. This is most visible on a tablet left on overnight.
+- **Renaming a bean, or giving one a photo, now updates their face everywhere straight away**, rather than leaving the old one on cards until the app was restarted.
+- Wrapping presents for a birthday, or planning one, no longer sets off a celebration. Only the birthday itself does.
+- Two-letter initials, emoji names and right-to-left titles no longer break when a long title is shortened.
+- The screen now stays awake on a wall-mounted tablet after the system briefly takes the lock back, instead of going dark for good.
+- Leaving the beanie wall no longer gets stuck on a "leaving" screen if the family file is mid-save, and it says what happened.
+- A repeating list whose list was deleted on another device at the same moment no longer reports a failure that did not happen, and no longer leaves a stray entry on the history shelf.
 
 ### Security
 
 - A pre-existing saved sign-in is no longer signed as trusted until the family file itself confirms the member it names.
 - Ending a session for integrity reasons now also drops this device's permission to re-open the family file unattended.
 - A failed session write no longer leaves the previous, higher-privilege session in place.
+- **Entering a PIN to confirm a sensitive action is now limited to a few tries**, then pauses before allowing more. Closing and reopening the prompt, or reloading the page, no longer hands back a fresh set of attempts.
+- A saved sign-in from before this release can no longer be edited by hand to claim a role or an identity the family file does not give it.
+- A grown-up's permissions are no longer granted from the saved sign-in alone when the family file cannot be opened.
+- **Leaving the beanie wall now always asks the signed-in grown-up to prove who they are**, even when someone has already unlocked editing. Proving it in order to leave no longer unlocks editing as a side effect.
+- Ending a session for integrity reasons now drops only the affected family's unattended re-open, not every family's on the device.
 
 ---
 

@@ -9,6 +9,7 @@ import {
   type CelebrationVerdict,
 } from '@/utils/activityCelebration';
 import { resolveMemberColor } from '@/constants/memberColors';
+import { isDarkNow } from '@/composables/useDarkMode';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 /**
@@ -87,11 +88,19 @@ function channels(hex: string): string {
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) || 0).join(', ');
 }
 
-/** Reactive: `settingsStore` toggles this class on <html> when the theme changes. */
+/**
+ * Genuinely reactive, via `useDarkMode`'s observer on the `<html>` class.
+ *
+ * This used to read `document.documentElement.classList` directly, and the comment
+ * claiming that was reactive was simply wrong: no chip component had any other theme
+ * dependency, so switching light→dark (or `theme: 'system'` flipping at sunset) never
+ * re-invoked `identityFor` and every painted chip kept the light alpha. That is the exact
+ * outcome `WASH_ALPHA_DARK` exists to prevent — "13% on a dark surface is close to
+ * invisible, which matters most on the kitchen tablet at night" — and the wall never
+ * unmounts, so it never self-healed (#78 review).
+ */
 function currentAlpha(): number {
-  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? WASH_ALPHA_DARK
-    : WASH_ALPHA;
+  return isDarkNow() ? WASH_ALPHA_DARK : WASH_ALPHA;
 }
 
 function wash(hex: string): string {
@@ -104,11 +113,22 @@ export function useActivityIdentity() {
   const familyStore = useFamilyStore();
 
   /**
-   * Cheap roster fingerprint. A member's colour or name change must invalidate the
-   * memo, and comparing ids + colours is far cheaper than re-classifying every chip.
+   * Cheap roster fingerprint — every field the built identity actually RENDERS.
+   *
+   * It previously fingerprinted `id:color` alone while claiming to cover names, so a
+   * rename or a new avatar photo produced a fresh `FamilyMember` object (updateMember
+   * replaces it) but an IDENTICAL revision string. Vue's computed short-circuits on an
+   * unchanged value, so components whose only roster dependency is this one never
+   * re-rendered and `identityFor` kept handing back pre-edit member objects — the stack's
+   * `aria-label` read the old name and `memberAvatarBindings` resolved the old photo, on
+   * the always-mounted wall, until 800 distinct cache keys evicted them (#78 review).
+   *
+   * Anything `buildIdentity` reads off a member belongs in here.
    */
   const familyRevision = computed(() =>
-    familyStore.members.map((m) => `${m.id}:${m.color ?? ''}`).join('|')
+    familyStore.members
+      .map((m) => `${m.id}:${m.color ?? ''}:${m.name}:${m.avatarPhotoId ?? ''}`)
+      .join('|')
   );
 
   const locale = computed(() => translation.currentLanguage ?? 'en');

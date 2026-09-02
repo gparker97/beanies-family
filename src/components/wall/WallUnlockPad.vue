@@ -18,16 +18,16 @@
  * case it is in — it tries the digits against each candidate and reports who
  * matched.
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import PinKeypad from '@/components/ui/PinKeypad.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { MAX_PIN_ATTEMPTS, PIN_LENGTH } from '@/services/auth/deviceUnlock';
+import { PIN_LENGTH } from '@/services/auth/deviceUnlock';
+import { usePinAttemptLimit, PIN_COOLDOWN_MS } from '@/composables/usePinAttemptLimit';
 import { verifyPassword } from '@/services/auth/passwordService';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember } from '@/types/models';
 
@@ -41,30 +41,26 @@ const props = defineProps<{
 const emit = defineEmits<{ verified: [FamilyMember]; cancelled: [] }>();
 
 const SURFACE = 'beanie-wall';
-/**
- * The wall is the one physically exposed, always-on surface in the product, and
- * a correct PIN here is full-app access (it also gates leaving). Unlimited
- * instant guesses on a 4.5rem keypad is not a step-up. `MAX_PIN_ATTEMPTS` is
- * the same budget `deviceUnlock` enforces everywhere else; the cooldown is
- * session-local because this pad guards a mode, not the family key.
- */
-const COOLDOWN_MS = 60_000;
 
 const { t } = useTranslation();
 
 const pin = ref('');
 const error = ref<string | null>(null);
 const isVerifying = ref(false);
-const failures = ref(0);
-const lockedUntil = ref(0);
-const now = ref(Date.now());
-const ticker = setInterval(() => (now.value = Date.now()), 1000);
-onBeforeUnmount(() => clearInterval(ticker));
 
-const cooldownSeconds = computed(() =>
-  Math.max(0, Math.ceil((lockedUntil.value - now.value) / 1000))
-);
-const inCooldown = computed(() => cooldownSeconds.value > 0);
+/**
+ * The wall is the one physically exposed, always-on surface in the product, and a correct
+ * PIN here is full-app access (it also gates leaving). Unlimited instant guesses on a
+ * 4.5rem keypad is not a step-up.
+ *
+ * The budget lives OUTSIDE this component deliberately. It used to be local refs, but
+ * `BaseModal` renders its slot under `v-if="open"`, so `WallLockMenu` closing the
+ * challenge unmounted the pad and reset the count — the cooldown cost an attacker two
+ * extra taps per five guesses, and the `watch` below that promised it would survive was
+ * dead code (#80 review).
+ */
+const limit = usePinAttemptLimit('wall-unlock', SURFACE, 'wall-unlock');
+const { inCooldown, cooldownSeconds } = limit;
 const disabled = computed(() => isVerifying.value || inCooldown.value);
 
 // A reopened pad must never show the previous attempt's digits or error.
@@ -73,8 +69,9 @@ watch(
   (open) => {
     if (open) {
       pin.value = '';
-      // A cooldown must SURVIVE closing and reopening the pad, or it is no
-      // limit at all — the attacker just taps the padlock again.
+      // A cooldown SURVIVES closing and reopening the pad (the budget is module-scoped,
+      // see usePinAttemptLimit), so keep its message on screen rather than clearing it
+      // and presenting a pad that silently refuses every digit.
       if (!inCooldown.value) error.value = null;
     }
   }
@@ -108,28 +105,16 @@ async function verify(entered: string) {
       }
     }
     if (matched) {
+      limit.recordSuccess();
       emit('verified', matched);
       return;
     }
     pin.value = '';
-    failures.value += 1;
-    if (failures.value >= MAX_PIN_ATTEMPTS) {
-      failures.value = 0;
-      lockedUntil.value = Date.now() + COOLDOWN_MS;
-      now.value = Date.now();
-      error.value = fillTemplate(t('wall.unlock.tooMany'), { seconds: COOLDOWN_MS / 1000 });
-    } else {
-      error.value = t('pin.incorrect');
-    }
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'wall_unlock_result',
-      context: {
-        action: 'unlock',
-        kind: inCooldown.value ? 'locked_out' : 'wrong_pin',
-      },
-    });
+    // `recordFailure` counts and persists the attempt AND emits the failure telemetry,
+    // so the surface only chooses the wording.
+    error.value = limit.recordFailure()
+      ? fillTemplate(t('wall.unlock.tooMany'), { seconds: PIN_COOLDOWN_MS / 1000 })
+      : t('pin.incorrect');
   } catch (e) {
     pin.value = '';
     error.value = t('wall.unlock.failed');
