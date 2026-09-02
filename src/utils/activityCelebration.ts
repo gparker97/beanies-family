@@ -44,49 +44,67 @@ const NOT_CELEBRATING: CelebrationVerdict = {
 /** Latin-ish scripts, where word boundaries exist and matter. */
 const WORD_BOUNDED_SCRIPT = /^[ -ɏ\s]+$/;
 
+/** Inflections a base verb may legitimately wear: book/books/booked/booking. */
+const VERB_INFLECTIONS = ['', 's', 'ed', 'ing', 'd'] as const;
+
 /**
- * Whole-word match. A substring match lights up "partygoer", "Anniversary Road"
- * and half the words containing "bday", so the boundary is the point rather than
- * a refinement. Multi-word keywords ("baby shower") are matched as a phrase.
+ * Word tokens, lowercased. A LITERAL split, deliberately.
  *
- * CJK has no word boundaries and `\b` does not apply, so those locales fall back
- * to a plain substring test — correct for a script where a term cannot appear
- * inside an unrelated word the way "bday" can inside "bdays".
+ * This used to build a `new RegExp` per keyword per title, which the security lint
+ * flags (`detect-non-literal-regexp`) — rightly, even though the inputs are our own
+ * curated constants today: nothing structurally stops a future caller passing a title
+ * or a user-supplied list, and a crafted pattern is a ReDoS. Tokenising is safe by
+ * construction rather than by convention, and it is what "whole word" actually means.
+ */
+function tokens(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+/**
+ * Whole-word (or whole-phrase) match. A substring match lights up "partygoer",
+ * "Anniversary Road" and half the words containing "bday", so the boundary is the
+ * point rather than a refinement.
+ *
+ * CJK has no word boundaries, so those locales fall back to a substring test —
+ * correct for a script where a term cannot hide inside an unrelated word.
  */
 function matchesWord(haystack: string, needle: string): boolean {
-  if (WORD_BOUNDED_SCRIPT.test(needle)) {
-    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`, 'iu').test(haystack);
+  if (!WORD_BOUNDED_SCRIPT.test(needle)) return haystack.includes(needle);
+  const hay = tokens(haystack);
+  const want = tokens(needle);
+  if (!want.length) return false;
+  for (let i = 0; i + want.length <= hay.length; i++) {
+    if (want.every((w, k) => hay[i + k] === w)) return true;
   }
-  return haystack.includes(needle);
+  return false;
 }
 
 /**
  * Does the title OPEN with an errand verb?
  *
- * A bare `startsWith` suppressed every title whose first word merely begins with a
- * verb's letters — "Payton's birthday" by `pay`, "Booker family wedding" by `book`,
- * "Post-graduation party" by `post`, "Planetarium trip" by `plan`. Each lost its card
- * treatment AND reported `suppressed: 'errand-verb'`, so the false negatives looked
- * deliberate in telemetry and were unmeasurable.
- *
- * The mirror failure: the list stores "pick up", and `'picking up'.startsWith('pick up')`
- * is false, so the gerund escaped. Matching on a word boundary fixes both directions,
- * and the trailing `\w*` accepts inflections (picking, booking, ordered).
+ * A bare `startsWith` suppressed every title whose first word merely BEGAN with a
+ * verb's letters — "Payton's birthday" by `pay`, "Booker family wedding" by `book` —
+ * and reported each as a deliberate errand, so the false negatives were unmeasurable.
+ * Matching whole tokens fixes that, and the inflection list is explicit so "book"
+ * covers "booking" without also swallowing "Booker".
  */
 function startsWithErrandVerb(title: string, locale: string): boolean {
   const verbs = CELEBRATION_ERRAND_VERBS[locale] ?? CELEBRATION_ERRAND_VERBS.en ?? [];
-  const trimmed = title.trim().toLowerCase();
+  const hay = tokens(title);
+  const lowered = title.trim().toLowerCase();
+
   return verbs.some((verb) => {
     const v = verb.toLowerCase();
-    if (!WORD_BOUNDED_SCRIPT.test(v)) return trimmed.startsWith(v);
-    const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Inflections are an EXPLICIT small set, not `\w*`. `\w*` let "book" swallow
-    // "Booker" and "pay" swallow "Payton", which is the over-matching this replaced.
-    const [first, ...rest] = v.split(/\s+/);
-    const head = `${esc(first!)}(?:s|ed|ing|d)?`;
-    const tail = rest.length ? `\\s+${rest.map(esc).join('\\s+')}` : '';
-    return new RegExp(`^${head}${tail}($|[^\\p{L}\\p{N}])`, 'u').test(trimmed);
+    if (!WORD_BOUNDED_SCRIPT.test(v)) return lowered.startsWith(v);
+    const want = tokens(v);
+    if (!want.length || hay.length < want.length) return false;
+    // Only the FIRST word inflects; "pick up" must still be followed by "up".
+    const head = want[0]!;
+    if (!VERB_INFLECTIONS.some((suffix) => hay[0] === head + suffix)) return false;
+    return want.slice(1).every((w, k) => hay[k + 1] === w);
   });
 }
 

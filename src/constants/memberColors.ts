@@ -31,8 +31,8 @@ export interface MemberColor {
 }
 
 /**
- * Retired, but NOT removed: red was palette index 1, and onboarding assigned
- * `MEMBER_COLOR_VALUES[addedMembers.length % 6]` — so the SECOND bean of every
+ * Retired, but NOT removed: red was palette index 1, and onboarding assigned colours
+ * by round-robin over the count of beans added so far — so the SECOND bean of every
  * wizard-onboarded family holds `#ef4444`. That is a certainty, not a 1-in-6.
  *
  * Dropping it outright orphaned those beans: `ColorCircleSelector` rings on
