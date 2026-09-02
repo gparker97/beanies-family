@@ -304,6 +304,18 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'recur_interval',
   'recur_end',
   'recur_reason',
+  // Bean identity (#? 2026-09-02, surfaces 'member-colour' / 'activity-celebration' /
+  // 'activity-owner-resolve'). ONE new key: a GENERIC `count`. The file already carries
+  // several feature-scoped counters (`hint_count`, `file_count`, `inferred_count`…), but
+  // no bare `count`, so every event on these three surfaces would have been stripped
+  // server-side without this line. `action`, `kind` and `error_code` above are REUSED per
+  // the convention noted there. All values are small integers or fixed enums — never an
+  // activity title, a member name, or a matched keyword.
+  //
+  // MIRRORED in infrastructure/lambda/telemetry/index.mjs (pinned by a Lambda test) and
+  // declared in docs/runbooks/native-store-submission.md — a key in one and not the others
+  // is dropped after leaving the device, silently.
+  'count',
 ]);
 
 export const MAX_STRING_LEN = 200;

@@ -7,7 +7,8 @@ import { computed } from 'vue';
  * want different extras (a lane shows events, the board shows stars), and a
  * `mode` prop would have grown a branch for every future difference.
  */
-import WallMemberFace from '@/components/wall/WallMemberFace.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import type { FamilyMember } from '@/types/models';
 
 const props = defineProps<{
@@ -34,6 +35,8 @@ const props = defineProps<{
 const headerTint = computed(() => `${props.member.color}2e`);
 const bodyTint = computed(() => `${props.member.color}0d`);
 defineEmits<{ headerClick: [] }>();
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -49,7 +52,11 @@ defineEmits<{ headerClick: [] }>();
       :style="{ background: headerTint }"
       @click="headerAction && $emit('headerClick')"
     >
-      <WallMemberFace :member="member" :size="compact ? 'md' : 'lg'" />
+      <BeanieAvatar
+        v-bind="memberAvatarBindings(member)"
+        fallback="initials"
+        :size="compact ? 'lg' : '2xl'"
+      />
       <div>
         <p class="font-outfit text-secondary-500 wall-bean-name font-bold dark:text-gray-100">
           {{ member.name }}

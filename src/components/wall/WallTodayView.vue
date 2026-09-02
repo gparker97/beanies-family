@@ -10,12 +10,14 @@
  * answers "are we late?" without anybody doing arithmetic.
  */
 import { computed, ref, watch } from 'vue';
-import WallMemberFace from '@/components/wall/WallMemberFace.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
+import { useActivityChipClass } from '@/composables/useActivityChipClass';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { normalizeAssignees } from '@/utils/assignees';
+
 import { wallActivityColour, wallEvents } from '@/utils/wallActivities';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
@@ -105,10 +107,14 @@ const nowId = computed(() => {
 function subtitleFor(activity: FamilyActivity): string {
   return activity.location || activity.description || '';
 }
+/**
+ * Whose event this is. Delegates to `classifyActivityChip`, the documented single
+ * source of truth — this used to map RAW `normalizeAssignees` through `.find()`
+ * with no dedupe, so an id written twice by two merging devices drew the same
+ * bean twice. The classifier resolves and dedupes in one pass.
+ */
 function membersFor(activity: FamilyActivity): FamilyMember[] {
-  return normalizeAssignees(activity)
-    .map((id) => familyStore.members.find((m) => m.id === id))
-    .filter((m): m is FamilyMember => !!m);
+  return classify(activity).members;
 }
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {
@@ -138,6 +144,9 @@ function dayLabel(ymd: string) {
 function dayNumber(ymd: string) {
   return new Date(`${ymd}T00:00:00`).getDate();
 }
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
+const { classify } = useActivityChipClass();
 </script>
 
 <template>
@@ -200,10 +209,11 @@ function dayNumber(ymd: string) {
             </span>
           </span>
           <span class="flex shrink-0">
-            <WallMemberFace
+            <BeanieAvatar
               v-for="person in membersFor(entry.activity)"
               :key="person.id"
-              :member="person"
+              v-bind="memberAvatarBindings(person)"
+              fallback="initials"
               size="sm"
               class="-ml-2.5 ring-2 ring-white first:ml-0 dark:ring-slate-800"
             />

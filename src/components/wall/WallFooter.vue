@@ -12,7 +12,8 @@
  * must not silently re-filter a parent's phone.
  */
 import { computed } from 'vue';
-import WallMemberFace from '@/components/wall/WallMemberFace.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -22,6 +23,8 @@ const emit = defineEmits<{ select: [string | null] }>();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const members = computed(() => familyStore.sortedHumans);
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -52,7 +55,7 @@ const members = computed(() => familyStore.sortedHumans);
       :aria-pressed="focused === member.id"
       @click="emit('select', focused === member.id ? null : member.id)"
     >
-      <WallMemberFace :member="member" size="sm" />
+      <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
       {{ member.name }}
     </button>
 

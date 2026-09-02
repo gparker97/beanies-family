@@ -18,7 +18,8 @@
  */
 import { computed, inject } from 'vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
-import WallMemberFace from '@/components/wall/WallMemberFace.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -126,6 +127,8 @@ const percent = computed(() =>
     ? Math.round((boardProgress.value.done / boardProgress.value.total) * 100)
     : 0
 );
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -177,7 +180,7 @@ const percent = computed(() =>
           class="flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center dark:border-slate-700"
           :style="{ background: `${member.color}2e` }"
         >
-          <WallMemberFace :member="member" size="md" />
+          <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
           <div>
             <p class="font-outfit text-secondary-500 wall-bean-name font-bold dark:text-gray-100">
               {{ member.name }}
