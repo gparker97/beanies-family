@@ -397,6 +397,9 @@ test.describe('Family Planner', () => {
     const rescheduleStr = `${rescheduleTarget.getFullYear()}-${String(rescheduleTarget.getMonth() + 1).padStart(2, '0')}-${String(rescheduleTarget.getDate()).padStart(2, '0')}`;
 
     await openAddActivity(page);
+    // Recurring is chosen EXPLICITLY (one-time is the default as of 2026-09-02), and FIRST —
+    // switching modes adds the cadence controls and moves everything below them down.
+    await page.getByRole('button', { name: /recurring/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Reschedule Test');
     await selectAssignee(page);
     await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
