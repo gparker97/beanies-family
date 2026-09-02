@@ -18,6 +18,7 @@ import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 
 import { formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
@@ -347,6 +348,13 @@ const { identityFor } = useActivityIdentity();
           }"
           @click="emit('view-activity', ev.occurrence.activity.id, ev.occurrence.date)"
         >
+          <!-- Confetti only where the block is tall enough to hold it; a 30-minute
+               slot is 24px and a scatter there is noise, not celebration. -->
+          <CelebrationConfetti
+            v-if="identityFor(ev.occurrence.activity).celebration.celebrating"
+            :activity-id="ev.occurrence.activity.id"
+            density="card"
+          />
           <div class="flex items-start gap-1">
             <div class="min-w-0 flex-1">
               <div
