@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
@@ -379,12 +380,24 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               v-for="occ in memberUntimedActivities(member.id)"
               :key="occ.activity.id"
               class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-              :class="
-                identityFor(occ.activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : ''
-              "
+              :class="[
+                identityFor(occ.activity, { laneMemberId: member.id }).dashed
+                  ? 'border-dashed'
+                  : '',
+                identityFor(occ.activity, { laneMemberId: member.id }).celebration.celebrating
+                  ? 'is-celebration'
+                  : '',
+              ]"
               :style="identityFor(occ.activity, { laneMemberId: member.id }).style"
               @click="emit('view-activity', occ.activity.id, currentDay.dateStr)"
             >
+              <CelebrationConfetti
+                v-if="
+                  identityFor(occ.activity, { laneMemberId: member.id }).celebration.celebrating
+                "
+                :activity-id="occ.activity.id"
+                density="month"
+              />
               {{ occ.activity.title }}
             </div>
             <!-- Todos (show in first member column) -->
@@ -478,9 +491,12 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                 v-for="(activity, ai) in group"
                 :key="activity.id"
                 class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
-                :class="
-                  identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : ''
-                "
+                :class="[
+                  identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : '',
+                  identityFor(activity, { laneMemberId: member.id }).celebration.celebrating
+                    ? 'is-celebration'
+                    : '',
+                ]"
                 :style="{
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
@@ -489,6 +505,15 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                 }"
                 @click.stop="emit('view-activity', activity.id, currentDay.dateStr)"
               >
+                <!--
+                  DESKTOP bean lanes. `DayTimeline` covers the MOBILE path only, so a
+                  celebration reached this view on a phone and nowhere else.
+                -->
+                <CelebrationConfetti
+                  v-if="identityFor(activity, { laneMemberId: member.id }).celebration.celebrating"
+                  :activity-id="activity.id"
+                  density="week"
+                />
                 <div
                   class="font-outfit flex items-center truncate text-xs font-semibold"
                   style="color: var(--color-text)"

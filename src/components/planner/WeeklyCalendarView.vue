@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import {
   useWeekNavigation,
@@ -838,6 +839,7 @@ function onStripDayClick(dateStr: string) {
                 v-for="(activity, ai) in group"
                 :key="activity.id"
                 class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
+                :class="identityFor(activity).celebration.celebrating ? 'is-celebration' : ''"
                 :style="{
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
@@ -846,6 +848,15 @@ function onStripDayClick(dateStr: string) {
                 }"
                 @click.stop="emit('view-activity', activity.id, day.dateStr)"
               >
+                <!--
+                  DESKTOP week grid. `DayTimeline` covers the MOBILE path only, so a
+                  celebration reached this view on a phone and nowhere else.
+                -->
+                <CelebrationConfetti
+                  v-if="identityFor(activity).celebration.celebrating"
+                  :activity-id="activity.id"
+                  density="week"
+                />
                 <div
                   class="font-outfit flex items-center truncate text-xs font-semibold"
                   style="color: var(--color-text)"
