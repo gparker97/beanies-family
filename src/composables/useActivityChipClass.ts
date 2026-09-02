@@ -7,10 +7,13 @@ import type { FamilyActivity, FamilyMember } from '@/types/models';
 /**
  * Heritage Orange — re-exported so the dozen existing importers of it from this
  * module are unaffected. It is DECLARED in `@/constants/memberColors`, which has
- * zero imports: this module reaches `useAccountsStore` through `useMemberInfo`,
- * and until 2026-09-02 the constants file imported the colour from here, which
- * dragged a finance store into every avatar in the app and into the beanie
- * wall's lint-fenced tree. Do not move the declaration back.
+ * zero imports. Until 2026-09-02 the constants file imported the colour from HERE,
+ * and this module used to reach `useAccountsStore` through `useMemberInfo` — so a
+ * constants file dragged a finance store into every avatar in the app and into the
+ * beanie wall's lint-fenced tree. `useMemberInfo` is finance-free as of that same
+ * change, so the chain is clean in both directions now; keep it that way. Wall
+ * components import this module directly and the lint zone catches DIRECT imports
+ * only, so a finance import added to `useMemberInfo` would silently re-open it.
  */
 export { HERITAGE_ORANGE };
 

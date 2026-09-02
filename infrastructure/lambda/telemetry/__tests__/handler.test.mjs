@@ -327,6 +327,7 @@ describe('Telemetry Lambda handler', () => {
         'connection_type',
         'consecutive_failures',
         'context_build_error',
+        'count',
         'credential_source',
         'detail',
         'detail_field_count',
@@ -393,9 +394,6 @@ describe('Telemetry Lambda handler', () => {
         'recovery_method',
         'recur_children_expected',
         'recur_children_removed',
-        // #70 recurrence unification — the canonical-rule shape. Low-cardinality
-        // enums/ints only: `recur_end` is the END DISCRIMINANT
-        // (never/onDate/afterCount), never the end date itself.
         'recur_end',
         'recur_interval',
         'recur_occurrence_ymd',

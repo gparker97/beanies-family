@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { getAvatarImagePath } from '@/constants/avatars';
-import { resolveMemberColor } from '@/constants/memberColors';
+import { NEUTRAL_MEMBER_COLOR, resolveMemberColor } from '@/constants/memberColors';
 import type { AvatarVariant } from '@/constants/avatars';
 
 /**
@@ -61,7 +61,9 @@ const props = withDefaults(defineProps<Props>(), {
   variant: undefined,
   fallback: 'beanie',
   initials: '',
-  color: '#3b82f6',
+  // Neutral, not #3b82f6 — that is the hue `authStore` hard-codes for every pod owner,
+  // so a forgotten `color` prop silently rendered as "the owner".
+  color: NEUTRAL_MEMBER_COLOR,
   size: 'md',
   ariaLabel: undefined,
   photoUrl: null,
@@ -86,6 +88,10 @@ const SIZE_CLASSES: Record<string, string> = {
   md: 'h-10 w-10',
   lg: 'h-12 w-12',
   xl: 'h-16 w-16',
+  // NOTE: `2xl` (56px) is deliberately SMALLER than `xl` (64px). `xl` predates this and
+  // is used by profile heroes; `2xl` exists solely as the destination for
+  // `WallMemberFace`'s old `lg` step, whose exact 56px keeps the wall's lane headers
+  // pixel-identical. Renaming either would churn call sites for cosmetics.
   '2xl': 'h-14 w-14',
 };
 
@@ -103,6 +109,46 @@ const sizeClass = computed(() => SIZE_CLASSES[props.size] || SIZE_CLASSES.md);
 const textClass = computed(() => TEXT_CLASSES[props.size] || TEXT_CLASSES.md);
 const showInitials = computed(() => props.fallback === 'initials');
 const resolvedColor = computed(() => resolveMemberColor(props.color));
+
+/**
+ * Initials are drawn in whichever of white/near-black actually reads on the member's
+ * colour, rather than always white.
+ *
+ * Not one of the six palette hues clears WCAG AA (4.5:1) against white — teal 2.49:1,
+ * green 2.28:1, amber 2.15:1, pink 3.53:1, blue 3.68:1, violet 4.23:1 — and three
+ * miss even the 3:1 large-text floor. Against Deep Slate they all clear it
+ * comfortably. Computed rather than hard-coded so a future palette change cannot
+ * quietly reintroduce unreadable initials.
+ */
+function relativeLuminance(hex: string): number {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+  const ch = [0, 2, 4].map((i) => {
+    const v = parseInt(full.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!;
+}
+
+const initialsInk = computed(() =>
+  /^#[0-9a-f]{3,8}$/i.test(resolvedColor.value) && relativeLuminance(resolvedColor.value) > 0.45
+    ? '#2C3E50'
+    : '#ffffff'
+);
+
+/**
+ * Never an anonymous coloured disc. `initials` defaults to `''` and
+ * `memberAvatarBindings` deliberately degrades to `''` for a member the roster does
+ * not know, so without this the fallback had no fallback — a row of blank circles on
+ * the one screen whose job is telling beans apart. The deleted `WallMemberFace`
+ * derived its letter from `member.name` and could never be blank.
+ */
+const initialsText = computed(() => {
+  const given = props.initials.trim();
+  if (given) return given;
+  const fromLabel = props.ariaLabel?.trim();
+  return fromLabel ? [...fromLabel][0]!.toUpperCase() : '?';
+});
 const imagePath = computed(() => getAvatarImagePath(props.variant ?? 'adult-other'));
 const isFiltered = computed(() => props.variant === 'family-filtered');
 
@@ -165,10 +211,11 @@ function onPhotoError() {
     -->
     <span
       v-if="showInitials"
-      class="font-outfit grid h-full w-full place-items-center leading-none font-bold text-white"
+      class="font-outfit grid h-full w-full place-items-center leading-none font-bold"
       :class="textClass"
+      :style="{ color: initialsInk }"
       aria-hidden="true"
-      >{{ initials }}</span
+      >{{ initialsText }}</span
     >
     <img
       v-else

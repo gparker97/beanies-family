@@ -53,7 +53,8 @@ export const CELEBRATION_ERRAND_VERBS: Record<string, readonly string[]> = {
     'prepare',
     'shop',
     'send',
-    'post',
+    // 'post' deliberately omitted: it suppresses "Post-graduation party", and
+    // "post the invitations" is rare enough not to be worth that trade.
     'rsvp',
   ],
   zh: ['買', '买', '訂', '订', '準備', '准备', '安排', '取', '寄'],
@@ -62,5 +63,13 @@ export const CELEBRATION_ERRAND_VERBS: Record<string, readonly string[]> = {
 /**
  * Emoji that are near-certain intent — and the only signal that works in every
  * language, including ones with no keyword list at all.
+ *
+ * 🎁 and 🎊 are deliberately ABSENT. A gift is the canonical errand OBJECT: "Buy 🎁
+ * for Leo" is a shopping trip, so including it reopened the exact hole the errand-verb
+ * rule exists to close. 🎊 is the registry emoji for `work_party`, which sits in the
+ * Work group precisely so it does NOT celebrate — including it would have let the
+ * emoji rule overturn the category rule's deliberate exclusion.
+ *
+ * These are the occasion itself, not its trappings.
  */
-export const CELEBRATION_EMOJI = ['🎂', '🎉', '🎈', '🥳', '🎊', '🍰', '🎁'] as const;
+export const CELEBRATION_EMOJI = ['🎂', '🎉', '🎈', '🥳', '🍰'] as const;
