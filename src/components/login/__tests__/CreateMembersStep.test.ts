@@ -35,6 +35,11 @@ const owner: {
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
     owner,
+    // `members` must be present and iterable: colour assignment reads the REAL roster
+    // (not just the beans added in this wizard) so the second bean cannot be handed the
+    // owner's colour — which is exactly what the old `addedMembers.length` round-robin
+    // did, because it excluded the owner.
+    members: [owner],
     createMember: mockCreateMember,
     deleteMember: mockDeleteMember,
   }),

@@ -10,6 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-02
 
+### Changed
+
+- **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red has left the palette — it is reserved for delete buttons, not for people.
+- Two beans whose names start with the same letter now show two letters on their face, so they can be told apart without relying on colour.
+
+### Fixed
+
+- A bean with no colour set could show as a blank circle instead of a neutral one.
+- A photo on the beanie wall could be rate-limited by Google and fail to appear; it now loads the same way photos do everywhere else in the app, and the bean's initial stays visible while it loads.
+- An event that named the same person twice (which can happen when two devices sync) drew that person's face twice on the wall.
+
 ### Added
 
 - **Repeating lists now keep a history.** When a repeating list rolls over, the finished cycle is saved to a "history" shelf on the lists page, grouped by this week, last week, then by month. Saved cycles are read-only, and are removed automatically once they are around three months old.

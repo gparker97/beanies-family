@@ -24,7 +24,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
-import { MEMBER_COLOR_VALUES } from '@/constants/memberColors';
+import { nextFreeMemberColor } from '@/constants/memberColors';
 import { reportError } from '@/utils/errorReporter';
 import { formatBirthdayShort } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
@@ -127,9 +127,13 @@ function openAddMemberForm(role: 'parent' | 'child') {
   showMemberForm.value = true;
 }
 
+/**
+ * Was a round-robin on `addedMembers.length` — which EXCLUDES the pod owner, so the
+ * second bean could be handed the owner's colour on the very first family. One rule
+ * now, shared with the member modal, over the real roster.
+ */
 function getNextColor(): string {
-  const usedCount = addedMembers.value.length;
-  return MEMBER_COLOR_VALUES[usedCount % MEMBER_COLOR_VALUES.length] ?? MEMBER_COLOR_VALUES[0]!;
+  return nextFreeMemberColor([...familyStore.members, ...addedMembers.value]).color;
 }
 </script>
 
