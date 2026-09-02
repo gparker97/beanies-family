@@ -40,6 +40,23 @@ describe('ActivityOwnerStack', () => {
     expect(w.text()).not.toContain('+');
   });
 
+  it('collapses to ONE face plus a count in dense mode', () => {
+    // The title is the only thing a reader cannot recover by tapping — the faces are
+    // one tap away, a truncated title is not. On a month cell four pills ate about half
+    // the row, so dense trades three faces for one plus a count and gives the width back.
+    const w = mount(ActivityOwnerStack, {
+      props: { members: ['a', 'b', 'c', 'd'].map((x, i) => m(String(i), x)), dense: true },
+    });
+    expect(w.findAllComponents({ name: 'BeanieAvatar' })).toHaveLength(1);
+    expect(w.text()).toContain('+3');
+  });
+
+  it('still shows a lone owner as a face, not as +1, when dense', () => {
+    const w = mount(ActivityOwnerStack, { props: { members: [m('1', 'Max')], dense: true } });
+    expect(w.findAllComponents({ name: 'BeanieAvatar' })).toHaveLength(1);
+    expect(w.text()).not.toContain('+');
+  });
+
   it('honours a custom cap', () => {
     const w = stack([m('1', 'A'), m('2', 'B'), m('3', 'C')], 1);
     expect(w.findAllComponents({ name: 'BeanieAvatar' })).toHaveLength(1);

@@ -33,15 +33,25 @@ const props = withDefaults(
      * column — the whole reason the stack is right-anchored.
      */
     max?: number;
+    /**
+     * Space is at a premium — collapse to ONE face plus a count.
+     *
+     * On a month cell four pills can eat half the row, and the title is the only thing
+     * a reader cannot recover by tapping the card: the faces are one tap away, the
+     * truncated title is not. A single face plus `+3` still says "shared, tap to see
+     * who", which is the job at this size.
+     */
+    dense?: boolean;
     size?: 'xs' | 'sm' | 'md';
   }>(),
-  { max: 3, size: 'sm' }
+  { max: 3, size: 'sm', dense: false }
 );
 
 const { memberAvatarBindings } = useMemberAvatarBindings();
 
-const shown = computed(() => props.members.slice(0, props.max));
-const overflow = computed(() => Math.max(0, props.members.length - props.max));
+const cap = computed(() => (props.dense ? 1 : props.max));
+const shown = computed(() => props.members.slice(0, cap.value));
+const overflow = computed(() => Math.max(0, props.members.length - cap.value));
 
 /**
  * The stack is decorative for a screen reader — the card's own accessible name

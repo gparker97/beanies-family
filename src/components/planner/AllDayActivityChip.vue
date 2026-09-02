@@ -52,6 +52,8 @@ const bgColor = computed(() => `${identity.value.color}22`);
     :color="color"
     :bg-color="bgColor"
     :leading-emoji="identity.emoji"
+    :celebrating="identity.celebration.celebrating"
+    :sticker="identity.sticker"
     :is-start="isStart"
     :is-end="isEnd"
     testid="all-day-activity-chip"
