@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import {
   useDayNavigation,
   useTimeGrid,
@@ -56,6 +58,7 @@ const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
 const { identityFor } = useActivityIdentity();
+const { memberAvatarBindings } = useMemberAvatarBindings();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
@@ -294,12 +297,14 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
             :key="'header-' + member.id"
             class="relative flex flex-col items-center gap-1 py-2.5"
           >
-            <span
-              class="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"
-              :style="{ backgroundColor: member.color }"
-            >
-              {{ member.name.charAt(0).toUpperCase() }}
-            </span>
+            <!--
+              The lane header is what NAMES this column — so a solo card inside it can
+              show no face at all. That makes its initial load-bearing: a hand-rolled
+              `charAt(0)` showed "M" for both Max and Mia here while the filter chips
+              two rows above correctly showed "MA" and "MI", so the one place the rule
+              mattered most was the one place that ignored it.
+            -->
+            <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
             <span
               class="font-outfit text-secondary-500/55 text-xs font-semibold lowercase dark:text-gray-400"
             >
