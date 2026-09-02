@@ -28,29 +28,25 @@ const SIZE_CLASSES: Record<string, string> = {
 const sizeClass = computed(() => SIZE_CLASSES[props.size] || SIZE_CLASSES.md);
 
 /**
- * The registry is `satisfies`-narrowed so a typo in a STATIC name is a compile error.
- * But `name` stays `string` on purpose — CategoryIcon resolves data-driven names and
- * AccountTypeIcon builds one from a template literal — so the compile-time guarantee
- * only covers the statically-bound call sites.
+ * The three-dot placeholder is deliberate and NOT an error.
  *
- * Hence the noise: a three-dot circle looks deliberate, which makes it the worst
- * possible fallback to render silently. Say so once per unknown name.
+ * A previous version console.error'd on any unknown name. That was wrong twice over:
+ * `src/constants/categories.ts` legitimately references sixteen names this registry has
+ * never held (`handshake`, `school`, `music`, `stethoscope`, `dumbbell`, …), which
+ * `CategoryIcon` binds straight through — so it fired constantly on Transactions, once
+ * per icon INSTANCE, from inside a computed getter, and went only to the console where
+ * nobody would see it. Noise that loud trains people to ignore the console, which costs
+ * more than the missing signal it was meant to buy.
+ *
+ * The compile-time narrowing on `BEANIE_ICONS` is the real guard for statically-named
+ * icons. Data-driven names fall back quietly, as they always did.
  */
-const warnedIcons = new Set<string>();
-
-const iconDef = computed<BeanieIconDef>(() => {
-  const def = getIconDef(props.name);
-  if (def) return def;
-  if (!warnedIcons.has(props.name)) {
-    warnedIcons.add(props.name);
-    console.error(
-      `[beanieIcon] unknown icon "${props.name}" — add it to BEANIE_ICONS in ` +
-        `src/constants/icons.ts, or fix the name. Rendering the placeholder.`
-    );
-  }
-  // Fallback: three-dot circle (matches CategoryIcon default)
-  return { paths: ['M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'] };
-});
+const iconDef = computed<BeanieIconDef>(
+  () =>
+    getIconDef(props.name) || {
+      paths: ['M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+    }
+);
 </script>
 
 <template>

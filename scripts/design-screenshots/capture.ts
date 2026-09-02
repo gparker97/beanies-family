@@ -1,7 +1,7 @@
-import { test } from '../fixtures/test';
-import { IndexedDBHelper } from '../helpers/indexeddb';
-import { bypassLoginIfNeeded } from '../helpers/auth';
-import { gotoRoot, gotoRoute } from '../helpers/navigation';
+import { test } from '../../e2e/fixtures/test';
+import { IndexedDBHelper } from '../../e2e/helpers/indexeddb';
+import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
+import { gotoRoot, gotoRoute } from '../../e2e/helpers/navigation';
 
 /**
  * NOT a test — a screenshot harness for design review.
@@ -16,9 +16,15 @@ import { gotoRoot, gotoRoute } from '../helpers/navigation';
  * navigated per view and captured six identical blank frames, and passed,
  * because a screenshot harness asserts nothing. Seed once, click through.
  *
- * Excluded from the ADR-007 E2E budget: it makes no assertions. Run it
- * deliberately:
- *   npx playwright test e2e/specs/screenshots.spec.ts --project=chromium
+ * It lives OUTSIDE `e2e/specs/` deliberately. `playwright.config.ts` has
+ * `testDir: './e2e/specs'` with no `testIgnore`, so a file placed there is run by CI
+ * on every push to main across a chromium+webkit matrix — and a 240s zero-assertion
+ * spec that leans on `waitForTimeout` and English button labels can only ever fail,
+ * never pass usefully. It also broke the ADR-007 budget silently (21 -> 22 tests).
+ * Same shape as `scripts/store-screenshots/`, which already solved this.
+ *
+ * Run it deliberately:
+ *   npx playwright test -c playwright.design.config.ts
  */
 
 const MEMBERS = [
@@ -29,10 +35,15 @@ const MEMBERS = [
   { id: 'm-leo', name: 'Leo', color: '#22c55e', ageGroup: 'child', gender: 'male' },
 ];
 
+/**
+ * Local calendar date. `toISOString()` is UTC, so offsetting a local date and then
+ * serialising that way lands on the wrong day west of Greenwich in the evening — every
+ * `d: 0` activity would seed on tomorrow and the day shots would come out empty.
+ */
 function ymd(offsetDays = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 const ACTIVITIES = [
@@ -177,6 +188,7 @@ test.describe('design screenshots', () => {
     await page.evaluate(() => {
       const chips = document.querySelectorAll('[data-testid="month-chip"]');
       const host = document.createElement('div');
+      host.id = 'tier-closeup';
       host.style.cssText =
         'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column;gap:24px;padding:48px;font-family:Inter,sans-serif';
       const label = document.createElement('div');
@@ -195,8 +207,10 @@ test.describe('design screenshots', () => {
       document.body.appendChild(host);
     });
     await shoot('07-tiers-closeup', 1200, 900);
-    await gotoRoute(page, '/activities');
-    await page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
+    // Remove the overlay rather than reloading: `gotoRoute` drops the memory-provider
+    // Automerge doc, so navigating back leaves an empty family and the app-content wait
+    // never resolves.
+    await page.evaluate(() => document.getElementById('tier-closeup')?.remove());
 
     // Dark mode on the densest surface.
     await page.setViewportSize({ width: 1440, height: 950 });

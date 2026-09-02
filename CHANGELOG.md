@@ -19,10 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Tapping a day on the wall's today view moves the view to that day**, meals card included, rather than opening a sheet over it.
 - The step-up prompt now says so plainly when a bean has no PIN or password to prove with, instead of looking like an ordinary cancel.
-- **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red is no longer given to new beans — it is reserved for delete buttons, not for people — though a bean that already has it keeps it.
+- **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red is no longer given to new beans, it is reserved for delete buttons, not for people, though a bean that already has it keeps it.
 - Two beans whose names start with the same letter now show enough letters on their face to tell them apart, so they no longer depend on colour alone.
-- **Colours now say who, not what.** Everywhere a card appears — the planner, the wall, to-dos and lists — it is coloured by the bean it belongs to rather than by the kind of activity, and the activity's own emoji says what it is. An event shared by two beans blends both their colours; one that belongs to nobody stays orange. Every bean's face now appears on the month view too, which it never did on a computer before.
-- **Cards show a bean's face instead of their full name**, which leaves room for the thing you actually wanted to read. Where you are _choosing_ a bean rather than reading about one — assigning a to-do, filtering the wall — the name stays.
+- **Colours now say who, not what.** Everywhere a card appears, the planner, the wall, to-dos and lists, it is coloured by the bean it belongs to rather than by the kind of activity, and the activity's own emoji says what it is. An event shared by two beans blends both their colours; one that belongs to nobody stays orange. Every bean's face now appears on the month view too, which it never did on a computer before.
+- **Cards show a bean's face instead of their full name**, which leaves room for the thing you actually wanted to read. Where you are _choosing_ a bean rather than reading about one, assigning a to-do, filtering the wall, the name stays.
 
 ### Fixed
 
