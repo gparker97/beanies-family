@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
-import { getActivityColor } from '@/stores/activityStore';
-import { getActivityFallbackEmoji } from '@/constants/activityCategories';
-import { normalizeAssignees } from '@/utils/assignees';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
+
 import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
@@ -41,18 +40,21 @@ function formatDisplayDate(dateStr: string): string {
   if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
   return formatNookDate(dateStr);
 }
+
+const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
   <button
     type="button"
     class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-800"
-    :style="{ borderLeftColor: getActivityColor(activity) }"
+    :class="identityFor(activity).dashed ? 'border-dashed' : ''"
+    :style="identityFor(activity).style"
     @click="$emit('click')"
   >
     <!-- Category icon -->
     <span class="flex-shrink-0 text-base leading-none">
-      {{ activity.icon ?? getActivityFallbackEmoji(activity.category) }}
+      {{ identityFor(activity).emoji }}
     </span>
 
     <div class="min-w-0 flex-1">
@@ -108,7 +110,7 @@ function formatDisplayDate(dateStr: string): string {
           <!-- eslint-enable vue/no-bare-strings-in-template -->
         </span>
         <span class="flex-1" />
-        <MemberChip v-for="mid in normalizeAssignees(activity)" :key="mid" :member-id="mid" />
+        <ActivityOwnerStack :members="identityFor(activity).stackMembers" size="sm" />
       </div>
     </div>
   </button>

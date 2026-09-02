@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import {
   useDayNavigation,
   useTimeGrid,
@@ -10,18 +10,14 @@ import {
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useTranslation } from '@/composables/useTranslation';
-import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useActivityStore } from '@/stores/activityStore';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import {
-  belongsInMemberColumn,
-  isSharedEvent,
-  matchesAssigneeFilter,
-  normalizeAssignees,
-} from '@/utils/assignees';
+import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
@@ -57,8 +53,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const { isMobile, isTablet } = useBreakpoint();
+const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
+const { identityFor } = useActivityIdentity();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
@@ -110,20 +107,6 @@ const mobileDayActivities = computed<Occurrence[]>(() => {
 // belongs in everyone's column: a two-owner event already appears in both, and one with
 // no owner is owned by everybody. The shared style is what keeps a duplicated card from
 // reading as a separate personal obligation in each column.
-/**
- * Shared events now appear in every member column, so they need to read as one shared
- * thing rather than a separate obligation per person. The planner colours by CATEGORY
- * (not by member), so hue cannot carry that meaning here — the dashed edge does, and it
- * matches the wall's treatment.
- */
-/** Roster ids as a set: `isShared` is called once per block per render, per column. */
-const memberIds = computed(() => new Set(familyStore.members.map((m) => m.id)));
-function isShared(activity: { assigneeIds?: string[]; assigneeId?: string }): boolean {
-  // Resolved against the roster, so a stale or duplicated id in `assigneeIds` cannot
-  // dress a one-owner event as shared.
-  return isSharedEvent(activity, (id) => memberIds.value.has(id));
-}
-
 function memberActivities(memberId: string): Occurrence[] {
   return dayActivities.value.filter((o) => belongsInMemberColumn(o.activity, memberId));
 }
@@ -386,11 +369,10 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               v-for="occ in memberUntimedActivities(member.id)"
               :key="occ.activity.id"
               class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-              :class="isShared(occ.activity) ? 'border-dashed' : ''"
-              :style="{
-                borderLeftColor: getActivityColor(occ.activity),
-                background: getActivityColor(occ.activity) + '15',
-              }"
+              :class="
+                identityFor(occ.activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : ''
+              "
+              :style="identityFor(occ.activity, { laneMemberId: member.id }).style"
               @click="emit('view-activity', occ.activity.id, currentDay.dateStr)"
             >
               {{ occ.activity.title }}
@@ -486,13 +468,14 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                 v-for="(activity, ai) in group"
                 :key="activity.id"
                 class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
-                :class="isShared(activity) ? 'border-dashed' : ''"
+                :class="
+                  identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : ''
+                "
                 :style="{
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
                   width: `calc(${100 / group.length}% - 2px)`,
-                  borderLeftColor: getActivityColor(activity),
-                  background: getActivityColor(activity) + '18',
+                  ...identityFor(activity, { laneMemberId: member.id }).style,
                 }"
                 @click.stop="emit('view-activity', activity.id, currentDay.dateStr)"
               >
@@ -514,18 +497,17 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                   >
                     · 📍 {{ activity.location }}
                   </span>
-                  <div
-                    v-if="normalizeAssignees(activity).length > 0"
-                    class="ml-auto flex flex-shrink-0 -space-x-1"
-                    :aria-label="t('planner.assignedTo')"
-                  >
-                    <MemberChip
-                      v-for="mid in normalizeAssignees(activity).slice(0, isTablet ? 3 : 2)"
-                      :key="mid"
-                      :member-id="mid"
-                      :size="isTablet ? 'dot' : 'sm'"
-                    />
-                  </div>
+                  <!--
+                    Lane-aware: this IS a member column, so the header already names its
+                    bean. A face here therefore always means "someone else is in this
+                    too", which is what lets a shared event read as shared with no
+                    decoration at all.
+                  -->
+                  <ActivityOwnerStack
+                    :members="identityFor(activity, { laneMemberId: member.id }).stackMembers"
+                    size="xs"
+                    class="ml-auto"
+                  />
                 </div>
               </div>
             </template>

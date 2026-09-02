@@ -20,13 +20,12 @@
  */
 import { computed } from 'vue';
 import { useMemberInfo } from '@/composables/useMemberInfo';
-import { useActivityChipClass } from '@/composables/useActivityChipClass';
-import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { formatNameList, normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
 
@@ -44,15 +43,12 @@ const emit = defineEmits<{
 }>();
 
 const { getMemberName } = useMemberInfo();
-const { classify } = useActivityChipClass();
+const { identityFor } = useActivityIdentity();
 const { categoryLabel: resolveCategoryLabel } = useActivityCategoryLabel();
 
-const classification = computed(() => classify(props.occurrence.activity));
-
-const emoji = computed(() => {
-  const a = props.occurrence.activity;
-  return a.icon ?? getActivityFallbackEmoji(a.category);
-});
+/** Whose, which faces, which glyph, celebration, wash — one call, one rule. */
+const identity = computed(() => identityFor(props.occurrence.activity));
+const emoji = computed(() => identity.value.emoji);
 
 const time = computed(() => {
   const t = props.occurrence.activity.startTime;
@@ -83,20 +79,13 @@ const categoryLabel = computed(() => resolveCategoryLabel(props.occurrence.activ
 const ariaLabel = computed(() => {
   const ids = normalizeAssignees(props.occurrence.activity);
   const names =
-    classification.value.kind === 'solo'
+    identity.value.kind === 'solo'
       ? ids.map((id) => getMemberName(id))
-      : classification.value.members.map((m) => m.name);
+      : identity.value.stackMembers.map((m) => m.name);
   return [formatNameList(names), categoryLabel.value, time.value, title.value]
     .filter(Boolean)
     .join(' · ');
 });
-
-/**
- * 12% alpha tint of the resolved color for the chip's fill. Matches the
- * pattern in `AllDayActivityChip.vue` — `${color}1f` works for any 6-char
- * hex string, which both member.color and HERITAGE_ORANGE always are.
- */
-const bgColor = computed(() => `${classification.value.color}1f`);
 
 function onClick(event: MouseEvent) {
   event.stopPropagation();
@@ -108,7 +97,8 @@ function onClick(event: MouseEvent) {
   <button
     type="button"
     class="font-inter text-secondary-500 flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80 dark:text-gray-200"
-    :style="{ borderLeftColor: classification.color, backgroundColor: bgColor }"
+    :class="identity.dashed ? 'border-dashed' : ''"
+    :style="identity.style"
     :aria-label="ariaLabel"
     data-testid="month-chip"
     @click="onClick"
@@ -131,14 +121,12 @@ function onClick(event: MouseEvent) {
 
     <ClashIndicator :clash="clash" class="flex-shrink-0" />
 
-    <!-- Right-edge avatar stack — mobile-only (`md:hidden`) and only for
-         multi-person events (the left bar already says whose for solo). -->
-    <span
-      v-if="classification.kind !== 'solo' && classification.members.length > 0"
-      class="ml-0.5 flex flex-shrink-0 items-center -space-x-1.5 md:hidden"
-      aria-hidden="true"
-    >
-      <MemberChip v-for="m in classification.members" :key="m.id" :member-id="m.id" size="dot" />
-    </span>
+    <!--
+      Right-anchored owner faces. No longer `md:hidden`: the month grid on desktop
+      showed no faces at all, so hue was the sole identity signal on the very surface
+      where the most events are visible at once. And no longer skipped for solo — the
+      month grid is not a bean lane, so nothing else here names the owner.
+    -->
+    <ActivityOwnerStack :members="identity.stackMembers" size="xs" class="ml-0.5" />
   </button>
 </template>

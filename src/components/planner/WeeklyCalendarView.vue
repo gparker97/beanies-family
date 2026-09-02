@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import {
   useWeekNavigation,
   useTimeGrid,
@@ -10,7 +10,8 @@ import {
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useTranslation } from '@/composables/useTranslation';
-import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useActivityStore } from '@/stores/activityStore';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
@@ -71,8 +72,9 @@ const { t } = useTranslation();
 // External-calendar clash lookup (#34) — called inline per timed block (a composable
 // can't run inside a v-for). All store coupling stays in useClash.ts.
 const clashFor = useClashLookup();
-const { isMobile, isTablet } = useBreakpoint();
+const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
+const { identityFor } = useActivityIdentity();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
@@ -840,8 +842,7 @@ function onStripDayClick(dateStr: string) {
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
                   width: `calc(${100 / group.length}% - 2px)`,
-                  borderLeftColor: getActivityColor(activity),
-                  background: getActivityColor(activity) + '18',
+                  ...identityFor(activity).style,
                 }"
                 @click.stop="emit('view-activity', activity.id, day.dateStr)"
               >
@@ -869,12 +870,7 @@ function onStripDayClick(dateStr: string) {
                     class="ml-auto flex flex-shrink-0 -space-x-1"
                     :aria-label="t('planner.assignedTo')"
                   >
-                    <MemberChip
-                      v-for="mid in normalizeAssignees(activity).slice(0, isTablet ? 3 : 2)"
-                      :key="mid"
-                      :member-id="mid"
-                      :size="isTablet ? 'dot' : 'sm'"
-                    />
+                    <ActivityOwnerStack :members="identityFor(activity).stackMembers" size="xs" />
                   </div>
                 </div>
               </div>
