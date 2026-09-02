@@ -28,16 +28,43 @@ describe('ColorCircleSelector', () => {
     expect(w.emitted('update:modelValue')?.[0]).toEqual(['#222']);
   });
 
-  it('disables a colour held by someone else and does NOT emit on click', async () => {
-    // A swatch that merely looks dimmed but still fires is a silent failure wearing
-    // a hover state — the whole point is that a colour identifies exactly one bean.
+  it('disables a colour held by someone else', () => {
     const taken = new Map([['#222', member('m2', 'Mia', '#222')]]);
     const w = mountWith('#111', taken);
     const second = w.findAll('button')[1]!;
     expect(second.attributes('disabled')).toBeDefined();
     expect(second.attributes('aria-disabled')).toBe('true');
-    await second.trigger('click');
+  });
+
+  it('refuses a taken colour in the HANDLER, not just via the disabled attribute', async () => {
+    // Calling the handler directly, because `trigger('click')` proves nothing here:
+    // @vue/test-utils no-ops it on a disabled BUTTON (`vue-test-utils.cjs.js:7215`),
+    // so the previous version of this test was satisfied by the library rather than by
+    // the component — and would have stayed green if the guard were only an attribute.
+    // Swapping `disabled` for `aria-disabled` (to keep the swatch focusable and its
+    // tooltip readable) would then have silently re-opened duplicate assignment.
+    const taken = new Map([['#222', member('m2', 'Mia', '#222')]]);
+    const w = mountWith('#111', taken);
+    (w.vm as unknown as { select: (v: string) => void }).select?.('#222');
+    await w.vm.$nextTick();
     expect(w.emitted('update:modelValue')).toBeUndefined();
+  });
+
+  it('keeps the holder badges visible when the palette is exhausted and unlocks', async () => {
+    // The escape hatch used to strip BOTH signals: `isTaken()` returned false for every
+    // swatch, which unlocked the palette AND removed every holder badge, while the
+    // notice only ever fired on the create path. A family holding all six hues editing
+    // a legacy bean saw a completely ordinary picker and created a duplicate blind.
+    const taken = new Map([
+      ['#111', member('m1', 'Ann', '#111')],
+      ['#222', member('m2', 'Mia', '#222')],
+      ['#333', member('m3', 'Bo', '#333')],
+    ]);
+    const w = mountWith('#999', taken);
+    expect(w.findAll('button').filter((b) => b.attributes('disabled') !== undefined)).toHaveLength(
+      0
+    );
+    expect(w.findAllComponents({ name: 'BeanieAvatar' }).length).toBe(3);
   });
 
   it("names the holder, so 'taken' explains itself without a sentence", () => {

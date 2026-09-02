@@ -10,17 +10,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-02
 
-### Changed
-
-- **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red has left the palette — it is reserved for delete buttons, not for people.
-- Two beans whose names start with the same letter now show two letters on their face, so they can be told apart without relying on colour.
-
-### Fixed
-
-- A bean with no colour set could show as a blank circle instead of a neutral one.
-- A photo on the beanie wall could be rate-limited by Google and fail to appear; it now loads the same way photos do everywhere else in the app, and the bean's initial stays visible while it loads.
-- An event that named the same person twice (which can happen when two devices sync) drew that person's face twice on the wall.
-
 ### Added
 
 - **Repeating lists now keep a history.** When a repeating list rolls over, the finished cycle is saved to a "history" shelf on the lists page, grouped by this week, last week, then by month. Saved cycles are read-only, and are removed automatically once they are around three months old.
@@ -30,6 +19,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Tapping a day on the wall's today view moves the view to that day**, meals card included, rather than opening a sheet over it.
 - The step-up prompt now says so plainly when a bean has no PIN or password to prove with, instead of looking like an ordinary cancel.
+- **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red is no longer given to new beans — it is reserved for delete buttons, not for people — though a bean that already has it keeps it.
+- Two beans whose names start with the same letter now show enough letters on their face to tell them apart, so they no longer depend on colour alone.
+- **Colours on the planner now say who, not what.** A card is coloured by the bean it belongs to rather than by the kind of activity, and the activity's own emoji says what it is. An event shared by two beans blends both their colours; one that belongs to nobody stays orange. Every bean's face now appears on the month view too, which it never did on a computer before.
 
 ### Fixed
 
@@ -39,6 +31,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Removing a bean now checks that you are allowed to before asking you to confirm.
 - Deleting a list that had already been removed on another device reported success; it now says what happened.
 - History clean-up no longer stops working on a device whose clock was wrong once, and no longer warns about a clock jump every eighth day on families with no history yet.
+- A bean with no colour set could show as a blank circle instead of a neutral one.
+- A photo on the beanie wall could be rate-limited by Google and fail to appear; it now loads the same way photos do everywhere else in the app, and the bean's initial stays visible while it loads.
+- An event that named the same person twice (which can happen when two devices sync) drew that person's face twice.
 
 ### Security
 
