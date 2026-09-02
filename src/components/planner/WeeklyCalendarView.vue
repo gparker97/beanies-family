@@ -877,10 +877,19 @@ function onStripDayClick(dateStr: string) {
                   >
                     · 📍 {{ activity.location }}
                   </span>
+                  <!--
+                    `ml-auto shrink-0` — faces are ALWAYS right-anchored, which is what keeps
+                    a title's left edge identical on every card. Without it this stack sat
+                    wherever the preceding content ended: the location span carries `flex-1`,
+                    so a card WITH a location pushed the faces right and a card without one
+                    left them mid-row. `DailyCalendarView` already does this; this was the
+                    one call site that relied on a sibling to do it.
+                  -->
                   <ActivityOwnerStack
                     :members="identityFor(activity).stackMembers"
                     size="xs"
                     dense
+                    class="ml-auto shrink-0"
                   />
                 </div>
               </div>
