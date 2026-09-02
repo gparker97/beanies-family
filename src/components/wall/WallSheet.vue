@@ -23,7 +23,6 @@ import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { fillTemplate } from '@/utils/fillTemplate';
 
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
@@ -104,7 +103,6 @@ const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 const { mealsToday, trip } = useWallPeripherals();
-const { categoryLabel } = useActivityCategoryLabel();
 
 /**
  * Read the discriminated union through a local first. Narrowing on
@@ -304,6 +302,18 @@ const { identityFor } = useActivityIdentity();
       class="flex h-[84%] w-full flex-col overflow-hidden rounded-t-[30px] bg-[var(--cloud-white,#F8F9FA)] px-7 pt-6 pb-6 dark:bg-slate-900"
     >
       <div class="mb-4 flex shrink-0 items-center gap-3.5">
+        <!--
+          The category, as the emoji every card surface already uses — beside the title,
+          where it reads as identity rather than as a labelled data field competing with
+          the time and the place. `aria-hidden` because the category is not the heading;
+          a screen reader gets the title, and the emoji would only interrupt it.
+        -->
+        <span
+          v-if="target.kind === 'activity' && activity?.category"
+          class="wall-sheet-title shrink-0"
+          aria-hidden="true"
+          >{{ activityEmoji(activity) }}</span
+        >
         <h2
           class="font-outfit text-secondary-500 wall-sheet-title font-extrabold dark:text-gray-100"
         >
@@ -359,10 +369,25 @@ const { identityFor } = useActivityIdentity();
               walks up to a wall to check about an activity, so they get a band
               of their own at wall scale — mirroring the treatment a travel
               segment gets — and the supporting logistics sit under it.
+
+              TWO cells, not three. Category briefly had one of its own here, which
+              contradicted this comment: at wall distance it competed for attention
+              with the time and the place while being the least useful of the three,
+              and it spelled the category out as a word the rest of the app writes
+              nowhere else. It now rides beside the title as the emoji, which is
+              where every card surface already puts it.
             -->
             <div class="wall-hero mb-4 flex flex-wrap items-stretch gap-3">
               <div class="wall-hero-cell">
-                <p class="wall-hero-cap font-outfit">{{ t('wall.hero.when') }}</p>
+                <!--
+                  Icons on the two hero facts, for the same reason the detail rows below
+                  carry them: at wall distance a row is found by SHAPE before it is read.
+                  These are the two things anybody walks over to check, so they were the
+                  odd ones out without them.
+                -->
+                <p class="wall-hero-cap font-outfit flex items-center gap-1.5">
+                  <BeanieIcon name="clock" size="sm" />{{ t('wall.hero.when') }}
+                </p>
                 <p class="font-outfit wall-hero-value font-extrabold">
                   <template v-if="activity.startTime">
                     {{ activity.startTime
@@ -379,20 +404,14 @@ const { identityFor } = useActivityIdentity();
                 else. The planner's own modal never did this; the wall was the odd one.
               -->
               <div class="wall-hero-cell wall-hero-grow">
-                <p class="wall-hero-cap font-outfit">{{ t('planner.field.location') }}</p>
+                <p class="wall-hero-cap font-outfit flex items-center gap-1.5">
+                  <BeanieIcon name="map-pin" size="sm" />{{ t('planner.field.location') }}
+                </p>
                 <p v-if="activity.location" class="font-outfit wall-hero-value font-extrabold">
                   {{ activity.location }}
                 </p>
                 <p v-else class="font-outfit wall-hero-value wall-hero-empty font-extrabold">
                   {{ t('planner.noLocation') }}
-                </p>
-              </div>
-              <!-- Category gets its own cell, shown as the emoji the rest of the app uses. -->
-              <div v-if="activity.category" class="wall-hero-cell">
-                <p class="wall-hero-cap font-outfit">{{ t('form.category') }}</p>
-                <p class="font-outfit wall-hero-value font-extrabold">
-                  <span aria-hidden="true">{{ activityEmoji(activity) }}</span>
-                  {{ categoryLabel(activity.category) }}
                 </p>
               </div>
             </div>

@@ -17,6 +17,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **A birthday now looks like one.** A celebration is marked by a bunting edge, like a row of party flags along the top of the card, with a scatter of beans across the wider ones. The orange border it used to have has gone: orange already means today, selected, and needs-attention elsewhere, so a birthday read as an alert, and that border was covering up the colour that says whose card it is.
+- **New activities are one-off by default.** Repeating is now something you choose, rather than something you have to turn off.
+- **The wall's activity details lead with the two things you walk over to check.** When and where now carry icons, like the rows beneath them, and the category has moved up beside the title as its emoji rather than being spelled out as a word in a box of its own.
 - **Tapping a day on the wall's today view moves the view to that day**, meals card included, rather than opening a sheet over it.
 - The step-up prompt now says so plainly when a bean has no PIN or password to prove with, instead of looking like an ordinary cancel.
 - **Every bean now has its own colour, and no two beans can share one.** Picking a colour shows which ones are already taken and who has them, and a new bean is given a free colour rather than a random one. Alert red is no longer given to new beans, it is reserved for delete buttons, not for people, though a bean that already has it keeps it.
@@ -37,6 +40,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - An event that named the same person twice (which can happen when two devices sync) drew that person's face twice.
 - **An activity with no location showed its category in the location's place**, spelled out as a word the app uses nowhere else. Location now always means location, and says so plainly when there isn't one; the category has its own spot with its emoji.
 - The wall's activity details now show an icon beside each row, and the bean's face beside whoever is doing the drop-off or pick-up.
+- **Celebrations now show on the day and week views**, not only on the month and the wall.
 - **Switching to dark mode now deepens the colour on every card**, instead of leaving them washed out until the page was reloaded. This is most visible on a tablet left on overnight.
 - **Renaming a bean, or giving one a photo, now updates their face everywhere straight away**, rather than leaving the old one on cards until the app was restarted.
 - Wrapping presents for a birthday, or planning one, no longer sets off a celebration. Only the birthday itself does.
@@ -52,7 +56,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - A failed session write no longer leaves the previous, higher-privilege session in place.
 - **Entering a PIN to confirm a sensitive action is now limited to a few tries**, then pauses before allowing more. Closing and reopening the prompt, or reloading the page, no longer hands back a fresh set of attempts.
 - A saved sign-in from before this release can no longer be edited by hand to claim a role or an identity the family file does not give it.
-- A grown-up's permissions are no longer granted from the saved sign-in alone when the family file cannot be opened.
 - **Leaving the beanie wall now always asks the signed-in grown-up to prove who they are**, even when someone has already unlocked editing. Proving it in order to leave no longer unlocks editing as a side effect.
 - Ending a session for integrity reasons now drops only the affected family's unattended re-open, not every family's on the device.
 

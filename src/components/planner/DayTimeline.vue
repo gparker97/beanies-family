@@ -247,6 +247,7 @@ const { identityFor } = useActivityIdentity();
         v-for="occ in untimedActivities"
         :key="'untimed-' + occ.activity.id"
         class="flex cursor-pointer items-center gap-1.5 rounded-md border-l-[3px] px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+        :class="identityFor(occ.activity).celebration.celebrating ? 'is-celebration' : ''"
         :style="{
           ...identityFor(occ.activity).style,
         }"
@@ -334,6 +335,9 @@ const { identityFor } = useActivityIdentity();
           :key="ev.occurrence.activity.id"
           type="button"
           class="absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md dark:bg-slate-800"
+          :class="
+            identityFor(ev.occurrence.activity).celebration.celebrating ? 'is-celebration' : ''
+          "
           :style="{
             top: ev.top,
             height: ev.height,

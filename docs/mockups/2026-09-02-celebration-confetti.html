@@ -1,0 +1,978 @@
+<title>Celebration Card, Revised</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+/>
+
+<style>
+  /* ── Tokens ────────────────────────────────────────────────────────────
+     Brand values are the CIG's, not invented here. Neutrals are biased
+     toward Deep Slate rather than pure grey so the page reads as part of
+     the same family as the app it describes.                            */
+  :root {
+    --orange: #f15d22;
+    --terracotta: #e67e22;
+    --silk: #aed6f1;
+    --slate: #2c3e50;
+    --cloud: #f8f9fa;
+
+    --ink: #2c3e50;
+    --ink-soft: #4d5d6c;
+    --ink-faint: #8496a6;
+    --ground: #f4f6f8;
+    --panel: #ffffff;
+    --rule: #dde4ea;
+    --shadow: 0 2px 10px rgb(44 62 80 / 8%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ink: #ecf0f1;
+      --ink-soft: #bdc3c7;
+      --ink-faint: #8496a6;
+      --ground: #1a252f;
+      --panel: #243342;
+      --rule: #3a4a5a;
+      --shadow: 0 2px 12px rgb(0 0 0 / 30%);
+    }
+  }
+  :root[data-theme='dark'] {
+    --ink: #ecf0f1;
+    --ink-soft: #bdc3c7;
+    --ink-faint: #8496a6;
+    --ground: #1a252f;
+    --panel: #243342;
+    --rule: #3a4a5a;
+    --shadow: 0 2px 12px rgb(0 0 0 / 30%);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: Inter, system-ui, sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  .wrap {
+    margin: 0 auto;
+    max-width: 74rem;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: Outfit, system-ui, sans-serif;
+    text-wrap: balance;
+  }
+  h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.4rem;
+  }
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.0625rem;
+    margin: 0 0 0.5rem;
+    max-width: 46rem;
+  }
+  h2 {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0 0 0.35rem;
+  }
+  .sec {
+    border-top: 1px solid var(--rule);
+    margin-top: 3.25rem;
+    padding-top: 1.75rem;
+  }
+  .note {
+    color: var(--ink-soft);
+    font-size: 0.9375rem;
+    margin: 0 0 1.5rem;
+    max-width: 46rem;
+  }
+  .eyebrow {
+    color: var(--ink-faint);
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  code {
+    background: color-mix(in srgb, var(--slate) 8%, transparent);
+    border-radius: 5px;
+    font-size: 0.875em;
+    padding: 0.1em 0.35em;
+  }
+  .pill {
+    border-radius: 20px;
+    display: inline-block;
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.6rem;
+    text-transform: uppercase;
+  }
+  .pill-rec {
+    background: color-mix(in srgb, var(--orange) 14%, transparent);
+    color: var(--orange);
+  }
+  .pill-no {
+    background: color-mix(in srgb, var(--slate) 10%, transparent);
+    color: var(--ink-soft);
+  }
+
+  /* ── Specimen staging ──────────────────────────────────────────────────
+     Specimens are pinned light/dark rather than following the viewer, so
+     both grounds can be judged at once. The celebration surface differs
+     between them, which is the whole reason to compare side by side.    */
+  .stage-row {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  }
+  .stage {
+    border: 1px solid var(--rule);
+    border-radius: 24px;
+    overflow: hidden;
+  }
+  .stage-cap {
+    background: var(--panel);
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-faint);
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    padding: 0.55rem 1rem;
+    text-transform: uppercase;
+  }
+  .stage-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+    padding: 1.6rem 1.25rem 1.9rem;
+  }
+  .light-ground {
+    background: #f8f9fa;
+  }
+  .dark-ground {
+    background: #1a252f;
+  }
+
+  /* ── The real thing, copied verbatim from src/style.css ────────────────
+     Values are not re-typed by eye: gradient, border, shadow and sticker
+     offsets are the shipped ones, so what is judged here is only the
+     confetti added on top.                                              */
+  .cel {
+    background:
+      linear-gradient(var(--cel-surface), var(--cel-surface)) padding-box,
+      linear-gradient(115deg, #f15d22, #e67e22 60%, #aed6f1) border-box;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    box-shadow: 0 3px 14px rgb(241 93 34 / 16%);
+    position: relative;
+  }
+  .light-ground .cel {
+    --cel-surface: #fff;
+    --cel-ink: #2c3e50;
+    --cel-ink-soft: #4d5d6c;
+  }
+  .dark-ground .cel {
+    --cel-surface: #1e293b;
+    --cel-ink: #ecf0f1;
+    --cel-ink-soft: #bdc3c7;
+  }
+  .cel::after {
+    background: var(--cel-surface);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgb(44 62 80 / 18%);
+    content: attr(data-sticker);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.16rem;
+    pointer-events: none;
+    position: absolute;
+    right: -6px;
+    top: -9px;
+    z-index: 3;
+  }
+
+  /* Card interiors, at the three widths the app actually renders. */
+  .card-inner {
+    padding: 0.6rem 0.7rem;
+    position: relative;
+    z-index: 2;
+  }
+  .card-title {
+    align-items: center;
+    color: var(--cel-ink);
+    display: flex;
+    font-family: Outfit, system-ui, sans-serif;
+    font-weight: 700;
+    gap: 0.3rem;
+  }
+  .card-sub {
+    color: var(--cel-ink-soft);
+    font-size: 0.6875rem;
+    margin-top: 0.1rem;
+  }
+  .w-timeline {
+    width: 13.75rem;
+  }
+  .w-agenda {
+    width: 23.75rem;
+  }
+  .w-wall {
+    width: 32.5rem;
+  }
+  .w-timeline .card-title {
+    font-size: 0.75rem;
+  }
+  .w-agenda .card-title {
+    font-size: 0.9375rem;
+  }
+  .w-wall .card-title {
+    font-size: 1.25rem;
+  }
+  .w-wall .card-inner {
+    padding: 1rem 1.15rem;
+  }
+  .w-wall .card-sub {
+    font-size: 0.875rem;
+  }
+  .w-agenda .card-inner {
+    padding: 0.75rem 0.85rem;
+  }
+  .face {
+    align-items: center;
+    border-radius: 999px;
+    color: #fff;
+    display: inline-flex;
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    height: 1.25rem;
+    justify-content: center;
+    margin-left: auto;
+    width: 1.25rem;
+  }
+
+  /* ── Confetti ─────────────────────────────────────────────────────────
+     Pod order is mandated by the CIG and must never be reordered or
+     recoloured: Deep Slate, Terracotta, Heritage Orange, Sky Silk. Beans
+     are bean-shaped, never rectangular, and Alert Red never appears.
+     `overflow: hidden` on the card keeps beans inside the squircle; the
+     sticker sits outside it on its own layer.                           */
+  .confetti {
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+  }
+  .bean {
+    border-radius: 50% 50% 48% 52% / 60% 58% 42% 40%;
+    height: 7px;
+    position: absolute;
+    width: 10px;
+  }
+  .w-wall .bean {
+    height: 9px;
+    width: 13px;
+  }
+
+  /* ── Revised treatments ───────────────────────────────────────────────
+     No gradient border. The bean's own colour keeps the left edge, so a
+     birthday still says whose it is.                                    */
+  .plain {
+    background: var(--cel-surface);
+    border: 0;
+    border-left: 3px solid var(--bean, #f15d22);
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgb(44 62 80 / 10%);
+    overflow: hidden;
+    position: relative;
+  }
+  .dark-ground .plain {
+    box-shadow: 0 2px 12px rgb(0 0 0 / 28%);
+  }
+
+  /* Bunting: semicircles bitten out of the top edge, in the ground colour.
+     Festive by SHAPE, so it borrows no colour meaning at all. */
+  .bunting::before {
+    background: radial-gradient(circle 5px at 7px 0, var(--behind) 0 5px, transparent 5.5px) repeat-x;
+    background-size: 14px 9px;
+    content: '';
+    height: 9px;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 4;
+  }
+  .light-ground {
+    --behind: #f8f9fa;
+  }
+  .dark-ground {
+    --behind: #1a252f;
+  }
+
+  /* Recoloured border, orange removed — shown so it can be rejected knowingly. */
+  .silkband {
+    background:
+      linear-gradient(var(--cel-surface), var(--cel-surface)) padding-box,
+      linear-gradient(115deg, #aed6f1, #e67e22 70%, #aed6f1) border-box;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+  }
+  .sticker::after {
+    background: var(--cel-surface);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgb(44 62 80 / 18%);
+    content: attr(data-sticker);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.16rem;
+    pointer-events: none;
+    position: absolute;
+    right: -6px;
+    top: -9px;
+    z-index: 5;
+  }
+  .light-ground .plain,
+  .light-ground .silkband {
+    --cel-surface: #fff;
+    --cel-ink: #2c3e50;
+    --cel-ink-soft: #4d5d6c;
+  }
+  .dark-ground .plain,
+  .dark-ground .silkband {
+    --cel-surface: #1e293b;
+    --cel-ink: #ecf0f1;
+    --cel-ink-soft: #bdc3c7;
+  }
+
+  .cel-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+  .opt-grid {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+    margin-top: 1.25rem;
+  }
+  .opt {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 1.25rem 1.35rem 1.5rem;
+  }
+  .opt h3 {
+    align-items: baseline;
+    display: flex;
+    font-size: 1.0625rem;
+    gap: 0.6rem;
+    margin: 0.35rem 0 0.3rem;
+  }
+  .opt p {
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    margin: 0 0 1.1rem;
+  }
+  .verdict {
+    border-left: 3px solid var(--orange);
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    margin-top: 1.1rem;
+    padding-left: 0.85rem;
+  }
+
+  ul.tight {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+  }
+  ul.tight li {
+    color: var(--ink-soft);
+    font-size: 0.9375rem;
+    margin-bottom: 0.35rem;
+  }
+  ul.tight b {
+    color: var(--ink);
+  }
+
+  /* Dense surfaces: the rule is that these get NO confetti. */
+  .dense-row {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .month-chip {
+    align-items: center;
+    border-radius: 6px;
+    display: flex;
+    font-size: 0.6875rem;
+    gap: 0.25rem;
+    padding: 0.15rem 0.35rem;
+    width: 8.75rem;
+  }
+  .allday-chip {
+    border-radius: 6px;
+    font-size: 0.75rem;
+    overflow: hidden;
+    padding: 0.15rem 0.4rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 11.25rem;
+  }
+  .month-chip .card-title,
+  .allday-chip .card-title {
+    font-size: inherit;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .anim .bean {
+      animation: settle 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+    }
+  }
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.6);
+    }
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">beanies.family · tier 3 · revision 2</p>
+  <h1>Celebration card, revised</h1>
+  <p class="lede">
+    Round one proposed confetti under the shipped gradient border. The border is now the problem:
+    <b>orange edges already mean three other things</b>, and the celebration style quietly erases the
+    bean's own colour. This revision moves tier 3 off the edge entirely.
+  </p>
+
+  <section class="sec" style="border-top: 0; margin-top: 2rem; padding-top: 0">
+    <p class="eyebrow">Why the border has to go</p>
+    <h2>Three collisions, one of them invisible until you read the CSS</h2>
+    <ul class="tight">
+      <li>
+        <b>Orange edge already means "today".</b> <code>MonthDayCard.vue:160</code> gives the current
+        day <code>border-primary-500 border-l-[3px]</code> over an orange wash.
+      </li>
+      <li>
+        <b>And "selected".</b> Same file, next line: <code>ring-primary-500 ring-2 ring-inset</code>.
+      </li>
+      <li>
+        <b>And "needs attention".</b> <code>TodoItemRow.vue:64</code> washes hints, overdue and
+        due-today in Heritage Orange — the CIG's alert colour, since red is reserved for destructive
+        actions.
+      </li>
+      <li>
+        <b>The one nobody spotted: it erases the bean.</b> <code>.is-celebration</code> sets
+        <code>border-left-color: transparent !important</code>. The left edge is where the owner's
+        colour lives — the entire point of the identity change — so today a birthday card is the one
+        card that <i>cannot</i> tell you whose it is.
+      </li>
+    </ul>
+    <p class="note" style="margin-top: 1.1rem">
+      Underneath all four is one fact: <b>in this palette every colour is already spoken for</b> —
+      orange is alert, Sky Silk is calm background, Terracotta is the gradient partner, Deep Slate is
+      the anchor. Recolouring the border just moves the collision. <b>Shape and texture are
+      unclaimed</b>, so that is where tier 3 should live.
+    </p>
+  </section>
+
+  <!-- ── Baseline ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <p class="eyebrow">Today</p>
+    <h2>What ships right now</h2>
+    <p class="note">
+      Correct, and quiet. Greg's read on seeing it live: <i>"just a plain white card with a gradient
+      border"</i>. At wall distance the gradient edge is doing all the work.
+    </p>
+    <div class="stage-row">
+      <div class="stage">
+        <p class="stage-cap">Light</p>
+        <div class="stage-body light-ground">
+          <div class="cel w-agenda" data-sticker="🎂">
+            <div class="card-inner">
+              <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party</div>
+              <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stage">
+        <p class="stage-cap">Dark</p>
+        <div class="stage-body dark-ground">
+          <div class="cel w-agenda" data-sticker="🎂">
+            <div class="card-inner">
+              <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party</div>
+              <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Replacement treatments ───────────────────────────────────── -->
+  <section class="sec">
+    <p class="eyebrow">The choice, revised</p>
+    <h2>Three ways to be festive without touching the edge's meaning</h2>
+    <p class="note">
+      All three carry the full scatter at low opacity, per your call. What differs is what replaces
+      the gradient border. The bean's colour (Mia, Heritage Orange here) is back on the left edge in
+      the first two, so a birthday card tells you whose it is again.
+    </p>
+
+    <div class="opt-grid">
+      <div class="opt">
+        <p class="eyebrow">Revision 1</p>
+        <h3>No edge at all <span class="pill pill-no">quietest</span></h3>
+        <p>The confetti and the sticker are the whole tier. The card is otherwise an ordinary card.</p>
+        <div class="stage light-ground"><div class="stage-body"><div class="plain w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div></div>
+        <p class="verdict">Zero collision, and the identity edge survives. Possibly too quiet to read as a celebration at all.</p>
+      </div>
+
+      <div class="opt">
+        <p class="eyebrow">Revision 2</p>
+        <h3>Bunting edge <span class="pill pill-rec">recommended</span></h3>
+        <p>
+          Semicircles bitten out of the top edge — a party banner in silhouette. Festive by
+          <b>shape</b>, so it borrows no colour meaning from anything.
+        </p>
+        <div class="stage light-ground"><div class="stage-body"><div class="plain bunting w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div></div>
+        <p class="verdict">
+          Unmistakably celebratory, unmistakably not an alert. Nothing else in the app has a
+          non-rectangular edge, so it cannot be confused with today, selected or overdue.
+        </p>
+      </div>
+
+      <div class="opt">
+        <p class="eyebrow">Revision 3</p>
+        <h3>Border, orange removed <span class="pill pill-no">not advised</span></h3>
+        <p>Silk → Terracotta → Silk. Closest to what ships today, with the alert colour taken out.</p>
+        <div class="stage light-ground"><div class="stage-body"><div class="silkband w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div></div>
+        <p class="verdict">
+          Terracotta still reads orange at 2px, and it still overwrites the identity edge. It fixes
+          the hue and keeps the structural problem.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Opacity ladder ───────────────────────────────────────────── -->
+  <section class="sec">
+    <p class="eyebrow">How low is low</p>
+    <h2>Confetti opacity, on the recommended bunting card</h2>
+    <p class="note">
+      Same twenty beans each time. Pick the one that still reads across a kitchen without pulling
+      focus from the title.
+    </p>
+    <div class="stage-row">
+      <div class="stage"><p class="stage-cap">22% · barely there</p><div class="stage-body light-ground"><div class="plain bunting w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.22">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div></div>
+      <div class="stage"><p class="stage-cap">35% · recommended</p><div class="stage-body light-ground"><div class="plain bunting w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div></div>
+      <div class="stage"><p class="stage-cap">50% · top of the range</p><div class="stage-body light-ground"><div class="plain bunting w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.5">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div></div>
+    </div>
+    <div class="stage dark-ground" style="margin-top: 1.25rem">
+      <p class="stage-cap" style="background: #243342; border-color: #3a4a5a; color: #8496a6">
+        35% on the kitchen tablet at night · Deep Slate beans lifted to #4a6274
+      </p>
+      <div class="stage-body"><div class="plain bunting w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #4a6274; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #4a6274; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #4a6274; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #4a6274; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #4a6274; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div></div>
+    </div>
+    <p class="note" style="margin-top: 1rem">
+      Deep Slate beans are invisible on the dark surface at any opacity. The Pod order is mandated so
+      the colour cannot be dropped — it lifts to <code>#4a6274</code> on dark, the border token the
+      dark theme already uses.
+    </p>
+  </section>
+
+  <!-- ── Widths ───────────────────────────────────────────────────── -->
+  <section class="sec">
+    <p class="eyebrow">Recommended combination, at real widths</p>
+    <h2>Bunting + 35% scatter</h2>
+    <div class="cel-scroll">
+      <div class="stage light-ground" style="min-width: 34rem">
+        <p class="stage-cap">Timeline block 220px · agenda card 380px · wall card 520px</p>
+        <div class="stage-body">
+          <div class="plain bunting w-timeline sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div>
+          <div class="plain bunting w-agenda sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div>
+          <div class="plain bunting w-wall sticker" data-sticker="🎂" style="--bean: #f15d22">
+              <div class="confetti" style="opacity: 0.35">
+                <span class="bean" style="background: #2c3e50; left: 3%; top: 12%; transform: rotate(-38deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 11%; top: 62%; transform: rotate(20deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 18%; top: 28%; transform: rotate(-12deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 25%; top: 78%; transform: rotate(46deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 32%; top: 40%; transform: rotate(-56deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 39%; top: 8%; transform: rotate(30deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 46%; top: 70%; transform: rotate(-24deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 53%; top: 34%; transform: rotate(64deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 60%; top: 84%; transform: rotate(-8deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 67%; top: 18%; transform: rotate(38deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 74%; top: 56%; transform: rotate(-48deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 81%; top: 26%; transform: rotate(16deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 88%; top: 72%; transform: rotate(-30deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 94%; top: 44%; transform: rotate(58deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 7%; top: 88%; transform: rotate(-14deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 43%; top: 92%; transform: rotate(42deg)"></span>
+                <span class="bean" style="background: #2c3e50; left: 22%; top: 4%; transform: rotate(-62deg)"></span>
+                <span class="bean" style="background: #e67e22; left: 57%; top: 2%; transform: rotate(26deg)"></span>
+                <span class="bean" style="background: #f15d22; left: 85%; top: 6%; transform: rotate(-44deg)"></span>
+                <span class="bean" style="background: #aed6f1; left: 70%; top: 96%; transform: rotate(50deg)"></span>
+              </div>
+              <div class="card-inner">
+                <div class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday party
+                  <span class="face" style="background: #f15d22">M</span></div>
+                <div class="card-sub">2:00pm – 5:00pm · The Green Room</div>
+              </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The rule ─────────────────────────────────────────────────── -->
+  <section class="sec">
+    <p class="eyebrow">The rule that keeps it rare</p>
+    <h2>Dense surfaces get the border and the sticker, never confetti</h2>
+    <p class="note">
+      A month cell can hold four celebrations at once. Confetti there is not festive, it is a
+      texture. These three keep exactly what they have today.
+    </p>
+    <div class="stage light-ground">
+      <div class="stage-body">
+        <div class="dense-row">
+          <div class="cel month-chip" data-sticker="🎂">
+            <div class="card-inner" style="padding: 0.15rem 0.35rem">
+              <span class="card-title"><span aria-hidden="true">🎂</span> Mia's birthday</span>
+            </div>
+          </div>
+          <div class="cel allday-chip">
+            <div class="card-inner" style="padding: 0.15rem 0.4rem">
+              <span class="card-title"><span aria-hidden="true">🎉</span> Anniversary</span>
+            </div>
+          </div>
+          <div class="cel w-timeline" data-sticker="🎓" style="height: 3.25rem">
+            <div class="card-inner">
+              <div class="card-title" style="font-size: 0.75rem">
+                <span aria-hidden="true">🎓</span> Leo's graduation
+              </div>
+              <div class="card-sub">10:00am</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top: 1rem">
+      The all-day chip carries no sticker either — it is <code>truncate</code>, so the overhanging
+      corner is clipped away. That is already how it ships.
+    </p>
+  </section>
+
+  <!-- ── Build notes ──────────────────────────────────────────────── -->
+  <section class="sec">
+    <p class="eyebrow">If bunting + 35% is the call</p>
+    <h2>What gets built</h2>
+    <ul class="tight">
+      <li>
+        <b>A <code>confetti</code> flag on the verdict.</b> <code>CelebrationVerdict</code> gains it
+        beside <code>celebrating</code>, so a surface asks rather than deciding for itself.
+      </li>
+      <li>
+        <b>Once per activity per session.</b> A module-level <code>Set</code> of activity ids in
+        <code>useActivityIdentity</code> returns <code>confetti: false</code> on later mounts — a
+        virtualised card re-mounting on scroll must not replay it. Cleared on family change, on the
+        same watcher the blank-colour warning already uses.
+      </li>
+      <li>
+        <b>One component.</b> <code>CelebrationConfetti.vue</code>, scaling bean count from its
+        container width, used by the day timeline, the agenda card and the wall's today card. Not
+        four hand-rolled copies — that is what made the wash drift across seven call sites before.
+      </li>
+      <li>
+        <b>Respect <code>prefers-reduced-motion</code>.</b> Beans still render, they just do not
+        animate in — the same treatment <code>CelebrationShower</code> already applies.
+      </li>
+      <li>
+        <b>Deep Slate lifts to <code>#4a6274</code> on dark.</b> Otherwise a quarter of the Pod is
+        invisible on the surface that matters most.
+      </li>
+      <li>
+        <b>Delete the gradient border from <code>.is-celebration</code></b>, including its
+        <code>border-left-color: transparent !important</code> — that line is what erases the bean.
+        The identity edge then needs no special case on a celebrating card.
+      </li>
+      <li>
+        <b>The bunting is one pseudo-element</b> reading a <code>--behind</code> custom property for
+        the surface it sits on, so it works on the wall's tinted day columns as well as a plain page.
+      </li>
+    </ul>
+  </section>
+</div>

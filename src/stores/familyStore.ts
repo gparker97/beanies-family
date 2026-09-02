@@ -24,19 +24,6 @@ export const useFamilyStore = defineStore('family', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  /**
-   * Has `loadMembers` completed at least once this page load, whatever it found?
-   *
-   * Distinct from `members.length > 0`, and the distinction is a privilege boundary.
-   * App.vue's path 3 renders an EMPTY doc as a persistent, recoverable state (no file
-   * configured, cache unavailable, Drive permission lost), so "roster is empty" is not
-   * "roster has not loaded yet" — it is a steady state a user can sit in for a whole
-   * session. `usePermissions` falls back to the stored session's `role` only while the
-   * roster is genuinely unresolved; keying that on emptiness left the forgeable role
-   * authoritative indefinitely in exactly that state (#80 review).
-   */
-  const rosterResolved = ref(false);
-
   // Getters
   const currentMember = computed(() => members.value.find((m) => m.id === currentMemberId.value));
 
@@ -370,10 +357,6 @@ export const useFamilyStore = defineStore('family', () => {
       // vanished and the canViewFinances true->false diagnostic fired on every boot.
       const resolvedForRoster = currentMemberId.value ? null : await resolveSessionMember(roster);
       members.value = roster;
-      // Set BEFORE the resolution tail below: every `return` in it is a completed load,
-      // and a rejection path that left this false would hand the forgeable session role
-      // back to usePermissions on the way out.
-      rosterResolved.value = true;
       logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
@@ -808,7 +791,6 @@ export const useFamilyStore = defineStore('family', () => {
     // State
     members,
     currentMemberId,
-    rosterResolved,
     isLoading,
     error,
     // Getters

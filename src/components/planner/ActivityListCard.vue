@@ -7,8 +7,7 @@ import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
-import ConfettiEffect from '@/components/ui/ConfettiEffect.vue';
-import { useReducedMotion } from '@/composables/useReducedMotion';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
@@ -48,8 +47,6 @@ const { identityFor } = useActivityIdentity();
 
 /** One classification per card, not one per binding. */
 const identity = computed(() => identityFor(props.activity));
-
-const { prefersReducedMotion } = useReducedMotion();
 </script>
 
 <template>
@@ -66,10 +63,19 @@ const { prefersReducedMotion } = useReducedMotion();
   >
     <!--
       Confetti is limited to full-width surfaces like this one. A month cell can hold
-      several celebrations at once, and ten animating nodes each would be a mess — the
-      dense surfaces take the gradient border and the sticker only.
+      several celebrations at once, and twenty nodes each would be texture rather than
+      celebration — dense surfaces take the bunting edge and the sticker only.
+
+      `CelebrationConfetti`, not the generic `ConfettiEffect`: that one defaults to
+      cyan/yellow/green, none of which are in the CIG palette, and draws rectangles rather
+      than beans. It also rendered nothing at all under reduced motion, which took the
+      celebration away from the people who asked for less movement, not less meaning.
     -->
-    <ConfettiEffect v-if="identity.celebration.celebrating && !prefersReducedMotion" active />
+    <CelebrationConfetti
+      v-if="identity.celebration.celebrating"
+      :activity-id="activity.id"
+      density="wall"
+    />
     <!-- Category icon -->
     <span class="flex-shrink-0 text-base leading-none">
       {{ identity.emoji }}
