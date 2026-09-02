@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { FamilyActivity } from '@/types/models';
 /**
  * View B — one lane per bean, carrying that person's events AND their jobs.
  *
@@ -21,7 +22,8 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
-import { wallActivityColour, sortByTime } from '@/utils/wallActivities';
+import { sortByTime } from '@/utils/wallActivities';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { jobsProgress } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
@@ -68,9 +70,12 @@ const members = computed(() => {
   const allowed = new Set(props.visibleMemberIds);
   return humans.filter((m) => allowed.has(m.id));
 });
-const membersById = computed(() => new Map(familyStore.members.map((m) => [m.id, m])));
-function colourFor(activity: Parameters<typeof wallActivityColour>[0]) {
-  return wallActivityColour(activity, membersById.value);
+/**
+ * Each lane IS a bean, so `laneMemberId` is passed: the lane header already names
+ * them, which is what lets a solo chip carry no face at all.
+ */
+function identityOf(activity: FamilyActivity, memberId: string) {
+  return identityFor(activity, { laneMemberId: memberId });
 }
 /**
  * Computed once per render, not per call. The template asks `todosFor` four
@@ -132,6 +137,8 @@ function jobsHeading(memberId: string) {
   const { done, total } = jobsProgress(todosOf(memberId));
   return `${t('wall.jobs.heading')} · ${done}/${total}`;
 }
+
+const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
@@ -153,8 +160,7 @@ function jobsHeading(memberId: string) {
           v-for="entry in eventsFor(member.id).slice(0, LANE_EVENTS)"
           :key="entry.activity.id + entry.date"
           :activity="entry.activity"
-          :colour="colourFor(entry.activity)"
-          :members-by-id="membersById"
+          :identity="identityOf(entry.activity, member.id)"
           :time="entry.activity.startTime || t('planner.allDay')"
           @open="emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })"
         />

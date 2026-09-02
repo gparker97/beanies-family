@@ -1,5 +1,6 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 import TodoMemberFilter from '../TodoMemberFilter.vue';
 import type { FamilyMember } from '@/types/models';
 
@@ -8,6 +9,13 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// MemberChip's face now delegates to BeanieAvatar, which resolves the member's photo
+// and initials through the stores — so this needs a real Pinia, not just the
+// useMemberInfo stub below.
+beforeEach(() => {
+  setActivePinia(createPinia());
+});
+
 // MemberChip resolves members via useMemberInfo — stub it so the avatar renders.
 const MEMBERS: Record<string, { name: string; color: string }> = {
   m1: { name: 'Ada', color: '#e76f51' },
@@ -15,6 +23,16 @@ const MEMBERS: Record<string, { name: string; color: string }> = {
 };
 vi.mock('@/composables/useMemberInfo', () => ({
   useMemberInfo: () => ({ getMemberById: (id: string) => MEMBERS[id] }),
+}));
+vi.mock('@/composables/useMemberAvatar', () => ({
+  useMemberAvatarBindings: () => ({
+    memberAvatarBindings: (m: { name: string; color: string }) => ({
+      color: m.color,
+      initials: m.name.slice(0, 1).toUpperCase(),
+      ariaLabel: m.name,
+    }),
+  }),
+  getMemberAvatarVariant: () => 'adult-other',
 }));
 
 const members = [
