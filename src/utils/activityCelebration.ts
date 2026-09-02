@@ -44,8 +44,78 @@ const NOT_CELEBRATING: CelebrationVerdict = {
 /** Latin-ish scripts, where word boundaries exist and matter. */
 const WORD_BOUNDED_SCRIPT = /^[ -ɏ\s]+$/;
 
-/** Inflections a base verb may legitimately wear: book/books/booked/booking. */
-const VERB_INFLECTIONS = ['', 's', 'ed', 'ing', 'd'] as const;
+/**
+ * Every form a base verb may legitimately wear: book/books/booked/booking.
+ *
+ * This was a flat suffix list concatenated onto the base, which silently failed for most
+ * of the verbs it was written for. English does not just append: "wrap" yields
+ * wrap/wraps/wraped/wraping/wrapd, and never "wrapping" — so "Wrapping birthday presents"
+ * escaped the errand suppressor, matched the `birthday` keyword, and got the gradient
+ * border, corner sticker and a confetti burst. The same held for plan/planning,
+ * shop/shopping, prepare/preparing and organise/organising, i.e. the majority of the list,
+ * and the verdict reported `rule: 'keyword'` so the miss was invisible in telemetry
+ * (#78 review).
+ *
+ * Three regular English patterns cover the list without a dictionary:
+ *  - doubled final consonant on a consonant-vowel-consonant stem (wrap → wrapping)
+ *  - dropped silent -e (prepare → preparing)
+ *  - -y → -ies / -ied after a consonant (carry → carries)
+ *
+ * Over-generation is deliberately preferred to under-generation: a spurious form has to
+ * be the title's FIRST word to suppress anything, whereas a missing one ships a wrong
+ * celebration. Irregular verbs (buy → bought) are still missed; add them to the list
+ * explicitly if one ever matters.
+ */
+const VOWELS = 'aeiou';
+const SIBILANT_ENDINGS = ['s', 'x', 'z', 'ch', 'sh'];
+
+function verbForms(base: string): Set<string> {
+  const forms = new Set<string>([base, `${base}ing`, `${base}ed`, `${base}s`]);
+  if (SIBILANT_ENDINGS.some((end) => base.endsWith(end))) forms.add(`${base}es`);
+
+  const last = base.at(-1) ?? '';
+  const secondLast = base.at(-2) ?? '';
+  const thirdLast = base.at(-3) ?? '';
+
+  if (last === 'e') {
+    // prepare → preparing / prepared; also covers organise, invite, arrange.
+    const stem = base.slice(0, -1);
+    forms.add(`${stem}ing`);
+    forms.add(`${base}d`);
+  } else if (last === 'y' && secondLast && !VOWELS.includes(secondLast) && base.length > 2) {
+    // carry → carries / carried. "buy"/"pay" keep their vowel and stay regular here.
+    const stem = base.slice(0, -1);
+    forms.add(`${stem}ies`);
+    forms.add(`${stem}ied`);
+  } else if (
+    base.length >= 3 &&
+    !VOWELS.includes(last) &&
+    last !== 'w' &&
+    last !== 'x' &&
+    last !== 'y' &&
+    VOWELS.includes(secondLast) &&
+    thirdLast &&
+    !VOWELS.includes(thirdLast)
+  ) {
+    // Consonant-vowel-consonant: wrap → wrapping / wrapped; plan, shop, drop, book is
+    // excluded correctly (double vowel), as is "call" (double consonant).
+    forms.add(`${base}${last}ing`);
+    forms.add(`${base}${last}ed`);
+  }
+  return forms;
+}
+
+/** Memoised — the verb lists are constants, so each base inflects once per page load. */
+const verbFormCache = new Map<string, Set<string>>();
+
+function formsFor(base: string): Set<string> {
+  let hit = verbFormCache.get(base);
+  if (!hit) {
+    hit = verbForms(base);
+    verbFormCache.set(base, hit);
+  }
+  return hit;
+}
 
 /**
  * Word tokens, lowercased. A LITERAL split, deliberately.
@@ -103,7 +173,7 @@ function startsWithErrandVerb(title: string, locale: string): boolean {
     if (!want.length || hay.length < want.length) return false;
     // Only the FIRST word inflects; "pick up" must still be followed by "up".
     const head = want[0]!;
-    if (!VERB_INFLECTIONS.some((suffix) => hay[0] === head + suffix)) return false;
+    if (!hay[0] || !formsFor(head).has(hay[0])) return false;
     return want.slice(1).every((w, k) => hay[k + 1] === w);
   });
 }

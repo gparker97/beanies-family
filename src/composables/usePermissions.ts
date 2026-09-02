@@ -20,17 +20,29 @@ export function usePermissions() {
 
   // When currentMember is resolved, use its role and permission flags.
   /**
-   * A loaded pod ALWAYS contains its owner (`normalizeRoles` guarantees exactly one; the
-   * single exception, a pets-only pod, has no human to confer owner on anyway), so an
-   * empty roster means "not loaded yet" — never "a pod with no owner".
+   * Has the roster been RESOLVED? Two independent signals, either of which is sufficient.
+   *
+   * `members.length > 0` was the original test, and it is still valid in one direction: a
+   * loaded pod always contains its owner, so a non-empty roster is certainly loaded. It
+   * holds for the many paths that populate `members` without going through `loadMembers`
+   * (createMember, updateMember, removeMember, and tests).
+   *
+   * It is NOT valid in the other direction, which is where the privilege leak was. App.vue's
+   * path 3 renders an empty doc as a persistent recoverable state (cache unavailable, Drive
+   * permission lost) that a user can sit in for a whole session, and `resolveSessionMember`
+   * deliberately refuses to sign them out of it. So "empty" is not "still loading", and
+   * keyed on emptiness alone the fallback below stopped being a pre-load window and became
+   * an indefinite grant of owner from the forgeable session `role`: write a bare legacy
+   * session with `role:'owner'`, revoke Drive permission, and pod management unlocks
+   * (#80 review). `rosterResolved` closes exactly that case.
    */
-  const rosterLoaded = computed(() => familyStore.members.length > 0);
+  const rosterLoaded = computed(() => familyStore.rosterResolved || familyStore.members.length > 0);
 
   const isOwner = computed(
     () =>
       familyStore.currentMember?.role === 'owner' ||
-      // Pre-load ONLY. Once a roster exists, an absent currentMember is a REJECTION (see
-      // familyStore's session handling), not a fallback — otherwise forging just the
+      // Pre-load ONLY. Once a load has completed, an absent currentMember is a REJECTION
+      // (see familyStore's session handling), not a fallback — otherwise forging just the
       // `role` field in the stored session confers owner outright (#80).
       (!rosterLoaded.value && authStore.currentUser?.role === 'owner')
   );

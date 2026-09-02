@@ -1194,14 +1194,65 @@ describe('authStore.initializeAuth — session restore vs registry (B5, iOS ITP 
     expect(sessionSeal.seal).not.toHaveBeenCalled();
     expect(authStore.sessionIsLegacy).toBe(true);
 
-    // The roster is what vouches for it. Only then is it worth committing.
-    authStore.confirmSessionMember();
-    expect(sessionSeal.seal).toHaveBeenCalledWith(expect.objectContaining({ memberId: 'm-1' }));
+    // The roster is what vouches for it, and it vouches with the POD'S OWN VALUES —
+    // those are what get sealed, not the unverified ones in the restored blob.
+    authStore.confirmSessionMember({
+      memberId: 'm-1',
+      email: 'real@example.com',
+      role: 'member',
+      displayName: 'Real Name',
+    });
+    expect(sessionSeal.seal).toHaveBeenCalledWith(
+      expect.objectContaining({ memberId: 'm-1', email: 'real@example.com', role: 'member' })
+    );
     expect(authStore.sessionIsLegacy).toBe(false);
 
     // Idempotent: a second roster load must not re-seal.
     vi.mocked(sessionSeal.seal).mockClear();
-    authStore.confirmSessionMember();
+    authStore.confirmSessionMember({ memberId: 'm-1', email: 'real@example.com' });
     expect(sessionSeal.seal).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The laundering vector (#80 review).
+   *
+   * A bare legacy session is an unauthenticated shape in EVERY field, and only `memberId`
+   * was ever checked against the roster. Re-sealing the blob verbatim therefore signed a
+   * hand-edited `role` with the real device key and made it valid forever — including past
+   * LEGACY_SESSION_SUNSET, the date the whole legacy branch is time-boxed by.
+   */
+  it("seals the ROSTER's values, never the restored blob's unverified ones", async () => {
+    // A forged session: a real member id (so the roster vouches) but a claimed owner role.
+    seed({
+      ok: true,
+      user: { ...sampleUser, memberId: 'm-1', role: 'owner', email: 'forged@evil.example' },
+      legacy: true,
+    });
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+    expect(sessionSeal.seal).not.toHaveBeenCalled();
+
+    // The pod says m-1 is an ordinary member with a different email.
+    authStore.confirmSessionMember({
+      memberId: 'm-1',
+      email: 'real@example.com',
+      role: 'member',
+      displayName: 'Real Name',
+    });
+
+    const sealed = vi.mocked(sessionSeal.seal).mock.calls[0]![0];
+    expect(sealed.role).toBe('member');
+    expect(sealed.email).toBe('real@example.com');
+    expect(authStore.currentUser?.role).toBe('member');
+  });
+
+  it('refuses to seal a member the roster did not actually vouch for', async () => {
+    seed({ ok: true, user: { ...sampleUser, memberId: 'm-1' }, legacy: true });
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+
+    authStore.confirmSessionMember({ memberId: 'somebody-else', email: 'x@y.z' });
+    expect(sessionSeal.seal).not.toHaveBeenCalled();
+    expect(authStore.sessionIsLegacy).toBe(true);
   });
 });
