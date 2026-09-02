@@ -170,6 +170,34 @@ test.describe('design screenshots', () => {
     await view('Day');
     await shoot('05-day-phone', 390, 844);
 
+    // The three tiers side by side at 3x. The blend is real but 13% alpha across a
+    // ~90px month chip is easy to miss — this is the shot that answers "is it actually
+    // blending?" without needing a colour picker.
+    await view('Month');
+    await page.evaluate(() => {
+      const chips = document.querySelectorAll('[data-testid="month-chip"]');
+      const host = document.createElement('div');
+      host.style.cssText =
+        'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column;gap:24px;padding:48px;font-family:Inter,sans-serif';
+      const label = document.createElement('div');
+      label.style.cssText = 'font:600 15px Inter;color:#2C3E50';
+      label.textContent = 'card tiers at 3x — solo · shared (blend + dashed edge) · celebration';
+      host.appendChild(label);
+      Array.from(chips)
+        .slice(0, 6)
+        .forEach((c) => {
+          const wrap = document.createElement('div');
+          wrap.style.cssText =
+            'transform:scale(3);transform-origin:left center;width:300px;margin:20px 0';
+          wrap.appendChild(c.cloneNode(true));
+          host.appendChild(wrap);
+        });
+      document.body.appendChild(host);
+    });
+    await shoot('07-tiers-closeup', 1200, 900);
+    await gotoRoute(page, '/activities');
+    await page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
+
     // Dark mode on the densest surface.
     await page.setViewportSize({ width: 1440, height: 950 });
     await view('Month');
