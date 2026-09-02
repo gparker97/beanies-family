@@ -14,10 +14,10 @@
  * wrappers (prev/next arrows vs. day-pill strip).
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
-import { getActivityColor } from '@/stores/activityStore';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { normalizeAssignees } from '@/utils/assignees';
 import { formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
@@ -205,6 +205,8 @@ function eventTimeLabel(act: FamilyActivity): string {
 function handleSlotClick(hour: number): void {
   emit('add-activity', props.dateStr, `${String(hour).padStart(2, '0')}:00`);
 }
+
+const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
@@ -246,8 +248,7 @@ function handleSlotClick(hour: number): void {
         :key="'untimed-' + occ.activity.id"
         class="flex cursor-pointer items-center gap-1.5 rounded-md border-l-[3px] px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
         :style="{
-          borderLeftColor: getActivityColor(occ.activity),
-          background: getActivityColor(occ.activity) + '15',
+          ...identityFor(occ.activity).style,
         }"
         @click="emit('view-activity', occ.activity.id, occ.date)"
       >
@@ -264,12 +265,7 @@ function handleSlotClick(hour: number): void {
           class="flex flex-shrink-0 -space-x-1"
           :aria-label="t('planner.assignedTo')"
         >
-          <MemberChip
-            v-for="mid in normalizeAssignees(occ.activity).slice(0, 3)"
-            :key="mid"
-            :member-id="mid"
-            size="dot"
-          />
+          <ActivityOwnerStack :members="identityFor(occ.activity).stackMembers" size="xs" />
         </div>
       </div>
 
@@ -348,8 +344,7 @@ function handleSlotClick(hour: number): void {
             height: ev.height,
             left: `calc(${(ev.lane / ev.totalLanes) * 100}% + 2px)`,
             width: `calc(${(1 / ev.totalLanes) * 100}% - 4px)`,
-            borderLeftColor: getActivityColor(ev.occurrence.activity),
-            background: getActivityColor(ev.occurrence.activity) + '12',
+            ...identityFor(ev.occurrence.activity).style,
           }"
           @click="emit('view-activity', ev.occurrence.activity.id, ev.occurrence.date)"
         >
@@ -377,11 +372,9 @@ function handleSlotClick(hour: number): void {
               class="flex flex-shrink-0 -space-x-1"
               :aria-label="t('planner.assignedTo')"
             >
-              <MemberChip
-                v-for="mid in normalizeAssignees(ev.occurrence.activity).slice(0, 3)"
-                :key="mid"
-                :member-id="mid"
-                size="dot"
+              <ActivityOwnerStack
+                :members="identityFor(ev.occurrence.activity).stackMembers"
+                size="xs"
               />
             </div>
           </div>

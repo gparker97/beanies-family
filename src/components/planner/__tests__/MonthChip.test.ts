@@ -79,28 +79,46 @@ describe('MonthChip classification', () => {
     // Solo chip: Aria's green on the left bar (case-insensitive — JSDOM
     // preserves the hex from inline style verbatim).
     expect(button.attributes('style')?.toLowerCase()).toContain('border-left-color: #6aa84f');
-    // Solo chip: no avatar stack (no MemberChip with size="dot")
-    expect(wrapper.findAllComponents({ name: 'MemberChip' }).length).toBe(0);
+    // The month grid is NOT a bean lane — nothing else on the chip names the owner —
+    // so a solo chip now DOES carry its owner's face. It previously showed none, and
+    // was `md:hidden` besides, so desktop month view had no faces at all and hue was
+    // the sole identity signal on the surface showing the most events at once.
+    expect(
+      wrapper.findAllComponents({ name: 'ActivityOwnerStack' })[0]!.props('members')
+    ).toHaveLength(1);
   });
 
-  it('renders family chip (0 assignees) with Heritage Orange and all-human avatar stack', () => {
+  it('renders family chip (0 assignees) with Heritage Orange and every human', () => {
     const occurrence = makeOccurrence(makeActivity({ assigneeIds: [], title: 'Family dinner' }));
     const wrapper = mount(MonthChip, { props: { occurrence } });
     const button = wrapper.get('[data-testid="month-chip"]');
+    // Heritage Orange is now the NO-OWNER colour specifically, not "orange for anything
+    // with more than one person" — see the shared case below.
     expect(button.attributes('style')?.toLowerCase()).toContain('border-left-color: #f15d22');
-    // 3 humans in the mock family → 3 MemberChip dots in the stack
-    expect(wrapper.findAllComponents({ name: 'MemberChip' }).length).toBe(3);
+    expect(
+      wrapper.findAllComponents({ name: 'ActivityOwnerStack' })[0]!.props('members')
+    ).toHaveLength(3);
+    expect(button.classes()).not.toContain('border-dashed');
   });
 
-  it('renders shared chip (2+ assignees) with Heritage Orange and selected-members stack', () => {
+  it("renders shared chip (2+ assignees) with the FIRST owner's edge over a blend", () => {
     const occurrence = makeOccurrence(
       makeActivity({ assigneeIds: ['m-greg', 'm-mira'], title: 'Date night' })
     );
     const wrapper = mount(MonthChip, { props: { occurrence } });
     const button = wrapper.get('[data-testid="month-chip"]');
-    expect(button.attributes('style')?.toLowerCase()).toContain('border-left-color: #f15d22');
-    // Stack shows only the 2 selected members, not all 3 humans
-    expect(wrapper.findAllComponents({ name: 'MemberChip' }).length).toBe(2);
+    // Was flat Heritage Orange. A shared event now wears the first owner's edge over a
+    // two-stop blend of both hues: "shared" is carried three ways over (the blend, the
+    // dashed edge, the face stack), where flat orange was the only cue available when
+    // that rule was written. Orange survives as the no-owner colour.
+    const style = button.attributes('style')?.toLowerCase() ?? '';
+    expect(style).toContain('border-left-color: #2c3e50');
+    expect(style).toContain('linear-gradient');
+    // The dashed edge stays: it is the one shared cue that needs no colour vision.
+    expect(button.classes()).toContain('border-dashed');
+    expect(
+      wrapper.findAllComponents({ name: 'ActivityOwnerStack' })[0]!.props('members')
+    ).toHaveLength(2);
   });
 
   it('falls back to solo semantics when every assignee resolves to a deleted member', () => {
@@ -111,8 +129,10 @@ describe('MonthChip classification', () => {
     const button = wrapper.get('[data-testid="month-chip"]');
     // Default gray fallback color, not Heritage Orange
     expect(button.attributes('style')?.toLowerCase()).toContain('border-left-color: #6b7280');
-    // No avatar stack
-    expect(wrapper.findAllComponents({ name: 'MemberChip' }).length).toBe(0);
+    // Nobody resolvable to draw.
+    expect(
+      wrapper.findAllComponents({ name: 'ActivityOwnerStack' })[0]!.props('members')
+    ).toHaveLength(0);
   });
 
   it('honours legacy assigneeId field via normalizeAssignees', () => {

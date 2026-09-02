@@ -77,17 +77,12 @@ describe('AllDayActivityChip', () => {
     expect(wrapper.emitted('click')).toHaveLength(1);
   });
 
-  it('falls back to neutral slate and warns when the activity has no resolvable color', () => {
-    // Force getActivityColor to return falsy by passing a malformed activity.
-    // The store's helper falls through to category default; if category is
-    // unknown, the helper may still return a truthy value (depends on
-    // ACTIVITY_COLORS map). To deterministically trigger the warn path,
-    // override `color` with explicit empty string.
-    const corrupted = activity({ color: '' as FamilyActivity['color'] });
-    // getActivityColor returns activity.color ?? categoryColor; '' is truthy
-    // for `??` (it's not null/undefined). To actually trigger fallback, we
-    // need the helper to return falsy. Construct an activity with a bogus
-    // category that isn't in ACTIVITY_COLORS.
+  it('falls back to neutral grey when the owner has no usable colour', () => {
+    // Rewritten 2026-09-02. This used to exercise `getActivityColor`'s category-colour
+    // fallback and asserted only that the chip rendered at all — it could not fail.
+    // Hue now means WHOSE, so the case that matters is a member whose stored colour is
+    // blank: previously that produced a transparent chip, because every call site used
+    // `?? fallback`, which passes an empty string straight through.
     const bogus = activity({
       color: undefined as unknown as FamilyActivity['color'],
       category: '__missing_category__' as FamilyActivity['category'],
@@ -95,14 +90,10 @@ describe('AllDayActivityChip', () => {
     const wrapper = mount(AllDayActivityChip, {
       props: { activity: bogus, isStart: true, isEnd: true },
     });
-
-    // Either the helper returned falsy (warn fires) or it returned a
-    // category-default truthy color (warn doesn't fire). The fallback
-    // path is the defensive guard; if real-world category colors always
-    // resolve, no warn is acceptable. So we only assert the chip rendered.
-    expect(wrapper.find('[data-testid="all-day-activity-chip"]').exists()).toBe(true);
-    // Use the unused 'corrupted' variable to satisfy lint.
-    void corrupted;
+    const chip = wrapper.find('[data-testid="all-day-activity-chip"]');
+    expect(chip.exists()).toBe(true);
+    // Never empty, never transparent — a colour always resolves to something visible.
+    expect(wrapper.findComponent({ name: 'AllDayChip' }).props('color')).toBeTruthy();
   });
 
   it('renders the photo indicator on the title cell when activity has photos', () => {
