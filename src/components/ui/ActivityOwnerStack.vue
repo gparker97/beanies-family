@@ -49,6 +49,14 @@ const overflow = computed(() => Math.max(0, props.members.length - props.max));
  * Reading eight names between the title and the time is worse than reading none.
  */
 const label = computed(() => props.members.map((m) => m.name).join(', '));
+
+/** The overflow pill must match the FACES, not a fixed 24px — `sm` renders 32px ones. */
+const OVERFLOW_SIZE: Record<string, string> = {
+  xs: 'h-6 w-6',
+  sm: 'h-8 w-8',
+  md: 'h-10 w-10',
+};
+const overflowSize = computed(() => OVERFLOW_SIZE[props.size] ?? OVERFLOW_SIZE.xs);
 </script>
 
 <template>
@@ -64,7 +72,8 @@ const label = computed(() => props.members.map((m) => m.name).join(', '));
     />
     <span
       v-if="overflow"
-      class="font-outfit -ml-1.5 grid h-6 w-6 place-items-center rounded-full bg-[var(--tint-slate-10)] text-xs font-bold text-[var(--color-text-muted)] ring-2 ring-white dark:bg-slate-600 dark:text-gray-200 dark:ring-slate-800"
+      :class="overflowSize"
+      class="font-outfit -ml-1.5 grid place-items-center rounded-full bg-[var(--tint-slate-10)] text-xs font-bold text-[var(--color-text-muted)] ring-2 ring-white dark:bg-slate-600 dark:text-gray-200 dark:ring-slate-800"
       aria-hidden="true"
       >+{{ overflow }}</span
     >

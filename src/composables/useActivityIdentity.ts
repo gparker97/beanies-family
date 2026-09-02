@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useActivityChipClass, type ActivityChipClass } from '@/composables/useActivityChipClass';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { activityEmoji } from '@/utils/activityEmoji';
 import { isCelebrationActivity, type CelebrationVerdict } from '@/utils/activityCelebration';
 import { resolveMemberColor } from '@/constants/memberColors';
@@ -19,10 +20,19 @@ import type { FamilyActivity, FamilyMember } from '@/types/models';
  * So the rule is written here and each surface binds the result.
  */
 
-/** The single wash opacity. Four different values used to mean "this same wash". */
+/**
+ * The single wash opacity — one value where seven call sites used four.
+ *
+ * Two of them, because an INLINE style cannot be overridden by a `.dark` rule and the
+ * migrated surfaces gave up their theme-aware `var(--tint-*)` classes to get one
+ * consistent rule. 13% on a dark surface is close to invisible, which matters most on
+ * the kitchen tablet at night.
+ *
+ * Chosen in JS rather than through a `var()` inside `rgba()`: that IS valid CSS, but it
+ * is unparseable by the test DOM, so the wash would only ever have been verifiable in a
+ * real browser. A rule you cannot test is a rule that quietly stops holding.
+ */
 const WASH_ALPHA = 0.13;
-
-/** Slightly stronger in dark mode, where a 13% tint on a dark surface disappears. */
 const WASH_ALPHA_DARK = 0.24;
 
 export interface ActivityIdentity {
@@ -34,8 +44,17 @@ export interface ActivityIdentity {
   /** The category glyph — what the activity IS, now that hue says whose it is. */
   emoji: string;
   celebration: CelebrationVerdict;
-  /** Inline style for the card's wash and edge. */
+  /**
+   * Wash + edge, for surfaces whose background IS the wash (grid blocks, chips).
+   *
+   * `background` is a SHORTHAND and beats any class, so binding this on a card that
+   * carries its own `bg-white dark:bg-slate-800` silently replaces that surface — a
+   * 13% tint straight onto the page, with a shadow tuned for white. Those surfaces
+   * want `edgeStyle` instead.
+   */
   style: Record<string, string>;
+  /** Edge only — for cards that keep their own background. */
+  edgeStyle: Record<string, string>;
   /** Shared events keep a dashed edge — the one cue that needs no colour vision. */
   dashed: boolean;
 }
@@ -55,16 +74,36 @@ export interface IdentityOptions {
   celebrationOverride?: boolean | null;
 }
 
-function rgba(hex: string, alpha: number): string {
+/** `r, g, b` channel triplet, so the alpha can come from a themeable custom property. */
+function channels(hex: string): string {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h.slice(0, 6);
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) || 0);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) || 0).join(', ');
+}
+
+/** Reactive: `settingsStore` toggles this class on <html> when the theme changes. */
+function currentAlpha(): number {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? WASH_ALPHA_DARK
+    : WASH_ALPHA;
+}
+
+function wash(hex: string): string {
+  return `rgba(${channels(hex)}, ${currentAlpha()})`;
 }
 
 export function useActivityIdentity() {
   const { classify } = useActivityChipClass();
   const translation = useTranslationStore();
+  const familyStore = useFamilyStore();
+
+  /**
+   * Cheap roster fingerprint. A member's colour or name change must invalidate the
+   * memo, and comparing ids + colours is far cheaper than re-classifying every chip.
+   */
+  const familyRevision = computed(() =>
+    familyStore.members.map((m) => `${m.id}:${m.color ?? ''}`).join('|')
+  );
 
   const locale = computed(() => translation.currentLanguage ?? 'en');
 
@@ -88,12 +127,47 @@ export function useActivityIdentity() {
     return verdict;
   }
 
+  /**
+   * Per-render memo, keyed on the activity + the options that change the answer.
+   *
+   * A template legitimately needs the identity in several bindings — the wash, the
+   * dashed class, the emoji, the stack — and telling every call site to hoist its own
+   * `computed` is a rule that gets forgotten, then silently costs a `classify()` (a Set
+   * build plus linear roster scans) per binding per chip. On a month grid that is
+   * hundreds of redundant classifications per paint. Memoising here makes the
+   * composable's own "classify once per activity" guarantee true by construction
+   * rather than by convention.
+   *
+   * Cleared whenever the roster or the activity's `updatedAt` changes, both of which
+   * are in the key.
+   */
+  const identityCache = new Map<string, ActivityIdentity>();
+
   function identityFor(activity: FamilyActivity, opts: IdentityOptions = {}): ActivityIdentity {
+    const key = `${activity.id}:${activity.updatedAt}:${opts.laneMemberId ?? ''}:${
+      opts.celebrationOverride ?? ''
+    }:${familyRevision.value}:${currentAlpha()}`;
+    const hit = identityCache.get(key);
+    if (hit) return hit;
+    const built = buildIdentity(activity, opts);
+    if (identityCache.size > 800) identityCache.clear();
+    identityCache.set(key, built);
+    return built;
+  }
+
+  function buildIdentity(activity: FamilyActivity, opts: IdentityOptions): ActivityIdentity {
     const c = classify(activity);
 
     // The lane rule, applied ONCE. No component decides this for itself.
+    //
+    // In a lane, an event with NO owner shows no faces at all: it is already in every
+    // bean's column, so repeating the whole family inside each one says nothing and
+    // costs the title its width. Outside a lane the faces are the only thing saying
+    // "this is everyone's", so they stay.
     const stackMembers = opts.laneMemberId
-      ? c.members.filter((m) => m.id !== opts.laneMemberId)
+      ? c.kind === 'family'
+        ? []
+        : c.members.filter((m) => m.id !== opts.laneMemberId)
       : c.members;
 
     const dashed = c.kind === 'shared';
@@ -112,9 +186,11 @@ export function useActivityIdentity() {
       c.kind === 'shared'
         ? {
             borderLeftColor: first,
-            background: `linear-gradient(105deg, ${rgba(first, WASH_ALPHA)}, ${rgba(second, WASH_ALPHA)})`,
+            background: `linear-gradient(105deg, ${wash(first)}, ${wash(second)})`,
           }
-        : { borderLeftColor: color, background: rgba(color, WASH_ALPHA) };
+        : { borderLeftColor: color, background: wash(color) };
+
+    const edgeStyle: Record<string, string> = { borderLeftColor: style.borderLeftColor! };
 
     return {
       color,
@@ -123,6 +199,7 @@ export function useActivityIdentity() {
       emoji: activityEmoji(activity),
       celebration: celebrationFor(activity, opts.celebrationOverride),
       style,
+      edgeStyle,
       dashed,
     };
   }

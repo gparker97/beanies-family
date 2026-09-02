@@ -6953,7 +6953,6 @@ const STRING_DEFS = {
   'planner.field.dropoff': { en: 'Drop Off Duty', beanie: 'drop off duty' },
   'planner.field.pickup': { en: 'Pick Up Duty', beanie: 'pick up duty' },
   'planner.field.location': { en: 'Location', beanie: 'location' },
-  'planner.field.noLocation': { en: 'No location', beanie: 'no location' },
   'planner.field.feeSchedule': { en: 'Fee Schedule', beanie: 'fee schedule' },
   'planner.field.feeAmount': { en: 'Fee Amount', beanie: 'fee amount' },
   'planner.field.feePayer': { en: 'Who Pays?', beanie: 'who pays?' },

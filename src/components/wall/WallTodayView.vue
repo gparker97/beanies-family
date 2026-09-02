@@ -10,15 +10,13 @@
  * answers "are we late?" without anybody doing arithmetic.
  */
 import { computed, ref, watch } from 'vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
-import { useActivityChipClass } from '@/composables/useActivityChipClass';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { useActivityStore } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 
-import { wallActivityColour, wallEvents } from '@/utils/wallActivities';
+import { wallEvents } from '@/utils/wallActivities';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
@@ -52,12 +50,15 @@ const emit = defineEmits<{
 }>();
 
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
-const membersById = computed(() => new Map(familyStore.members.map((m) => [m.id, m])));
+/**
+ * One rule, so the SAME event cannot be violet on the week view and orange here. This
+ * used `wallActivityColour`, which returns Heritage Orange for anything with 2+ owners,
+ * while every migrated surface returns the first owner's hue.
+ */
 function colourFor(activity: FamilyActivity) {
-  return wallActivityColour(activity, membersById.value);
+  return identityFor(activity).color;
 }
 
 /**
@@ -113,13 +114,9 @@ function subtitleFor(activity: FamilyActivity): string {
  * with no dedupe, so an id written twice by two merging devices drew the same
  * bean twice. The classifier resolves and dedupes in one pass.
  */
+/** Whose event this is. `ActivityOwnerStack` caps the row at three plus a count. */
 function membersFor(activity: FamilyActivity): FamilyMember[] {
-  const c = classify(activity);
-  // A 0-assignee event is the whole family's, and the classifier returns every human for
-  // it. Drawing all of them here is the Phase 2 design — but it needs the 3-face cap in
-  // `ActivityOwnerStack`, which does not exist yet, and this row is sized for 0-2 faces.
-  // Until then, an unowned event shows none, exactly as it did before.
-  return c.kind === 'family' ? [] : c.members;
+  return identityFor(activity).stackMembers;
 }
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {
@@ -150,8 +147,7 @@ function dayNumber(ymd: string) {
   return new Date(`${ymd}T00:00:00`).getDate();
 }
 
-const { memberAvatarBindings } = useMemberAvatarBindings();
-const { classify } = useActivityChipClass();
+const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
@@ -214,14 +210,7 @@ const { classify } = useActivityChipClass();
             </span>
           </span>
           <span class="flex shrink-0">
-            <BeanieAvatar
-              v-for="person in membersFor(entry.activity)"
-              :key="person.id"
-              v-bind="memberAvatarBindings(person)"
-              fallback="initials"
-              size="sm"
-              class="-ml-2.5 ring-2 ring-white first:ml-0 dark:ring-slate-800"
-            />
+            <ActivityOwnerStack :members="membersFor(entry.activity)" size="sm" />
           </span>
         </button>
         <p v-if="!events.length" class="font-caveat m-auto text-[var(--muted-text,#4d5d6c)]">

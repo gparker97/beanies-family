@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useActivityChipClass } from '@/composables/useActivityChipClass';
 /**
  * The drill-in sheet — the wall's ONE answer to "what happens when I touch it".
  *
@@ -28,7 +27,8 @@ import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel
 import { fillTemplate } from '@/utils/fillTemplate';
 
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
-import { wallActivityColour, wallEvents } from '@/utils/wallActivities';
+import { wallEvents } from '@/utils/wallActivities';
+import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { activityDetailRows } from '@/utils/activityDetails';
 import { useVacationStore } from '@/stores/vacationStore';
 import {
@@ -123,8 +123,6 @@ function onKeydown(event: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onKeydown));
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
-
-const membersById = computed(() => new Map(familyStore.members.map((m) => [m.id, m])));
 
 const dayEvents = computed(() => {
   const value = target.value;
@@ -276,18 +274,14 @@ const detailRows = computed(() => {
  * raw ids through `.find()` — the old version had no dedupe, so a duplicated
  * assignee id from a CRDT merge rendered the same bean twice.
  */
+/** Whose activity this is. `ActivityOwnerStack` caps the row at three plus a count. */
 function membersForActivity(activity: FamilyActivity): FamilyMember[] {
-  const c = classify(activity);
-  // See WallTodayView: an unowned event is everyone's, but the uncapped stack this
-  // renders would put the whole family in a row sized for two. Phase 2 adds the cap.
-  return c.kind === 'family' ? [] : c.members;
+  return identityFor(activity).stackMembers;
 }
 /** Whose list this is — blank when the owner is not a member we know. */
 function listOwnerName(list: FamilyList): string {
   return familyStore.members.find((m) => m.id === list.ownerId)?.name ?? '';
 }
-
-const { classify } = useActivityChipClass();
 
 const { memberAvatarBindings } = useMemberAvatarBindings();
 
@@ -295,6 +289,8 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 function rowMember(id: string) {
   return familyStore.members.find((m) => m.id === id);
 }
+
+const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
@@ -388,7 +384,7 @@ function rowMember(id: string) {
                   {{ activity.location }}
                 </p>
                 <p v-else class="font-outfit wall-hero-value wall-hero-empty font-extrabold">
-                  {{ t('planner.field.noLocation') }}
+                  {{ t('planner.noLocation') }}
                 </p>
               </div>
               <!-- Category gets its own cell, shown as the emoji the rest of the app uses. -->
@@ -413,17 +409,22 @@ function rowMember(id: string) {
                   definition, so this sheet and the planner's modal cannot disagree
                   about which icon means "pickup".
                 -->
-                <span
-                  class="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] text-[var(--color-primary-500,#F15D22)]"
-                  style="background: var(--tint-orange-8)"
-                  aria-hidden="true"
-                >
-                  <BeanieIcon :name="row.icon" size="sm" />
-                </span>
                 <dt
-                  class="font-outfit wall-sheet-label w-24 shrink-0 font-bold tracking-[0.08em] text-[var(--muted-text,#4d5d6c)] uppercase"
+                  class="font-outfit wall-sheet-label flex w-36 shrink-0 items-center gap-2 font-bold tracking-[0.08em] text-[var(--muted-text,#4d5d6c)] uppercase"
                 >
-                  {{ t(row.labelKey) }}
+                  <!--
+                    The icon lives INSIDE the <dt>. A bare <span> as a direct child of
+                    the <dl>'s row div is outside the content model (dt/dd only), which
+                    can break the term/definition pairing for assistive tech.
+                  -->
+                  <span
+                    class="grid h-7 w-7 shrink-0 place-items-center rounded-[9px] text-[var(--color-primary-500,#F15D22)]"
+                    style="background: var(--tint-orange-8)"
+                    aria-hidden="true"
+                  >
+                    <BeanieIcon :name="row.icon" size="sm" />
+                  </span>
+                  <span>{{ t(row.labelKey) }}</span>
                 </dt>
                 <dd
                   class="font-inter wall-sheet-line text-secondary-500 flex items-center gap-2 dark:text-gray-200"
@@ -432,6 +433,7 @@ function rowMember(id: string) {
                   <BeanieAvatar
                     v-if="row.memberId && rowMember(row.memberId)"
                     v-bind="memberAvatarBindings(rowMember(row.memberId)!)"
+                    aria-hidden="true"
                     fallback="initials"
                     size="xs"
                   />
@@ -468,7 +470,7 @@ function rowMember(id: string) {
             </div>
             <span
               class="mt-4 block h-1.5 w-16 rounded-full"
-              :style="{ background: wallActivityColour(activity, membersById) }"
+              :style="{ background: identityFor(activity).color }"
               aria-hidden="true"
             />
           </div>

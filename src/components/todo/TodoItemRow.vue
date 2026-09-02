@@ -9,7 +9,7 @@ import { isHint, HINT_TYPE_META } from '@/utils/helpfulHints';
 import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
-import type { TodoItem } from '@/types/models';
+import type { FamilyMember, TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
 const hintHelpUrl = `${MARKETING_URL}/help/features/helpful-hints`;
@@ -120,8 +120,8 @@ const { getMemberById } = useMemberInfo();
  */
 function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
   return effectiveAssignees(entity, (id) => Boolean(getMemberById(id)))
-    .map((id) => getMemberById(id)!)
-    .filter(Boolean);
+    .map((id) => getMemberById(id))
+    .filter((m): m is FamilyMember => Boolean(m));
 }
 </script>
 

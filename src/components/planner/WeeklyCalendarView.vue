@@ -17,7 +17,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { matchesAssigneeFilter, normalizeAssignees } from '@/utils/assignees';
+import { matchesAssigneeFilter } from '@/utils/assignees';
 import {
   toDateInputValue,
   extractDatePart,
@@ -850,6 +850,7 @@ function onStripDayClick(dateStr: string) {
                   class="font-outfit flex items-center truncate text-xs font-semibold"
                   style="color: var(--color-text)"
                 >
+                  <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
                   <span class="truncate">{{ activity.title }}</span>
                   <PhotoIndicator :photo-ids="activity.photoIds" />
                   <ClashIndicator :clash="clashFor(activity.id, day.dateStr)" class="ml-1" />
@@ -865,13 +866,7 @@ function onStripDayClick(dateStr: string) {
                   >
                     · 📍 {{ activity.location }}
                   </span>
-                  <div
-                    v-if="normalizeAssignees(activity).length > 0"
-                    class="ml-auto flex flex-shrink-0 -space-x-1"
-                    :aria-label="t('planner.assignedTo')"
-                  >
-                    <ActivityOwnerStack :members="identityFor(activity).stackMembers" size="xs" />
-                  </div>
+                  <ActivityOwnerStack :members="identityFor(activity).stackMembers" size="xs" />
                 </div>
               </div>
             </template>

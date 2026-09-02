@@ -61,7 +61,8 @@ export function activityDetailRows({
       labelKey: 'planner.field.dropoff',
       value: dropoff,
       memberId: activity.dropoffMemberId,
-      icon: 'car',
+      // Distinct glyphs: these are the two rows the icon column exists to tell apart.
+      icon: 'arrow-up',
     });
   }
 
@@ -71,7 +72,7 @@ export function activityDetailRows({
       labelKey: 'planner.field.pickup',
       value: pickup,
       memberId: activity.pickupMemberId,
-      icon: 'car',
+      icon: 'arrow-down',
     });
   }
 

@@ -108,7 +108,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           "
           @click="selectMember(member.id)"
         >
-          <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="xs" />
+          <BeanieAvatar
+            v-bind="memberAvatarBindings(member)"
+            fallback="initials"
+            size="xs"
+            aria-hidden="true"
+          />
           {{ member.name }}
         </button>
       </div>

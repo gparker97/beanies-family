@@ -37,7 +37,13 @@ defineEmits<{ click: [event: MouseEvent] }>();
  */
 const identity = computed(() => identityFor(props.activity));
 const color = computed(() => identity.value.color);
-const bgColor = computed(() => identity.value.style.background ?? 'transparent');
+/**
+ * A FLAT tint, never the shared gradient. AllDayChip paints one button per day cell,
+ * so a multi-day run reads as one continuous bar only if every cell's fill matches —
+ * a `linear-gradient` restarts in each cell and produces a seam per day boundary.
+ * "Shared" is still carried here by the dashed edge and the face stack.
+ */
+const bgColor = computed(() => `${identity.value.color}22`);
 </script>
 
 <template>
@@ -45,6 +51,7 @@ const bgColor = computed(() => identity.value.style.background ?? 'transparent')
     :title="activity.title"
     :color="color"
     :bg-color="bgColor"
+    :leading-emoji="identity.emoji"
     :is-start="isStart"
     :is-end="isEnd"
     testid="all-day-activity-chip"

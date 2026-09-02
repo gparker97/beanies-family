@@ -18,7 +18,7 @@ import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
-import { normalizeAssignees } from '@/utils/assignees';
+
 import { formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
@@ -253,6 +253,7 @@ const { identityFor } = useActivityIdentity();
         @click="emit('view-activity', occ.activity.id, occ.date)"
       >
         <span class="min-w-0 flex-1 truncate">
+          <span aria-hidden="true">{{ identityFor(occ.activity).emoji }}</span>
           {{ occ.activity.title }}<PhotoIndicator :photo-ids="occ.activity.photoIds" /><span
             v-if="occ.activity.location"
             class="opacity-70"
@@ -260,13 +261,7 @@ const { identityFor } = useActivityIdentity();
             · 📍 {{ occ.activity.location }}</span
           >
         </span>
-        <div
-          v-if="normalizeAssignees(occ.activity).length > 0"
-          class="flex flex-shrink-0 -space-x-1"
-          :aria-label="t('planner.assignedTo')"
-        >
-          <ActivityOwnerStack :members="identityFor(occ.activity).stackMembers" size="xs" />
-        </div>
+        <ActivityOwnerStack :members="identityFor(occ.activity).stackMembers" size="xs" />
       </div>
 
       <!-- Todos due today -->
@@ -353,6 +348,7 @@ const { identityFor } = useActivityIdentity();
               <div
                 class="font-outfit flex items-center truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
               >
+                <span aria-hidden="true">{{ identityFor(ev.occurrence.activity).emoji }}</span>
                 <span class="truncate">{{ ev.occurrence.activity.title }}</span>
                 <PhotoIndicator :photo-ids="ev.occurrence.activity.photoIds" />
                 <ClashIndicator
@@ -367,16 +363,10 @@ const { identityFor } = useActivityIdentity();
                 >
               </div>
             </div>
-            <div
-              v-if="normalizeAssignees(ev.occurrence.activity).length > 0"
-              class="flex flex-shrink-0 -space-x-1"
-              :aria-label="t('planner.assignedTo')"
-            >
-              <ActivityOwnerStack
-                :members="identityFor(ev.occurrence.activity).stackMembers"
-                size="xs"
-              />
-            </div>
+            <ActivityOwnerStack
+              :members="identityFor(ev.occurrence.activity).stackMembers"
+              size="xs"
+            />
           </div>
         </button>
 

@@ -397,7 +397,7 @@ export interface AccountTypeIconDef extends BeanieIconDef {
   color: string;
 }
 
-export const ACCOUNT_TYPE_ICONS: Record<string, AccountTypeIconDef> = {
+export const ACCOUNT_TYPE_ICONS = {
   'account-checking': {
     paths: ['M3 6h18M3 12h18M3 18h18'],
     color: '#3b82f6',
@@ -478,7 +478,7 @@ export const ACCOUNT_TYPE_ICONS: Record<string, AccountTypeIconDef> = {
     paths: ['M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z'],
     color: '#14b8a6',
   },
-};
+} satisfies Record<string, AccountTypeIconDef>;
 
 // ─── Asset Type Icons ──────────────────────────────────────────────────────
 
@@ -486,7 +486,7 @@ export interface AssetTypeIconDef extends BeanieIconDef {
   color: string;
 }
 
-export const ASSET_TYPE_ICONS: Record<string, AssetTypeIconDef> = {
+export const ASSET_TYPE_ICONS = {
   'asset-real_estate': {
     paths: [
       'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
@@ -536,7 +536,7 @@ export const ASSET_TYPE_ICONS: Record<string, AssetTypeIconDef> = {
     paths: ['M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
     color: '#64748b',
   },
-};
+} satisfies Record<string, AssetTypeIconDef>;
 
 // ─── Added 2026-09-02 for the activity detail rows ─────────────────────────
 // `map-pin` existed only as an inline SVG in ActivityViewEditModal and a 📍 emoji
