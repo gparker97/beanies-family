@@ -28,6 +28,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
 import { wallEvents } from '@/utils/wallActivities';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { activityDetailRows } from '@/utils/activityDetails';
 import { useVacationStore } from '@/stores/vacationStore';
 import {
@@ -360,10 +361,29 @@ const { identityFor } = useActivityIdentity();
 
         <!-- one activity, read only -->
         <template v-else-if="target.kind === 'activity'">
+          <!--
+            The drawer celebrates too. Opening a celebratory card should not land on a
+            plain panel — the tier is about the OCCASION, so it belongs anywhere the
+            occasion is on screen, not only on the card that got you here.
+
+            `--celebration-behind` is set explicitly: this panel sits on the sheet's own
+            Cloud-White ground, not the page's, and the scallops are punched in whatever is
+            behind them.
+          -->
           <div
             v-if="activity"
             class="rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+            :class="
+              identityFor(activity).celebration.celebrating
+                ? 'is-celebration is-celebration-lg'
+                : ''
+            "
           >
+            <CelebrationConfetti
+              v-if="identityFor(activity).celebration.celebrating"
+              :activity-id="activity.id"
+              density="wall"
+            />
             <!--
               Time and place are the hero. They are the only two things anybody
               walks up to a wall to check about an activity, so they get a band
