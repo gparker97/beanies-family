@@ -7,6 +7,8 @@ import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import ConfettiEffect from '@/components/ui/ConfettiEffect.vue';
+import { useReducedMotion } from '@/composables/useReducedMotion';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import type { FamilyActivity } from '@/types/models';
@@ -46,6 +48,8 @@ const { identityFor } = useActivityIdentity();
 
 /** One classification per card, not one per binding. */
 const identity = computed(() => identityFor(props.activity));
+
+const { prefersReducedMotion } = useReducedMotion();
 </script>
 
 <template>
@@ -60,6 +64,12 @@ const identity = computed(() => identityFor(props.activity));
     :style="identity.edgeStyle"
     @click="$emit('click')"
   >
+    <!--
+      Confetti is limited to full-width surfaces like this one. A month cell can hold
+      several celebrations at once, and ten animating nodes each would be a mess — the
+      dense surfaces take the gradient border and the sticker only.
+    -->
+    <ConfettiEffect v-if="identity.celebration.celebrating && !prefersReducedMotion" active />
     <!-- Category icon -->
     <span class="flex-shrink-0 text-base leading-none">
       {{ identity.emoji }}
