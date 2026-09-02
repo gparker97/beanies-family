@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -37,6 +39,8 @@ const chipBase =
 const chipActive = 'bg-gradient-to-r from-secondary-500 to-[#3D5368] text-white';
 const chipInactive =
   'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400';
+
+const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -59,12 +63,7 @@ const chipInactive =
       :class="[chipBase, isMemberActive(member.id) ? chipActive : chipInactive]"
       @click="emit('select-member', member.id)"
     >
-      <span
-        class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-xs font-bold text-white"
-        :style="{ background: `linear-gradient(135deg, ${member.color}, ${member.color}dd)` }"
-      >
-        {{ member.name.charAt(0).toUpperCase() }}
-      </span>
+      <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="xs" />
       {{ member.name }}
     </button>
 

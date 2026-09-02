@@ -61,7 +61,12 @@ describe('classifyActivityChip', () => {
     );
     expect(result.kind).toBe('solo');
     expect(result.color).toBe('#6AA84F');
-    expect(result.members).toEqual([]);
+    // `members` carries the OWNER, even when solo. It returned `[]` until 2026-09-02,
+    // which baked the beanie wall's LANE rule ("the lane header already names this bean")
+    // into the classifier — so every non-lane surface (wall today, the wall sheet) had to
+    // re-derive the owner list for itself, and two of them did, un-deduped. The lane rule
+    // now lives in `useActivityIdentity`, the only thing that knows it is inside a lane.
+    expect(result.members).toEqual([HUMANS.find((m) => m.id === 'm-aria')]);
   });
 
   it('classifies 2+ assignees as "shared" with selected members only (not all humans)', () => {

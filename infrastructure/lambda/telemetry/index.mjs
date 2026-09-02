@@ -72,6 +72,9 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'route_name',
   'from_path',
   'action',
+  // Bean identity (2026-09-02): generic `count` for the 'member-colour',
+  // 'activity-celebration' and 'activity-owner-resolve' surfaces. Small integers only.
+  'count',
   'error_code',
   // Meal planner (#27, surface 'meal-planner'). PII-free fixed enums/bools:
   // `kind` (recipe|eat_out|leftovers|skip|other), `slot` (breakfast|lunch|
