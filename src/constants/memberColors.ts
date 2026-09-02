@@ -11,8 +11,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * THIS MODULE HAS ZERO IMPORTS, DELIBERATELY. Do not add one.
  *
- * It is imported by `BeanieAvatar`, `ActivityOwnerStack` and `wallActivities.ts`
- * — i.e. by every member face in the app and by the beanie wall, which is
+ * It is imported by `BeanieAvatar` and `wallActivities.ts` — i.e. by every member
+ * face in the app and by the beanie wall, which is
  * lint-fenced against finance stores (`eslint.config.js`, FINANCE EXCLUSION).
  * Until 2026-09-02 this file re-exported `HERITAGE_ORANGE` *from*
  * `@/composables/useActivityChipClass`, which imports `useFamilyStore` and
@@ -30,22 +30,47 @@ export interface MemberColor {
   gradient: string;
 }
 
+/**
+ * Retired, but NOT removed: red was palette index 1, and onboarding assigned
+ * `MEMBER_COLOR_VALUES[addedMembers.length % 6]` — so the SECOND bean of every
+ * wizard-onboarded family holds `#ef4444`. That is a certainty, not a 1-in-6.
+ *
+ * Dropping it outright orphaned those beans: `ColorCircleSelector` rings on
+ * `modelValue === color.value`, so they showed six swatches with none selected, and
+ * one tap "to make the form look right" would rewrite the identity hue this release
+ * makes load-bearing. Exactly the defect this file's header warns about.
+ *
+ * So it stays in `MEMBER_COLORS` (selectable, highlightable, correctly labelled) and
+ * is excluded from `ASSIGNABLE_MEMBER_COLORS` (never handed to a NEW bean). A family
+ * that already has a red bean keeps it until they choose otherwise.
+ */
+export const RETIRED_MEMBER_COLORS: readonly string[] = ['#ef4444'];
+
 export const MEMBER_COLORS: MemberColor[] = [
   { value: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #60a5fa)' },
-  // Teal replaced red (#ef4444) on 2026-09-02. Red is reserved brand-wide for
+  // Teal is the assignable replacement for red. Red is reserved brand-wide for
   // destructive actions and hard validation errors, so a bean wearing it put an
   // alarm colour on a child's swimming lesson. Teal was chosen over a rose or
   // coral precisely because those neighbour the pink below — and the whole
   // argument for member-owned hue is that adjacent hues at 5px are not a signal.
   { value: '#14b8a6', gradient: 'linear-gradient(135deg, #14b8a6, #2dd4bf)' },
+  { value: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f87171)' },
   { value: '#22c55e', gradient: 'linear-gradient(135deg, #22c55e, #4ade80)' },
   { value: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)' },
   { value: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' },
   { value: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #f472b6)' },
 ];
 
-/** Just the hex values, for code that assigns a color (not a swatch selector). */
+/** Every hex in the picker, retired ones included — for selection and highlighting. */
 export const MEMBER_COLOR_VALUES: string[] = MEMBER_COLORS.map((c) => c.value);
+
+/**
+ * The hues a NEW bean may be given. Excludes retired colours, so red is never handed
+ * out again while remaining valid for the beans that already wear it.
+ */
+export const ASSIGNABLE_MEMBER_COLORS: string[] = MEMBER_COLOR_VALUES.filter(
+  (c) => !RETIRED_MEMBER_COLORS.includes(c)
+);
 
 /**
  * Heritage Orange — the brand "primary" tied to family / everyone activities.
@@ -71,8 +96,9 @@ export const HERITAGE_ORANGE = '#F15D22';
  * `matchesAssigneeFilter.test.ts` and `wallActivities.test.ts`).
  *
  * NOTE: as of 2026-09-02 this is the *no-owner* colour only. An event shared by
- * two or more named beans wears the first owner's edge over a blended wash of
- * both their hues — see `useActivityIdentity`.
+ * two or more named beans will wear the first owner's edge over a blended wash of
+ * both their hues once the card surfaces land (Phase 2); today every multi-owner
+ * event still uses this colour.
  */
 export const SHARED_EVENT_COLOR = HERITAGE_ORANGE;
 
@@ -140,23 +166,30 @@ export function nextFreeMemberColor<T extends { id: string; color?: string }>(
   excludeId?: string
 ): { color: string; reused: T | null } {
   const taken = takenColors(members, excludeId);
-  const free = MEMBER_COLOR_VALUES.find((c) => !taken.has(c));
+  const free = ASSIGNABLE_MEMBER_COLORS.find((c) => !taken.has(c));
   if (free) return { color: free, reused: null };
 
-  // Every colour is held. Pick the least-used one and say whose it is.
+  // Every assignable colour is held. Pick the LEAST-used and say whose it is.
+  //
+  // The tie-break has to break ties, which the obvious `<` loop does not: with six
+  // hues held once each — the only case that actually occurs — a strict minimum never
+  // improves on the first candidate, so it always returned palette index 0. That is
+  // `#3b82f6`, which `authStore` hard-codes for every pod owner, so the duplicate
+  // landed on the single most-visible person on every shared surface. Ties are broken
+  // AWAY from the owner and away from adults, toward the least-seen bean.
   const counts = new Map<string, number>();
   for (const m of members) {
     if (m.id === excludeId || !m.color) continue;
     counts.set(m.color, (counts.get(m.color) ?? 0) + 1);
   }
-  let best = MEMBER_COLOR_VALUES[0]!;
-  let bestCount = Number.POSITIVE_INFINITY;
-  for (const c of MEMBER_COLOR_VALUES) {
-    const n = counts.get(c) ?? 0;
-    if (n < bestCount) {
-      best = c;
-      bestCount = n;
-    }
-  }
+  const rank = (c: string): number => {
+    const holder = [...taken.entries()].find(([value]) => value === c)?.[1] as
+      (T & { role?: string; isPet?: boolean }) | undefined;
+    // Lower is better. Usage dominates; the owner is the last resort.
+    return (
+      (counts.get(c) ?? 0) * 10 + (holder?.role === 'owner' ? 5 : 0) + (holder?.isPet ? -1 : 0)
+    );
+  };
+  const best = [...ASSIGNABLE_MEMBER_COLORS].sort((a, b) => rank(a) - rank(b))[0]!;
   return { color: best, reused: taken.get(best) ?? null };
 }

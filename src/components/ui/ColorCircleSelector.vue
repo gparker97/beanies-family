@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -37,8 +38,21 @@ function holderOf(value: string): FamilyMember | undefined {
   return props.taken?.get(value);
 }
 
-/** Its own colour is always selectable; only someone else's is barred. */
+/**
+ * Its own colour is always selectable; only someone else's is barred.
+ *
+ * AND never all of them. A bean on an off-palette or retired colour in a family that
+ * already holds every hue would otherwise see six disabled swatches and no selection —
+ * an unrecoverable form, because the one thing it needs to do is change that colour.
+ * When nothing is left, the lock comes off entirely and the collision notice explains
+ * why; a duplicate the user chose knowingly beats a form that cannot be saved.
+ */
+const anySelectable = computed(() =>
+  props.colors.some((c) => c.value === props.modelValue || !holderOf(c.value))
+);
+
 function isTaken(value: string): boolean {
+  if (!anySelectable.value) return false;
   return value !== props.modelValue && Boolean(holderOf(value));
 }
 
@@ -73,13 +87,23 @@ function titleFor(value: string): string {
         The holder's own face on the swatch, so "taken" needs no sentence to explain
         itself. A disabled swatch with no explanation reads as a bug.
       -->
-      <BeanieAvatar
+      <!--
+        Wrapped in a positioned span rather than passing `absolute` to BeanieAvatar:
+        its root already carries `relative`, and Tailwind emits `.relative` after
+        `.absolute` at equal specificity, so the class fell through and the badge sat
+        in normal flow beneath the swatch. The ring separates it from the same-coloured
+        swatch behind it.
+      -->
+      <span
         v-if="isTaken(color.value) && holderOf(color.value)"
-        v-bind="memberAvatarBindings(holderOf(color.value)!)"
-        fallback="initials"
-        size="xs"
-        class="pointer-events-none absolute -right-1 -bottom-1"
-      />
+        class="pointer-events-none absolute -right-1 -bottom-1 rounded-full ring-2 ring-white dark:ring-slate-800"
+      >
+        <BeanieAvatar
+          v-bind="memberAvatarBindings(holderOf(color.value)!)"
+          fallback="initials"
+          size="xs"
+        />
+      </span>
     </div>
   </div>
 </template>

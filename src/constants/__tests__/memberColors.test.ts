@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MEMBER_COLORS,
   MEMBER_COLOR_VALUES,
+  ASSIGNABLE_MEMBER_COLORS,
   SHARED_EVENT_COLOR,
   NEUTRAL_MEMBER_COLOR,
   resolveMemberColor,
@@ -40,14 +41,19 @@ describe('palette', () => {
     expect(MEMBER_COLOR_VALUES).not.toContain(SHARED_EVENT_COLOR);
   });
 
-  it('no longer contains alert red', () => {
-    // Red is reserved brand-wide for destructive actions and hard validation errors.
-    expect(MEMBER_COLOR_VALUES).not.toContain('#ef4444');
+  it('no longer ASSIGNS alert red, but still recognises it', () => {
+    // Red is reserved brand-wide for destructive actions. It cannot be handed to a new
+    // bean — but it must stay in the picker, because it was palette index 1 and the
+    // round-robin gave it to the SECOND bean of every wizard-onboarded family. Dropping
+    // it outright would show those beans six swatches with none selected, and one tap
+    // would silently rewrite an identity hue.
+    expect(ASSIGNABLE_MEMBER_COLORS).not.toContain('#ef4444');
+    expect(MEMBER_COLOR_VALUES).toContain('#ef4444');
   });
 
-  it('has six distinct colours, each with a gradient', () => {
-    expect(MEMBER_COLOR_VALUES).toHaveLength(6);
-    expect(new Set(MEMBER_COLOR_VALUES).size).toBe(6);
+  it('has distinct colours, each with a gradient', () => {
+    expect(new Set(MEMBER_COLOR_VALUES).size).toBe(MEMBER_COLOR_VALUES.length);
+    expect(ASSIGNABLE_MEMBER_COLORS).toHaveLength(6);
     expect(MEMBER_COLORS.every((c) => c.gradient.includes(c.value))).toBe(true);
   });
 });
@@ -71,34 +77,52 @@ describe('takenColors', () => {
 
 describe('nextFreeMemberColor', () => {
   it('returns the first unused colour and no collision', () => {
-    const { color, reused } = nextFreeMemberColor([m('a', MEMBER_COLOR_VALUES[0])]);
-    expect(color).toBe(MEMBER_COLOR_VALUES[1]);
+    const { color, reused } = nextFreeMemberColor([m('a', ASSIGNABLE_MEMBER_COLORS[0])]);
+    expect(color).toBe(ASSIGNABLE_MEMBER_COLORS[1]);
     expect(reused).toBeNull();
   });
 
   it('never returns a held colour while a free one exists', () => {
-    const members = MEMBER_COLOR_VALUES.slice(0, 5).map((c, i) => m(`m${i}`, c));
+    const members = ASSIGNABLE_MEMBER_COLORS.slice(0, 5).map((c, i) => m(`m${i}`, c));
     const { color } = nextFreeMemberColor(members);
     expect(members.map((x) => x.color)).not.toContain(color);
   });
 
   it('names the colliding member when the palette is exhausted, never returns silently', () => {
-    const members = MEMBER_COLOR_VALUES.map((c, i) => m(`m${i}`, c));
+    const members = ASSIGNABLE_MEMBER_COLORS.map((c, i) => m(`m${i}`, c));
     const { color, reused } = nextFreeMemberColor(members);
-    expect(MEMBER_COLOR_VALUES).toContain(color);
+    expect(ASSIGNABLE_MEMBER_COLORS).toContain(color);
     expect(reused).not.toBeNull();
     expect(reused?.color).toBe(color);
   });
 
   it('is deterministic', () => {
-    const members = [m('a', MEMBER_COLOR_VALUES[0])];
+    const members = [m('a', ASSIGNABLE_MEMBER_COLORS[0])];
     expect(nextFreeMemberColor(members).color).toBe(nextFreeMemberColor(members).color);
   });
 
   it('lets an edited member keep their own colour via excludeId', () => {
-    const members = MEMBER_COLOR_VALUES.map((c, i) => m(`m${i}`, c));
+    const members = ASSIGNABLE_MEMBER_COLORS.map((c, i) => m(`m${i}`, c));
     const { color, reused } = nextFreeMemberColor(members, 'm2');
-    expect(color).toBe(MEMBER_COLOR_VALUES[2]);
+    expect(color).toBe(ASSIGNABLE_MEMBER_COLORS[2]);
     expect(reused).toBeNull();
+  });
+
+  it('never hands out a retired colour, even when every assignable one is held', () => {
+    const members = ASSIGNABLE_MEMBER_COLORS.map((c, i) => m(`m${i}`, c));
+    expect(nextFreeMemberColor(members).color).not.toBe('#ef4444');
+  });
+
+  it('breaks a tie AWAY from the pod owner', () => {
+    // With six hues held once each — the only case that occurs — a strict `<` minimum
+    // never improves on the first candidate, so it always returned palette index 0.
+    // That is the colour authStore hard-codes for every owner, so the duplicate landed
+    // on the most-visible person on every shared surface: the opposite of least-used.
+    const members = ASSIGNABLE_MEMBER_COLORS.map((c, i) =>
+      i === 0 ? { id: 'owner', color: c, role: 'owner' } : m(`m${i}`, c)
+    );
+    const { color, reused } = nextFreeMemberColor(members);
+    expect(color).not.toBe(ASSIGNABLE_MEMBER_COLORS[0]);
+    expect(reused?.id).not.toBe('owner');
   });
 });

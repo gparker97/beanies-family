@@ -25,6 +25,7 @@ import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
 import { nextFreeMemberColor } from '@/constants/memberColors';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { reportError } from '@/utils/errorReporter';
 import { formatBirthdayShort } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
@@ -33,6 +34,9 @@ const emit = defineEmits<{ finish: [] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+
+/** Set when a new bean has to share an existing bean's colour (all hues held). */
+const colorSharedWith = ref<string | null>(null);
 
 const addedMembers = ref<FamilyMember[]>([]);
 const isAddingMember = ref(false);
@@ -133,7 +137,15 @@ function openAddMemberForm(role: 'parent' | 'child') {
  * now, shared with the member modal, over the real roster.
  */
 function getNextColor(): string {
-  return nextFreeMemberColor([...familyStore.members, ...addedMembers.value]).color;
+  // `familyStore.members` ALREADY contains every bean added in this wizard —
+  // `createMember` pushes into it — so spreading `addedMembers` too double-counted each
+  // one and skewed the exhaustion tie-break. One source.
+  const { color, reused } = nextFreeMemberColor(familyStore.members);
+  // The helper returns the collision precisely so it cannot be dropped. Six hues and a
+  // seventh bean means there is nothing left to give; a family that cannot see that
+  // would just think the app got it wrong.
+  colorSharedWith.value = reused?.name ?? null;
+  return color;
 }
 </script>
 
@@ -229,6 +241,22 @@ function getNextColor(): string {
         class="font-outfit mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400"
       >
         {{ t('loginV6.addAnotherBeanie') }}
+      </p>
+      <!--
+        Said out loud rather than swallowed: with six hues and a seventh bean there is
+        nothing left to give, and a family that cannot see why two beans match would
+        just think the app got it wrong.
+      -->
+      <p
+        v-if="colorSharedWith"
+        class="font-inter mb-2 text-center text-xs text-[var(--color-text-muted)]"
+      >
+        {{
+          fillTemplate(t('family.colorAllTaken'), {
+            name: addedMembers[addedMembers.length - 1]?.name ?? '',
+            other: colorSharedWith,
+          })
+        }}
       </p>
       <div class="flex justify-center gap-2">
         <button

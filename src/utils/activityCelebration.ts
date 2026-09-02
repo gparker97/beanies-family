@@ -61,10 +61,33 @@ function matchesWord(haystack: string, needle: string): boolean {
   return haystack.includes(needle);
 }
 
+/**
+ * Does the title OPEN with an errand verb?
+ *
+ * A bare `startsWith` suppressed every title whose first word merely begins with a
+ * verb's letters — "Payton's birthday" by `pay`, "Booker family wedding" by `book`,
+ * "Post-graduation party" by `post`, "Planetarium trip" by `plan`. Each lost its card
+ * treatment AND reported `suppressed: 'errand-verb'`, so the false negatives looked
+ * deliberate in telemetry and were unmeasurable.
+ *
+ * The mirror failure: the list stores "pick up", and `'picking up'.startsWith('pick up')`
+ * is false, so the gerund escaped. Matching on a word boundary fixes both directions,
+ * and the trailing `\w*` accepts inflections (picking, booking, ordered).
+ */
 function startsWithErrandVerb(title: string, locale: string): boolean {
   const verbs = CELEBRATION_ERRAND_VERBS[locale] ?? CELEBRATION_ERRAND_VERBS.en ?? [];
-  const trimmed = title.trim().toLocaleLowerCase();
-  return verbs.some((v) => trimmed.startsWith(v.toLocaleLowerCase()));
+  const trimmed = title.trim().toLowerCase();
+  return verbs.some((verb) => {
+    const v = verb.toLowerCase();
+    if (!WORD_BOUNDED_SCRIPT.test(v)) return trimmed.startsWith(v);
+    const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Inflections are an EXPLICIT small set, not `\w*`. `\w*` let "book" swallow
+    // "Booker" and "pay" swallow "Payton", which is the over-matching this replaced.
+    const [first, ...rest] = v.split(/\s+/);
+    const head = `${esc(first!)}(?:s|ed|ing|d)?`;
+    const tail = rest.length ? `\\s+${rest.map(esc).join('\\s+')}` : '';
+    return new RegExp(`^${head}${tail}($|[^\\p{L}\\p{N}])`, 'u').test(trimmed);
+  });
 }
 
 /**
@@ -97,9 +120,12 @@ export function isCelebrationActivity(
     return { celebrating: true, rule: 'emoji', suppressed: null };
   }
 
-  const lower = title.toLocaleLowerCase();
+  // `.toLowerCase()`, NOT `.toLocaleLowerCase()`: the latter follows the host OS, and a
+  // Turkish device maps 'I' to 'ı', so 'BIRTHDAY' stopped matching 'birthday' entirely
+  // — and the regex `i` flag cannot help once the haystack is destructively lowercased.
+  const lower = title.toLowerCase();
   const keywords = CELEBRATION_KEYWORDS[locale] ?? CELEBRATION_KEYWORDS.en ?? [];
-  const hit = keywords.some((k) => matchesWord(lower, k.toLocaleLowerCase()));
+  const hit = keywords.some((k) => matchesWord(lower, k.toLowerCase()));
   if (!hit) return NOT_CELEBRATING;
 
   // An errand ABOUT a celebration is not one. Checked only once a keyword matched, so

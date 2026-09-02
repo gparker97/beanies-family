@@ -114,7 +114,12 @@ function subtitleFor(activity: FamilyActivity): string {
  * bean twice. The classifier resolves and dedupes in one pass.
  */
 function membersFor(activity: FamilyActivity): FamilyMember[] {
-  return classify(activity).members;
+  const c = classify(activity);
+  // A 0-assignee event is the whole family's, and the classifier returns every human for
+  // it. Drawing all of them here is the Phase 2 design — but it needs the 3-face cap in
+  // `ActivityOwnerStack`, which does not exist yet, and this row is sized for 0-2 faces.
+  // Until then, an unowned event shows none, exactly as it did before.
+  return c.kind === 'family' ? [] : c.members;
 }
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {

@@ -72,6 +72,41 @@ describe('isCelebrationActivity', () => {
     expect(isCelebrationActivity(a('Buy 🎂')).celebrating).toBe(true);
   });
 
+  it('does not suppress a name that merely BEGINS with an errand verb', () => {
+    // A bare startsWith suppressed each of these, and reported it as a deliberate
+    // errand — so the false negatives were invisible in telemetry.
+    for (const title of [
+      "Payton's birthday",
+      'Booker family wedding',
+      'Post-graduation party',
+      'Planetarium trip for Mia birthday',
+      'Preparatory school graduation',
+    ]) {
+      expect(isCelebrationActivity(a(title)).celebrating).toBe(true);
+    }
+  });
+
+  it('still suppresses real errands, including inflected forms', () => {
+    for (const title of [
+      'Buy birthday present',
+      'Booking the anniversary dinner',
+      'Ordered birthday cake',
+      'Picking up birthday cake',
+    ]) {
+      const v = isCelebrationActivity(a(title));
+      expect(v.celebrating).toBe(false);
+      expect(v.suppressed).toBe('errand-verb');
+    }
+  });
+
+  it('does NOT treat a gift or work-party emoji as a celebration', () => {
+    // 🎁 is the canonical errand OBJECT — including it reopened the exact hole the
+    // errand rule closes. 🎊 is work_party's registry emoji, the one category the
+    // group rule deliberately excludes.
+    expect(isCelebrationActivity(a('Buy 🎁 for Leo party')).celebrating).toBe(false);
+    expect(isCelebrationActivity(a('Team drinks 🎊')).celebrating).toBe(false);
+  });
+
   it('honours an explicit override in both directions', () => {
     expect(isCelebrationActivity(a("Leo's birthday"), 'en', false).celebrating).toBe(false);
     expect(isCelebrationActivity(a('Tuesday'), 'en', true).celebrating).toBe(true);
