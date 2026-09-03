@@ -8626,9 +8626,14 @@ const STRING_DEFS = {
   // AI document-extraction wedge (#133) — photo/invitation → prefilled activity.
   // Share target (#64) — beanies as a share destination for another app's photo or PDF.
   'shareTarget.busy.title': { en: 'Still Reading', beanie: 'still reading' },
+  // ⚠️ Source-NEUTRAL. This used to say "the last thing you shared", which was correct while
+  // the busy guard only ever fired on the share path. #84 puts the in-app capture behind the
+  // same module-level lock, so that wording would tell someone who never opened a share sheet
+  // that they had. `useSharedDocumentIngest.test.ts` asserts on the KEY, so this is safe to
+  // reword.
   'shareTarget.busy.message': {
-    en: 'beanies is still reading the last thing you shared. Try again in a moment.',
-    beanie: 'beanies is still reading the last thing you shared. try again in a moment.',
+    en: 'beanies is still reading the last thing you gave it. Try again in a moment.',
+    beanie: 'beanies is still reading the last thing you gave it. try again in a moment.',
   },
   'shareTarget.signIn.title': { en: 'Sign In First', beanie: 'sign in first' },
   'shareTarget.signIn.message': {
@@ -8670,11 +8675,36 @@ const STRING_DEFS = {
     en: 'beanies read all of them as one item. The first one is kept as the attachment.',
     beanie: 'beanies read all of them as one item. the first one is kept as the attachment.',
   },
-  'shareTarget.noLink.title': { en: 'No Link Found', beanie: 'no link found' },
-  'shareTarget.noLink.message': {
-    en: 'There was no link in what you shared. beanies reads links, photos, screenshots and PDFs.',
+  // Shared TEXT (#83). `shareTarget.noLink.*` used to live here and has been retired: its
+  // only reason for existing was the dead end these bands replaced.
+  //
+  // The copy names what beanies needs, never "the share" — the same strings are reachable
+  // from the in-app capture surface, where "you shared" would be wrong.
+  'shareTarget.text.tooShort.title': { en: 'Not Enough to Read', beanie: 'not enough to read' },
+  'shareTarget.text.tooShort.message': {
+    en: 'beanies needs a bit more than that. Include the date, the time and where it is.',
+    beanie: 'beanies needs a bit more than that. include the date, the time and where it is.',
+  },
+  'shareTarget.text.tooLong.title': { en: 'That’s a Lot of Text', beanie: 'that’s a lot of text' },
+  'shareTarget.text.tooLong.message': {
+    en: 'That is more text than beanies can read at once. Pick out the part with the details and try again.',
     beanie:
-      'there was no link in what you shared. beanies reads links, photos, screenshots and pdfs.',
+      'that is more text than beanies can read at once. pick out the part with the details and try again.',
+  },
+  'shareTarget.text.truncated.title': { en: 'Read the First Part', beanie: 'read the first part' },
+  'shareTarget.text.truncated.message': {
+    en: 'That was long, so beanies read the beginning of it. Check the details before you save.',
+    beanie:
+      'that was long, so beanies read the beginning of it. check the details before you save.',
+  },
+  'shareTarget.text.quota.title': { en: 'That’s Plenty for Now', beanie: 'that’s plenty for now' },
+  // "on this device", not "for your family": the budget behind this message lives in
+  // localStorage, so the other parent's phone still has its own. Saying "your family" would
+  // send someone to check with a partner who is not actually blocked.
+  'shareTarget.text.quota.message': {
+    en: 'beanies has read a lot of text on this device in the last hour. Try again after {resetsAt}.',
+    beanie:
+      'beanies has read a lot of text on this device in the last hour. try again after {resetsAt}.',
   },
   'shareTarget.failed.title': { en: "Couldn't Open That", beanie: "couldn't open that" },
   'shareTarget.failed.message': {
@@ -8682,6 +8712,17 @@ const STRING_DEFS = {
     beanie: 'beanies could not read what was shared. try sharing it again.',
   },
   'shareTarget.failed.action': { en: 'Go to the Nook', beanie: 'go to the nook' },
+  // Our proxy refused on purpose — too many extractions in the window (#83). Deliberately
+  // vague about WHICH limit tripped: family and IP are implementation detail, and the
+  // developer channel for that is the console line in `managedProvider`.
+  'ai.error.rateLimited.title': { en: 'Taking a Breather', beanie: 'taking a breather' },
+  // No attribution at all. This fires for the per-family limit AND the per-IP one, and the IP
+  // limit can trip behind a shared network the family has nothing to do with — telling them
+  // "your family has read a lot" would then be simply false.
+  'ai.error.rateLimited.message': {
+    en: 'beanies has done a lot of reading just now. Give it a few minutes and try again.',
+    beanie: 'beanies has done a lot of reading just now. give it a few minutes and try again.',
+  },
   'ai.offline.title': { en: "You're Offline", beanie: "you're offline" },
   'ai.offline.message': {
     en: 'Connect to the internet and beanies can read this for you.',
@@ -8837,7 +8878,6 @@ const STRING_DEFS = {
     beanie:
       "that's a video — beanies reads its description and follows the recipe link most cooks put there.",
   },
-  'recipeExtract.link.orFrom': { en: 'or read from', beanie: 'or read from' },
   'recipeExtract.reader.label': { en: 'Read a Recipe', beanie: 'read a recipe' },
   'recipeExtract.reader.aria': {
     // The control now opens a LINK field it programmatically focuses. Describing it as
@@ -8846,15 +8886,15 @@ const STRING_DEFS = {
     en: 'Read a recipe from a link, photo or PDF',
     beanie: 'read a recipe from a link, photo or pdf',
   },
-  'recipeExtract.chip.title': { en: 'Recipe', beanie: 'recipe' },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
   'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },
+  // Names the four SOURCES, not three types. The whole point of #84 is that the user never
+  // declares what the thing is — so the copy must not ask them to either.
   'ai.magic.subtitle': {
-    en: 'Snap an invite or travel booking, beanies will fill it in',
-    beanie: 'snap an invite or travel booking, beanies will fill it in',
+    en: 'A photo, a file, a link or some text — beanies works out what it is',
+    beanie: 'a photo, a file, a link or some text — beanies works out what it is',
   },
-  'ai.magic.invite': { en: 'Invite', beanie: 'invite' },
-  'ai.magic.travelBooking': { en: 'Travel booking', beanie: 'travel booking' },
+  'ai.magic.action': { en: 'Read something for me', beanie: 'read something for me' },
   'ai.magic.perform': { en: 'Magic beans', beanie: 'magic beans' },
   'ai.magic.performHint': {
     en: 'Snap an invite, beanies fills it in',
@@ -8956,8 +8996,33 @@ const STRING_DEFS = {
     en: 'How do you want to add it?',
     beanie: 'how do you want to add it?',
   },
+  // Shared by RecipeLinkModal and the magic-beans sheet via `AiSourceButtons` (#84). Replaces
+  // `recipeExtract.link.orFrom`, which was recipe-specific for no reason.
+  'ai.picker.orFrom': { en: 'or read from', beanie: 'or read from' },
   'ai.picker.takePhoto': { en: 'Take a photo', beanie: 'take a photo' },
   'ai.picker.chooseFile': { en: 'Choose a file', beanie: 'choose a file' },
+  // The file is over AI_PICKER_MAX_BYTES. Deliberately SEPARATE from the "can't read that"
+  // type refusal: at the share boundary the user did not choose the file, so one message for
+  // both was right; in-app they did choose it, and "too big" is actionable where "can't read
+  // that" is not. Names the actual limit — a bound the user cannot see is not actionable.
+  'ai.picker.tooLarge.title': { en: 'That File Is Too Big', beanie: 'that file is too big' },
+  'ai.picker.tooLarge.message': {
+    en: 'beanies can read files up to 25 MB. Try a smaller photo, or a screenshot of the part that matters.',
+    beanie:
+      'beanies can read files up to 25 mb. try a smaller photo, or a screenshot of the part that matters.',
+  },
+  // The magic-beans sheet (#84) — one button, four sources, no type question.
+  'ai.capture.title': { en: 'Magic beans', beanie: 'magic beans' },
+  'ai.capture.action': { en: 'Read it', beanie: 'read it' },
+  'ai.capture.label': { en: 'Paste anything', beanie: 'paste anything' },
+  'ai.capture.placeholder': {
+    en: 'Paste a message, an email, or a link…',
+    beanie: 'paste a message, an email, or a link…',
+  },
+  'ai.capture.hint': {
+    en: 'An invite, a booking, a recipe — beanies works out which it is.',
+    beanie: 'an invite, a booking, a recipe — beanies works out which it is.',
+  },
   'ai.picker.openErrorTitle': {
     en: "Couldn't Open the Picker",
     beanie: "couldn't open the picker",
@@ -8989,16 +9054,16 @@ const STRING_DEFS = {
   // inline link to the privacy article (gated on PRIVACY_ARTICLE_LIVE — plain
   // text until it ships). Keep `introLink` a verbatim substring of `intro`.
   'ai.consent.intro': {
-    en: "beanies will read this photo or document and magically extract the key details for you (well, it's not actually magic, it's just secure, private AI).",
+    en: "beanies will read this photo, document or selected text and magically extract the key details for you (well, it's not actually magic, it's just secure, private AI).",
     beanie:
-      "beanies will read this photo or document and magically extract the key details for you (well, it's not actually magic, it's just secure, private ai).",
+      "beanies will read this photo, document or selected text and magically extract the key details for you (well, it's not actually magic, it's just secure, private ai).",
   },
   'ai.consent.introLink': { en: 'secure, private', beanie: 'secure, private' },
   'ai.consent.whatLabel': { en: 'What we send', beanie: 'what we send' },
   'ai.consent.whatValue': {
-    en: "Only this one photo or document, never anything else, and never any of your family's data.",
+    en: "Only this one photo, document or piece of text, never anything else, and never any of your family's data.",
     beanie:
-      "only this one photo or document, never anything else, and never any of your family's data.",
+      "only this one photo, document or piece of text, never anything else, and never any of your family's data.",
   },
   'ai.consent.whereLabel': { en: 'Where it goes', beanie: 'where it goes' },
   // Honesty (ADR-030 binding principle): today the document is encrypted in transit
@@ -9007,9 +9072,9 @@ const STRING_DEFS = {
   // here may imply our server cannot see the document. Once Gate 3 ships, this can
   // become "only the AI's secure hardware can read it, not even our own server".
   'ai.consent.whereManaged': {
-    en: 'To a private AI service that reads the document inside secure hardware its own operator cannot see into, then keeps nothing. It travels encrypted, by way of a beanies server that stores nothing.',
+    en: 'To a private AI service that reads it inside secure hardware its own operator cannot see into, then keeps nothing. It travels encrypted, by way of a beanies server that stores nothing.',
     beanie:
-      'to a private ai service that reads the document inside secure hardware its own operator cannot see into, then keeps nothing. it travels encrypted, by way of a beanies server that stores nothing.',
+      'to a private ai service that reads it inside secure hardware its own operator cannot see into, then keeps nothing. it travels encrypted, by way of a beanies server that stores nothing.',
   },
   'ai.consent.whereByok': {
     en: "To your own AI provider, using the key you've provided.",
@@ -9017,9 +9082,9 @@ const STRING_DEFS = {
   },
   'ai.consent.afterLabel': { en: 'Afterwards', beanie: 'afterwards' },
   'ai.consent.afterValue': {
-    en: "Nothing is kept by the AI service. Your photo or document is saved only with your own family's data, attached to this activity.",
+    en: "Nothing is kept by the AI service. Anything beanies keeps is saved only with your own family's data, attached to this item.",
     beanie:
-      "nothing is kept by the ai service. your photo or document is saved only with your own family's data, attached to this activity.",
+      "nothing is kept by the ai service. anything beanies keeps is saved only with your own family's data, attached to this item.",
   },
   'ai.consent.confirm': {
     en: 'I understand - gimme those beans!',
@@ -9048,8 +9113,8 @@ const STRING_DEFS = {
     beanie: 'ask before reading photos',
   },
   'settings.ai.askBeforePhotosHint': {
-    en: 'Show a privacy check before sending a photo or document to beanies AI.',
-    beanie: 'show a privacy check before sending a photo or document to beanies ai.',
+    en: 'Show a privacy check before sending a photo, document or selected text to beanies AI.',
+    beanie: 'show a privacy check before sending a photo, document or selected text to beanies ai.',
   },
   // #133 Phase 4 — AI tier settings
   'settings.card.ai': { en: 'beanies AI', beanie: 'beanies ai' },

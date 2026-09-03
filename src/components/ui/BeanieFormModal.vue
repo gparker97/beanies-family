@@ -28,7 +28,10 @@ interface Props {
    * this modal/drawer sit above another open one (e.g. a list drawer opened
    * from inside the activity drawer). Defaults to 'base'.
    */
-  layer?: 'base' | 'overlay';
+  // 'top' exists for a modal that must never be occluded by ANY other modal — the ADR-030
+  // consent gate is the case: a permission prompt the user cannot see is a security-UX
+  // failure, not a stacking nit. Forwarded straight to BaseModal, which owns the z-values.
+  layer?: 'base' | 'overlay' | 'top';
 }
 
 const props = withDefaults(defineProps<Props>(), {

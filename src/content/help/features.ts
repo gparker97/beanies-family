@@ -1765,10 +1765,10 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     category: 'features',
     title: 'Share Something Straight to beanies',
     excerpt:
-      'Send a photo, screenshot or PDF from any app on your phone into beanies, and it works out whether it is an activity, a trip or a recipe.',
+      'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip or a recipe.',
     icon: '\u{1F4E4}',
-    readTime: 4,
-    updatedDate: '2026-08-26',
+    readTime: 5,
+    updatedDate: '2026-09-03',
     sections: [
       {
         type: 'heading',
@@ -1796,9 +1796,9 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'In whichever app the photo, screenshot or PDF is in, tap <strong>Share</strong>',
+          'In whichever app the photo, screenshot, PDF or text is in, tap <strong>Share</strong> \u2014 for text, select the part you want first',
           'Choose <strong>beanies.family</strong> from the list that appears',
-          'The first time, beanies asks your permission to send this one document to be read \u2014 have a look at what it says, then agree',
+          'The first time, beanies asks your permission to send this one thing to be read \u2014 have a look at what it says, then agree',
           'beanies reads it and opens the matching form, already filled in',
           'Check it over and tap <strong>Save</strong>',
         ],
@@ -1819,12 +1819,50 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Photos, screenshots, PDFs \u2014 and links. Share a recipe page, an event page or a YouTube video and beanies opens the page, reads it, and fills in the form. Anything else, like a spreadsheet or a zip file, simply will not list beanies as a choice.',
+          'Photos, screenshots, PDFs, links \u2014 and text you have selected. Share a recipe page, an event page or a YouTube video and beanies opens the page, reads it, and fills in the form. Anything else, like a spreadsheet or a zip file, simply will not list beanies as a choice.',
       },
       {
         type: 'paragraph',
         content:
           'beanies decides for itself which of three things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), or a <strong>recipe</strong>. If it genuinely cannot tell, it says so instead of guessing \u2014 you can still add the item yourself.',
+      },
+      {
+        type: 'heading',
+        content: 'Sharing text you have selected',
+        level: 2,
+        id: 'text',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Sometimes there is no attachment at all \u2014 the details <em>are</em> the message. A class-group message with the trip date and the drop-off time, an email confirming a booking, a note a friend sent. Select the part with the details in it, tap <strong>Share</strong>, and choose beanies.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Select the useful part rather than the whole thread. beanies reads what you send, so a tighter selection gives a better answer \u2014 and beanies works out for itself whether it is an activity, a trip or a recipe, exactly as it does for a photo.',
+      },
+      {
+        type: 'callout',
+        content:
+          'The text you select is sent to the private AI reader so it can be understood, in exactly the same way a photo is. It is used to fill in the form and is not kept separately. Nothing is added to your family\u2019s data until you check the form and press <strong>Save</strong>.',
+        title: 'What happens to the text you share',
+        icon: '\u{1F512}',
+      },
+      {
+        type: 'heading',
+        content: 'When beanies says no to some text',
+        level: 3,
+        id: 'text-limits',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Too little to go on.</strong> A few words cannot carry a date, a time and a place, so beanies asks for a bit more rather than guessing.',
+          '<strong>Too much at once.</strong> A whole email thread is more than beanies reads in one go. Pick out the part with the details and share that instead. If what you send is long but not enormous, beanies reads the beginning and tells you it did \u2014 so check the form before saving.',
+          '<strong>A lot of reading in a short time.</strong> There is a limit on how much beanies reads for one family in an hour. It is there to keep costs predictable for everyone, and it tells you when it lifts. Sharing photos and PDFs is not affected.',
+        ],
       },
       {
         type: 'heading',

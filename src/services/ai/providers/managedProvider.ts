@@ -1,11 +1,19 @@
 // Managed-tier provider (beanies-managed, default tier). The single compressed document
-// is sent to OUR server-side proxy, which holds the Tinfoil API key, is throttled per
-// ROUTE, and retains nothing. (Corrected 2026-08-25: this comment previously claimed
-// per-FAMILY rate limiting. There is none, and never has been — the only limit is a
-// global API-Gateway route throttle on `POST /ai-extract`, burst 5 / rate 2, shared by
-// every caller. Do not restate the per-family claim; it is a privacy/abuse statement we
-// cannot support.) A browser PWA cannot safely hold the provider key, hence
-// the proxy. The proxy returns our typed JSON contract ({ ...ExtractionResult }), so this
+// is sent to OUR server-side proxy, which holds the Tinfoil API key and retains nothing.
+// A browser PWA cannot safely hold the provider key, hence the proxy.
+//
+// RATE LIMITING — corrected twice, so state it precisely and do not drift again. This
+// comment once claimed per-family limiting when there was none (corrected 2026-08-25 to
+// "there is none, and never has been"). As of #83 there IS one, so the correction is now
+// wrong in the other direction. What is actually deployed:
+//   1. a global API-Gateway route throttle on `POST /ai-extract` (burst 5 / rate 2), shared
+//      by every caller — the backstop, and the reason the limiter below may fail open;
+//   2. a per-FAMILY hourly limit, keyed on the `familyId` this provider sends;
+//   3. a per-IP hourly limit, keyed on the source address API Gateway observed.
+// (2) and (3) apply to TEXT sources only for now, and neither is authoritative: family is
+// forgeable (it is client-supplied), IP is shared behind NAT. Either tripping refuses.
+//
+// The proxy returns our typed JSON contract ({ ...ExtractionResult }), so this
 // provider validates that shape rather than parsing a raw chat completion.
 //
 // GATE 3 (deferred — lands with the Phase-2 backend): integrate Tinfoil's verification SDK
@@ -76,6 +84,10 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
           : { text: request.source.text }),
         todayIso: request.todayIso,
         task,
+        // ADDED beside `todayIso`, never a rename — see the frozen-wire-format note above.
+        // Omitted entirely when absent, so an old bundle's body is byte-identical to what it
+        // sends today and the Lambda's absent-id fallback is what handles it.
+        ...(request.familyId ? { familyId: request.familyId } : {}),
       }),
       signal: buildSignal(request.signal),
     });
@@ -104,6 +116,31 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
     }
     if (code === 'upstream_timeout' || res.status === 504) {
       throw new ExtractionProviderError('timeout', 'Managed extraction timed out upstream');
+    }
+    // Match on the STATUS as well as our own `code`, and a pre-existing bug closes for free.
+    // The API-Gateway route throttle returns a bare 429 with `{"message":"Too Many Requests"}`
+    // and NO `code`, which until now fell through to `provider_error` — reported by the shared
+    // toast mapper's `default:` arm WITH an error surface, i.e. paging #beanies-errors every
+    // time two families extracted at once. Matching the status is strictly more robust.
+    //
+    // (Caveat worth recording rather than re-discovering: an API-Gateway-generated 429 carries
+    // no CORS headers, so from a browser it surfaces as a network error and classifies as
+    // `provider_error` regardless. Our OWN 429 goes through the Lambda's `response()` helper
+    // and does carry them, which is the case this branch actually catches.)
+    if (code === 'rate_limited' || res.status === 429) {
+      // Developer channel, matching the `unknown_task` precedent below: the toast copy is
+      // deliberately generic, so the specifics belong in the console rather than in a widened
+      // result type nobody reads.
+      console.error(
+        '[ai-extract] the proxy refused this extraction: too many requests in the current ' +
+          'window. This is an intentional abuse limit, not an outage. See the ' +
+          'beanies-ai-rate-{env} DynamoDB table and the ai-extract Lambda logs for which ' +
+          'limit tripped (family or ip).'
+      );
+      throw new ExtractionProviderError(
+        'rate_limited',
+        `Managed proxy rate-limited this request (HTTP ${res.status})`
+      );
     }
     if (code === 'unknown_task') {
       // The client is ahead of the proxy: this build asks for a task the deployed Lambda

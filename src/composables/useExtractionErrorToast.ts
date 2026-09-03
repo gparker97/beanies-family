@@ -73,6 +73,15 @@ export function useExtractionErrorToast() {
           t('recipeExtract.unreachable.message')
         );
         return;
+      case 'rate_limited':
+        // We refused on purpose — too many extractions from this family or IP in the window
+        // (#83). NOT the per-device client budget: that refuses before any provider call and
+        // shows `shareTarget.text.quota.*`, so it can never produce this code. Nothing is
+        // broken, so info and deliberately NO error surface: an
+        // expected, intentional refusal must never page #beanies-errors. Same treatment
+        // `fetch_blocked` and `upstream_busy` already get.
+        showToast('info', t('ai.error.rateLimited.title'), t('ai.error.rateLimited.message'));
+        return;
       case 'no_content':
         // The fetch worked; the page/video just had nothing readable in it.
         showToast('info', t('recipeExtract.noContent.title'), t('recipeExtract.noContent.message'));

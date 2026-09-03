@@ -30,6 +30,7 @@ import {
   closeSheetForNavigation,
   hasSheetHistoryMarker,
 } from '@/composables/useQuickAdd';
+import { surfaceForOrigin } from '@/types/magicPayload';
 import type { SharePayload, ShareKind } from '@/types/magicPayload';
 import { reportError } from '@/utils/errorReporter';
 
@@ -180,16 +181,8 @@ function openReader(reader: MagicReader, payload?: SharePayload): void {
   });
 }
 
-export function openPhotoReader(): void {
-  openReader('photo');
-}
-
 export function openDocumentReader(): void {
   openReader('document');
-}
-
-export function openRecipeReader(): void {
-  openReader('recipe');
 }
 
 /**
@@ -225,10 +218,20 @@ export function consumePendingMagic<R extends MagicReader>(
     // consent already given, so it must not disappear without a trace.
     if (payload) {
       reportError({
-        surface: 'share-target-ingest',
-        message: 'extracted share dropped: destination reader closed on arrival',
+        // The SURFACE, not just `detail` — this is the one report that says "the AI call was
+        // billed and the result vanished", and a CloudWatch filter on `surface` alone must
+        // find it under the door it actually came in by.
+        surface: surfaceForOrigin(payload.env.origin),
+        message: 'extracted capture dropped: destination reader closed on arrival',
         severity: 'warning',
-        context: { action: 'reader_disabled', kind: payload.kind },
+        // `detail` names WHICH door it came in by (#84). Without it, the one error path that
+        // says "the AI call was billed and the result vanished" points at the share funnel for
+        // an in-app capture — the wrong door, on the report that matters most.
+        context: {
+          action: 'reader_disabled',
+          kind: payload.kind,
+          detail: payload.env.origin ?? 'share',
+        },
       });
     }
     return;
@@ -238,10 +241,10 @@ export function consumePendingMagic<R extends MagicReader>(
     // mismatch must never be delivered: handing a travel result to the activity form would
     // corrupt the prefill silently. Drop it loudly instead of casting the problem away.
     reportError({
-      surface: 'share-target-ingest',
-      message: 'share payload kind does not match the reader it reached',
+      surface: surfaceForOrigin(payload.env.origin),
+      message: 'capture payload kind does not match the reader it reached',
       severity: 'error',
-      context: { action: 'threw', kind: payload.kind },
+      context: { action: 'threw', kind: payload.kind, detail: payload.env.origin ?? 'share' },
     });
     return;
   }
@@ -298,8 +301,6 @@ export function useMagicReader() {
     canReadDocument,
     canReadRecipe,
     canReadAny,
-    openPhotoReader,
     openDocumentReader,
-    openRecipeReader,
   };
 }

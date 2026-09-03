@@ -4,9 +4,16 @@
   Share Extension (#64).
 
   NSExtensionActivationRule is what decides whether beanies APPEARS in another app's share
-  sheet, so it is the security boundary as much as the UX one: only images and PDFs, and a
-  bounded count. `MaxCount` of 5 mirrors MAX_EXTRACT_PAGES on the JS side — the app reads at
-  most five pages, so offering to accept twenty would promise something it will not do.
+  sheet, so it is the security boundary as much as the UX one: images, PDFs, web URLs and
+  selected TEXT, each with a bounded count. `MaxCount` of 5 mirrors MAX_EXTRACT_PAGES on the
+  JS side — the app reads at most five pages, so offering to accept twenty would promise
+  something it will not do.
+
+  Text (#83) is `NSExtensionActivationSupportsText`, a BOOLEAN — not a `…WithMaxCount`
+  integer like the four keys below it. There is no count to bound: a text share is one
+  selection. Its SIZE is bounded on the JS side instead (MAX_SHARE_TEXT_BYTES, decided from
+  `File.size` before decoding), because the extension's `.plainText` branch already writes a
+  shared string into the app group as a .txt, which is the same path a shared web URL takes.
 
   NSExtensionPrincipalClass is deliberately the plain view controller rather than
   SLComposeServiceViewController: there is no compose UI, the extension writes to the app
@@ -49,6 +56,12 @@
 				     orchestrator normalises that back to text for every platform. -->
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
 				<integer>1</integer>
+				<!-- Selected text (#83). The ONLY iOS change the feature needs: the
+				     extension's .plainText branch already exists and writes the string as
+				     a .txt, which ShareIntentPlugin maps to text/plain and the
+				     orchestrator picks up on its textFromFile path. Boolean, not a count. -->
+				<key>NSExtensionActivationSupportsText</key>
+				<true/>
 			</dict>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
