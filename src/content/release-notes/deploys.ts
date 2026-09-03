@@ -29,7 +29,7 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
     features: [
       {
         icon: '\u{1F372}',
-        title: { en: 'Plan the week of meals', beanie: 'plan the week of meals' },
+        title: { en: 'The meal planner', beanie: 'the meal planner' },
         description: {
           en: 'Plan breakfast, lunch, dinner and snacks across the whole week. Drop a recipe onto a day, say who is cooking, add a serve time or a guest, and mark it off once it is made. When the week is set, print or share it as a one-page sheet for the fridge.',
           beanie:
