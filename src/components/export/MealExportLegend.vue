@@ -62,7 +62,19 @@ defineProps<{
 
 .dot {
   align-items: center;
+
+  /*
+   * A PILL, not a fixed circle. `initialsById` widens an initial to two glyphs whenever two
+   * cooks share a first letter — which is the whole reason the printed chip can lose its
+   * name and stay readable in greyscale — and "Mi" does not fit a 16px box, so the letters
+   * spilled past the coloured ground and read as clipped.
+   *
+   * One glyph still renders as a circle (min-width == height); two widen the pill and
+   * nothing else moves. Same fix the on-screen `MemberChip` took when it grew 16 -> 24px
+   * for two-letter initials.
+   */
   border-radius: 999px;
+  box-sizing: border-box;
   color: #fff;
   display: inline-flex;
   flex: none;
@@ -71,7 +83,10 @@ defineProps<{
   font-weight: 700;
   height: 16px;
   justify-content: center;
-  width: 16px;
+  letter-spacing: 0.01em;
+  min-width: 16px;
+  padding: 0 3px;
+  width: auto;
 }
 
 .hint {
