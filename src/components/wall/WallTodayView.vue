@@ -1,32 +1,30 @@
 <script setup lang="ts">
 /**
- * View C — today at full size.
+ * View C — today at full size, on the time axis.
  *
- * Built for the glance you actually take walking past, which is why this is
- * the most legible of the layouts: one day, large type, and the rest of the
- * week reduced to a strip you can tap.
+ * The view with room to breathe, so it gets the fullest expression of the grid:
+ * full-density blocks, side-by-side overlaps at a readable width, and the
+ * now-line as the hero. It answers "are we late?" without anybody doing
+ * arithmetic — which is the point of this view over view A.
  *
- * The "happening now" marker is the point of this view over view A — it
- * answers "are we late?" without anybody doing arithmetic.
+ * The hand-rolled `minutesOf` / `nowId` / assumed-duration constant this file
+ * used to carry are gone: the grid derives the running block from ONE definition
+ * (`activitySpanMinutes` + the block's own state), so the marker here and the
+ * marker on every other view can no longer disagree.
  */
 import { computed, ref, watch } from 'vue';
-import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
-import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
+import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
-
-import { wallEvents } from '@/utils/wallActivities';
+import { wallDayAllDay, wallEvents, wallPeripheralVariant } from '@/utils/wallActivities';
+import { computeAllDaySpans } from '@/utils/allDaySpans';
+import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
-import type { FamilyActivity, FamilyMember } from '@/types/models';
+import type { FamilyActivity } from '@/types/models';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
-/** How long an untimed-end activity is assumed to run, for the "now" marker. */
-const ASSUMED_DURATION_MIN = 90;
-
-// The page renders all four views through one `<component :is>` with a single
-// prop bag, so every view receives props it does not declare. Without this they
-// would land on the root element as stray DOM attributes.
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
@@ -41,10 +39,8 @@ const props = defineProps<{
   orphanLists: WallListGroup[];
   visibleMemberIds: string[] | null;
 }>();
-// `openDay` is deliberately NOT declared here. The three wall views share one parent
-// binding (`<component :is>`), and in THIS view tapping a day moves the view to that day
-// rather than opening a sheet over it — so the emit stays with the two views that still
-// mean "open a sheet", and the shared listener simply never fires for this one.
+// `openDay` is deliberately NOT declared: in THIS view tapping a day moves the
+// panel to that day rather than opening a sheet over it.
 const emit = defineEmits<{
   open: [WallSheetTarget];
   openChores: [];
@@ -52,23 +48,13 @@ const emit = defineEmits<{
 
 const activityStore = useActivityStore();
 const { t } = useTranslation();
+const { identityFor } = useActivityIdentity();
 
 /**
- * One rule, so the SAME event cannot be violet on the week view and orange here. This
- * used `wallActivityColour`, which returns Heritage Orange for anything with 2+ owners,
- * while every migrated surface returns the first owner's hue.
- */
-function colourFor(activity: FamilyActivity) {
-  return identityFor(activity).color;
-}
-
-/**
- * The day the big panel is showing. Tapping the week strip moves this rather than opening
- * a drawer: the drawer covered the very panel that already renders a day in full, so it
- * was a second, smaller copy of this view sitting on top of it.
- *
- * Follows `todayYmd` when that changes, so the midnight rollover pulls the wall back to
- * the real today instead of stranding it on yesterday.
+ * The day the big panel is showing. Tapping the week strip moves this rather
+ * than opening a drawer: the drawer covered the very panel that already renders
+ * a day in full. Follows `todayYmd` so the midnight rollover pulls the wall back
+ * to the real today instead of stranding it on yesterday.
  */
 const focusYmd = ref(props.todayYmd);
 watch(
@@ -82,43 +68,37 @@ const isToday = computed(() => focusYmd.value === props.todayYmd);
 const events = computed(() =>
   wallEvents(activityStore.activitiesForDate(focusYmd.value), props.visibleMemberIds)
 );
-
-function minutesOf(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
-const nowMinutes = computed(() => props.now.getHours() * 60 + props.now.getMinutes());
-
+const gridColumns = computed(() => [
+  {
+    key: focusYmd.value,
+    isToday: isToday.value,
+    occurrences: events.value.filter((e) => !e.activity.isAllDay),
+  },
+]);
 /**
- * The activity currently running. Only one is marked, and a later start wins,
- * so overlapping events resolve to the one you most recently should have been
- * at rather than lighting up two rows.
+ * This view's single column is a DAY, not a member — so it takes the day-shaped
+ * helper, exactly as the week does, with a one-day window.
+ *
+ * ⚠️ Not `wallSharedAllDay`: that splits by member column and asks
+ * `belongsInMemberColumn` of each. Handing it a placeholder id would have hidden
+ * every all-day event that HAS an owner (a child's INSET day, a birthday) from
+ * the one view whose job is to show the whole day. `wallDayAllDay` also picks up
+ * both halves of `computeAllDaySpans`, so a multi-day trip clamps to this column
+ * instead of disappearing.
  */
-const nowId = computed(() => {
-  let best: { id: string; start: number } | null = null;
-  for (const { activity } of events.value) {
-    if (!activity.startTime) continue;
-    const start = minutesOf(activity.startTime);
-    const end = activity.endTime ? minutesOf(activity.endTime) : start + ASSUMED_DURATION_MIN;
-    if (nowMinutes.value < start || nowMinutes.value >= end) continue;
-    if (!best || start > best.start) best = { id: activity.id, start };
-  }
-  return best?.id ?? null;
+const allDaySpans = computed(() => {
+  const days = [focusYmd.value];
+  const result = computeAllDaySpans(
+    events.value.map((o) => ({ activity: o.activity, date: o.date })),
+    days.map((dateStr) => ({ dateStr }))
+  );
+  return wallDayAllDay(result, days, (activity, ymd) => ({ activity, date: ymd }));
 });
 
-function subtitleFor(activity: FamilyActivity): string {
-  return activity.location || activity.description || '';
-}
-/**
- * Whose event this is. Delegates to `classifyActivityChip`, the documented single
- * source of truth — this used to map RAW `normalizeAssignees` through `.find()`
- * with no dedupe, so an id written twice by two merging devices drew the same
- * bean twice. The classifier resolves and dedupes in one pass.
- */
-/** Whose event this is. `ActivityOwnerStack` caps the row at three plus a count. */
-function membersFor(activity: FamilyActivity): FamilyMember[] {
-  return identityFor(activity).stackMembers;
-}
+const peripheralVariant = computed(() =>
+  wallPeripheralVariant(props.portrait ? 'band' : 'rail', events.value.length, props.portrait)
+);
+
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {
   const map = new Map<string, ReturnType<typeof wallEvents>>();
@@ -130,6 +110,10 @@ const stripByDay = computed(() => {
 function eventsOn(ymd: string) {
   return stripByDay.value.get(ymd) ?? [];
 }
+function colourFor(activity: FamilyActivity) {
+  return identityFor(activity).color;
+}
+
 /** Names the day on screen. With the drawer gone, this is what tells you where you are. */
 const focusLabel = computed(() =>
   isToday.value
@@ -140,94 +124,38 @@ const focusLabel = computed(() =>
         month: 'long',
       })
 );
-
-function dayLabel(ymd: string) {
-  return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
-}
-function dayNumber(ymd: string) {
-  return new Date(`${ymd}T00:00:00`).getDate();
-}
-
-const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
   <div class="flex min-h-0 flex-1 gap-4" :class="portrait ? 'flex-col' : 'flex-row'">
     <div class="flex min-h-0 flex-1 flex-col gap-2.5">
       <div
-        class="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[26px] bg-white px-5 py-1 shadow-[var(--card-shadow)] dark:bg-slate-800"
+        class="flex shrink-0 items-center justify-between gap-3"
+        :style="{ paddingLeft: `${AXIS_WIDTH_PX}px` }"
       >
-        <div
-          class="sticky top-0 z-[1] flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(44,62,80,0.06)] bg-white py-2 dark:border-slate-700 dark:bg-slate-800"
-        >
-          <p class="font-outfit text-secondary-500 wall-slot-title font-bold dark:text-gray-100">
-            {{ focusLabel }}
-          </p>
-          <button
-            v-if="!isToday"
-            type="button"
-            class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1 font-bold"
-            @click="focusYmd = todayYmd"
-          >
-            {{ t('wall.today.backToToday') }}
-          </button>
-        </div>
-        <button
-          v-for="entry in events"
-          :key="entry.activity.id + entry.date"
-          type="button"
-          class="flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0 dark:border-slate-700"
-          :class="[
-            isToday && entry.activity.id === nowId
-              ? 'rounded-2xl border-b-0 bg-gradient-to-r from-[var(--tint-orange-8)] to-transparent px-3'
-              : '',
-            // Today's list is rows rather than cards, so it had no celebration treatment at
-            // all — the one wall view that stayed plain while the others celebrated.
-            identityFor(entry.activity).celebration.celebrating
-              ? 'is-celebration rounded-2xl border-b-0 px-3'
-              : '',
-          ]"
-          @click="
-            emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
-          "
-        >
-          <CelebrationConfetti
-            v-if="identityFor(entry.activity).celebration.celebrating"
-            :activity-id="entry.activity.id"
-            density="week"
-          />
-          <span class="w-24 shrink-0">
-            <span class="font-outfit wall-slot-time block font-extrabold">
-              {{ entry.activity.startTime || t('planner.allDay') }}
-            </span>
-          </span>
-          <span class="min-w-0 flex-1">
-            <span
-              v-if="isToday && entry.activity.id === nowId"
-              class="font-outfit wall-nowtag text-primary-500 block font-extrabold tracking-[0.11em] uppercase"
-            >
-              {{ t('wall.today.now') }}
-            </span>
-            <span
-              class="font-outfit text-secondary-500 wall-slot-title block font-bold dark:text-gray-100"
-            >
-              {{ entry.activity.title }}
-            </span>
-            <span
-              v-if="subtitleFor(entry.activity)"
-              class="font-inter wall-slot-sub block truncate text-[var(--muted-text,#4d5d6c)]"
-            >
-              {{ subtitleFor(entry.activity) }}
-            </span>
-          </span>
-          <span class="flex shrink-0">
-            <ActivityOwnerStack :members="membersFor(entry.activity)" size="sm" />
-          </span>
-        </button>
-        <p v-if="!events.length" class="font-caveat m-auto text-[var(--muted-text,#4d5d6c)]">
-          {{ t('wall.day.nothingOn') }}
+        <p class="font-outfit text-secondary-500 wall-slot-title font-bold dark:text-gray-100">
+          {{ focusLabel }}
         </p>
+        <button
+          v-if="!isToday"
+          type="button"
+          class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1 font-bold"
+          @click="focusYmd = todayYmd"
+        >
+          {{ t('wall.today.backToToday') }}
+        </button>
       </div>
+
+      <WallTimeGrid
+        :columns="gridColumns"
+        :all-day-spans="allDaySpans"
+        :now="now"
+        :dim-past="isToday"
+        :show-now="isToday"
+        :axis-width="AXIS_WIDTH_PX"
+        view-id="today"
+        @open="emit('open', $event)"
+      />
 
       <div class="grid shrink-0 gap-2" style="grid-template-columns: repeat(7, 1fr)">
         <button
@@ -246,10 +174,10 @@ const { identityFor } = useActivityIdentity();
           <span
             class="font-outfit wall-strip-day block font-bold tracking-[0.1em] uppercase opacity-70"
           >
-            {{ dayLabel(ymd) }}
+            {{ weekdayShort(ymd) }}
           </span>
           <span class="font-outfit wall-strip-num block leading-tight font-extrabold">
-            {{ dayNumber(ymd) }}
+            {{ dayOfMonth(ymd) }}
           </span>
           <span class="mt-1 flex min-h-[7px] justify-center gap-1" aria-hidden="true">
             <i
@@ -266,7 +194,7 @@ const { identityFor } = useActivityIdentity();
 
     <div :class="portrait ? 'shrink-0' : 'w-[296px] shrink-0 overflow-y-auto'">
       <WallPeripheralCards
-        :variant="portrait ? 'band' : 'rail'"
+        :variant="peripheralVariant"
         :portrait="portrait"
         :meals-ymd="focusYmd"
         :todos-for="todosFor"

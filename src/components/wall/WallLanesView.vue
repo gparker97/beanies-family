@@ -1,51 +1,37 @@
 <script setup lang="ts">
-import type { FamilyActivity } from '@/types/models';
 /**
- * View B — one lane per bean, carrying that person's events AND their jobs.
+ * View B — one lane per bean, on one shared time axis.
  *
- * A child finds their own column and reads their whole day in one place: what
- * they have on, and what they owe. Lanes wrap (auto-fit) rather than shrinking
- * past legibility, so a family of five reads 3+2 and a larger family wraps
- * again instead of producing seven unreadable slivers.
+ * This is the view a time grid changes most. As five independent stacks, the
+ * lanes could not answer the single most valuable question a family screen has:
+ * *are two of these at the same time, and is anybody free?* On a shared axis
+ * 16:00 is the SAME line in every lane, so Leo's football colliding with Milo's
+ * swimming — and nobody left to drive both — is a shape you see rather than six
+ * timestamps you compare.
  *
  * Humans only. Pets belong on the family roster, but a lane headed "Bella · 0
- * today" with an empty jobs list is dead space on the one screen that cannot
- * afford it.
+ * today" is dead space on the one screen that cannot afford it.
  */
 import { computed } from 'vue';
-import WallBeanColumn from '@/components/wall/WallBeanColumn.vue';
-import WallEventChip from '@/components/wall/WallEventChip.vue';
-import WallJobList from '@/components/wall/WallJobList.vue';
+import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
+import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
-import { sortByTime } from '@/utils/wallActivities';
-import { useActivityIdentity } from '@/composables/useActivityIdentity';
-import { jobsProgress } from '@/utils/wallJobs';
+import { sortByTime, wallPeripheralVariant, wallSharedAllDay } from '@/utils/wallActivities';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
-/** Two to-dos plus a "+N more" reads better than three crammed rows. */
-const LANE_JOBS = 2;
-/**
- * A lane carries a header, events AND jobs in one column height, so only about
- * two event chips fit. The overflow is NOT silent: the header reads "3 today"
- * and is itself the drill-in to the full day, which is a better use of the few
- * remaining pixels than a "+1 more" button that would not fit either.
- */
-const LANE_EVENTS = 2;
-
-// The page renders all four views through one `<component :is>` with a single
-// prop bag, so every view receives props it does not declare. Without this they
-// would land on the root element as stray DOM attributes.
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
   todayYmd: string;
   tomorrowYmd: string;
   portrait: boolean;
+  now: Date;
   todosFor: (memberId: string) => WallJob[];
   unassignedTodos: WallJob[];
   listsFor: (memberId: string) => WallListGroup[];
@@ -70,50 +56,88 @@ const members = computed(() => {
   const allowed = new Set(props.visibleMemberIds);
   return humans.filter((m) => allowed.has(m.id));
 });
-/**
- * Each lane IS a bean, so `laneMemberId` is passed: the lane header already names
- * them, which is what lets a solo chip carry no face at all.
- */
-function identityOf(activity: FamilyActivity, memberId: string) {
-  return identityFor(activity, { laneMemberId: memberId });
-}
-/**
- * Computed once per render, not per call. The template asks `todosFor` four
- * times per member (the heading count, the rows, the overflow test, the
- * overflow count), each re-filtering every to-do and re-sorting. `WallChoreBoard`
- * memoises the same shape; this is the surface where it regressed.
- */
-const todosByMember = computed(() => {
-  const map = new Map<string, WallJob[]>();
-  // MUST call the prop, not `todosOf` — reading the memo from inside its own getter makes
-  // the computed self-referential, which Vue bails out of. That threw during render and
-  // blanked the entire lanes view (every bean disappeared), rather than merely losing the
-  // memoisation it was added for.
-  for (const member of members.value) map.set(member.id, props.todosFor(member.id));
-  return map;
-});
-function todosOf(memberId: string): WallJob[] {
-  // Recompute on a miss rather than returning empty, matching WallChoreBoard: a silently
-  // empty lane is indistinguishable from "nothing to do", which is the failure this view
-  // just had.
-  return todosByMember.value.get(memberId) ?? props.todosFor(memberId);
-}
+const memberIds = computed(() => members.value.map((m) => m.id));
 
 const todayEvents = computed(() => activityStore.activitiesForDate(props.todayYmd));
 const tomorrowEvents = computed(() => activityStore.activitiesForDate(props.tomorrowYmd));
 
 /**
- * A lane is a person's column, and a SHARED event belongs in everyone's: an event with
- * two owners already appears in both their lanes, and one with no owner is owned by
- * everybody, so it appears in all of them. The shared style is what stops a duplicated
- * chip reading as five separate personal obligations.
+ * Memoised per member rather than recomputed per template read.
  *
- * Still deliberately NOT `matchesWallFilter`, which answers the different question of
- * what the whole wall is showing.
+ * NOT the `activitiesForDate` month-expansion bug `WallDaysView` guards against
+ * — `todayEvents` is already a computed, so that runs once. This is the cheaper
+ * filter-and-sort, which the template previously asked for three times per bean.
  */
+const eventsByMember = computed(() => {
+  const map = new Map<string, ReturnType<typeof sortByTime>>();
+  for (const member of members.value) {
+    map.set(
+      member.id,
+      sortByTime(todayEvents.value.filter((e) => belongsInMemberColumn(e.activity, member.id)))
+    );
+  }
+  return map;
+});
 function eventsFor(memberId: string) {
-  return sortByTime(todayEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)));
+  return eventsByMember.value.get(memberId) ?? [];
 }
+
+/**
+ * ⚠️ A lane is a person's column, and a SHARED event belongs in everyone's: an
+ * event with two owners appears in both their lanes, one with no owner in all of
+ * them. `belongsInMemberColumn` is the same predicate the all-day band uses, so
+ * the band and the plot can never disagree about whose column something is in.
+ *
+ * Timed events only reach the grid; the all-day ones go to the band.
+ */
+const gridColumns = computed(() =>
+  members.value.map((member) => ({
+    key: member.id,
+    laneMemberId: member.id,
+    // The lane wears the bean's colour for its whole height — which is also why
+    // the cards inside it do not. See `WallTimeBlock`'s `washed` prop.
+    tint: member.color,
+    isToday: true,
+    occurrences: eventsFor(member.id).filter((e) => !e.activity.isAllDay),
+  }))
+);
+const allDaySpans = computed(() =>
+  wallSharedAllDay(
+    todayEvents.value.filter((e) => e.activity.isAllDay),
+    memberIds.value
+  )
+);
+
+/**
+ * ⚠️ No per-lane jobs row. To-dos live in the DRAWER, as they do everywhere else.
+ *
+ * A row of jobs pinned under the lanes was tried and removed. It cost a whole
+ * band of height — enough that the grid, the jobs and the peripheral cards
+ * together crushed the calendar to about 90px — and it put to-dos somewhere they
+ * appear nowhere else in the app, uncoloured and detached from the bean whose
+ * lane they sat under. The cards keep their full height and their titles, and a
+ * tap opens the same to-do drawer every other screen uses. One place for to-dos,
+ * and the height goes back to the calendar.
+ *
+ * Landscape puts them BESIDE the lanes, as the today view does. Stacked under
+ * the grid they cost about 250px — more than the jobs row they replaced — and
+ * squeezed the calendar into a 230px strip. Sideways they cost nothing vertical,
+ * and six lanes across the remaining ~920px still leave 150px each. Portrait has
+ * no width to spare, so it keeps the band.
+ */
+const busiest = computed(() => Math.max(0, ...members.value.map((m) => eventsFor(m.id).length)));
+const peripheralVariant = computed(() =>
+  wallPeripheralVariant(props.portrait ? 'band' : 'rail', busiest.value, props.portrait)
+);
+
+/**
+ * A face beside a name needs room. Six lanes across a landscape tablet is ~153px
+ * each, which truncates the subtitle to "3 today · 1..." — so the plate stacks
+ * once the family is large enough, exactly as it does in portrait. Derived from
+ * the lane COUNT rather than a measured width, so it cannot flicker.
+ */
+const inlineHeaders = computed(() => !props.portrait && members.value.length <= 4);
+
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
 }
@@ -128,93 +152,68 @@ function subtitleFor(memberId: string) {
     ? `${head} · ${fillTemplate(t('wall.lane.tomorrow'), { count: tomorrow })}`
     : head;
 }
-/**
- * A lane shows this bean's TO-DOS, not their chores. Chores get the whole chore
- * board — folding them in here too was what made the lane's heading ambiguous
- * ("jobs" being neither word the app uses).
- */
-function jobsHeading(memberId: string) {
-  const { done, total } = jobsProgress(todosOf(memberId));
-  return `${t('wall.jobs.heading')} · ${done}/${total}`;
-}
-
-const { identityFor } = useActivityIdentity();
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-2.5">
-    <div
-      class="grid min-h-0 flex-1 gap-2.5"
-      style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr))"
-    >
-      <WallBeanColumn
-        v-for="member in members"
-        :key="member.id"
-        :member="member"
-        :subtitle="subtitleFor(member.id)"
-        compact
-        header-action
-        @header-click="emit('openDay', todayYmd)"
+  <div class="flex min-h-0 flex-1 gap-4" :class="portrait ? 'flex-col' : 'flex-row'">
+    <div class="flex min-h-0 flex-1 flex-col gap-2.5">
+      <!-- lane headers, on the same column track as the plot -->
+      <div
+        class="grid shrink-0 gap-0"
+        :style="{
+          paddingLeft: `${AXIS_WIDTH_PX}px`,
+          gridTemplateColumns: `repeat(${members.length}, 1fr)`,
+        }"
       >
-        <WallEventChip
-          v-for="entry in eventsFor(member.id).slice(0, LANE_EVENTS)"
-          :key="entry.activity.id + entry.date"
-          :activity="entry.activity"
-          :identity="identityOf(entry.activity, member.id)"
-          :time="entry.activity.startTime || t('planner.allDay')"
-          @open="emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })"
-        />
-        <p
-          v-if="!eventsFor(member.id).length"
-          class="font-caveat m-auto text-[var(--muted-text,#4d5d6c)] opacity-70"
+        <!--
+        `min-w-0` is load-bearing: a grid `1fr` track will not shrink below its
+        content's min-content width, so without it six inline headers pushed the
+        track wider than the plot and Milo and Theo fell off the right edge of a
+        portrait tablet — while the grid below them still drew six columns.
+        Portrait stacks the plate instead of running it inline; 123px of column
+        is not enough for a face and a name side by side.
+      -->
+        <button
+          v-for="member in members"
+          :key="member.id"
+          type="button"
+          class="min-w-0 px-1.5 py-1"
+          @click="emit('openDay', todayYmd)"
         >
-          {{ t('wall.day.nothingOn') }}
-        </p>
+          <WallBeanHeader
+            :member="member"
+            :subtitle="subtitleFor(member.id)"
+            compact
+            :inline="inlineHeaders"
+          />
+        </button>
+      </div>
 
-        <template #footer>
-          <div
-            v-if="todosOf(member.id).length"
-            class="mt-auto border-t border-dashed border-[rgba(44,62,80,0.12)] px-3 pt-2 pb-2 dark:border-slate-700"
-          >
-            <p
-              class="font-outfit wall-lane-jobs-heading mb-1 font-bold tracking-[0.1em] text-[var(--muted-text,#4d5d6c)] uppercase"
-            >
-              {{ jobsHeading(member.id) }}
-            </p>
-            <WallJobList
-              :jobs="todosOf(member.id).slice(0, LANE_JOBS)"
-              :is-pending="isPending"
-              @toggle="emit('toggle', $event)"
-            />
-            <button
-              v-if="todosOf(member.id).length > LANE_JOBS"
-              type="button"
-              class="font-outfit text-primary-500 wall-more font-bold"
-              @click="emit('open', { kind: 'todos' })"
-            >
-              {{
-                fillTemplate(t('wall.card.more'), {
-                  count: todosOf(member.id).length - LANE_JOBS,
-                })
-              }}
-              <span aria-hidden="true">›</span>
-            </button>
-          </div>
-        </template>
-      </WallBeanColumn>
+      <WallTimeGrid
+        :columns="gridColumns"
+        :all-day-spans="allDaySpans"
+        :now="now"
+        :dim-past="true"
+        :show-now="true"
+        :axis-width="AXIS_WIDTH_PX"
+        view-id="lanes"
+        @open="emit('open', $event)"
+      />
     </div>
 
-    <WallPeripheralCards
-      variant="band"
-      :portrait="portrait"
-      :meals-ymd="todayYmd"
-      :todos-for="todosFor"
-      :unassigned-todos="unassignedTodos"
-      :lists-for="listsFor"
-      :orphan-lists="orphanLists"
-      :visible-member-ids="visibleMemberIds"
-      @open="emit('open', $event)"
-      @open-chores="emit('openChores')"
-    />
+    <div :class="portrait ? 'shrink-0' : 'w-[296px] shrink-0 overflow-y-auto'">
+      <WallPeripheralCards
+        :variant="peripheralVariant"
+        :portrait="portrait"
+        :meals-ymd="todayYmd"
+        :todos-for="todosFor"
+        :unassigned-todos="unassignedTodos"
+        :lists-for="listsFor"
+        :orphan-lists="orphanLists"
+        :visible-member-ids="visibleMemberIds"
+        @open="emit('open', $event)"
+        @open-chores="emit('openChores')"
+      />
+    </div>
   </div>
 </template>

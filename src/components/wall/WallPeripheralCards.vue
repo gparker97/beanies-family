@@ -30,7 +30,14 @@ import type { FamilyList, FamilyMember } from '@/types/models';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
 const props = defineProps<{
-  variant: 'band' | 'rail';
+  /**
+   * `band` under the calendar, `rail` beside it — and `strip` when the time grid
+   * needs the height back on a busy day. The strip is the SAME content in one
+   * row, not a different set of cards: the decision of when to use it is made by
+   * `wallPeripheralVariant` from the day's event count, never from the layout
+   * result (that would oscillate).
+   */
+  variant: 'band' | 'rail' | 'strip';
   /** A portrait band gets two columns; four across 800px truncates every label. */
   portrait?: boolean;
   /**
@@ -55,7 +62,7 @@ const familyStore = useFamilyStore();
 const { tonight, trip } = useWallPeripherals();
 
 /** The rail is one column wide, so it shows fewer rows than the band. */
-const rows = computed(() => (props.variant === 'rail' ? 2 : 3));
+const rows = computed(() => (props.variant === 'band' ? 3 : props.variant === 'rail' ? 2 : 1));
 
 const beans = computed(() => {
   const humans = familyStore.sortedHumans;
@@ -84,13 +91,16 @@ function outstandingFor(source: (id: string) => WallJob[]) {
     .slice(0, rows.value);
 }
 const outstandingTodos = computed(() => {
-  const rows = outstandingFor(props.todosFor);
+  // Named `entries`, not `rows`: a local `rows` shadowed the `rows` computed
+  // above, so the cap that limits this list silently became `slice(0, its own
+  // length)` — a no-op.
+  const entries = outstandingFor(props.todosFor);
   const loose = props.unassignedTodos.filter((j) => !j.done);
   // Unclaimed work still needs a way in: the card is what opens the drawer, and
   // gating it on assigned counts alone left a family whose only to-do was added
   // at the wall (which creates them unassigned) with no route back to it.
-  if (loose.length) rows.push({ member: null, jobs: loose });
-  return rows.slice(0, rows.length);
+  if (loose.length) entries.push({ member: null, jobs: loose });
+  return entries.slice(0, rows.value);
 });
 
 /**
@@ -177,7 +187,56 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
+  <!--
+    The slim strip. Same four things, one row — shown when the grid needs the
+    height. Deliberately a separate branch rather than four more ternaries
+    through the card markup below: the cards only ever see 'band' or 'rail',
+    so no read site can be missed.
+  -->
   <div
+    v-if="variant === 'strip'"
+    class="flex shrink-0 items-center rounded-[18px] bg-white p-1.5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+  >
+    <button
+      v-if="tonight"
+      type="button"
+      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0 dark:border-slate-700"
+      @click="emit('open', { kind: 'meals', ymd: mealsYmd })"
+    >
+      <span aria-hidden="true">{{ tonight.emoji }}</span>
+      <span class="truncate">{{ tonight.name }}</span>
+    </button>
+    <button
+      type="button"
+      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0 dark:border-slate-700"
+      :aria-label="t('wall.card.todos')"
+      @click="emit('open', { kind: 'todos' })"
+    >
+      <span aria-hidden="true">✅</span>
+      <span>{{ todoProgress.done }} / {{ todoProgress.total }}</span>
+    </button>
+    <button
+      v-if="visibleLists.length"
+      type="button"
+      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0 dark:border-slate-700"
+      @click="emit('openChores')"
+    >
+      <span aria-hidden="true">📝</span>
+      <span class="truncate">{{ visibleLists[0]?.list.title }}</span>
+    </button>
+    <button
+      v-if="trip"
+      type="button"
+      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 font-semibold"
+      @click="emit('open', { kind: 'trip' })"
+    >
+      <span aria-hidden="true">✈️</span>
+      <span class="truncate">{{ trip.name }}</span>
+    </button>
+  </div>
+
+  <div
+    v-else
     class="min-h-0 gap-2.5"
     :class="
       variant === 'rail'
