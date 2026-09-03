@@ -41,8 +41,17 @@ export interface SharedContent {
  * Enforced in the ORCHESTRATOR so every platform is bounded identically — an earlier draft
  * capped only in the Android plugin, which left the PWA path feeding an unbounded string
  * into a whole-string `split`.
+ *
+ * ⚠️ Raised 4,000 → 10,000 (#85). The old number was sized when a text share was a NOTE
+ * AROUND A LINK. An ordinary school email is ~4,500 characters, so the very first real-world
+ * example overflowed it and lost its tail after a notice. This is purely a client-side cost
+ * choice, not a wire bound: `ai-extract` accepts 32,000, and the already-shipped LINK arm
+ * routinely sends up to 24,000 characters of fetched page text — so 10,000 is still
+ * materially cheaper than one link share.
+ *
+ * ⚠️ The native mirrors track the CEILING, not this. Do not "sync" them to this value.
  */
-export const MAX_SHARE_TEXT_CHARS = 4000;
+export const MAX_SHARE_TEXT_CHARS = 10_000;
 
 /**
  * Above this, a text share is refused outright rather than truncated.
@@ -108,6 +117,30 @@ export const SHARE_TEXT_BUDGET: BudgetPolicy = { max: 20, windowMs: 60 * 60_000 
 export function shareTextBudgetKey(familyId: string): string {
   return `share-text:${familyId}`;
 }
+
+// ── Link-vs-text precedence (#85) — a DIFFERENT question from the size bands ──────────────
+//
+// The bands above ask "how much of this do we read?". This asks "which arm reads it at all?",
+// and it is measured on a DIFFERENT string: the trimmed text with every URL candidate removed.
+// Do not compare it to, derive it from, or reconcile it with the three bounds above.
+
+/**
+ * Above this much prose (URLs removed), the BODY is the share and a link inside it is
+ * incidental — a school email, a class-group message, a forwarded newsletter. At or below it,
+ * the share is a link with a note around it and the LINK path wins.
+ *
+ * ⚠️ Deliberately LOW. The link path is the only route to schema.org recipe data, which the
+ * model never has to guess at; a midpoint threshold would swallow chattier recipe shares to no
+ * benefit. 200 sits above the longest realistic human caption and far below the shortest real
+ * email body.
+ *
+ * ⚠️ Known accepted cost, and it CANNOT be tuned away: a bare link wrapped in a long
+ * confidentiality footer now reads as text, and the model answers `none` where fetching the
+ * link used to work. Any threshold that admits a 4,500-character email also admits a
+ * 900-character legal footer. Detected by the `outweighed` triage note appearing alongside
+ * `classified kind='none'`.
+ */
+export const MAX_LINK_NOTE_CHARS = 200;
 
 export interface ShareAdapter {
   name: SharePlatform;

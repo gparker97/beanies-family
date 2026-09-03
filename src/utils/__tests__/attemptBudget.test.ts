@@ -58,6 +58,34 @@ describe('attemptBudget', () => {
       expect(consumeAttempt(KEY, POLICY).ok).toBe(false);
     });
 
+    it('peek does not PERSIST — no storage write of any kind', () => {
+      // ⚠️ Load-bearing for the share orchestrator, which since the link-vs-text precedence
+      // (#85) evaluates `peekAttempt` BEFORE deciding the arm — so a pure LINK share now peeks
+      // where it never used to. That is only safe if peeking is free. Asserted here, at the
+      // module that owns the behaviour, rather than through the orchestrator: a spy there
+      // could not distinguish this write from the many others a share makes.
+      //
+      // Watches removeItem as well as setItem: with an EMPTY budget a leaked `persist()` takes
+      // the removeItem branch, so a setItem-only assertion passes even when peeking persists.
+      //
+      // ⚠️ NOT mutation-verified, unlike the precedence rule's five mutations. Adding
+      // `persist(now)` to `peekAttempt` did not make this fail, and the cause was traced to a
+      // stale module in the runner rather than to the assertion — so treat this as a guard
+      // against an obvious regression, not as a proof. The property itself is four lines of
+      // `peekAttempt` and is true by inspection.
+      consumeAttempt(KEY, POLICY);
+      const setItem = vi.spyOn(Storage.prototype, 'setItem');
+      const removeItem = vi.spyOn(Storage.prototype, 'removeItem');
+
+      peekAttempt(KEY, POLICY);
+      peekAttempt('share-text:never-seen', POLICY);
+
+      expect(setItem).not.toHaveBeenCalled();
+      expect(removeItem).not.toHaveBeenCalled();
+      setItem.mockRestore();
+      removeItem.mockRestore();
+    });
+
     it('peek reports the refusal once the budget is spent', () => {
       for (let i = 0; i < 3; i += 1) consumeAttempt(KEY, POLICY);
       const verdict = peekAttempt(KEY, POLICY);

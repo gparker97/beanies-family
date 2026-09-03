@@ -83,8 +83,8 @@ public class ShareIntentPlugin extends Plugin {
     /**
      * Mirrors MAX_SHARE_TEXT_CEILING + 1 in src/services/share/types.ts.
      *
-     * ⚠️ Deliberately the ceiling + 1 and NOT MAX_SHARE_TEXT_CHARS (4000, which this was
-     * until #83). Clipping at the read cap here would destroy the information JS needs to
+     * ⚠️ Deliberately the ceiling + 1 and NOT MAX_SHARE_TEXT_CHARS (the read cap, which this
+     * mirrored until #83 — and which has since moved again, to 10,000). Clipping at the read cap here would destroy the information JS needs to
      * tell an ordinary long share from one that must be refused: every over-ceiling share
      * would arrive looking exactly 4000 characters long. The +1 is what lets JS distinguish
      * "at the ceiling" from "clipped at the ceiling".
