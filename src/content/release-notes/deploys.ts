@@ -17,6 +17,61 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.03',
+    date: '2026-09-03',
+    month: '3 september 2026',
+    spotlight: true,
+    summary: {
+      en: "The meal planner is here: plan the family's week of meals, see who is cooking at a glance, and print it for the fridge.",
+      beanie:
+        "the meal planner is here: plan the family's week of meals, see who is cooking at a glance, and print it for the fridge.",
+    },
+    features: [
+      {
+        icon: '\u{1F372}',
+        title: { en: 'Plan the week of meals', beanie: 'plan the week of meals' },
+        description: {
+          en: 'Plan breakfast, lunch, dinner and snacks across the whole week. Drop a recipe onto a day, say who is cooking, add a serve time or a guest, and mark it off once it is made. When the week is set, print or share it as a one-page sheet for the fridge.',
+          beanie:
+            'plan breakfast, lunch, dinner and snacks across the whole week. drop a recipe onto a day, say who is cooking, add a serve time or a guest, and mark it off once it is made. when the week is set, print or share it as a one-page sheet for the fridge.',
+        },
+        tryItRoute: '/meal-planner',
+        tryItLabel: { en: 'Plan this week', beanie: 'plan this week' },
+      },
+      {
+        icon: '\u{1F3A8}',
+        title: { en: 'Colour now means the bean', beanie: 'colour now means the bean' },
+        description: {
+          en: 'Everywhere a card appears, on the calendar, the wall, to-dos and lists, it is coloured by the bean it belongs to rather than by the kind of activity. The activity keeps its own emoji to say what it is, so one glance tells you whose it is. An event shared by two beans blends both their colours.',
+          beanie:
+            'everywhere a card appears, on the calendar, the wall, to-dos and lists, it is coloured by the bean it belongs to rather than by the kind of activity. the activity keeps its own emoji to say what it is, so one glance tells you whose it is. an event shared by two beans blends both their colours.',
+        },
+      },
+      {
+        icon: '\u{1F382}',
+        title: { en: 'Birthdays look like birthdays', beanie: 'birthdays look like birthdays' },
+        description: {
+          en: 'A birthday, an anniversary or a celebration now stands out wherever it appears, with a scatter of beans across the card. Open one and the beans come down to meet you.',
+          beanie:
+            'a birthday, an anniversary or a celebration now stands out wherever it appears, with a scatter of beans across the card. open one and the beans come down to meet you.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.08.29',
     date: '2026-08-29',
     month: '29 august 2026',
