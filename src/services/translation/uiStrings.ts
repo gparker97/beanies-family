@@ -5610,7 +5610,6 @@ const STRING_DEFS = {
   'wall.list.progress': { en: '{done} of {total} done', beanie: '{done} of {total} done' },
   'wall.lane.today': { en: '{count} today', beanie: '{count} today' },
   'wall.lane.tomorrow': { en: '{count} tomorrow', beanie: '{count} tomorrow' },
-  'wall.today.now': { en: 'Happening now', beanie: 'happening now' },
   'lists.cycle.archiveFailed': {
     en: 'Couldn’t save this list’s history. It’ll try again next time you open the app.',
     beanie: 'couldn’t save this list’s history. it’ll try again next time you open beanies.',
@@ -5622,6 +5621,19 @@ const STRING_DEFS = {
   'lists.completed.earlier': { en: 'Earlier', beanie: 'earlier' },
   'wall.today.today': { en: 'Today', beanie: 'today' },
   'wall.today.backToToday': { en: 'Back to today', beanie: 'back to today' },
+  // ── the time grid (the concertina axis) ──────────────────────────────
+  'wall.grid.quietUntil': { en: 'Quiet until {time}', beanie: 'quiet until {time}' },
+  'wall.grid.allDay': { en: 'All day', beanie: 'all day' },
+  'wall.grid.everyone': { en: 'Everyone', beanie: 'everyone' },
+  // Deliberately NOT `wall.today.now` ('Happening now'): the block marker has
+  // room for one word and the today-view heading has room for two, so sharing
+  // one key would degrade whichever surface lost the argument.
+  'wall.grid.runningNow': { en: 'Now', beanie: 'now' },
+  'wall.grid.nowAt': { en: 'Now {time}', beanie: 'now {time}' },
+  'wall.grid.fallback': {
+    en: 'Showing a simple list — the time grid could not be drawn',
+    beanie: 'showing a simple list — the time grid could not be drawn 🫘',
+  },
   'wall.filter.everyone': { en: 'Everyone', beanie: 'everyone' },
   'wall.sheet.activity': { en: 'Activity', beanie: 'the activity' },
   'wall.sheet.meals': { en: "Today's meals", beanie: "today's meals" },

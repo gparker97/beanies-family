@@ -477,14 +477,6 @@ watch(activeView, () => (sheet.value = null));
   font-size: 0.8rem;
 }
 
-.wall-root :deep(.wall-nowtag) {
-  font-size: 0.66rem;
-}
-
-.wall-root :deep(.wall-slot-sub) {
-  font-size: 0.88rem;
-}
-
 .wall-root :deep(.wall-stars) {
   font-size: 0.95rem;
 }
@@ -544,12 +536,53 @@ watch(activeView, () => (sheet.value = null));
   font-size: 1.65rem;
 }
 
-.wall-root :deep(.wall-chip-time) {
-  font-size: 0.72rem;
+.wall-root :deep(.wall-block-title) {
+  font-size: 0.95rem;
 }
 
-.wall-root :deep(.wall-chip-title) {
-  font-size: 0.95rem;
+/* ── the time grid ────────────────────────────────────────────────────
+ * Every size here is >= 0.75rem (the documented 12px floor). The wall scale
+ * already carried SIX sub-floor sizes (verified: .wall-pill 0.6, .wall-nowtag
+ * 0.66, .wall-lane-jobs-heading 0.66, .wall-lock-heading 0.7, .wall-strip-day
+ * 0.7, .wall-sheet-label 0.72, .wall-strip-count 0.72, .wall-chip-time 0.72).
+ * This change REMOVES two of them — .wall-chip-time and .wall-nowtag, deleted
+ * with WallEventChip and the today view's hand-rolled now tag — and adds none,
+ * so the count goes 6 -> 4. These rem-based sizes are invisible to lint, which
+ * polices `text-[Xpx]` only; the remaining four are pre-existing and out of
+ * scope here.
+ */
+.wall-root :deep(.wall-axis) {
+  font-size: 0.88rem;
+}
+
+.wall-root :deep(.wall-block-title-tight) {
+  font-size: 0.85rem;
+}
+
+/* One class, three uses: the block's detail line, the all-day "everyone" tag
+ * and the all-day label in the gutter. */
+.wall-root :deep(.wall-block-meta) {
+  font-size: 0.75rem;
+}
+
+.wall-root :deep(.wall-block-sliver) {
+  font-size: 1.05rem;
+}
+
+.wall-root :deep(.wall-fold-label) {
+  font-size: 1.15rem;
+}
+
+.wall-root :deep(.wall-nowpill) {
+  font-size: 0.78rem;
+}
+
+.wall-root :deep(.wall-allday) {
+  font-size: 0.85rem;
+}
+
+.wall-root :deep(.wall-tblock-now) {
+  font-size: 0.75rem;
 }
 
 .wall-root :deep(.wall-job-title) {

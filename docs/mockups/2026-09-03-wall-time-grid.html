@@ -1,0 +1,826 @@
+<meta charset="utf-8">
+<title>Beanie Wall Time Grid</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   beanie wall — the TIME GRID (2026-09-03)
+   Follow-on to docs/mockups/beanie-wall-2026-08-31.html.
+   CIG-clamped: Outfit/Inter/Caveat, Heritage Orange for accents (never Alert
+   Red), squircle radii, soft diffused shadows only.
+
+   This is a WORKING prototype, not a picture. The concertina layout below is
+   the real algorithm running on real-shaped data — change the data and the
+   grid re-lays itself. The bar at the top of the PAGE is mockup furniture.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --heritage-orange:#F15D22; --terracotta:#E67E22; --deep-slate:#2C3E50;
+  --sky-silk:#AED6F1; --cloud-white:#F8F9FA; --soft-green:#27AE60;
+  --muted:#4d5d6c; --sq:26px;
+  --card-shadow:0 4px 20px rgb(44 62 80 / 6%);
+  --lift-shadow:0 10px 34px rgb(44 62 80 / 10%);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#eef1f4;color:var(--deep-slate);
+  font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* ── mockup furniture ─────────────────────────────────────────────── */
+.bar{position:sticky;top:0;z-index:60;display:flex;flex-wrap:wrap;gap:16px;align-items:center;
+  padding:13px 20px;background:#fff;box-shadow:0 1px 0 rgb(44 62 80 / 8%)}
+.bar h1{font-family:'Outfit';font-size:.98rem;font-weight:800;margin:0 10px 0 0}
+.bar h1 span{color:var(--heritage-orange)}
+.grp{display:flex;align-items:center;gap:6px}
+.grp b{font-family:'Outfit';font-size:.64rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-right:3px}
+.tab{font-family:'Outfit';font-size:.78rem;font-weight:600;padding:7px 13px;border:0;cursor:pointer;
+  border-radius:999px;background:rgb(44 62 80 / 6%);color:var(--deep-slate)}
+.tab[aria-pressed="true"]{background:var(--heritage-orange);color:#fff}
+.hint{margin-left:auto;font-size:.75rem;color:var(--muted);max-width:44ch;line-height:1.45}
+.note{padding:12px 20px 0;font-size:.83rem;color:var(--muted);max-width:1100px;line-height:1.6}
+.note b{color:var(--deep-slate)}
+.note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;
+  background:rgb(44 62 80 / 6%);padding:1px 5px;border-radius:5px}
+.stage{display:flex;justify-content:center;padding:18px 20px 46px}
+.frame{background:#1f2d3a;border-radius:26px;padding:14px;box-shadow:0 26px 60px rgb(44 62 80 / 26%)}
+.screen{overflow:hidden;border-radius:14px;background:var(--cloud-white);position:relative}
+.land .screen{width:1280px;height:800px}
+.port .screen{width:800px;height:1180px}
+
+/* ── the wall shell (unchanged from the shipped design) ───────────── */
+.wall{position:absolute;inset:0;display:flex;flex-direction:column;
+  background:
+    radial-gradient(900px 500px at 8% -6%, rgb(241 93 34 / 7%), transparent 70%),
+    radial-gradient(800px 460px at 96% 4%, rgb(174 214 241 / 30%), transparent 72%),
+    var(--cloud-white)}
+.top{display:flex;align-items:center;gap:18px;padding:18px 26px 10px;flex:none}
+.today-date{font-family:'Outfit';font-weight:800;letter-spacing:-.02em;line-height:1;font-size:42px}
+.today-date .dow{color:var(--heritage-orange)}
+.top-sub{font-size:14.5px;color:var(--muted);margin-top:6px}
+.topright{margin-left:auto;display:flex;align-items:center;gap:14px}
+.clock{text-align:right}
+.clock .t{font-family:'Outfit';font-weight:800;font-size:38px;line-height:1;letter-spacing:-.02em}
+.clock .saved{font-size:12.5px;color:var(--muted);margin-top:5px;display:flex;align-items:center;
+  gap:6px;justify-content:flex-end}
+.clock .saved i{width:7px;height:7px;border-radius:50%;background:var(--soft-green);display:block}
+.vswitch{display:flex;background:#fff;border-radius:18px;box-shadow:var(--card-shadow);padding:4px;gap:2px;flex:none}
+.vswitch button{width:46px;height:44px;border:0;background:transparent;border-radius:14px;cursor:pointer;
+  font-size:19px;line-height:1;display:grid;place-items:center;color:var(--deep-slate);opacity:.5}
+.vsep{width:1px;background:rgb(44 62 80 / 10%);margin:6px 3px}
+.vswitch button[aria-pressed="true"]{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));
+  color:#fff;opacity:1;box-shadow:0 3px 10px rgb(241 93 34 / 30%)}
+.lockbtn{width:52px;height:52px;border-radius:18px;background:#fff;box-shadow:var(--card-shadow);
+  display:grid;place-items:center;font-size:22px;cursor:pointer;flex:none}
+.body{flex:1;display:flex;gap:14px;padding:2px 26px 0;min-height:0;overflow:hidden}
+.main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px}
+.port .body{flex-direction:column}
+
+/* ═══ THE TIME GRID ═════════════════════════════════════════════════
+   One continuous white surface with column dividers, NOT seven separate
+   cards. That is what makes it read as a grid: a rule drawn at 07:30 is
+   one line across the whole week, so "the 8am crunch" is a shape you see
+   rather than seven times you read.
+   ═════════════════════════════════════════════════════════════════ */
+.tgrid{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+
+/* day / bean headers, aligned to the same column track as the plot */
+.heads{display:grid;gap:0;flex:none;padding-left:var(--axis-w)}
+.head{text-align:center;padding:5px 4px 7px;border-radius:14px 14px 0 0}
+.head .dow{font-family:'Outfit';font-size:12.5px;font-weight:700;letter-spacing:.11em;
+  text-transform:uppercase;opacity:.62;display:block}
+.head .dnum{font-family:'Outfit';font-size:25px;font-weight:800;line-height:1.05;display:block}
+.head.is-today{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:#fff}
+.head.is-today .dow{opacity:.82}
+/* bean lane header: face + name, so a lane is a person not a date */
+.head.bean{display:flex;align-items:center;gap:8px;justify-content:center;padding:8px 6px}
+.head.bean .nm{font-family:'Outfit';font-size:16.5px;font-weight:700}
+.head.bean .ct{font-size:11.5px;color:var(--muted);display:block;font-weight:500}
+
+/* the all-day band — pinned above the axis, because these have no time */
+.allday{display:grid;flex:none;background:rgb(174 214 241 / 26%);border-radius:14px;
+  padding:5px;gap:5px;margin-left:var(--axis-w)}
+.allday.empty{display:none}
+.ad{display:flex;align-items:center;gap:6px;min-width:0;padding:4px 8px;border-radius:10px;
+  background:#fff;box-shadow:0 1px 4px rgb(44 62 80 / 6%)}
+.ad .t{font-family:'Outfit';font-size:13.5px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ad.shared{justify-content:center}
+.ad .everyone{font-family:'Outfit';font-size:10px;font-weight:800;letter-spacing:.11em;
+  text-transform:uppercase;color:#2b6ea8;background:rgb(174 214 241 / 40%);
+  padding:2px 7px;border-radius:999px;margin-left:4px}
+.adlab{font-family:'Outfit';font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:#2b6ea8;position:absolute;left:0;width:var(--axis-w);text-align:right;padding-right:11px;
+  line-height:1;margin-top:9px}
+.adwrap{position:relative;flex:none}
+
+.plotwrap{flex:1;min-height:0;position:relative;display:flex}
+.axis{width:var(--axis-w);flex:none;position:relative}
+.axis .lab{position:absolute;right:11px;font-family:'Outfit';font-size:14px;font-weight:800;
+  color:var(--muted);line-height:1;transform:translateY(-50%);white-space:nowrap;letter-spacing:-.01em}
+.axis .lab.dim{opacity:.42;font-weight:700}
+.plot{flex:1;min-width:0;position:relative;background:#fff;border-radius:20px;
+  box-shadow:var(--card-shadow);overflow:hidden}
+.colsep{position:absolute;top:0;bottom:0;width:1px;background:rgb(44 62 80 / 7%)}
+.rule{position:absolute;left:0;right:0;height:1px;background:rgb(44 62 80 / 6%)}
+.todaywash{position:absolute;top:0;bottom:0;background:rgb(241 93 34 / 4.5%)}
+
+/* ── the fold: the signature element ──────────────────────────────
+   A stretch where NOTHING is on, in ANY column, folds away. It is not
+   blank space saved: the label answers the question the gap poses.   */
+.fold{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;
+  background:rgb(44 62 80 / 3.5%);
+  border-top:1px dashed rgb(44 62 80 / 20%);border-bottom:1px dashed rgb(44 62 80 / 20%)}
+.fold i{position:absolute;top:50%;width:0;height:0;transform:translateY(-50%);
+  border-top:7px solid transparent;border-bottom:7px solid transparent}
+.fold i.l{left:0;border-left:8px solid rgb(44 62 80 / 9%)}
+.fold i.r{right:0;border-right:8px solid rgb(44 62 80 / 9%)}
+.foldlab{position:absolute;left:0;right:0;z-index:8;display:flex;justify-content:center;
+  transform:translateY(-50%);pointer-events:none}
+.foldlab span{font-family:'Caveat';font-size:18px;font-weight:700;color:var(--muted);
+  background:#fff;padding:1px 13px;border-radius:999px;white-space:nowrap;
+  box-shadow:0 0 0 4px #fff}
+.foldtick{position:absolute;right:11px;font-family:'Outfit';font-size:15px;font-weight:800;
+  color:rgb(44 62 80 / 28%);transform:translateY(-50%);letter-spacing:.08em}
+
+/* ── an event block ─────────────────────────────────────────────── */
+.col{position:absolute;top:0;bottom:0}
+.blk{position:absolute;border-radius:12px;padding:5px 8px 5px 9px;overflow:hidden;
+  border-left:5px solid;background:#fff;box-shadow:0 1px 5px rgb(44 62 80 / 8%);
+  display:flex;flex-direction:column;justify-content:flex-start;cursor:pointer}
+.blk .bt{font-family:'Outfit';font-weight:700;line-height:1.18;font-size:15px;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.blk .bm{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.blk .faces{position:absolute;right:5px;bottom:4px;display:flex;gap:-4px}
+.blk.dashed{border-left-style:dashed}
+.blk.tight{padding:3px 6px 3px 8px}
+.blk.tight .bt{font-size:13.5px;-webkit-line-clamp:2}
+.blk.tight .bm{display:none}
+.blk .emoji{font-size:13px;margin-right:3px}
+/* A collision on a 130px week column cannot show two titles. It gives up the
+   TITLE, never the position — the block still sits at its true time, says what
+   kind of thing it is, and opens on a tap. */
+.blk.sliver{padding:5px 2px;align-items:center}
+.blk.sliver .bt{font-size:17px;-webkit-line-clamp:1;text-align:center}
+.blk.sliver .emoji{margin:0;font-size:17px}
+/* a long block is mostly empty, so its content sits at the optical centre */
+.blk.tall{justify-content:center}
+/* what has already happened steps back rather than disappearing */
+.blk.past{opacity:.42;box-shadow:none}
+/* the event running right now fills as it goes — the wall answers "how much
+   longer" without anyone doing arithmetic */
+.blk .prog{position:absolute;left:0;bottom:0;height:3px;opacity:.55;border-radius:0 3px 3px 0}
+.blk .nowtag{position:absolute;top:5px;right:6px;font-family:'Outfit';font-size:9.5px;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--heritage-orange);
+  padding:1.5px 6px;border-radius:999px}
+.blk.sliver .nowtag{display:none}
+/* narrow week columns: the axis carries the time, so the block does not
+   print it. That reclaimed line is what makes seven columns viable. */
+.face{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;
+  font-family:'Outfit';font-size:10.5px;font-weight:800;border:2px solid #fff;margin-left:-6px;
+  flex:none}
+.face:first-child{margin-left:0}
+.face.lg{width:26px;height:26px;font-size:13px}
+
+/* ── now ────────────────────────────────────────────────────────── */
+/* The now-line runs BEHIND the blocks. Drawn over them it struck a line through
+   the title of the very event it was marking — the one block on the screen whose
+   text matters most right now. A running event says so with its own ring and the
+   fill along its foot; the line's job is the empty space between columns. */
+.nowline{position:absolute;left:0;right:0;height:2px;background:var(--heritage-orange);z-index:2;
+  box-shadow:0 0 0 3px rgb(241 93 34 / 10%)}
+.nowline::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;
+  border-radius:50%;background:var(--heritage-orange)}
+.nowpill{position:absolute;right:8px;transform:translateY(-50%);z-index:7;
+  background:var(--heritage-orange);color:#fff;font-family:'Outfit';font-size:12.5px;font-weight:800;
+  padding:3px 8px;border-radius:999px;letter-spacing:.02em;
+  box-shadow:0 3px 9px rgb(241 93 34 / 34%);white-space:nowrap}
+
+.empty{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);text-align:center;
+  font-family:'Caveat';font-size:19px;color:var(--muted);opacity:.55}
+
+/* ── the peripheral band, in its two states ─────────────────────── */
+.band{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.card{background:#fff;border-radius:var(--sq);box-shadow:var(--card-shadow);padding:13px 15px;cursor:pointer}
+.card h3{font-family:'Outfit';font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--heritage-orange);margin:0 0 8px;display:flex;align-items:center;gap:6px}
+.card .line{font-family:'Outfit';font-size:16px;font-weight:600}
+.card .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.slim{flex:none;display:flex;align-items:center;gap:0;background:#fff;border-radius:18px;
+  box-shadow:var(--card-shadow);padding:9px 6px;cursor:pointer}
+.slim div{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  font-family:'Outfit';font-size:14.5px;font-weight:600;border-right:1px solid rgb(44 62 80 / 8%)}
+.slim div:last-child{border-right:0}
+.slim em{font-style:normal;font-size:17px}
+.slim b{color:var(--muted);font-weight:600;font-size:13px}
+
+/* lane jobs footer — pinned under the grid, aligned to the lane columns */
+.jobsrow{display:grid;flex:none;gap:0;padding-left:var(--axis-w)}
+.jobscell{padding:7px 9px 3px;border-right:1px solid rgb(44 62 80 / 7%)}
+.jobscell:last-child{border-right:0}
+.jobscell h4{font-family:'Outfit';font-size:10px;font-weight:800;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 5px}
+.jrow{display:flex;align-items:center;gap:7px;padding:2.5px 0}
+.jrow .tick{width:19px;height:19px;border-radius:50%;border:2px solid rgb(44 62 80 / 18%);flex:none;
+  display:grid;place-items:center;color:#fff;font-size:10px}
+.jrow.done .tick{background:var(--soft-green);border-color:var(--soft-green)}
+.jrow .jt{font-family:'Outfit';font-size:13.5px;font-weight:600}
+.jrow.done .jt{opacity:.45;text-decoration:line-through}
+.jobswrap{flex:none;background:#fff;border-radius:0 0 20px 20px;box-shadow:var(--card-shadow);
+  margin-top:-6px;padding-top:4px}
+
+/* week strip under the today view */
+.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;flex:none}
+.strip button{border:0;cursor:pointer;background:#fff;border-radius:16px;padding:7px 2px;text-align:center;
+  box-shadow:var(--card-shadow)}
+.strip button[aria-pressed="true"]{background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:#fff}
+.strip .sd{font-family:'Outfit';font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.65;display:block}
+.strip .sn{font-family:'Outfit';font-size:19px;font-weight:800;display:block;line-height:1.1}
+.strip .pips{display:flex;gap:3px;justify-content:center;margin-top:3px;min-height:6px}
+.strip .pips i{width:5px;height:5px;border-radius:50%;display:block}
+.rail{width:286px;flex:none;display:flex;flex-direction:column;gap:11px;min-height:0}
+
+/* ── annotation overlay ─────────────────────────────────────────── */
+.anno{position:absolute;inset:0;pointer-events:none;z-index:40;display:none}
+.showanno .anno{display:block}
+.cal{position:absolute;font-family:'Outfit';font-size:12.5px;font-weight:700;line-height:1.35;
+  background:var(--deep-slate);color:#fff;padding:7px 11px;border-radius:12px;max-width:230px;
+  box-shadow:0 8px 24px rgb(44 62 80 / 34%)}
+.cal em{font-style:normal;color:var(--sky-silk);display:block;font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:3px}
+.cal::after{content:'';position:absolute;width:9px;height:9px;background:var(--deep-slate);transform:rotate(45deg)}
+.cal.dn::after{left:24px;bottom:-4px}
+.cal.up::after{left:24px;top:-4px}
+.cal.lf::after{left:-4px;top:16px}
+.cal.rt::after{right:-4px;top:16px}
+.ring{position:absolute;border:2.5px dashed var(--heritage-orange);border-radius:14px;
+  background:rgb(241 93 34 / 6%)}
+</style>
+
+<div class="bar">
+  <h1>beanie wall — the <span>time grid</span></h1>
+  <div class="grp"><b>view</b>
+    <button class="tab" data-view="today" aria-pressed="true">◉ today</button>
+    <button class="tab" data-view="lanes" aria-pressed="false">▤ bean lanes</button>
+    <button class="tab" data-view="week" aria-pressed="false">▦ the week</button>
+  </div>
+  <div class="grp"><b>screen</b>
+    <button class="tab" data-orient="land" aria-pressed="true">landscape</button>
+    <button class="tab" data-orient="port" aria-pressed="false">portrait</button>
+  </div>
+  <div class="grp"><b>show</b>
+    <button class="tab" id="annoBtn" aria-pressed="false">the mechanism</button>
+    <button class="tab" id="busyBtn" aria-pressed="false">a busy week</button>
+  </div>
+  <p class="hint">Not a picture — the concertina layout below is the real algorithm running on real-shaped data. Flip <b>a busy week</b> to watch it re-fit.</p>
+</div>
+
+<p class="note" id="viewnote"></p>
+
+<div class="stage"><div class="frame land" id="frame"><div class="screen" id="screen"></div></div></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   1. THE DATA
+   ══════════════════════════════════════════════════════════════════ */
+const M = {
+  greg:  {name:'Greg',  color:'#2C3E50', face:'G'},
+  sofia: {name:'Sofia', color:'#E67E22', face:'S'},
+  leo:   {name:'Leo',   color:'#F15D22', face:'L'},
+  milo:  {name:'Milo',  color:'#3D8FD1', face:'M'},
+  theo:  {name:'Theo',  color:'#27AE60', face:'T'},
+};
+const SHARED = '#F15D22';       /* an event owned by nobody is everybody's */
+const mins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+const hhmm = v => String(Math.floor(v/60)).padStart(2,'0')+':'+String(v%60).padStart(2,'0');
+const ev = (s,e,title,who,emoji) => ({s:mins(s), e:mins(e), title, who, emoji});
+
+/* Mon-first week; Thursday 3 Sept is today. */
+const QUIET = [
+  {dow:'Mon',num:31,allDay:[],ev:[
+    ev('07:30','08:00','School run',['leo','milo'],'🚗'),
+    ev('08:05','08:20','Nursery drop-off',['theo'],'🎒'),
+    ev('15:20','15:50','Pickup',['sofia'],'🚗'),
+    ev('16:00','18:00','Football training',['leo'],'⚽'),
+    ev('18:30','19:15','Dinner',[],'🍲')]},
+  {dow:'Tue',num:1,allDay:[],ev:[
+    ev('07:30','08:00','School run',['leo','milo'],'🚗'),
+    ev('08:05','08:20','Nursery drop-off',['theo'],'🎒'),
+    ev('15:20','15:50','Pickup',['sofia'],'🚗'),
+    ev('17:00','17:45','Piano lesson',['theo'],'🎹'),
+    ev('18:30','19:15','Dinner',[],'🍲')]},
+  {dow:'Wed',num:2,allDay:[],ev:[
+    ev('07:30','08:00','School run',['leo','milo'],'🚗'),
+    ev('15:20','15:50','Pickup',['sofia'],'🚗'),
+    ev('16:00','18:00','Football training',['leo'],'⚽'),
+    ev('18:30','19:15','Dinner',[],'🍲')]},
+  {dow:'Thu',num:3,today:true,allDay:[{title:'Term starts',emoji:'🎒',who:[]}],ev:[
+    ev('07:30','08:00','School run',['leo','milo'],'🚗'),
+    ev('08:05','08:20','Nursery drop-off',['theo'],'🎒'),
+    ev('15:20','15:50','Pickup',['sofia'],'🚗'),
+    ev('16:00','18:00','Football training',['leo'],'⚽'),
+    ev('16:30','17:30','Swimming',['milo'],'🏊'),
+    ev('18:30','19:15','Dinner',[],'🍲'),
+    ev('19:30','20:00','Bath & bed',['theo'],'🛁')]},
+  {dow:'Fri',num:4,allDay:[],ev:[
+    ev('07:30','08:00','School run',['leo','milo'],'🚗'),
+    ev('15:20','15:50','Pickup',['sofia'],'🚗'),
+    ev('18:30','19:15','Dinner',[],'🍲'),
+    ev('19:30','20:45','Film night',[],'🍿')]},
+  {dow:'Sat',num:5,allDay:[],ev:[
+    ev('10:00','11:30','Swim gala',['milo'],'🏊'),
+    ev('16:00','18:00','Ella’s party',['theo'],'🎈')]},
+  {dow:'Sun',num:6,allDay:[],ev:[
+    ev('12:00','14:30','Lunch at Gran’s',[],'🍽'),
+    ev('18:30','19:15','Dinner',[],'🍲')]},
+];
+/* the stress case: what a genuinely full week does to the layout */
+const BUSY = JSON.parse(JSON.stringify(QUIET));
+BUSY[3].ev.splice(3,0, ev('09:00','09:40','Dentist',['sofia'],'🦷'), ev('12:30','13:15','Physio',['greg'],'🩹'));
+BUSY[3].ev.push(ev('20:15','21:00','Homework club',['leo'],'📚'));
+BUSY[0].ev.splice(2,0, ev('09:30','10:15','Vet — Bella',['greg'],'🐕'), ev('13:00','14:00','Parents’ evening',['sofia'],'🏫'));
+BUSY[1].ev.splice(2,0, ev('11:00','12:00','Boiler service',['greg'],'🔧'));
+BUSY[2].ev.splice(1,0, ev('08:30','09:15','Standup',['greg'],'💻'), ev('14:00','15:00','Optician',['leo'],'👓'));
+BUSY[4].ev.splice(1,0, ev('10:30','11:15','Haircuts',['leo','milo'],'✂️'));
+BUSY[5].ev.unshift(ev('08:00','09:00','Parkrun',['greg','leo'],'🏃'));
+BUSY[6].ev.unshift(ev('09:30','10:30','Church',[],'⛪'));
+
+const JOBS = {
+  greg:  [{t:'Bins out',d:true},{t:'Book MOT',d:false}],
+  sofia: [{t:'Reply to school',d:true},{t:'Order kit',d:false}],
+  leo:   [{t:'Reading, 20 min',d:false},{t:'Tidy room',d:false}],
+  milo:  [{t:'Spellings',d:true},{t:'Pack swim bag',d:false}],
+  theo:  [{t:'Feed Bella',d:true}],
+};
+
+const NOW = mins('17:05');
+let VIEW='today', ORIENT='land', ANNO=false, BUSYMODE=false, FOCUS=3;
+
+/* ══════════════════════════════════════════════════════════════════════
+   2. THE CONCERTINA — the whole proposal in one function.
+
+   Events keep TRUE proportional height. Any stretch where nothing is on,
+   in any column on screen, folds to a fixed band that says what is being
+   skipped. If the day still will not fit, the fold threshold tightens and
+   then the minimum block shrinks — in that order, deterministically.
+   It never scrolls and it never silently drops an event.
+   ══════════════════════════════════════════════════════════════════ */
+const FOLD_H  = 30;                      /* a folded stretch is always this tall */
+const MAX_GAP_PX = 74;                   /* ⭐ no empty stretch may EVER render taller
+                                            than this. A gap folds when it is long in
+                                            MINUTES *or* long in PIXELS — which is what
+                                            stops a sparse weekend afternoon leaving a
+                                            third of the week blank. */
+const GAP_STEPS = [90,75,60,45,30];      /* minutes: how big a gap must be to fold */
+const MIN_STEPS = [36,33,30,27];         /* px: the shortest a block may ever be */
+const SLIVER_W  = 95;                    /* px: below this a colliding block loses its title */
+
+function findFolds(spans, windowS, windowE, gapThreshold){
+  /* A fold needs the stretch to be empty in EVERY column. One Saturday gala at
+     10:00 correctly stops the weekday morning fold from swallowing it — the grid
+     would otherwise be lying about where that gala sits. */
+  const busy = spans.map(e=>[e.s,e.e]).sort((a,b)=>a[0]-b[0]);
+  const merged=[];
+  for(const [s,e] of busy){
+    const last = merged[merged.length-1];
+    if(merged.length && s <= last[1]) last[1]=Math.max(last[1],e);
+    else merged.push([s,e]);
+  }
+  const folds=[]; let cur = windowS;
+  for(const [s,e] of merged){
+    if(s - cur >= gapThreshold) folds.push([cur,s]);
+    cur = Math.max(cur,e);
+  }
+  if(windowE - cur >= gapThreshold) folds.push([cur,windowE]);
+  return folds;
+}
+
+function buildScale(windowS, windowE, folds, availableH){
+  const foldedMin = folds.reduce((a,[s,e])=>a+(e-s),0);
+  const liveMin   = Math.max(1,(windowE-windowS) - foldedMin);
+  const pxPerMin  = Math.max(0.01, (availableH - folds.length*FOLD_H)) / liveMin;
+  const y = t => {
+    t = Math.max(windowS, Math.min(windowE, t));
+    let acc = 0, cur = windowS;
+    for(const [fs,fe] of folds){
+      if(t <= fs) return acc + (t-cur)*pxPerMin;
+      acc += (fs-cur)*pxPerMin;
+      if(t < fe) return acc + FOLD_H * ((t-fs)/(fe-fs));
+      acc += FOLD_H; cur = fe;
+    }
+    return acc + (t-cur)*pxPerMin;
+  };
+  return {y, pxPerMin};
+}
+
+/* Folds are detected from the TRUE spans of events, never from their rendered
+   heights. An earlier pass inflated each event's end by the minimum-block floor
+   before looking for gaps — which, on a week-wide scale, stretched a 15-minute
+   nursery drop-off across ninety minutes and closed the very gap that was
+   supposed to fold. The fold and the floor are separate concerns and must stay
+   that way; the floor is a RENDERING minimum, not a claim about the day.
+
+   ⚠️ The pixel test is measured against the UNFOLDED scale, and this is the
+   whole ballgame. Measuring it against the folded scale is a runaway: every
+   fold raises the pixels-per-minute, which qualifies more gaps, which folds
+   more, which raises it again — a week with one honest fold came out chopped
+   into five, including two thirty-minute bands that saved nothing at all
+   (a 30px band replacing a 32px gap). Asking "how tall would this gap be if
+   we folded nothing?" is a fixed question with a stable answer. */
+function solve(all, availableH, minBlock, gapThreshold){
+  const windowS = Math.floor(Math.min(...all.map(e=>e.s))/5)*5;
+  const windowE = Math.ceil (Math.max(...all.map(e=>e.e))/5)*5;
+  const base  = buildScale(windowS, windowE, [], availableH);   /* nothing folded */
+  const byPx  = MAX_GAP_PX / base.pxPerMin;
+  const folds = findFolds(all, windowS, windowE, Math.max(20, Math.min(gapThreshold, byPx)));
+  const scale = buildScale(windowS, windowE, folds, availableH);
+  return {windowS, windowE, folds, ...scale};
+}
+
+function place(events, y, minBlock){
+  /* ⭐ TWO kinds of collision, and they want opposite answers.
+
+     A REAL overlap — the two events genuinely run at the same time — splits the
+     column and sits side by side. It must never push anything down: stacking a
+     real overlap cascades into every later block, and Thursday's dinner stopped
+     lining up with every other dinner. A grid whose y no longer means one time
+     is not a grid.
+
+     A FLOOR-INDUCED collision is two consecutive events five minutes apart, both
+     forced to the legible minimum height. They are not simultaneous and must not
+     be drawn as if they were — splitting these was what turned every week column
+     into unreadable slivers. They stack, and the push is small and honest
+     because the events really do follow one another. */
+  const b = events.map(e=>({...e, top:y(e.s), h:Math.max(minBlock, y(e.e)-y(e.s))}))
+                  .sort((p,q)=>p.s-q.s || q.e-p.e);
+
+  /* 1 — real overlaps, tested on TRUE times, share the column */
+  let i=0;
+  while(i<b.length){
+    let j=i, end=b[i].e;
+    while(j+1<b.length && b[j+1].s < end){ j++; end=Math.max(end,b[j].e); }
+    const cluster=b.slice(i,j+1), lanes=[];
+    for(const x of cluster){
+      let k=lanes.findIndex(t=>x.s>=t);
+      if(k===-1){k=lanes.length;lanes.push(0);}
+      lanes[k]=x.e; x.lane=k;
+    }
+    /* On a narrow column a 50/50 split leaves neither event readable, so the
+       LONGER one keeps the majority width and its title, and the shorter becomes
+       a sliver. Borrowed from Fantastical, whose overlap rule degrades what is
+       inside the block rather than the block itself. */
+    const span = cluster.map(x=>x.e-x.s);
+    for(const x of cluster){
+      x.weights = lanes.length===2
+        ? (span[0] >= span[1] ? [0.62,0.38] : [0.38,0.62])
+        : null;
+    }
+    for(const x of cluster) x.lanes=lanes.length;
+    i=j+1;
+  }
+
+  /* 2 — within one lane, nudge apart only what the height floor overlapped */
+  const byLane=new Map();
+  for(const x of b){ if(!byLane.has(x.lane)) byLane.set(x.lane,[]); byLane.get(x.lane).push(x); }
+  for(const lane of byLane.values()){
+    lane.sort((p,q)=>p.top-q.top);
+    let prev=-1e9;
+    for(const x of lane){ if(x.top < prev+3) x.top = prev+3; prev = x.top+x.h; }
+  }
+  return b;
+}
+
+/* A block held open by the height floor can end LATER than the fold that follows
+   it. Letting it bleed into the fold put a block on top of the one sentence that
+   explains the fold. So the fold is pushed down instead, and everything after it
+   moves with it — the axis, the rules, the now-line and every later block, all
+   through one shifted mapping. Nothing is ever drawn over the fold. */
+function settle(cols, folds, y, availableH){
+  const all = cols.flat();
+  const shifts = [];               /* {from, by} — cumulative, in time order */
+  const bands  = [];
+  let shift = 0;
+  for(const [fs,fe] of folds){
+    const before = all.filter(b=>b.s < fs).map(b=>b.top+b.h);
+    const want   = y(fs) + shift;
+    const actual = Math.max(want, before.length ? Math.max(...before)+4 : -1e9);
+    const delta  = actual - want;
+    if(delta) for(const b of all) if(b.s >= fe) b.top += delta;
+    shift += delta;
+    shifts.push({from:fe, by:shift});
+    bands.push({top:actual, s:fs, e:fe});
+  }
+  const Y = t => { let acc=0; for(const s of shifts) if(t >= s.from) acc = s.by; return y(t)+acc; };
+  return {bands, Y, total: Math.max(0, ...all.map(b=>b.top+b.h))};
+}
+
+function concertina(columns, availableH){
+  const all = columns.flat();
+  if(!all.length) return {cols:columns.map(()=>[]), bands:[], Y:()=>0,
+    windowS:mins('08:00'), windowE:mins('20:00'), ticks:[]};
+
+  /* ⚠️ The settle pass ADDS height, so a configuration that fits on paper can
+     overflow once folds are pushed clear of the blocks above them. Reacting to
+     that by folding harder was wrong — it exhausted every step and landed on the
+     most aggressive setting available, chopping a week that needed ONE fold into
+     five. The overflow is a budget problem, not a fold problem: lay out again
+     against a smaller budget and the same gentle fold survives. Only when the
+     budget genuinely cannot absorb it does the fold threshold tighten. */
+  let best=null;
+  outer:
+  for(const gap of GAP_STEPS){
+    for(const minB of MIN_STEPS){
+      let budget = availableH;
+      for(let k=0;k<5;k++){
+        const {windowS, windowE, folds, y} = solve(all, budget, minB, gap);
+        const cols = columns.map(c=>place(c, y, minB));
+        const {bands, Y, total} = settle(cols, folds, y, availableH);
+        best = {cols, bands, Y, windowS, windowE, gap, minB, total};
+        if(total <= availableH + 1) break outer;
+        const over = total - availableH;
+        if(budget - over < availableH*0.55) break;
+        budget -= Math.max(4, over);
+      }
+    }
+  }
+  const starts=[...new Set(all.map(e=>e.s))].sort((a,b)=>a-b);
+  const ticks=[]; let lastY=-99;
+  for(const s of starts){ const yy=best.Y(s); if(yy-lastY>=20){ticks.push({t:s,y:yy});lastY=yy;} }
+  best.ticks=ticks;
+  return best;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   3. RENDER
+   ══════════════════════════════════════════════════════════════════ */
+const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const colourOf = who => who.length===0 ? SHARED : (who.length===1 ? M[who[0]].color : SHARED);
+const faces = (who,lg) => who.map(k=>`<span class="face${lg?' lg':''}" style="background:${M[k].color}">${M[k].face}</span>`).join('');
+
+function blockHTML(b, colW, opts={}){
+  const gapPx = 3;
+  const lanes = b.lanes||1, lane = b.lane||0;
+  const wts = b.weights;
+  const laneW = colW * (wts ? wts[lane] : 1/lanes);
+  /* A block earns its detail line by the width it actually gets, not by the
+     width of the column — the second half of a collision is a different size. */
+  const wide   = laneW > 210;
+  const sliver = laneW < SLIVER_W;
+  const w = 100*(wts ? wts[lane] : 1/lanes);
+  const left = wts ? 100*(lane ? wts[0] : 0) : (100/lanes)*lane;
+  const c = colourOf(b.who);
+  const running = opts.showNow && b.s<=NOW && NOW<b.e;
+  /* dimming what has already happened is near-universal in this category and
+     is the cheapest way to make "what is left of today" the thing you read */
+  const past = opts.dimPast && b.e <= NOW;
+  const pct  = running ? Math.round(100*(NOW-b.s)/Math.max(1,b.e-b.s)) : 0;
+  return `<div class="blk${wide?'':' tight'}${sliver?' sliver':''}${b.h>90?' tall':''}${past?' past':''}${b.who.length===0?' dashed':''}"
+     style="top:${b.top}px;height:${b.h}px;left:calc(${left}% + ${lane?gapPx:0}px);
+            width:calc(${w}% - ${lanes>1?gapPx:0}px);border-left-color:${c};
+            ${running?`box-shadow:0 0 0 2px ${c}55, 0 2px 8px rgb(44 62 80 / 12%)`:''}">
+    <span class="bt" title="${esc(b.title)}"><span class="emoji">${b.emoji}</span>${sliver?'':esc(b.title)}</span>
+    ${wide && b.h>=46 ? `<span class="bm">${hhmm(b.s)}–${hhmm(b.e)}${b.who.length?' · '+b.who.map(k=>M[k].name).join(' & '):''}</span>`:''}
+    ${!sliver && b.who.length && b.h>=30 ? `<span class="faces">${faces(b.who)}</span>`:''}
+    ${running && laneW>=150 ? `<span class="nowtag">now</span>`:''}
+    ${running ? `<span class="prog" style="width:${pct}%;background:${c}"></span>`:''}
+  </div>`;
+}
+
+function gridHTML(cfg){
+  /* cfg: {columns:[{head, events}], height, wide, axisW, showNow, todayIdx} */
+  const L = concertina(cfg.columns.map(c=>c.events), cfg.height);
+  const n = cfg.columns.length, cw = 100/n;
+  const track = `grid-template-columns:repeat(${n},1fr)`;
+
+  const heads = cfg.columns.map((c,i)=>c.head(i===cfg.todayIdx)).join('');
+  /* An all-day item that every column carries is one thing, not n things. Five
+     lanes each saying "Term starts" is the same sentence read five times — and on
+     the bean lanes it is ALWAYS the same sentence, because an all-day event with
+     no owner belongs to the whole family. It spans instead. */
+  const first = cfg.columns[0]?.allDay || [];
+  const shared = n>1 ? first.filter(a=>cfg.columns.every(c=>(c.allDay||[]).some(x=>x.title===a.title))) : [];
+  const sharedT = new Set(shared.map(a=>a.title));
+  const own = cfg.columns.map(c=>(c.allDay||[]).filter(a=>!sharedT.has(a.title)));
+  const anyAllDay = shared.length || own.some(c=>c.length);
+  const allday = anyAllDay ? `<div class="adwrap">
+      <span class="adlab">all day</span>
+      <div class="allday" style="${track}">
+        ${shared.length?`<div style="grid-column:1 / -1">${shared.map(a=>
+          `<div class="ad shared"><span>${a.emoji}</span><span class="t">${esc(a.title)}</span>
+           <span class="everyone">everyone</span></div>`).join('')}</div>`:''}
+        ${own.some(c=>c.length)?cfg.columns.map((c,i)=>
+          `<div>${own[i].map(a=>`<div class="ad"><span>${a.emoji}</span><span class="t">${esc(a.title)}</span></div>`).join('')}</div>`
+        ).join(''):''}
+      </div></div>` : '';
+
+  const seps = Array.from({length:n-1},(_,i)=>`<div class="colsep" style="left:${cw*(i+1)}%"></div>`).join('');
+  const wash = cfg.todayIdx>=0 && n>1 ? `<div class="todaywash" style="left:${cw*cfg.todayIdx}%;width:${cw}%"></div>`:'';
+  const rules = L.ticks.map(t=>`<div class="rule" style="top:${t.y}px"></div>`).join('');
+  const foldBands = L.bands.map(f=>`<div class="fold" style="top:${f.top}px;height:${FOLD_H}px">
+      <i class="l"></i><i class="r"></i></div>`).join('');
+  const foldLabels = L.bands.map(f=>`<div class="foldlab" style="top:${f.top+FOLD_H/2}px">
+      <span>quiet until ${hhmm(f.e)}</span></div>`).join('');
+  const cols = L.cols.map((blocks,i)=>`<div class="col" style="left:${cw*i}%;width:${cw}%">
+      ${blocks.length?blocks.map(b=>blockHTML(b, cfg.pxWidth/n, {
+          /* the running-now treatment belongs to today's column only; the dimming
+             of what has already happened belongs to every column that IS today —
+             which on the bean lanes is all five of them */
+          showNow: cfg.showNow && (cfg.todayIdx<0 || i===cfg.todayIdx),
+          dimPast: cfg.dimPast && (cfg.todayIdx<0 || i===cfg.todayIdx),
+        })).join('')
+        :`<p class="empty">nothing on</p>`}
+    </div>`).join('');
+
+  const showNow = cfg.showNow && NOW>=L.windowS && NOW<=L.windowE;
+  const nowY = showNow ? L.Y(NOW) : 0;
+  const now = showNow ? `<div class="nowline" style="top:${nowY}px"></div>` : '';
+  const nowPill = showNow ? `<div class="nowpill" style="top:${nowY}px">now ${hhmm(NOW)}</div>` : '';
+
+  const axis = `<div class="axis">
+      ${L.ticks.map(t=>`<span class="lab" style="top:${t.y}px">${hhmm(t.t)}</span>`).join('')}
+      ${L.bands.map(f=>`<span class="foldtick" style="top:${f.top+FOLD_H/2}px">⌇</span>`).join('')}
+    </div>`;
+
+  return {
+    html:`<div class="tgrid" style="--axis-w:${cfg.axisW}px">
+      <div class="heads" style="${track}">${heads}</div>
+      ${allday}
+      <div class="plotwrap">
+        ${axis}
+        <div class="plot" data-measure="${cfg.key}">${wash}${rules}${foldBands}${seps}${cols}${foldLabels}${now}</div>
+        ${nowPill}
+      </div>
+      ${cfg.footer||''}
+    </div>`,
+    L
+  };
+}
+
+/* ── the three views ─────────────────────────────────────────────── */
+const DATA = () => BUSYMODE ? BUSY : QUIET;
+
+function dayHead(d){ return (isT)=>`<div class="head${isT?' is-today':''}">
+  <span class="dow">${d.dow}</span><span class="dnum">${d.num}</span></div>`; }
+
+function viewWeek(port){
+  const days = DATA();
+  const shown = port ? days.slice(0,3) : days;
+  const todayIdx = shown.findIndex(d=>d.today);
+  const key = 'week-'+ORIENT;
+  const g = gridHTML({
+    columns: shown.map(d=>({head:dayHead(d), events:d.ev, allDay:d.allDay})),
+    key, height:H(key, port?690:466), axisW: port?60:62, showNow:true, dimPast:true, todayIdx,
+    pxWidth: port ? 800-52-60 : 1280-52-62,
+  });
+  const rest = port ? `<div class="strip" style="grid-template-columns:repeat(4,1fr)">${
+    days.slice(3).map(d=>`<button><span class="sd">${d.dow}</span><span class="sn">${d.num}</span>
+      <span class="pips">${d.ev.slice(0,4).map(e=>`<i style="background:${colourOf(e.who)}"></i>`).join('')}</span></button>`).join('')
+  }</div>` : '';
+  return `<div class="main">${g.html}${rest}
+    <div class="slim">
+      <div><em>🍲</em>Chicken pie <b>· tonight</b></div>
+      <div><em>✅</em>Jobs <b>4 / 9</b></div>
+      <div><em>📝</em>Lists <b>2 open</b></div>
+      <div><em>✈️</em>Lisbon <b>· in 9 days</b></div>
+    </div></div>`;
+}
+
+function viewLanes(port){
+  const days = DATA();
+  const today = days.find(d=>d.today);
+  const beans = ['greg','sofia','leo','milo','theo'];
+  const forBean = k => today.ev.filter(e=>e.who.length===0 || e.who.includes(k));
+  const key = 'lanes-'+ORIENT;
+  const g = gridHTML({
+    columns: beans.map(k=>({
+      head:()=>`<div class="head bean"><span class="face lg" style="background:${M[k].color}">${M[k].face}</span>
+        <span><span class="nm">${M[k].name}</span><span class="ct">${forBean(k).length} today</span></span></div>`,
+      events: forBean(k), allDay: today.allDay,
+    })),
+    key, height:H(key, port?560:380), axisW:62, showNow:true, dimPast:true, todayIdx:-1,
+    pxWidth: (port?800:1280)-52-62,
+    footer:`<div class="jobswrap"><div class="jobsrow" style="grid-template-columns:repeat(5,1fr);--axis-w:62px">${
+      beans.map(k=>`<div class="jobscell"><h4>jobs · ${JOBS[k].filter(j=>j.d).length}/${JOBS[k].length}</h4>${
+        JOBS[k].map(j=>`<div class="jrow${j.d?' done':''}"><span class="tick">${j.d?'✓':''}</span><span class="jt">${esc(j.t)}</span></div>`).join('')
+      }</div>`).join('')}</div></div>`,
+  });
+  return `<div class="main">${g.html}
+    <div class="slim">
+      <div><em>🍲</em>Chicken pie <b>· tonight</b></div>
+      <div><em>📝</em>Lists <b>2 open</b></div>
+      <div><em>✈️</em>Lisbon <b>· in 9 days</b></div>
+    </div></div>`;
+}
+
+function viewToday(port){
+  const days = DATA();
+  const d = days[FOCUS];
+  const key = 'today-'+ORIENT;
+  const g = gridHTML({
+    columns:[{head:()=>'', events:d.ev, allDay:d.allDay}],
+    key, height:H(key, port?640:512), axisW:74, showNow:!!d.today, dimPast:!!d.today, todayIdx:0,
+    pxWidth: port ? 800-52-74 : 1280-52-286-14-74,
+  });
+  /* the head cell is empty here — the page header already names the day */
+  const grid = g.html.replace(/<div class="heads"[^>]*>[\s\S]*?<\/div>\s*(?=<div class="adwrap"|<div class="plotwrap")/,'');
+  const strip = `<div class="strip">${days.map((x,i)=>`<button aria-pressed="${i===FOCUS}" onclick="setFocus(${i})">
+      <span class="sd">${x.dow}</span><span class="sn">${x.num}</span>
+      <span class="pips">${x.ev.slice(0,4).map(e=>`<i style="background:${colourOf(e.who)}"></i>`).join('')}</span></button>`).join('')}</div>`;
+  const rail = `<div class="rail">
+      <div class="card"><h3>🍲 tonight</h3><div class="line">Chicken pie</div><div class="sub">Sofia is cooking · 18:30</div></div>
+      <div class="card"><h3>✅ jobs</h3><div class="line">4 of 9 done</div><div class="sub">Leo and Milo still have theirs</div></div>
+      <div class="card"><h3>📝 lists</h3><div class="line">Big shop · 6 left</div><div class="sub">Swim bag · 2 left</div></div>
+      <div class="card"><h3>✈️ next trip</h3><div class="line">Lisbon</div><div class="sub">Sat 12 Sept · 5 nights</div></div>
+    </div>`;
+  return port
+    ? `<div class="main">${grid}${strip}<div class="slim">
+        <div><em>🍲</em>Chicken pie</div><div><em>✅</em>4 / 9</div>
+        <div><em>📝</em>2 open</div><div><em>✈️</em>Lisbon</div></div></div>`
+    : `<div class="main">${grid}${strip}</div>${rail}`;
+}
+
+/* ── annotations ─────────────────────────────────────────────────── */
+const ANNOS = {
+  today:[
+    {x:96,y:300,w:250,h:36,ring:true},
+    {x:360,y:250,c:'up',t:'<em>the fold</em>Seven empty hours become one band that answers the question the gap poses. Nothing is hidden — there is nothing there.'},
+    {x:660,y:392,c:'lf',t:'<em>now</em>One orange rule across the whole grid. Are we late is answered without arithmetic.'},
+    {x:660,y:470,c:'lf',t:'<em>two at once</em>Football and swimming overlap, so they sit side by side. Two things at once look like two things at once.'},
+    {x:96,y:118,c:'dn',t:'<em>the axis</em>Only times that actually start something get a label. An hourly ruler is noise on a folded axis.'},
+  ],
+  lanes:[
+    {x:250,y:300,w:770,h:52,ring:true},
+    {x:250,y:214,c:'dn',t:'<em>why lanes gain most</em>One shared axis means 16:00 is the SAME line in every lane. Leo’s football and Milo’s swimming collide — and you can see nobody is free to drive both.'},
+    {x:1000,y:600,c:'rt',t:'<em>jobs stay put</em>Pinned below the grid, aligned to the same lanes. A child reads their column top to bottom: what I have on, then what I owe.'},
+  ],
+  week:[
+    {x:96,y:196,w:1130,h:34,ring:true},
+    {x:300,y:120,c:'dn',t:'<em>the fold is honest</em>Saturday’s 10:00 gala stops the weekday morning fold swallowing it. A stretch folds only when it is empty in EVERY column.'},
+    {x:96,y:264,c:'dn',t:'<em>the chips lose their clock</em>The axis carries the time, so no block prints 07:30. That reclaimed line is what makes seven columns readable.'},
+    {x:900,y:640,c:'rt',t:'<em>the band gave way</em>Meals, jobs, lists and travel collapsed to one strip so the grid could have the height. It expands again on a quiet week.'},
+  ],
+};
+
+/* The grid is laid out to a HEIGHT, and flexbox only knows that height after
+   the first paint. So render once with an estimate, measure the plot, and if
+   the estimate was wrong re-render with the truth. Guessing left a hundred
+   pixels of white space under the last event of the day. */
+const MEASURED = {};
+const H = (key, fallback) => MEASURED[key] || fallback;
+
+function render(again){
+  const port = ORIENT==='port';
+  const body = VIEW==='week'?viewWeek(port):VIEW==='lanes'?viewLanes(port):viewToday(port);
+  const d = DATA()[FOCUS];
+  const anno = (ANNOS[VIEW]||[]).map(a=>a.ring
+    ? `<div class="ring" style="left:${a.x}px;top:${a.y}px;width:${a.w}px;height:${a.h}px"></div>`
+    : `<div class="cal ${a.c}" style="left:${a.x}px;top:${a.y}px">${a.t}</div>`).join('');
+
+  document.getElementById('screen').innerHTML = `<div class="wall">
+    <div class="top">
+      <div>
+        <div class="today-date"><span class="dow">Thursday</span> 3 September</div>
+        <div class="top-sub">Term starts · Lisbon in 9 days · 4 of 9 jobs done</div>
+      </div>
+      <div class="topright">
+        <div class="clock"><div class="t">17:05</div><div class="saved"><i></i>saved 2 min ago</div></div>
+        <div class="vswitch">
+          <button aria-pressed="${VIEW==='week'}"  onclick="setView('week')">▦</button>
+          <button aria-pressed="${VIEW==='lanes'}" onclick="setView('lanes')">▤</button>
+          <button aria-pressed="${VIEW==='today'}" onclick="setView('today')">◉</button>
+          <span class="vsep"></span><button>✅</button>
+        </div>
+        <div class="lockbtn">🔒</div>
+      </div>
+    </div>
+    <div class="body">${body}</div>
+  </div>
+  <div class="anno">${anno}</div>`;
+
+  document.getElementById('frame').className = 'frame '+ORIENT;
+  document.body.classList.toggle('showanno', ANNO);
+  const notes = {
+    today:'<b>Today.</b> The view with room to breathe, so it gets the fullest expression: true proportional blocks, side-by-side overlaps, and the now-line as the hero. The week strip underneath moves this panel rather than opening a drawer over it, exactly as it does today.',
+    lanes:'<b>Bean lanes.</b> The view a time grid changes most. Today these are five unaligned stacks; on one shared axis, 16:00 is the same line in every lane — so a collision between two children’s clubs becomes a shape rather than something you work out. Jobs stay pinned below the grid.',
+    week:'<b>The week.</b> The hard one, and the one where the grid pays for itself: because the axis carries the time, a block no longer prints <code>07:30</code>, which buys back a whole line of text per event and makes seven columns readable. One continuous surface with column dividers, not seven separate cards — that is what lets a rule at 07:30 be a single line across the week.'
+  };
+  document.getElementById('viewnote').innerHTML = notes[VIEW];
+
+  if(!again){
+    const el = document.querySelector('[data-measure]');
+    if(el){
+      const h = Math.round(el.clientHeight), key = el.dataset.measure;
+      if(h > 40 && Math.abs((MEASURED[key]||0) - h) > 1){ MEASURED[key] = h; render(true); }
+    }
+  }
+}
+function setView(v){ VIEW=v; document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed', b.dataset.view===v)); render(); }
+function setFocus(i){ FOCUS=i; render(); }
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+document.querySelectorAll('[data-orient]').forEach(b=>b.onclick=()=>{
+  ORIENT=b.dataset.orient;
+  document.querySelectorAll('[data-orient]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.orient===ORIENT));
+  render();
+});
+document.getElementById('annoBtn').onclick=e=>{ ANNO=!ANNO; e.target.setAttribute('aria-pressed',ANNO); render(); };
+document.getElementById('busyBtn').onclick=e=>{ BUSYMODE=!BUSYMODE; e.target.setAttribute('aria-pressed',BUSYMODE); render(); };
+render();
+</script>

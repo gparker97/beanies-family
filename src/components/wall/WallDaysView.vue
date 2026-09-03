@@ -1,36 +1,42 @@
 <script setup lang="ts">
-import type { FamilyActivity } from '@/types/models';
 /**
- * View A — the week.
+ * View A — the week, on one shared time axis.
  *
  * Landscape: all seven days as columns. Portrait: three days as columns (NOT
- * stacked rows) with the rest as a tappable strip. Events always read
- * VERTICALLY, because down is how time reads; wrapping a day into a horizontal
- * grid destroys the "what's next" scan this whole surface exists for.
+ * stacked rows) with the rest as a tappable strip.
  *
- * Days are CAPPED and overflow into a "+N more" button rather than being
- * clipped by `overflow: hidden`. A silently truncated column is the worst
- * failure this screen can have — the family believes they have seen the day.
+ * This is the view where the grid pays for itself. Because the axis carries the
+ * time, a block no longer prints `07:30` — and that reclaimed line of text per
+ * event is what makes seven columns readable at tablet width. It also means a
+ * rule drawn at 07:30 is ONE line across the whole week, so "the 8am crunch" is
+ * a shape you see rather than seven times you read.
+ *
+ * Nothing truncates any more: the grid fits the day by folding empty stretches
+ * and, in the last resort, by squeezing — so the old `+N more` button and its
+ * cap have gone. A silently truncated column was the worst failure this screen
+ * could have, and now it cannot happen.
  */
 import { computed } from 'vue';
-import WallEventChip from '@/components/wall/WallEventChip.vue';
+import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { useActivityStore } from '@/stores/activityStore';
-import { useTranslation } from '@/composables/useTranslation';
-import { fillTemplate } from '@/utils/fillTemplate';
-import { wallEvents } from '@/utils/wallActivities';
+import { computeAllDaySpans } from '@/utils/allDaySpans';
+import { wallDayAllDay, wallEvents, wallPeripheralVariant } from '@/utils/wallActivities';
+import { dayOfMonth, weekdayShort } from '@/utils/date';
+import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import type { FamilyActivity } from '@/types/models';
 import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 
 // The page renders all four views through one `<component :is>` with a single
-// prop bag, so every view receives props it does not declare. Without this they
-// would land on the root element as stray DOM attributes.
+// prop bag, so every view receives props it does not declare.
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
   weekDays: string[];
   todayYmd: string;
   portrait: boolean;
+  now: Date;
   todosFor: (memberId: string) => WallJob[];
   unassignedTodos: WallJob[];
   listsFor: (memberId: string) => WallListGroup[];
@@ -44,32 +50,16 @@ const emit = defineEmits<{
 }>();
 
 const activityStore = useActivityStore();
-const { t } = useTranslation();
-
-/** Columns here are DAYS, not bean lanes, so nothing names an owner — every one shows. */
-function identityOf(activity: FamilyActivity) {
-  return identityFor(activity);
-}
-
-/** The dot pips still need a single colour. */
-function colourFor(activity: FamilyActivity) {
-  return identityFor(activity).color;
-}
+const { identityFor } = useActivityIdentity();
 
 /** Portrait cannot hold seven readable columns; three plus a strip is the honest fit. */
 const visible = computed(() => (props.portrait ? props.weekDays.slice(0, 3) : props.weekDays));
 const rest = computed(() => (props.portrait ? props.weekDays.slice(3) : []));
-/** Three wide columns fit more rows than seven narrow ones. */
-const cap = computed(() => (props.portrait ? 8 : 6));
 
 /**
  * One expansion per day, memoised in a computed — NOT a function the template
- * calls repeatedly.
- *
- * `activitiesForDate` expands a whole MONTH of recurrences and then filters to
- * the one day. The template asks each column three times (the chips, the
- * overflow count, the empty state), so seven columns cost ~21 month-expansions
- * per render — on a screen that re-renders every 20s, forever, on a tablet.
+ * calls repeatedly. `activitiesForDate` expands a whole MONTH of recurrences and
+ * then filters to the one day, on a screen that re-renders every 20s forever.
  */
 const eventsByDay = computed(() => {
   const map = new Map<string, ReturnType<typeof wallEvents>>();
@@ -78,94 +68,89 @@ const eventsByDay = computed(() => {
   }
   return map;
 });
-
 function eventsFor(ymd: string) {
   return eventsByDay.value.get(ymd) ?? [];
 }
-function shownFor(ymd: string) {
-  return eventsFor(ymd).slice(0, cap.value);
-}
-function overflowFor(ymd: string) {
-  return Math.max(0, eventsFor(ymd).length - cap.value);
-}
-function dayLabel(ymd: string) {
-  return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
-}
-function dayNumber(ymd: string) {
-  return new Date(`${ymd}T00:00:00`).getDate();
-}
-/** Times are already stored as display-ready HH:mm; all-day items have none. */
-function timeLabel(entry: { activity: { startTime?: string } }) {
-  return entry.activity.startTime || t('planner.allDay');
-}
 
-const { identityFor } = useActivityIdentity();
+const gridColumns = computed(() =>
+  visible.value.map((ymd) => ({
+    key: ymd,
+    // Timed only — the all-day items go to the band, via `wallDayAllDay`. All
+    // three views pass the same shape, so the grid's contract does not vary.
+    occurrences: eventsFor(ymd).filter((e) => !e.activity.isAllDay),
+    isToday: ymd === props.todayYmd,
+  }))
+);
+
+/**
+ * ⚠️ BOTH halves of `computeAllDaySpans` are required. `spans` is multi-day ONLY;
+ * every single-day all-day item — a birthday, an INSET day, bin night — is in
+ * `singleByDate`. Passing `spans` alone would drop all of those from this view
+ * entirely: they are not timed, so they never reach the plot either. See
+ * `wallDayAllDay` and its test.
+ */
+const allDaySpans = computed(() => {
+  const occurrences = visible.value.flatMap((ymd) => eventsFor(ymd));
+  const result = computeAllDaySpans(
+    occurrences.map((o) => ({ activity: o.activity, date: o.date })),
+    visible.value.map((dateStr) => ({ dateStr }))
+  );
+  return wallDayAllDay(result, visible.value, (activity, ymd) => ({ activity, date: ymd }));
+});
+
+/** Content-derived, never layout-derived — see `wallPeripheralVariant`. */
+const busiest = computed(() => Math.max(0, ...visible.value.map((ymd) => eventsFor(ymd).length)));
+const peripheralVariant = computed(() =>
+  wallPeripheralVariant('band', busiest.value, props.portrait)
+);
+
+/** The rest-of-week strip still needs a colour per pip. */
+function colourFor(activity: FamilyActivity) {
+  return identityFor(activity).color;
+}
 </script>
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-2.5">
+    <!-- day headers, on the same column track as the plot below -->
     <div
-      class="grid min-h-0 flex-1 gap-2.5"
-      :style="{ gridTemplateColumns: `repeat(${visible.length}, 1fr)` }"
+      class="grid shrink-0 gap-0"
+      :style="{
+        paddingLeft: `${AXIS_WIDTH_PX}px`,
+        gridTemplateColumns: `repeat(${visible.length}, 1fr)`,
+      }"
     >
-      <div
+      <button
         v-for="ymd in visible"
         :key="ymd"
-        class="flex min-h-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)] dark:bg-slate-800"
-        :class="ymd === todayYmd ? 'ring-[3px] ring-[var(--heritage-orange)]' : ''"
+        type="button"
+        class="rounded-t-2xl px-2 py-1.5 text-center"
+        :class="
+          ymd === todayYmd
+            ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
+            : 'text-secondary-500 dark:text-gray-100'
+        "
+        @click="emit('openDay', ymd)"
       >
-        <button
-          type="button"
-          class="w-full px-3 py-2 text-center"
-          :class="
-            ymd === todayYmd
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
-              : 'border-b border-[rgba(44,62,80,0.06)] dark:border-slate-700'
-          "
-          @click="emit('openDay', ymd)"
-        >
-          <span class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70">
-            {{ dayLabel(ymd) }}
-          </span>
-          <span class="font-outfit wall-dnum block leading-none font-extrabold">
-            {{ dayNumber(ymd) }}
-          </span>
-        </button>
-        <!--
-          `overflow-y-auto`, not `hidden`: the cap is a fixed COUNT, not a
-          measured fit, so on a 4:3 tablet, with two-line titles, or under Large
-          text size the last chips and the "+N more" button itself can still be
-          pushed out. Scrolling keeps them reachable rather than silently gone.
-        -->
-        <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
-          <WallEventChip
-            v-for="entry in shownFor(ymd)"
-            :key="entry.activity.id + entry.date"
-            :activity="entry.activity"
-            :identity="identityOf(entry.activity)"
-            :time="timeLabel(entry)"
-            @open="
-              emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
-            "
-          />
-          <button
-            v-if="overflowFor(ymd)"
-            type="button"
-            class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2 py-1.5 font-bold"
-            @click="emit('openDay', ymd)"
-          >
-            {{ fillTemplate(t('wall.card.more'), { count: overflowFor(ymd) }) }}
-            <span aria-hidden="true">›</span>
-          </button>
-          <p
-            v-if="!eventsFor(ymd).length"
-            class="font-caveat m-auto text-[var(--muted-text,#4d5d6c)] opacity-70"
-          >
-            {{ t('wall.day.nothingOn') }}
-          </p>
-        </div>
-      </div>
+        <span class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70">
+          {{ weekdayShort(ymd) }}
+        </span>
+        <span class="font-outfit wall-dnum block leading-tight font-extrabold">
+          {{ dayOfMonth(ymd) }}
+        </span>
+      </button>
     </div>
+
+    <WallTimeGrid
+      :columns="gridColumns"
+      :all-day-spans="allDaySpans"
+      :now="now"
+      :dim-past="true"
+      :show-now="true"
+      :axis-width="AXIS_WIDTH_PX"
+      view-id="days"
+      @open="emit('open', $event)"
+    />
 
     <!-- portrait only: the rest of the week, tappable -->
     <div
@@ -183,7 +168,7 @@ const { identityFor } = useActivityIdentity();
         <span
           class="font-outfit text-secondary-500 wall-rest-day font-bold uppercase dark:text-gray-100"
         >
-          {{ dayLabel(ymd) }} {{ dayNumber(ymd) }}
+          {{ weekdayShort(ymd) }} {{ dayOfMonth(ymd) }}
         </span>
         <span class="ml-auto flex gap-1" aria-hidden="true">
           <i
@@ -202,7 +187,7 @@ const { identityFor } = useActivityIdentity();
     </div>
 
     <WallPeripheralCards
-      variant="band"
+      :variant="peripheralVariant"
       :portrait="portrait"
       :meals-ymd="todayYmd"
       :todos-for="todosFor"
