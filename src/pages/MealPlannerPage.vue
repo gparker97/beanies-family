@@ -6,6 +6,7 @@
  * day/week share. All CRDT work goes through mealPlanStore (MVO).
  */
 import { ref, computed, nextTick, onMounted } from 'vue';
+import { resolveMemberColor } from '@/constants/memberColors';
 import RecipeRail from '@/components/mealplan/RecipeRail.vue';
 import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
 import MealDayStack from '@/components/mealplan/MealDayStack.vue';
@@ -173,6 +174,15 @@ async function clearDay(date: string) {
   const ok = await confirm({
     title: 'mealPlanner.clear.dayTitle',
     message: 'mealPlanner.clear.dayMessage',
+    // NAMES THE DAY. Seven identical ✕ buttons sit across the board and the copy is
+    // "Clear this day?" — so the confirm could not tell you which column was about to be
+    // wiped, and the wrong one is unrecoverable. `detail` is a plain string by contract,
+    // which is why the date is formatted here rather than interpolated into a key.
+    detail: new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }),
     variant: 'danger',
     confirmLabel: 'mealPlanner.clear.confirmLabel',
   });
@@ -180,9 +190,19 @@ async function clearDay(date: string) {
 }
 
 // ── Share / export the week ──────────────────────────────────────────────────
-function cook(id?: string): { name: string; color?: string } | undefined {
+function cook(id?: string): { name: string; color?: string; initial?: string } | undefined {
   const m = id ? familyStore.members.find((mm) => mm.id === id) : undefined;
-  return m ? { name: m.name, color: m.color } : undefined;
+  if (!m) return undefined;
+  return {
+    name: m.name,
+    // `resolveMemberColor`, not the raw field: a member with no colour set was falling
+    // through to the export's own `|| '#2C3E50'`, so two colourless cooks rendered
+    // identical Deep Slate discs in every cell AND in the legend.
+    color: resolveMemberColor(m.color),
+    // Roster-wide collision map — the same source the on-screen card uses. The printed
+    // chip carries no name, so on a mono printer this letter is all that is left.
+    initial: familyStore.initialsById.get(m.id),
+  };
 }
 
 // Resolver object handed to `buildMealExportRows` so a meal is named/attributed

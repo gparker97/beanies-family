@@ -11,6 +11,7 @@ import MealCard from './MealCard.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useMealDrag } from '@/composables/useMealDrag';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 const props = defineProps<{ date: string; mealSlot: MealSlot; meals: MealPlanEntry[] }>();
@@ -35,7 +36,33 @@ const isOver = ref(false);
  * `isEmpty` decides how LOUD it is, not whether it exists — a full-height dashed panel is
  * an invitation on an empty slot and clutter under a meal that is already planned.
  */
+/**
+ * How LOUD the add button is, not whether it exists.
+ *
+ * Two earlier mistakes are corrected here. The compact branch was `opacity-55` on a 24px
+ * box, which composited the ink to about 1.5:1 and put its only recovery behind `hover` —
+ * on the touch surface this change was made for. And `snack` regressed: it was the ONE
+ * slot that already allowed multi-add, so a filled snack cell used to get the full panel
+ * and this demoted it to the faded stub. Both branches now keep full contrast and a 44px
+ * target; the compact one is simply narrower.
+ */
 const isEmpty = computed(() => props.meals.length === 0);
+
+/**
+ * Every add button announced the same "Add a meal", and there are 28 of them on the board —
+ * one indistinguishable name, 28 times, for a screen-reader user. Naming the slot and the
+ * day is what makes them tellable apart.
+ */
+const addLabel = computed(() =>
+  fillTemplate(t('mealPlanner.addMealTo'), {
+    slot: t(`mealPlanner.slot.${props.mealSlot}`),
+    day: new Date(`${props.date}T00:00:00`).toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }),
+  })
+);
 
 function onDragOver(e: DragEvent): void {
   if (!dragged.value) return;
@@ -85,11 +112,9 @@ async function onDrop(): Promise<void> {
          space droppable (it inherits the root's drag handlers). -->
     <button
       type="button"
-      class="font-outfit flex items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.42)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] dark:border-slate-600 dark:text-slate-500"
-      :class="
-        isEmpty ? 'min-h-[2.75rem] flex-1' : 'min-h-[1.5rem] shrink-0 opacity-55 hover:opacity-100'
-      "
-      :aria-label="t('mealPlanner.addMeal')"
+      class="font-outfit flex min-h-[2.75rem] items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.55)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:border-[#F15D22] focus-visible:text-[#F15D22] dark:border-slate-600 dark:text-slate-400"
+      :class="isEmpty ? 'flex-1' : 'shrink-0'"
+      :aria-label="addLabel"
       @click="emit('addMeal', date, mealSlot)"
     >
       ＋
