@@ -14,6 +14,7 @@ relatedPosts:
   - japan-trip-with-my-son
   - getting-your-beans-in-a-row
   - my-life-could-use-some-helpful-hints
+  - mommy-whats-for-dinner-tonight
 tags:
   - family-organization
   - routines
