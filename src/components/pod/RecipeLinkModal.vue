@@ -20,7 +20,7 @@ import { nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import AiSourceButtons from '@/components/ai/AiSourceButtons.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecipeLinkInput } from '@/composables/useRecipeLinkInput';
 
@@ -94,36 +94,8 @@ function handleSave(): void {
     </FormFieldGroup>
 
     <!-- Secondary sources. Deliberately quieter than the field above: a hairline divider,
-         no fill, muted text. Available in one tap, but never competing with the link. -->
-    <div class="mt-6">
-      <div class="flex items-center gap-3">
-        <span class="h-px flex-1 bg-[var(--divider,rgba(44,62,80,0.08))]"></span>
-        <span
-          class="font-outfit text-secondary-500/50 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
-        >
-          {{ t('recipeExtract.link.orFrom') }}
-        </span>
-        <span class="h-px flex-1 bg-[var(--divider,rgba(44,62,80,0.08))]"></span>
-      </div>
-
-      <div class="mt-3 grid grid-cols-2 gap-2.5">
-        <button
-          type="button"
-          class="font-outfit text-secondary-500 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 text-sm font-semibold transition-colors hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-200"
-          @click="emit('camera')"
-        >
-          <BeanieIcon name="camera" size="sm" class="opacity-60" />
-          <span class="truncate">{{ t('ai.picker.takePhoto') }}</span>
-        </button>
-        <button
-          type="button"
-          class="font-outfit text-secondary-500 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 text-sm font-semibold transition-colors hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-200"
-          @click="emit('file')"
-        >
-          <BeanieIcon name="image" size="sm" class="opacity-60" />
-          <span class="truncate">{{ t('ai.picker.chooseFile') }}</span>
-        </button>
-      </div>
-    </div>
+         no fill, muted text. Available in one tap, but never competing with the link.
+         Shared with the magic-beans sheet (#84) — see `AiSourceButtons`. -->
+    <AiSourceButtons @camera="emit('camera')" @file="emit('file')" />
   </BeanieFormModal>
 </template>

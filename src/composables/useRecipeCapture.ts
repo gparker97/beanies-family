@@ -35,6 +35,7 @@ import {
   type RecipePrefill,
 } from '@/utils/recipeExtractionToRecipe';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
 import type { ConsentGrant } from './useDocumentConsent';
@@ -64,6 +65,9 @@ export interface UseRecipeCaptureOptions {
 
 export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const { tier, byokConfig } = useAiCapability();
+  // Family id for the proxy's per-family rate limit (#83). Read here rather than in the AI
+  // service, which is deliberately store-free.
+  const familyContextStore = useFamilyContextStore();
   const { isOnline } = useOnline();
   const { showToast } = useToast();
   const { t } = useTranslation();
@@ -144,15 +148,26 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       showToast('info', t('ai.pdfTruncated.title'), t('ai.pdfTruncated.message'));
     }
 
-    // A share did its reading in the orchestrator, so it never passed through the `start`
-    // that `processFile`/`processUrl` log before their await. Log it here instead, so this
-    // surface's start/ready pair still balances and a delivery regression stays visible.
-    if (env.origin === 'share') {
+    // A capture read by the ORCHESTRATOR — a share, or the in-app magic-beans button (#84) —
+    // never passed through the `start` that `processFile`/`processUrl` log before their
+    // await. Log it here instead, so this surface's start/ready pair still balances and a
+    // delivery regression stays visible.
+    //
+    // ⚠️ Tests for PRESENCE, not `=== 'share'`. This read `env.origin === 'share'` until #84
+    // widened the field: left as it was, an in-app capture would have silently stopped being
+    // compensated and the pair would have quietly gone out of balance again — the exact
+    // failure this block exists to prevent, reintroduced by the change that added a second
+    // orchestrated door. `detail` names WHICH door, so the two remain separable.
+    if (env.origin) {
       logEvent({
         level: 'info',
         surface: SURFACE,
         message: 'capture started',
-        context: { action: 'start', kind: env.link?.kind ?? 'document', detail: 'share' },
+        context: {
+          action: 'start',
+          kind: env.link?.kind ?? 'document',
+          detail: env.origin,
+        },
       });
     }
 
@@ -252,6 +267,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         todayIso: toDateInputValue(new Date()),
         byok: byokConfig.value ?? undefined,
         grant,
+        familyId: familyContextStore.activeFamilyId ?? undefined,
       });
 
       if (!result.success || !result.data) {
@@ -364,6 +380,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             todayIso: toDateInputValue(new Date()),
             byok: byokConfig.value ?? undefined,
             grant,
+            familyId: familyContextStore.activeFamilyId ?? undefined,
           });
           if (!result.success || !result.data) {
             logEvent({

@@ -65,6 +65,17 @@ export interface ExtractOptions {
    * an ungated extraction a compile error rather than a review catch.
    */
   grant: ConsentGrant;
+  /**
+   * Which family this extraction is for, so the managed proxy can rate-limit per family
+   * (#83). Optional: BYOK and on-device ignore it, and an absent id degrades to the proxy's
+   * IP limit rather than failing.
+   *
+   * Passed as an OPTION rather than read from a store on purpose. This module is deliberately
+   * store-free — `grep -rn "from '@/stores/" src/services/ai/` returns nothing — and calling
+   * `useFamilyStore()` here would put app state into the one AI module that has none and make
+   * every existing test in this service require a Pinia instance.
+   */
+  familyId?: string;
 }
 
 function selectProvider(opts: ExtractOptions): ExtractionProvider {
@@ -237,6 +248,7 @@ async function runWithSource<T extends ExtractionTask>(
     source,
     todayIso: opts.todayIso,
     signal: opts.signal,
+    familyId: opts.familyId,
   };
   try {
     const data = await provider.run(task, request);
@@ -311,11 +323,24 @@ export function extractShareFromDocuments(
 }
 
 /**
- * Classify AND extract a shared LINK's already-fetched text in ONE call (#64 links).
+ * Classify AND extract already-fetched or shared TEXT in ONE call (#64 links, #83 text).
  *
- * The text comes from `content-fetch` (a reduced page, or a video's description) behind its
- * SSRF guard — never a raw user string, and never the bare URL: the model cannot fetch, and
- * `youtu.be/dQw4w9` tells it nothing. Always resolves with a classified outcome.
+ * ⚠️ The text is UNTRUSTED, and since #83 it is no longer even provenance-bounded. It is
+ * EITHER a page/video description fetched by `content-fetch` behind its SSRF guard, OR raw
+ * text a person supplied directly — selected in another app and shared in, or pasted into the
+ * magic-beans sheet inside beanies (#84). This JSDoc used
+ * to promise "never a raw user string"; that guarantee was traded, deliberately and once, for
+ * the rate limiting that replaced it (`docs/adr/035-plain-text-share-provenance.md`).
+ *
+ * What still holds, and is what makes the trade safe:
+ *   - the prompt builder fences the text in untrusted-content markers and instructs the model
+ *     to ignore instructions inside it (`extractionPrompt.ts` → `buildUserMessage`);
+ *   - the caller bounds the length before it gets here;
+ *   - nothing is persisted without the user confirming it in a review modal;
+ *   - the proxy throttles per family and per IP.
+ *
+ * Never the bare URL: the model cannot fetch, and `youtu.be/dQw4w9` tells it nothing.
+ * Always resolves with a classified outcome.
  */
 export function extractShareFromText(
   text: string,

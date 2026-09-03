@@ -99,6 +99,8 @@ If the DPA gate fails, the managed engine switches to **Gemini Flash-Lite (via V
 
   > **Correction (2026-08-25, #72 security pass).** Earlier revisions of this ADR and of `managedProvider.ts` described the proxy as rate-limiting **per family**. It does not, and never did. The only limit is a **global API-Gateway route throttle** (`POST /ai-extract`, burst 5 / rate 2 — `infrastructure/modules/registry/main.tf`), shared across all callers, keyed on nothing. Any future claim of per-family limiting must be built before it is written down.
 
+  > **Superseded (2026-09-03, #83 — see [ADR-035](035-plain-text-share-provenance.md)).** Per-family limiting has now been **built**, so the correction above is itself out of date. The proxy applies a per-family (80/hour) and per-IP (120/hour) limit on **text sources**, on top of the route throttle, which remains as the backstop. This was not an enhancement: it is what replaces the text arm's **provenance guarantee** — that arm used to carry only content `content-fetch` had fetched behind its SSRF guard, and since #83 it also carries raw text a person shared from another app. ADR-035 records the trade, its limits, and the fail-open posture that comes with it.
+
 - The managed tier is a billable third-party dependency (cost + rotation + abuse surface); Tinfoil's exact Qwen-VL $/M is likely a premium over RedPill/Gemini (still sub-cent/doc — confirm from dashboard).
 - The strong privacy claim depends on **integrating Tinfoil's verification SDK + EHBP** — until shipped + verified, claims stay scoped to "attested confidential compute + zero retention."
 - On-device multimodal is deferred; the wedge depends on the cloud tier until in-browser VLMs mature.

@@ -24,6 +24,8 @@ vi.mock('@/composables/useQuickAdd', () => ({
   closeSheetForNavigation: h.closeSheetForNavigation,
   hasSheetHistoryMarker: () => h.hasMarker.value,
 }));
+const reportError = vi.fn();
+vi.mock('@/utils/errorReporter', () => ({ reportError: (e: unknown) => reportError(e) }));
 vi.mock('@/router', () => ({
   default: {
     currentRoute: {
@@ -38,11 +40,12 @@ vi.mock('@/router', () => ({
 
 import {
   useMagicReader,
-  openPhotoReader,
   openDocumentReader,
   consumePendingMagic,
+  dispatchSharePayload,
   pendingMagicReader,
 } from '@/composables/useMagicReader';
+import type { SharePayload } from '@/types/magicPayload';
 
 /** Clear the module singleton between tests (matches either surface → null). */
 function resetPending(): void {
@@ -122,32 +125,31 @@ describe('useMagicReader — gating', () => {
 });
 
 describe('useMagicReader — dispatch', () => {
-  it('openPhotoReader records the request, closes the sheet for navigation, and pushes /activities', () => {
-    openPhotoReader();
-    expect(pendingMagicReader.value).toBe('photo');
-    expect(h.closeSheetForNavigation).toHaveBeenCalledOnce();
-    expect(h.routerPush).toHaveBeenCalledWith('/activities');
-  });
-
-  it('openDocumentReader routes to /travel', () => {
+  // ⚠️ These assert `openReader`'s sheet/history discipline, and they were driven by
+  // `openPhotoReader` until #84 deleted it along with the three magic chips. The discipline
+  // itself is unchanged and still reachable: `openDocumentReader` survives (`VacationStep1`)
+  // and runs the identical `openReader` path. RE-POINTED rather than deleted — losing this
+  // coverage is how the FAB's cross-page history race comes back.
+  it('openDocumentReader records the request, closes the sheet for navigation, and pushes /travel', () => {
     openDocumentReader();
     expect(pendingMagicReader.value).toBe('document');
+    expect(h.closeSheetForNavigation).toHaveBeenCalledOnce();
     expect(h.routerPush).toHaveBeenCalledWith('/travel');
   });
 
   it('REPLACES (not pushes) the sheet-marker entry when launched cross-page from the FAB — no history.back() race', () => {
     h.hasMarker.value = true; // sheet was opened → marker on the stack
-    openPhotoReader();
-    expect(h.routerReplace).toHaveBeenCalledWith('/activities');
+    openDocumentReader();
+    expect(h.routerReplace).toHaveBeenCalledWith('/travel');
     expect(h.routerPush).not.toHaveBeenCalled();
     // closeQuickAdd (which would call history.back()) must NOT run on the cross-page path
     expect(h.closeQuickAdd).not.toHaveBeenCalled();
   });
 
   it('when already on the target route, pops the sheet via closeQuickAdd and does not navigate', () => {
-    h.currentPath.value = '/activities';
-    openPhotoReader();
-    expect(pendingMagicReader.value).toBe('photo');
+    h.currentPath.value = '/travel';
+    openDocumentReader();
+    expect(pendingMagicReader.value).toBe('document');
     expect(h.closeQuickAdd).toHaveBeenCalledOnce();
     expect(h.routerPush).not.toHaveBeenCalled();
     expect(h.routerReplace).not.toHaveBeenCalled();
@@ -157,33 +159,83 @@ describe('useMagicReader — dispatch', () => {
 describe('consumePendingMagic', () => {
   it('runs the handler and clears the ref when the surface matches and the gate is open', () => {
     const handler = vi.fn();
-    openPhotoReader();
-    consumePendingMagic('photo', handler, true);
+    openDocumentReader();
+    consumePendingMagic('document', handler, true);
     expect(handler).toHaveBeenCalledOnce();
     expect(pendingMagicReader.value).toBeNull();
   });
 
   it('clears the ref WITHOUT running the handler when the gate is closed', () => {
     const handler = vi.fn();
-    openPhotoReader();
-    consumePendingMagic('photo', handler, false);
+    openDocumentReader();
+    consumePendingMagic('document', handler, false);
     expect(handler).not.toHaveBeenCalled();
     expect(pendingMagicReader.value).toBeNull();
   });
 
   it('no-ops when the surface does not match (leaves the ref for the right page)', () => {
     const handler = vi.fn();
-    openPhotoReader();
-    consumePendingMagic('document', handler, true);
+    openDocumentReader();
+    consumePendingMagic('photo', handler, true);
     expect(handler).not.toHaveBeenCalled();
-    expect(pendingMagicReader.value).toBe('photo');
+    expect(pendingMagicReader.value).toBe('document');
   });
 
   it('is idempotent — a second consume after the first finds nothing', () => {
     const handler = vi.fn();
-    openPhotoReader();
-    consumePendingMagic('photo', handler, true);
-    consumePendingMagic('photo', handler, true);
+    openDocumentReader();
+    consumePendingMagic('document', handler, true);
+    consumePendingMagic('document', handler, true);
     expect(handler).toHaveBeenCalledOnce();
+  });
+});
+
+// ─── The dropped-payload reports (#84) ───────────────────────────────────────
+//
+// These two `reportError`s are the ONLY signal that says "the AI call was billed and the
+// result vanished". Before #84 they hardcoded the share surface, so an in-app capture's
+// dropped payload pointed at the wrong door — on the one report where that matters most.
+
+describe('a dropped payload is reported against the door it came in by', () => {
+  function payloadFrom(origin: 'share' | 'in-app'): SharePayload {
+    return {
+      kind: 'travel',
+      data: { isTravel: true, tripName: 'T', segments: [] },
+      env: { sourceFile: null, origin },
+    } as unknown as SharePayload;
+  }
+
+  it('files an IN-APP capture on the in-app surface', () => {
+    dispatchSharePayload(payloadFrom('in-app'));
+    consumePendingMagic('document', vi.fn(), false); // gate closed → payload dropped
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'magic-beans-capture',
+        context: expect.objectContaining({ detail: 'in-app' }),
+      })
+    );
+  });
+
+  it('files a SHARE on the share surface', () => {
+    dispatchSharePayload(payloadFrom('share'));
+    consumePendingMagic('document', vi.fn(), false);
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'share-target-ingest',
+        context: expect.objectContaining({ detail: 'share' }),
+      })
+    );
+  });
+
+  it('does NOT report when a payload-less opener is dropped', () => {
+    // An opener at a gated affordance is expected — there is nothing to lose.
+    openDocumentReader();
+    // `resetPending()` in beforeEach drains any payload the previous test left, and that
+    // drain legitimately reports — so clear after arranging, not before.
+    reportError.mockClear();
+    consumePendingMagic('document', vi.fn(), false);
+    expect(reportError).not.toHaveBeenCalled();
   });
 });
