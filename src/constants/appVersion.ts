@@ -20,4 +20,15 @@
  * `getFullVersionLabel`). Bump this constant as the first step of a prod release so
  * the shown version never goes stale the way the old hardcoded "v1.0.0 - MVP" did.
  */
-export const APP_VERSION = '0.15R3';
+// ⚠️ AN `R<n>` SUFFIX CANNOT REACH THE APP STORE TWICE WITHIN ONE BASE VERSION.
+//
+// `scripts/derive-store-version.mjs` strips `R<n>` because iOS
+// `CFBundleShortVersionString` must be at most three dot-separated integers — so `0.15`,
+// `0.15R1`, `0.15R2` and `0.15R3` are all the SAME version number to Apple. The 0.15R3
+// release failed at upload with "The version number has been previously used" because 0.15
+// was already taken, and no retry could have fixed it.
+//
+// The web and Play accept any `R<n>` freely (Play keys on `versionCode`), so an R revision is
+// fine for a web-only or Play-only ship. **If a release is going to the App Store, use a new
+// numeric version** (`0.15.1`, not `0.15R3`).
+export const APP_VERSION = '0.15.1';
