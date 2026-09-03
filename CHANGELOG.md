@@ -25,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - On the printed meal plan, a cook whose initial is shared with someone else now fits their chip properly, and the key at the foot shows the same letters as the meals above it.
 - The key at the foot of the printed plan no longer lists serve times and guests when nothing on that week uses them.
 - The meals card on your nook now shows an icon for eat out, leftovers and skip, and a bean's face rather than a plain letter.
+- The site said beanies was MIT licensed in five places, including the terms page. It is AGPL-3.0 with the Commons Clause, and the terms now describe what that actually allows: run it, fork it, self-host it, share your changes, but do not sell it.
 
 ---
 

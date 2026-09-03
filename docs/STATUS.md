@@ -454,6 +454,24 @@
 >
 > Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
 
+> **Last updated:** 2026-09-03 (SESSION 3 — **BLOG ONLY. Post #57 staged on `main`, NOT deployed. A parallel session was running; this session touched only blog + licence files.**)
+>
+> **1. Post #57 "mommy, what's for dinner tonight?"** (`30410c38`) — the meal planner + AI recipe reader, framed on the hero-parent/SPOF argument. Staged for 2026-09-04, `draft: false`. `deploy-web.yml` is `workflow_dispatch` only, so it is on `main` and invisible until dispatched. **Notion is the golden source and IS in sync** — verified by re-fetching the page blocks and diffing: 5 links identical, all 25 paragraphs verbatim.
+>
+> ⚠️ **The `mcp__notion__API-update-a-block` MCP tool cannot write block content** — its `type` parameter never reaches the request body, so every call 400s with `body.paragraph should be defined`. Both plausible shapes tried. Worked around by calling the Notion REST API directly with the token from `~/.claude.json` (greg approved). **Any future skill step that patches Notion blocks must use the REST path, not the MCP tool.**
+>
+> ⚠️ **The bundled `optimize-blog-image.mjs` flattens animation.** The recipe-share demo is an animated WebP (183 frames, 3.7MB GIF → 1.5MB) produced with `sharp(..., {animated: true})` directly. It is the heaviest asset on the site; q50 got it to 1.17MB but visibly softened the UI text. First blog post to carry motion — there were no `.webm`/`.mp4`/animated assets in `web/public/blog/` before this.
+>
+> **2. Licence claim corrected** (`9abe2380`) — the site claimed **MIT** in five places (footer sitewide, `terms.astro`, two `help/faq.astro` entries, `help/glossary.astro`). Actual licence is **AGPL-3.0 + Commons Clause**, licensor NJL Solutions Pte Ltd. This was not a copy nit: `terms.astro` granted the right to "use, copy, modify, and distribute", and MIT permits commercial resale while the Commons Clause specifically forbids selling. Terms now describes the AGPL copyleft conditions and the Commons Clause restriction. Zero MIT claims remain in `web/src/` or `content/`.
+>
+> **3. Hub-and-spoke loop closed** — the post links to both `overwhelmed-family-planning` and `family-organization`; both guides list `mommy-whats-for-dinner-tonight` in `relatedPosts`. All four internal links carry the standard blog UTM set.
+>
+> ⭐ **DEV-SERVER TRAP, cost real time — worth knowing:** ports **4321 and 5173 are held by an SSH tunnel** (`ss -ltnp` → `users:(("ssh",pid=3418))`). Astro finds 4321 busy, prints one line (`Port 4321 is in use, trying another one...`) and silently serves on **4322**; the tunnel answers 4321 with a stale site (404 for the new post). Nothing looks broken. Same trap applies to the Vue app on 5173. Either kill the tunnel or pin the port — and note `npm run dev:web -- --port 4399` does NOT work (becomes `astro dev 4399`, read as a positional and ignored); needs `--port=4400`.
+>
+> ⚠️ **Pre-existing bug found, NOT fixed:** the Astro glob-loader reports **duplicate collection ids** for five entries — `family-organization`, `overwhelmed-family-planning`, `local-first-family-finance-planning-tools`, `maple-alternative`, `best-cozi-maple-alternatives-in-2026` — each warning "Later items with the same id will overwrite earlier ones". Two of those are the pillar guides edited this session. Visible only in the dev-server log. Likely the glob matches both `content/` and a copy under `web/src/content/`, or frontmatter `slug:` colliding with the filename-derived id. Unrelated to the post; needs a look.
+>
+> **Substack handoff artifact:** https://claude.ai/code/artifact/24049bdc-a743-49b6-b390-3628a293bb9f (built from the production `.blog-prose`, links retagged `utm_source=substack`/`utm_medium=email`, three image upload slots, formatted-clipboard copy).
+
 > **Last updated:** 2026-09-03 (SESSION 2 — **THE CONCERTINA TIME GRID, shipped to `main` behind `beanieWall` (prod `false`). NOT DEPLOYED.** 5578 tests, type-check + eslint + stylelint + prettier clean. Plan: `docs/plans/2026-09-03-wall-time-grid.md`. Prototype: `docs/mockups/2026-09-03-wall-time-grid.html` (artifact https://claude.ai/code/artifact/3d1b5eb0-b443-4219-808b-3bfe103995c3). All three wall calendar views now share ONE time axis: `WallDaysView`/`WallLanesView`/`WallTodayView` became thin column-choosers over `WallTimeGrid`, `WallEventChip` and `WallBeanColumn` were deleted, and the layout is a pure module (`src/utils/wallTimeGrid.ts`) so the arithmetic — where every defect in this design has lived — is exhaustively testable.
 >
 > ⭐ **THE CENTRAL LESSON, and it cost three rounds to learn: a uniform scale is not the same as a grid that READS as uniform.** The approved prototype fitted pixels-per-minute continuously to the plot height and ticked the axis at EVENT START TIMES. The scale was genuinely uniform — and it still looked arbitrary, because the labels came out at 07:30 / 08:05 / 15:20 / 16:00 and nothing on screen told the reader the axis was linear. greg: _"the gaps appear random heights — 1 hour is not represented with a consistent height."_ Fixed by quantizing the scale to six known steps (so an hour is the same height day to day), ticking on the HOUR, snapping the window out to whole hours so the grid begins and ends on a labelled rule, and raising the hour rules from 6% to 11% — at 6% the lanes and today views read as having no grid at all. Scale became the LADDER's outermost axis, so everything else is spent before the height of an hour is allowed to change. The whole budget-retry mechanism (`BUDGET_RETRIES`/`MIN_BUDGET_FRACTION`) then became dead machinery and was deleted.
@@ -1734,8 +1752,28 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-**Validated 2026-09-02:** every existing block below re-checked against the repo; **none**
-were stale. #66 still has no `weeklyAgenda`/`agendaShare` fingerprint in `src/`; the
+**Validated 2026-09-03 (session 3):** re-checked the blocks below; **none** were stale,
+**none removed**. #66 still has no `weeklyAgenda`/`agendaShare` fingerprint in `src/` or
+`web/src/`; travel decomposition has no new fingerprint; the #65/#61 open-guard validation
+is still an unrun CloudWatch query. This session was blog-only and shipped none of them.
+
+### ⭐ Session 2026-09-03 (3) — blog #57 staged, awaiting deploy ⭐
+
+1. **Deploy the post.** `gh workflow run deploy-web.yml --ref main`, then verify
+   `https://beanies.family/blog/mommy-whats-for-dinner-tonight` actually serves it — a
+   green workflow is not a rendered page. The licence correction ships in the same deploy.
+2. **Close the Notion loop** on row #57 (`3c8247d9-a99f-8026-98c7-d20f8f92911f`) **only
+   once live**: Status → Published, URL → live URL, Substack → tick after greg confirms
+   he has cross-posted. ⚠️ Use the **Notion REST API**, not `mcp__notion__API-update-a-block`
+   (broken — see the session entry above).
+3. **Cross-post to Substack** from the handoff artifact
+   (https://claude.ai/code/artifact/24049bdc-a743-49b6-b390-3628a293bb9f). Three images
+   need uploading by hand at the marked slots; Substack will not import from a URL.
+4. **Duplicate collection ids** (pre-existing, unfixed): five entries warn
+   "Later items with the same id will overwrite earlier ones" in the Astro dev log,
+   including both pillar guides. Diagnose the glob overlap.
+
+**Carried from 2026-09-02:** #66 still has no `weeklyAgenda`/`agendaShare` fingerprint in `src/`; the
 #65/#61 open-guard validation is a CloudWatch query nobody has run yet (the code IS
 deployed); #27's on-device meal-planner pass is still owed; travel decomposition is still
 roughly half done. Nothing removed.
