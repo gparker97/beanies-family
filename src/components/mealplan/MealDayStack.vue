@@ -28,7 +28,7 @@ function mealsFor(slot: MealSlot): MealPlanEntry[] {
   <div class="space-y-4 p-3">
     <div v-for="slot in SLOTS" :key="slot">
       <div
-        class="font-outfit mb-1.5 text-[0.62rem] font-semibold tracking-[0.06em] text-[rgba(44,62,80,0.4)] uppercase"
+        class="font-outfit mb-1.5 text-xs font-semibold tracking-[0.06em] text-[rgba(44,62,80,0.4)] uppercase"
       >
         {{ t(`mealPlanner.slot.${slot}`) }}
       </div>

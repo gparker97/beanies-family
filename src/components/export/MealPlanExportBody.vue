@@ -18,6 +18,19 @@ const props = defineProps<{ rows: MealExportRows }>();
 const columns = `74px repeat(${props.rows.dayColumns.length}, minmax(0, 1fr))`;
 
 /** Fixed per-slot glyph for the rail (presentation, not translated). */
+/**
+ * Print counterparts of `MealWeekBoard`'s `SLOT_META.band`, at print alphas.
+ *
+ * Deliberately a touch stronger than the screen values: a laser printer loses the bottom
+ * few percent of a tint entirely, so the screen's 4-7% would come out as plain white paper.
+ */
+const SLOT_BAND: Record<MealSlot, string> = {
+  breakfast: 'rgb(230 166 74 / 14%)',
+  lunch: 'rgb(174 214 241 / 22%)',
+  dinner: 'rgb(241 93 34 / 10%)',
+  snack: 'rgb(39 174 96 / 12%)',
+};
+
 const SLOT_ICON: Record<MealSlot, string> = {
   breakfast: '🍳',
   lunch: '🥪',
@@ -36,7 +49,7 @@ const SLOT_ICON: Record<MealSlot, string> = {
 
     <!-- One row per slot. -->
     <template v-for="row in rows.rows" :key="row.slot">
-      <div class="slot-head">
+      <div class="slot-head" :style="{ '--slot-band': SLOT_BAND[row.slot] }">
         <span class="slot-ic" aria-hidden="true">{{ SLOT_ICON[row.slot] }}</span
         >{{ row.slotLabel }}
       </div>
@@ -53,11 +66,16 @@ const SLOT_ICON: Record<MealSlot, string> = {
           :class="{ divided: j > 0, type: meal.isType }"
         >
           <div class="dish-name">{{ meal.name }}</div>
+          <!--
+            The cook is a chip, not a chip plus their name — the same convention the app's
+            cards use, and print space is tighter still. The legend at the foot of the sheet
+            is what maps a colour to a person, so the name here was the third time the page
+            said it.
+          -->
           <div v-if="meal.cook" class="dish-who">
             <span class="cook-dot" :style="{ background: meal.cook.color || '#2C3E50' }">{{
               meal.cook.initial
             }}</span>
-            <span>{{ meal.cook.name }}</span>
           </div>
           <div v-if="meal.serveTime || meal.guestCount" class="dish-meta">
             <span v-if="meal.serveTime">⏰ {{ meal.serveTime }}</span>
@@ -103,7 +121,9 @@ const SLOT_ICON: Record<MealSlot, string> = {
 
 .slot-head {
   align-items: center;
-  background: rgb(44 62 80 / 5%);
+
+  /* Matches the screen's row band so the printed sheet and the app read as one system. */
+  background: var(--slot-band, rgb(44 62 80 / 5%));
   border-radius: 10px;
   color: rgb(44 62 80 / 55%);
   display: flex;
@@ -138,10 +158,15 @@ const SLOT_ICON: Record<MealSlot, string> = {
   justify-content: center;
 }
 
+/*
+ * An empty slot on a sheet pinned to the fridge is an INVITATION, so it gets a line to
+ * write on rather than a middot standing in for "nothing here". The dot said the cell was
+ * empty, which the reader could already see.
+ */
 .cell.empty::before {
-  color: rgb(44 62 80 / 25%);
-  content: '·';
-  font-size: 20px;
+  border-bottom: 1px solid rgb(44 62 80 / 16%);
+  content: '';
+  width: 74%;
 }
 
 .dish.divided {
