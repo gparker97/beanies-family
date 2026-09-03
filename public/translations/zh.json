@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-02",
-    "translationCount": 4411
+    "lastUpdated": "2026-09-03",
+    "translationCount": 4416
   },
   "translations": {
     "app.name": {
@@ -20206,11 +20206,6 @@
       "hash": "12vg97",
       "lastUpdated": "2026-08-19"
     },
-    "mealPlanner.export.legendHint": {
-      "translation": "⏰ 上菜时间 · 👥 客人",
-      "hash": "85eeaw",
-      "lastUpdated": "2026-08-19"
-    },
     "reviewDemo.entry": {
       "translation": "应用审阅访问权限",
       "hash": "cex41f",
@@ -22060,6 +22055,36 @@
       "translation": "所有颜色均已采用— {name}将与{other}共享。",
       "hash": "51hw8f",
       "lastUpdated": "2026-09-02"
+    },
+    "mealPlanner.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-09-03"
+    },
+    "mealPlanner.addMealTo": {
+      "translation": "在{day}向{slot}添加餐点",
+      "hash": "gvgt0v",
+      "lastUpdated": "2026-09-03"
+    },
+    "mealPlanner.export.legendServeTime": {
+      "translation": "⏰服务时间",
+      "hash": "ngjyc2",
+      "lastUpdated": "2026-09-03"
+    },
+    "mealPlanner.export.legendGuests": {
+      "translation": "参与嘉宾",
+      "hash": "7wccnh",
+      "lastUpdated": "2026-09-03"
+    },
+    "pin.tooManyAttempts": {
+      "translation": "尝试次数过多。请等待{seconds}秒，然后再试一次。",
+      "hash": "nsv4ph",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.leave.busy": {
+      "translation": "仍在节省费用。请稍等片刻，然后再次尝试离开。",
+      "hash": "n1qc1n",
+      "lastUpdated": "2026-09-03"
     }
   }
 }
