@@ -84,15 +84,28 @@ function hasMeals(date: string): boolean {
           {{ t('mealPlanner.thisWeek') }}
         </div>
         <!-- Clear-day: appears on hover when the day has meals -->
-        <button
-          v-if="hasMeals(day.dateStr)"
-          type="button"
-          class="font-outfit absolute top-0 right-1 rounded-full px-1.5 text-xs font-semibold text-[rgba(44,62,80,0.35)] opacity-0 transition group-hover:opacity-100 hover:text-[#F15D22]"
-          :aria-label="t('mealPlanner.clearDay')"
-          @click="emit('clearDay', day.dateStr)"
-        >
-          {{ t('mealPlanner.clearDay') }}
-        </button>
+        <!--
+          Clear-day sits ABOVE the weekday, in its own reserved strip.
+          It used to be an absolutely-positioned text button at `top-0 right-1`, over the
+          centred day name — so at "Clear day" width it covered the very label the column is
+          identified by. An icon in a reserved row cannot collide with anything.
+
+          It is also no longer hover-only. `opacity-0 group-hover` makes a control that does
+          not exist on a touch screen, and the meal planner's home is a tablet: on
+          `hover: none` it stays visible.
+        -->
+        <div class="flex h-5 items-start justify-end pr-1">
+          <button
+            v-if="hasMeals(day.dateStr)"
+            type="button"
+            class="font-outfit grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 dark:text-slate-400 [@media(hover:none)]:opacity-100"
+            :aria-label="t('mealPlanner.clearDay')"
+            :title="t('mealPlanner.clearDay')"
+            @click="emit('clearDay', day.dateStr)"
+          >
+            <span aria-hidden="true">&#x2715;</span>
+          </button>
+        </div>
       </div>
 
       <!-- Slot rows -->
