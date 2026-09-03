@@ -20,7 +20,10 @@ export const MEAL_TYPE_STYLE: Record<MealTypeKind, { emoji: string; tint: string
   leftovers: { emoji: '♻️', tint: 'bg-[var(--tint-slate-10)]' },
   // A skipped meal is the one that means "nothing here", so it stays the quietest.
   skip: { emoji: '⊘', tint: 'bg-[var(--tint-slate-5)]' },
-  other: { emoji: '🍽️', tint: 'bg-[var(--tint-orange-8)]' },
+  // ✎ — the glyph the rail always used, kept deliberately. 🍽️ is `SLOT_EMOJI.dinner` and
+  // the tint is `MealThumb`'s default, so an `other` meal in the dinner row rendered a
+  // medallion byte-identical to a recipe with no photo.
+  other: { emoji: '✎', tint: 'bg-[var(--tint-orange-8)]' },
 };
 
 /** The medallion emoji for any meal kind; recipes fall back to their slot's glyph. */

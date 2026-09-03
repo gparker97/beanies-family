@@ -63,8 +63,20 @@ const guestCount = computed(() => props.meal.guestNames?.length ?? 0);
  * `skip` keeps a dashed edge and reduced opacity: it is the one kind that means "no meal
  * here", and that should still read as absence at a glance.
  */
+/**
+ * Guarded, like `mealTypeEmoji` beside it.
+ *
+ * This replaced a `switch` whose `default:` absorbed any unrecognised kind. Nothing
+ * validates `kind` on the read path (the projection is a raw cast and the repository a
+ * passthrough), and cross-version CRDT merge is a supported scenario — so a sixth
+ * `MealKind` shipped while an older client is still in the family would throw inside a
+ * computed, and Vue's handler would swap the card for a comment node and page
+ * #beanies-errors on every render.
+ */
 const typeTint = computed(() =>
-  props.meal.kind === 'recipe' ? '' : MEAL_TYPE_STYLE[props.meal.kind].tint
+  props.meal.kind === 'recipe'
+    ? ''
+    : (MEAL_TYPE_STYLE[props.meal.kind]?.tint ?? MEAL_TYPE_STYLE.other.tint)
 );
 const isSkip = computed(() => props.meal.kind === 'skip');
 /** Only a recipe can be cooked; a type card has nothing to cook. */
@@ -76,12 +88,22 @@ function onDragStart(e: DragEvent): void {
 </script>
 
 <template>
+  <!--
+    SKIP KEEPS TRANSPARENT CHROME. Unifying the type cards gave every kind the white card,
+    shadow and 0.09 border, and skip added only `border-dashed` on top — which halved the
+    dash to ~6% alpha and gave "nothing planned" a fill and a drop shadow. It is the one
+    kind that means absence, so it has no fill, no shadow, and a dash strong enough to read.
+  -->
   <div
     role="button"
     tabindex="0"
     draggable="true"
-    class="cursor-pointer rounded-[13px] border border-[rgba(44,62,80,0.09)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform duration-150 hover:-translate-y-px hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-    :class="isSkip ? 'border-dashed opacity-70' : ''"
+    class="cursor-pointer rounded-[13px] border p-2 transition-transform duration-150 hover:-translate-y-px"
+    :class="
+      isSkip
+        ? 'border-dashed border-[rgba(44,62,80,0.28)] opacity-70 dark:border-slate-500'
+        : 'border-[rgba(44,62,80,0.09)] bg-white shadow-[var(--card-shadow)] hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800'
+    "
     @click="emit('open')"
     @keydown.enter.prevent="emit('open')"
     @keydown.space.prevent="emit('open')"

@@ -1214,6 +1214,9 @@ const STRING_DEFS = {
   'mealPlanner.copyLastWeek': { en: 'Copy last week', beanie: 'copy last week' },
   'mealPlanner.copyHere': { en: 'Copy to this week', beanie: 'copy to this week' },
   'mealPlanner.clearDay': { en: 'Clear day', beanie: 'clear day' },
+  // Day-scoped. `mealPlanner.thisWeek` is week-scoped and stays in use for the
+  // jump-to-this-week button, so the day badge needed its own word rather than a reword.
+  'mealPlanner.today': { en: 'Today', beanie: 'today' },
   'mealPlanner.clearWeek': { en: 'Clear week', beanie: 'clear week' },
   'mealPlanner.clear.dayTitle': { en: 'Clear this day?', beanie: 'clear this day?' },
   'mealPlanner.clear.dayMessage': {
@@ -1241,6 +1244,10 @@ const STRING_DEFS = {
     beanie: 'that one is already in this meal.',
   },
   'mealPlanner.addMeal': { en: 'Add a meal', beanie: 'add a meal' },
+  'mealPlanner.addMealTo': {
+    en: 'Add a meal to {slot} on {day}',
+    beanie: 'add a meal to {slot} on {day}',
+  },
   'mealPlanner.emptyWeek': {
     en: 'No meals planned this week yet — drop a recipe onto a day to start.',
     beanie: 'no meals planned this week yet — drop a recipe onto a day to start.',

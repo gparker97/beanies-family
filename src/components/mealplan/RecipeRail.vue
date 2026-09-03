@@ -75,7 +75,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
     tile: MEAL_TYPE_STYLE.leftovers.tint,
   },
   { kind: 'skip', emoji: MEAL_TYPE_STYLE.skip.emoji, tile: MEAL_TYPE_STYLE.skip.tint },
-  { kind: 'other', emoji: '✎', tile: 'bg-[var(--tint-orange-8)]' },
+  { kind: 'other', emoji: MEAL_TYPE_STYLE.other.emoji, tile: MEAL_TYPE_STYLE.other.tint },
 ];
 </script>
 

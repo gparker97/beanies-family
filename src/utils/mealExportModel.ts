@@ -15,7 +15,15 @@ export interface MealResolvers {
   /** Display name for a meal — recipe name, or the type label (Eat out / …). */
   mealName: (meal: MealPlanEntry) => string;
   /** Cook display info, or undefined when unassigned. */
-  cook: (memberId?: string) => { name: string; color?: string } | undefined;
+  /**
+   * Cook display info, or undefined when unassigned.
+   *
+   * `initial` is supplied by the caller from the roster-wide collision map, NOT derived
+   * here: the printed cell shows the chip alone, so on a mono printer the letter is the
+   * ONLY carrier left once colour is gone — and two cooks whose names start the same would
+   * otherwise be identical everywhere on the page, legend included.
+   */
+  cook: (memberId?: string) => { name: string; color?: string; initial?: string } | undefined;
 }
 
 /** One meal within a grid cell (a day+slot may hold several — multi-dish). */
@@ -25,7 +33,19 @@ export interface ExportMealCell {
   /** Non-recipe "type" meal (eat out / leftovers / skip / other) — rendered muted+italic. */
   isType: boolean;
   /** Resolved cook — `initial` is derived here so the renderer stays dumb. */
-  cook?: { name: string; initial: string; color?: string };
+  cook?: {
+    name: string;
+    initial: string;
+    color?: string;
+  };
+  /**
+   * The cook's note, e.g. "Ben's friend is dairy-free, use the oat cream".
+   *
+   * Print is the only surface that shows it. The board card dropped its 📝 glyph for width
+   * and no other view ever rendered `note`, so the one thing a parent writes down for the
+   * other was reaching nobody. The fridge sheet is where it is actually read.
+   */
+  note?: string;
   serveTime?: string;
   /** Non-member guest count (names aren't shown on the sheet — a "+N" chip is). */
   guestCount: number;
@@ -56,7 +76,12 @@ export interface MealExportRows {
 /** Fixed slot order — the export always shows all four rows (empty cells dashed). */
 const SLOT_ORDER: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
-/** First grapheme of a name, uppercased, for the cook chip. Empty string if none. */
+/**
+ * Fallback only — the caller should pass a collision-aware initial.
+ *
+ * Kept for resolvers that supply none (tests, and the share-text path), where one letter is
+ * better than none.
+ */
 function initialOf(name: string): string {
   return [...name.trim()][0]?.toUpperCase() ?? '';
 }
@@ -67,7 +92,10 @@ function toCell(meal: MealPlanEntry, resolvers: MealResolvers): ExportMealCell {
     id: meal.id,
     name: resolvers.mealName(meal),
     isType: meal.kind !== 'recipe',
-    cook: cook ? { name: cook.name, initial: initialOf(cook.name), color: cook.color } : undefined,
+    note: meal.note?.trim() || undefined,
+    cook: cook
+      ? { name: cook.name, initial: cook.initial || initialOf(cook.name), color: cook.color }
+      : undefined,
     serveTime: meal.serveTime,
     guestCount: meal.guestNames?.length ?? 0,
   };
