@@ -41,10 +41,18 @@ watch(
 const ALT_TYPES: Exclude<MealKind, 'recipe'>[] = ['eat_out', 'leftovers', 'skip', 'other'];
 const canQuickAdd = computed(() => quickName.value.trim().length > 0);
 
+/**
+ * Closes only on a REAL add — the same rule `quickAdd` already followed.
+ *
+ * `createMeal` returns `null` when it refuses a duplicate in the cell, and this discarded
+ * that and closed regardless, so a refused add looked like it worked: the toast fired
+ * behind a sheet that was already dismissing. Newly reachable now that a filled slot shows
+ * a `+` at all, which is exactly the case where picking the dish already there is likely.
+ */
 async function pickRecipe(recipeId: string): Promise<void> {
   if (busy.value) return;
   busy.value = true;
-  await mealPlanStore.createMeal({
+  const meal = await mealPlanStore.createMeal({
     date: props.date,
     slot: props.mealSlot,
     kind: 'recipe',
@@ -52,7 +60,7 @@ async function pickRecipe(recipeId: string): Promise<void> {
     cooked: false,
   });
   busy.value = false;
-  emit('close');
+  if (meal) emit('close');
 }
 
 async function quickAdd(): Promise<void> {
@@ -78,12 +86,18 @@ async function quickAdd(): Promise<void> {
   busy.value = false;
 }
 
+/** Same rule as `pickRecipe` — a refused add must not look like a successful one. */
 async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
   if (busy.value) return;
   busy.value = true;
-  await mealPlanStore.createMeal({ date: props.date, slot: props.mealSlot, kind, cooked: false });
+  const meal = await mealPlanStore.createMeal({
+    date: props.date,
+    slot: props.mealSlot,
+    kind,
+    cooked: false,
+  });
   busy.value = false;
-  emit('close');
+  if (meal) emit('close');
 }
 </script>
 

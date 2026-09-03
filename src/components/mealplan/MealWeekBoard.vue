@@ -5,13 +5,14 @@
  * their intents up. Meals come from the store per cell. Each slot row carries a
  * colour-coded label chip + a top divider so the rows read distinctly.
  */
+import { computed } from 'vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useTranslation } from '@/composables/useTranslation';
 import MealSlotCell from './MealSlotCell.vue';
 import type { WeekDay } from '@/composables/useCalendarNavigation';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
-defineProps<{ weekDays: WeekDay[] }>();
+const props = defineProps<{ weekDays: WeekDay[] }>();
 const emit = defineEmits<{
   openMeal: [meal: MealPlanEntry];
   addMeal: [date: string, slot: MealSlot];
@@ -37,10 +38,26 @@ const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
  * stronger than a chip at the same value.
  */
 const SLOT_META: Record<MealSlot, { emoji: string; band: string; ink: string }> = {
-  breakfast: { emoji: '🍳', band: 'bg-[rgba(230,166,74,0.07)]', ink: 'text-[#9a6a1a]' },
-  lunch: { emoji: '🥪', band: 'bg-[var(--tint-silk-10)]', ink: 'text-secondary-500' },
-  dinner: { emoji: '🍽️', band: 'bg-[var(--tint-orange-4)]', ink: 'text-[#D14D1A]' },
-  snack: { emoji: '🍎', band: 'bg-[rgba(39,174,96,0.06)]', ink: 'text-[#1e7a45]' },
+  breakfast: {
+    emoji: '🍳',
+    band: 'bg-[rgba(230,166,74,0.07)] dark:bg-[rgba(230,166,74,0.10)]',
+    ink: 'text-[#7d560f] dark:text-[#e3b063]',
+  },
+  lunch: {
+    emoji: '🥪',
+    band: 'bg-[rgba(174,214,241,0.16)] dark:bg-[rgba(174,214,241,0.10)]',
+    ink: 'text-[#2c3e50] dark:text-[#aed6f1]',
+  },
+  dinner: {
+    emoji: '🍽️',
+    band: 'bg-[rgba(241,93,34,0.06)] dark:bg-[rgba(241,93,34,0.10)]',
+    ink: 'text-[#b8420f] dark:text-[#f2865a]',
+  },
+  snack: {
+    emoji: '🍎',
+    band: 'bg-[rgba(39,174,96,0.06)] dark:bg-[rgba(39,174,96,0.11)]',
+    ink: 'text-[#166534] dark:text-[#5fc98d]',
+  },
 };
 
 // Fixed en-US to match the app's English-only date labels (utils/date.ts) — an
@@ -50,9 +67,19 @@ const WEEKDAY_FMT = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 function mealsFor(date: string, slot: MealSlot): MealPlanEntry[] {
   return mealPlanStore.mealsForDate(date).filter((m) => m.slot === slot);
 }
+/**
+ * Emptiness only — deliberately NOT `mealsForDate(...).length`.
+ *
+ * That helper filters AND sorts the whole meal history to build an array this throws away,
+ * seven times per render, purely to decide whether to show a ✕. `some` early-exits and
+ * allocates nothing.
+ */
 function hasMeals(date: string): boolean {
-  return mealPlanStore.mealsForDate(date).length > 0;
+  return mealPlanStore.meals.some((m) => m.date === date);
 }
+
+/** The rightmost day, for the row's rounded cap — see the cell's `rounded-r` note. */
+const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
 </script>
 
 <template>
@@ -77,13 +104,16 @@ function hasMeals(date: string): boolean {
           column" control is looked for.
 
           Not hover-only either: `opacity-0 group-hover` is a control that does not exist on
-          a touch screen, and this planner's home is a tablet.
+          a touch screen, and this planner's home is a tablet. The query is
+          `any-pointer: coarse`, NOT `hover: none` — the latter describes only the PRIMARY
+          pointer, so an iPad with a keyboard case (or any touch laptop) reports
+          `hover: hover` and would have fallen back to the invisible state.
         -->
         <div class="flex h-5 items-start justify-end pr-1">
           <button
             v-if="hasMeals(day.dateStr)"
             type="button"
-            class="font-outfit grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 dark:text-slate-400 [@media(hover:none)]:opacity-100"
+            class="font-outfit grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 dark:text-slate-400 [@media(any-pointer:coarse)]:opacity-100"
             :aria-label="t('mealPlanner.clearDay')"
             :title="t('mealPlanner.clearDay')"
             @click="emit('clearDay', day.dateStr)"
@@ -104,7 +134,7 @@ function hasMeals(date: string): boolean {
           v-if="day.isToday"
           class="font-outfit mt-0.5 inline-block rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-xs font-bold text-[#F15D22]"
         >
-          {{ t('mealPlanner.thisWeek') }}
+          {{ t('mealPlanner.today') }}
         </div>
       </div>
 
@@ -129,12 +159,21 @@ function hasMeals(date: string): boolean {
         <div
           v-for="day in weekDays"
           :key="`${slot}-${day.dateStr}`"
-          class="min-h-[4rem] border-t border-l border-t-[rgba(44,62,80,0.07)] border-l-[rgba(44,62,80,0.05)] px-1 py-2 last:rounded-r-[14px] dark:border-t-slate-700 dark:border-l-slate-700/60"
+          class="min-h-[4rem] border-t border-l border-t-[rgba(44,62,80,0.07)] px-1 py-2 dark:border-t-slate-700"
           :class="[
             SLOT_META[slot].band,
-            // Today stays the strongest column cue, over the row band rather than instead
-            // of it — the two are answering different questions.
-            day.isToday ? 'bg-[rgba(241,93,34,0.05)]' : '',
+            // TODAY IS AN EDGE, NOT A FILL. A cell can only have one background-color, so
+            // the previous version stacked the today wash and the row band as two `bg-*`
+            // utilities and Tailwind's emission order silently picked the winner per slot —
+            // today's column came out orange on breakfast and snack and lost the wash
+            // entirely on lunch and dinner. A border is a different property, so it layers.
+            day.isToday
+              ? 'border-l-2 border-l-[rgba(241,93,34,0.45)] dark:border-l-[rgba(241,93,34,0.55)]'
+              : 'border-l border-l-[rgba(44,62,80,0.05)] dark:border-l-slate-700/60',
+            // FINDING: `last:` is `:last-child`, and `<template v-for>` makes every cell a
+            // flat child of the one grid — so it matched cell 40 of 40 and rounded the
+            // snack row alone. Index-tested instead.
+            day.dateStr === lastDayStr ? 'rounded-r-[14px]' : '',
           ]"
         >
           <MealSlotCell

@@ -77,6 +77,8 @@ const SLOT_ICON: Record<MealSlot, string> = {
               meal.cook.initial
             }}</span>
           </div>
+          <!-- The note, on the one surface with room to read it. -->
+          <div v-if="meal.note" class="dish-note">{{ meal.note }}</div>
           <div v-if="meal.serveTime || meal.guestCount" class="dish-meta">
             <span v-if="meal.serveTime">⏰ {{ meal.serveTime }}</span>
             <span v-if="meal.guestCount">👥 +{{ meal.guestCount }}</span>
@@ -209,6 +211,14 @@ const SLOT_ICON: Record<MealSlot, string> = {
   height: 16px;
   justify-content: center;
   width: 16px;
+}
+
+.dish-note {
+  color: rgb(44 62 80 / 62%);
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1.25;
+  margin-top: 2px;
 }
 
 .dish-meta {
