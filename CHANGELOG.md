@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **The beanie wall now lays the day out against time.** All three calendar views share one time axis, so an event's position on screen is when it happens rather than merely what order it comes in. On the bean lanes this means 16:00 is the same line in every lane — two children's clubs clashing, with nobody free to drive to both, is now something you see rather than something you work out. A stretch with nothing on in any column folds away into a line that says when the day picks up again ("quiet until 15:20"), so a whole day fits without scrolling and without hiding anything. Events that have already happened step back, the one running now fills as it goes, and a long event is trimmed but says how long it really is. Still behind the beanie wall setting.
+
 - **Swipe between days on the meal planner** on a phone, the same way the calendar already works.
 
 ### Fixed
