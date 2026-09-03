@@ -29,9 +29,12 @@ let online = true;
 vi.mock('../useOnline', () => ({ useOnline: () => ({ isOnline: { value: online } }) }));
 
 let aiConfigured = true;
+let aiTier = 'managed';
 vi.mock('../useAiCapability', () => ({
   useAiCapability: () => ({
-    tier: { value: 'managed' },
+    get tier() {
+      return { value: aiTier };
+    },
     byokConfig: { value: null },
     isConfigured: { value: aiConfigured },
   }),
@@ -55,6 +58,20 @@ vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
     get currentMember() {
       return currentMember;
+    },
+  }),
+}));
+
+// The family id scopes the text budget and is sent to the proxy so it can rate-limit per
+// family (#83). Mocked rather than swallowed in the orchestrator on purpose: in production
+// Pinia is always up by the time a share is triaged (`awaitReadiness` has already confirmed
+// `currentMember`), so a try/catch there would only hide a real regression — the family
+// limit silently ceasing to apply.
+let activeFamilyId: string | null = 'fam-1';
+vi.mock('@/stores/familyContextStore', () => ({
+  useFamilyContextStore: () => ({
+    get activeFamilyId() {
+      return activeFamilyId;
     },
   }),
 }));
@@ -91,7 +108,12 @@ vi.mock('../useMagicReader', () => ({
   readerForShareKind: (k: string) => ({ event: 'photo', travel: 'document', recipe: 'recipe' })[k],
 }));
 
-import { ingestSharedContent, isReadingSharedDocument } from '../useSharedDocumentIngest';
+import {
+  ingestInAppSource,
+  ingestSharedContent,
+  isReadingSharedDocument,
+} from '../useSharedDocumentIngest';
+import { __resetAttemptBudgetForTests } from '@/utils/attemptBudget';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -110,6 +132,11 @@ const actions = () => logEvent.mock.calls.map((c) => c[0].context?.action);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The text budget is MODULE-level and persisted, exactly so it survives a reload. That
+  // makes it survive a test too, so one case's spend would otherwise leak into the next.
+  __resetAttemptBudgetForTests();
+  activeFamilyId = 'fam-1';
+  aiTier = 'managed';
   online = true;
   aiConfigured = true;
   authInitialized = true;
@@ -249,10 +276,19 @@ describe('share ingest — links', () => {
   it('rejects a YouTube URL with no readable video id, rather than fetching it', async () => {
     // A channel or playlist page holds nothing we can read. `routeUrl` calls it invalid, and
     // the picker uses that same predicate — so it never reaches the fetcher.
-    await link('https://youtu.be/short');
+    //
+    // The share is essentially just the link (the note around it is under the text minimum),
+    // so it is refused AS A LINK rather than handed to the model as prose — the model cannot
+    // fetch, so that call could only ever return `none`.
+    await link('have a look at this one https://youtu.be/short');
 
     expect(resolveRecipeSource).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.noLink.title', expect.anything());
+    expect(extractShareFromText).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'recipeExtract.badLink.title',
+      expect.anything()
+    );
   });
 
   it('finds a link at the END of a sentence', async () => {
@@ -269,13 +305,13 @@ describe('share ingest — links', () => {
     expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
   });
 
-  it('says so when the shared text carries no link at all', async () => {
-    await link('just some words I copied');
+  it('reads the text itself when the share carries no link at all (#83)', async () => {
+    // This used to be the "No Link Found" dead end. The text IS the share now.
+    await link('Sports day is on Tuesday the 4th at 9am, meet at the school gate');
 
     expect(resolveRecipeSource).not.toHaveBeenCalled();
-    expect(extractShareFromText).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.noLink.title', expect.anything());
-    expect(actions()).toEqual(['received', 'no_url']);
+    expect(extractShareFromText).toHaveBeenCalled();
+    expect(actions()).toEqual(['received', 'triaged', 'classified', 'ready']);
   });
 
   it('takes a schema.org Recipe page at its word — ZERO AI calls', async () => {
@@ -387,12 +423,22 @@ describe('share ingest — links', () => {
   });
 
   it('caps sender-supplied text before anything parses it', async () => {
-    // The cap lives in the orchestrator so every platform is bounded identically.
+    // The cap lives in the orchestrator so every platform is bounded identically. A URL
+    // sitting past it is unfindable — accepted, and unchanged by #83.
     const buried = `${'x '.repeat(3000)}https://example.com/cake`;
     await link(buried);
 
     expect(resolveRecipeSource).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.noLink.title', expect.anything());
+    // 6000 chars is over the read cap but under the ceiling, so it is read TRUNCATED, with
+    // the user told once — not silently, and not refused.
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'shareTarget.text.truncated.title',
+      expect.anything()
+    );
+    const sent = extractShareFromText.mock.calls[0][0] as string;
+    expect(sent.length).toBe(4000);
+    expect(sent).not.toContain('https://example.com/cake');
   });
 });
 
@@ -674,5 +720,673 @@ describe('share ingest — refusals and failures', () => {
       'shareTarget.firstAttached.title',
       expect.anything()
     );
+  });
+});
+
+// ─── #83: shared plain text ──────────────────────────────────────────────────
+//
+// The precedence matrix lives HERE, in the existing file, because every row is a statement
+// about `prepare()`'s ordering and the rest of that ordering is already tested above. Each
+// row asserts a DIFFERENT outcome, so no case can pass vacuously — the failure this guards
+// against is the new branch quietly capturing a share that used to take another path.
+
+describe('share ingest — shared text (#83)', () => {
+  const share = (text: string) => ingestSharedContent({ files: [], text }, meta);
+  /** Long enough to clear MIN_SHARE_TEXT_CHARS, with no URL in it. */
+  const REAL = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+
+  /** A shared `.txt`, which is how EVERY iOS text share arrives. */
+  function txt(content: string, sizeOverride?: number) {
+    const file = new File([content], 'shared.txt', { type: 'text/plain' });
+    if (sizeOverride !== undefined) {
+      // A real 200 KB File would allocate 200 KB per test run; the byte gate reads `size`
+      // and nothing else, so overriding it tests the gate honestly and cheaply.
+      Object.defineProperty(file, 'size', { value: sizeOverride });
+    }
+    return file;
+  }
+
+  describe('precedence — the new branch is strictly downstream of every existing one', () => {
+    it('files only → documents', async () => {
+      await ingestSharedContent({ files: [img()] }, meta);
+      expect(extractShareFromDocuments).toHaveBeenCalled();
+      expect(extractShareFromText).not.toHaveBeenCalled();
+    });
+
+    it('files + a readable caption → documents, never the caption', async () => {
+      await ingestSharedContent({ files: [img()], text: REAL }, meta);
+      expect(extractShareFromDocuments).toHaveBeenCalled();
+      expect(extractShareFromText).not.toHaveBeenCalled();
+    });
+
+    it('an UNREADABLE file beside a caption is still a FILE problem', async () => {
+      // The silent substitution this guards against: reading the caption instead and never
+      // telling the user their photo was too big. Senders routinely set both extras.
+      await ingestSharedContent(
+        {
+          files: [new File(['x'], 'sheet.xlsx', { type: 'application/vnd.ms-excel' })],
+          text: REAL,
+        },
+        meta
+      );
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(extractShareFromDocuments).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.unsupported.title',
+        expect.anything()
+      );
+    });
+
+    it('text containing a link still takes the LINK path', async () => {
+      await share(`Have a look at this https://example.com/cake ${REAL}`);
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+    });
+
+    it('a shared .txt IS the share, and reaches the text path', async () => {
+      await ingestSharedContent({ files: [txt(REAL)] }, meta);
+      expect(extractShareFromText).toHaveBeenCalledWith(REAL, expect.anything());
+    });
+  });
+
+  describe('size bands', () => {
+    it('refuses text under the minimum WITHOUT an AI call', async () => {
+      await share('Soccer 4pm');
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooShort.title',
+        expect.anything()
+      );
+      expect(actions()).toEqual(['received', 'rejected_type']);
+    });
+
+    it('counts the minimum AFTER trimming, so whitespace cannot pass it', async () => {
+      await share(`   ${' '.repeat(60)}   `);
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooShort.title',
+        expect.anything()
+      );
+    });
+
+    it('refuses text over the ceiling WITHOUT an AI call', async () => {
+      await share('a'.repeat(40_000));
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooLong.title',
+        expect.anything()
+      );
+    });
+
+    it('truncates between the cap and the ceiling, with exactly ONE notice', async () => {
+      await share('a'.repeat(10_000));
+      const sent = extractShareFromText.mock.calls[0][0] as string;
+      expect(sent).toHaveLength(4000);
+
+      const truncationToasts = showToast.mock.calls.filter(
+        (c) => c[1] === 'shareTarget.text.truncated.title'
+      );
+      expect(truncationToasts).toHaveLength(1);
+      // ⚠️ And NOT on the envelope: every review surface renders `ai.pdfTruncated.*` from
+      // `env.truncated` — copy about PAGES, which a text share does not have. Setting it
+      // would show a second notice about pages that do not exist.
+      expect(dispatchSharePayload.mock.calls[0][0].env.truncated).toBeUndefined();
+    });
+
+    it('does not truncate, or say it did, at the cap exactly', async () => {
+      await share('a'.repeat(4000));
+      expect(extractShareFromText.mock.calls[0][0]).toHaveLength(4000);
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.truncated.title',
+        expect.anything()
+      );
+    });
+
+    it('never splits a surrogate pair when it truncates', async () => {
+      // '🎉' is a surrogate PAIR, so a naive slice at 4000 lands mid-character and yields a
+      // lone surrogate that renders as U+FFFD.
+      await share('a'.repeat(3999) + '🎉'.repeat(50));
+      const sent = extractShareFromText.mock.calls[0][0] as string;
+      expect(sent).toHaveLength(3999);
+      expect(sent).not.toMatch(/[\uD800-\uDFFF]/);
+    });
+  });
+
+  describe('the byte gate — bounding the DECODE, not just its result', () => {
+    it('refuses an over-ceiling .txt without decoding it', async () => {
+      const file = txt(REAL, 200_000);
+      const spy = vi.spyOn(file, 'text');
+      const sliceSpy = vi.spyOn(file, 'slice');
+      await ingestSharedContent({ files: [file] }, meta);
+
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooLong.title',
+        expect.anything()
+      );
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      // `text()` is called on the SLICE, never on the file — so this alone only catches an
+      // unbounded whole-file decode.
+      expect(spy).not.toHaveBeenCalled();
+      // ⚠️ And the bound itself. Without this, widening the slice to any value at all was
+      // undetectable, which makes "bounds the decode" an untested claim.
+      expect(sliceSpy).toHaveBeenCalledWith(0, 16_000);
+    });
+
+    it('still takes the LINK path for an over-ceiling .txt that begins with a link', async () => {
+      // iOS delivers a shared URL as a .txt. Returning `over_ceiling` from the byte gate
+      // would refuse a link share that works today — which is why the gate sets a flag and
+      // the verdict is applied only in the no-URL fallback.
+      const file = txt(`https://example.com/cake ${'x'.repeat(500)}`, 200_000);
+      await ingestSharedContent({ files: [file] }, meta);
+
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooLong.title',
+        expect.anything()
+      );
+    });
+  });
+
+  describe('the budget', () => {
+    /** Spend the whole hourly budget. */
+    async function exhaust() {
+      for (let i = 0; i < 20; i += 1) await share(REAL);
+    }
+
+    it('refuses once spent, naming when it resets, and makes NO AI call', async () => {
+      await exhaust();
+      expect(extractShareFromText).toHaveBeenCalledTimes(20);
+      extractShareFromText.mockClear();
+
+      await share(REAL);
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.quota.title',
+        // `fillTemplate` has substituted a real time, so the user is told when to come back.
+        expect.not.stringContaining('{resetsAt}')
+      );
+    });
+
+    it('refuses BEFORE the consent prompt, so a refusal is cheap', async () => {
+      await exhaust();
+      requestConsent.mockClear();
+      await share(REAL);
+      expect(requestConsent).not.toHaveBeenCalled();
+    });
+
+    it('does NOT consume budget when consent is declined', async () => {
+      // Peek in `prepare`, consume in `read`. Consuming at the peek would burn a share every
+      // time somebody looked at the consent prompt and thought better of it.
+      requestConsent.mockResolvedValue(null);
+      for (let i = 0; i < 25; i += 1) await share(REAL);
+
+      requestConsent.mockResolvedValue({});
+      await share(REAL);
+      expect(extractShareFromText).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not apply to a BYOK family — we do not ration someone else’s key', async () => {
+      aiTier = 'byok';
+      for (let i = 0; i < 25; i += 1) await share(REAL);
+      expect(extractShareFromText).toHaveBeenCalledTimes(25);
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.quota.title',
+        expect.anything()
+      );
+    });
+
+    it('scopes the budget to the family, so switching families does not inherit one', async () => {
+      await exhaust();
+      activeFamilyId = 'fam-2';
+      extractShareFromText.mockClear();
+      await share(REAL);
+      expect(extractShareFromText).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('observability', () => {
+    it('tags the whole funnel with detail=text, so it is separable from file and link', async () => {
+      await share(REAL);
+      const byAction = Object.fromEntries(
+        logEvent.mock.calls.map((c) => [c[0].context?.action, c[0].context])
+      );
+      expect(byAction.triaged.detail).toBe('text');
+      expect(byAction.ready.detail).toBe('text');
+    });
+
+    it('tags a link share detail=link, so the two funnels never share a counter', async () => {
+      await share('https://example.com/cake');
+      const byAction = Object.fromEntries(
+        logEvent.mock.calls.map((c) => [c[0].context?.action, c[0].context])
+      );
+      expect(byAction.triaged.detail).toBe('link');
+      expect(byAction.ready.detail).toBe('link');
+    });
+
+    it('never logs the shared text, a substring of it, or its exact length', async () => {
+      const secret = `${REAL} — the passcode is hunter2`;
+      await share(secret);
+      const serialised = JSON.stringify(logEvent.mock.calls);
+      expect(serialised).not.toContain('hunter2');
+      expect(serialised).not.toContain('school gate');
+      // Deliberately NOT `not.toContain(String(secret.length))` — that length is two digits,
+      // so the check both false-passes and false-fails on any coincidental "84" in a payload.
+      // Assert the actual rule instead: band membership is the granularity, so no context
+      // field may carry a character count at all.
+      const contexts = logEvent.mock.calls.map((c) => c[0].context ?? {});
+      for (const ctx of contexts) {
+        expect(Object.keys(ctx)).not.toContain('length');
+        expect(Object.keys(ctx)).not.toContain('char_count');
+      }
+    });
+  });
+
+  it('sends the family id so the proxy can rate-limit per family', async () => {
+    await share(REAL);
+    expect(extractShareFromText).toHaveBeenCalledWith(
+      REAL,
+      expect.objectContaining({ familyId: 'fam-1' })
+    );
+  });
+});
+
+// ─── #84: the IN-APP entry point ─────────────────────────────────────────────
+//
+// Additive. The share cases above are untouched, which is the point: `ingestInAppSource`
+// reaches the same `runIngest` tail, so if adding it changed any of them the split was not
+// behaviour-preserving.
+
+describe('ingestInAppSource (#84)', () => {
+  /** Long enough to clear MIN_SHARE_TEXT_CHARS, with no URL in it. */
+  const REAL = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+
+  const paste = (text: string) => ingestInAppSource({ kind: 'paste', text });
+  const pick = (file: File) => ingestInAppSource({ kind: 'file', file });
+
+  describe('a picked file', () => {
+    it('reads it through the same documents path a share uses', async () => {
+      await pick(img());
+      expect(extractShareFromDocuments).toHaveBeenCalledTimes(1);
+      expect(extractShareFromDocuments.mock.calls[0][0]).toHaveLength(1);
+      expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-stamps it with the type its BYTES say, exactly as the share path does', async () => {
+      const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+      await pick(new File([pdfBytes], 'booking', { type: 'application/octet-stream' }));
+
+      const sent = extractShareFromDocuments.mock.calls[0][0][0] as File;
+      expect(sent.type).toBe('application/pdf');
+    });
+
+    it('refuses an over-size file with the SIZE message, and makes no AI call', async () => {
+      // ⚠️ A DIFFERENT message from "can't read that". At the share boundary the user did not
+      // choose the file, so one message for both was right. In-app they did choose it, and
+      // "too big, here is the limit" is actionable where "can't read that" is not.
+      const big = img();
+      Object.defineProperty(big, 'size', { value: 30 * 1024 * 1024 });
+      await pick(big);
+
+      expect(showToast).toHaveBeenCalledWith('info', 'ai.picker.tooLarge.title', expect.anything());
+      expect(extractShareFromDocuments).not.toHaveBeenCalled();
+    });
+
+    it('refuses an unreadable TYPE with the type message, not the size one', async () => {
+      await pick(new File(['x'], 'sheet.xlsx', { type: 'application/vnd.ms-excel' }));
+
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.unsupported.title',
+        expect.anything()
+      );
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'ai.picker.tooLarge.title',
+        expect.anything()
+      );
+      expect(extractShareFromDocuments).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pasted text', () => {
+    it('reads prose with no link as text', async () => {
+      await paste(REAL);
+      expect(extractShareFromText).toHaveBeenCalledWith(REAL, expect.anything());
+    });
+
+    it('routes a pasted LINK to the resolver, not to the model as text', async () => {
+      await paste('https://example.com/cake');
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+    });
+
+    it('inherits the share path length bands rather than re-deciding them', async () => {
+      // ONE text policy, in `sourceFromText`. If these ever pass in-app but fail on a share
+      // (or the reverse), the two doors have diverged.
+      await paste('Soccer 4pm');
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooShort.title',
+        expect.anything()
+      );
+      expect(extractShareFromText).not.toHaveBeenCalled();
+
+      showToast.mockClear();
+      await paste('a'.repeat(40_000));
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooLong.title',
+        expect.anything()
+      );
+      expect(extractShareFromText).not.toHaveBeenCalled();
+    });
+
+    it('shares ONE budget with the share path — not a second allowance', async () => {
+      // The whole point of routing both doors through `sourceFromText`. A separate in-app
+      // budget would double what a family can spend just by using a different button.
+      for (let i = 0; i < 20; i += 1) await paste(REAL);
+      expect(extractShareFromText).toHaveBeenCalledTimes(20);
+      extractShareFromText.mockClear();
+
+      // A SHARE now, against the budget the in-app captures already spent.
+      await ingestSharedContent({ files: [], text: REAL }, meta);
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.quota.title',
+        expect.anything()
+      );
+    });
+  });
+
+  describe('preconditions', () => {
+    it('refuses a BYOK member with no key BEFORE prompting for consent', async () => {
+      // `awaitReadiness` is skipped in-app (auth and family are settled), but one of its four
+      // preconditions still applies. Without this the user pays a consent prompt for a call
+      // guaranteed to fail at extraction.
+      aiConfigured = false;
+      await paste(REAL);
+
+      expect(requestConsent).not.toHaveBeenCalled();
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith('info', 'ai.unavailable.title', expect.anything());
+    });
+
+    it('prompts for consent exactly ONCE per capture', async () => {
+      await paste(REAL);
+      expect(requestConsent).toHaveBeenCalledTimes(1);
+    });
+
+    it('saves nothing when consent is declined', async () => {
+      requestConsent.mockResolvedValue(null);
+      await paste(REAL);
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(dispatchSharePayload).not.toHaveBeenCalled();
+    });
+
+    it('reports being offline instead of calling the model', async () => {
+      online = false;
+      await paste(REAL);
+      expect(reportExtractionFailure).toHaveBeenCalledWith('offline');
+      expect(extractShareFromText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the shared lock', () => {
+    it('contends with a share for the SAME lock, and says so', async () => {
+      // `isIngesting` means "one AI read at a time, app-wide". A separate in-app lock would
+      // let a share arriving mid-capture double the AI spend.
+      let releaseShare: (v: unknown) => void = () => {};
+      extractShareFromDocuments.mockReturnValueOnce(
+        new Promise((r) => {
+          releaseShare = r;
+        })
+      );
+      const inFlight = ingestSharedContent({ files: [img()] }, meta);
+      await Promise.resolve();
+
+      await paste(REAL);
+      expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.busy.title', expect.anything());
+      expect(extractShareFromText).not.toHaveBeenCalled();
+
+      releaseShare(EVENT_RESULT);
+      await inFlight;
+    });
+
+    it('frees the lock after a throw, so one bad capture does not wedge every later one', async () => {
+      extractShareFromText.mockRejectedValueOnce(new Error('boom'));
+      await paste(REAL);
+      expect(reportError).toHaveBeenCalled();
+
+      extractShareFromText.mockResolvedValue(EVENT_RESULT);
+      await paste(REAL);
+      expect(dispatchSharePayload).toHaveBeenCalled();
+    });
+  });
+
+  describe('observability — the two funnels must never share a counter', () => {
+    it('emits EVERY event on the in-app surface, and none on the share one', async () => {
+      // ⚠️ The invariant that keeps the threaded sites honest. One missed `env` is a red test
+      // here rather than a dashboard somebody notices is wrong in three months — and it is
+      // what makes the exact number of threaded sites irrelevant.
+      await paste(REAL);
+      const surfaces = new Set(logEvent.mock.calls.map((c) => c[0].surface));
+      expect([...surfaces]).toEqual(['magic-beans-capture']);
+    });
+
+    it('emits EVERY event on the share surface for a share, and none on the in-app one', async () => {
+      await ingestSharedContent({ files: [], text: REAL }, meta);
+      const surfaces = new Set(logEvent.mock.calls.map((c) => c[0].surface));
+      expect([...surfaces]).toEqual(['share-target-ingest']);
+    });
+
+    // NOTE: the `opened` denominator is emitted by `MagicReaderCard` when the sheet opens,
+    // not by this function — firing it here would make the rate equal its own numerator, so
+    // abandonment would be invisible. Covered in `MagicReaderCard.test.ts`.
+
+    it('marks the envelope in-app, so the review surfaces can tell the doors apart', async () => {
+      await paste(REAL);
+      expect(dispatchSharePayload.mock.calls[0][0].env.origin).toBe('in-app');
+    });
+
+    it('still marks a share as share', async () => {
+      await ingestSharedContent({ files: [img()] }, meta);
+      expect(dispatchSharePayload.mock.calls[0][0].env.origin).toBe('share');
+    });
+
+    it('marks the envelope in-app on the jsonld and titleOnly branches too', async () => {
+      // Two of the five `origin` literals a classify-only test would never reach.
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'jsonld',
+        recipe: { name: 'Cake', imageUrl: 'https://example.com/cake.jpg' },
+        path: 'jsonld',
+        sourceUrl: 'https://example.com/cake',
+        imageUrl: 'https://example.com/cake.jpg',
+      });
+      await paste('https://example.com/cake');
+      expect(dispatchSharePayload.mock.calls[0][0].env.origin).toBe('in-app');
+
+      dispatchSharePayload.mockClear();
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'titleOnly',
+        title: 'Cake',
+        path: 'youtube',
+        sourceUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      });
+      await paste('https://youtu.be/dQw4w9WgXcQ');
+      expect(dispatchSharePayload.mock.calls[0][0].env.origin).toBe('in-app');
+    });
+
+    it('never logs the pasted text or a substring of it', async () => {
+      await paste(`${REAL} — the passcode is hunter2`);
+      const serialised = JSON.stringify(logEvent.mock.calls);
+      expect(serialised).not.toContain('hunter2');
+      expect(serialised).not.toContain('school gate');
+    });
+  });
+});
+
+// ─── Review follow-ups (#83 / #84) ───────────────────────────────────────────
+//
+// Each test below exists because a mutation proved the previous coverage could not see the
+// behaviour. They are grouped by what the mutation was.
+
+describe('the in-app surface invariant holds on EVERY path, not just the happy one', () => {
+  const REAL = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+  const surfaces = () => new Set(logEvent.mock.calls.map((c) => c[0].surface));
+
+  it('a picked FILE files every event in-app', async () => {
+    // Mutation this catches: `logReceivedKind(SHARE_ENV, 'file', 1)` in `inAppSource`.
+    await ingestInAppSource({ kind: 'file', file: img() });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+  });
+
+  it('an over-size file refusal files in-app', async () => {
+    const big = img();
+    Object.defineProperty(big, 'size', { value: 30 * 1024 * 1024 });
+    await ingestInAppSource({ kind: 'file', file: big });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+  });
+
+  it('an unreadable-type refusal files in-app', async () => {
+    await ingestInAppSource({
+      kind: 'file',
+      file: new File(['x'], 'sheet.xlsx', { type: 'application/vnd.ms-excel' }),
+    });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+  });
+
+  it('the AI-not-configured refusal files in-app', async () => {
+    // Mutation this catches: `notReady(SHARE_ENV, …)` in `ingestInAppSource`. The BYOK test
+    // asserts only the toast, so the surface was free to be wrong.
+    aiConfigured = false;
+    await ingestInAppSource({ kind: 'paste', text: REAL });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+  });
+
+  it('a text-band refusal files in-app', async () => {
+    await ingestInAppSource({ kind: 'paste', text: 'Soccer 4pm' });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+  });
+
+  it('a budget refusal files in-app', async () => {
+    for (let i = 0; i < 20; i += 1) await ingestInAppSource({ kind: 'paste', text: REAL });
+    logEvent.mockClear();
+    await ingestInAppSource({ kind: 'paste', text: REAL });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+  });
+
+  it('a busy refusal files in-app', async () => {
+    let release: (v: unknown) => void = () => {};
+    extractShareFromDocuments.mockReturnValueOnce(
+      new Promise((r) => {
+        release = r;
+      })
+    );
+    const inFlight = ingestSharedContent({ files: [img()] }, meta);
+    await Promise.resolve();
+    logEvent.mockClear();
+
+    await ingestInAppSource({ kind: 'paste', text: REAL });
+    expect([...surfaces()]).toEqual(['magic-beans-capture']);
+
+    release(EVENT_RESULT);
+    await inFlight;
+  });
+
+  it('a throw files in-app, on reportError as well as logEvent', async () => {
+    extractShareFromText.mockRejectedValueOnce(new Error('boom'));
+    await ingestInAppSource({ kind: 'paste', text: REAL });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'magic-beans-capture' })
+    );
+  });
+});
+
+describe('an unreadable link is refused as a LINK, not read as prose', () => {
+  const share = (text: string) => ingestSharedContent({ files: [], text }, meta);
+
+  it('refuses a bare YouTube playlist without an AI call', async () => {
+    // 46 characters, so it clears MIN_SHARE_TEXT_CHARS and would otherwise be sent to the
+    // model as text — one billed call for an answer that can only be `none`, replacing a
+    // refusal that used to be free.
+    await share('https://www.youtube.com/playlist?list=PLabc123');
+
+    expect(extractShareFromText).not.toHaveBeenCalled();
+    expect(resolveRecipeSource).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'recipeExtract.badLink.title',
+      expect.anything()
+    );
+  });
+
+  it('does not spend budget on one', async () => {
+    for (let i = 0; i < 25; i += 1) await share('https://www.youtube.com/playlist?list=PLabc123');
+    // The budget is untouched, so a real share still works.
+    await share('Sports day Tuesday the 4th at 9am, meet at the school gate');
+    expect(extractShareFromText).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives a SHORT unreadable link link-shaped copy, not "not enough to read"', async () => {
+    // 20 chars — under the minimum. Telling someone who shared a link to "include the date,
+    // the time and where it is" is advice about an event.
+    await share('https://youtu.be/xyz');
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'recipeExtract.badLink.title',
+      expect.anything()
+    );
+    expect(showToast).not.toHaveBeenCalledWith(
+      'info',
+      'shareTarget.text.tooShort.title',
+      expect.anything()
+    );
+  });
+
+  it('still reads prose that merely CONTAINS an unreadable link', async () => {
+    // The guard must not swallow a real text share that happens to cite a channel.
+    await share('Sports day is Tuesday at 9am, details https://www.youtube.com/@school here');
+    expect(extractShareFromText).toHaveBeenCalled();
+  });
+});
+
+describe('the truncation notice is only made once it is TRUE', () => {
+  const share = (text: string) => ingestSharedContent({ files: [], text }, meta);
+  const LONG = 'a'.repeat(10_000);
+  const truncationToasts = () =>
+    showToast.mock.calls.filter((c) => c[1] === 'shareTarget.text.truncated.title');
+
+  it('is not shown when the share never runs because we are offline', async () => {
+    // "beanies read the beginning of it — check the details before you save" is a straight
+    // falsehood next to an offline error: nothing was read and there is nothing to save.
+    online = false;
+    await share(LONG);
+    expect(truncationToasts()).toHaveLength(0);
+  });
+
+  it('is not shown when consent is declined', async () => {
+    requestConsent.mockResolvedValue(null);
+    await share(LONG);
+    expect(truncationToasts()).toHaveLength(0);
+  });
+
+  it('is not counted as an attempt, so its rate against `ready` stays honest', async () => {
+    online = false;
+    await share(LONG);
+    expect(actions()).not.toContain('truncated');
+  });
+
+  it('IS shown, exactly once, when the read actually happens', async () => {
+    await share(LONG);
+    expect(truncationToasts()).toHaveLength(1);
+    expect(actions()).toContain('truncated');
   });
 });

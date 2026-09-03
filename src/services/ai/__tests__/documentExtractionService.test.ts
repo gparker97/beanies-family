@@ -115,10 +115,54 @@ describe('extractEventFromDocument — tier dispatch', () => {
     expect(urls).toHaveLength(1);
     expect(urls[0]).toMatch(/^data:image\/jpeg;base64,/);
     expect(request.todayIso).toBe('2026-06-03');
-    // No family-data fields are present on the request — only the document + date + signal.
-    // `task` is deliberately NO LONGER on the request: it is run()'s first argument, and
-    // carrying it in both places would be two sources of truth that can disagree.
-    expect(Object.keys(request).sort()).toEqual(['signal', 'source', 'todayIso']);
+    // No family DATA is present on the request — only the document, the date, the signal and
+    // (since #83) the family ID.
+    //
+    // ⚠️ `familyId` is on this list deliberately and is NOT a widening of what leaves the
+    // device. It is a random UUID with no personal data in it — the same value
+    // `diagnosticContext.ts` already ships raw to our telemetry, and documented as PII-free
+    // for exactly that reason. It exists so the proxy can rate-limit per family. Anything
+    // that is actually family DATA (members, activities, balances) must never appear here.
+    //
+    // `task` is deliberately NOT on the request: it is run()'s first argument, and carrying
+    // it in both places would be two sources of truth that can disagree.
+    expect(Object.keys(request).sort()).toEqual(['familyId', 'signal', 'source', 'todayIso']);
+    // Not supplied by this caller, so it is carried as undefined and JSON.stringify drops it.
+    expect(request.familyId).toBeUndefined();
+  });
+
+  it('threads familyId through to the provider when supplied (#83)', async () => {
+    mockManagedExtract.mockResolvedValue(SAMPLE);
+
+    await extractEventFromDocument(file(), {
+      tier: 'managed',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+      familyId: 'fam-1',
+    });
+
+    const [, request] = mockManagedExtract.mock.calls[0];
+    expect(request.familyId).toBe('fam-1');
+  });
+
+  it('passes familyId through to a BYOK provider too, which simply ignores it', async () => {
+    // The previous version of this test asserted only `res.success === true` for an absent
+    // familyId — which the test above already covers via `request.familyId` being undefined,
+    // and whose named behaviour (the proxy's IP fallback) is server-side and unreachable from
+    // here. This asserts something no other test does: the option is threaded independently of
+    // tier, so switching tiers cannot silently drop it.
+    const byokRun = vi.fn().mockResolvedValue(SAMPLE);
+    mockCreateByok.mockReturnValue({ id: 'openai', run: byokRun });
+    await extractEventFromDocument(file(), {
+      tier: 'byok',
+      todayIso: '2026-06-03',
+      grant: __testConsentGrant,
+      byok: { provider: 'openai', apiKey: 'k' },
+      familyId: 'fam-1',
+    });
+
+    const [, request] = byokRun.mock.calls[0];
+    expect(request.familyId).toBe('fam-1');
   });
 
   it('multi-page PDF: sends one compressed data URL per page and threads truncated', async () => {

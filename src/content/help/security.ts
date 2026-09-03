@@ -647,7 +647,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "Tap <strong>✨ Perform magic</strong> (or the <strong>Invite</strong> and <strong>Travel booking</strong> buttons) and beanies reads a single photo or document you choose — a party invitation, a flight itinerary, a hotel confirmation — and magically pulls out the key details, then opens a pre-filled activity or trip for you to check and save. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one document you pick, and only when you ask.",
+          "Tap <strong>✨ Magic beans</strong> and give beanies one thing — a photo, a file, a link, or some text you pasted. A party invitation, a flight itinerary, a hotel confirmation, the details from a class-group message. beanies works out what it is for you, pulls out the key details, and opens a pre-filled activity, trip or recipe to check and save. You never have to say which it is first. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one thing you pick, and only when you ask.",
       },
       {
         type: 'callout',
@@ -665,7 +665,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Only the one photo or document</strong> you chose for that action.',
+          '<strong>Only the one photo, document or piece of text</strong> you chose for that action.',
           "<strong>Never the rest of your family's data</strong> — your accounts, activities, trips, members, and notes never leave your device for this.",
           'Nothing is sent until you confirm. You can decline and fill the activity or trip in by hand.',
         ],
@@ -679,7 +679,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On the default setting, your photo or document is encrypted in transit and sent to a private, secure AI service that processes it and keeps nothing. It passes through a beanies server on the way, which holds it only for the moment it takes to forward it, and stores nothing. If you bring your own AI provider (BYOK), it goes straight to that provider instead, using your key, and never touches a beanies server.',
+          'On the default setting, what you picked is encrypted in transit and sent to a private, secure AI service that processes it and keeps nothing. It passes through a beanies server on the way, which holds it only for the moment it takes to forward it, and stores nothing. If you bring your own AI provider (BYOK), it goes straight to that provider instead, using your key, and never touches a beanies server.',
       },
       {
         type: 'callout',
@@ -697,7 +697,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On the default setting, your photo or document is read by a specialist AI model running inside <strong>attested confidential-compute hardware</strong>. It is a sealed environment, built on AMD SEV-SNP and Intel TDX chips, that the company operating the servers cannot see into. Your document is encrypted on the way there and back, read only to pull out the details, and then it is gone.',
+          'On the default setting, what you picked is read by a specialist AI model running inside <strong>attested confidential-compute hardware</strong>. It is a sealed environment, built on AMD SEV-SNP and Intel TDX chips, that the company operating the servers cannot see into. It is encrypted on the way there and back, read only to pull out the details, and then it is gone.',
       },
       {
         type: 'list',
@@ -724,7 +724,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "The AI service does not retain any data or information. The photo or document you picked is saved only with your own family's data file, and attached to the activity, trip, or other item it created, so you can find it later. You can remove it before saving if you'd like.",
+          "The AI service does not retain any data or information. A photo or document you picked is saved only with your own family's data file, and attached to the activity, trip, or other item it created, so you can find it later. You can remove it before saving if you'd like. Text you shared is used to fill in the form and is not kept separately.",
       },
       {
         type: 'heading',

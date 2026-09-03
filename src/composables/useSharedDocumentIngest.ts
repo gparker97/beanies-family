@@ -20,8 +20,21 @@ import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { consentOpen, requestConsent } from './useDocumentConsent';
 import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
-import { isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
-import { MAX_SHARE_TEXT_CHARS, type SharedContent } from '@/services/share/types';
+import { AI_PICKER_MAX_BYTES, isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
+import {
+  MAX_SHARE_TEXT_BYTES,
+  MAX_SHARE_TEXT_CEILING,
+  MAX_SHARE_TEXT_CHARS,
+  MIN_SHARE_TEXT_CHARS,
+  SHARE_TEXT_BUDGET,
+  shareTextBudgetKey,
+  type SharedContent,
+} from '@/services/share/types';
+import { boundText } from '@/utils/boundText';
+import { consumeAttempt, peekAttempt } from '@/utils/attemptBudget';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { formatTime12, toTimeInputValue } from '@/utils/date';
 import { extractUrls } from '@/utils/url';
 import { withSniffedType } from '@/utils/sniffFileType';
 import {
@@ -35,11 +48,33 @@ import { reportError } from '@/utils/errorReporter';
 import { toDateInputValue } from '@/utils/date';
 import { assertNever } from '@/utils/assertNever';
 import type { ResultEnvelope, SharePayload, ShareKind } from '@/types/magicPayload';
-import type { ShareExtractionResult } from '@/services/ai/types';
+import type { ExtractionErrorCode, ShareExtractionResult } from '@/services/ai/types';
 import type { ConsentGrant } from './useDocumentConsent';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const SURFACE = 'share-target-ingest';
+
+/**
+ * Which door a capture came in by, carried through the shared spine (#84).
+ *
+ * The two fields travel TOGETHER, as one object rather than two parameters, so no call site
+ * can pair the wrong surface with the wrong origin. There is deliberately NO default value
+ * anywhere: an unthreaded site is then a compile error rather than an event silently filed
+ * under the share funnel.
+ *
+ * ⚠️ Keep this a LABEL. The moment it carries behaviour — a policy, a callback, a flag — the
+ * two paths have diverged and should be two functions, not one function reading a field.
+ */
+export interface IngestEnv {
+  /** Telemetry surface. Free-form by design: this is what separates the two funnels in
+   *  CloudWatch without a new context key, an allowlist entry or a Lambda deploy. */
+  surface: string;
+  /** Which entry point. Rides onto `ResultEnvelope.origin` for the review surfaces. */
+  origin: 'share' | 'in-app';
+}
+
+/** The share path's ONE literal. Every other site takes its env from a parameter. */
+const SHARE_ENV: IngestEnv = { surface: SURFACE, origin: 'share' };
 
 /** How long a cold-started app is given to finish restoring the session before we answer. */
 const READY_TIMEOUT_MS = 10_000;
@@ -111,13 +146,20 @@ async function waitUntilReady(): Promise<void> {
 }
 
 /** Tell the user why nothing happened, and record it. Never a silent return. */
-function notReady(detail: string, titleKey: UIStringKey, messageKey: UIStringKey): void {
+function notReady(
+  env: IngestEnv,
+  detail: string,
+  titleKey: UIStringKey,
+  messageKey: UIStringKey
+): void {
   const { showToast } = useToast();
   const { t } = useTranslation();
   logEvent({
     level: 'info',
-    surface: SURFACE,
-    message: 'share not ready',
+    surface: env.surface,
+    // Source-neutral: this is now reached from both doors. The FILTERABLE field is `surface`,
+    // which says which one — a message string is not a dashboard filter.
+    message: 'ingest not ready',
     context: { action: 'not_ready', detail },
   });
   showToast('info', t(titleKey), t(messageKey));
@@ -134,23 +176,33 @@ function notReady(detail: string, titleKey: UIStringKey, messageKey: UIStringKey
 async function awaitReadiness(): Promise<boolean> {
   await waitUntilReady();
   if (!useAuthStore().isInitialized) {
-    notReady('auth_timeout', 'shareTarget.notReady.title', 'shareTarget.notReady.message');
+    notReady(
+      SHARE_ENV,
+      'auth_timeout',
+      'shareTarget.notReady.title',
+      'shareTarget.notReady.message'
+    );
     return false;
   }
   if (!useAuthStore().isAuthenticated) {
     // Deliberately not queued across a login: holding someone else's file across an auth
     // boundary is a data-handling question this change is not taking on.
-    notReady('signed_out', 'shareTarget.signIn.title', 'shareTarget.signIn.message');
+    notReady(SHARE_ENV, 'signed_out', 'shareTarget.signIn.title', 'shareTarget.signIn.message');
     return false;
   }
   if (!useFamilyStore().currentMember) {
-    notReady('family_loading', 'shareTarget.notReady.title', 'shareTarget.notReady.message');
+    notReady(
+      SHARE_ENV,
+      'family_loading',
+      'shareTarget.notReady.title',
+      'shareTarget.notReady.message'
+    );
     return false;
   }
   if (!useAiCapability().isConfigured.value) {
     // Reuses the same "not set up yet" wording the shared mapper shows for `not_available`,
     // rather than inventing a second phrasing for the same state.
-    notReady('ai_unconfigured', 'ai.unavailable.title', 'ai.unavailable.message');
+    notReady(SHARE_ENV, 'ai_unconfigured', 'ai.unavailable.title', 'ai.unavailable.message');
     return false;
   }
   return true;
@@ -176,17 +228,237 @@ function trimUrlPunctuation(url: string): string {
  * the two funnels are separable. `file_count` is 0 for a link, so existing dashboards keep
  * meaning what they mean.
  */
-function logReceivedKind(detail: 'file' | 'link', fileCount: number): void {
+function logReceivedKind(
+  env: IngestEnv,
+  detail: 'file' | 'link' | 'text',
+  fileCount: number
+): void {
   logEvent({
     level: 'info',
-    surface: SURFACE,
+    surface: env.surface,
     message: 'share triaged',
     context: { action: 'triaged', detail, file_count: fileCount },
   });
 }
 
-/** What the share turned out to be, once triaged. Network-free to produce. */
-type ShareSource = { kind: 'documents'; files: File[] } | { kind: 'link'; url: string };
+/**
+ * The one place a budget refusal is reported. Shared by the `prepare` peek and the `read`
+ * consume so the two cannot drift into two messages for one limit.
+ */
+function refuseForQuota(env: IngestEnv, resetsAt: number): void {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+  logEvent({
+    level: 'warn',
+    surface: env.surface,
+    // `action: 'refused'` — a DELIBERATE refusal, not a type rejection. Folding it into
+    // `rejected_type` would make "how many were refused, and why" unanswerable.
+    message: 'text share refused by the local budget',
+    context: { action: 'refused', detail: 'quota' },
+  });
+  showToast(
+    'info',
+    t('shareTarget.text.quota.title'),
+    fillTemplate(t('shareTarget.text.quota.message'), {
+      resetsAt: formatTime12(toTimeInputValue(new Date(resetsAt))),
+    })
+  );
+}
+
+/**
+ * What the share turned out to be, once triaged. Network-free to produce.
+ *
+ * `text` is the #83 arm: sender-supplied prose carrying no usable link. It is strictly
+ * DOWNSTREAM of every existing decision in `prepare` — files still win, a link inside the
+ * text still wins — so adding it could not change any outcome that already worked.
+ * `truncated` means the text was longer than the read cap and has been bounded; the
+ * orchestrator says so with its own toast (see `runTextBands`).
+ */
+type ShareSource =
+  | { kind: 'documents'; files: File[] }
+  | { kind: 'link'; url: string }
+  | { kind: 'text'; text: string; truncated: boolean };
+
+/**
+ * Which funnel an event belongs to, derived from the source rather than threaded alongside
+ * it. `ShareSource` IS the discriminator and `read()` already receives it, so a parallel
+ * `detail` parameter would be a second representation of one fact to keep in sync by hand.
+ * Closed by the union: a fourth arm cannot compile without updating this.
+ */
+function sourceDetail(source: ShareSource): 'file' | 'link' | 'text' {
+  switch (source.kind) {
+    case 'documents':
+      return 'file';
+    case 'link':
+      return 'link';
+    case 'text':
+      return 'text';
+    default:
+      return assertNever(source, 'shareSourceDetail');
+  }
+}
+
+/**
+ * The budget key for the current family, or `null` when the budget does not apply.
+ *
+ * Two reasons it may not apply, and both are deliberate:
+ *   - **BYOK/on-device**: the user pays for their own key and the server throttle does not
+ *     touch them, so a client cap would be us rationing someone else's quota for no benefit.
+ *   - **No family id**: nothing sane to scope a budget to. `awaitReadiness` has already
+ *     established `currentMember`, so this is a should-not-happen rather than a real path,
+ *     but failing OPEN here matches the server's own fail-open posture — the request still
+ *     meets the route throttle and both server limits.
+ */
+function textBudgetKey(): string | null {
+  if (useAiCapability().tier.value !== 'managed') return null;
+  const familyId = useFamilyContextStore().activeFamilyId;
+  return familyId ? shareTextBudgetKey(familyId) : null;
+}
+
+/**
+ * Turn sender-supplied TEXT into a `ShareSource`: a link if one is in there, otherwise the
+ * text itself, bounded and budgeted (#83).
+ *
+ * Extracted out of `prepare()` (#84) so BOTH entry points get one text policy rather than
+ * two. Everything about what text is acceptable — the link-vs-text decision, the three size
+ * bands, the truncation notice, and the quota PEEK — lives here and only here. An in-app
+ * paste therefore inherits the share path's limits structurally, not by discipline.
+ *
+ * The matching `consumeAttempt` deliberately does NOT live here: it sits immediately before
+ * the AI call in `runIngest`, because consent runs between the two and spending a share on a
+ * declined prompt would be a bug the user can see.
+ *
+ * Returns `null` to mean "the user has already been told and the event already logged" — the
+ * same sentinel `prepare` uses, for the same reason.
+ *
+ * @param overCeilingByBytes The verdict of the pre-decode byte gate, when the text came from
+ *   a shared `.txt`. Passed in rather than re-derived: only the caller has the `File`.
+ */
+async function sourceFromText(
+  text: string,
+  env: IngestEnv,
+  overCeilingByBytes = false
+): Promise<ShareSource | null> {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+
+  // Cap before anything parses it — `extractUrls` splits the whole string. Accepted
+  // consequence: truncation can sever a URL sitting past the cap, and `no_url` is then the
+  // honest outcome. Bounding untrusted input at the boundary is worth that tail.
+  const capped = text.slice(0, MAX_SHARE_TEXT_CHARS);
+  // The SAME predicate the resolver applies moments later. A weaker one here would pick a
+  // YouTube channel link sitting ahead of a good recipe URL and then die on it, with a
+  // readable link two words away.
+  //
+  // Punctuation is trimmed first because sentence-punctuated prose is the NORMAL input
+  // here — "Watch this https://youtu.be/dQw4w9WgXcQ." is how people share. `extractUrls`
+  // strips it on its bare-domain pass but not on its protocol pass, and the trailing dot
+  // makes the video id 12 characters, which `routeUrl` rejects outright: a perfectly
+  // readable video became "No Link Found".
+  // Imported HERE rather than at module scope. `App.vue` statically imports
+  // `useShareTargets`, which imports this file — so a top-level import would drag the
+  // recipe link-reading graph (`recipeSourceUrl`, `recipeSourceResolver`,
+  // `recipeFetchService`, `shareLink` — ~22 KB) into the eager entry chunk, where none of
+  // it lived before. Until now it was reachable only from the lazily-routed cookbook.
+  // Every cold boot would pay for it; only a text share ever runs it.
+  const { routeUrl } = await import('@/utils/recipeSourceUrl');
+  const candidates = extractUrls(capped).map(trimUrlPunctuation);
+  const url = candidates.find((candidate) => routeUrl(candidate).kind !== 'invalid');
+  if (url) {
+    logReceivedKind(env, 'link', 0);
+    return { kind: 'link', url };
+  }
+
+  const trimmed = text.trim();
+
+  // ⚠️ There WERE links, but none beanies can read — a YouTube channel, a playlist, an
+  // `/@handle`. Refuse as a LINK; do not fall through to the text bands with them.
+  //
+  // Before #83 this was the "no link found" dead end and cost nothing. The bands now accept
+  // anything over 25 characters, and a bare `https://www.youtube.com/playlist?list=…` is 46 —
+  // so it would pass, spend a budget slot, and reach the model as prose. The model cannot
+  // fetch, so `none` is the only possible answer: one billed call and one slot for a refusal
+  // that was free a moment ago. It would also contradict `extractShareFromText`'s own JSDoc
+  // ("Never the bare URL"), and a SHORT unreadable link would be told "beanies needs a bit
+  // more than that — include the date, the time and where it is", which is advice about an
+  // event given to someone who shared a link.
+  const withoutUrls = candidates.reduce((rest, c) => rest.split(c).join(' '), trimmed).trim();
+  if (candidates.length && withoutUrls.length < MIN_SHARE_TEXT_CHARS) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'shared link is not one beanies can read',
+      context: { action: 'rejected_type', detail: 'unreadable_link' },
+    });
+    showToast('info', t('recipeExtract.badLink.title'), t('recipeExtract.badLink.message'));
+    return null;
+  }
+
+  // No usable link, so the text ITSELF is the share (#83). This used to be a dead end,
+  // deliberately: routing bare text to the model turns any app's share sheet into a general
+  // text→model endpoint on a soft-keyed proxy. That is still true — what changed is that
+  // the provenance fence has been REPLACED rather than removed. Bounded here, budgeted
+  // here and in `read`, and throttled per family and per IP at the proxy. See
+  // `docs/adr/035-plain-text-share-provenance.md`.
+  //
+  // ⚠️ Bands are measured on the ORIGINAL trimmed string (declared above the link check,
+  // which also needs it), never on `capped` — that copy is ≤ the read cap by construction, so
+  // band logic reading it could never see either the truncate or the refuse band.
+
+  if (overCeilingByBytes || trimmed.length > MAX_SHARE_TEXT_CEILING) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'shared text was too long to read',
+      context: { action: 'rejected_type', detail: 'over_ceiling' },
+    });
+    showToast('info', t('shareTarget.text.tooLong.title'), t('shareTarget.text.tooLong.message'));
+    return null;
+  }
+
+  // Measured AFTER trim, or 30 spaces would pass. A couple of words cannot carry a date,
+  // a time and a title, and paying the model to discover that is pure cost.
+  if (trimmed.length < MIN_SHARE_TEXT_CHARS) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'shared text was too short to read',
+      context: { action: 'rejected_type', detail: 'too_short' },
+    });
+    showToast('info', t('shareTarget.text.tooShort.title'), t('shareTarget.text.tooShort.message'));
+    return null;
+  }
+
+  // PEEK, do not consume. Consent runs after `prepare`, so consuming here would burn a
+  // share when the user DECLINES. The matching `consumeAttempt` sits immediately before the
+  // AI call in `read`.
+  const budgetKey = textBudgetKey();
+  if (budgetKey) {
+    const allowed = peekAttempt(budgetKey, SHARE_TEXT_BUDGET);
+    if (!allowed.ok) {
+      refuseForQuota(env, allowed.resetsAt);
+      return null;
+    }
+  }
+
+  // Between the cap and the ceiling the text is bounded and the caller is told — but NOT
+  // here. `sourceFromText` runs inside triage, and the offline guard and the consent prompt
+  // both come after it and can both end the flow. Announcing "beanies read the beginning of
+  // it — check the details before you save" and then showing an offline error, or nothing at
+  // all because consent was declined, is a straight falsehood: nothing was read and there is
+  // nothing to save. The same applies to the event, which the design deliberately files
+  // OUTSIDE the refusal bucket as "a success with a notice" — emitted here it would count
+  // attempts, so its ratio against `ready` would overstate truncated successes by every
+  // declined and offline attempt.
+  //
+  // The flag rides on the ShareSource; `runIngest` announces it at the point it becomes true.
+  const truncated = trimmed.length > MAX_SHARE_TEXT_CHARS;
+
+  logReceivedKind(env, 'text', 0);
+  // `boundText`, not `slice`: cutting UTF-16 code units can split a surrogate pair and hand
+  // the model a U+FFFD where an emoji was.
+  return { kind: 'text', text: boundText(trimmed, MAX_SHARE_TEXT_CHARS), truncated };
+}
 
 /**
  * Triage the share into documents or a link. NO NETWORK — which is what lets the single
@@ -217,13 +489,30 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
   // Whether `text` came from a shared `.txt` FILE rather than from a caption. The two are
   // treated differently below: a .txt IS the share, a caption merely accompanies files.
   let textFromFile = false;
+  // Set when the FILE's byte size puts it unambiguously past the ceiling. See below for why
+  // this is a flag and not an early return.
+  let overCeilingByBytes = false;
   if (!usable.length && !text) {
     const textFile = stamped.find((f) => f.type === 'text/plain');
-    // Bound the DECODE, not just its result: another app can hand over a 100 MB file
-    // declaring itself text, and decoding it whole before slicing is the very OOM the cap
-    // exists to prevent. 4 = the UTF-8 worst case per character.
     if (textFile) {
-      text = await textFile.slice(0, MAX_SHARE_TEXT_CHARS * 4).text();
+      // Decide the band from `File.size` BEFORE decoding. Reading a fixed
+      // `MAX_SHARE_TEXT_CHARS * 4` slice — as this did until #83 — silently reduced a
+      // 50,000-character iOS share to 4,000 characters before any band logic could see it,
+      // so it could never be classified `over_ceiling` and looked like an ordinary under-cap
+      // share. That is exactly the "silently reads the first slice of a wall of text"
+      // behaviour the size policy exists to prevent.
+      //
+      // ⚠️ This sets a FLAG rather than returning. iOS delivers a shared URL as a `.txt`, and
+      // a mail-app selection can exceed the byte bound, so refusing here would break a `.txt`
+      // that BEGINS WITH A LINK — which takes the link path today and must keep doing so. The
+      // verdict is applied only in the no-URL fallback below.
+      overCeilingByBytes = textFile.size > MAX_SHARE_TEXT_BYTES;
+      // The slice in the non-over-ceiling arm is belt-and-braces against a lying `File.size`,
+      // NOT the working bound — the two numbers are equal, so it never clips a file that is
+      // actually used and can never split a UTF-8 sequence. Deliberate; not dead code.
+      text = await textFile
+        .slice(0, overCeilingByBytes ? MAX_SHARE_TEXT_CHARS * 4 : MAX_SHARE_TEXT_BYTES)
+        .text();
       textFromFile = true;
     }
   }
@@ -252,7 +541,7 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
         t('shareTarget.firstAttached.message')
       );
     }
-    logReceivedKind('file', usable.length);
+    logReceivedKind(SHARE_ENV, 'file', usable.length);
     return { kind: 'documents', files: usable };
   }
 
@@ -278,44 +567,11 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
   }
 
   if (text) {
-    // Cap before anything parses it — `extractUrls` splits the whole string. Accepted
-    // consequence: truncation can sever a URL sitting past the cap, and `no_url` is then the
-    // honest outcome. Bounding untrusted input at the boundary is worth that tail.
-    const capped = text.slice(0, MAX_SHARE_TEXT_CHARS);
-    // The SAME predicate the resolver applies moments later. A weaker one here would pick a
-    // YouTube channel link sitting ahead of a good recipe URL and then die on it, with a
-    // readable link two words away.
-    //
-    // Punctuation is trimmed first because sentence-punctuated prose is the NORMAL input
-    // here — "Watch this https://youtu.be/dQw4w9WgXcQ." is how people share. `extractUrls`
-    // strips it on its bare-domain pass but not on its protocol pass, and the trailing dot
-    // makes the video id 12 characters, which `routeUrl` rejects outright: a perfectly
-    // readable video became "No Link Found".
-    // Imported HERE rather than at module scope. `App.vue` statically imports
-    // `useShareTargets`, which imports this file — so a top-level import would drag the
-    // recipe link-reading graph (`recipeSourceUrl`, `recipeSourceResolver`,
-    // `recipeFetchService`, `shareLink` — ~22 KB) into the eager entry chunk, where none of
-    // it lived before. Until now it was reachable only from the lazily-routed cookbook.
-    // Every cold boot would pay for it; only a text share ever runs it.
-    const { routeUrl } = await import('@/utils/recipeSourceUrl');
-    const url = extractUrls(capped)
-      .map(trimUrlPunctuation)
-      .find((candidate) => routeUrl(candidate).kind !== 'invalid');
-    if (url) {
-      logReceivedKind('link', 0);
-      return { kind: 'link', url };
-    }
-
-    // Deliberately a toast, NOT a `share`-task call on the bare text: that would turn any
-    // app's share sheet into a general text→model endpoint on a soft-keyed proxy, and it is
-    // a different feature with its own UX questions. One string pair is the honest answer.
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'shared text carried no link',
-      context: { action: 'no_url' },
-    });
-    showToast('info', t('shareTarget.noLink.title'), t('shareTarget.noLink.message'));
+    const fromText = await sourceFromText(text, SHARE_ENV, overCeilingByBytes);
+    if (fromText) return fromText;
+    // `null` means the text was refused and the user already told — but a caption beside
+    // files is a different story, and that case returned earlier. Reaching here means the
+    // text WAS the share, so the refusal is the whole answer.
     return null;
   }
 
@@ -344,38 +600,103 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
  */
 type ReadOutcome = { kind: 'none' } | { kind: ShareKind; payload: SharePayload };
 
-async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutcome | null> {
+async function read(
+  source: ShareSource,
+  grant: ConsentGrant,
+  env: IngestEnv
+): Promise<ReadOutcome | null> {
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { reportExtractionFailure } = useExtractionErrorToast();
   const { tier, byokConfig } = useAiCapability();
+  const detail = sourceDetail(source);
   const opts = {
     tier: tier.value,
     todayIso: toDateInputValue(new Date()),
     byok: byokConfig.value ?? undefined,
     grant,
+    // Lets the proxy rate-limit per family (#83). Absent is a supported state, not an error:
+    // the Lambda falls back to its IP limit. Read from the context store rather than the AI
+    // layer, which is deliberately store-free.
+    familyId: useFamilyContextStore().activeFamilyId ?? undefined,
   };
+
+  /** Report an extraction failure once, tagged with which funnel it came from. */
+  function failed(errorCode: ExtractionErrorCode | undefined): null {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'share extraction failed',
+      context: { action: 'failed', error_code: errorCode, detail },
+    });
+    reportExtractionFailure(errorCode);
+    return null;
+  }
+
+  /**
+   * Extract from TEXT and classify the result. Shared verbatim by the link arm (a fetched
+   * page's reduced text) and the #83 text arm (what a person selected in another app) —
+   * everything downstream of `extractShareFromText` is identical for the two, and writing it
+   * twice is how the two funnels would drift.
+   */
+  // `envelope`, not `env` — `env` is the IngestEnv in scope, and shadowing it here with a
+  // ResultEnvelope is exactly the kind of confusion that produces a wrong-funnel event.
+  async function readText(text: string, envelope: ResultEnvelope): Promise<ReadOutcome | null> {
+    const result = await extractShareFromText(text, opts);
+    if (!result.success || !result.data) return failed(result.errorCode);
+    return classify(result.data, envelope);
+  }
 
   if (source.kind === 'documents') {
     // ONE call that classifies AND extracts. The page cap lives in the funnel; this
     // orchestrator never counts pages or files.
     const result = await extractShareFromDocuments(source.files, opts);
-    if (!result.success || !result.data) {
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'share extraction failed',
-        context: { action: 'failed', error_code: result.errorCode },
-      });
-      reportExtractionFailure(result.errorCode);
-      return null;
-    }
+    if (!result.success || !result.data) return failed(result.errorCode);
     return classify(result.data, {
       sourceFile: source.files[0],
       compressedBlob: result.compressedBlob,
       truncated: result.truncated,
-      origin: 'share',
+      origin: env.origin,
     });
+  }
+
+  if (source.kind === 'text') {
+    // CONSUME the budget here, not in `prepare`. This is the last point before an AI call is
+    // actually made, so consent having been declined — or any earlier refusal — costs the
+    // user nothing. `prepare`'s peek is what makes the refusal cheap and pre-consent; this is
+    // what makes it correct.
+    const budgetKey = textBudgetKey();
+    if (budgetKey) {
+      const allowed = consumeAttempt(budgetKey, SHARE_TEXT_BUDGET);
+      if (!allowed.ok) {
+        refuseForQuota(env, allowed.resetsAt);
+        return null;
+      }
+    }
+    // The truncation notice belongs HERE, not in triage: this is the first point at which
+    // "beanies read the beginning of it" is actually true — offline has been ruled out,
+    // consent has been given, and the budget has just been spent on a real call.
+    if (source.truncated) {
+      logEvent({
+        level: 'info',
+        surface: env.surface,
+        // NOT `rejected_type`: a truncated read is a success with a notice, and filing it as
+        // a rejection would inflate the refusal counter and hide a success.
+        message: 'shared text was truncated',
+        context: { action: 'truncated', detail: 'text' },
+      });
+      showToast(
+        'info',
+        t('shareTarget.text.truncated.title'),
+        t('shareTarget.text.truncated.message')
+      );
+    }
+
+    // ⚠️ `truncated` is deliberately NOT set on the envelope. Every review surface renders
+    // `ai.pdfTruncated.*` from it — copy about PAGES, which a text share does not have. The
+    // truncation notice is `prepare`'s own toast; setting this too would show two notices,
+    // one of them about pages that do not exist.
+    return readText(source.text, { sourceFile: null, origin: env.origin });
   }
 
   // A LINK. `resolveRecipeSource` is reused verbatim — despite the name, its page route
@@ -398,7 +719,7 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
       const link = toShareLink(resolved, route);
       logEvent({
         level: 'info',
-        surface: SURFACE,
+        surface: env.surface,
         message: 'link resolved',
         context: { action: 'resolved', extraction_path: resolved.path },
       });
@@ -410,7 +731,7 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
         payload: {
           kind: 'recipe',
           source: { via: 'jsonld', recipe: resolved.recipe },
-          env: { sourceFile: null, link, origin: 'share' },
+          env: { sourceFile: null, link, origin: env.origin },
         },
       };
     }
@@ -418,29 +739,18 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
       const link = toShareLink(resolved, route);
       logEvent({
         level: 'info',
-        surface: SURFACE,
+        surface: env.surface,
         message: 'link resolved',
         context: { action: 'resolved', extraction_path: resolved.path },
       });
-      const result = await extractShareFromText(resolved.text, opts);
-      if (!result.success || !result.data) {
-        logEvent({
-          level: 'info',
-          surface: SURFACE,
-          message: 'share extraction failed',
-          context: { action: 'failed', error_code: result.errorCode },
-        });
-        reportExtractionFailure(result.errorCode);
-        return null;
-      }
-      return classify(result.data, { sourceFile: null, link, origin: 'share' });
+      return readText(resolved.text, { sourceFile: null, link, origin: env.origin });
     }
     case 'titleOnly': {
       // Same fallback the pasted-link path takes: a named, linked recipe the user finishes
       // themselves, rather than losing a capture they chose deliberately.
       logEvent({
         level: 'info',
-        surface: SURFACE,
+        surface: env.surface,
         message: 'link resolved to a title only',
         context: { action: 'resolved', extraction_path: resolved.path, detail: 'title_only' },
       });
@@ -452,7 +762,7 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
           source: { via: 'titleOnly', title: resolved.title },
           env: {
             sourceFile: null,
-            origin: 'share',
+            origin: env.origin,
             link: {
               pageUrl: resolved.sourceUrl,
               provenanceUrl: resolved.sourceUrl,
@@ -472,7 +782,7 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
       // make a "failed / received" alarm page on a healthy week when people share Shorts.
       logEvent({
         level: 'warn',
-        surface: SURFACE,
+        surface: env.surface,
         message: 'refused to read the link',
         context: { action: 'refused', error_code: resolved.reason },
       });
@@ -487,9 +797,9 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
     case 'failed':
       logEvent({
         level: 'info',
-        surface: SURFACE,
+        surface: env.surface,
         message: 'link fetch failed',
-        context: { action: 'failed', error_code: resolved.errorCode },
+        context: { action: 'failed', error_code: resolved.errorCode, detail },
       });
       reportExtractionFailure(resolved.errorCode);
       return null;
@@ -513,9 +823,6 @@ async function read(source: ShareSource, grant: ConsentGrant): Promise<ReadOutco
  * count of one long function.
  */
 export async function ingestSharedContent(content: SharedContent, meta: ShareMeta): Promise<void> {
-  const { showToast } = useToast();
-  const { t } = useTranslation();
-
   // Fires before anything can fail, so every later event has a denominator.
   //
   // `detail` is deliberately NOT decided here. On iOS — the one platform where a shared link
@@ -524,16 +831,49 @@ export async function ingestSharedContent(content: SharedContent, meta: ShareMet
   // `detail='link'`. The verdict is known one function later, so `prepare` emits it.
   logEvent({
     level: 'info',
-    surface: SURFACE,
+    surface: SHARE_ENV.surface,
     message: 'share received',
     context: { action: 'received', os: meta.platform, cold_start: meta.coldStart },
   });
 
+  await withIngestLock(SHARE_ENV, async () => {
+    // ⚠️ Readiness and triage are SHARE-ONLY and stay outside `runIngest`, in this order.
+    // `awaitReadiness` polls for a cold-started app to finish restoring its session, which is
+    // meaningless inside a running one; `prepare` is platform triage, which an in-app capture
+    // has no equivalent of. Folding either into the shared tail would change the share path's
+    // behaviour, which this split exists to avoid.
+    if (!(await awaitReadiness())) return;
+
+    const source = await prepare(content, meta);
+    if (!source) return; // already logged and toasted
+
+    await runIngest(source, SHARE_ENV);
+  });
+}
+
+/**
+ * The busy guard, the reading overlay and the outermost catch. Wraps BOTH entry points.
+ *
+ * ⚠️ Separate from `runIngest` for a REASON, not for symmetry. The busy guard fires before
+ * `awaitReadiness` and `prepare`; folding the lock into `runIngest` would move it after them
+ * on the share path, which is a behaviour change. This wrapper preserves the current ordering
+ * exactly.
+ *
+ * The lock is shared by both doors deliberately. `isIngesting` is module-level and already
+ * means "one AI read at a time, app-wide": an in-app capture must contend for it, or a share
+ * arriving mid-capture doubles the AI spend. It is also what drives
+ * `isReadingSharedDocument`, so the in-app path inherits the globally-mounted
+ * `AiProcessingOverlay` with no new code at all.
+ */
+async function withIngestLock(env: IngestEnv, run: () => Promise<void>): Promise<void> {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+
   if (isIngesting.value) {
     logEvent({
       level: 'info',
-      surface: SURFACE,
-      message: 'share arrived mid-ingest',
+      surface: env.surface,
+      message: 'ingest arrived while busy',
       context: { action: 'busy' },
     });
     showToast('info', t('shareTarget.busy.title'), t('shareTarget.busy.message'));
@@ -542,75 +882,13 @@ export async function ingestSharedContent(content: SharedContent, meta: ShareMet
   isIngesting.value = true;
 
   try {
-    if (!(await awaitReadiness())) return;
-
-    const source = await prepare(content, meta);
-    if (!source) return; // already logged and toasted
-
-    // Offline sits between triage and consent — both `prepare` branches are network-free, so
-    // the file path's original ordering (triage → offline → consent → extract) is preserved.
-    const { reportExtractionFailure } = useExtractionErrorToast();
-    if (!useOnline().isOnline.value) {
-      reportExtractionFailure('offline');
-      return;
-    }
-
-    // ADR-030 consent, before a single byte leaves the device — and before the FETCH, not
-    // just the extraction. A third-party app cannot cause a document or a page to be read
-    // without the user seeing this.
-    const grant = await requestConsent();
-    if (!grant) {
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'consent declined',
-        context: { action: 'consent_declined' },
-      });
-      return;
-    }
-
-    const outcome = await read(source, grant);
-    if (!outcome) return; // already logged and toasted
-
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'share classified',
-      context: { action: 'classified', kind: outcome.kind },
-    });
-
-    if (outcome.kind === 'none') {
-      showToast('info', t('shareTarget.unrecognised.title'), t('shareTarget.unrecognised.message'));
-      return;
-    }
-
-    // Is the destination reader actually available to this member? Permission AND flag — say
-    // so rather than routing into a silent no-op.
-    const reader = readerForShareKind(outcome.kind);
-    if (!isReaderEnabled(reader)) {
-      logEvent({
-        level: 'warn',
-        surface: SURFACE,
-        message: 'target reader unavailable',
-        context: { action: 'reader_disabled', kind: outcome.kind },
-      });
-      showToast('info', t('shareTarget.readerOff.title'), t('shareTarget.readerOff.message'));
-      return;
-    }
-
-    dispatchSharePayload(outcome.payload);
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'share ready for review',
-      context: { action: 'ready', kind: outcome.kind },
-    });
+    await run();
   } catch (err) {
     // A native listener rejection escapes Vue's error handler entirely, so this catch is the
     // only thing between a throw and a user who is told nothing.
     reportError({
-      surface: SURFACE,
-      message: 'share ingest threw',
+      surface: env.surface,
+      message: 'ingest threw',
       // Not `critical`: nothing is persisted at this point, so no user data is at risk.
       severity: 'error',
       error: err,
@@ -620,6 +898,202 @@ export async function ingestSharedContent(content: SharedContent, meta: ShareMet
   } finally {
     isIngesting.value = false;
   }
+}
+
+/**
+ * The shared tail: offline → consent → read → classify → none → reader gate → dispatch.
+ *
+ * Everything from here down is identical whichever door the content came in by, which is
+ * exactly why it is one function. The ONLY thing the two entry points disagree about is how a
+ * `ShareSource` was obtained.
+ */
+async function runIngest(source: ShareSource, env: IngestEnv): Promise<void> {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+
+  // Offline sits between triage and consent — every `ShareSource` is produced without a
+  // network call, so the file path's original ordering (triage → offline → consent → extract)
+  // is preserved.
+  const { reportExtractionFailure } = useExtractionErrorToast();
+  if (!useOnline().isOnline.value) {
+    reportExtractionFailure('offline');
+    return;
+  }
+
+  // ADR-030 consent, before a single byte leaves the device — and before the FETCH, not just
+  // the extraction. A third-party app cannot cause a document or a page to be read without
+  // the user seeing this, and neither can a mis-tap inside beanies.
+  const grant = await requestConsent();
+  if (!grant) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'consent declined',
+      context: { action: 'consent_declined' },
+    });
+    return;
+  }
+
+  const outcome = await read(source, grant, env);
+  if (!outcome) return; // already logged and toasted
+
+  logEvent({
+    level: 'info',
+    surface: env.surface,
+    message: 'share classified',
+    context: { action: 'classified', kind: outcome.kind },
+  });
+
+  if (outcome.kind === 'none') {
+    showToast('info', t('shareTarget.unrecognised.title'), t('shareTarget.unrecognised.message'));
+    return;
+  }
+
+  // Is the destination reader actually available to this member? Permission AND flag — say
+  // so rather than routing into a silent no-op.
+  const reader = readerForShareKind(outcome.kind);
+  if (!isReaderEnabled(reader)) {
+    logEvent({
+      level: 'warn',
+      surface: env.surface,
+      message: 'target reader unavailable',
+      context: { action: 'reader_disabled', kind: outcome.kind },
+    });
+    showToast('info', t('shareTarget.readerOff.title'), t('shareTarget.readerOff.message'));
+    return;
+  }
+
+  dispatchSharePayload(outcome.payload);
+  logEvent({
+    level: 'info',
+    surface: env.surface,
+    message: 'share ready for review',
+    // `detail` here is what gives each source's conversion rate a denominator: the `triaged`
+    // event already carries it, so filtering on one value follows a capture from arrival to
+    // review without the funnels sharing a counter.
+    context: { action: 'ready', kind: outcome.kind, detail: sourceDetail(source) },
+  });
+}
+
+// ─── The IN-APP entry point (#84) ────────────────────────────────────────────────────────
+
+const IN_APP_ENV: IngestEnv = { surface: 'magic-beans-capture', origin: 'in-app' };
+
+/** What the magic-beans sheet can hand over. A camera shot and a picked file are the same
+ *  thing once a `File` exists, so there are two arms rather than three. */
+export type InAppInput = { kind: 'file'; file: File } | { kind: 'paste'; text: string };
+
+/**
+ * Record that someone opened the magic-beans sheet (#84).
+ *
+ * ⚠️ This is the DENOMINATOR, so it must fire when the sheet OPENS — not when an ingest
+ * starts. Fired at the ingest it would only ever count captures the user went through with,
+ * making the rate equal to the numerator: opening the sheet and abandoning it would be
+ * indistinguishable from never tapping the button at all, and "is anybody using this?" —
+ * the first question this feature has to answer — would be unanswerable.
+ *
+ * Exported so the card can call it at the tap while `IN_APP_ENV` stays private here.
+ */
+export function logCaptureOpened(): void {
+  logEvent({
+    level: 'info',
+    surface: IN_APP_ENV.surface,
+    message: 'capture opened',
+    context: { action: 'opened' },
+  });
+}
+
+/**
+ * Read something the user handed over from INSIDE beanies, and route it by what the AI says
+ * it is — the same pipeline a share goes through (#84).
+ *
+ * ── Why this lives here, beside `ingestSharedContent` ─────────────────────────────────
+ *
+ * It uses four of this file's private helpers (`withIngestLock`, `runIngest`,
+ * `sourceFromText`, `notReady`), and putting the two entry points on one screen is what makes
+ * a divergence between them visible. A separate composable would hide exactly the drift this
+ * change exists to remove.
+ *
+ * A plain exported FUNCTION, not a composable: `prepare` already runs from a native listener
+ * outside `setup()`, and this file deliberately holds no lifecycle hooks.
+ *
+ * ⚠️ If a FIFTH source ever appears, the seam to cut is `prepare`/`read` into a `share/`
+ * module pair — NOT "one composable per entry point". Two entry points is the maximum this
+ * shape supports; a third means the split above.
+ */
+export async function ingestInAppSource(input: InAppInput): Promise<void> {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+
+  await withIngestLock(IN_APP_ENV, async () => {
+    // ⚠️ `awaitReadiness` is deliberately NOT called: auth and family are settled inside a
+    // running app, and its polling loop would be dead time. But ONE of its four preconditions
+    // still applies here — `isConfigured` is false for BYOK-without-a-key and for on-device,
+    // and without this check the user pays a consent prompt for a call that is guaranteed to
+    // fail at extraction. Same `notReady` site the share path uses, so there is one toast and
+    // one log for "not set up yet" rather than two phrasings of it.
+    if (!useAiCapability().isConfigured.value) {
+      notReady(IN_APP_ENV, 'ai_unconfigured', 'ai.unavailable.title', 'ai.unavailable.message');
+      return;
+    }
+
+    const source = await inAppSource(input, showToast, t);
+    if (!source) return; // already logged and toasted
+
+    await runIngest(source, IN_APP_ENV);
+  });
+}
+
+/**
+ * Turn an in-app input into a `ShareSource`, or refuse it out loud.
+ *
+ * Three lines of triage and then the shared tail — everything about WHAT is acceptable comes
+ * from the same two helpers the share path uses (`withSniffedType` + `isAiPickerAcceptedFile`
+ * for files, `sourceFromText` for text). There is deliberately no second accept policy and no
+ * second text policy here.
+ */
+async function inAppSource(
+  input: InAppInput,
+  showToast: ReturnType<typeof useToast>['showToast'],
+  t: ReturnType<typeof useTranslation>['t']
+): Promise<ShareSource | null> {
+  if (input.kind === 'paste') {
+    return sourceFromText(input.text, IN_APP_ENV);
+  }
+
+  // Re-stamp with the type the BYTES say it is, exactly as `prepare` does — a PDF declared
+  // `application/octet-stream` must not be accepted and then compressed as an image.
+  const stamped = await withSniffedType(input.file);
+
+  // ⚠️ Size is checked SEPARATELY from acceptance, on purpose. `isAiPickerAcceptedFile`
+  // returns one boolean for "empty", "too big" and "not a type we read". At the share boundary
+  // one message for all three was right, because the user did not choose the file. In-app they
+  // did choose it, and "too big, here is the limit" is actionable where "can't read that" is
+  // not. This check must come FIRST, or the size case falls into the generic message.
+  if (stamped.size > AI_PICKER_MAX_BYTES) {
+    logEvent({
+      level: 'info',
+      surface: IN_APP_ENV.surface,
+      message: 'capture file too large',
+      context: { action: 'rejected_type', detail: 'too_large' },
+    });
+    showToast('info', t('ai.picker.tooLarge.title'), t('ai.picker.tooLarge.message'));
+    return null;
+  }
+
+  if (!(await isAiPickerAcceptedFile(stamped))) {
+    logEvent({
+      level: 'info',
+      surface: IN_APP_ENV.surface,
+      message: 'capture file unreadable',
+      context: { action: 'rejected_type', detail: 'unsupported' },
+    });
+    showToast('info', t('shareTarget.unsupported.title'), t('shareTarget.unsupported.message'));
+    return null;
+  }
+
+  logReceivedKind(IN_APP_ENV, 'file', 1);
+  return { kind: 'documents', files: [stamped] };
 }
 
 /**

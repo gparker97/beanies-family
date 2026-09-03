@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-03",
-    "translationCount": 4416
+    "translationCount": 4434
   },
   "translations": {
     "app.name": {
@@ -14872,9 +14872,9 @@
       "lastUpdated": "2026-06-08"
     },
     "ai.consent.intro": {
-      "translation": "beanies 会读取这张照片或文档，神奇地帮你提取关键信息（嗯，其实不是魔法，只是安全、私密的 AI）。",
-      "hash": "s9q2es",
-      "lastUpdated": "2026-06-07"
+      "translation": "beanies将阅读这张照片、文档或选定的文本，并神奇地为您提取关键细节（嗯，这实际上并不神奇，它只是安全、私密的人工智能）。",
+      "hash": "bfbspc",
+      "lastUpdated": "2026-09-03"
     },
     "ai.consent.whatLabel": {
       "translation": "我们发送的内容",
@@ -14882,9 +14882,9 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whatValue": {
-      "translation": "只有这张照片或文件，没有其他任何东西，也没有任何家庭数据。",
-      "hash": "wi603u",
-      "lastUpdated": "2026-06-03"
+      "translation": "只有这张照片、文件或一段文字，没有其他任何东西，也没有任何家庭数据。",
+      "hash": "cb0azm",
+      "lastUpdated": "2026-09-03"
     },
     "ai.consent.whereLabel": {
       "translation": "去向",
@@ -14892,9 +14892,9 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.whereManaged": {
-      "translation": "发送到私有 AI 服务：它在连运营商也无法窥视的安全硬件中读取文档，之后不保留任何内容。文档全程加密传输，途经 beanies 服务器，但服务器不会存储任何内容。",
-      "hash": "vez89n",
-      "lastUpdated": "2026-07-10"
+      "translation": "对于在安全硬件中读取它的私有AI服务，它自己的操作员无法看到，然后什么也不保留。它通过不存储任何内容的beanies服务器加密传输。",
+      "hash": "t40j46",
+      "lastUpdated": "2026-09-03"
     },
     "ai.consent.whereByok": {
       "translation": "使用您提供的密钥，提供给您自己的人工智能提供商。",
@@ -14907,9 +14907,9 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.afterValue": {
-      "translation": "AI服务不保留任何内容。您的照片或文件只会与您家人的数据一起保存，并附加到此活动中。",
-      "hash": "j5kpdz",
-      "lastUpdated": "2026-06-03"
+      "translation": "AI服务不保留任何内容。Beanies保存的任何东西都只会与您自己家庭的数据一起保存，并附加到此项目中。",
+      "hash": "v42bfn",
+      "lastUpdated": "2026-09-03"
     },
     "ai.consent.confirm": {
       "translation": "我明白了，魔豆拿来吧！",
@@ -14942,9 +14942,9 @@
       "lastUpdated": "2026-06-03"
     },
     "settings.ai.askBeforePhotosHint": {
-      "translation": "在将照片或文档发送给beanies AI之前，请先显示隐私检查。",
-      "hash": "oq9unm",
-      "lastUpdated": "2026-06-03"
+      "translation": "在向AI发送照片、文档或所选文本之前，显示隐私检查。",
+      "hash": "5lpmkg",
+      "lastUpdated": "2026-09-03"
     },
     "ai.sourcePhotoPreview": {
       "translation": "保存后附加",
@@ -15332,19 +15332,9 @@
       "lastUpdated": "2026-06-08"
     },
     "ai.magic.subtitle": {
-      "translation": "拍下邀请函或旅行预订，beanies 帮你填好",
-      "hash": "vv84co",
-      "lastUpdated": "2026-06-07"
-    },
-    "ai.magic.invite": {
-      "translation": "邀请函",
-      "hash": "yq6orb",
-      "lastUpdated": "2026-06-07"
-    },
-    "ai.magic.travelBooking": {
-      "translation": "旅行预订",
-      "hash": "e8gk99",
-      "lastUpdated": "2026-06-07"
+      "translation": "一张照片、一个文件、一个链接或一些文字— beanies计算出它是什么",
+      "hash": "po1m9h",
+      "lastUpdated": "2026-09-03"
     },
     "ai.magic.perform": {
       "translation": "魔豆",
@@ -20637,9 +20627,9 @@
       "lastUpdated": "2026-08-27"
     },
     "shareTarget.busy.message": {
-      "translation": "beanies仍在阅读您分享的最后一篇文章。请稍后重试。",
-      "hash": "ij0gqz",
-      "lastUpdated": "2026-08-27"
+      "translation": "beanies仍在阅读你给它的最后一件事。请稍后重试。",
+      "hash": "dx6byg",
+      "lastUpdated": "2026-09-03"
     },
     "shareTarget.signIn.title": {
       "translation": "请先登录！",
@@ -20709,16 +20699,6 @@
     "shareTarget.firstAttached.message": {
       "translation": "beanies将所有这些都视为一个项目。第一个作为附件保留。",
       "hash": "x48m51",
-      "lastUpdated": "2026-08-27"
-    },
-    "shareTarget.noLink.title": {
-      "translation": "没有链接",
-      "hash": "4z94zp",
-      "lastUpdated": "2026-08-27"
-    },
-    "shareTarget.noLink.message": {
-      "translation": "您分享的内容中没有链接。Beanies会阅读链接、照片、屏幕截图和PDF。",
-      "hash": "s3ne7y",
       "lastUpdated": "2026-08-27"
     },
     "shareTarget.failed.title": {
@@ -20916,11 +20896,6 @@
       "hash": "1g5nbi",
       "lastUpdated": "2026-08-27"
     },
-    "recipeExtract.link.orFrom": {
-      "translation": "或阅读自",
-      "hash": "6vtgy1",
-      "lastUpdated": "2026-08-27"
-    },
     "recipeExtract.reader.label": {
       "translation": "阅读配方",
       "hash": "ow7fcn",
@@ -20929,11 +20904,6 @@
     "recipeExtract.reader.aria": {
       "translation": "通过链接、照片或PDF阅读食谱",
       "hash": "tskrgj",
-      "lastUpdated": "2026-08-27"
-    },
-    "recipeExtract.chip.title": {
-      "translation": "配方",
-      "hash": "um2dea",
       "lastUpdated": "2026-08-27"
     },
     "loginFlow.recoveryTitle": {
@@ -21736,11 +21706,6 @@
       "hash": "tk75j0",
       "lastUpdated": "2026-09-01"
     },
-    "wall.today.now": {
-      "translation": "即时消息--",
-      "hash": "sl3kkq",
-      "lastUpdated": "2026-09-01"
-    },
     "wall.filter.everyone": {
       "translation": "所有人",
       "hash": "5qdaq3",
@@ -22084,6 +22049,131 @@
     "wall.leave.busy": {
       "translation": "仍在节省费用。请稍等片刻，然后再次尝试离开。",
       "hash": "n1qc1n",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.grid.quietUntil": {
+      "translation": "安静至{time}",
+      "hash": "xlr7sz",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.grid.allDay": {
+      "translation": "所有",
+      "hash": "cf37nh",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.grid.everyone": {
+      "translation": "所有人",
+      "hash": "5qdaq3",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.grid.runningNow": {
+      "translation": "正在播出",
+      "hash": "1ol2",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.grid.nowAt": {
+      "translation": "现在{time}",
+      "hash": "x0cehr",
+      "lastUpdated": "2026-09-03"
+    },
+    "wall.grid.fallback": {
+      "translation": "显示简单列表—无法绘制时间网格",
+      "hash": "ql14bb",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.tooShort.title": {
+      "translation": "不够阅读",
+      "hash": "k36dvc",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.tooShort.message": {
+      "translation": "豆子需要的不止于此。包括日期、时间和位置。",
+      "hash": "lc0lw1",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.tooLong.title": {
+      "translation": "有很多文字",
+      "hash": "l9blp3",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.tooLong.message": {
+      "translation": "这比Beanies一次可以阅读的文本还要多。选择包含详细信息的零件，然后重试。",
+      "hash": "xd1pcz",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.truncated.title": {
+      "translation": "阅读第一部分",
+      "hash": "piwzhg",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.truncated.message": {
+      "translation": "那很长，所以豆子读了它的开头。保存前，请检查详细信息。",
+      "hash": "rf6jd1",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.quota.title": {
+      "translation": "这已经足够了",
+      "hash": "jockoo",
+      "lastUpdated": "2026-09-03"
+    },
+    "shareTarget.text.quota.message": {
+      "translation": "beanies在过去一小时内阅读了此设备上的大量文本。请在{resetsAt}后重试。",
+      "hash": "2mjt8i",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.error.rateLimited.title": {
+      "translation": "深呼吸",
+      "hash": "wfqvbc",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.error.rateLimited.message": {
+      "translation": "beanies刚刚做了很多阅读。请稍等几分钟，然后重试。",
+      "hash": "6btr4i",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.magic.action": {
+      "translation": "给我读点东西",
+      "hash": "gcf4f5",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.picker.orFrom": {
+      "translation": "或阅读自",
+      "hash": "6vtgy1",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.picker.tooLarge.title": {
+      "translation": "文件太大",
+      "hash": "pw6trr",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.picker.tooLarge.message": {
+      "translation": "beanies可以读取高达25 MB的文件。请尝试较小的照片或重要部分的屏幕截图。",
+      "hash": "pfr8zq",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.capture.title": {
+      "translation": "魔豆",
+      "hash": "laeicw",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.capture.action": {
+      "translation": "看看这本书吧",
+      "hash": "pmt8vf",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.capture.label": {
+      "translation": "粘贴任何内容",
+      "hash": "k707sh",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.capture.placeholder": {
+      "translation": "粘贴消息、电子邮件或链接……",
+      "hash": "u9e6jg",
+      "lastUpdated": "2026-09-03"
+    },
+    "ai.capture.hint": {
+      "translation": "邀请，预订，食谱— beanies就是这样。",
+      "hash": "r4zwzg",
       "lastUpdated": "2026-09-03"
     }
   }

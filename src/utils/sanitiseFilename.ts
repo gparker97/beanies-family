@@ -1,3 +1,4 @@
+import { boundText } from './boundText';
 // Bound an untrusted filename before it reaches a `File` and, from there, storage (#64).
 //
 // The share boundary is exported to every app on the device (an Android `ACTION_SEND` filter
@@ -37,7 +38,7 @@ export function sanitiseAttachmentBase(name: string): string {
   const basename = name.split(/[/\\]/).pop() ?? '';
   // Drop the final extension — the caller appends the real one.
   const withoutExt = basename.replace(/\.[^.]*$/, '');
-  const cleaned = withoutExt
+  const bounded = withoutExt
     // Then flatten anything left, so a double extension cannot survive.
     .replace(/\./g, ' ')
     // Keep letters, marks and digits in ANY script, plus space, dash and underscore.
@@ -45,13 +46,14 @@ export function sanitiseAttachmentBase(name: string): string {
     .replace(/[^\p{L}\p{M}\p{N} \-_]+/gu, '-')
     .replace(/-{2,}/g, '-')
     .replace(/\s{2,}/g, ' ')
-    .replace(/^[-_\s]+|[-_\s]+$/g, '')
-    .slice(0, MAX_BASE_LENGTH)
-    // Slicing counts UTF-16 units, so it can cut an astral character (CJK Ext-B, Adlam,
-    // Deseret — all `\p{L}`, all preserved above) in half and leave a lone surrogate that
-    // then reaches storage. Unreachable while the filter was ASCII-only; reachable now.
-    .replace(/[\uD800-\uDBFF]$/, '')
-    // Slicing can also re-expose a trailing separator.
+    .replace(/^[-_\s]+|[-_\s]+$/g, '');
+
+  // Bounding counts UTF-16 units, so it can cut an astral character (CJK Ext-B, Adlam,
+  // Deseret — all `\p{L}`, all preserved above) in half and leave a lone surrogate that then
+  // reaches storage. `boundText` is the ONE answer to that question in this codebase; the trim
+  // used to be inlined here, which is exactly the drift a shared helper exists to prevent.
+  const cleaned = boundText(bounded, MAX_BASE_LENGTH)
+    // Bounding can also re-expose a trailing separator.
     .replace(/[-_\s]+$/, '');
 
   return cleaned || FALLBACK_BASE;

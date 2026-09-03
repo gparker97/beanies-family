@@ -1,26 +1,76 @@
 <script setup lang="ts">
 /**
- * "beanies can do magic" — the FAB quick-add sheet card. The one magic surface
- * that lives OUTSIDE a page (the sheet is mounted at the app shell), so it
- * dispatches through the `useMagicReader` singleton (`openPhotoReader` /
- * `openDocumentReader`) rather than a local emit. Self-gating: the whole card is
- * hidden unless at least one reader is available, and each chip shows only when
- * its flag + permission allow. When a single chip shows it spans full width.
+ * "beanies can do magic" — the FAB quick-add sheet card.
+ *
+ * ONE button since #84. It used to carry three chips (📸 invite / ✈️ travel booking /
+ * 🍳 recipe), each opening a different reader, which meant the user had to declare what their
+ * photo or document WAS before beanies had looked at it. That is the AI's job — and picking
+ * wrong produced a bad extraction rather than a helpful error. See `MagicBeansSheet`.
+ *
+ * Self-gating on `canReadAny`, exactly as before. That is permission-neutral by construction
+ * rather than by flag state: `gate('recipe')` is ungated, so `canReadAny` reduces to
+ * `canEditActivities` unconditionally — the two feature flags never entered into it.
+ *
+ * ⚠️ The `AiDocumentPicker` is mounted HERE, on the card, and not inside the sheet. On native,
+ * the camera intent backgrounds the app; if the component holding the hidden input unmounts
+ * while that is happening, the `change` callback lands on a dead input and the photo silently
+ * vanishes. The card stays mounted while the magic drawer is open, so the ref stays live. If
+ * this ever proves fragile on a real device, hoist the picker to the app shell beside
+ * `AiProcessingOverlay` — do NOT paper over it with a retry.
  */
+import { ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMagicReader } from '@/composables/useMagicReader';
+import { ingestInAppSource, logCaptureOpened } from '@/composables/useSharedDocumentIngest';
+import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
+import MagicBeansSheet from '@/components/ai/MagicBeansSheet.vue';
 import BetaBadge from '@/components/ui/BetaBadge.vue';
 
 const { t } = useTranslation();
-const {
-  canReadPhoto,
-  canReadDocument,
-  canReadRecipe,
-  canReadAny,
-  openPhotoReader,
-  openDocumentReader,
-  openRecipeReader,
-} = useMagicReader();
+const { canReadAny } = useMagicReader();
+
+const sheetOpen = ref(false);
+
+/**
+ * The denominator for the whole in-app funnel — see `logCaptureOpened`. Fired at the TAP so
+ * abandonment is measurable; every later event in the funnel is a fraction of this.
+ */
+function openSheet(): void {
+  logCaptureOpened();
+  sheetOpen.value = true;
+}
+const picker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
+
+/**
+ * Every path closes the sheet FIRST. See the sheet's header for the three separate things
+ * that break otherwise — the overlay z-index collision, the body-scroll lock, and
+ * `openQuickAdd()` refusing while an overlay is open, which leaves the FAB dead.
+ *
+ * The ingest is deliberately NOT awaited: it owns its own errors (`withIngestLock`'s catch
+ * reports and toasts) and runs for several seconds behind the global reading overlay. Awaiting
+ * here would add nothing and would keep this component's handler alive across a navigation.
+ */
+function handlePaste(text: string): void {
+  sheetOpen.value = false;
+  void ingestInAppSource({ kind: 'paste', text });
+}
+
+// The camera needs the image-only `capture` input, NOT the mixed accept: in a Capacitor
+// WebView an `image/*,application/pdf` accept routes to the system documents picker, which
+// has no camera entry at all. That is the whole reason `AiDocumentPicker` exposes two.
+function handleCamera(): void {
+  sheetOpen.value = false;
+  picker.value?.pickCamera();
+}
+
+function handleFile(): void {
+  sheetOpen.value = false;
+  picker.value?.pickFile();
+}
+
+function handlePickedFile(file: File): void {
+  void ingestInAppSource({ kind: 'file', file });
+}
 </script>
 
 <template>
@@ -35,34 +85,24 @@ const {
     </h2>
     <p class="mt-1.5 text-xs leading-snug opacity-90">{{ t('ai.magic.subtitle') }}</p>
 
-    <div class="relative z-[1] mt-3 flex flex-wrap gap-2.5">
+    <div class="relative z-[1] mt-3">
       <button
-        v-if="canReadPhoto"
         type="button"
-        class="font-outfit text-primary-600 inline-flex h-[42px] min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-sm font-bold whitespace-nowrap shadow-[0_3px_8px_-3px_rgba(44,62,80,0.28)] transition-transform hover:scale-[1.02]"
-        @click="openPhotoReader"
+        class="font-outfit text-primary-600 inline-flex h-[42px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-sm font-bold whitespace-nowrap shadow-[0_3px_8px_-3px_rgba(44,62,80,0.28)] transition-transform hover:scale-[1.02]"
+        @click="openSheet"
       >
-        <span aria-hidden="true">📸</span>
-        <span class="truncate">{{ t('ai.magic.invite') }}</span>
-      </button>
-      <button
-        v-if="canReadDocument"
-        type="button"
-        class="font-outfit text-primary-600 inline-flex h-[42px] min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-sm font-bold whitespace-nowrap shadow-[0_3px_8px_-3px_rgba(44,62,80,0.28)] transition-transform hover:scale-[1.02]"
-        @click="openDocumentReader"
-      >
-        <span aria-hidden="true">✈️</span>
-        <span class="truncate">{{ t('ai.magic.travelBooking') }}</span>
-      </button>
-      <button
-        v-if="canReadRecipe"
-        type="button"
-        class="font-outfit text-primary-600 inline-flex h-[42px] min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-sm font-bold whitespace-nowrap shadow-[0_3px_8px_-3px_rgba(44,62,80,0.28)] transition-transform hover:scale-[1.02]"
-        @click="openRecipeReader"
-      >
-        <span aria-hidden="true">🍳</span>
-        <span class="truncate">{{ t('recipeExtract.chip.title') }}</span>
+        <span aria-hidden="true">✨</span>
+        <span class="truncate">{{ t('ai.magic.action') }}</span>
       </button>
     </div>
+
+    <AiDocumentPicker ref="picker" @file="handlePickedFile" />
+    <MagicBeansSheet
+      :open="sheetOpen"
+      @close="sheetOpen = false"
+      @submit="handlePaste"
+      @camera="handleCamera"
+      @file="handleFile"
+    />
   </section>
 </template>

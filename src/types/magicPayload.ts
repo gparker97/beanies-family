@@ -87,11 +87,35 @@ export interface ResultEnvelope {
    * Where this capture entered from.
    *
    * `recipe-extract` pairs a `start` event with a `ready` one so a failure RATE is
-   * computable. The in-app paths log `start` themselves before their await; a SHARE has
-   * already done its reading elsewhere and arrives straight at delivery, so without this
-   * flag its `ready` had no denominator and the pair silently stopped balancing.
+   * computable. A page's OWN readers log `start` themselves before their await; a capture
+   * that was read by the ORCHESTRATOR (a share, or the in-app magic-beans button) arrives
+   * straight at delivery, so without this flag its `ready` had no denominator and the pair
+   * silently stopped balancing.
+   *
+   * ⚠️ Widened from `'share'` in #84. Any reader that tests `=== 'share'` rather than for
+   * presence will silently stop compensating for an in-app capture — see `useRecipeCapture`.
    */
-  origin?: 'share';
+  origin?: 'share' | 'in-app';
+}
+
+/**
+ * Telemetry surface per entry point (#84).
+ *
+ * Lives HERE rather than in `useSharedDocumentIngest` because `useMagicReader` needs it too,
+ * and that file is imported BY the orchestrator — putting it there would be an import cycle.
+ * This module is types-only and imports neither, so it is the one place both can reach.
+ *
+ * The surface is what separates the two funnels in CloudWatch. An event filed under the wrong
+ * one is not a cosmetic problem: it makes "how many in-app captures failed" unanswerable.
+ */
+export const INGEST_SURFACES = {
+  share: 'share-target-ingest',
+  'in-app': 'magic-beans-capture',
+} as const;
+
+/** The surface for a capture's origin. A payload-less opener has no origin — treat as share. */
+export function surfaceForOrigin(origin: ResultEnvelope['origin']): string {
+  return INGEST_SURFACES[origin ?? 'share'];
 }
 
 /** A classified extraction result routed to the page that owns its review modal. */

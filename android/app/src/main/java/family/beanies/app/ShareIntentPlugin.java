@@ -70,16 +70,33 @@ public class ShareIntentPlugin extends Plugin {
     private int pendingOffered = 0;
 
     /**
-     * Sender-attached text — a shared link, or prose around one (#64 links).
+     * Sender-attached text — a shared link, prose around one (#64 links), or the whole
+     * share when a person selects text and sends it (#83).
      *
-     * Capped at MAX_TEXT_CHARS, which MIRRORS `MAX_SHARE_TEXT_CHARS` in
-     * `src/services/share/types.ts`. That JS-side cap is the real one, applied for every
-     * platform; this is defence-in-depth so an unbounded string never crosses the bridge.
+     * Capped at MAX_TEXT_CHARS, which MIRRORS `MAX_SHARE_TEXT_CEILING + 1` in
+     * `src/services/share/types.ts` — the REFUSAL band, not the read cap. That JS-side
+     * policy is the real one, applied for every platform; this is defence-in-depth so an
+     * unbounded string never crosses the bridge.
      */
     private String pendingText = null;
 
-    /** Mirrors MAX_SHARE_TEXT_CHARS in src/services/share/types.ts. */
-    private static final int MAX_TEXT_CHARS = 4000;
+    /**
+     * Mirrors MAX_SHARE_TEXT_CEILING + 1 in src/services/share/types.ts.
+     *
+     * ⚠️ Deliberately the ceiling + 1 and NOT MAX_SHARE_TEXT_CHARS (4000, which this was
+     * until #83). Clipping at the read cap here would destroy the information JS needs to
+     * tell an ordinary long share from one that must be refused: every over-ceiling share
+     * would arrive looking exactly 4000 characters long. The +1 is what lets JS distinguish
+     * "at the ceiling" from "clipped at the ceiling".
+     *
+     * ⚠️ And do NOT add a surrogate trim here, however wrong `substring` looks. It can leave
+     * a lone trailing surrogate, but ONLY when the source exceeded 32,001 characters — at
+     * which point JS sees `length > CEILING` and refuses the share outright, so the malformed
+     * tail is never rendered, never sent, and never reaches a model. Trimming it here would
+     * create a SECOND truncation rule that can drift from the JS one, and the whole point of
+     * this constant is that all three platforms reach the same verdict from one band check.
+     */
+    private static final int MAX_TEXT_CHARS = 32001;
 
     /** Sentinel: the URI was read fine, the file was simply empty. Not a failure. */
     private static final JSObject EMPTY_FILE = new JSObject();

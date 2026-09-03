@@ -98,6 +98,10 @@ async function handleAddFromDocument(): Promise<void> {
 // It MUST be delivered into THIS `useRecipeCapture()` instance: `deliverRecipe` sets the
 // pending source that `attachAfterSave` later consumes, and that state is composable-local.
 // A fresh instance would save the recipe with no photo attached — silently.
+// ⚠️ The payload-less `else` is UNREACHABLE since #84 deleted `openRecipeReader` along with
+// the three magic chips — nothing calls `openReader('recipe')` any more. Kept for the same
+// reason as the planner's: the handler signature is shared with 'document', which still uses
+// that branch. See `FamilyPlannerPage.vue`.
 useMagicReaderConsumer(
   'recipe',
   (payload) => {

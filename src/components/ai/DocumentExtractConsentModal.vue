@@ -2,6 +2,14 @@
 /**
  * Per-action consent for the photo → activity wedge (#133, ADR-030).
  *
+ * ⚠️ `layer="top"` is load-bearing, not cosmetic. This is a GATE: it asks permission before
+ * anything leaves the device, so a version of it the user cannot see is a security-UX
+ * failure, not a z-index nit. It previously defaulted to `layer="base"` (z-50) — the same
+ * layer as `QuickAddSheet` — and since App.vue mounts the quick-add sheet LATER in the body,
+ * equal z-index meant the sheet painted over this dialog. Every in-app magic-beans capture
+ * (#84) requests consent while that sheet is open, so the prompt was invisible and the flow
+ * appeared to hang on its own await. Do not lower this.
+ *
  * Built on BeanieFormModal (the mandated modal hierarchy — never raw BaseModal). The
  * itemised "what / where / after" list is why this is a dedicated modal rather than a
  * useConfirm() call: useConfirm's `detail` is a single untranslated string and can't carry
@@ -72,6 +80,7 @@ function onConfirm(): void {
 <template>
   <BeanieFormModal
     variant="modal"
+    layer="top"
     size="narrow"
     :open="consentOpen"
     :title="t('ai.consent.title')"

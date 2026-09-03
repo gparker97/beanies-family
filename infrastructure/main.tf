@@ -163,5 +163,8 @@ module "ai_extract" {
   api_domain_name           = module.registry.api_domain_name
   tinfoil_api_key           = var.tinfoil_api_key
   ai_extract_api_key        = var.ai_extract_api_key
+  # Reuses content-fetch's SNS topic rather than creating a second one (#83) — one email
+  # confirmation, one Slack forwarder. This is what makes ai_extract depend on content_fetch.
+  alerts_topic_arn = module.content_fetch.alerts_topic_arn
 }
 

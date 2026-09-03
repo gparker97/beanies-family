@@ -67,3 +67,30 @@ variable "cors_origins" {
     "http://localhost:4173",          # Vite preview server
   ]
 }
+
+variable "reserved_concurrency" {
+  description = "Reserved concurrent executions for the ai-extract Lambda. Caps PARALLELISM; the per-route throttle in modules/registry caps VOLUME. Both are needed, and this one must not sit below what the throttle admits."
+  type        = number
+  # ⚠️ Sized to COVER the route throttle, not guessed. `POST /ai-extract` admits a sustained
+  # 2 rps (modules/registry/main.tf), and this function's timeout is 29s, so an invocation can
+  # hold a slot for the full 29 seconds: worst-case demand is 2 × 29 ≈ 58 concurrent, and
+  # realistic demand at 8-15s Tinfoil latency is 16-30.
+  #
+  # An earlier revision set this to 10 by analogy with content-fetch's 5. That was WRONG and
+  # would have been a self-inflicted denial of service: ten slots saturate well inside what
+  # the throttle already permits, every further invoke is Lambda-throttled, and an
+  # API-Gateway-generated error carries no CORS headers — so from a browser it surfaces as an
+  # opaque network failure that classifies as `provider_error` and pages #beanies-errors. The
+  # already-shipped IMAGE path would break, and the #83 limits do not touch that path at all.
+  #
+  # Do NOT lower this to "save money". Concurrency is free; only invocations are billable, and
+  # the route throttle is what bounds those. Lowering it throttles a working feature while
+  # bounding nothing.
+  default = 60
+}
+
+variable "alerts_topic_arn" {
+  description = "SNS topic ARN for alarms (from the content-fetch module). Empty disables alarm actions so a self-hoster without an address still gets a working apply."
+  type        = string
+  default     = ""
+}

@@ -19,6 +19,7 @@
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
+import { checkLimits } from './rateLimit.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
 const API_KEY = process.env.AI_EXTRACT_API_KEY;
@@ -107,7 +108,7 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
-  const { imageDataUrls, imageDataUrl, text, todayIso, task: rawTask } = parsed || {};
+  const { imageDataUrls, imageDataUrl, text, todayIso, task: rawTask, familyId } = parsed || {};
   // Task selects the prompt + required-keys. Default to 'event' so older clients (which
   // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
   const task = rawTask === undefined ? 'event' : rawTask;
@@ -182,6 +183,44 @@ export async function handler(event) {
     return response(400, { error: 'Invalid todayIso' }, event);
   }
   const todayDate = todayIso.slice(0, 10);
+
+  // ── Abuse limits (#83) ────────────────────────────────────────────────────────────────
+  //
+  // Placement is deliberate on all three sides:
+  //   • AFTER the x-api-key check, so an unauthenticated flood costs no DynamoDB writes;
+  //   • AFTER body/JSON/task/text/image/todayIso validation, so a malformed request never
+  //     consumes a family's budget;
+  //   • BEFORE the try/catch around the billable upstream call.
+  //
+  // Gated on `hasText`: TEXT SOURCES ONLY for now. The image path is bounded by its own size
+  // limits and `AI_PICKER_MAX_BYTES`, has not changed, and has run under the route throttle
+  // since #133 — widening to it is a strictly larger blast radius (it can break a working
+  // reader) for no new risk in this change. A deliberate follow-up, not smuggled in.
+  //
+  // ⚠️ `checkLimits` never throws and fails open internally, which is why this is one `if`
+  // and not a nested try/catch. Keeping this validation section flat is why it stays readable.
+  if (hasText) {
+    const verdict = await checkLimits({
+      familyId: typeof familyId === 'string' ? familyId : undefined,
+      // NEVER `x-forwarded-for` — that header is caller-controlled, and an attacker rotating
+      // it would defeat the IP limit entirely. See rateLimit.mjs.
+      ip: event?.requestContext?.http?.sourceIp,
+    });
+    if (!verdict.allowed) {
+      // Through `response()` so the CORS headers are present. An API-Gateway-generated 429
+      // carries none, which from a browser surfaces as an opaque network error instead of a
+      // classifiable refusal.
+      return response(
+        429,
+        {
+          error: 'Too many requests',
+          code: 'rate_limited',
+          retryAfterSeconds: verdict.retryAfterSeconds,
+        },
+        event
+      );
+    }
+  }
 
   try {
     let upstream;

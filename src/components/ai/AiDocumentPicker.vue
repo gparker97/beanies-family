@@ -3,7 +3,15 @@
  * The file-intake step for the AI "Magic beans" document readers, shared by the
  * photo→activity (FamilyPlannerPage) and document→trip (TravelPlansPage) flows.
  *
- * The page runs its consent gate first, then calls `pick()` (exposed). On a
+ * The page runs its consent gate first, then calls `pick()` (exposed).
+ *
+ * ⚠️ EXCEPT the magic-beans card (#84), which opens the picker FIRST and requests consent
+ * inside the shared ingest, once a file exists. Nothing leaves the device before consent
+ * either way — the gate still precedes every byte — but the ORDER differs: there the user
+ * takes the photo and is then asked, so declining discards work already done. That is a
+ * deliberate consequence of one button serving four sources (the type is unknown until the
+ * content exists), not an oversight. Do not "restore" consent-first there without reading
+ * `MagicBeansSheet`'s header. On a
  * touch-primary device `pick()` shows a small chooser — Take a photo (camera) or
  * Choose a file (image/PDF) — because a Capacitor WebView's documents picker has
  * no camera entry for the mixed image+PDF accept. On desktop it opens the file

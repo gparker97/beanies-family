@@ -21,6 +21,7 @@ vi.mock('@/services/ai/recipeFetchService', () => ({
   recipeFetchService: { fetchImage: (...a: unknown[]) => fetchImage(...a) },
 }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+import { logEvent } from '@/services/telemetry/logEvent';
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('../useToast', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock('../useAiCapability', () => ({
@@ -165,5 +166,67 @@ describe('processUrl — the title-only fallback', () => {
     // Nothing was inferred, so nothing may be flagged as inferred.
     expect(prefill.inferredIngredients).toEqual([]);
     expect(prefill.inferredSteps).toEqual([]);
+  });
+});
+
+// ─── The compensating `start` event (#84) ────────────────────────────────────
+//
+// `recipe-extract` pairs a `start` with a `ready` so a failure RATE is computable. A capture
+// read by the ORCHESTRATOR — a share, or the in-app magic-beans button — never passes through
+// the `start` that `processFile`/`processUrl` log before their await, so `deliverRecipe` logs
+// it instead.
+//
+// ⚠️ This block is the assertion plan #84 named and did not get written. The guard tested
+// `env.origin === 'share'` before #84 widened the field; left that way, an in-app capture
+// would have silently stopped being compensated and the pair would have quietly gone out of
+// balance again — the exact regression the production comment warns about, invisible to the
+// eight tests that were already here.
+
+describe('deliverRecipe compensates the start event for BOTH orchestrated doors', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  const RECIPE_SOURCE = {
+    via: 'extraction' as const,
+    data: { isRecipe: true, name: 'Cake', ingredients: [], steps: [] },
+  };
+
+  function deliver(origin: 'share' | 'in-app' | undefined) {
+    const capture = useRecipeCapture({ onRecipeReady: vi.fn() });
+    capture.deliverRecipe(
+      RECIPE_SOURCE as never,
+      {
+        sourceFile: null,
+        ...(origin ? { origin } : {}),
+      } as never
+    );
+  }
+
+  const startEvents = () =>
+    (logEvent as unknown as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0]?.context?.action === 'start'
+    );
+
+  it('logs start for a SHARE, naming which door', () => {
+    deliver('share');
+    expect(startEvents()).toHaveLength(1);
+    expect(startEvents()[0][0].context.detail).toBe('share');
+  });
+
+  it('logs start for an IN-APP capture, naming which door', () => {
+    // Tests for PRESENCE, not `=== 'share'`. Reverting that guard makes this the only failing
+    // test in the file.
+    deliver('in-app');
+    expect(startEvents()).toHaveLength(1);
+    expect(startEvents()[0][0].context.detail).toBe('in-app');
+  });
+
+  it('does NOT log start when the page did its own reading', () => {
+    // `processFile`/`processUrl` already logged one; a second would double-count the
+    // denominator and make the failure rate look better than it is.
+    deliver(undefined);
+    expect(startEvents()).toHaveLength(0);
   });
 });

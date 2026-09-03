@@ -550,7 +550,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'You can also start from the <strong>+</strong> button anywhere in the app — look for the <strong>Magic beans</strong> card and tap <strong>Recipe 🍳</strong>. It takes you to the cookbook and opens the reader.',
+          'You can also start from the <strong>+</strong> button anywhere in the app — look for the <strong>Magic beans</strong> card and tap it. Give beanies the recipe as a photo, a file, a link or pasted text; it works out that it is a recipe and takes you to the cookbook with the reader open.',
         title: 'A shortcut from anywhere',
         icon: '✨',
       },

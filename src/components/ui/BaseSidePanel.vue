@@ -14,7 +14,11 @@ interface Props {
    * sits above another open drawer/modal — use it when this panel opens on
    * top of one (e.g. a list drawer launched from inside the activity drawer).
    */
-  layer?: 'base' | 'overlay';
+  // 'top' (z-[250], matching BaseModal) is for a panel that must never be occluded by any
+  // other surface. Accepted here so BeanieFormModal can forward one layer union to both of
+  // its containers — a drawer that silently DOWNGRADED 'top' to 'overlay' would be the worse
+  // failure, because the caller asking for 'top' has a reason.
+  layer?: 'base' | 'overlay' | 'top';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,8 +37,12 @@ const sizeClasses: Record<string, string> = {
 
 // Backdrop sits just under the panel; 'overlay' clears a base drawer (z-40)
 // and a base modal (z-50) beneath it.
-const backdropZ = computed(() => (props.layer === 'overlay' ? 'z-[55]' : 'z-40'));
-const panelZ = computed(() => (props.layer === 'overlay' ? 'z-[60]' : 'z-40'));
+const backdropZ = computed(() =>
+  props.layer === 'top' ? 'z-[245]' : props.layer === 'overlay' ? 'z-[55]' : 'z-40'
+);
+const panelZ = computed(() =>
+  props.layer === 'top' ? 'z-[250]' : props.layer === 'overlay' ? 'z-[60]' : 'z-40'
+);
 
 const emit = defineEmits<{
   close: [];

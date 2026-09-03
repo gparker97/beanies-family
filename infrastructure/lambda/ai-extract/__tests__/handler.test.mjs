@@ -1,6 +1,8 @@
 /* global process */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { __setRateLimitClientForTests } from '../rateLimit.mjs';
 
 const API_KEY = 'test-key';
 const originalLog = console.log;
@@ -372,6 +374,145 @@ describe('ai-extract Lambda handler', () => {
         makeEvent({ headers: keyHeader, body: { ...goodBody, task: 'travel' } })
       );
       assert.equal(res.statusCode, 502);
+    });
+  });
+
+  describe('rate limiting (#83)', () => {
+    /**
+     * A stub that refuses whichever key prefix is named.
+     *
+     * ⚠️ `calls` is a CLOSURE, not `this.calls`. `checkLimits` destructures `{ send }` and
+     * calls it detached, so a method using `this` throws — and that throw is swallowed by the
+     * limiter's fail-open catch, which silently allows the request. That failure looks exactly
+     * like a passing limiter, which is how it wasted a debugging pass.
+     */
+    function refusingClient(prefix) {
+      const calls = [];
+      return {
+        calls,
+        commands: {
+          UpdateItemCommand: class {
+            constructor(input) {
+              this.input = input;
+            }
+          },
+        },
+        send(cmd) {
+          calls.push(cmd.input);
+          if (cmd.input.Key.pk.S.startsWith(prefix)) {
+            const err = new Error('conditional request failed');
+            err.name = 'ConditionalCheckFailedException';
+            return Promise.reject(err);
+          }
+          return Promise.resolve({});
+        },
+      };
+    }
+
+    describe('when the limiter actually refuses', () => {
+      let ddb;
+      beforeEach(() => {
+        process.env.RATE_TABLE = 'beanies-ai-rate-test';
+        ddb = refusingClient('f#');
+        __setRateLimitClientForTests(ddb);
+      });
+      afterEach(() => {
+        delete process.env.RATE_TABLE;
+        __setRateLimitClientForTests(null);
+      });
+
+      it('returns 429 with a machine-readable code and a retry hint', async () => {
+        const res = parseResponse(
+          await handler(
+            makeEvent({
+              headers: keyHeader,
+              body: {
+                task: 'share',
+                text: 'a page about a school fair',
+                todayIso: '2026-06-03',
+                familyId: 'fam-1',
+              },
+            })
+          )
+        );
+
+        assert.equal(res.statusCode, 429);
+        assert.equal(res.parsedBody.code, 'rate_limited');
+        assert.ok(res.parsedBody.retryAfterSeconds > 0);
+      });
+
+      it('carries CORS headers, which an API-Gateway-generated 429 would not', async () => {
+        // This is WHY the refusal goes through `response()`. Without them the browser sees an
+        // opaque network error, classifies it as `provider_error`, and pages #beanies-errors —
+        // the exact noise the 429 mapping exists to stop.
+        const res = await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: {
+              task: 'share',
+              text: 'a page about a school fair',
+              todayIso: '2026-06-03',
+              familyId: 'fam-1',
+            },
+          })
+        );
+        assert.equal(res.statusCode, 429);
+        assert.ok(res.headers['Access-Control-Allow-Origin']);
+      });
+
+      it('makes NO upstream call when it refuses', async () => {
+        let called = false;
+        globalThis.fetch = async () => {
+          called = true;
+          return fakeUpstream({ content: '{}' });
+        };
+        await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: {
+              task: 'share',
+              text: 'a page about a school fair',
+              todayIso: '2026-06-03',
+              familyId: 'fam-1',
+            },
+          })
+        );
+        assert.equal(called, false, 'a refused request must not be billable');
+      });
+
+      it('does NOT limit the image path — the hasText gate', async () => {
+        // Deliberate scope: the image path is bounded by its own size limits and has run under
+        // the route throttle since #133. Widening to it can break a working reader.
+        globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify(VALID_EXTRACTION) });
+        const res = await handler(makeEvent({ headers: keyHeader, body: goodBody }));
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(ddb.calls.length, 0, 'the image path must reach no rate-limit write');
+      });
+
+      it('keys the IP on requestContext.http.sourceIp and NEVER x-forwarded-for', async () => {
+        // ⚠️ rateLimit.mjs calls this "the single most bypassable detail in this module":
+        // x-forwarded-for is caller-controlled, so honouring it would defeat the IP limit
+        // entirely — an attacker would just rotate the header.
+        const allowing = refusingClient('never-matches');
+        __setRateLimitClientForTests(allowing);
+
+        const event = makeEvent({
+          headers: { ...keyHeader, 'x-forwarded-for': '9.9.9.9' },
+          body: { task: 'share', text: 'a page about a school fair', todayIso: '2026-06-03' },
+        });
+        event.requestContext = { http: { method: 'POST', sourceIp: '203.0.113.7' } };
+
+        globalThis.fetch = async () =>
+          fakeUpstream({ content: JSON.stringify({ kind: 'event', event: VALID_EXTRACTION }) });
+        await handler(event);
+
+        const sha = (v) => createHash('sha256').update(v).digest('hex');
+        const ipKeys = allowing.calls.map((c) => c.Key.pk.S).filter((k) => k.startsWith('i#'));
+        assert.equal(ipKeys.length, 1, 'exactly one IP bucket should be counted');
+        assert.ok(ipKeys[0].includes(sha('203.0.113.7')), 'must key on sourceIp');
+        assert.ok(!ipKeys[0].includes(sha('9.9.9.9')), 'must NOT key on x-forwarded-for');
+      });
     });
   });
 

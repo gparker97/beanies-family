@@ -60,6 +60,24 @@ export interface ExtractionRequest {
   todayIso: string;
   /** Optional cancel signal so the UI can abort a slow extraction. */
   signal?: AbortSignal;
+  /**
+   * Which family this extraction is for, so the managed proxy can rate-limit per family
+   * (#83). A caller-supplied request attribute exactly like `todayIso` — NOT something the
+   * AI layer fetches; that layer is deliberately store-free.
+   *
+   * OPTIONAL in both directions, on purpose: an old cached bundle sends none and the Lambda
+   * falls back to its IP limit rather than 400ing, and providers that are not our proxy
+   * (BYOK, on-device) simply ignore it. `family.id` is a random UUID with no personal data
+   * in it — the same value `diagnosticContext.ts` already ships raw to our telemetry.
+   *
+   * ⚠️ Populated by the TEXT callers only — `useSharedDocumentIngest` and `useRecipeCapture`.
+   * The image wedges (`useDocumentToActivity`, `useDocumentToTravel`) deliberately do NOT set
+   * it: the proxy's per-family limit is gated on `hasText`, so it would be a dead value there,
+   * and reading it would give two composables a Pinia dependency they otherwise do not have.
+   * ⚠️ WHEN THE LIMITS WIDEN TO IMAGES (a named follow-up in ADR-035) those two call sites
+   * must start passing it, or image extractions will silently count against the IP limit only.
+   */
+  familyId?: string;
 }
 
 /**
@@ -239,9 +257,13 @@ export type ExtractionErrorCode =
   | 'video_blocked' // YouTube would not serve the video's details to a server (#72). The
   // video is fine in a browser; only our datacenter request is refused, so the copy must
   // point at the workaround rather than implying the video is broken.
-  | 'source_unreachable'; // the SITE refused us or the page is gone (404/410/403/429).
-// Deliberately separate from provider_error: nothing is wrong on our side, and telling the
-// user "something went wrong" would send them to us instead of to their link.
+  | 'source_unreachable' // the SITE refused us or the page is gone (404/410/403/429).
+  // Deliberately separate from provider_error: nothing is wrong on our side, and telling the
+  // user "something went wrong" would send them to us instead of to their link.
+  | 'rate_limited'; // OUR proxy refused: too many extractions from this family or IP in the
+// window (#83). An expected, intentional refusal — the system working as designed — so it
+// must NEVER reach an error surface. `useExtractionErrorToast` gives it an info toast, the
+// same treatment `fetch_blocked` and `upstream_busy` already get.
 
 /**
  * Result of the extraction funnel. Per-service `{ success, … }` shape — matching

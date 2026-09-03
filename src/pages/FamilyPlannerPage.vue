@@ -323,8 +323,15 @@ async function handleAddFromPhoto(): Promise<void> {
 
 // Photo-reader cross-surface dispatch: the global FAB card sets `pendingMagic`
 // and navigates here; pick it up (watch + onMounted) and run the same handler.
-// A share arrives already extracted (#64) and is DELIVERED rather than re-read; no payload
-// means the magic affordance asked to open the picker, which is the original behaviour.
+// A capture arrives already extracted (#64, #84) and is DELIVERED rather than re-read; no
+// payload means an affordance asked to open the picker instead.
+//
+// ⚠️ The payload-less `else` is UNREACHABLE for 'photo' since #84 deleted `openPhotoReader`
+// with the three magic chips — nothing calls `openReader('photo')` any more. Kept anyway,
+// deliberately: `useMagicReaderConsumer`'s handler signature is shared with 'document', which
+// still uses that branch (`VacationStep1.vue`), so removing it here would make one of three
+// consumers a different shape for no gain. Delete it only if the opener-without-payload
+// concept goes away entirely.
 useMagicReaderConsumer(
   'photo',
   (payload) => {
