@@ -24,7 +24,18 @@ const mealPlanStore = useMealPlanStore();
 const { dragged, endDrag } = useMealDrag();
 
 const isOver = ref(false);
-const showAdd = computed(() => props.meals.length === 0 || props.mealSlot === 'snack');
+/**
+ * Adding is ALWAYS available. It used to be `meals.length === 0 || slot === 'snack'`, so a
+ * breakfast, lunch or dinner that already had something in it offered no way to add a
+ * second — most visibly on mobile, where the cell is the whole row and there is nowhere
+ * else to tap. Nothing else enforced one-per-slot: the store holds an array, and the print
+ * export already styles a second dish in a cell (`.dish.divided`), so the button was the
+ * only thing saying no.
+ *
+ * `isEmpty` decides how LOUD it is, not whether it exists — a full-height dashed panel is
+ * an invitation on an empty slot and clutter under a meal that is already planned.
+ */
+const isEmpty = computed(() => props.meals.length === 0);
 
 function onDragOver(e: DragEvent): void {
   if (!dragged.value) return;
@@ -73,14 +84,17 @@ async function onDrop(): Promise<void> {
          is full (a filled non-snack), a transparent grow-filler keeps the empty
          space droppable (it inherits the root's drag handlers). -->
     <button
-      v-if="showAdd"
       type="button"
-      class="font-outfit flex min-h-[2.75rem] flex-1 items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.42)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] dark:border-slate-600 dark:text-slate-500"
+      class="font-outfit flex items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.42)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] dark:border-slate-600 dark:text-slate-500"
+      :class="
+        isEmpty ? 'min-h-[2.75rem] flex-1' : 'min-h-[1.5rem] shrink-0 opacity-55 hover:opacity-100'
+      "
       :aria-label="t('mealPlanner.addMeal')"
       @click="emit('addMeal', date, mealSlot)"
     >
       ＋
     </button>
-    <div v-else class="min-h-[0.75rem] flex-1" aria-hidden="true"></div>
+    <!-- Keeps the rest of the cell droppable when the add button no longer fills it. -->
+    <div v-if="!isEmpty" class="min-h-[0.75rem] flex-1" aria-hidden="true"></div>
   </div>
 </template>
