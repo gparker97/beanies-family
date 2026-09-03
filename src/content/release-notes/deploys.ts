@@ -22,14 +22,14 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
     month: '3 september 2026',
     spotlight: true,
     summary: {
-      en: "The meal planner is here: plan the family's week of meals, see who is cooking at a glance, and print it for the fridge.",
+      en: "Plan the family's week of meals, see who is cooking at a glance, and print it for the fridge.",
       beanie:
-        "the meal planner is here: plan the family's week of meals, see who is cooking at a glance, and print it for the fridge.",
+        "plan the family's week of meals, see who is cooking at a glance, and print it for the fridge.",
     },
     features: [
       {
         icon: '\u{1F372}',
-        title: { en: 'The meal planner', beanie: 'the meal planner' },
+        title: { en: 'Meal plans are here!', beanie: 'meal plans are here!' },
         description: {
           en: 'Plan breakfast, lunch, dinner and snacks across the whole week. Drop a recipe onto a day, say who is cooking, add a serve time or a guest, and mark it off once it is made. When the week is set, print or share it as a one-page sheet for the fridge.',
           beanie:

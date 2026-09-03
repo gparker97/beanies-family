@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-03
+
+### Added
+
+- **Swipe between days on the meal planner** on a phone, the same way the calendar already works.
+
+---
+
 ## 2026-09-02
 
 ### Added
