@@ -24,13 +24,13 @@ const SHARE_PATH = '/share';
  * the PWA had no equivalent.
  */
 // ⚠️ Mirrors MAX_SHARE_TEXT_CEILING + 1 in src/services/share/types.ts — the REFUSAL band,
-// NOT the 4,000-char read cap it mirrored until #83.
+// NOT the read cap it mirrored until #83 (which has since moved again, to 10,000).
 //
 // This is the third of three native/platform mirrors (the others are ShareIntentPlugin.java
 // and, implicitly, the iOS .txt). Clipping at the READ cap here destroys the information the
 // app needs to tell an ordinary long share from one that must be refused: every over-ceiling
-// PWA share would arrive looking exactly 4,000 characters long, so `over_ceiling` would be
-// unreachable and a 30,000-character paste would be silently reduced to 4,000 with no notice.
+// PWA share would arrive looking exactly the cap's length, so `over_ceiling` would be
+// unreachable and a 30,000-character paste would be silently reduced with no notice.
 // That is exactly the "silently reads the first slice of a wall of text" behaviour the size
 // policy exists to prevent. The +1 is what lets JS distinguish "at the ceiling" from
 // "clipped at the ceiling".

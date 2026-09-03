@@ -91,6 +91,25 @@ vi.mock('@/services/ai/documentExtractionService', () => ({
   extractShareFromText: (t: unknown, o: unknown) => extractShareFromText(t, o),
 }));
 
+// The real `routeUrl`, wrapped so its calls can be COUNTED. The suite depends on its actual
+// verdicts (which URLs are usable), so this delegates rather than stubbing.
+//
+// ⚠️ A plain closure counter, NOT a `vi.fn()`: `vi.clearAllMocks()` in `beforeEach` wipes a
+// mock's implementation, which would leave `routeUrl` returning `undefined` and break every
+// link test in the file. This exists only so "the link-router chunk is never loaded when the
+// body wins" is assertable rather than asserted by inspection.
+const routerCalls = { count: 0 };
+vi.mock('@/utils/recipeSourceUrl', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/recipeSourceUrl')>();
+  return {
+    ...actual,
+    routeUrl: (u: string) => {
+      routerCalls.count += 1;
+      return actual.routeUrl(u);
+    },
+  };
+});
+
 const resolveRecipeSource = vi.fn();
 vi.mock('@/services/ai/recipeSourceResolver', () => ({
   resolveRecipeSource: (url: string) => resolveRecipeSource(url),
@@ -114,6 +133,7 @@ import {
   isReadingSharedDocument,
 } from '../useSharedDocumentIngest';
 import { __resetAttemptBudgetForTests } from '@/utils/attemptBudget';
+import { MAX_LINK_NOTE_CHARS, MAX_SHARE_TEXT_CHARS } from '@/services/share/types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -136,6 +156,7 @@ beforeEach(() => {
   // makes it survive a test too, so one case's spend would otherwise leak into the next.
   __resetAttemptBudgetForTests();
   activeFamilyId = 'fam-1';
+  routerCalls.count = 0;
   aiTier = 'managed';
   online = true;
   aiConfigured = true;
@@ -422,22 +443,26 @@ describe('share ingest — links', () => {
     expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
   });
 
-  it('caps sender-supplied text before anything parses it', async () => {
+  it('bounds what is READ at the cap, so a URL past it is never seen', async () => {
     // The cap lives in the orchestrator so every platform is bounded identically. A URL
-    // sitting past it is unfindable — accepted, and unchanged by #83.
-    const buried = `${'x '.repeat(3000)}https://example.com/cake`;
+    // sitting past it is unfindable — accepted, and unchanged.
+    //
+    // ⚠️ Derived from the constant, not a literal. Written against a 4,000 cap this buried the
+    // URL at offset 6,000; at 10,000 that URL became visible AND the prose won the arm, so the
+    // test failed for a reason unrelated to what it was pinning.
+    const buried = `${'x '.repeat(MAX_SHARE_TEXT_CHARS)}https://example.com/cake`;
     await link(buried);
 
     expect(resolveRecipeSource).not.toHaveBeenCalled();
-    // 6000 chars is over the read cap but under the ceiling, so it is read TRUNCATED, with
-    // the user told once — not silently, and not refused.
+    // Over the read cap but under the ceiling, so it is read TRUNCATED, with the user told
+    // once — not silently, and not refused.
     expect(showToast).toHaveBeenCalledWith(
       'info',
       'shareTarget.text.truncated.title',
       expect.anything()
     );
     const sent = extractShareFromText.mock.calls[0][0] as string;
-    expect(sent.length).toBe(4000);
+    expect(sent.length).toBe(MAX_SHARE_TEXT_CHARS);
     expect(sent).not.toContain('https://example.com/cake');
   });
 });
@@ -822,9 +847,9 @@ describe('share ingest — shared text (#83)', () => {
     });
 
     it('truncates between the cap and the ceiling, with exactly ONE notice', async () => {
-      await share('a'.repeat(10_000));
+      await share('a'.repeat(MAX_SHARE_TEXT_CHARS + 2_000));
       const sent = extractShareFromText.mock.calls[0][0] as string;
-      expect(sent).toHaveLength(4000);
+      expect(sent).toHaveLength(MAX_SHARE_TEXT_CHARS);
 
       const truncationToasts = showToast.mock.calls.filter(
         (c) => c[1] === 'shareTarget.text.truncated.title'
@@ -837,8 +862,8 @@ describe('share ingest — shared text (#83)', () => {
     });
 
     it('does not truncate, or say it did, at the cap exactly', async () => {
-      await share('a'.repeat(4000));
-      expect(extractShareFromText.mock.calls[0][0]).toHaveLength(4000);
+      await share('a'.repeat(MAX_SHARE_TEXT_CHARS));
+      expect(extractShareFromText.mock.calls[0][0]).toHaveLength(MAX_SHARE_TEXT_CHARS);
       expect(showToast).not.toHaveBeenCalledWith(
         'info',
         'shareTarget.text.truncated.title',
@@ -847,11 +872,12 @@ describe('share ingest — shared text (#83)', () => {
     });
 
     it('never splits a surrogate pair when it truncates', async () => {
-      // '🎉' is a surrogate PAIR, so a naive slice at 4000 lands mid-character and yields a
-      // lone surrogate that renders as U+FFFD.
-      await share('a'.repeat(3999) + '🎉'.repeat(50));
+      // '🎉' is a surrogate PAIR, so a naive slice at the cap lands mid-character and yields a
+      // lone surrogate that renders as U+FFFD. Derived from the constant: at a literal 3,999
+      // this input fell UNDER the raised cap and stopped truncating at all.
+      await share('a'.repeat(MAX_SHARE_TEXT_CHARS - 1) + '🎉'.repeat(50));
       const sent = extractShareFromText.mock.calls[0][0] as string;
-      expect(sent).toHaveLength(3999);
+      expect(sent).toHaveLength(MAX_SHARE_TEXT_CHARS - 1);
       expect(sent).not.toMatch(/[\uD800-\uDFFF]/);
     });
   });
@@ -874,7 +900,7 @@ describe('share ingest — shared text (#83)', () => {
       expect(spy).not.toHaveBeenCalled();
       // ⚠️ And the bound itself. Without this, widening the slice to any value at all was
       // undetectable, which makes "bounds the decode" an untested claim.
-      expect(sliceSpy).toHaveBeenCalledWith(0, 16_000);
+      expect(sliceSpy).toHaveBeenCalledWith(0, MAX_SHARE_TEXT_CHARS * 4);
     });
 
     it('still takes the LINK path for an over-ceiling .txt that begins with a link', async () => {
@@ -1360,7 +1386,10 @@ describe('an unreadable link is refused as a LINK, not read as prose', () => {
 
 describe('the truncation notice is only made once it is TRUE', () => {
   const share = (text: string) => ingestSharedContent({ files: [], text }, meta);
-  const LONG = 'a'.repeat(10_000);
+  // ⚠️ Derived from the constant. A literal 10_000 equals the cap exactly, so `> cap` is
+  // false: the "IS shown" test below hard-fails AND the three above it silently stop asserting
+  // anything, because they check "no truncation notice" about a share that no longer truncates.
+  const LONG = 'a'.repeat(MAX_SHARE_TEXT_CHARS + 2_000);
   const truncationToasts = () =>
     showToast.mock.calls.filter((c) => c[1] === 'shareTarget.text.truncated.title');
 
@@ -1388,5 +1417,213 @@ describe('the truncation notice is only made once it is TRUE', () => {
     await share(LONG);
     expect(truncationToasts()).toHaveLength(1);
     expect(actions()).toContain('truncated');
+  });
+});
+
+// ─── Link-vs-text precedence (#85) ───────────────────────────────────────────
+//
+// Before this rule, the FIRST usable URL won unconditionally — so a school email whose details
+// are in the body was routed to its own signature URL, and beanies read the school's homepage
+// instead of the field trip. Reproduced against production before the fix.
+
+describe('link-vs-text precedence (#85)', () => {
+  const share = (text: string) => ingestSharedContent({ files: [], text }, meta);
+
+  /** A realistic school email: details in the body, links incidental. */
+  const SCHOOL_EMAIL = [
+    'Dear Grade 5 Families,',
+    '',
+    'We are excited to share details of an upcoming Grade 5 field trip to the Lee Kong Chian',
+    'Natural History Museum at the National University of Singapore on Tuesday 14 October,',
+    'leaving school at 9am and returning by 3pm.',
+    '',
+    'https://lkcnhm.nus.edu.sg/',
+    '',
+    'To make this possible we are asking families for a co-payment of $42 per student, which',
+    'covers return transport, museum admission, a guided tour and the hands-on workshop.',
+    '',
+    'Warm regards,',
+    'The Grade 5 Team',
+    'www.smmis.edu.sg',
+  ].join('\n');
+
+  describe('a body outweighs the links inside it', () => {
+    it('reads a school email as TEXT, never fetching the link in it', async () => {
+      // ⚠️ THE case this rule exists for. `https://lkcnhm.nus.edu.sg/` sits in the body and
+      // `routeUrl` calls it valid, so before #85 the museum's HOMEPAGE was fetched and read —
+      // a page with no field trip, no date and no $42.
+      await share(SCHOOL_EMAIL);
+
+      expect(resolveRecipeSource).not.toHaveBeenCalled();
+      expect(extractShareFromText).toHaveBeenCalledTimes(1);
+      expect(extractShareFromText.mock.calls[0][0]).toContain('co-payment of $42');
+    });
+
+    it('says in the log that the body won, so a mis-tuned threshold is diagnosable', async () => {
+      await share(SCHOOL_EMAIL);
+      const triaged = logEvent.mock.calls.find((c) => c[0].context?.action === 'triaged')![0];
+
+      expect(triaged.message).toBe('share triaged — the message outweighed the links in it');
+      // The prefix is stable so a saved query keyed on it keeps working.
+      expect(triaged.message.startsWith('share triaged')).toBe(true);
+      expect(triaged.context.detail).toBe('text');
+      // `file_count` keeps its documented meaning — it is not carrying the reason.
+      expect(triaged.context.file_count).toBe(0);
+    });
+
+    it('does NOT add the note when the text had no links at all', async () => {
+      await share('Sports day is Tuesday the 4th at 9am, meet at the school gate please');
+      const triaged = logEvent.mock.calls.find((c) => c[0].context?.action === 'triaged')![0];
+      expect(triaged.message).toBe('share triaged');
+    });
+  });
+
+  describe('a note around a link is still a LINK share', () => {
+    it.each([
+      ['a bare link', 'https://example.com/cake'],
+      ['a 20-char note', 'Made this last night https://example.com/cake'],
+      [
+        'a 49-char note',
+        'Have a look at this recipe I found, looks amazing https://example.com/cake',
+      ],
+    ])('%s → link', async (_label, text) => {
+      await share(text);
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+      expect(extractShareFromText).toHaveBeenCalledWith('page text', expect.anything());
+    });
+
+    it('holds at exactly the threshold, and flips one character past it', async () => {
+      // The boundary itself, from the constant — the one place the number is doing real work.
+      const url = ' https://example.com/cake';
+      await share('a'.repeat(MAX_LINK_NOTE_CHARS) + url);
+      expect(resolveRecipeSource).toHaveBeenCalledOnce();
+
+      vi.clearAllMocks();
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'text',
+        text: 'page text',
+        path: 'page_text',
+        sourceUrl: 'https://example.com/cake',
+        imageUrl: '',
+      });
+      await share('a'.repeat(MAX_LINK_NOTE_CHARS + 1) + url);
+      expect(resolveRecipeSource).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the prose measurement strips BOTH forms of a candidate', () => {
+    it('excludes a bare-domain signature from the count', async () => {
+      // ⚠️ The fixture is chosen to STRADDLE the threshold, which is the only way this test
+      // can fail against the pre-fix strip. `extractUrls` returns bare domains
+      // scheme-prefixed, so splitting on the candidate alone leaves `www.someschool.edu.sg`
+      // (21 chars) in the prose: one-form measures 212 (> 200 → text), two-form measures 190
+      // (≤ 200 → link). A fixture like `Regards\nwww.school.edu.sg` proves nothing — both
+      // strips land under MIN_SHARE_TEXT_CHARS and both refuse.
+      await share('a'.repeat(190) + ' www.someschool.edu.sg');
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://www.someschool.edu.sg');
+    });
+  });
+
+  describe('the prose measurement handles two candidates where one is a prefix', () => {
+    it('does not strand a URL path as prose when the same domain appears twice', async () => {
+      // ⚠️ `split` removes EVERY literal occurrence, so stripping the shorter candidate first
+      // chews the front off the longer one and strands its path — which the longer candidate
+      // then never matches. This exact text left `/recipe/pumpkin-pie` (19 chars) counted as
+      // prose, inflating the measurement enough to tip an ordinary recipe share into the text
+      // arm and lose the schema.org quantities. Fixed by stripping longest-first.
+      //
+      // ⚠️ Tuned to STRADDLE the threshold, which is the only way this test can fail against
+      // the unsorted strip: measured correctly the prose is 199 (≤ 200 → LINK); with the
+      // fragment stranded it is 220 (> 200 → TEXT). Both computed by running the real
+      // `extractUrls` over this exact fixture.
+      const note = 'Check out this site, '.padEnd(180, 'x');
+      await share(
+        `${note} https://example.com or the recipe at https://example.com/recipe/pumpkin-pie`
+      );
+
+      expect(resolveRecipeSource).toHaveBeenCalled();
+      expect(extractShareFromText).toHaveBeenCalledWith('page text', expect.anything());
+    });
+  });
+
+  describe('the text arm must be able to READ it — never turn a working share into a refusal', () => {
+    it('keeps the link path for an over-ceiling .txt that begins with a link', async () => {
+      // iOS delivers EVERY shared URL as a .txt, and `prepare` sets `overCeilingByBytes` as a
+      // flag rather than returning precisely so this keeps working. Prose here is 500 — over
+      // the threshold — so only `textArmUsable` stops it becoming a "too long" refusal.
+      const file = new File([`https://example.com/cake ${'x'.repeat(500)}`], 'shared.txt', {
+        type: 'text/plain',
+      });
+      Object.defineProperty(file, 'size', { value: 200_000 });
+      await ingestSharedContent({ files: [file] }, meta);
+
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.tooLong.title',
+        expect.anything()
+      );
+    });
+
+    it('keeps the link path once the text budget is spent', async () => {
+      // A link share has NEVER consumed the text budget and must not start refusing because of
+      // it — the budget is a text-arm cost control, not a share-wide one.
+      const REAL = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+      for (let i = 0; i < 20; i += 1) await share(REAL);
+      vi.clearAllMocks();
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'text',
+        text: 'page text',
+        path: 'page_text',
+        sourceUrl: 'https://example.com/cake',
+        imageUrl: '',
+      });
+
+      await share(`${'a'.repeat(250)} https://example.com/cake`);
+
+      expect(resolveRecipeSource).toHaveBeenCalledOnce();
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.quota.title',
+        expect.anything()
+      );
+    });
+  });
+
+  describe('the hoisted budget peek costs nothing', () => {
+    // That peeking neither consumes nor persists is asserted at its own module
+    // (`attemptBudget.test.ts` — "peek does not PERSIST"), where a storage spy can actually
+    // isolate it. What matters HERE is the observable consequence.
+    it('leaves a later text share its full budget', async () => {
+      // The observable consequence of the above: 20 link shares must not eat into the text
+      // allowance, because the budget is a text-arm cost control and never was share-wide.
+      for (let i = 0; i < 20; i += 1) await share('Made this https://example.com/cake');
+      vi.clearAllMocks();
+
+      const REAL = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+      for (let i = 0; i < 20; i += 1) await share(REAL);
+      expect(extractShareFromText).toHaveBeenCalledTimes(20);
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.text.quota.title',
+        expect.anything()
+      );
+    });
+  });
+
+  describe('efficiency and failure', () => {
+    it('never loads the link-router chunk when the body wins', async () => {
+      // The dominant new case. The import comment exists to keep ~22 KB of recipe graph out of
+      // the eager chunk; this stops paying for it on the path with no use for it.
+      await share(SCHOOL_EMAIL);
+      expect(routerCalls.count).toBe(0);
+    });
+
+    // ⚠️ NOT unit-tested, deliberately, and said out loud rather than faked: the `.catch` on
+    // the dynamic import only fires when `import()` REJECTS, and `vi.mock` resolves the module
+    // — so any test here would be exercising a thrown `routeUrl`, not a failed chunk load, and
+    // would pass with the `.catch` deleted. The guard is still correct and cheap (offline or a
+    // stale deploy reads the message instead of erroring), and its `link_router_unavailable`
+    // event is the signal that says whether it ever fires in production.
   });
 });
