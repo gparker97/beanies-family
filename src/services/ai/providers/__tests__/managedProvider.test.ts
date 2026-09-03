@@ -10,13 +10,25 @@
  *  2. `familyId` riding on the wire as an ADDED field, never a rename — the request body is a
  *     frozen contract, because the bundle and the Lambda deploy independently.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
+import { ExtractionProviderError } from '../../types';
+import type { managedProvider as ManagedProvider } from '../managedProvider';
 
+// ⚠️ `managedProvider` reads `import.meta.env.VITE_AI_EXTRACT_URL` at MODULE LOAD, and ESM
+// hoists static imports above every top-level statement — so a static `import` here would
+// capture the environment BEFORE `vi.stubEnv` ran. It only appeared to work locally because a
+// developer's `.env.local` supplies that variable; CI has no `.env`, so `PROXY_URL` was
+// undefined and every 429 assertion got `not_available` instead. A test that passes only on a
+// machine with the right dotfile is not a test.
+//
+// Stub first, then import dynamically inside `beforeAll` (which runs after top-level code).
 vi.stubEnv('VITE_AI_EXTRACT_URL', 'https://api.example.test/ai-extract');
 vi.stubEnv('VITE_AI_EXTRACT_API_KEY', 'soft-key');
 
-import { managedProvider } from '../managedProvider';
-import { ExtractionProviderError } from '../../types';
+let managedProvider: typeof ManagedProvider;
+beforeAll(async () => {
+  ({ managedProvider } = await import('../managedProvider'));
+});
 
 const originalFetch = globalThis.fetch;
 
