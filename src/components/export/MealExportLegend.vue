@@ -11,7 +11,12 @@ defineProps<{
   /** e.g. "Cooks". */
   cooksLabel: string;
   cooks: ExportCook[];
-  /** e.g. "⏰ serve time · 👥 guests". */
+  /**
+   * e.g. "⏰ serve time · 👥 guests" — or only one half, or empty.
+   *
+   * The caller builds it from what the sheet contains, so a key is never printed for a
+   * symbol that is not on the page.
+   */
   hint: string;
 }>();
 </script>
@@ -25,7 +30,7 @@ defineProps<{
         <span>{{ c.name }}</span>
       </span>
     </span>
-    <span class="hint">{{ hint }}</span>
+    <span v-if="hint" class="hint">{{ hint }}</span>
   </div>
 </template>
 
