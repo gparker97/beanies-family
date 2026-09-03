@@ -68,6 +68,29 @@ function hasMeals(date: string): boolean {
         class="group relative rounded-t-[14px] border-l border-l-[rgba(44,62,80,0.05)] pb-2 text-center dark:border-l-slate-700/60"
         :class="day.isToday ? 'bg-[rgba(241,93,34,0.05)]' : ''"
       >
+        <!--
+          Clear-day is the FIRST thing in the column, in its own reserved strip.
+          It began as an absolutely-positioned text button at `top-0 right-1`, over the
+          centred day name — at "Clear day" width it covered the very label the column is
+          identified by. Moving it into flow fixed the collision but put it under the date,
+          which reads as belonging to the row beneath. Top-right is where a "remove this
+          column" control is looked for.
+
+          Not hover-only either: `opacity-0 group-hover` is a control that does not exist on
+          a touch screen, and this planner's home is a tablet.
+        -->
+        <div class="flex h-5 items-start justify-end pr-1">
+          <button
+            v-if="hasMeals(day.dateStr)"
+            type="button"
+            class="font-outfit grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 dark:text-slate-400 [@media(hover:none)]:opacity-100"
+            :aria-label="t('mealPlanner.clearDay')"
+            :title="t('mealPlanner.clearDay')"
+            @click="emit('clearDay', day.dateStr)"
+          >
+            <span aria-hidden="true">&#x2715;</span>
+          </button>
+        </div>
         <div
           class="font-outfit text-sm font-bold"
           :class="day.isToday ? 'text-[#F15D22]' : 'text-secondary-500 dark:text-slate-100'"
@@ -82,29 +105,6 @@ function hasMeals(date: string): boolean {
           class="font-outfit mt-0.5 inline-block rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-xs font-bold text-[#F15D22]"
         >
           {{ t('mealPlanner.thisWeek') }}
-        </div>
-        <!-- Clear-day: appears on hover when the day has meals -->
-        <!--
-          Clear-day sits ABOVE the weekday, in its own reserved strip.
-          It used to be an absolutely-positioned text button at `top-0 right-1`, over the
-          centred day name — so at "Clear day" width it covered the very label the column is
-          identified by. An icon in a reserved row cannot collide with anything.
-
-          It is also no longer hover-only. `opacity-0 group-hover` makes a control that does
-          not exist on a touch screen, and the meal planner's home is a tablet: on
-          `hover: none` it stays visible.
-        -->
-        <div class="flex h-5 items-start justify-end pr-1">
-          <button
-            v-if="hasMeals(day.dateStr)"
-            type="button"
-            class="font-outfit grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 dark:text-slate-400 [@media(hover:none)]:opacity-100"
-            :aria-label="t('mealPlanner.clearDay')"
-            :title="t('mealPlanner.clearDay')"
-            @click="emit('clearDay', day.dateStr)"
-          >
-            <span aria-hidden="true">&#x2715;</span>
-          </button>
         </div>
       </div>
 

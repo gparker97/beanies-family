@@ -2,8 +2,8 @@
 /**
  * One planned meal on the board. Leads with the meal name (prominent), the cook
  * clearly beneath (secondary), a leading recipe-photo thumbnail (emoji fallback),
- * a state dot (orange to-cook / green cooked), and meta glyphs (guests / serve-time)
- * only when present. Non-recipe types render as tinted chips. Clicking
+ * a green tick on the medallion once it has been cooked, and meta glyphs (guests /
+ * serve-time) only when present. Non-recipe types render as tinted chips. Clicking
  * opens the editor; draggable on pointer devices (the tap click is the accessible path).
  */
 import { computed } from 'vue';
@@ -67,6 +67,8 @@ const typeTint = computed(() =>
   props.meal.kind === 'recipe' ? '' : MEAL_TYPE_STYLE[props.meal.kind].tint
 );
 const isSkip = computed(() => props.meal.kind === 'skip');
+/** Only a recipe can be cooked; a type card has nothing to cook. */
+const isCooked = computed(() => props.meal.kind === 'recipe' && props.meal.cooked === true);
 
 function onDragStart(e: DragEvent): void {
   startDrag({ source: 'meal', mealId: props.meal.id }, e);
@@ -92,19 +94,54 @@ function onDragStart(e: DragEvent): void {
         back to the slot glyph); a type shows its own emoji on a tinted ground — the icon it
         already had in the rail and lost the moment it was dragged onto the board.
       -->
-      <MealThumb
-        :photo-ids="isType ? undefined : recipe?.photoIds"
-        :fallback-emoji="mealTypeEmoji(meal.kind) ?? SLOT_EMOJI[meal.slot]"
-        :tint-class="typeTint"
-      />
+      <span class="relative flex-none">
+        <MealThumb
+          :photo-ids="isType ? undefined : recipe?.photoIds"
+          :fallback-emoji="mealTypeEmoji(meal.kind) ?? SLOT_EMOJI[meal.slot]"
+          :tint-class="typeTint"
+        />
+        <!--
+          COOKED is marked; not-cooked is not.
+          There used to be a dot on every recipe card — orange for to-cook, green for done —
+          which spent a slot in the tightest row in the app to report the ordinary state.
+          Not-yet-cooked is what almost every meal is almost all of the time, and a planner
+          full of orange dots says nothing. Only the exception earns a mark, and it rides on
+          the medallion so it costs no width at all.
+        -->
+        <span
+          v-if="isCooked"
+          class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-[#27AE60] text-white ring-2 ring-white dark:ring-slate-800"
+          :aria-label="t('mealPlanner.card.cooked')"
+          role="img"
+        >
+          <!-- SVG, not a "✓" glyph: a tick sized to fit a 16px badge would have to be set
+               below the 12px type floor, and this is an icon rather than text. -->
+          <svg
+            class="h-2.5 w-2.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+      </span>
       <div class="min-w-0 flex-1">
         <div
           class="font-outfit text-secondary-500 text-sm leading-tight font-bold break-words dark:text-slate-100"
         >
           {{ name }}
         </div>
-        <!-- Nothing to show when there is no cook and no cooked-state dot. -->
-        <div v-if="cook || meal.kind === 'recipe'" class="mt-1 flex items-center gap-1.5">
+        <!--
+          Right-anchored, like every face in the calendar — it sat left, so on mobile the
+          chip landed mid-card or hard left depending on what else was in the row and never
+          lined up down a column.
+        -->
+        <div v-if="cook" class="mt-1 flex items-center justify-end gap-1.5">
           <!--
             The cook is a FACE, not a face plus their name — the same convention the
             calendar cards use. It showed the initial and the full name side by side, which
@@ -126,12 +163,6 @@ function onDragStart(e: DragEvent): void {
             say that a field was empty, which the empty space already says — and on most
             meals who cooks is understood without being written down.
           -->
-          <span
-            v-if="meal.kind === 'recipe'"
-            class="ml-auto h-2 w-2 flex-none rounded-full"
-            :class="meal.cooked ? 'bg-[#27AE60]' : 'bg-[#F15D22]'"
-            :aria-label="meal.cooked ? t('mealPlanner.card.cooked') : t('mealPlanner.card.toCook')"
-          />
         </div>
         <div
           v-if="guestCount || meal.serveTime"
