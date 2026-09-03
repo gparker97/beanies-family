@@ -16,8 +16,13 @@ const props = withDefaults(
     fallbackEmoji: string;
     /** Square side in rem. */
     sizeRem?: number;
+    /**
+     * Ground for the emoji medallion, so a non-recipe meal carries its own tint while
+     * keeping the same footprint as a photo. Defaults to the recipe tint.
+     */
+    tintClass?: string;
   }>(),
-  { photoIds: undefined, sizeRem: 1.75 }
+  { photoIds: undefined, sizeRem: 1.75, tintClass: '' }
 );
 
 const photoStore = usePhotoStore();
@@ -47,7 +52,8 @@ const showImg = computed(() => !!url.value && !imgFailed.value);
   />
   <span
     v-else
-    class="flex flex-none items-center justify-center rounded-[9px] bg-[var(--tint-orange-8)]"
+    class="flex flex-none items-center justify-center rounded-[9px]"
+    :class="tintClass || 'bg-[var(--tint-orange-8)]'"
     :style="{ width: `${sizeRem}rem`, height: `${sizeRem}rem`, fontSize: `${sizeRem * 0.55}rem` }"
     aria-hidden="true"
     >{{ fallbackEmoji }}</span
