@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Swipe between days on the meal planner** on a phone, the same way the calendar already works.
 
+### Fixed
+
+- On the printed meal plan, a cook whose initial is shared with someone else now fits their chip properly, and the key at the foot shows the same letters as the meals above it.
+- The key at the foot of the printed plan no longer lists serve times and guests when nothing on that week uses them.
+- The meals card on your nook now shows an icon for eat out, leftovers and skip, and a bean's face rather than a plain letter.
+
 ---
 
 ## 2026-09-02
