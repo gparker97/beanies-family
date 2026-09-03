@@ -7,6 +7,9 @@
 import { computed } from 'vue';
 import NookSectionCard from './NookSectionCard.vue';
 import MealThumb from '@/components/mealplan/MealThumb.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
+import { MEAL_TYPE_STYLE, mealTypeEmoji } from '@/constants/mealTypes';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -17,6 +20,7 @@ import type { MealPlanEntry, MealSlot } from '@/types/models';
 const emit = defineEmits<{ openMeal: [meal: MealPlanEntry] }>();
 
 const { t } = useTranslation();
+const { memberAvatarBindings } = useMemberAvatarBindings();
 const mealPlanStore = useMealPlanStore();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
@@ -57,14 +61,19 @@ function cookFor(m: MealPlanEntry) {
           @click="emit('openMeal', m)"
         >
           <span
-            class="font-outfit w-14 flex-none text-[0.6rem] font-semibold tracking-[0.05em] text-[rgba(44,62,80,0.45)] uppercase"
+            class="font-outfit w-14 flex-none text-xs font-semibold tracking-[0.05em] text-[rgba(44,62,80,0.45)] uppercase"
           >
             {{ t(`mealPlanner.slot.${m.slot}`) }}
           </span>
+          <!--
+            A medallion on EVERY meal, as on the board. It was `v-if="kind === 'recipe'"`,
+            so eat-out, leftovers and skip had no icon here at all and the rows did not line
+            up — the same gap the board's type cards had before `MEAL_TYPE_STYLE` existed.
+          -->
           <MealThumb
-            v-if="m.kind === 'recipe'"
-            :photo-ids="recipeFor(m)?.photoIds"
-            :fallback-emoji="SLOT_EMOJI[m.slot]"
+            :photo-ids="m.kind === 'recipe' ? recipeFor(m)?.photoIds : undefined"
+            :fallback-emoji="mealTypeEmoji(m.kind) ?? SLOT_EMOJI[m.slot]"
+            :tint-class="m.kind === 'recipe' ? '' : MEAL_TYPE_STYLE[m.kind].tint"
             :size-rem="1.6"
           />
           <span
@@ -72,13 +81,19 @@ function cookFor(m: MealPlanEntry) {
           >
             {{ nameFor(m) }}
           </span>
-          <span
+          <!--
+            `BeanieAvatar`, not a seventh hand-rolled circle. This one had drifted the same
+            three ways the board card had: `name[0]` initials (which break a two-bean
+            collision and any emoji name), a raw `color` so a member with none set rendered
+            white-on-transparent, and no photo support.
+          -->
+          <BeanieAvatar
             v-if="cookFor(m)"
-            class="font-outfit flex h-5 w-5 flex-none items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
-            :style="{ backgroundColor: cookFor(m)!.color }"
-          >
-            {{ (cookFor(m)!.name[0] ?? '?').toUpperCase() }}
-          </span>
+            v-bind="memberAvatarBindings(cookFor(m)!)"
+            fallback="initials"
+            size="xs"
+            class="flex-none"
+          />
         </button>
       </li>
     </ul>

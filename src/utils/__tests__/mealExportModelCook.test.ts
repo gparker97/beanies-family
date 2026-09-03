@@ -75,6 +75,23 @@ describe('printed cook chip', () => {
     expect(mia.cook?.initial).not.toBe(max.cook?.initial);
   });
 
+  /**
+   * The legend is the KEY that makes a nameless cell chip decodable, so if it derives its
+   * own initial the two disagree and the key stops working — which is exactly what shipped:
+   * cells printed "SOF" while the legend printed "S" for the same person.
+   */
+  it('gives the legend the same initial as the cells', () => {
+    const model = buildMealExportRows(
+      [meal({ cookMemberId: 'a' })],
+      DATES,
+      resolvers(() => ({ name: 'Sofia', initial: 'SOF', color: '#8b5cf6' }))
+    );
+    const cell = model.rows.find((r) => r.slot === 'dinner')!.cells.flat()[0]!;
+    expect(model.cooks).toHaveLength(1);
+    expect(model.cooks[0]!.initial).toBe('SOF');
+    expect(model.cooks[0]!.initial).toBe(cell.cook!.initial);
+  });
+
   it('carries the note, which no other surface renders', () => {
     const cell = firstCell([meal({ note: '  use the oat cream  ' })], () => undefined);
     expect(cell.note).toBe('use the oat cream');
