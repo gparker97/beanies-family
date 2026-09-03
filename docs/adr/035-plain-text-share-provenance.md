@@ -101,6 +101,7 @@ reader — for no new risk in this change.
   `extractionPrompt` (all three copies), `documentExtractionService.extractShareFromText`'s
   JSDoc, and `managedProvider`'s header — the last of which had already been corrected once in
   the other direction and is now stated precisely.
+- **Amended 2026-09-03 (link-vs-text precedence).** This ADR's context rests on "the only way to reach the text arm was for a user to share a **link**", and it sized these limits for the traffic #83 was expected to create. The precedence change makes the raw-text arm the COMMON path — a share whose prose exceeds `MAX_LINK_NOTE_CHARS` now reads as text even when it contains a usable link — and the client read cap rose 4,000 → 10,000, so worst-case per-DEVICE raw-text volume goes from 20 × 4,000 to 20 × 10,000 characters an hour. **No limit moves and no decision here is reversed**; the per-family 80/hour, the per-IP 120/hour, the route throttle and the 32,000 wire bound are all unchanged. Recorded so the next person sizing these limits is not working from a number that is no longer true.
 - **Deploy order is load-bearing and runs opposite to #64.** No new task or source is
   introduced, so a new bundle against the old Lambda extracts fine — but unthrottled. The
   Lambda ships first, is verified against real traffic, and only then does the client bundle

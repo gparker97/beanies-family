@@ -24,6 +24,7 @@ import { AI_PICKER_MAX_BYTES, isAiPickerAcceptedFile } from '@/constants/aiDocum
 import {
   MAX_SHARE_TEXT_BYTES,
   MAX_SHARE_TEXT_CEILING,
+  MAX_LINK_NOTE_CHARS,
   MAX_SHARE_TEXT_CHARS,
   MIN_SHARE_TEXT_CHARS,
   SHARE_TEXT_BUDGET,
@@ -228,15 +229,32 @@ function trimUrlPunctuation(url: string): string {
  * the two funnels are separable. `file_count` is 0 for a link, so existing dashboards keep
  * meaning what they mean.
  */
+/**
+ * Why a triage went the way it did, when the bare `detail` does not say.
+ *
+ * A literal union rather than a one-entry lookup table: same type safety, without an
+ * indirection standing between the key and the string it maps to. Extend by adding a literal —
+ * NEVER by adding another parameter, because two of this helper's call sites are file shares
+ * where any such flag is meaningless.
+ */
+type TriageNote = 'the message outweighed the links in it';
+const OUTWEIGHED_LINKS: TriageNote = 'the message outweighed the links in it';
+
 function logReceivedKind(
   env: IngestEnv,
   detail: 'file' | 'link' | 'text',
-  fileCount: number
+  fileCount: number,
+  note?: TriageNote
 ): void {
   logEvent({
     level: 'info',
     surface: env.surface,
-    message: 'share triaged',
+    // ⚠️ THE PREFIX IS STABLE. Every message starts 'share triaged', so a saved CloudWatch
+    // query moves from `= "share triaged"` to `like /^share triaged/` and keeps working as
+    // notes are added. The note rides in the MESSAGE — developer-authored free text, not
+    // allowlisted — rather than in `context`, so no new key ships and `file_count` keeps its
+    // documented meaning.
+    message: note ? `share triaged — ${note}` : 'share triaged',
     context: { action: 'triaged', detail, file_count: fileCount },
   });
 }
@@ -316,8 +334,11 @@ function textBudgetKey(): string | null {
 }
 
 /**
- * Turn sender-supplied TEXT into a `ShareSource`: a link if one is in there, otherwise the
- * text itself, bounded and budgeted (#83).
+ * Turn sender-supplied TEXT into a `ShareSource`: the LINK when the share IS a link, otherwise
+ * the text itself, bounded and budgeted (#83, precedence #85).
+ *
+ * The precedence is `MAX_LINK_NOTE_CHARS`: a body outweighs the links inside it, a note around
+ * a link does not — but only where the text arm can actually read the share.
  *
  * Extracted out of `prepare()` (#84) so BOTH entry points get one text policy rather than
  * two. Everything about what text is acceptable — the link-vs-text decision, the three size
@@ -342,70 +363,141 @@ async function sourceFromText(
   const { showToast } = useToast();
   const { t } = useTranslation();
 
+  // ── Measure ────────────────────────────────────────────────────────────────────────────
+  //
+  // ⚠️ Bands are measured on the ORIGINAL trimmed string, never on `capped` — that copy is ≤
+  // the read cap by construction, so band logic reading it could never see either the truncate
+  // or the refuse band.
+  const trimmed = text.trim();
   // Cap before anything parses it — `extractUrls` splits the whole string. Accepted
-  // consequence: truncation can sever a URL sitting past the cap, and `no_url` is then the
+  // consequence: truncation can sever a URL sitting past the cap, and the text arm is then the
   // honest outcome. Bounding untrusted input at the boundary is worth that tail.
   const capped = text.slice(0, MAX_SHARE_TEXT_CHARS);
-  // The SAME predicate the resolver applies moments later. A weaker one here would pick a
-  // YouTube channel link sitting ahead of a good recipe URL and then die on it, with a
-  // readable link two words away.
-  //
-  // Punctuation is trimmed first because sentence-punctuated prose is the NORMAL input
-  // here — "Watch this https://youtu.be/dQw4w9WgXcQ." is how people share. `extractUrls`
-  // strips it on its bare-domain pass but not on its protocol pass, and the trailing dot
-  // makes the video id 12 characters, which `routeUrl` rejects outright: a perfectly
-  // readable video became "No Link Found".
-  // Imported HERE rather than at module scope. `App.vue` statically imports
-  // `useShareTargets`, which imports this file — so a top-level import would drag the
-  // recipe link-reading graph (`recipeSourceUrl`, `recipeSourceResolver`,
-  // `recipeFetchService`, `shareLink` — ~22 KB) into the eager entry chunk, where none of
-  // it lived before. Until now it was reachable only from the lazily-routed cookbook.
-  // Every cold boot would pay for it; only a text share ever runs it.
-  const { routeUrl } = await import('@/utils/recipeSourceUrl');
-  const candidates = extractUrls(capped).map(trimUrlPunctuation);
-  const url = candidates.find((candidate) => routeUrl(candidate).kind !== 'invalid');
-  if (url) {
-    logReceivedKind(env, 'link', 0);
-    return { kind: 'link', url };
-  }
 
-  const trimmed = text.trim();
-
-  // ⚠️ There WERE links, but none beanies can read — a YouTube channel, a playlist, an
-  // `/@handle`. Refuse as a LINK; do not fall through to the text bands with them.
+  // Punctuation is trimmed because sentence-punctuated prose is the NORMAL input here —
+  // "Watch this https://youtu.be/dQw4w9WgXcQ." is how people share. `extractUrls` strips it on
+  // its bare-domain pass but not on its protocol pass, and the trailing dot makes the video id
+  // 12 characters, which `routeUrl` rejects outright: a perfectly readable video became "No
+  // Link Found".
   //
-  // Before #83 this was the "no link found" dead end and cost nothing. The bands now accept
-  // anything over 25 characters, and a bare `https://www.youtube.com/playlist?list=…` is 46 —
-  // so it would pass, spend a budget slot, and reach the model as prose. The model cannot
-  // fetch, so `none` is the only possible answer: one billed call and one slot for a refusal
-  // that was free a moment ago. It would also contradict `extractShareFromText`'s own JSDoc
-  // ("Never the bare URL"), and a SHORT unreadable link would be told "beanies needs a bit
-  // more than that — include the date, the time and where it is", which is advice about an
-  // event given to someone who shared a link.
-  const withoutUrls = candidates.reduce((rest, c) => rest.split(c).join(' '), trimmed).trim();
-  if (candidates.length && withoutUrls.length < MIN_SHARE_TEXT_CHARS) {
-    logEvent({
-      level: 'info',
-      surface: env.surface,
-      message: 'shared link is not one beanies can read',
-      context: { action: 'rejected_type', detail: 'unreadable_link' },
+  // `Set` because `trimUrlPunctuation` can collapse two distinct candidates onto one string,
+  // which defeats `extractUrls`' own dedupe and would run the same whole-string split twice.
+  // This value now picks the ARM, not just a refusal, so it pays to be exact.
+  const candidates = [...new Set(extractUrls(capped).map(trimUrlPunctuation))];
+
+  // ⚠️ BOTH forms. `extractUrls` returns a bare domain SCHEME-PREFIXED (`url.ts:75` pushes
+  // `https://${cleaned}`), while this splits the ORIGINAL text — so splitting on the candidate
+  // alone never matches `www.school.edu.sg` and leaves the whole domain counted as prose.
+  // Verified: "Regards\nwww.smmis.edu.sg" measures 24 one-form, 7 two-form. Latent and harmless
+  // while this only gated a refusal (it made the refusal LESS likely, the safe direction); not
+  // harmless now that the same number picks the arm.
+  //
+  // It can OVER-strip: prose that repeats a domain in words ("I love example.com so much…")
+  // loses those mentions too, so 113 characters can measure 89. Measured, accepted, and in the
+  // SAFE direction — undercounting prose biases toward the LINK arm, which is the path that
+  // works today. Do not "fix" it with word boundaries; a URL is not a word.
+  //
+  // ⚠️ LONGEST FIRST, and this is not cosmetic. `split` removes every literal occurrence, so
+  // stripping a SHORTER candidate that is a prefix of a longer one chews the front off the
+  // longer one too and strands its path as prose — which the longer candidate can then never
+  // match. "Check out https://example.com or the recipe at https://example.com/recipe/x" left
+  // `/recipe/x` behind, INFLATING the count by 19 and able to tip an ordinary recipe share over
+  // the threshold into the text arm, losing the schema.org quantities the low threshold exists
+  // to protect. Ordering by descending length removes the specific URL before the general one.
+  const stripScheme = (u: string) => u.replace(/^https?:\/\//, '');
+  const prose = [...candidates]
+    .sort((a, b) => b.length - a.length)
+    .reduce((rest, c) => rest.split(c).join(' ').split(stripScheme(c)).join(' '), trimmed)
+    .trim().length;
+
+  // ── Decide ─────────────────────────────────────────────────────────────────────────────
+  //
+  // The bands, decided BEFORE the arm so each is evaluated once and read twice. Nothing here
+  // has a side effect: `peekAttempt` consumes nothing and writes nothing (pinned by a test,
+  // because it is an assumption about another module's internals).
+  const overCeiling = overCeilingByBytes || trimmed.length > MAX_SHARE_TEXT_CEILING;
+  const budgetKey = textBudgetKey();
+  const quota = budgetKey ? peekAttempt(budgetKey, SHARE_TEXT_BUDGET) : null;
+
+  // ⚠️ "Can the text arm actually READ this?", NOT "should it". A link-bearing share must never
+  // become a refusal because the arm it was newly routed to could not run. Two shipped cases
+  // depend on this: an over-ceiling `.txt` that BEGINS with a link (iOS delivers every shared
+  // URL that way, and `prepare` sets `overCeilingByBytes` as a flag rather than returning
+  // precisely so it keeps working), and any link share once the text budget is spent — which
+  // has never consumed that budget and must not start refusing.
+  const textArmUsable =
+    !overCeiling && trimmed.length >= MIN_SHARE_TEXT_CHARS && quota?.ok !== false;
+
+  // THE PRECEDENCE (#85), in one line. A body outweighs the links inside it; a note around a
+  // link does not. Before this, the FIRST usable URL won unconditionally — so a school email
+  // whose details are in the body was routed to its own signature URL, and beanies read the
+  // school's homepage instead of the field trip.
+  const bodyOutweighsLinks = prose > MAX_LINK_NOTE_CHARS;
+
+  // ── Dispatch ───────────────────────────────────────────────────────────────────────────
+  if (candidates.length && !(bodyOutweighsLinks && textArmUsable)) {
+    // Imported HERE rather than at module scope. `App.vue` statically imports
+    // `useShareTargets`, which imports this file — so a top-level import would drag the recipe
+    // link-reading graph (`recipeSourceUrl`, `recipeSourceResolver`, `recipeFetchService`,
+    // `shareLink` — ~22 KB) into the eager entry chunk, where none of it lived before. And it
+    // now sits INSIDE this block, so the dominant new case (a long email) never loads it.
+    const router = await import('@/utils/recipeSourceUrl').catch((err: unknown) => {
+      // "Offline, or a stale deploy" — not a code fault. If the message is readable on its
+      // own, read it: a result beats an error. If it is NOT, rethrow — `withIngestLock`
+      // already reports and shows `ai.error.generic`, and handling it here too would invent a
+      // fourth meaning for `null` and show two toasts for one failure.
+      if (!textArmUsable) throw err;
+      reportError({
+        surface: env.surface,
+        // `severity` omitted: 'error' is the default, and this must not page Slack.
+        message: 'link router chunk failed to load — read as text instead',
+        error: err,
+        context: { action: 'rejected_type', detail: 'link_router_unavailable' },
+      });
+      return null;
     });
-    showToast('info', t('recipeExtract.badLink.title'), t('recipeExtract.badLink.message'));
-    return null;
+
+    if (router) {
+      // The SAME predicate the resolver applies moments later. A weaker one here would pick a
+      // YouTube channel link sitting ahead of a good recipe URL and then die on it, with a
+      // readable link two words away.
+      const url = candidates.find((c) => router.routeUrl(c).kind !== 'invalid');
+      if (url) {
+        logReceivedKind(env, 'link', 0);
+        return { kind: 'link', url };
+      }
+
+      // ⚠️ There WERE links, but none beanies can read — a YouTube channel, a playlist, an
+      // `/@handle`. Refuse as a LINK; do not fall through to the text bands with them.
+      //
+      // The bands accept anything over 25 characters, and a bare
+      // `https://www.youtube.com/playlist?list=…` is 46 — so it would pass, spend a budget
+      // slot, and reach the model as prose. The model cannot fetch, so `none` is the only
+      // possible answer: one billed call and one slot for a refusal that was free a moment
+      // ago. It would also contradict `extractShareFromText`'s own JSDoc ("Never the bare
+      // URL"), and a SHORT unreadable link would be told "include the date, the time and where
+      // it is" — advice about an event, given to someone who shared a link.
+      if (prose < MIN_SHARE_TEXT_CHARS) {
+        logEvent({
+          level: 'info',
+          surface: env.surface,
+          message: 'shared link is not one beanies can read',
+          context: { action: 'rejected_type', detail: 'unreadable_link' },
+        });
+        showToast('info', t('recipeExtract.badLink.title'), t('recipeExtract.badLink.message'));
+        return null;
+      }
+    }
   }
 
-  // No usable link, so the text ITSELF is the share (#83). This used to be a dead end,
-  // deliberately: routing bare text to the model turns any app's share sheet into a general
-  // text→model endpoint on a soft-keyed proxy. That is still true — what changed is that
-  // the provenance fence has been REPLACED rather than removed. Bounded here, budgeted
-  // here and in `read`, and throttled per family and per IP at the proxy. See
-  // `docs/adr/035-plain-text-share-provenance.md`.
+  // ── The text arm ───────────────────────────────────────────────────────────────────────
   //
-  // ⚠️ Bands are measured on the ORIGINAL trimmed string (declared above the link check,
-  // which also needs it), never on `capped` — that copy is ≤ the read cap by construction, so
-  // band logic reading it could never see either the truncate or the refuse band.
-
-  if (overCeilingByBytes || trimmed.length > MAX_SHARE_TEXT_CEILING) {
+  // The text ITSELF is the share (#83). This used to be a dead end, deliberately: routing bare
+  // text to the model turns any app's share sheet into a general text→model endpoint on a
+  // soft-keyed proxy. That is still true — what changed is that the provenance fence has been
+  // REPLACED rather than removed. Bounded here, budgeted here and in `read`, and throttled per
+  // family and per IP at the proxy. See `docs/adr/035-plain-text-share-provenance.md`.
+  if (overCeiling) {
     logEvent({
       level: 'info',
       surface: env.surface,
@@ -429,32 +521,25 @@ async function sourceFromText(
     return null;
   }
 
-  // PEEK, do not consume. Consent runs after `prepare`, so consuming here would burn a
-  // share when the user DECLINES. The matching `consumeAttempt` sits immediately before the
-  // AI call in `read`.
-  const budgetKey = textBudgetKey();
-  if (budgetKey) {
-    const allowed = peekAttempt(budgetKey, SHARE_TEXT_BUDGET);
-    if (!allowed.ok) {
-      refuseForQuota(env, allowed.resetsAt);
-      return null;
-    }
+  // PEEKED above, not consumed. Consent runs after `prepare`, so consuming there would burn a
+  // share when the user DECLINES. The matching `consumeAttempt` sits immediately before the AI
+  // call in `read`.
+  if (quota && !quota.ok) {
+    refuseForQuota(env, quota.resetsAt);
+    return null;
   }
 
-  // Between the cap and the ceiling the text is bounded and the caller is told — but NOT
-  // here. `sourceFromText` runs inside triage, and the offline guard and the consent prompt
-  // both come after it and can both end the flow. Announcing "beanies read the beginning of
-  // it — check the details before you save" and then showing an offline error, or nothing at
-  // all because consent was declined, is a straight falsehood: nothing was read and there is
-  // nothing to save. The same applies to the event, which the design deliberately files
-  // OUTSIDE the refusal bucket as "a success with a notice" — emitted here it would count
-  // attempts, so its ratio against `ready` would overstate truncated successes by every
-  // declined and offline attempt.
-  //
-  // The flag rides on the ShareSource; `runIngest` announces it at the point it becomes true.
+  // Between the cap and the ceiling the text is bounded and the caller is told — but NOT here.
+  // `sourceFromText` runs inside triage, and the offline guard and the consent prompt both come
+  // after it and can both end the flow. Announcing "beanies read the beginning of it — check
+  // the details before you save" and then showing an offline error, or nothing at all because
+  // consent was declined, is a straight falsehood: nothing was read and there is nothing to
+  // save. The flag rides on the ShareSource; `runIngest` announces it when it becomes true.
   const truncated = trimmed.length > MAX_SHARE_TEXT_CHARS;
 
-  logReceivedKind(env, 'text', 0);
+  // The note is set ONLY when the new precedence chose text over a usable link, so
+  // `filter @message like /outweighed/` measures exactly how often the rule fires.
+  logReceivedKind(env, 'text', 0, candidates.length ? OUTWEIGHED_LINKS : undefined);
   // `boundText`, not `slice`: cutting UTF-16 code units can split a surrogate pair and hand
   // the model a U+FFFD where an emoji was.
   return { kind: 'text', text: boundText(trimmed, MAX_SHARE_TEXT_CHARS), truncated };

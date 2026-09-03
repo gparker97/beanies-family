@@ -1840,7 +1840,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Select the useful part rather than the whole thread. beanies reads what you send, so a tighter selection gives a better answer \u2014 and beanies works out for itself whether it is an activity, a trip or a recipe, exactly as it does for a photo.',
+          'A whole message is fine \u2014 you do not need to trim it down to the useful part. beanies reads what you send and works out for itself whether it is an activity, a trip or a recipe, exactly as it does for a photo. A tighter selection is still read a little more precisely, so it is worth trimming an enormous thread.',
       },
       {
         type: 'callout',
@@ -1860,9 +1860,20 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Too little to go on.</strong> A few words cannot carry a date, a time and a place, so beanies asks for a bit more rather than guessing.',
-          '<strong>Too much at once.</strong> A whole email thread is more than beanies reads in one go. Pick out the part with the details and share that instead. If what you send is long but not enormous, beanies reads the beginning and tells you it did \u2014 so check the form before saving.',
+          '<strong>A very long thread.</strong> An ordinary email is fine. Something enormous \u2014 a whole thread with every reply \u2014 is more than beanies reads in one go: it reads the beginning and tells you it did, so check the form before saving.',
           '<strong>A lot of reading in a short time.</strong> There is a limit on how much beanies reads for one family in an hour. It is there to keep costs predictable for everyone, and it tells you when it lifts. Sharing photos and PDFs is not affected.',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'When what you share has a link in it',
+        level: 3,
+        id: 'text-with-links',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Most messages worth sharing have a link somewhere \u2014 the school website, a payment page, a signature. beanies looks at how much you actually sent: share a <strong>whole message</strong> and it reads the message, treating the links in it as part of the text; share a <strong>link with a few words around it</strong> and it opens the link instead. You do not have to choose.',
       },
       {
         type: 'heading',
