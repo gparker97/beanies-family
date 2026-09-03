@@ -16,6 +16,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useMealDrag } from '@/composables/useMealDrag';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { mealDisplayName } from '@/utils/mealDisplayName';
+import { MEAL_TYPE_STYLE, mealTypeEmoji } from '@/constants/mealTypes';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 const props = defineProps<{ meal: MealPlanEntry }>();
@@ -50,18 +51,22 @@ const cook = computed(() =>
 
 const guestCount = computed(() => props.meal.guestNames?.length ?? 0);
 
-const typeClass = computed(() => {
-  switch (props.meal.kind) {
-    case 'eat_out':
-      return 'bg-[var(--tint-silk-20)]';
-    case 'leftovers':
-      return 'bg-[var(--tint-slate-5)]';
-    case 'skip':
-      return 'border border-dashed border-[rgba(44,62,80,0.18)] opacity-70';
-    default:
-      return 'bg-[var(--tint-orange-8)]';
-  }
-});
+/**
+ * Eat-out, leftovers and skip wear the SAME card chrome as a recipe.
+ *
+ * They used to be flat tinted chips with no thumbnail, so a row of meals read as two
+ * different species of object and the type cards looked unfinished beside a card with a
+ * photo. Now every card is a white card with a medallion, and the medallion says which
+ * kind it is — the division the calendar already settled on, where the surface says whose
+ * and the glyph says what.
+ *
+ * `skip` keeps a dashed edge and reduced opacity: it is the one kind that means "no meal
+ * here", and that should still read as absence at a glance.
+ */
+const typeTint = computed(() =>
+  props.meal.kind === 'recipe' ? '' : MEAL_TYPE_STYLE[props.meal.kind].tint
+);
+const isSkip = computed(() => props.meal.kind === 'skip');
 
 function onDragStart(e: DragEvent): void {
   startDrag({ source: 'meal', mealId: props.meal.id }, e);
@@ -73,12 +78,8 @@ function onDragStart(e: DragEvent): void {
     role="button"
     tabindex="0"
     draggable="true"
-    class="cursor-pointer rounded-[13px] p-2 transition-transform duration-150 hover:-translate-y-px"
-    :class="
-      isType
-        ? typeClass
-        : 'border border-[rgba(44,62,80,0.09)] bg-white shadow-[var(--card-shadow)] hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800'
-    "
+    class="cursor-pointer rounded-[13px] border border-[rgba(44,62,80,0.09)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform duration-150 hover:-translate-y-px hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+    :class="isSkip ? 'border-dashed opacity-70' : ''"
     @click="emit('open')"
     @keydown.enter.prevent="emit('open')"
     @keydown.space.prevent="emit('open')"
@@ -86,10 +87,15 @@ function onDragStart(e: DragEvent): void {
     @dragend="endDrag"
   >
     <div class="flex items-start gap-2">
+      <!--
+        One medallion on every card, so the grid lines up. A recipe shows its photo (falling
+        back to the slot glyph); a type shows its own emoji on a tinted ground — the icon it
+        already had in the rail and lost the moment it was dragged onto the board.
+      -->
       <MealThumb
-        v-if="!isType"
-        :photo-ids="recipe?.photoIds"
-        :fallback-emoji="SLOT_EMOJI[meal.slot]"
+        :photo-ids="isType ? undefined : recipe?.photoIds"
+        :fallback-emoji="mealTypeEmoji(meal.kind) ?? SLOT_EMOJI[meal.slot]"
+        :tint-class="typeTint"
       />
       <div class="min-w-0 flex-1">
         <div
@@ -97,7 +103,8 @@ function onDragStart(e: DragEvent): void {
         >
           {{ name }}
         </div>
-        <div class="mt-1 flex items-center gap-1.5">
+        <!-- Nothing to show when there is no cook and no cooked-state dot. -->
+        <div v-if="cook || meal.kind === 'recipe'" class="mt-1 flex items-center gap-1.5">
           <!--
             The cook is a FACE, not a face plus their name — the same convention the
             calendar cards use. It showed the initial and the full name side by side, which
@@ -114,12 +121,11 @@ function onDragStart(e: DragEvent): void {
             size="xs"
             class="flex-none ring-2 ring-white dark:ring-slate-800"
           />
-          <span
-            v-else-if="!isType"
-            class="font-outfit text-xs font-semibold text-[rgba(44,62,80,0.6)] dark:text-slate-400"
-          >
-            {{ t('mealPlanner.card.anyone') }}
-          </span>
+          <!--
+            No cook, no label. "Anyone" filled a line on the tightest surface in the app to
+            say that a field was empty, which the empty space already says — and on most
+            meals who cooks is understood without being written down.
+          -->
           <span
             v-if="meal.kind === 'recipe'"
             class="ml-auto h-2 w-2 flex-none rounded-full"

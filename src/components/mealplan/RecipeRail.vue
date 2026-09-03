@@ -6,6 +6,7 @@
  * enhancement; the same actions are available by tapping a slot (MealPickerSheet).
  */
 import { ref } from 'vue';
+import { MEAL_TYPE_STYLE } from '@/constants/mealTypes';
 import { storeToRefs } from 'pinia';
 import MealThumb from './MealThumb.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
@@ -65,9 +66,15 @@ async function onRemoveDrop(): Promise<void> {
 }
 
 const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: string }[] = [
-  { kind: 'eat_out', emoji: '🍜', tile: 'bg-[var(--tint-silk-20)]' },
-  { kind: 'leftovers', emoji: '♻️', tile: 'bg-[var(--tint-slate-5)]' },
-  { kind: 'skip', emoji: '⊘', tile: 'bg-[var(--tint-slate-5)]' },
+  // Icons and tints come from `MEAL_TYPE_STYLE` — they used to live only here, which is
+  // why a type dragged onto the board arrived with no icon at all.
+  { kind: 'eat_out', emoji: MEAL_TYPE_STYLE.eat_out.emoji, tile: MEAL_TYPE_STYLE.eat_out.tint },
+  {
+    kind: 'leftovers',
+    emoji: MEAL_TYPE_STYLE.leftovers.emoji,
+    tile: MEAL_TYPE_STYLE.leftovers.tint,
+  },
+  { kind: 'skip', emoji: MEAL_TYPE_STYLE.skip.emoji, tile: MEAL_TYPE_STYLE.skip.tint },
   { kind: 'other', emoji: '✎', tile: 'bg-[var(--tint-orange-8)]' },
 ];
 </script>
