@@ -15,6 +15,7 @@ import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore } from '@/stores/activityStore';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
+import { isDarkNow } from '@/composables/useDarkMode';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
@@ -59,6 +60,21 @@ const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
 const { identityFor } = useActivityIdentity();
+
+/**
+ * The lane's own background: the bean's hue, flat, for the full height of the day.
+ *
+ * Deliberately WEAKER than a card's wash and stronger on dark, mirroring the two-value
+ * rule `useActivityIdentity` uses for exactly the same reason — a tint that reads on white
+ * disappears on slate. A large field also reads stronger than a small one at equal alpha,
+ * which is why this sits well under the 13% a card carries elsewhere.
+ *
+ * Eight-digit hex rather than `color-mix`: the wall runs on old iPads, and this is the same
+ * idiom the gradient it replaces already used.
+ */
+function laneTint(color: string): string {
+  return `${color}${isDarkNow() ? '1F' : '14'}`;
+}
 const { memberAvatarBindings } = useMemberAvatarBindings();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
@@ -379,7 +395,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
             <div
               v-for="occ in memberUntimedActivities(member.id)"
               :key="occ.activity.id"
-              class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+              class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 bg-white px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-slate-800"
               :class="[
                 identityFor(occ.activity, { laneMemberId: member.id }).dashed
                   ? 'border-dashed'
@@ -388,7 +404,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                   ? 'is-celebration'
                   : '',
               ]"
-              :style="identityFor(occ.activity, { laneMemberId: member.id }).style"
+              :style="identityFor(occ.activity, { laneMemberId: member.id }).edgeStyle"
               @click="emit('view-activity', occ.activity.id, currentDay.dateStr)"
             >
               <CelebrationConfetti
@@ -458,10 +474,19 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
             :key="'col-' + member.id"
             class="relative border-l border-gray-200/40 dark:border-slate-600/30"
           >
-            <!-- Subtle color gradient at top -->
+            <!--
+              The lane IS the bean, for the whole height of the day.
+              It was a 40px gradient fading to transparent, so the column announced its
+              owner and then stopped — by mid-morning every lane was white and they blended
+              into each other. That matters more here than anywhere else: this is the one
+              surface that deliberately hides the owner's face on a solo card (see the lane
+              rule on `laneMemberId`), so the lane is carrying the identity alone and has to
+              keep carrying it. Flat, not a gradient: a gradient reads as decoration, a
+              field reads as structure.
+            -->
             <div
-              class="pointer-events-none absolute inset-x-0 top-0 z-[1] h-10"
-              :style="{ background: `linear-gradient(to bottom, ${member.color}0A, transparent)` }"
+              class="pointer-events-none absolute inset-0 z-0"
+              :style="{ background: laneTint(member.color) }"
             />
 
             <!-- Hour row borders (clickable to add activity) -->
@@ -490,7 +515,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               <div
                 v-for="(activity, ai) in group"
                 :key="activity.id"
-                class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
+                class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] bg-white px-1.5 py-1 text-xs shadow-sm transition-shadow hover:shadow-md dark:bg-slate-800"
                 :class="[
                   identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : '',
                   identityFor(activity, { laneMemberId: member.id }).celebration.celebrating
@@ -501,7 +526,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
                   width: `calc(${100 / group.length}% - 2px)`,
-                  ...identityFor(activity, { laneMemberId: member.id }).style,
+                  ...identityFor(activity, { laneMemberId: member.id }).edgeStyle,
                 }"
                 @click.stop="emit('view-activity', activity.id, currentDay.dateStr)"
               >
