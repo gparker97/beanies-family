@@ -129,7 +129,11 @@ export function buildMealExportRows(
       if (resolved) {
         cookIds.add(meal.cookMemberId);
         cooks.push({
-          initial: initialOf(resolved.name),
+          // The SAME initial the cells use. This built its own with `initialOf`, so the
+          // legend printed "S" while the cells printed "SOF" for one person — and the
+          // legend is the key that makes the cells decodable, so a mismatch defeats it
+          // entirely. One derivation, used twice.
+          initial: resolved.initial || initialOf(resolved.name),
           name: resolved.name,
           color: resolved.color,
         });
