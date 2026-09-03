@@ -44,6 +44,8 @@ describe('ExportSheet', () => {
 });
 
 const ROWS: MealExportRows = {
+  hasServeTime: false,
+  hasGuests: false,
   dayColumns: [
     { dateISO: '2026-08-17', weekday: 'Mon', dayNum: '17' },
     { dateISO: '2026-08-18', weekday: 'Tue', dayNum: '18' },

@@ -190,6 +190,22 @@ async function clearDay(date: string) {
 }
 
 // ── Share / export the week ──────────────────────────────────────────────────
+
+/**
+ * The footer key, built from what the sheet actually contains.
+ *
+ * It used to be a fixed "⏰ serve time · 👥 guests" printed on every export, so a plan
+ * with neither still carried a key for two symbols that appeared nowhere — which reads as
+ * "these are missing" rather than "these do not apply", and sends the reader looking.
+ */
+const exportHint = computed(() => {
+  const rows = exportRows.value;
+  if (!rows) return '';
+  const parts: string[] = [];
+  if (rows.hasServeTime) parts.push(t('mealPlanner.export.legendServeTime'));
+  if (rows.hasGuests) parts.push(t('mealPlanner.export.legendGuests'));
+  return parts.join(' · ');
+});
 function cook(id?: string): { name: string; color?: string; initial?: string } | undefined {
   const m = id ? familyStore.members.find((mm) => mm.id === id) : undefined;
   if (!m) return undefined;
@@ -473,7 +489,7 @@ async function runExport(format: ExportFormat): Promise<void> {
             v-if="exportRows"
             :cooks-label="t('mealPlanner.export.cooksLabel')"
             :cooks="exportRows.cooks"
-            :hint="t('mealPlanner.export.legendHint')"
+            :hint="exportHint"
           />
         </template>
       </ExportSheet>

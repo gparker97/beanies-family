@@ -92,6 +92,37 @@ describe('printed cook chip', () => {
     expect(model.cooks[0]!.initial).toBe(cell.cook!.initial);
   });
 
+  /**
+   * The footer key must describe what is ON the sheet. It used to print
+   * "⏰ serve time · 👥 guests" on every export, so a plan using neither still carried a
+   * key for two symbols that appeared nowhere — which reads as "these are missing".
+   */
+  it('reports serve time and guests only when the sheet actually has them', () => {
+    const none = buildMealExportRows(
+      [meal({})],
+      DATES,
+      resolvers(() => undefined)
+    );
+    expect(none.hasServeTime).toBe(false);
+    expect(none.hasGuests).toBe(false);
+
+    const timed = buildMealExportRows(
+      [meal({ serveTime: '18:30' })],
+      DATES,
+      resolvers(() => undefined)
+    );
+    expect(timed.hasServeTime).toBe(true);
+    expect(timed.hasGuests).toBe(false);
+
+    const withGuests = buildMealExportRows(
+      [meal({ guestNames: ['Ben'] })],
+      DATES,
+      resolvers(() => undefined)
+    );
+    expect(withGuests.hasGuests).toBe(true);
+    expect(withGuests.hasServeTime).toBe(false);
+  });
+
   it('carries the note, which no other surface renders', () => {
     const cell = firstCell([meal({ note: '  use the oat cream  ' })], () => undefined);
     expect(cell.note).toBe('use the oat cream');

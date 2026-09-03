@@ -1329,10 +1329,10 @@ const STRING_DEFS = {
   'mealPlanner.export.accent': { en: "what's cooking? 🌱", beanie: "what's cooking? 🌱" },
   'mealPlanner.export.weekOf': { en: 'week of', beanie: 'week of' },
   'mealPlanner.export.cooksLabel': { en: 'Cooks', beanie: 'cooks' },
-  'mealPlanner.export.legendHint': {
-    en: '⏰ serve time · 👥 guests',
-    beanie: '⏰ serve time · 👥 guests',
-  },
+  // Split in two: the footer key now prints only the parts the sheet actually uses, so it
+  // never explains a symbol that is not on the page.
+  'mealPlanner.export.legendServeTime': { en: '⏰ serve time', beanie: '⏰ serve time' },
+  'mealPlanner.export.legendGuests': { en: '👥 guests', beanie: '👥 guests' },
   'mealPlanner.export.failed': {
     en: "Couldn't create the file",
     beanie: "couldn't create the file",

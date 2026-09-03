@@ -71,6 +71,16 @@ export interface MealExportRows {
   rows: ExportSlotRow[];
   /** Distinct cooks across the week, in first-appearance order (footer legend). */
   cooks: ExportCook[];
+  /**
+   * Does the sheet actually contain a serve time / a guest count?
+   *
+   * The footer key used to advertise "⏰ serve time · 👥 guests" unconditionally, so a
+   * plan with neither still printed a key for two symbols that were nowhere on the page —
+   * which reads as "these are missing" rather than "these do not apply". A key should
+   * describe what is present.
+   */
+  hasServeTime: boolean;
+  hasGuests: boolean;
 }
 
 /** Fixed slot order — the export always shows all four rows (empty cells dashed). */
@@ -151,5 +161,12 @@ export function buildMealExportRows(
     ),
   }));
 
-  return { dayColumns, rows, cooks };
+  const cells = rows.flatMap((r) => r.cells.flat());
+  return {
+    dayColumns,
+    rows,
+    cooks,
+    hasServeTime: cells.some((c) => !!c.serveTime),
+    hasGuests: cells.some((c) => c.guestCount > 0),
+  };
 }
