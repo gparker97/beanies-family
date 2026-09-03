@@ -48,7 +48,7 @@ Beanies Main Issue Tracker
 
 **Connected MCP namespace.** The tracker is shared with the **`mcp__notion-beanies__*`** integration (the plain `mcp__notion__*` integration returns `object_not_found` for this DB). Use `notion-beanies`. If only `notion` is connected, try it as a fallback and tell the user which one worked; if neither is present, the MCP isn't connected (see step 1).
 
-**Never hardcode select/multi-select options** (Priority, Issue Type, Device Type, View, Category, the control selects). They drift — `View` alone has ~30 options and grows. Always read the **live** options from `API-retrieve-a-data-source` on the `data_source_id` at runtime (step 2) and map onto those. (For reference only, at time of writing: Priority = `Critical / High / Normal / Low / Future`; Device Type = `Desktop / Mobile (Browser) / Mobile (PWA) / iOS App / Android App / All`; Category = `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`. Verify live — do not trust this line.)
+**Never hardcode select/multi-select options** (Priority, Issue Type, Device Type, View, Category, the control selects). They drift — `View` alone has ~30 options and grows. Always read the **live** options from `API-retrieve-a-data-source` on the `data_source_id` at runtime (step 2) and map onto those. (For reference only, verified live 2026-09-03: Issue Type = `Bug / Feature / Security`; Priority = `Critical / High / Normal / Low / Future` — note **`Low / Future` is ONE option**, and there is no `High Priority`; Device Type = `Desktop / Mobile (Browser) / Mobile (PWA) / iOS App / Android App / All / Mobile / PWA`; Category = `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`. Verify live — do not trust this line.)
 
 ---
 
@@ -68,12 +68,13 @@ Then confirm the Notion MCP is connected (same availability pattern as `start-se
 
 ### 3. Classify the issue
 
-Decide **Bug vs Feature** from the raw input (the live `Issue Type` only offers these two). This determines the Conditional tier:
+Decide **Bug vs Feature vs Security** from the raw input. This determines the Conditional tier:
 
 - **Feature** → needs _User Story_ (+ _UI / UX Expectations_).
 - **Bug** → needs _Current Behavior_ + _Expected Behavior_ (+ repro detail, folded into _References_ — there is no dedicated Repro property).
+- **Security** → bug-shaped, and treated as such: _Current Behavior_ is the exploit path, _Expected Behavior_ is the invariant that should hold. Prefer it over `Bug` whenever the work is closing an exposure rather than fixing something a user experiences as broken — and say so in _Notes_ when nothing is visibly broken today, so a later reader does not mistake the row for a live incident.
 
-If it's genuinely a refactor/chore/tech-debt item, file it as the closest of Bug/Feature (usually Feature for new capability, Bug for "X is broken/wrong") and say so in _Notes_. If the type is ambiguous, ask.
+If it's genuinely a refactor/chore/tech-debt item, file it as the closest of the three (usually Feature for new capability, Bug for "X is broken/wrong") and say so in _Notes_. If the type is ambiguous, ask.
 
 ### 4. Research — proportional, subagent-backed
 
@@ -101,7 +102,7 @@ Never silently create a near-duplicate. If nothing matches, say so briefly and c
 
 Four fields are **decisions, not research** — they encode how the work should be delivered, and they're the user's to make. Propose a sensible default with your reasoning, then confirm (batch with `AskUserQuestion`):
 
-- **Priority** (`Critical / High / Normal / Low / Future`, live) — propose from impact + urgency; default `Normal` unless the input signals otherwise.
+- **Priority** (`Critical / High / Normal / Low / Future`, live — `Low / Future` is a single option) — propose from impact + urgency; default `Normal` unless the input signals otherwise. For a security row, weigh the MITIGATIONS as well as the severity: an escalation that needs several preconditions and is backstopped elsewhere is not automatically Critical, and saying why in _Notes_ is what stops the priority reading as an under-call later.
 - **generate mockup?** (`Yes / No`) — propose `Yes` for any new/changed **visual** surface (a feature touching a visual `View`), `No` for bugs, logic, tooling, and copy-only changes. This is the flag pre-plan's step-6 mockup loop reads.
 - **github issue** (`create github issue` / `do not create github issue`) — propose per how the user usually works; this is a passthrough pre-plan hands to `beanies-plan`.
 - **Feature gated?** (`Yes - behind feature gate in settings` / `No feature gate`) — **gating is by request only**; default `No feature gate` unless the user wants it behind a Settings feature flag.

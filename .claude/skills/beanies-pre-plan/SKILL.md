@@ -30,7 +30,7 @@ This table is the ONE authoritative definition of the intake fields. The copy/pa
 | Field                          | Tier            | Applies to | Notion property (type)                                                   | → beanies-plan section          |
 | ------------------------------ | --------------- | ---------- | ------------------------------------------------------------------------ | ------------------------------- |
 | Title                          | Required        | all        | Name (title)                                                             | plan Title                      |
-| Type                           | Required        | all        | Issue Type (select: Bug / Feature)                                       | labeling                        |
+| Type                           | Required        | all        | Issue Type (select: Bug / Feature / Security)                            | labeling                        |
 | Priority                       | Required        | all        | Priority (select — vocab-mapped, see binding block)                      | labeling                        |
 | Surfaces — platforms           | Required        | all        | Device Type (multi-select)                                               | Approach + DRY targeting + labeling |
 | Surfaces — area                | Required        | all        | View (multi-select)                                                      | Approach + labeling             |
@@ -53,7 +53,7 @@ This table is the ONE authoritative definition of the intake fields. The copy/pa
 **Tiers** (read off the _Tier_ + _Applies to_ columns):
 
 - **Required** — always present. ~6 fields. Keep it this small; if intake becomes a 20-field form it gets abandoned.
-- **Conditional** — required only for their _Type_: `feature` → User story (+ UX/mockup); `bug` → Current + Expected (+ Repro if available). `refactor`/`chore`/`other` (PASTE only — Notion's `Issue Type` offers just Bug/Feature) → Required tier only.
+- **Conditional** — required only for their _Type_: `feature` → User story (+ UX/mockup); `bug` **and `security`** → Current + Expected (+ Repro if available). A security row is bug-shaped because it describes an exposure: _Current_ is the exploit path and _Expected_ is the invariant that should hold. `refactor`/`chore`/`other` (PASTE only — Notion's `Issue Type` offers Bug / Feature / Security) → Required tier only.
 - **Optional** — fill when known, else leave the `—` placeholder. Never interrogate the user about these.
 
 **Notion conventions** (the DB is the authority for NOTION mode):
@@ -218,8 +218,9 @@ Feature gated? (select) → passthrough directive to beanies-plan (gating is BY 
 **Vocab maps** (Notion value → canonical, one-way — the skill never writes these back):
 
 ```
-Priority:  Critical → critical · High Priority → high · Normal → medium · Low / Future → low
-Issue Type: Bug → bug · Feature → feature
+Priority:  Critical → critical · High → high · Normal → medium · Low / Future → low
+           (`Low / Future` is ONE option, not two. There is no `High Priority` option.)
+Issue Type: Bug → bug · Feature → feature · Security → security
 Device Type / View / Category: carried verbatim (no remap)
 ```
 
@@ -227,7 +228,7 @@ Device Type / View / Category: carried verbatim (no remap)
 
 | Property            | Notion type                               | Role in this skill                                   |
 | ------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| Status              | select (Not started / In Progress / Done) | read filter (`Not started`) + write-back (`In Progress`) |
+| Status              | select (Not started / In Progress / Ready for Testing / Done) | read filter (`Not started`) + write-back (`In Progress`) |
 | beanies-plan prompt | rich_text                                 | immediate write-back target — the assembled block    |
 | plan file url       | url                                       | deferred write-back target — GitHub URL of the saved plan (step 8) |
 | generate mockup?    | select (Yes / No)                         | control — `Yes` triggers the step-6 mockup loop      |
