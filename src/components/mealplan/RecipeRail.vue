@@ -130,7 +130,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
          cards, so they read as the same draggable object and never truncate. -->
     <div class="flex-none">
       <div
-        class="font-outfit mt-4 text-[0.62rem] font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
+        class="font-outfit mt-4 text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
       >
         {{ t('mealPlanner.picker.alternatives') }}
       </div>

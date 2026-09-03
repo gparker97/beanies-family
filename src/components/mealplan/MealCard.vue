@@ -2,12 +2,14 @@
 /**
  * One planned meal on the board. Leads with the meal name (prominent), the cook
  * clearly beneath (secondary), a leading recipe-photo thumbnail (emoji fallback),
- * a state dot (orange to-cook / green cooked), and meta glyphs (note / guests /
- * serve-time) only when present. Non-recipe types render as tinted chips. Clicking
+ * a state dot (orange to-cook / green cooked), and meta glyphs (guests / serve-time)
+ * only when present. Non-recipe types render as tinted chips. Clicking
  * opens the editor; draggable on pointer devices (the tap click is the accessible path).
  */
 import { computed } from 'vue';
 import MealThumb from './MealThumb.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -20,6 +22,7 @@ const props = defineProps<{ meal: MealPlanEntry }>();
 const emit = defineEmits<{ open: [] }>();
 
 const { t } = useTranslation();
+const { memberAvatarBindings } = useMemberAvatarBindings();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
 const { startDrag, endDrag } = useMealDrag();
@@ -44,7 +47,6 @@ const cook = computed(() =>
     ? familyStore.members.find((m) => m.id === props.meal.cookMemberId)
     : undefined
 );
-const cookInitial = computed(() => (cook.value?.name?.[0] ?? '?').toUpperCase());
 
 const guestCount = computed(() => props.meal.guestNames?.length ?? 0);
 
@@ -96,16 +98,27 @@ function onDragStart(e: DragEvent): void {
           {{ name }}
         </div>
         <div class="mt-1 flex items-center gap-1.5">
-          <span
+          <!--
+            The cook is a FACE, not a face plus their name — the same convention the
+            calendar cards use. It showed the initial and the full name side by side, which
+            is the one fact twice, on the surface where horizontal space is scarcest.
+
+            `BeanieAvatar` rather than a hand-rolled circle: this was a sixth copy after
+            five were collapsed into that component, and the copy had drifted — `charAt(0)`
+            initials (which break two-bean collisions and emoji names) and no photo support.
+          -->
+          <BeanieAvatar
             v-if="cook"
-            class="font-outfit flex h-4 w-4 flex-none items-center justify-center rounded-full text-[0.55rem] font-bold text-white ring-2 ring-white dark:ring-slate-800"
-            :style="{ backgroundColor: cook.color }"
-            >{{ cookInitial }}</span
-          >
+            v-bind="memberAvatarBindings(cook)"
+            fallback="initials"
+            size="xs"
+            class="flex-none ring-2 ring-white dark:ring-slate-800"
+          />
           <span
+            v-else-if="!isType"
             class="font-outfit text-xs font-semibold text-[rgba(44,62,80,0.6)] dark:text-slate-400"
           >
-            {{ cook ? cook.name : isType ? '' : t('mealPlanner.card.anyone') }}
+            {{ t('mealPlanner.card.anyone') }}
           </span>
           <span
             v-if="meal.kind === 'recipe'"
@@ -115,10 +128,13 @@ function onDragStart(e: DragEvent): void {
           />
         </div>
         <div
-          v-if="meal.note || guestCount || meal.serveTime"
-          class="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6rem] text-[rgba(44,62,80,0.5)] dark:text-slate-400"
+          v-if="guestCount || meal.serveTime"
+          class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[rgba(44,62,80,0.5)] dark:text-slate-400"
         >
-          <span v-if="meal.note" aria-hidden="true">📝</span>
+          <!--
+            No note glyph. It said "there is a note" without saying what, and at the 12px
+            floor it costs width a 7rem column does not have — on a card that opens on tap.
+          -->
           <span v-if="meal.serveTime" class="font-outfit font-semibold"
             >⏰ {{ meal.serveTime }}</span
           >

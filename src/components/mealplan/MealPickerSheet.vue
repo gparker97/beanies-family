@@ -145,7 +145,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
 
       <div>
         <div
-          class="font-outfit text-[0.62rem] font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
+          class="font-outfit text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
         >
           {{ t('mealPlanner.picker.alternatives') }}
         </div>
