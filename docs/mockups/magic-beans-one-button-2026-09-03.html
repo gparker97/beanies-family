@@ -1,0 +1,298 @@
+<meta charset="utf-8">
+<title>One Magic Beans Button</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   #84 — one magic-beans button (2026-09-03)
+   CIG-clamped: Heritage Orange for accents (never Alert Red), Outfit/Inter/
+   Caveat, squircle radii, soft diffused shadows. The card's gradient, badge
+   and copy are the SHIPPED MagicReaderCard.vue — only the affordance changes.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --heritage-orange:#F15D22; --terracotta:#E67E22; --deep-slate:#2C3E50;
+  --sky-silk:#AED6F1; --cloud-white:#F8F9FA; --soft-green:#27AE60;
+  --muted:#4d5d6c;
+  --card-shadow:0 4px 20px rgb(44 62 80 / 6%);
+  --lift:0 12px 26px -10px rgb(241 93 34 / 65%);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#eef1f4;color:var(--deep-slate);
+  font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* ── page furniture (not the design) ──────────────────────────────── */
+.bar{position:sticky;top:0;z-index:60;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+  padding:13px 20px;background:#fff;box-shadow:0 1px 0 rgb(44 62 80 / 8%)}
+.bar h1{font-family:'Outfit';font-size:.98rem;font-weight:800;margin:0 10px 0 0}
+.bar h1 span{color:var(--heritage-orange)}
+.hint{margin-left:auto;font-size:.75rem;color:var(--muted);max-width:52ch;line-height:1.45}
+.intro{padding:16px 24px 0;max-width:900px}
+.intro p{font-size:.86rem;line-height:1.6;color:var(--muted);margin:.4rem 0}
+.intro b{color:var(--deep-slate)}
+.intro .approved{background:rgb(39 174 96 / 10%);border-left:4px solid var(--soft-green);
+  border-radius:0 12px 12px 0;padding:11px 14px;margin-top:14px;color:var(--deep-slate)}
+.rejected{padding:8px 24px 60px;max-width:1180px}
+.rejected h3{font-family:'Outfit';font-size:.82rem;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.rejected>p{font-size:.8rem;color:var(--muted);line-height:1.55;margin:0 0 16px;max-width:78ch}
+.rejected .stage{padding:0;gap:22px}
+.rejected .dir{width:392px;opacity:.62}
+.rejected .dir .screen{height:392px}
+.chosen{position:absolute;top:12px;right:12px;z-index:5;font-family:'Outfit';font-size:.6rem;
+  font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--soft-green);
+  padding:4px 10px;border-radius:99px;box-shadow:0 4px 12px -3px rgb(39 174 96 / 60%)}
+.dir{position:relative}
+.dir.pick{box-shadow:0 0 0 2.5px var(--soft-green),0 12px 30px -12px rgb(39 174 96 / 45%)}
+.dir.pick .screen{height:452px}
+.stage{display:flex;gap:26px;flex-wrap:wrap;padding:20px 24px 60px;align-items:flex-start}
+
+.dir{background:#fff;border-radius:24px;padding:18px;box-shadow:var(--card-shadow);width:430px}
+.dir h2{font-family:'Outfit';font-size:1.02rem;font-weight:800;margin:0 0 2px}
+.dir h2 em{font-style:normal;color:var(--heritage-orange)}
+.dir .sub{font-size:.78rem;color:var(--muted);line-height:1.5;margin:0 0 14px}
+.verdict{font-size:.74rem;line-height:1.5;margin-top:12px;padding:10px 12px;border-radius:12px;
+  background:rgb(174 214 241 / 26%)}
+.verdict b{font-family:'Outfit'}
+.pair{display:flex;gap:12px}
+/* the caption wrappers are the flex items, not the phones — without this the
+   second phone collapses to a sliver, because its content is absolutely
+   positioned and so contributes no intrinsic width */
+.pair>div{flex:1;min-width:0}
+.phone{background:#1f2d3a;border-radius:26px;padding:8px;flex:1;min-width:0}
+.screen{background:var(--cloud-white);border-radius:19px;overflow:hidden;height:400px;position:relative;
+  display:flex;flex-direction:column}
+.caption{font-family:'Outfit';font-size:.64rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);text-align:center;margin:7px 0 0}
+
+/* ── the quick-add sheet ──────────────────────────────────────────── */
+.sheet{margin-top:auto;background:#fff;border-radius:22px 22px 19px 19px;padding:14px 13px 16px;
+  box-shadow:0 -8px 26px rgb(44 62 80 / 12%)}
+.grab{width:38px;height:4px;border-radius:99px;background:rgb(44 62 80 / 14%);margin:0 auto 12px}
+.sheet h3{font-family:'Outfit';font-size:.9rem;font-weight:800;margin:0 0 10px}
+
+/* the shipped magic card */
+.magic{border-radius:20px;padding:13px;color:#fff;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));
+  box-shadow:var(--lift)}
+.magic::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgb(255 255 255 / 22%) 50%,transparent 62%)}
+.magic .mt{font-family:'Outfit';font-size:.86rem;font-weight:800;display:flex;align-items:center;gap:7px}
+.beta{margin-left:auto;font-family:'Outfit';font-size:.54rem;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;background:rgb(255 255 255 / 26%);border-radius:99px;padding:2px 7px}
+.magic .ms{font-size:.68rem;line-height:1.4;opacity:.9;margin:5px 0 0}
+.chips{display:flex;gap:7px;margin-top:11px;position:relative;z-index:1}
+.chip{flex:1;min-width:0;height:38px;border-radius:12px;background:#fff;color:#d8511c;border:0;
+  font-family:'Outfit';font-size:.72rem;font-weight:700;display:flex;align-items:center;
+  justify-content:center;gap:5px;box-shadow:0 3px 8px -3px rgb(44 62 80 / 28%);white-space:nowrap;
+  overflow:hidden}
+.one{width:100%;height:46px;border-radius:14px;background:#fff;color:#d8511c;border:0;
+  font-family:'Outfit';font-size:.86rem;font-weight:800;display:flex;align-items:center;
+  justify-content:center;gap:8px;margin-top:11px;position:relative;z-index:1;
+  box-shadow:0 4px 12px -4px rgb(44 62 80 / 34%)}
+
+/* ── scrim + the opened surface ───────────────────────────────────── */
+.scrim{position:absolute;inset:0;background:rgb(44 62 80 / 42%)}
+.surface{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:22px 22px 19px 19px;
+  padding:14px 13px 16px;box-shadow:0 -10px 30px rgb(44 62 80 / 22%)}
+.surface h4{font-family:'Outfit';font-size:.86rem;font-weight:800;margin:0 0 3px}
+.surface .sh{font-size:.7rem;color:var(--muted);line-height:1.45;margin:0 0 12px}
+.row{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:14px;
+  background:var(--cloud-white);margin-bottom:8px}
+.row em{font-style:normal;font-size:1.15rem;width:26px;text-align:center}
+.row>span:not(.chev){flex:1;min-width:0}
+.row .rl{display:block;font-family:'Outfit';font-size:.78rem;font-weight:700;line-height:1.25}
+.row .rd{display:block;font-size:.64rem;color:var(--muted);margin-top:2px;line-height:1.35}
+.row .chev{margin-left:auto;color:var(--muted);opacity:.5;font-size:.9rem}
+
+/* B: the paste field is the hero */
+.paste{border:2px dashed rgb(241 93 34 / 40%);border-radius:16px;padding:13px;
+  background:rgb(241 93 34 / 5%);min-height:96px;position:relative}
+.paste .ph{font-family:'Caveat';font-size:1.02rem;color:var(--muted);opacity:.85}
+.paste .caret{display:inline-block;width:1.5px;height:15px;background:var(--heritage-orange);
+  vertical-align:-3px;margin-left:1px}
+.orrow{display:flex;align-items:center;gap:10px;margin:12px 0}
+.orrow i{flex:1;height:1px;background:rgb(44 62 80 / 10%)}
+.orrow span{font-family:'Outfit';font-size:.6rem;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted)}
+.duo{display:flex;gap:9px}
+.duo button{flex:1;min-width:0;height:52px;border-radius:14px;border:1.5px solid rgb(44 62 80 / 12%);
+  background:#fff;font-family:'Outfit';font-size:.74rem;font-weight:700;color:var(--deep-slate);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.duo button em{font-style:normal;font-size:1.1rem}
+
+/* C: inline on the card */
+.inline-paste{margin-top:10px;position:relative;z-index:1;background:rgb(255 255 255 / 92%);
+  border-radius:13px;padding:10px 11px;min-height:60px}
+.inline-paste .ph{font-family:'Caveat';font-size:.96rem;color:#8a6a5c}
+.inline-row{display:flex;gap:7px;margin-top:8px;position:relative;z-index:1}
+.inline-row button{flex:1;min-width:0;height:38px;border-radius:12px;background:rgb(255 255 255 / 22%);
+  border:1.5px solid rgb(255 255 255 / 45%);color:#fff;font-family:'Outfit';font-size:.72rem;
+  font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}
+
+.after{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:9px;padding:22px;text-align:center;background:var(--cloud-white)}
+.after .spin{width:38px;height:38px;border-radius:50%;border:3px solid rgb(44 62 80 / 10%);
+  border-top-color:var(--heritage-orange)}
+.after .at{font-family:'Outfit';font-size:.84rem;font-weight:800}
+.after .ad{font-size:.7rem;color:var(--muted);line-height:1.45}
+.note{font-family:'Caveat';font-size:.94rem;color:var(--muted);text-align:center;margin-top:8px}
+</style>
+
+<div class="bar">
+  <h1>#84 — one <span>magic beans</span> button</h1>
+  <p class="hint">APPROVED: direction B. The card's gradient, badge and copy are the shipped component; only the affordance changes.</p>
+</div>
+
+<div class="intro">
+  <p><b>The question the design has to get right.</b> The three chips today ask
+  <b>“what IS this?”</b> — invite, travel booking, recipe — which is exactly the
+  question the AI should be answering, and the one a user can get wrong. A source
+  picker asks <b>“where is it?”</b> — camera, file, clipboard. That is mechanical,
+  unavoidable, and <em>not</em> the same question. Every direction below keeps the
+  second and removes the first.</p>
+  <p><b>Constraint carried from the codebase:</b> on native, the mixed image+PDF
+  accept routes to the documents picker with <b>no camera entry</b> — which is why
+  <code>AiDocumentPicker</code> exists. A single button must not lose the camera.</p>
+  <p class="approved"><b>Approved 2026-09-03: direction B.</b> It is the only one
+  where no “what kind of thing is this?” decision happens at any point — you either
+  paste or tap a source — and it keeps the explicit camera button that
+  <code>AiDocumentPicker</code> exists to preserve on native. The two rejected
+  directions are kept at the foot as a record of the trade, not as alternatives.</p>
+</div>
+
+<div class="stage">
+
+  <!-- ═══ B — one surface, everything at once — APPROVED ═══ -->
+  <div class="dir pick">
+    <span class="chosen">Approved</span>
+    <h2><em>B.</em> One surface, everything at once</h2>
+    <p class="sub">One button opens one surface where all four sources are already present.
+      The paste field is focused, so pasting needs no choice at all.</p>
+    <div class="pair">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sheet">
+            <div class="grab"></div>
+            <h3>Add something</h3>
+            <div class="magic">
+              <div class="mt"><span>✨</span><span>Magic beans</span><span class="beta">Beta</span></div>
+              <p class="ms">Show beanies a photo, a file or some text and it will work out what to do with it.</p>
+              <button class="one"><span>✨</span><span>Read something for me</span></button>
+            </div>
+          </div>
+        </div></div>
+        <p class="caption">at rest</p>
+      </div>
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="scrim"></div>
+          <div class="surface">
+            <h4>Give beanies something to read</h4>
+            <p class="sh">A photo, a file, or anything you’ve copied.</p>
+            <div class="paste"><span class="ph">paste here<span class="caret"></span></span></div>
+            <div class="orrow"><i></i><span>or</span><i></i></div>
+            <div class="duo">
+              <button><em>📷</em><span>Take a photo</span></button>
+              <button><em>📄</em><span>Choose a file</span></button>
+            </div>
+          </div>
+        </div></div>
+        <p class="caption">tapped</p>
+      </div>
+    </div>
+    <p class="verdict"><b>Why this one.</b> No “what kind of thing is this?” decision at any
+      point: the paste case costs zero extra taps and the other two cost one. The camera
+      stays an explicit button, which is what keeps it reachable on native. It costs a
+      taller sheet, and the dashed field is a new pattern for this app — both accepted.</p>
+  </div>
+
+</div>
+
+<div class="rejected">
+  <h3>Also considered</h3>
+  <p>Kept as a record of the trade, not as alternatives. Both were rejected for the same
+     underlying reason: they each reintroduce a decision the user should not have to make —
+     A by asking before anything happens, C by putting the decision where the keyboard will
+     cover it.</p>
+  <div class="stage">
+  <!-- ═══ A — the source sheet ═══ -->
+  <div class="dir">
+    <h2><em>A.</em> The source sheet</h2>
+    <p class="sub">One button opens a short list of places the thing might be. Closest to
+      what ships today (<code>AiDocumentPicker</code>’s chooser, <code>ChoiceModal</code>).</p>
+    <div class="pair">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sheet">
+            <div class="grab"></div>
+            <h3>Add something</h3>
+            <div class="magic">
+              <div class="mt"><span>✨</span><span>Magic beans</span><span class="beta">Beta</span></div>
+              <p class="ms">Show beanies a photo, a file or some text and it will work out what to do with it.</p>
+              <button class="one"><span>✨</span><span>Read something for me</span></button>
+            </div>
+          </div>
+        </div></div>
+        <p class="caption">at rest</p>
+      </div>
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="scrim"></div>
+          <div class="surface">
+            <h4>Where is it?</h4>
+            <p class="sh">beanies works out what it is once it can see it.</p>
+            <div class="row"><em>📷</em><span><span class="rl">Take a photo</span><span class="rd">An invite on the fridge, a letter</span></span><span class="chev">›</span></div>
+            <div class="row"><em>📄</em><span><span class="rl">Choose a file</span><span class="rd">A photo or a PDF</span></span><span class="chev">›</span></div>
+            <div class="row"><em>📋</em><span><span class="rl">Paste text or a link</span><span class="rd">Anything you copied</span></span><span class="chev">›</span></div>
+          </div>
+        </div></div>
+        <p class="caption">tapped</p>
+      </div>
+    </div>
+    <p class="verdict"><b>Trades.</b> Familiar, and the native camera is safe. But it is a
+      second tap before anything happens, and a list still <em>feels</em> like being asked to
+      choose — even though it asks a different question.</p>
+  </div>
+
+  <!-- ═══ C — inline on the card ═══ -->
+  <div class="dir">
+    <h2><em>C.</em> Inline on the card</h2>
+    <p class="sub">No sheet at all. The card itself takes a paste, with photo and file
+      beside it.</p>
+    <div class="pair">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sheet">
+            <div class="grab"></div>
+            <h3>Add something</h3>
+            <div class="magic">
+              <div class="mt"><span>✨</span><span>Magic beans</span><span class="beta">Beta</span></div>
+              <p class="ms">Paste anything, or show beanies a photo — it works out the rest.</p>
+              <div class="inline-paste"><span class="ph">paste a message, a link, anything…</span></div>
+              <div class="inline-row">
+                <button><span>📷</span><span>Photo</span></button>
+                <button><span>📄</span><span>File</span></button>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <p class="caption">at rest — no tap needed to paste</p>
+      </div>
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="after">
+            <div class="spin"></div>
+            <p class="at">Reading it…</p>
+            <p class="ad">beanies is working out what this is.</p>
+            <p class="note">then straight to the review you already know</p>
+          </div>
+        </div></div>
+        <p class="caption">after any source</p>
+      </div>
+    </div>
+    <p class="verdict"><b>Trades.</b> Fewest taps, and the card itself says what it accepts.
+      But it puts a text input inside the FAB sheet on a phone — the keyboard covers the
+      sheet it belongs to — and the card grows tall enough to crowd the rest of quick-add.</p>
+  </div>
+  </div>
+
+</div>
