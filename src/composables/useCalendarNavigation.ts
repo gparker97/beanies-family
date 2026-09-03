@@ -159,6 +159,20 @@ export function useTimeGrid(timedItems: Ref<Array<{ startTime?: string; endTime?
 }
 
 /** Group items by overlapping time ranges. Returns array of groups. */
+/**
+ * @see clusterOverlapping in `@/utils/wallTimeGrid` — the same overlap sweep,
+ * written for the beanie wall's time grid over ALREADY-PARSED minute offsets.
+ *
+ * The two have deliberately NOT been converged. This one bundles `HH:mm` parsing
+ * and a 60-minute assumed duration into the sweep, and its `parseMinutes` returns
+ * `NaN` for a malformed time — which currently makes such an item start a NEW
+ * group and still render. Pointing this at the stricter helper would filter it
+ * out instead, i.e. silently drop an activity from the planner, across three live
+ * call sites (`DayTimeline`, `DailyCalendarView`, `WeeklyCalendarView`).
+ *
+ * If you are here to change clustering, change BOTH or neither. Follow-ups F1/F2
+ * in `docs/plans/2026-09-03-wall-time-grid.md`.
+ */
 export function groupOverlapping<T extends { startTime?: string; endTime?: string }>(
   items: T[]
 ): T[][] {

@@ -635,3 +635,51 @@ export function safeOccurredOn(
   });
   return fallback;
 }
+
+// ── Time-of-day and wall/grid day labels ───────────────────────────────────
+
+/**
+ * `HH:mm` → minutes since midnight, or `null` when the string is not a time.
+ *
+ * Returns `null` rather than `NaN` **on purpose**. `const [h, m] = t.split(':').map(Number)`
+ * appears in eight places in this codebase and not one of them rejects `NaN` — and `NaN`
+ * is the worst possible failure value here, because it propagates silently through every
+ * subsequent arithmetic step and lands in a CSS length, where the browser drops the
+ * declaration with no error anywhere. On the beanie wall's time grid that rendered every
+ * block at the top of an empty axis and looked like a layout bug rather than bad data.
+ * A `null` is a value the caller is forced to handle.
+ *
+ * This is the intended single definition, but it deliberately does NOT yet replace the
+ * ad-hoc destructures elsewhere. `addHourToTime` and `formatTime12` in this file, and
+ * `parseMinutes` in `useCalendarNavigation.ts`, re-FORMAT rather than compute an offset,
+ * and converging them would change live-planner behaviour for malformed input across 23
+ * importing files. See follow-ups F1/F2/F4 in
+ * `docs/plans/2026-09-03-wall-time-grid.md`.
+ */
+export function minutesOfDay(hhmm: string | undefined | null): number | null {
+  if (!hhmm) return null;
+  const parts = hhmm.split(':');
+  if (parts.length !== 2) return null;
+  const [rawH, rawM] = parts;
+  // Reject anything that is not purely digits: `Number(' 7')` is 7 and
+  // `Number('7.5')` is 7.5, both of which would sail through a NaN check.
+  if (!/^\d{1,2}$/.test(rawH ?? '') || !/^\d{1,2}$/.test(rawM ?? '')) return null;
+  const h = Number(rawH);
+  const m = Number(rawM);
+  if (h > 24 || m > 59) return null;
+  const total = h * 60 + m;
+  return total > 1440 ? null : total;
+}
+
+/**
+ * `YYYY-MM-DD` → "Mon". The short weekday label used by the wall's day columns
+ * and week strips; was byte-identical in `WallDaysView` and `WallTodayView`.
+ */
+export function weekdayShort(ymd: string): string {
+  return parseLocalDate(ymd).toLocaleDateString(undefined, { weekday: 'short' });
+}
+
+/** `YYYY-MM-DD` → the day of the month as a number. Sibling of {@link weekdayShort}. */
+export function dayOfMonth(ymd: string): number {
+  return parseLocalDate(ymd).getDate();
+}
