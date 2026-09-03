@@ -7,6 +7,7 @@
  */
 import { ref, computed, nextTick, onMounted } from 'vue';
 import { resolveMemberColor } from '@/constants/memberColors';
+import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import RecipeRail from '@/components/mealplan/RecipeRail.vue';
 import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
 import MealDayStack from '@/components/mealplan/MealDayStack.vue';
@@ -100,6 +101,24 @@ function prevDay() {
 function nextDay() {
   mobileRef.value = addDays(mobileRef.value, 1);
 }
+
+/**
+ * Swipe the mobile day stack left / right to change day.
+ *
+ * `useCalendarSlide` is the same composable the day, week and month views use, so the
+ * gesture, its thresholds and its iOS-style slide are identical to the calendar rather
+ * than a second implementation that would drift. It brings the guardrails with it: an
+ * axis lock so vertical scrolling through the slots still works, an edge-ignore so it does
+ * not fight iOS Safari's back-swipe, and reduced-motion support that changes the day with
+ * no animation.
+ *
+ * Mobile only by construction — the container is `md:hidden`, so on desktop the element
+ * never exists and the listeners are never attached. That also settles the one collision
+ * worth checking: `MealCard` is `draggable` for drag-and-drop between cells, and HTML5 drag
+ * is a mouse-only API, so the two gestures never contend on the same input.
+ */
+const mobileSwipeRef = ref<HTMLElement | null>(null);
+useCalendarSlide(mobileSwipeRef, { onNext: nextDay, onPrev: prevDay });
 
 // ── Editor + picker (single hosted instances) ───────────────────────────────
 const editMeal = ref<MealPlanEntry | null>(null);
@@ -456,8 +475,15 @@ async function runExport(format: ExportFormat): Promise<void> {
     </div>
 
     <!-- Day stack (mobile) -->
+    <!--
+      `touch-action: pan-y` is required, not decorative: without it the browser claims the
+      horizontal pan before our pointer handler sees it, and the swipe silently never fires.
+      Same pairing every calendar view uses.
+    -->
     <div
+      ref="mobileSwipeRef"
       class="mt-4 overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:hidden dark:bg-slate-800"
+      style="touch-action: pan-y; will-change: transform"
     >
       <MealDayStack :date="mobileDate" @open-meal="openMeal" @add-meal="openPicker" />
     </div>
