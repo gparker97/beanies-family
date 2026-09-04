@@ -228,12 +228,13 @@ export interface RecipeExtractionResult extends AttestedResult {
   ingredients: RecipeLine[];
   steps: RecipeLine[];
   notes: string;
-  /**
-   * A model-supplied URL to a photo of the finished dish, or ''. UNTRUSTED and NOT yet
-   * screened here — the caller must put it through `safeHttpsUrl` (and, on the fetch path,
-   * a same-domain check) before it is fetched or stored. Never bind it to an element.
+  /*
+   * NO `imageUrl` (#86). The model was asked for one and could never supply a real one:
+   * `htmlToText` strips every tag before the model sees the page, so anything it returned was
+   * necessarily invented — which is exactly why the field needed a same-domain screen. Dish
+   * photos now come from the content-fetch Lambda's reading of the page's own markup. Removing
+   * the field removes the class of risk rather than defending against it.
    */
-  imageUrl: string;
   confidence: RecipeFieldConfidence;
 }
 

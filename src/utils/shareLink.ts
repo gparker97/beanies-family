@@ -6,51 +6,60 @@
 // one implementation, reachable from both the pasted-link and shared-link paths, and direct
 // unit tests instead of coverage-by-proxy through a 175-line function.
 
-import { isSameRegistrableDomain, safeHttpsUrl } from '@/utils/url';
+import { safeHttpsUrl } from '@/utils/url';
 import { logEvent } from '@/services/telemetry/logEvent';
-import type { ShareLink } from '@/types/magicPayload';
+import { IMAGE_SOURCES } from '@/types/magicPayload';
+import type { ImageCandidate, ImageSource, ShareLink } from '@/types/magicPayload';
 import type { ExtractionPath } from '@/services/ai/recipeSourceResolver';
 
 /**
- * The dish image to use, or null.
+ * Screen the page's declared image candidates into a usable, ordered list.
  *
- * SECURITY, not tidiness: a page we fetched is untrusted, so its self-declared image is only
- * accepted when it sits on the SAME REGISTRABLE DOMAIN as the page itself. Otherwise a
- * hostile page could name any host as its image and we would fetch it.
+ * WHY THE SAME-REGISTRABLE-DOMAIN BOUND IS GONE (#86). It used to live here, and it was a
+ * real control, not an oversight: the model could name ANY host as the image, so binding the
+ * host to the page we read was the only thing stopping a hostile page aiming our AWS egress
+ * wherever it liked. Two things changed together, and both are required:
  *
- * Prefer the mapper's value — it has already been bounded against the same page — and fall
- * back to the page's own `imageUrl` only after screening it. A rejection is logged rather
- * than swallowed, because "the photo just didn't appear" is otherwise undiagnosable.
+ *  1. The candidates are now extracted SERVER-SIDE from the markup of the page we actually
+ *     fetched, so a URL here came out of that page rather than out of a model's imagination.
+ *  2. The model no longer supplies an image URL at all. It never could — `htmlToText` strips
+ *     every tag before the model sees the page — so its only possible contribution was a
+ *     hallucination, and that path is deleted rather than defended.
+ *
+ * What remains is `safeHttpsUrl` here, plus `screenUrl` AND `resolvePublicAddress` inside
+ * `guardedFetch` on every candidate we actually fetch, on every redirect hop. The bound was
+ * the wrong tool; those are the right ones, and they are untouched.
+ *
+ * This is also the DEFENSIVE NORMALISER for the unchecked `body as T` cast in
+ * `recipeFetchService`. An old Lambda, a shape drift or an outright hostile response must
+ * yield `[]`, never a throw — this runs inside a Vue watch callback with no catch above it.
  */
-export function boundedDishImage(link: ShareLink, mapperImage: string | null): string | null {
-  if (mapperImage) return mapperImage;
-  if (!link.imageUrl) return null;
-
-  // Both rejections below are LOGGED, not just returned. This is the sole authorising
-  // control on a server-side image fetch, and without the event "the bound rejected it" is
-  // indistinguishable from "the site has no photo" — which is exactly the state that made a
-  // whole capture rung look broken once before. `console.warn` never leaves the device.
-  const safe = safeHttpsUrl(link.imageUrl);
-  if (!safe) {
-    logEvent({
-      level: 'info',
-      surface: 'recipe-extract',
-      message: 'dish image rejected: not a usable https URL',
-      context: { action: 'image_rejected', kind: link.kind, detail: 'scheme' },
-    });
-    return null;
+export function screenCandidates(raw: unknown): ImageCandidate[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ImageCandidate[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const { url, source } = item as { url?: unknown; source?: unknown };
+    if (typeof url !== 'string') continue;
+    const safe = safeHttpsUrl(url);
+    if (!safe) {
+      logEvent({
+        level: 'info',
+        surface: 'recipe-extract',
+        message: 'dish image candidate rejected: not a usable https URL',
+        // Never the URL itself — a page-authored value. The enum says which check failed.
+        context: { action: 'image_rejected', detail: 'unsafe_candidate' },
+      });
+      continue;
+    }
+    // An unrecognised `source` is RELABELLED, never a reason to drop the URL. The Lambda
+    // deploys ahead of the client, so a rung the server learns first would otherwise have
+    // every candidate silently discarded on-device for the whole deploy window. `source` is
+    // a CloudWatch dimension; only `safeHttpsUrl` and guardedFetch decide what we fetch.
+    const known = IMAGE_SOURCES.includes(source as ImageSource);
+    out.push({ url: safe, source: known ? (source as ImageSource) : 'other' });
   }
-  if (!isSameRegistrableDomain(safe, link.pageUrl)) {
-    logEvent({
-      level: 'info',
-      surface: 'recipe-extract',
-      message: 'dish image rejected by domain bound',
-      // Never the URL itself — a page-authored value. The enum says which check failed.
-      context: { action: 'image_rejected', kind: link.kind, detail: 'cross_domain' },
-    });
-    return null;
-  }
-  return safe;
+  return out;
 }
 
 /**
@@ -66,14 +75,14 @@ export function boundedDishImage(link: ShareLink, mapperImage: string | null): s
  * that is exactly when swapping them is silent.
  */
 export function toShareLink(
-  resolved: { path: ExtractionPath; sourceUrl: string; imageUrl: string },
+  resolved: { path: ExtractionPath; sourceUrl: string; imageCandidates: ImageCandidate[] },
   route: { kind: 'youtube' | 'page' | 'invalid'; url?: string }
 ): ShareLink {
   const isVideo = route.kind === 'youtube';
   return {
     pageUrl: resolved.sourceUrl,
     provenanceUrl: isVideo && route.url ? route.url : resolved.sourceUrl,
-    imageUrl: resolved.imageUrl,
+    imageCandidates: resolved.imageCandidates,
     path: resolved.path,
     kind: isVideo ? 'youtube' : 'page',
   };

@@ -18,6 +18,7 @@ import RecipeSourceStrip from './RecipeSourceStrip.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
+import type { DishImagePrefill } from '@/types/magicPayload';
 import { diffPayload } from '@/utils/diffPayload';
 import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -84,13 +85,36 @@ const sourceUrl = ref('');
  * blank-new-recipe case, so there is exactly one place that resets these refs.
  */
 /**
- * A dish photo is queued and will attach itself on save.
+ * The dish photo candidates for the recipe currently on screen, and their provenance.
+ *
+ * ⚠️ THIS COMPONENT IS THE SOLE OWNER OF THE DISH ATTACH, on every route (#86 §7).
+ *
+ * Two `useRecipeCapture` instances exist and BOTH run an attach for a single save — this
+ * one's `handleSave`, and `FamilyCookbookPage.handleSaved` off the `saved` emit. That is safe
+ * today only because the source file is composable-LOCAL, so the instance that did not
+ * capture holds nothing. The dish candidates cannot work that way: `applyPrefill` is
+ * deliberately fed by BOTH routes, so if this ref were also read by the page's instance the
+ * photo would be fetched and stored twice — two photos on the recipe, two of the four-photo
+ * cap consumed, and two `image_resolved` events inflating the very hit-rate metric the work
+ * exists to create.
+ *
+ * The fix is ownership, not a guard: `handleSave` is the only expression in the codebase that
+ * passes candidates to `attachAfterSave`. `FamilyCookbookPage.handleSaved` deliberately calls
+ * it with no second argument.
  *
  * Set from the prefill rather than from the capture instance, because `applyPrefill` is the
- * one funnel BOTH routes go through — the host page's capture and this form's own. Reading
- * it off either capture instance would be right only half the time.
+ * one funnel BOTH routes go through — reading it off either capture instance would be right
+ * only half the time.
  */
-const willAttachPhoto = ref(false);
+const dishImage = ref<DishImagePrefill | null>(null);
+
+/**
+ * A dish photo is queued and will attach itself on save.
+ *
+ * DERIVED, not a second ref: two values that must be kept in step are two places to forget,
+ * and one of them would eventually be missed on one path.
+ */
+const willAttachPhoto = computed(() => (dishImage.value?.candidates.length ?? 0) > 0);
 
 /**
  * The model-inferred lists, from WHICHEVER route delivered the prefill.
@@ -105,7 +129,7 @@ const localInferredIngredients = ref<string[]>([]);
 const localInferredSteps = ref<string[]>([]);
 
 function applyPrefill(prefill: RecipePrefill | null): void {
-  willAttachPhoto.value = !!prefill?.dishImageUrl;
+  dishImage.value = prefill?.dishImage ?? null;
   localInferredIngredients.value = prefill?.inferredIngredients ?? [];
   localInferredSteps.value = prefill?.inferredSteps ?? [];
   const f = prefill?.fields;
@@ -339,7 +363,10 @@ watch(
       // FamilyCookbookPage carries exactly this guard for its own instance, with a comment
       // saying why. This instance was given the hazard without the fix.
       capture.discardPendingSource();
-      willAttachPhoto.value = false;
+      // Cleared HERE, in the one place things are already cleared. No `props.recipe` watcher
+      // branch is needed: `onNew` reseeds via `applyPrefill` on every open-for-new, and this
+      // close path nulls it, so opening the form to EDIT finds it null by construction.
+      dishImage.value = null;
     }
   }
 );
@@ -362,9 +389,11 @@ async function handleSave(): Promise<void> {
   try {
     const result = await eager.commit();
     if (!result) return; // store reported via wrapAsync; keep modal open for retry
-    // Attach whatever OUR capture is holding. A no-op when the host page did the capture
-    // instead — that instance holds the source and attaches it from `saved` below.
-    void capture.attachAfterSave(result.id);
+    // Attach whatever OUR capture is holding, PLUS the dish candidates — which this
+    // component owns on every route (see `dishImage`). Passing the object by value here is
+    // load-bearing: `emit('close')` on the next line fires the watcher that nulls the ref,
+    // and `attachAfterSave` is deliberately unawaited.
+    void capture.attachAfterSave(result.id, dishImage.value);
     emit('saved', result.id);
     emit('close');
   } finally {

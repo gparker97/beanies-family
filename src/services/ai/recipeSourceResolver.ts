@@ -15,6 +15,11 @@
  * It decides WHAT to extract from. It never extracts, never persists, never toasts.
  */
 import { pickRecipeLinks, routeUrl } from '@/utils/recipeSourceUrl';
+// NOTE: `shareLink` imports `ExtractionPath` back from this module, but as `import type`, so
+// it is erased at compile time and there is no runtime cycle. Verified with `npm run build`,
+// whose whole-graph import analysis is the thing that would catch a real one.
+import { screenCandidates } from '@/utils/shareLink';
+import type { ImageCandidate } from '@/types/magicPayload';
 import {
   recipeFetchService,
   type JsonLdRecipe,
@@ -40,10 +45,17 @@ export type ResolvedRecipeSource =
       recipe: JsonLdRecipe;
       path: ExtractionPath;
       sourceUrl: string;
-      imageUrl: string;
+      /** The page's declared images, best first (#86). Already screened. May be empty. */
+      imageCandidates: ImageCandidate[];
     }
   /** Text for the model to read. */
-  | { kind: 'text'; text: string; path: ExtractionPath; sourceUrl: string; imageUrl: string }
+  | {
+      kind: 'text';
+      text: string;
+      path: ExtractionPath;
+      sourceUrl: string;
+      imageCandidates: ImageCandidate[];
+    }
   /**
    * A video we could reach, whose recipe exists only in the audio and pictures.
    *
@@ -57,7 +69,18 @@ export type ResolvedRecipeSource =
    * So the title and the link are genuinely all there is — and they are still most of the
    * admin. Handing them over beats throwing the capture away.
    */
-  | { kind: 'titleOnly'; title: string; sourceUrl: string; path: ExtractionPath }
+  | {
+      kind: 'titleOnly';
+      title: string;
+      sourceUrl: string;
+      path: ExtractionPath;
+      /**
+       * A title-only capture has no page to read, so the video thumbnail is the ONLY image
+       * it can ever have. It used to be hard-coded empty, which made the one case with no
+       * alternative also the one case guaranteed to have no picture (#86).
+       */
+      imageCandidates: ImageCandidate[];
+    }
   /** We can read nothing, and saying so is the correct outcome. */
   | { kind: 'refusal'; reason: 'no_text_no_link' | 'not_a_recipe_url' }
   | { kind: 'failed'; errorCode: ExtractionErrorCode };
@@ -85,6 +108,23 @@ const MAX_FETCHES_PER_CAPTURE = 2;
  */
 const MIN_DESCRIPTION_CHARS = 200;
 
+/**
+ * The two YouTube thumbnail rungs for a video id (#86).
+ *
+ * TWO, not one: `maxresdefault` 404s for any video not uploaded at >=720p, while `hqdefault`
+ * always exists. The attach ladder already falls through a failed fetch, so the fallback costs
+ * one array entry and no new logic.
+ *
+ * These are the one candidate whose HOST WE CHOOSE rather than a page declaring it, which is
+ * why constructing them client-side from the parsed video id is safe.
+ */
+function youtubeThumbnails(videoId: string): ImageCandidate[] {
+  return [
+    { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, source: 'youtube_thumb' },
+    { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, source: 'youtube_thumb' },
+  ];
+}
+
 function createFetchBudget(max: number = MAX_FETCHES_PER_CAPTURE): { take: () => boolean } {
   let used = 0;
   return {
@@ -100,14 +140,17 @@ function createFetchBudget(max: number = MAX_FETCHES_PER_CAPTURE): { take: () =>
 function fromPage(
   data: Extract<Awaited<ReturnType<RecipeFetchService['fetchPage']>>['data'], object>,
   path: { jsonld: ExtractionPath; text: ExtractionPath }
-): ResolvedRecipeSource {
+  // Narrowed to the two variants a page can actually produce, so callers that append
+  // candidates (the YouTube link-followed rung) can spread the result without TypeScript
+  // having to consider a `refusal` that this function cannot return.
+): Extract<ResolvedRecipeSource, { kind: 'jsonld' | 'text' }> {
   if (data.kind === 'jsonld') {
     return {
       kind: 'jsonld',
       recipe: data.recipe,
       path: path.jsonld,
       sourceUrl: data.finalUrl,
-      imageUrl: data.recipe.imageUrl,
+      imageCandidates: screenCandidates(data.imageCandidates),
     };
   }
   return {
@@ -116,7 +159,7 @@ function fromPage(
     text: data.title ? `${data.title}\n\n${data.text}` : data.text,
     path: path.text,
     sourceUrl: data.finalUrl,
-    imageUrl: data.imageUrl,
+    imageCandidates: screenCandidates(data.imageCandidates),
   };
 }
 
@@ -157,16 +200,20 @@ export async function resolveRecipeSource(
     return { kind: 'failed', errorCode: video.errorCode ?? 'provider_error' };
   }
   const { title, channel, description } = video.data;
+  const thumbs = youtubeThumbnails(route.videoId);
 
   // Rung 2 — follow the first plausible recipe link in the description.
   const links = pickRecipeLinks(description);
   if (links.length > 0 && budget.take()) {
     const linked = await svc.fetchPage(links[0], deps.signal);
     if (linked.success && linked.data) {
-      return fromPage(linked.data, {
+      const page = fromPage(linked.data, {
         jsonld: 'youtube_link_followed',
         text: 'youtube_link_followed',
       });
+      // The blog's own candidates come FIRST: its hero is the finished dish, whereas a video
+      // thumbnail is usually a face and a caption. The thumbnails ride along as a fallback.
+      return { ...page, imageCandidates: [...page.imageCandidates, ...thumbs] };
     }
     // Deliberately NOT fatal: a dead blog link should not cost us the captions. The
     // outcome is still recorded by the caller's telemetry via `extraction_path`.
@@ -192,7 +239,7 @@ export async function resolveRecipeSource(
       text: context,
       path: 'youtube_description',
       sourceUrl: route.url,
-      imageUrl: '',
+      imageCandidates: thumbs,
     };
   }
 
@@ -205,6 +252,7 @@ export async function resolveRecipeSource(
       title: title.trim(),
       sourceUrl: route.url,
       path: 'youtube_description',
+      imageCandidates: thumbs,
     };
   }
 

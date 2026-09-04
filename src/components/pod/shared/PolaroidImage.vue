@@ -20,10 +20,44 @@ const props = defineProps<{
    * it happens — and so a user does not start adding one of their own on top.
    */
   loading?: boolean;
+  /**
+   * Stable seed for the no-photo placeholder's glyph and tint (#86).
+   *
+   * Pass the recipe id. The same seed always yields the same drawing, so one recipe keeps one
+   * look; different seeds spread across the set, so a cookbook grid of un-photographed
+   * recipes reads as a house style rather than one broken image repeated down the page.
+   *
+   * OMITTED = today's exact appearance (the cloche, in Terracotta), so every other caller —
+   * cook logs, the scrapbook — is untouched by this.
+   */
+  variantSeed?: string;
 }>();
 
 import { computed, ref, watch, onUnmounted } from 'vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import { PLACEHOLDER_GLYPHS, PLACEHOLDER_TINTS } from './polaroidPlaceholder';
+import { stableIndex } from '@/utils/stableVariant';
+
+/** The glyph for this frame. Index 0 — the original cloche — when no seed is given. */
+const glyph = computed(() =>
+  props.variantSeed
+    ? PLACEHOLDER_GLYPHS[stableIndex(props.variantSeed, PLACEHOLDER_GLYPHS.length)]
+    : PLACEHOLDER_GLYPHS[0]
+);
+
+/**
+ * ⚠️ INLINE STYLE, NEVER A COMPUTED TAILWIND CLASS.
+ *
+ * The obvious `:class="`text-[${tint}]`"` does not work and fails SILENTLY: Tailwind scans
+ * source at build time, so a class assembled at runtime generates no CSS at all. `stroke` is
+ * `currentColor`, so the glyph would quietly inherit whatever colour the parent happens to
+ * have — a subtly wrong tint that no unit test can catch.
+ */
+const tint = computed(() =>
+  props.variantSeed
+    ? PLACEHOLDER_TINTS[stableIndex(props.variantSeed, PLACEHOLDER_TINTS.length)]
+    : PLACEHOLDER_TINTS[0]
+);
 
 /**
  * A JUST-UPLOADED photo is not immediately servable.
@@ -164,7 +198,8 @@ onUnmounted(clearTimer);
         aria-hidden="true"
       />
       <svg
-        class="relative z-10 h-20 w-20 text-[#E67E22]"
+        class="relative z-10 h-20 w-20"
+        :style="{ color: tint }"
         viewBox="0 0 64 64"
         fill="none"
         stroke="currentColor"
@@ -174,12 +209,12 @@ onUnmounted(clearTimer);
         aria-hidden="true"
       >
         <path
-          d="M14 30h36a2 2 0 0 1 2 2v2a18 18 0 0 1-18 18h-4a18 18 0 0 1-18-18v-2a2 2 0 0 1 2-2z"
+          v-for="(p, i) in glyph.paths"
+          :key="i"
+          :d="p.d"
+          :stroke-width="p.strokeWidth"
+          :stroke-dasharray="p.dashArray"
         />
-        <path d="M24 22c0-2 2-3 4-3s4 1 4 3" />
-        <path d="M32 18c0-2 2-3 4-3s4 1 4 3" />
-        <path d="M40 14c0-2 2-3 4-3" />
-        <path d="M10 54h44" stroke-width="1.5" stroke-dasharray="2 2" />
       </svg>
       <span
         v-if="caption"
