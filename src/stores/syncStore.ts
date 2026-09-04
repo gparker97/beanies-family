@@ -958,6 +958,14 @@ export const useSyncStore = defineStore('sync', () => {
   }> {
     const merging = !!options.merge;
 
+    // Latched: this device has already established it cannot read the remote,
+    // and every retry re-downloads megabytes to fail identically. This is the
+    // door the login flow's "Try again" and `ensureStaged` use, so without it
+    // that button was an unbounded re-download loop with a critical report per
+    // press. Reported as a plain failure; the honest message is already on
+    // screen from the attempt that latched.
+    if (remoteUnreadable()) return { success: false, reason: 'error' };
+
     // The single read chokepoint for the login flow (single-family auto-select +
     // FamilyPicker). On the post-consent redirect return the Google token may still
     // be mid-exchange; settle it (shared, once) before the first Drive read so a
@@ -1151,6 +1159,11 @@ export const useSyncStore = defineStore('sync', () => {
             }
           }
 
+          // The text `syncService.load()` handed us has now been MERGED, so the
+          // revision marker it stamped provisionally is earned. Without this the
+          // baseline would be dropped on the next check and every open would do
+          // a full read.
+          syncService.confirmRemoteMerged();
           await runPostLoadDriveHousekeeping();
           return { success: true };
         } catch (e) {
@@ -1162,7 +1175,19 @@ export const useSyncStore = defineStore('sync', () => {
           // failure no password can fix, and pinned the multi-megabyte envelope
           // in `pendingEncryptedFile` on the way. Let it out; App.vue and the
           // resume flow both classify it.
-          if (e instanceof PayloadLoadError) throw e;
+          if (e instanceof PayloadLoadError) {
+            // ⚠️ THE OTHER HALF, and it is the one that loses other people's
+            // data. `syncService.load()` already stamped this revision as the
+            // baseline; leaving it there makes the next change check answer
+            // 'unchanged', so `fetchAndMergeRemote` returns without throwing and
+            // the following save writes a full base over a revision this
+            // document never contained. Roll it back, and latch — this is the
+            // Drive cohort's read path, which never goes through
+            // `fetchAndMergeRemote` and so never armed the breaker.
+            syncService.rollbackRemoteMarker();
+            syncService.noteRemoteUnreadable(e);
+            throw e;
+          }
           console.warn('[syncStore] Failed to decrypt with current FK, may need re-auth:', e);
         }
       }
@@ -2986,11 +3011,12 @@ export const useSyncStore = defineStore('sync', () => {
               await hydrateFromEnvelope(pendingEncryptedFile.value.envelope);
               return true;
             } catch (e) {
-              // A payload failure is not a key problem: falling through reaches
-              // "password may have changed", discards the envelope and re-arms
-              // the poller — on a device with no cached key that is the whole
-              // bug this change removes, reached by another door.
-              if (e instanceof PayloadLoadError) {
+              // ⚠️ `keyMayBeWrong` gates this, exactly as in the twin in
+              // `backgroundSyncFromFile`. `hydrateFromEnvelope` decrypts the
+              // REMOTE envelope with the in-memory family key, so it is the
+              // canonical key-rotation site, and the recoverable fallback
+              // (`tryDecryptWithCachedKey` → re-prompt) is eight lines below.
+              if (e instanceof PayloadLoadError && !e.keyMayBeWrong) {
                 notePodUnopenable(e);
                 return false;
               }
@@ -3059,17 +3085,27 @@ export const useSyncStore = defineStore('sync', () => {
    * by `docClient.surface()`; `reportPayloadFailure` knows that).
    */
   function notePodUnopenable(err: PayloadLoadError): void {
+    // ⚠️ ARM THE SERVICE LATCH. Every guard reads `syncService`, and none of
+    // these callers reach `fetchAndMergeRemote` — they call
+    // `docClient.mergeRemoteEnvelope` directly — so without this the breaker was
+    // dead code: `stopFilePolling()` below ran and the caller's own `finally`
+    // re-armed the 10s timer straight through a guard that saw null.
+    //
+    // `noteRemoteUnreadable` also owns the report (once per class) and refuses
+    // to latch a `keyMayBeWrong` failure, which is why this is a call rather
+    // than a second copy of that logic.
+    syncService.noteRemoteUnreadable(err);
     podUnopenable.value = true;
     stopFilePolling();
-    // Null it first. The message is CONSTANT per class, so re-assigning the
-    // same string on a second failure is `Object.is` equal and the bar's
-    // watcher never fires — every occurrence after the first was silent to the
-    // user while still paging Slack.
-    backgroundSyncError.value = null;
     backgroundSyncError.value = useTranslationStore().t(payloadErrorMessageKey(err));
     backgroundSyncErrorKind.value = 'decrypt';
-    // The report is owned by `syncService.noteRemoteUnreadable`, once per latch
-    // rather than once per attempt.
+    // NOTE on repeats: the message is constant per class, so a second failure
+    // assigns an identical string and `BackgroundSyncBar`'s watcher does not
+    // re-fire. That is acceptable ONLY because a repeat cannot happen while the
+    // latch holds — and `clearPodUnopenable` nulls this ref, so the next genuine
+    // failure after a recovery does re-fire. Do not import `showToast` here to
+    // force it: `@/composables/useToast` closes an import cycle with this store
+    // and collapses its inferred type to `any` at every consumer.
   }
 
   /**
@@ -3079,6 +3115,12 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function clearPodUnopenable(): void {
     podUnopenable.value = false;
+    // Null the message too, so the NEXT failure re-fires the bar's watcher
+    // instead of assigning an identical string to itself.
+    if (backgroundSyncErrorKind.value === 'decrypt') {
+      backgroundSyncError.value = null;
+      backgroundSyncErrorKind.value = null;
+    }
   }
 
   function startFilePolling(): void {
@@ -3161,6 +3203,9 @@ export const useSyncStore = defineStore('sync', () => {
    * Reset all sync state (used on sign-out)
    */
   function resetState() {
+    // The service clears its own latch in `reset()`; the mirror has to follow or
+    // it outlives a sign-out and a family switch.
+    clearPodUnopenable();
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
@@ -4047,6 +4092,9 @@ export const useSyncStore = defineStore('sync', () => {
     fileId: string,
     fileName_param: string
   ): Promise<{ ok: true } | { ok: false; code: PodAccessErrorCode }> {
+    // `setProvider` below clears the service latch; keep the UI mirror in step,
+    // or the supported repair leaves a stale 'cannot be opened' banner behind.
+    clearPodUnopenable();
     try {
       if (!familyKey.value || !envelope.value) {
         return { ok: false, code: 'NO_HOME' };

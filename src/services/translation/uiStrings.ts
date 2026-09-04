@@ -4270,6 +4270,13 @@ const STRING_DEFS = {
     beanie:
       "this device ran out of memory opening your family's beans. nothing is wrong with your invite; the pod is simply bigger than this device can open. try again on a device with more memory.",
   },
+  // The decrypt-step case, where a stale key and damaged bytes look identical.
+  // Names the recoverable half, because that one has an action.
+  'podCredentialStale.inline': {
+    en: "Your family's data could not be unlocked. Your saved key may be out of date, so try your password. If that does not work, contact support@beanies.family.",
+    beanie:
+      "your family's beans could not be unlocked. your saved key may be out of date, so try your password. if that does not work, contact support@beanies.family.",
+  },
   'podCorrupted.inline': {
     en: 'Your family data could not be read and may be damaged. Trying again will not help. Please contact support@beanies.family so we can look at it with you.',
     beanie:

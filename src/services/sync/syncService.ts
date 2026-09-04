@@ -101,15 +101,24 @@ export function isRemoteUnreadable(): PayloadLoadError | null {
   return remoteUnreadable;
 }
 
-function noteRemoteUnreadable(err: PayloadLoadError): void {
-  const first = remoteUnreadable === null;
-  remoteUnreadable = err;
-  // Reported ONCE per latch, not per attempt. `setLocalChangeHandler` wires a
+export function noteRemoteUnreadable(err: PayloadLoadError): void {
+  // ⚠️ `keyMayBeWrong` must NOT latch. At the decrypt step a wrong key and a
+  // damaged ciphertext are indistinguishable (both are an AES-GCM tag
+  // rejection), and the wrong-key half is RECOVERABLE — a peer rotating the
+  // family key is routine. Latching it would refuse every save for the session,
+  // stop polling, and page Slack, while the re-prompt path that fixes it sits
+  // unreachable behind the latch.
+  if (err.keyMayBeWrong) return;
+  // Reported ONCE PER CLASS, not once per latch. `setLocalChangeHandler` wires a
   // debounced save to every keystroke-level mutation, so a per-attempt critical
-  // (which forces an immediate flush) paged roughly once a minute for the whole
-  // session. The too-large class stays out of here entirely — `docClient` is its
-  // single emitter, deliberately at non-paging severity.
-  if (first && !err.deviceCannotOpen) {
+  // (which forces an immediate flush) paged roughly once a minute. But keying it
+  // on "was the latch empty" let a too-large failure — which deliberately does
+  // not report, `docClient` owns that class — consume the flag and silence the
+  // corrupt report for the whole session, which is the one that matters.
+  const alreadyReported = reportedUnreadableSteps.has(err.name);
+  remoteUnreadable = err;
+  if (!alreadyReported && !err.deviceCannotOpen) {
+    reportedUnreadableSteps.add(err.name);
     reportError({
       surface: 'pod-load-failure',
       message: `Remote pod unreadable: Automerge ${err.step}`,
@@ -124,8 +133,39 @@ function noteRemoteUnreadable(err: PayloadLoadError): void {
   }
 }
 
+/**
+ * The marker `load()` stamped provisionally, kept so it can be rolled back.
+ *
+ * `load()` samples the remote's revision BEFORE the download (deliberately —
+ * C13), but the merge happens in the CALLER. Until the caller says it merged,
+ * this baseline is a promise the document has not kept.
+ */
+let pendingMarker: RemoteMarker | null = null;
+
+/** The caller merged the text `load()` returned. The baseline is now earned. */
+export function confirmRemoteMerged(): void {
+  pendingMarker = null;
+  clearRemoteUnreadable();
+}
+
+/**
+ * The caller could NOT merge what `load()` returned. Drop the baseline so the
+ * next change check reads again instead of skipping — the safe direction, and
+ * the one thing standing between an unreadable remote and a save that
+ * overwrites it.
+ */
+export function rollbackRemoteMarker(): void {
+  if (pendingMarker === null) return;
+  pendingMarker = null;
+  remoteBaseline = null;
+}
+
+/** Which error classes have already been reported for the current latch. */
+const reportedUnreadableSteps = new Set<string>();
+
 function clearRemoteUnreadable(): void {
   remoteUnreadable = null;
+  reportedUnreadableSteps.clear();
 }
 
 let currentProvider: StorageProvider | null = null;
@@ -1225,6 +1265,13 @@ export async function save(): Promise<boolean> {
  * true; absent or false means "this provider doesn't participate".
  */
 async function fetchAndMergeRemote(): Promise<void> {
+  // Latched: re-reading cannot help and is expensive. `setLocalChangeHandler`
+  // wires a debounced save to every keystroke-level mutation, so without this a
+  // typing user on the device this change targets caused a multi-megabyte read
+  // + parse + decrypt + failed WASM allocation roughly every two seconds,
+  // indefinitely. Throwing (rather than returning) keeps `doSave`'s refusal
+  // intact — a silent return would let the save through.
+  if (remoteUnreadable) throw remoteUnreadable;
   if (!currentProvider) return;
   // Drive's save path always calls this (legacy direct call); the polling
   // watcher only activates for providers that opt in. Both paths converge
@@ -1286,9 +1333,17 @@ async function fetchAndMergeRemote(): Promise<void> {
   // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
   // gap between the probe and the read, this records the OLDER revision → the next
   // open re-reads (the safe direction), never a stale skip.
-  learnRemoteMarker({ revision: change.revision, modifiedTime: change.modifiedTime });
-  // A remote we could not read a moment ago has now been read and merged.
-  clearRemoteUnreadable();
+  // C1 applies to THIS too, now that it sits after the merge await rather than
+  // before it: a family switch landing mid-merge would otherwise stamp family
+  // A's revision into family B's module-level baseline, and Drive revisions are
+  // small per-file counters, so a collision is plausible — after which B's
+  // remote reads as 'unchanged', is never read, and the next save writes over
+  // it. `commitRemoteBaseline` below has always been guarded for exactly this.
+  if (currentProvider === providerAtRead) {
+    learnRemoteMarker({ revision: change.revision, modifiedTime: change.modifiedTime });
+    // A remote we could not read a moment ago has now been read and merged.
+    clearRemoteUnreadable();
+  }
 
   // Local-wins merge of the three key dicts (wrappedKeys / inviteKeys /
   // passkeyWrappedKeys) — the local side is the just-mutated state about to
@@ -1539,7 +1594,15 @@ export async function load(): Promise<string | null> {
     // NOT fail the load; the read proceeds and re-raises any real auth error.
     remoteBaseline = null;
     try {
-      learnRemoteMarker(await probeRemoteMarker());
+      // ⚠️ PROVISIONAL until the caller confirms it merged. `load()` hands the
+      // text back and `syncStore` calls `docClient.mergeRemoteEnvelope`
+      // DIRECTLY, so a payload failure there used to leave this marker standing
+      // — the next `remoteChanged()` answered 'unchanged', `fetchAndMergeRemote`
+      // returned without throwing, and the save wrote a base over a revision the
+      // doc provably never contained. `confirmRemoteMerged()` / `rollbackRemoteMarker()`
+      // close that: the store calls one of them on every outcome.
+      pendingMarker = await probeRemoteMarker();
+      learnRemoteMarker(pendingMarker);
     } catch (e) {
       console.warn(
         '[syncService] load: pre-read marker probe failed — no change-detection baseline, callers do a full read; check Drive token/network:',
