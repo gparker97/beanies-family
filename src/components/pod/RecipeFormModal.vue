@@ -244,7 +244,11 @@ const mealOptions = computed<ChipOption[]>(() =>
  * Recomputed per (recipes, current tags) change — NOT per keystroke. `suggestTags` caps the
  * list because a family with 200 distinct tags would otherwise render 200 pills.
  */
-const tagSuggestions = computed(() => suggestTags(recipesStore.recipes, tags.value));
+// UNCAPPED on purpose: RecipeTagInput caps the visible row itself, and its autocomplete must
+// search every previously-used tag — the one ranked 9th is exactly the tag a user cannot
+// remember and most needs completed. Recomputed per (recipes, current tags) change, never per
+// keystroke; the per-keystroke filtering is a cheap pure match over this list.
+const tagSuggestions = computed(() => suggestTags(recipesStore.recipes, tags.value, Infinity));
 
 /**
  * The shortcut band shows only on a genuinely blank ADD.
