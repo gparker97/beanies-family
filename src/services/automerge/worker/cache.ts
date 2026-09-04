@@ -24,8 +24,15 @@ import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyServi
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
-import { loadAndVerify, applyChanges, unframeChanges, payloadFailure } from './docOps';
+import {
+  loadAndVerify,
+  applyChanges,
+  unframeChanges,
+  payloadFailure,
+  decodedSizeOf,
+} from './docOps';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
+import { PayloadLoadError, type PayloadLoadStep } from '@/types/sync';
 import * as Automerge from '@automerge/automerge';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -301,7 +308,7 @@ export async function loadCachedDoc(
   try {
     baseBinary = await decryptPayload(familyKey, new Uint8Array(base64ToBuffer(baseEntry.payload)));
   } catch (e) {
-    throw payloadFailure('decrypt', e, familyId, baseEntry.payload.length);
+    throw payloadFailure('decrypt', e, familyId, decodedSizeOf(baseEntry.payload));
   }
   const baseDoc = loadAndVerify(baseBinary, familyId); // throws CorruptPayloadError on a bad base
 
@@ -310,15 +317,29 @@ export async function loadCachedDoc(
   )) as Array<{ id: string; payload: string }>;
   if (incEntries.length === 0) return { doc: baseDoc, recovered: false };
 
+  /** Decrypt one increment, classifying an allocation failure as `decrypt`. */
+  const openIncrement = async (payload: string): Promise<Uint8Array> => {
+    try {
+      return await decryptPayload(familyKey, new Uint8Array(base64ToBuffer(payload)));
+    } catch (e) {
+      // Classified HERE rather than in the outer catch, which also covers
+      // `applyChanges`: labelling an increment-decode failure `materialize` is
+      // wrong in the field a triager reads first.
+      if (isAllocationFailure(e)) throw oomDuringReplay('decrypt', e, familyId, baseBinary);
+      throw e;
+    }
+  };
+
   // Fast path: decrypt + unframe every increment, apply in one call.
   try {
     const all: Uint8Array[] = [];
     for (const entry of incEntries) {
-      const framed = await decryptPayload(familyKey, new Uint8Array(base64ToBuffer(entry.payload)));
-      all.push(...unframeChanges(framed));
+      all.push(...unframeChanges(await openIncrement(entry.payload)));
     }
     return { doc: applyChanges(baseDoc, all).doc, recovered: false };
   } catch (fastErr) {
+    // Already classified by `openIncrement` — do not relabel it below.
+    if (fastErr instanceof PayloadLoadError) throw fastErr;
     // ⚠️ OUT OF MEMORY IS NOT CORRUPTION, AND THE SLOW PATH DESTROYS DATA FOR IT.
     //
     // If the fast path failed because the device could not allocate, EVERY
@@ -330,7 +351,9 @@ export async function loadCachedDoc(
     // couldn't inflate them. Surface it so `initAndLoadCache` takes its
     // preserve-the-cache branch and the bytes survive for a device (or a
     // reload) that can.
-    if (isAllocationFailure(fastErr)) throw oomDuringReplay(fastErr, familyId, baseBinary);
+    if (isAllocationFailure(fastErr)) {
+      throw oomDuringReplay('materialize', fastErr, familyId, baseBinary);
+    }
 
     // Slow path: apply increments one at a time from a fresh base, stop at the
     // first failure, keep the prefix. Never a silent partial (breadcrumb below).
@@ -341,15 +364,14 @@ export async function loadCachedDoc(
     let doc = loadAndVerify(baseBinary, familyId);
     for (const entry of incEntries) {
       try {
-        const framed = await decryptPayload(
-          familyKey,
-          new Uint8Array(base64ToBuffer(entry.payload))
-        );
-        doc = applyChanges(doc, unframeChanges(framed)).doc;
+        doc = applyChanges(doc, unframeChanges(await openIncrement(entry.payload))).doc;
       } catch (incErr) {
         // Same reasoning as above: running out of memory partway through replay
         // must not be recorded as "everything from here on is corrupt".
-        if (isAllocationFailure(incErr)) throw oomDuringReplay(incErr, familyId, baseBinary);
+        if (incErr instanceof PayloadLoadError) throw incErr;
+        if (isAllocationFailure(incErr)) {
+          throw oomDuringReplay('materialize', incErr, familyId, baseBinary);
+        }
         console.warn(
           `[cache] stopping increment replay at ${entry.id} (corrupt/unapplyable).`,
           incErr
@@ -363,12 +385,23 @@ export async function loadCachedDoc(
 
 /**
  * Increment replay's allocation failure, as the typed error the load path
- * branches on. Reports the BASE size, which is what a triager needs: the
- * increments are individually small; the base is what had to fit in memory
- * alongside them.
+ * branches on.
+ *
+ * The guarded blocks wrap `base64ToBuffer` + `decryptPayload` as well as
+ * `applyChanges`, so the step is NOT always `materialize` — hardcoding it
+ * mislabelled an increment-decode failure in the field a triager reads first.
+ * Callers pass the step their block actually reached.
+ *
+ * The size is the BASE's, which is the useful number either way: the increments
+ * are individually small; the base is what had to fit in memory alongside them.
  */
-function oomDuringReplay(cause: unknown, familyId: string | null, base: Uint8Array) {
-  return payloadFailure('materialize', cause, familyId, base.byteLength);
+function oomDuringReplay(
+  step: PayloadLoadStep,
+  cause: unknown,
+  familyId: string | null,
+  base: Uint8Array
+) {
+  return payloadFailure(step, cause, familyId, base.byteLength);
 }
 
 /** Cache the V4 envelope so the cache can be decrypted on refresh without the file. */

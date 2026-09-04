@@ -54,12 +54,19 @@ export function bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
 
 /** Convert a standard base64 string back to an ArrayBuffer. */
 export function base64ToBuffer(base64: string): ArrayBuffer {
-  // `atob` silently tolerates whitespace; chunking does NOT. A newline inside a
-  // chunk shifts every following group boundary, so a wrapped or pretty-printed
-  // string would decode to garbage rather than throw. Normalise first — the
-  // test is a single O(n) scan and is false for everything we produce
-  // ourselves, so the common path pays nothing but the scan.
-  const src = /\s/.test(base64) ? base64.replace(/\s+/g, '') : base64;
+  // ⚠️ WHITESPACE IS NOT HANDLED, ON PURPOSE. `atob` tolerates it and chunking
+  // does not (a newline inside a chunk shifts every following group boundary),
+  // but no producer here can emit it: `bufferToBase64` concatenates `btoa`
+  // output, and the `.beanpod` is `JSON.stringify(env, null, 2)` — pretty-print
+  // indentation goes BETWEEN tokens, never inside a string value, and a
+  // hand-wrapped file fails at `JSON.parse` long before this. A normalising
+  // pass would therefore be dead code that still charges an O(n) scan of a
+  // multi-megabyte string on every decode (base, every increment, twice on the
+  // recovery path), allocate a second full copy of it if it ever did fire, and
+  // — because `/\s/` matches ten characters `atob` rejects, NBSP and BOM among
+  // them — silently launder genuinely corrupt input into an opaque AES-GCM
+  // failure instead of a loud, correctly-classified one.
+  const src = base64;
   return measureSync(
     'base64.decode',
     () => {

@@ -219,11 +219,6 @@ export class PayloadTooLargeError extends PayloadLoadError {
 }
 
 /**
- * The copy-to-clipboard diagnostic blob for a payload failure, shared by every
- * surface that shows one (the fatal overlay, the login flow) so the fields a
- * support request carries can never drift between them.
- */
-/**
  * The INLINE message key for a payload failure — for compact error slots under
  * a password field, where the fatal overlay's three-sentence copy would point
  * at a diagnostic blob and a Clear-data button that are not on screen.
@@ -235,12 +230,20 @@ export class PayloadTooLargeError extends PayloadLoadError {
  */
 export function payloadErrorMessageKey(
   err: PayloadLoadError
-): 'podTooLarge.inline' | 'loginFlow.recoveryCorruptBody' {
-  return err instanceof PayloadTooLargeError
-    ? 'podTooLarge.inline'
-    : 'loginFlow.recoveryCorruptBody';
+): 'podTooLarge.inline' | 'podCorrupted.inline' {
+  // Both halves are purpose-built inline copy. The corrupt half used to reuse
+  // `loginFlow.recoveryCorruptBody`, which was written for OpenRecoveryPanel
+  // and says "try again, or load a different copy": UI these slots do not have,
+  // and a retype loop for a failure no password can fix. A join INVITEE has no
+  // copy of the family file at all.
+  return err instanceof PayloadTooLargeError ? 'podTooLarge.inline' : 'podCorrupted.inline';
 }
 
+/**
+ * The copy-to-clipboard diagnostic blob for a payload failure, shared by every
+ * surface that shows one (the fatal overlay, the login flow) so the fields a
+ * support request carries can never drift between them.
+ */
 export function payloadErrorDetail(
   err: PayloadLoadError,
   fileId: string | null,

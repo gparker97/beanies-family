@@ -13,8 +13,6 @@
  */
 
 import { ref, computed } from 'vue';
-import { payloadErrorMessageKey } from '@/types/sync';
-import { useTranslationStore } from '@/stores/translationStore';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -703,15 +701,14 @@ export function useJoinFlow() {
   async function handleSubmitDecryptPassword(password: string): Promise<boolean> {
     const ok = await tryStep('FILE_DECRYPT_FAILED', async () => {
       const result = await syncStore.decryptPendingFile(password);
-      if (!result.success) {
-        // Carry the honest reason: a raw Automerge/WASM string here reads as a
-        // password problem and invites an endless retype.
-        throw new Error(
-          result.payloadError
-            ? useTranslationStore().t(payloadErrorMessageKey(result.payloadError))
-            : (result.error ?? 'Decryption failed')
-        );
-      }
+      // Deliberately the RAW message, not a translated one. `tryStep` feeds this
+      // into `recordError`, which builds a `severity: 'critical'` Slack page out
+      // of it — and the joiner never sees it (the view renders
+      // `JOIN_ERRORS.FILE_DECRYPT_FAILED.messageKey`, which has no placeholder
+      // for it). Translating it would strip the engine string that
+      // `isAllocationFailure`'s feedback loop depends on and split the
+      // (surface, message) dedup bucket per locale, for no user-visible gain.
+      if (!result.success) throw new Error(result.error ?? 'Decryption failed');
       return true;
     });
     if (!ok) return false;

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-04",
-    "translationCount": 4447
+    "translationCount": 4488
   },
   "translations": {
     "app.name": {
@@ -22239,6 +22239,211 @@
     "photos.downloadFailedHelp": {
       "translation": "它可能已从您的家庭驱动器中删除，或者您可能无法访问它。",
       "hash": "oejlkz",
+      "lastUpdated": "2026-09-04"
+    },
+    "resumeSetup.podTooLarge": {
+      "translation": "此设备内存不足，无法打开此尺寸的pod。您的pod文件是安全的：没有任何损坏，也没有任何内容被删除。重新加载值得一试；清除数据无济于事，因为文件本身没有变化。如果问题仍然存在，请向support@beanies.family发送以下详细信息。",
+      "hash": "q02qft",
+      "lastUpdated": "2026-09-04"
+    },
+    "podTooLarge.inline": {
+      "translation": "此设备打开您的Pod时内存不足。您的文件是安全的；问题在于此设备，而不是您的数据。",
+      "hash": "hy9l2g",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.decryptFailed": {
+      "translation": "无法打开该文件。请检查您选择了正确的.beanpod文件，然后重试。",
+      "hash": "wk7lm2",
+      "lastUpdated": "2026-09-04"
+    },
+    "podCorrupted.inline": {
+      "translation": "无法读取您的家庭数据，可能已损坏。重试无济于事。请联系support@beanies.family ，以便我们与您一起查看。",
+      "hash": "1r8exb",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.starter": {
+      "translation": "开胃菜",
+      "hash": "3ufyq9",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.main": {
+      "translation": "主要",
+      "hash": "1f8ih",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.side": {
+      "translation": "側面",
+      "hash": "1j88n",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.dessert": {
+      "translation": "甜点",
+      "hash": "hqtr7e",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.drink": {
+      "translation": "饮料",
+      "hash": "13h1fc",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.baking": {
+      "translation": "烘培技术",
+      "hash": "ws9nqu",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.sauce": {
+      "translation": "酱汁",
+      "hash": "1bfc6h",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.course.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.field.course": {
+      "translation": "航线制定",
+      "hash": "xh6z3v",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.field.courseNone": {
+      "translation": "未设置",
+      "hash": "8bjq8b",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.field.meals": {
+      "translation": "适合",
+      "hash": "yvznju",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.field.tags": {
+      "translation": "標籤",
+      "hash": "1jpdl",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.placeholder": {
+      "translation": "添加标签并按回车键",
+      "hash": "buw3bi",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.hint": {
+      "translation": "以小写字母保存，因此您每次只会收到一个。",
+      "hash": "hncjxk",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.remove": {
+      "translation": "移除标签",
+      "hash": "jx3z6q",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.suggestions": {
+      "translation": "之前使用",
+      "hash": "wu942m",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.duplicate": {
+      "translation": "您已经拥有该标签。",
+      "hash": "o5af6",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.limit": {
+      "translation": "这是一个配方可以容纳的标签数量（ {max} ）。",
+      "hash": "ywxva9",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.tags.truncated": {
+      "translation": "该标签已缩短以适合（ {max}个字符）。",
+      "hash": "vnzuyp",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.section.dish": {
+      "translation": "这道菜",
+      "hash": "i8dlvt",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.section.method": {
+      "translation": "制作方法",
+      "hash": "kjx2i0",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.section.filing": {
+      "translation": "再次查找",
+      "hash": "y0ilfi",
+      "lastUpdated": "2026-09-04"
+    },
+    "recipes.section.personal": {
+      "translation": "您自己的触摸",
+      "hash": "b7ky94",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.group.none": {
+      "translation": "全部",
+      "hash": "vf5p2l",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.group.meal": {
+      "translation": "按餐点",
+      "hash": "w4nemk",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.group.course": {
+      "translation": "按课程",
+      "hash": "qvrq58",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.groupLabel": {
+      "translation": "顯示",
+      "hash": "1j7rx",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.filter.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.filterLabel": {
+      "translation": "航线制定",
+      "hash": "xh6z3v",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.sortLabel": {
+      "translation": "按排序",
+      "hash": "x0z916",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.sort.name": {
+      "translation": "A\\ u2013Z",
+      "hash": "cljleo",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.sort.recent": {
+      "translation": "最近添加",
+      "hash": "qyn0h4",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.sort.cooked": {
+      "translation": "煮得最熟",
+      "hash": "mwpqm4",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.shelf.unfiledMeal": {
+      "translation": "尚未提交餐点",
+      "hash": "taw93e",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.shelf.unfiledCourse": {
+      "translation": "还没有课程。",
+      "hash": "8hm56k",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.filteredEmpty": {
+      "translation": "烹饪书中还没有{course}食谱。",
+      "hash": "tqjsf4",
+      "lastUpdated": "2026-09-04"
+    },
+    "cookbook.showAll": {
+      "translation": "所有食谱",
+      "hash": "nm8db1",
       "lastUpdated": "2026-09-04"
     }
   }

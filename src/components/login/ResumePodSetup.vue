@@ -343,7 +343,13 @@ function surfacePayloadFailure(
       },
     });
   }
-  fatalErrorStore.setFatal(t(opts.copyKey), payloadErrorDetail(err, fileId, familyId));
+  // `clearDataHelps: false` — the overlay's standing advice is "reload, or clear
+  // your data and start fresh", and for BOTH payload classes clearing is either
+  // useless (the file is intact and too big for this device) or destructive of
+  // the one local copy. The message says so; the button must not contradict it.
+  fatalErrorStore.setFatal(t(opts.copyKey), payloadErrorDetail(err, fileId, familyId), {
+    clearDataHelps: false,
+  });
 }
 
 async function handleAutoLoadSubmit() {

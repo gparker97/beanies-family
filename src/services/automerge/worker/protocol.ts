@@ -16,7 +16,7 @@
  */
 import type { CollectionName } from '@/types/automerge';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
-import type { PayloadLoadError } from '@/types/sync';
+import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
@@ -192,7 +192,7 @@ interface ErrorCodec {
  */
 type PayloadErrorCtor = new (
   message: string,
-  step: 'load' | 'materialize',
+  step: PayloadLoadStep,
   familyId: string | null,
   payloadBytes: number | null
 ) => PayloadLoadError;
@@ -210,7 +210,7 @@ const payloadCodec = (Ctor: PayloadErrorCtor): ErrorCodec => ({
   reconstruct: (message, data) =>
     new Ctor(
       message,
-      (data?.step as 'load' | 'materialize') ?? 'load',
+      (data?.step as PayloadLoadStep) ?? 'load',
       (data?.familyId as string | null) ?? null,
       (data?.payloadBytes as number | null) ?? null
     ),

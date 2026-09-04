@@ -2,11 +2,10 @@
  * The allocation-failure classifier.
  *
  * The asymmetry is the whole point and is what these tests exist to pin: a
- * MISSED out-of-memory just degrades to today's behaviour, but a FALSE POSITIVE
- * skips the cache clear that genuine corruption needs to self-heal and leaves
- * the user wedged. So the negative cases below matter more than the positive
- * ones — particularly `RangeError` and a bare `unreachable` trap, both of which
- * are ALSO shapes real corruption produces.
+ * false positive leaves a corrupt cache un-healed and the user wedged, while a
+ * false negative DELETES the cache — base, increments and all, including edits
+ * that never reached Drive. Neither direction is free and the second is the
+ * unrecoverable one, so both are pinned here rather than assumed.
  */
 import { describe, it, expect } from 'vitest';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
@@ -36,33 +35,40 @@ describe('isAllocationFailure — positive cases', () => {
 });
 
 describe('isAllocationFailure — negative cases (the ones that matter)', () => {
-  it('does NOT match the RangeError a garbage length prefix ACTUALLY produces', () => {
-    // The real signature, verified in node — not the one a naive test reaches
-    // for. `new Uint8Array(1099511627776)` throws "Array buffer allocation
-    // failed", NOT "Invalid array length". An earlier version of the matcher
-    // listed that exact phrase while its own header claimed to exclude it, so a
-    // corrupt payload was classified as OOM and the self-heal clear was skipped.
-    expect(isAllocationFailure(new RangeError('Array buffer allocation failed'))).toBe(false);
+  it('does NOT match the UNAMBIGUOUS bad-length RangeErrors', () => {
+    // These mean "that is not a valid array length", which memory pressure
+    // never produces. They are the corruption signature, and matching them
+    // would skip the self-heal that a genuinely corrupt cache needs.
     expect(isAllocationFailure(new RangeError('Invalid typed array length: -1'))).toBe(false);
     expect(isAllocationFailure(new RangeError('Invalid array length'))).toBe(false);
   });
 
-  it('rejects the errors a bad length ACTUALLY throws, built for real', () => {
-    // Belt and braces: construct them rather than trusting a string literal that
+  it('DOES match "Array buffer allocation failed" — the ambiguous one', () => {
+    // V8 throws this both for `new Uint8Array(2^40)` and for a real allocation
+    // failure under memory pressure, so the string alone cannot decide it. The
+    // call path does: nothing on the pod-open path allocates from payload
+    // content (`base64ToBuffer` sizes from the string length; `unframeChanges`
+    // only `subarray`s, behind bounds checks), so here it means the device ran
+    // out of room.
+    //
+    // Asserted as a POSITIVE deliberately. Excluding it was a real regression:
+    // it is the first thing a 3GB tablet hits, and calling that corruption
+    // makes `initAndLoadCache` delete the entire cache DB.
+    expect(isAllocationFailure(new RangeError('Array buffer allocation failed'))).toBe(true);
+  });
+
+  it('rejects the error a NEGATIVE length actually throws, built for real', () => {
+    // Belt and braces: construct it rather than trusting a string literal that
     // could drift from what the engine emits. (2.5 is deliberately absent — V8
     // truncates a fractional length instead of throwing.)
-    for (const len of [1099511627776, 1e15, -1]) {
-      let thrown: unknown;
-      try {
-        new Uint8Array(len);
-      } catch (e) {
-        thrown = e;
-      }
-      expect(thrown, `expected new Uint8Array(${len}) to throw`).toBeInstanceOf(RangeError);
-      // Every one of these is a CORRUPTION shape. Classifying any as an
-      // allocation failure skips the cache clear that corruption needs.
-      expect(isAllocationFailure(thrown)).toBe(false);
+    let thrown: unknown;
+    try {
+      new Uint8Array(-1);
+    } catch (e) {
+      thrown = e;
     }
+    expect(thrown).toBeInstanceOf(RangeError);
+    expect(isAllocationFailure(thrown)).toBe(false);
   });
 
   it('does NOT match a bare `unreachable` wasm trap', () => {
