@@ -23,6 +23,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import type { AvatarVariant } from '@/constants/avatars';
 import type { FamilyMember, UUID } from '@/types/models';
+import { stableIndex } from '@/utils/stableVariant';
 
 defineProps<{
   beans: FamilyMember[];
@@ -40,9 +41,7 @@ const { t, isBeanieMode } = useTranslation();
 // binder. Hash from id keeps the value deterministic even when the
 // roster reorders.
 function inactiveTilt(id: string): number {
-  let hash = 0;
-  for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) | 0;
-  return Math.abs(hash) % 2 === 0 ? -2.5 : 2.5;
+  return stableIndex(id, 2) === 0 ? -2.5 : 2.5;
 }
 
 function nameFor(name: string): string {
