@@ -124,6 +124,18 @@ export type CompleteAutoLoadResult =
       familyId: string;
       error: CorruptPayloadError;
     }
+  /**
+   * The file is intact; THIS DEVICE ran out of memory inflating it. Distinct
+   * from `corrupted` so the exhaustive switch in `ResumePodSetup` forces a
+   * caller to handle it, rather than it silently taking the corrupt path and
+   * telling the user their data is damaged.
+   */
+  | {
+      kind: 'too-large';
+      fileId: string;
+      familyId: string;
+      error: PayloadTooLargeError;
+    }
   | { kind: 'network-error'; error: Error };
 
 // ─── Typed errors ─────────────────────────────────────────────────────────
@@ -138,15 +150,81 @@ export type CompleteAutoLoadResult =
  * Automerge couldn't even consume the byte stream; `materialize` means it
  * loaded but reading a field threw "Out of bounds table access" or similar.
  */
-export class CorruptPayloadError extends Error {
+export abstract class PayloadLoadError extends Error {
   readonly step: 'load' | 'materialize';
   readonly familyId: string | null;
-  constructor(message: string, step: 'load' | 'materialize', familyId: string | null) {
+  /** Decrypted byte length — the number that predicts the WASM cost. */
+  readonly payloadBytes: number | null;
+  constructor(
+    message: string,
+    step: 'load' | 'materialize',
+    familyId: string | null,
+    payloadBytes: number | null = null
+  ) {
     super(message);
-    this.name = 'CorruptPayloadError';
     this.step = step;
     this.familyId = familyId;
+    this.payloadBytes = payloadBytes;
   }
+}
+
+export class CorruptPayloadError extends PayloadLoadError {
+  constructor(
+    message: string,
+    step: 'load' | 'materialize',
+    familyId: string | null,
+    payloadBytes: number | null = null
+  ) {
+    super(message, step, familyId, payloadBytes);
+    // ⚠️ LITERAL, never `new.target.name` / `Ctor.name`. The worker error
+    // registry keys on `err.name` (`protocol.ts`) and the prod build minifies,
+    // so a derived name would arrive as a mangled string and the `instanceof`
+    // dispatch on main would silently degrade to a generic DocWorkerError.
+    this.name = 'CorruptPayloadError';
+  }
+}
+
+/**
+ * The decrypted bytes are FINE — this device could not allocate enough memory
+ * to inflate them. A sibling of `CorruptPayloadError`, deliberately NOT a
+ * subclass of it: every existing `instanceof CorruptPayloadError` site would
+ * then treat an out-of-memory failure as corruption, which is the exact bug
+ * this class exists to fix (chiefly `initAndLoadCache`, which DELETES the
+ * local cache on corruption — useless here, and destructive).
+ */
+export class PayloadTooLargeError extends PayloadLoadError {
+  constructor(
+    message: string,
+    step: 'load' | 'materialize',
+    familyId: string | null,
+    payloadBytes: number | null = null
+  ) {
+    super(message, step, familyId, payloadBytes);
+    this.name = 'PayloadTooLargeError'; // literal — see CorruptPayloadError
+  }
+}
+
+/**
+ * The copy-to-clipboard diagnostic blob for a payload failure, shared by every
+ * surface that shows one (the fatal overlay, the login flow) so the fields a
+ * support request carries can never drift between them.
+ */
+export function payloadErrorDetail(
+  err: PayloadLoadError,
+  fileId: string | null,
+  familyId: string | null
+): string {
+  return JSON.stringify(
+    {
+      fileId,
+      familyId: err.familyId ?? familyId,
+      step: err.step,
+      payloadBytes: err.payloadBytes,
+      message: err.message,
+    },
+    null,
+    2
+  );
 }
 
 /**

@@ -4205,6 +4205,15 @@ const STRING_DEFS = {
     beanie:
       "your pod file appears damaged and can't be opened. please contact support@beanies.family with the diagnostic details below — we may be able to help.",
   },
+  // ⚠️ The fatal overlay renders a "Clear data" button directly beneath this
+  // message. Copy that merely says "nothing has been deleted" beside that button
+  // is an invitation to wipe a perfectly good cache by hand, so the text has to
+  // say outright that clearing will not help.
+  'resumeSetup.podTooLarge': {
+    en: "This device doesn't have enough memory to open a pod this size. Your pod file is safe — nothing is damaged and nothing has been deleted, and clearing your data won't help. Try opening it on a device with more memory, or send support@beanies.family the details below.",
+    beanie:
+      "this device doesn't have enough memory to open a pod this size. your pod file is safe — nothing is damaged and nothing has been deleted, and clearing your data won't help. try opening it on a device with more memory, or send support@beanies.family the details below.",
+  },
 
   // Generic "wrong password" prompt — used by ResumePodSetup auto-load too.
   'auth.passwordIncorrect': {

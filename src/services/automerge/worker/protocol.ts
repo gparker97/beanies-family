@@ -15,7 +15,8 @@
  *     generic `DocWorkerError`.
  */
 import type { CollectionName } from '@/types/automerge';
-import { CorruptPayloadError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import type { PayloadLoadError } from '@/types/sync';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
@@ -189,17 +190,38 @@ interface ErrorCodec {
  * `instanceof` checks (e.g. the CorruptPayloadError recovery dispatch) keep
  * working across the boundary.
  */
+type PayloadErrorCtor = new (
+  message: string,
+  step: 'load' | 'materialize',
+  familyId: string | null,
+  payloadBytes: number | null
+) => PayloadLoadError;
+
+/**
+ * One codec for every `PayloadLoadError` subclass — they share a constructor
+ * shape, so a second hand-written codec would be the same six lines waiting to
+ * drift on the next field.
+ */
+const payloadCodec = (Ctor: PayloadErrorCtor): ErrorCodec => ({
+  serialize: (err) =>
+    err instanceof Ctor
+      ? { step: err.step, familyId: err.familyId, payloadBytes: err.payloadBytes }
+      : undefined,
+  reconstruct: (message, data) =>
+    new Ctor(
+      message,
+      (data?.step as 'load' | 'materialize') ?? 'load',
+      (data?.familyId as string | null) ?? null,
+      (data?.payloadBytes as number | null) ?? null
+    ),
+});
+
 const ERROR_REGISTRY: Record<string, ErrorCodec> = {
-  CorruptPayloadError: {
-    serialize: (err) =>
-      err instanceof CorruptPayloadError ? { step: err.step, familyId: err.familyId } : undefined,
-    reconstruct: (message, data) =>
-      new CorruptPayloadError(
-        message,
-        (data?.step as 'load' | 'materialize') ?? 'load',
-        (data?.familyId as string | null) ?? null
-      ),
-  },
+  // ⚠️ Keys are LITERAL strings, never `Ctor.name`: the prod build minifies and
+  // a mangled key would never match `serializeError`'s `err.name`, silently
+  // degrading every typed error to a generic DocWorkerError on main.
+  CorruptPayloadError: payloadCodec(CorruptPayloadError),
+  PayloadTooLargeError: payloadCodec(PayloadTooLargeError),
   // Reconstruct to the real class so `surface()`'s `instanceof WorkerCrashError`
   // check (crash-toast dedup) works when a drained pending call rejects.
   WorkerCrashError: {

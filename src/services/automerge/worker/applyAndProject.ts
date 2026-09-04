@@ -18,6 +18,7 @@
  * single main-thread buffer. See ADR-032.
  */
 import * as Automerge from '@automerge/automerge';
+import { PayloadTooLargeError } from '@/types/sync';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
@@ -493,14 +494,27 @@ export async function initAndLoadCache(
   try {
     loaded = await time2('automerge.cacheLoad', () => cache.loadCachedDoc(key, id));
   } catch (e) {
-    // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
-    // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
-    await cache.clearCache(id).catch(() => {});
-    await cache.initPersistenceDB(id);
-    // `clearCache` deleted the whole DB — base AND snapshot rows. Any cursor
-    // claiming those rows exist is now a lie, and only one of this function's three
-    // callers recovers with `dropDoc()`; the other two just log.
-    resetDocCursors();
+    // An OUT-OF-MEMORY failure must NOT clear the cache. The cached bytes are
+    // fine — this device could not allocate enough to inflate them — so
+    // deleting them cannot help, and it throws away the one copy that might
+    // have loaded (a smaller cached base, or the same doc after a reload frees
+    // memory). The retry would then re-download and fail identically, having
+    // destroyed data for nothing.
+    //
+    // Deliberately a DENYLIST, not the tidier `if (e instanceof
+    // CorruptPayloadError) clear()`: this catch also fires for IndexedDB and
+    // key errors, and flipping to an allowlist would silently change their
+    // behaviour too. Narrow change, one class. Do not "simplify" this.
+    if (!(e instanceof PayloadTooLargeError)) {
+      // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
+      // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
+      await cache.clearCache(id).catch(() => {});
+      await cache.initPersistenceDB(id);
+      // `clearCache` deleted the whole DB — base AND snapshot rows. Any cursor
+      // claiming those rows exist is now a lie, and only one of this function's three
+      // callers recovers with `dropDoc()`; the other two just log.
+      resetDocCursors();
+    }
     throw e; // whole DB cleared → baseline row gone with it (C16 self-healing)
   }
   if (!loaded) {

@@ -67,6 +67,36 @@ export function getDeviceInfo(): DeviceInfo {
 }
 
 /**
+ * Coarse device capability as ONE flat scalar: `mem=4,cores=8`.
+ *
+ * Rides in the already-allowlisted `detail` context key rather than earning a
+ * new one — a dedicated `device_memory_gb` key would drag in five consumer
+ * updates (the allowlist, the Lambda mirror + its pinned test, the store
+ * data-collection runbook, PrivacyInfo.xcprivacy, the Data-Safety answers and
+ * privacy.astro) for one integer. Same flat-scalar shape `web_storage` already
+ * uses.
+ *
+ * `navigator.deviceMemory` is a spec-clamped bucket (0.25-8) and
+ * `hardwareConcurrency` a small integer, so this is no fingerprinting
+ * escalation over the full user-agent the firehose already carries. Both are
+ * optional and absent on Safari/Firefox — returns null rather than throwing, so
+ * a probe fault can never drop the report it was attached to.
+ */
+export function deviceMemoryScalar(): string | null {
+  try {
+    if (typeof navigator === 'undefined') return null;
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const parts: string[] = [];
+    if (typeof nav.deviceMemory === 'number') parts.push(`mem=${nav.deviceMemory}`);
+    if (typeof nav.hardwareConcurrency === 'number') parts.push(`cores=${nav.hardwareConcurrency}`);
+    return parts.length > 0 ? parts.join(',') : null;
+  } catch (e) {
+    console.warn('[diagnostics] device-memory probe failed', e);
+    return null;
+  }
+}
+
+/**
  * Human-readable, line-broken summary. Existing `App.vue` init-error
  * fallback consumes this.
  */
