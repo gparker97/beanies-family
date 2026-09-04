@@ -79,6 +79,31 @@ jobs:
           set -euo pipefail
           echo "STORE_VERSION=$(node scripts/derive-store-version.mjs)" >> "$GITHUB_ENV"
 
+      - name: Write App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$APP_STORE_CONNECT_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey.p8"
+
+      # The version check must come BEFORE the build. `derive-store-version.mjs` strips the
+      # `R<n>` suffix (CFBundleShortVersionString takes at most three integers), so 0.15,
+      # 0.15R1 and 0.15R3 are all "0.15" to Apple. The 0.15R3 release built for five minutes
+      # and then died at upload with "The version number has been previously used" — a
+      # failure no retry could fix. Two seconds here, and the message says what to do.
+      #
+      # App Store destinations only: TestFlight legitimately reuses a marketing version
+      # (builds are told apart by CFBundleVersion). Fails OPEN if Apple is unreachable —
+      # the upload step is still the real enforcement.
+      - name: Check the App Store version is unused
+        if: startsWith(inputs.destination, 'appstore')
+        env:
+          MARKETING_VERSION: ${{ env.STORE_VERSION }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ vars.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_API_ISSUER_ID }}
+          ASC_API_KEY_P8_PATH: ${{ runner.temp }}/asc/AuthKey.p8
+        run: node scripts/deploy/assert-store-version-unused.mjs
+
       - name: Build web app
         run: npm run build
         env:
@@ -145,13 +170,6 @@ jobs:
 
       - name: Sync Capacitor (iOS)
         run: npx cap sync ios
-
-      - name: Write App Store Connect API key
-        env:
-          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/asc"
-          echo "$APP_STORE_CONNECT_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey.p8"
 
       - name: Build + ship (Fastlane)
         working-directory: ios/App

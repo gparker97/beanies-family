@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-04
+
+### Fixed
+
+- The iOS release now checks its version against the App Store before it starts building, so a version number that has already been used fails in seconds with a note on how to fix it, instead of five minutes into a signed build.
+
 ## 2026-09-03
 
 ### Added
