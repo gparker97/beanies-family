@@ -30,7 +30,9 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
-import { CorruptPayloadError } from '@/types/sync';
+import { PayloadLoadError, PayloadTooLargeError } from '@/types/sync';
+import { deviceMemoryScalar } from '@/utils/diagnostics';
+import { getPlatform } from '@/services/sync/capabilities';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
 import {
   isRpcResponse,
@@ -440,6 +442,17 @@ function postRaw(req: RpcRequest): void {
     const envelope = (args as { envelope?: Record<string, unknown> }).envelope;
     if (ENVELOPE_METHODS.has(req.method) && envelope && typeof envelope === 'object') {
       const { encryptedPayload, ...rest } = envelope;
+      // A long-lived in-memory envelope carries NO payload (see `withoutPayload`).
+      // Passing one here would arrive as a zero-byte decrypt, surface as a
+      // CorruptPayloadError, and CLEAR THE USER'S CACHE. Fail loudly instead —
+      // this is a developer mistake, not a runtime condition.
+      if (typeof encryptedPayload !== 'string' || encryptedPayload.length === 0) {
+        throw new DocWorkerError(
+          `'${req.method}' was given an envelope with no encryptedPayload — a long-lived ` +
+            `or cached envelope was passed where freshly-parsed bytes are required.`,
+          req.method
+        );
+      }
       args = { ...(args as object), envelope: { ...(plainify(rest) as object), encryptedPayload } };
     } else {
       args = plainify(args);
@@ -485,9 +498,18 @@ async function requestCore(
         method
       );
     }
-    const { result, delta, changed } = await inlineExecutor(method, args);
-    if (delta) applyDelta(delta);
-    return { result, changed };
+    // Route the inline throw through `surface()` as well. Without this the OOM
+    // metric would be blind to inline mode — which is the fallback when the
+    // worker cannot spawn, i.e. disproportionately the low-end devices this
+    // whole change is about. `quiet: true` preserves today's inline behaviour
+    // exactly (no toast); only classification and the single report are added.
+    try {
+      const { result, delta, changed } = await inlineExecutor(method, args);
+      if (delta) applyDelta(delta);
+      return { result, changed };
+    } catch (e) {
+      throw surface(e, method, true);
+    }
   }
 
   const cid = nextCid++;
@@ -819,11 +841,35 @@ function surface(
   implicatedMethods?: string[]
 ): Error {
   const error = err instanceof Error ? err : new DocWorkerError(String(err), method);
-  // Expected-degradation classes stay quiet: CorruptPayloadError (recovery
+  // Expected-degradation classes stay quiet: PayloadLoadError (recovery
   // dispatches on it) + WorkerCrashError (already surfaced once at the crash site).
-  const expected = error instanceof CorruptPayloadError || error instanceof WorkerCrashError;
+  const expected = error instanceof PayloadLoadError || error instanceof WorkerCrashError;
   if (!quiet && !expected) {
     notifyFailure(error, implicatedMethods ?? [method]);
+  }
+  // THE single emitter for an out-of-memory pod load. Every worker error and
+  // (since the inline branch routes through here too) every inline error passes
+  // this function exactly once, so an OOM cannot be reported twice or missed.
+  //
+  // Not `critical`: no data is lost and the file is intact, so paging a human
+  // per occurrence would be noise. The message is CONSTANT per step — the size
+  // rides in `perf_doc_bytes` — because `errorReporter` buckets its dedup on
+  // (surface, normalizeMessage) and a per-pod byte figure would give every pod
+  // its own bucket, defeating the throttle entirely.
+  if (error instanceof PayloadTooLargeError) {
+    reportError({
+      surface: 'pod-load-memory',
+      message: `Automerge ${error.step} ran out of memory loading a pod`,
+      error,
+      severity: 'error',
+      context: {
+        action: 'pod-load-oom',
+        error_code: error.step,
+        perf_doc_bytes: error.payloadBytes ?? undefined,
+        os: getPlatform(),
+        detail: deviceMemoryScalar() ?? undefined,
+      },
+    });
   }
   return error;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { reactive, isReactive } from 'vue';
-import { CorruptPayloadError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 import { serializeError, type RpcRequest } from '../protocol';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
@@ -33,6 +33,8 @@ import {
   setLocalChangeHandler,
   checkWorkerLiveness,
   initAndLoadCache,
+  setInlineExecutor,
+  forceInlineMode,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -221,10 +223,87 @@ describe('docClient', () => {
       ok: false,
       error: serializeError(new CorruptPayloadError('bad payload', 'materialize', 'fam-1')),
     }));
-    await expect(mergeRemoteEnvelope({} as never, 'fam-1')).rejects.toBeInstanceOf(
-      CorruptPayloadError
-    );
+    await expect(
+      // A realistic envelope: `postRaw` now rejects a payload-less one outright,
+      // because that shape means a long-lived/stripped envelope leaked to the worker.
+      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1')
+    ).rejects.toBeInstanceOf(CorruptPayloadError);
     expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('reports an OOM exactly ONCE, with no toast, in WORKER mode', async () => {
+    useWorker((req) => ({
+      cid: req.cid,
+      ok: false,
+      error: serializeError(new PayloadTooLargeError('oom', 'load', 'fam-1', 3_145_728)),
+    }));
+
+    await expect(
+      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1')
+    ).rejects.toBeInstanceOf(PayloadTooLargeError);
+
+    // Expected degradation: the fatal overlay is the user surface, not a toast.
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledTimes(1);
+
+    const call = vi.mocked(reportError).mock.calls[0][0];
+    expect(call.surface).toBe('pod-load-memory');
+    // NOT critical: no data is lost and the file is intact, so paging per
+    // occurrence would be noise.
+    expect(call.severity).toBe('error');
+    expect(call.context).toMatchObject({
+      action: 'pod-load-oom',
+      error_code: 'load',
+      perf_doc_bytes: 3_145_728,
+    });
+    // The message must be CONSTANT per step. `errorReporter` buckets its dedup
+    // on (surface, normalizeMessage), and normalizeMessage only collapses runs
+    // of 6+ digits — so a per-pod byte figure here would give every pod its own
+    // bucket and defeat the throttle entirely.
+    expect(call.message).not.toMatch(/\d/);
+  });
+
+  it('reports an OOM exactly ONCE, with no toast, in INLINE mode', async () => {
+    // Inline is the fallback when the worker cannot spawn — disproportionately
+    // the low-end devices this change is about. Before routing the inline branch
+    // through surface(), this population was invisible to the metric.
+    setInlineExecutor(async () => {
+      throw new PayloadTooLargeError('oom', 'materialize', 'fam-2', 999);
+    });
+    forceInlineMode();
+
+    await expect(getHeads()).rejects.toBeInstanceOf(PayloadTooLargeError);
+
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(reportError).mock.calls[0][0].context).toMatchObject({
+      action: 'pod-load-oom',
+      error_code: 'materialize',
+      perf_doc_bytes: 999,
+    });
+  });
+
+  it('does not report a NON-payload inline error through the OOM path', async () => {
+    // Routing inline through surface() must not change behaviour for anything
+    // else: it stays quiet (no toast, as today) and emits no pod-load event.
+    setInlineExecutor(async () => {
+      throw new Error('something else went wrong');
+    });
+    forceInlineMode();
+
+    await expect(getHeads()).rejects.toThrow('something else went wrong');
+
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stripped envelope at the RPC boundary instead of destroying the cache', async () => {
+    // A long-lived envelope carries no payload. Letting one through would decrypt
+    // to zero bytes, surface as CorruptPayloadError, and CLEAR THE USER'S CACHE.
+    useWorker(() => null);
+    await expect(
+      mergeRemoteEnvelope({ encryptedPayload: '', familyId: 'f' } as never, 'f')
+    ).rejects.toThrow(/no encryptedPayload/);
   });
 
   it('suppresses the toast when the caller opts out with quiet', async () => {
@@ -330,7 +409,9 @@ describe('docClient — Set-driven two-tier RPC timeout', () => {
     try {
       useWorker(() => null); // never responds → both hang until their deadlines fire
       const mergeOutcome = mergeRemoteEnvelope(
-        { encryptedPayload: '', familyId: 'f' } as never,
+        // Non-empty: an empty payload is now rejected at the RPC boundary before
+        // any timeout logic runs, which is a different test.
+        { encryptedPayload: 'ZmFrZQ==', familyId: 'f' } as never,
         'f'
       ).then(
         () => 'resolved',

@@ -14,6 +14,7 @@
  */
 
 import { ref, type Ref } from 'vue';
+import { PayloadTooLargeError } from '@/types/sync';
 import {
   transition,
   type LoginFlowEvent,
@@ -777,15 +778,22 @@ export function useLoginFlow(opts: {
               return;
             }
             if (!dec.success) {
-              if (dec.corrupted) {
-                // NOT a credential failure: the payload is unusable however right the
-                // password is. Re-asking loops forever — route to transport recovery,
-                // which carries the load-a-file escape.
-                proveError.value = t('loginFlow.recoveryCorruptBody');
+              if (dec.payloadError) {
+                // NOT a credential failure: the payload could not be loaded however
+                // right the password is. Re-asking loops forever — route to transport
+                // recovery, which carries the load-a-file escape.
+                //
+                // Two very different causes, and telling a user their file is damaged
+                // when it is merely too big for THIS device is the lie this change
+                // exists to remove.
+                const tooLarge = dec.payloadError instanceof PayloadTooLargeError;
+                proveError.value = t(
+                  tooLarge ? 'resumeSetup.podTooLarge' : 'loginFlow.recoveryCorruptBody'
+                );
                 emitProveOutcome({
                   method: 'password',
                   ok: false,
-                  errorCode: 'corrupted',
+                  errorCode: tooLarge ? 'too-large' : 'corrupted',
                   fallbackDepth: pendingProveDepth,
                 });
                 dispatch({ type: 'OPEN_FAILED', reason: 'error' });
