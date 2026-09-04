@@ -13,6 +13,11 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
+import CookbookControls from '@/components/pod/CookbookControls.vue';
+import RecipeTaxonomyBadges from '@/components/pod/RecipeTaxonomyBadges.vue';
+import { useCookbookView } from '@/composables/useCookbookView';
+import { useRecipeCourseLabel } from '@/composables/useRecipeCourseLabel';
+import { fillTemplate } from '@/utils/fillTemplate';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -111,8 +116,29 @@ useMagicReaderConsumer(
   canReadRecipe
 );
 
-const recipes = computed(() =>
-  [...recipesStore.recipes].sort((a, b) => a.name.localeCompare(b.name))
+const recipes = computed(() => recipesStore.recipes);
+
+// Filter / sort / group state. All rules live in `utils/recipeOrdering.ts`; this is wiring.
+// The page's old inline `[...recipes].sort(localeCompare)` is gone — alphabetical recipe order
+// now has exactly one definition (`byRecipeName`), shared with `useRecipeSearch`.
+const {
+  groupBy,
+  sortBy,
+  course,
+  setCourse,
+  clearFilter,
+  shelves,
+  courseCounts,
+  totalCount,
+  visibleCount,
+} = useCookbookView(recipes);
+const { courseLabel } = useRecipeCourseLabel();
+
+/** Named for the filtered-empty message. Never reached with a null course. */
+const filteredEmptyMessage = computed(() =>
+  fillTemplate(t('cookbook.filteredEmpty'), {
+    course: course.value ? courseLabel(course.value) : '',
+  })
 );
 
 const totalCookCount = computed(() => recipesStore.cookLogs.length);
@@ -262,78 +288,122 @@ async function handleSaved(id: string): Promise<void> {
       </div>
     </header>
 
-    <div
+    <CookbookControls
       v-if="recipes.length"
-      class="grid gap-5"
-      style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr))"
-    >
-      <article
-        v-for="r in recipes"
-        :key="r.id"
-        class="group dark:bg-surface-raised cursor-pointer overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] transition-all hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)]"
-        @click="openRecipe(r)"
-      >
-        <PolaroidImage
-          :src="thumbFor(r)"
-          :variant-seed="r.id"
-          :loading="!thumbFor(r) && isPending(r.id)"
-          :caption="
-            thumbFor(r)
-              ? undefined
-              : isPending(r.id)
-                ? t('recipeExtract.attaching')
-                : t('cookbook.card.noPhoto')
-          "
-          aspect-ratio="16 / 10"
-        />
-        <div class="p-4">
-          <h3 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
-            {{ r.name }}
-          </h3>
-          <p
-            v-if="r.subtitle"
-            class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1 text-xs"
-          >
-            {{ r.subtitle }}
-          </p>
-          <div
-            class="font-inter text-secondary-500/60 dark:text-ink-soft mt-3 flex flex-wrap gap-4 text-xs"
-          >
-            <span v-if="r.cookTime"
-              >🔥
-              <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
-                r.cookTime
-              }}</strong></span
-            >
-            <span v-if="r.prepTime"
-              >🕐
-              <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
-                r.prepTime
-              }}</strong></span
-            >
-            <span v-if="r.servings"
-              >🍽️
-              <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
-                r.servings
-              }}</strong></span
-            >
-            <span v-if="r.ingredients?.length">
-              🌿
-              <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">
-                {{ r.ingredients.length }} {{ t('cookbook.card.ingredients') }}
-              </strong>
-            </span>
-          </div>
-        </div>
-      </article>
+      v-model:group-by="groupBy"
+      v-model:sort-by="sortBy"
+      :course="course"
+      :course-counts="courseCounts"
+      :total-count="totalCount"
+      @update:course="setCourse($event)"
+    />
 
-      <AddTile
-        v-if="canEditActivities"
-        :label="t('cookbook.addRecipe')"
-        min-height="16rem"
-        @click="openAdd"
+    <!--
+      ONE rendering path. `groupBy: 'none'` returns a single shelf with `titleKey: null`, so
+      there is no v-if fork between "flat" and "grouped" — the fork is where a recipe would
+      go missing from one branch and not the other.
+    -->
+    <template v-if="recipes.length && visibleCount">
+      <section v-for="shelf in shelves" :key="shelf.key" class="mb-8 last:mb-0">
+        <h2
+          v-if="shelf.titleKey"
+          class="font-outfit text-secondary-500 dark:text-ink mb-3 flex items-center gap-2 text-lg font-bold"
+        >
+          <span v-if="shelf.emoji" aria-hidden="true">{{ shelf.emoji }}</span>
+          {{ t(shelf.titleKey) }}
+          <span class="font-inter text-xs font-normal text-[var(--color-text-muted)]">{{
+            shelf.items.length
+          }}</span>
+        </h2>
+        <div
+          class="grid gap-5"
+          style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr))"
+        >
+          <article
+            v-for="r in shelf.items"
+            :key="r.id"
+            class="group dark:bg-surface-raised cursor-pointer overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] transition-all hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)]"
+            @click="openRecipe(r)"
+          >
+            <PolaroidImage
+              :src="thumbFor(r)"
+              :variant-seed="r.id"
+              :loading="!thumbFor(r) && isPending(r.id)"
+              :caption="
+                thumbFor(r)
+                  ? undefined
+                  : isPending(r.id)
+                    ? t('recipeExtract.attaching')
+                    : t('cookbook.card.noPhoto')
+              "
+              aspect-ratio="16 / 10"
+            />
+            <div class="p-4">
+              <h3 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
+                {{ r.name }}
+              </h3>
+              <p
+                v-if="r.subtitle"
+                class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1 text-xs"
+              >
+                {{ r.subtitle }}
+              </p>
+              <RecipeTaxonomyBadges :course="r.course" :tags="r.tags" />
+              <div
+                class="font-inter text-secondary-500/60 dark:text-ink-soft mt-3 flex flex-wrap gap-4 text-xs"
+              >
+                <span v-if="r.cookTime"
+                  >🔥
+                  <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
+                    r.cookTime
+                  }}</strong></span
+                >
+                <span v-if="r.prepTime"
+                  >🕐
+                  <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
+                    r.prepTime
+                  }}</strong></span
+                >
+                <span v-if="r.servings"
+                  >🍽️
+                  <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
+                    r.servings
+                  }}</strong></span
+                >
+                <span v-if="r.ingredients?.length">
+                  🌿
+                  <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">
+                    {{ r.ingredients.length }} {{ t('cookbook.card.ingredients') }}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </article>
+
+          <!-- The add tile belongs to the LAST shelf only; one per group would be noise. -->
+          <AddTile
+            v-if="canEditActivities && shelf.key === shelves.at(-1)?.key"
+            :label="t('cookbook.addRecipe')"
+            min-height="16rem"
+            @click="openAdd"
+          />
+        </div>
+      </section>
+    </template>
+
+    <!-- Filter matched nothing. Distinct from the empty cookbook, and always offers a way back. -->
+    <div
+      v-else-if="recipes.length"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"
+    >
+      <EmptyState
+        emoji="🔍"
+        :message="filteredEmptyMessage"
+        :action-label="t('cookbook.showAll')"
+        @action="clearFilter()"
       />
     </div>
+
     <div
       v-else
       class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"

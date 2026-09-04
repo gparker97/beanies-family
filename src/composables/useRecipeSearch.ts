@@ -1,4 +1,5 @@
 import { computed, type Ref } from 'vue';
+import { byRecipeName } from '@/utils/recipeOrdering';
 import type { Recipe } from '@/types/models';
 
 /**
@@ -9,7 +10,7 @@ import type { Recipe } from '@/types/models';
  */
 export function useRecipeSearch(recipes: Ref<Recipe[]>, query: Ref<string>) {
   const results = computed<Recipe[]>(() => {
-    const sorted = [...recipes.value].sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = [...recipes.value].sort(byRecipeName);
     const q = query.value.trim().toLowerCase();
     if (!q) return sorted;
     return sorted.filter(

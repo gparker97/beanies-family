@@ -228,6 +228,17 @@ export interface RecipeExtractionResult extends AttestedResult {
   ingredients: RecipeLine[];
   steps: RecipeLine[];
   notes: string;
+  /**
+   * Course and meal slots the model inferred (#87), as RAW strings — no enum knowledge here.
+   *
+   * NON-OPTIONAL, defaulted to `''` / `[]` by the parser, so no consumer ever has to
+   * distinguish "absent" from "empty". Validation against the real enums happens in the MAPPER
+   * (`validatedTaxonomy`), matching how `category`/`categoryHint` are handled: the parser stays
+   * a pure shape-reader and a model that answers "Main Course" produces a rejected value, not a
+   * malformed result.
+   */
+  course: string;
+  mealSlots: string[];
   /*
    * NO `imageUrl` (#86). The model was asked for one and could never supply a real one:
    * `htmlToText` strips every tag before the model sees the page, so anything it returned was

@@ -19,6 +19,8 @@ function result(over: Partial<RecipeExtractionResult> = {}): RecipeExtractionRes
       { text: 'Bake for 45 minutes at 180C.', inferred: true },
     ],
     notes: 'Keeps 3 days in a tin.',
+    course: '',
+    mealSlots: [],
     confidence: { name: 0.9, ingredients: 0.8, steps: 0.7 },
     ...over,
   };
