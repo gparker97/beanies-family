@@ -120,3 +120,37 @@ describe('the url-safe wrappers still round-trip', () => {
     expect(bufferToBase64url(bytesOfLength(ENCODE_CHUNK * 2 + 1))).not.toContain('=');
   });
 });
+
+describe('base64ToBuffer — exact sizing and whitespace', () => {
+  it('returns a buffer with NO trailing slack, so no copy is needed', () => {
+    // The whole point of the exact-length arithmetic: over-allocating and then
+    // `bytes.buffer.slice(0, written)` duplicates the entire payload at peak,
+    // which would leave the chunked decode saving nothing at all.
+    for (const n of [0, 1, 2, 3, 4, 5, 6, 100_000, 100_001, 100_002]) {
+      const b64 = referenceEncode(bytesOfLength(n));
+      expect(base64ToBuffer(b64).byteLength, `length for ${n} bytes`).toBe(n);
+    }
+  });
+
+  it('handles UNPADDED input (base64url handed straight in)', () => {
+    for (const n of [1, 2, 4, 5, 7, ENCODE_CHUNK + 2]) {
+      const stripped = referenceEncode(bytesOfLength(n)).replace(/=+$/, '');
+      expect(new Uint8Array(base64ToBuffer(stripped))).toEqual(bytesOfLength(n));
+    }
+  });
+
+  it('decodes a line-wrapped string correctly', () => {
+    // `atob` ignores whitespace, but chunking on raw character offsets does not:
+    // a newline inside a chunk shifts every subsequent group boundary, so
+    // without the normalising pass this decodes to garbage rather than throwing.
+    const bytes = bytesOfLength(ENCODE_CHUNK * 2 + 5);
+    const wrapped = referenceEncode(bytes).replace(/(.{76})/g, '$1\n');
+    expect(wrapped).toContain('\n');
+    expect(new Uint8Array(base64ToBuffer(wrapped))).toEqual(bytes);
+  });
+
+  it('tolerates leading and trailing whitespace', () => {
+    const bytes = bytesOfLength(1000);
+    expect(new Uint8Array(base64ToBuffer(`\n  ${referenceEncode(bytes)}  \n`))).toEqual(bytes);
+  });
+});

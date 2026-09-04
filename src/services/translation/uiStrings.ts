@@ -4210,9 +4210,19 @@ const STRING_DEFS = {
   // is an invitation to wipe a perfectly good cache by hand, so the text has to
   // say outright that clearing will not help.
   'resumeSetup.podTooLarge': {
-    en: "This device doesn't have enough memory to open a pod this size. Your pod file is safe — nothing is damaged and nothing has been deleted, and clearing your data won't help. Try opening it on a device with more memory, or send support@beanies.family the details below.",
+    en: 'This device ran out of memory opening a pod this size. Your pod file is safe — nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. If it keeps happening, send support@beanies.family the details below.',
     beanie:
-      "this device doesn't have enough memory to open a pod this size. your pod file is safe — nothing is damaged and nothing has been deleted, and clearing your data won't help. try opening it on a device with more memory, or send support@beanies.family the details below.",
+      'this device ran out of memory opening a pod this size. your pod file is safe — nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. if it keeps happening, send support@beanies.family the details below.',
+  },
+  // The INLINE variant, for the compact error slots under a password field
+  // (LoadPodView, SettingsPage, the join and login flows). The overlay copy
+  // above is three sentences and points at "the details below" and a Clear-data
+  // button that exist only on the fatal overlay — using it here would reference
+  // UI the user cannot see.
+  'podTooLarge.inline': {
+    en: 'This device ran out of memory opening your pod. Your file is safe — the problem is this device, not your data.',
+    beanie:
+      'this device ran out of memory opening your pod. your file is safe — the problem is this device, not your data.',
   },
 
   // Generic "wrong password" prompt — used by ResumePodSetup auto-load too.

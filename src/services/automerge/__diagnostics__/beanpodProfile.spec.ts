@@ -104,10 +104,41 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
 
     // Sample RSS across the load — the peak is the number that decides whether
     // a device can open this pod at all.
+    //
+    // ⚠️ A `setInterval` CANNOT do this. `loadAndVerify` is fully synchronous,
+    // so the event loop never turns while it runs and the timer fires exactly
+    // zero times: the "peak" would be `max(before, after)`, a lower bound that
+    // misses the whole point, because the peak lives INSIDE the WASM inflation
+    // and is largely released by the time the call returns.
+    //
+    // A worker thread shares the process, and RSS is a per-PROCESS figure, so a
+    // sampler over there sees this thread's allocations while this thread is
+    // blocked. The max goes through a SharedArrayBuffer because the worker
+    // cannot post a message to a blocked main thread either.
     let peakRss = process.memoryUsage().rss;
-    const sampler = setInterval(() => {
-      peakRss = Math.max(peakRss, process.memoryUsage().rss);
-    }, 10);
+    const shared = new SharedArrayBuffer(8);
+    const peakView = new Float64Array(shared);
+    peakView[0] = peakRss;
+    let sampler: import('node:worker_threads').Worker | null = null;
+    try {
+      const { Worker } = await import('node:worker_threads');
+      sampler = new Worker(
+        `const { workerData } = require('node:worker_threads');
+         const peak = new Float64Array(workerData);
+         setInterval(() => {
+           const rss = process.memoryUsage.rss();
+           if (rss > peak[0]) peak[0] = rss;
+         }, 5).unref();
+         setInterval(() => {}, 1 << 30);`,
+        { eval: true, workerData: shared }
+      );
+    } catch (e) {
+      // Never fail the diagnostic over its own instrumentation — but say so
+      // loudly, because the number printed below then means something weaker.
+      process.stdout.write(
+        `\n  ⚠️  RSS sampler unavailable (${String(e)}) — peak is a LOWER BOUND\n`
+      );
+    }
 
     const startedAt = Date.now();
     let doc;
@@ -120,10 +151,10 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
         () => loadAndVerify(binary, envelope.familyId ?? null)
       );
     } finally {
-      clearInterval(sampler);
+      await sampler?.terminate();
     }
     const loadMs = Date.now() - startedAt;
-    peakRss = Math.max(peakRss, process.memoryUsage().rss);
+    peakRss = Math.max(peakRss, peakView[0] ?? 0, process.memoryUsage().rss);
 
     // `stats()` returns the counts directly. `getAllChanges(doc).length` would
     // materialise every change's BYTES — on a history-heavy pod that is itself

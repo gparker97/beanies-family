@@ -116,7 +116,6 @@ import {
   type CriticalWriteState,
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
-  CorruptPayloadError,
   PayloadLoadError,
   PayloadTooLargeError,
 } from '@/types/sync';
@@ -1368,6 +1367,15 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       const errorMessage = (e as Error).message;
       if (e instanceof PayloadLoadError) {
+        if (e instanceof PayloadTooLargeError) {
+          // Release the pending envelope. It carries the multi-megabyte base64
+          // payload, and holding it in a ref pins that memory for the rest of
+          // the session — on the one device that just proved it has none to
+          // spare, behind an overlay whose only action is a reload. Nothing can
+          // retry from it either: a different password cannot make the document
+          // smaller.
+          pendingEncryptedFile.value = null;
+        }
         return { success: false, error: errorMessage, payloadError: e };
       }
       if (errorMessage.includes('Incorrect password')) {
@@ -3747,7 +3755,7 @@ export const useSyncStore = defineStore('sync', () => {
             kind: 'corrupted',
             fileId: pending.driveFileId ?? '',
             familyId: pending.envelope.familyId ?? '',
-            error: err as CorruptPayloadError,
+            error: err,
           };
 
     try {
