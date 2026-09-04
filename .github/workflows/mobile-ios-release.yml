@@ -41,6 +41,10 @@ on:
         description: 'App Store promotional text (OPTIONAL, ≤170 chars; no review needed; leave blank to keep the current value; ignored for testflight)'
         type: string
         default: ''
+      replace_pending_submission:
+        description: 'Cancel a submission that is ALREADY in review, so this build can take its place. Needed when a previous build is stuck Waiting for Review - an App Store version in that state is not editable, so the new build cannot be attached. ⚠️ If the pending submission is IN REVIEW rather than merely waiting, cancelling it sends the app back to the end of the review queue.'
+        type: boolean
+        default: false
       match_bootstrap:
         description: 'FIRST RUN ONLY: let match CREATE the signing certificate and profiles and push them to the certificates repo. Leave false afterwards — Apple caps distribution certificates, so routine runs must stay read-only.'
         type: boolean
@@ -103,6 +107,18 @@ jobs:
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_API_ISSUER_ID }}
           ASC_API_KEY_P8_PATH: ${{ runner.temp }}/asc/AuthKey.p8
         run: node scripts/deploy/assert-store-version-unused.mjs
+
+      - name: Preflight — no submission already in review
+        # Same pre-build placement and same fail-open posture as the version check: a full
+        # signed build is ~5 minutes, and a version awaiting review cannot accept a new
+        # build, so discovering that at the upload step wastes all of it.
+        if: startsWith(inputs.destination, 'appstore')
+        env:
+          REPLACE_PENDING_SUBMISSION: ${{ inputs.replace_pending_submission }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ vars.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_API_ISSUER_ID }}
+          ASC_API_KEY_P8_PATH: ${{ runner.temp }}/asc/AuthKey.p8
+        run: node scripts/deploy/assert-no-pending-submission.mjs
 
       - name: Build web app
         run: npm run build
@@ -204,6 +220,11 @@ jobs:
           # refreshes it when set and leaves the current value untouched when empty;
           # unused by `beta`. No review needed — it can change independent of a build.
           PROMOTIONAL_TEXT: ${{ inputs.promotional_text }}
+          # Hands the same choice the preflight already reported on to deliver's own
+          # `reject_if_possible`, which cancels the pending submission AND polls until Apple
+          # has actually released the version. That poll is the manual "remove the build,
+          # refresh, re-open the version" dance that 0.16 needed by hand.
+          REPLACE_PENDING_SUBMISSION: ${{ inputs.replace_pending_submission }}
         run: |
           gem install fastlane --no-document
           # Routing rule (kept legible so control flow doesn't hide in the expression):

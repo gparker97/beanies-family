@@ -14,12 +14,10 @@
 import { describe, it, expect } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import fs from 'node:fs';
-import {
-  judge,
-  buildToken,
-  fetchExistingVersions,
-  readBundleId,
-} from '../deploy/assert-store-version-unused.mjs';
+import { judge, fetchExistingVersions } from '../deploy/assert-store-version-unused.mjs';
+// `buildToken` and `readBundleId` moved to the shared client when the second preflight
+// (assert-no-pending-submission) needed the same auth. The assertions below are unchanged.
+import { buildToken, readBundleId } from '../deploy/ascClient.mjs';
 
 describe('judge — the decision', () => {
   it('passes a version App Store Connect has never seen', () => {
