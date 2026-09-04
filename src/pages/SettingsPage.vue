@@ -52,6 +52,7 @@ import {
 } from '@/services/automerge/projection';
 import { COLLECTION_NAMES } from '@/types/automerge';
 import { payloadErrorMessageKey } from '@/types/sync';
+import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { deliverFile } from '@/utils/deliverFile';
@@ -421,7 +422,19 @@ async function handleDriveReconnect() {
 }
 
 async function handleRequestPermission() {
-  await syncStore.requestPermission();
+  const result = await syncStore.requestPermission();
+  if (!result.payloadError) return;
+  // A WARM surface: the app is painting real data behind this button, so the
+  // full-screen recovery overlay would be the wrong shape entirely. Say it in
+  // the same slot the other Settings failures use, and report it — Settings had
+  // no payload reporter at all, so the corrupt half here reached CloudWatch
+  // with zero events.
+  encryptionError.value = t(payloadErrorMessageKey(result.payloadError));
+  reportPayloadFailure(result.payloadError, {
+    source: 'reload',
+    fileId: syncStore.driveFileId ?? null,
+    familyId: useFamilyContextStore().activeFamilyId,
+  });
 }
 
 // Move the pod's storage between local file and Google Drive. Owner-only

@@ -180,6 +180,40 @@ export abstract class PayloadLoadError extends Error {
     this.familyId = familyId;
     this.payloadBytes = payloadBytes;
   }
+
+  /**
+   * Could the CREDENTIAL be at fault?
+   *
+   * This is the question every "delete the cached key / ask for a new invite
+   * link / re-prompt for the password" site is really asking, and getting it
+   * from the class alone is wrong in both directions:
+   *
+   *   • `decryptToDoc` wraps ONLY the decrypt — `loadAndVerify` runs outside
+   *     it — so `step: 'load'` or `'materialize'` means the AES-GCM tag already
+   *     verified. The key is provably correct and deleting it destroys a valid
+   *     credential.
+   *   • but `step: 'decrypt'` is not enough either: an ALLOCATION failure while
+   *     decoding or decrypting never got as far as checking the tag, so it says
+   *     nothing about the key.
+   *
+   * Only a genuine authentication failure — a corrupt-class error at the
+   * decrypt step — can mean a wrong key. Every consumer reads this instead of
+   * re-deriving it; the ad-hoc versions were wrong at two separate call sites,
+   * one of which deleted a working trusted-device key.
+   */
+  get keyMayBeWrong(): boolean {
+    return this.step === 'decrypt' && !this.deviceCannotOpen;
+  }
+
+  /**
+   * Is this "the device could not do it" rather than "the data is bad"?
+   * Overridden to `true` by `PayloadTooLargeError`. Prefer this to a bare
+   * `instanceof` wherever the QUESTION is about the device, so a future third
+   * subclass has to state its own answer.
+   */
+  get deviceCannotOpen(): boolean {
+    return false;
+  }
 }
 
 export class CorruptPayloadError extends PayloadLoadError {
@@ -215,6 +249,10 @@ export class PayloadTooLargeError extends PayloadLoadError {
   ) {
     super(message, step, familyId, payloadBytes);
     this.name = 'PayloadTooLargeError'; // literal — see CorruptPayloadError
+  }
+
+  override get deviceCannotOpen(): boolean {
+    return true;
   }
 }
 

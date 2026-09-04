@@ -556,6 +556,28 @@ watch(
   { flush: 'post' }
 );
 
+/**
+ * A corrupt local cache that has already been cleared and will re-seed from
+ * Drive.
+ *
+ * The user notices nothing and the post-init health check never runs, so
+ * without this event the fleet-wide rate of cache corruption — i.e. how often
+ * devices are forced into a full multi-megabyte re-download at boot — is
+ * unmeasurable. Non-paging: it self-heals.
+ */
+function noteCacheCorruptRecovered(err: PayloadLoadError): void {
+  logEvent({
+    level: 'warn',
+    surface: 'pod-load-failure',
+    message: 'local cache was unreadable and has been cleared; re-seeding from Drive',
+    context: {
+      action: 'cache-corrupt-recovered',
+      error_code: err.step,
+      perf_doc_bytes: err.payloadBytes ?? undefined,
+    },
+  });
+}
+
 /** The boot path's context for the shared payload-failure surface. */
 function surfaceFatal(err: PayloadLoadError): void {
   surfacePayloadFatal(err, {
@@ -677,23 +699,8 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           return 'failed';
         }
         if (cacheResult.payloadError) {
-          // The cache was corrupt, `initAndLoadCache` cleared it, and the Drive
-          // re-seed below will succeed — so the user notices nothing and the
-          // post-init health check never runs. Without an event here the
-          // fleet-wide rate of cache corruption (i.e. how often devices are
-          // forced into a full multi-megabyte re-download at boot) is
-          // unmeasurable. Non-paging: it self-heals.
           initBreadcrumbs.push(`path1a: cache ${cacheResult.payloadError.step} corrupt — cleared`);
-          logEvent({
-            level: 'warn',
-            surface: 'pod-load-failure',
-            message: 'local cache was unreadable and has been cleared; re-seeding from Drive',
-            context: {
-              action: 'cache-corrupt-recovered',
-              error_code: cacheResult.payloadError.step,
-              perf_doc_bytes: cacheResult.payloadError.payloadBytes ?? undefined,
-            },
-          });
+          noteCacheCorruptRecovered(cacheResult.payloadError);
         }
         initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');
         console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
@@ -844,23 +851,8 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           return 'failed';
         }
         if (cacheResult.payloadError) {
-          // The cache was corrupt, `initAndLoadCache` cleared it, and the Drive
-          // re-seed below will succeed — so the user notices nothing and the
-          // post-init health check never runs. Without an event here the
-          // fleet-wide rate of cache corruption (i.e. how often devices are
-          // forced into a full multi-megabyte re-download at boot) is
-          // unmeasurable. Non-paging: it self-heals.
           initBreadcrumbs.push(`path2: cache ${cacheResult.payloadError.step} corrupt — cleared`);
-          logEvent({
-            level: 'warn',
-            surface: 'pod-load-failure',
-            message: 'local cache was unreadable and has been cleared; re-seeding from Drive',
-            context: {
-              action: 'cache-corrupt-recovered',
-              error_code: cacheResult.payloadError.step,
-              perf_doc_bytes: cacheResult.payloadError.payloadBytes ?? undefined,
-            },
-          });
+          noteCacheCorruptRecovered(cacheResult.payloadError);
         }
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');

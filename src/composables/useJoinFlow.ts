@@ -18,7 +18,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { PayloadTooLargeError, type PayloadLoadError } from '@/types/sync';
+import { type PayloadLoadError } from '@/types/sync';
 import { lookupFamily } from '@/services/registry/registryService';
 import { features } from '@/config/features';
 import {
@@ -89,9 +89,15 @@ function asJoinDecryptError(result: {
 }): Error & { joinCode?: JoinErrorCode } {
   const err: Error & { joinCode?: JoinErrorCode } =
     result.payloadError ?? new Error(result.error ?? 'Decryption failed');
-  if (result.payloadError) {
-    err.joinCode =
-      result.payloadError instanceof PayloadTooLargeError ? 'FILE_TOO_LARGE' : 'FILE_CORRUPT';
+  const payload = result.payloadError;
+  if (payload && !payload.keyMayBeWrong) {
+    // `keyMayBeWrong` gates this deliberately. A `CorruptPayloadError` at the
+    // decrypt step is the ROTATED-KEY signature (a member was removed, or the
+    // Drive envelope is a newer re-encrypted copy), and for that
+    // `FILE_DECRYPT_FAILED` is right: a fresh invite link genuinely fixes it.
+    // Tagging it `FILE_CORRUPT` would tell the joiner their family's data is
+    // damaged, offer no recovery button at all, and page Slack every attempt.
+    err.joinCode = payload.deviceCannotOpen ? 'FILE_TOO_LARGE' : 'FILE_CORRUPT';
   }
   return err;
 }

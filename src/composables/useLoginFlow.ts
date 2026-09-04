@@ -15,7 +15,7 @@
 
 import { ref, type Ref } from 'vue';
 import { PayloadTooLargeError, PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
-import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
+import { reportPayloadFailure, surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import {
   transition,
   type LoginFlowEvent,
@@ -95,6 +95,8 @@ export function useLoginFlow(opts: {
   const authStore = useAuthStore();
   const familyStore = useFamilyStore();
   const familyContextStore = useFamilyContextStore();
+  /** Set by `ensureStaged` so its callers can emit an accurate funnel code. */
+  let stagedPayloadFailure: 'too-large' | 'corrupted' | null = null;
   const syncStore = useSyncStore();
   const { t } = useTranslation();
   const settingsStore = useSettingsStore();
@@ -231,21 +233,26 @@ export function useLoginFlow(opts: {
       // no-silent-failures rule): a persistent failure here quietly demotes every
       // trusted-device login on this device to manual credentials.
       // A payload failure here is not "the fast path missed": the pod cannot be
-      // opened at all, and a `warn` on the login-flow surface hides it from
-      // every pod-load filter.
+      // opened at all, so it also gets the pod-load report.
+      //
+      // The existing event stays for EVERY failure, not just the non-payload
+      // ones. `reportPayloadFailure` is deliberately silent for the
+      // device-cannot-open class, so replacing this outright made the fleet-wide
+      // rate of "trusted devices silently demoted to manual credentials" read
+      // zero for exactly the class this work is about.
       if (e instanceof PayloadLoadError) {
-        reportPayloadFailure(e, { source: 'boot' });
-      } else {
-        logEvent({
-          level: 'warn',
-          surface: 'login-flow',
-          message: 'trusted_auto_open_failed',
-          context: {
-            action: 'auto_open_failed',
-            error_code: e instanceof Error ? e.name : 'unknown',
-          },
-        });
+        reportPayloadFailure(e, { source: 'trusted-auto-open', familyId });
       }
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'trusted_auto_open_failed',
+        context: {
+          action: 'auto_open_failed',
+          error_code:
+            e instanceof PayloadLoadError ? e.step : e instanceof Error ? e.name : 'unknown',
+        },
+      });
     }
   }
 
@@ -430,9 +437,19 @@ export function useLoginFlow(opts: {
       // and the user gets a generic open failure with none of the honest copy —
       // on the step that runs BEFORE the prove screen.
       if (e instanceof PayloadLoadError) {
-        reportPayloadFailure(e, { source: 'boot' });
-        proveError.value = t(payloadErrorMessageKey(e));
-        dispatch({ type: 'OPEN_FAILED', reason: 'error' });
+        stagedPayloadFailure = e.deviceCannotOpen ? 'too-large' : 'corrupted';
+        // The FATAL overlay, not `OPEN_FAILED` — that lands in `open-recovery`,
+        // whose primary "Try again" clears `proveError`, re-downloads the pod
+        // and hits the identical allocation, unbounded, firing another critical
+        // report each press. Nothing is on screen at this point (this runs
+        // before the prove screen), so the overlay is the honest surface and its
+        // Reload really can help: a page reload reclaims the doc realm's wasm
+        // memory, which never shrinks in place.
+        surfacePayloadFatal(e, {
+          fileId: syncStore.driveFileId ?? null,
+          familyId: familyContextStore.activeFamilyId,
+          source: 'boot',
+        });
         return false;
       }
       reportError({
@@ -596,7 +613,15 @@ export function useLoginFlow(opts: {
       // CURRENT keyId, which only exists once the file is staged — sampling it before
       // staging left the rotation guard dead on the primary cold path.
       if (!(await ensureStaged())) {
-        emitOutcome(false, 'transport');
+        // `stagedPayloadFailure` is set by `ensureStaged`'s payload branch. A
+        // bare 'transport' collided with genuine network failures, so a
+        // fleet-wide rise in devices that cannot open their pod would read as a
+        // transport regression — in the funnel this work exists to be visible
+        // in. (The sibling branch 50 lines down already emits distinct codes
+        // for the same failure on the same screen.)
+        const staged = stagedPayloadFailure;
+        stagedPayloadFailure = null;
+        emitOutcome(false, staged ?? 'transport');
         return; // OPEN_FAILED dispatched; grant-less recovery retries back into prove
       }
       const unlock = await unlockWithPin({
@@ -655,7 +680,11 @@ export function useLoginFlow(opts: {
           // route the only report reaching CloudWatch could be the poorer of
           // the two. `reportPayloadFailure` also knows to stay quiet for
           // too-large, which `docClient.surface()` already emitted.
-          reportPayloadFailure(dec.payloadError, { source: 'pin-unlock' });
+          reportPayloadFailure(dec.payloadError, {
+            source: 'pin-unlock',
+            fileId: syncStore.driveFileId ?? null,
+            familyId: familyContextStore.activeFamilyId,
+          });
           return;
         }
         if (!dec.success) {
@@ -836,7 +865,11 @@ export function useLoginFlow(opts: {
                 // The password branch emitted nothing at all, and
                 // `docClient.surface()` reports only the too-large half — so a
                 // corrupt pod on this route reached CloudWatch with zero events.
-                reportPayloadFailure(dec.payloadError, { source: 'password-unlock' });
+                reportPayloadFailure(dec.payloadError, {
+                  source: 'password-unlock',
+                  fileId: syncStore.driveFileId ?? null,
+                  familyId: familyContextStore.activeFamilyId,
+                });
                 emitProveOutcome({
                   method: 'password',
                   ok: false,
@@ -930,8 +963,20 @@ export function useLoginFlow(opts: {
     if (state.value.kind !== 'open-recovery' || isBusy.value) return;
     isBusy.value = true;
     try {
-      const granted = await syncStore.requestPermission();
-      if (!granted) {
+      const result = await syncStore.requestPermission();
+      if (result.payloadError) {
+        // Permission was GRANTED — saying "check you picked the right .beanpod
+        // file" would be a lie, and `RECOVERY_RETRY` would re-run the identical
+        // failing cycle. Nothing is open here, so the honest overlay is right
+        // and its Reload can actually reclaim the wasm heap.
+        surfacePayloadFatal(result.payloadError, {
+          fileId: syncStore.driveFileId ?? null,
+          familyId: familyContextStore.activeFamilyId,
+          source: 'reload',
+        });
+        return;
+      }
+      if (!result.granted) {
         proveError.value = t('auth.fileLoadFailed');
         return;
       }
