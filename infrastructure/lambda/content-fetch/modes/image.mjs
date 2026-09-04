@@ -104,6 +104,10 @@ function tag(buf, start, end) {
  * Two lists under a comment promising they cannot drift is how they drift. `image/jpg` is not
  * the registered type but plenty of older hosts send it, so it is the one manual addition.
  */
+// The pattern is built from the module-level ACCEPTED constant plus one literal and is
+// evaluated once at module load. No request data reaches it, so there is no ReDoS surface
+// for an attacker to steer.
+// eslint-disable-next-line security/detect-non-literal-regexp
 const CONTENT_TYPE_RE = new RegExp(
   `^(?:${[...ACCEPTED.map((a) => a.mime), 'image/jpg'].join('|').replace(/\//g, '\\/')})\\b`,
   'i'
