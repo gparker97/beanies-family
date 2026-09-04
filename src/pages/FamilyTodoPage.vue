@@ -14,11 +14,11 @@ import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoSection from '@/components/todo/TodoSection.vue';
-import TodoSortMenu from '@/components/todo/TodoSortMenu.vue';
+import SortMenu from '@/components/ui/SortMenu.vue';
 import TodoMemberFilter from '@/components/todo/TodoMemberFilter.vue';
 import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
-import { useTodoSort } from '@/composables/useTodoSort';
+import { useTodoSort, SORT_OPTIONS } from '@/composables/useTodoSort';
 import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { sortTodos } from '@/utils/todo';
 
@@ -202,7 +202,7 @@ async function handleAcknowledge(id: string) {
           :members="sortedMembers"
           class="hidden sm:flex"
         />
-        <TodoSortMenu v-model:sort-by="sortBy" />
+        <SortMenu v-model="sortBy" :options="SORT_OPTIONS" trigger-label-key="todo.sortLabel" />
       </div>
     </div>
 

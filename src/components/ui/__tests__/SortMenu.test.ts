@@ -1,7 +1,8 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
-import TodoSortMenu from '../TodoSortMenu.vue';
+import SortMenu from '../SortMenu.vue';
+import { SORT_OPTIONS } from '@/composables/useTodoSort';
 
 // Decouple from the translation pipeline — `t` is a passthrough so assertions
 // are deterministic regardless of language/beanie-mode state.
@@ -23,8 +24,13 @@ const TRIGGER_RECT = {
 const mounted: VueWrapper[] = [];
 
 function factory(props: Record<string, unknown> = {}) {
-  const wrapper = mount(TodoSortMenu, {
-    props: { sortBy: 'dueDate', ...props },
+  const wrapper = mount(SortMenu, {
+    props: {
+      modelValue: 'dueDate',
+      options: SORT_OPTIONS,
+      triggerLabelKey: 'todo.sortLabel',
+      ...props,
+    },
     attachTo: document.body,
   });
   // positionPopover() reads the trigger's getBoundingClientRect; happy-dom
@@ -44,14 +50,14 @@ function menuEl(): HTMLElement | null {
   return document.body.querySelector('[role="menu"]');
 }
 
-describe('TodoSortMenu', () => {
+describe('SortMenu', () => {
   afterEach(() => {
     // Unmount (don't wipe innerHTML) so Vue tears down teleported nodes cleanly.
     while (mounted.length) mounted.pop()!.unmount();
   });
 
   it('shows the active sort in the trigger and starts collapsed', () => {
-    const wrapper = factory({ sortBy: 'dueDate' });
+    const wrapper = factory({ modelValue: 'dueDate' });
     expect(wrapper.text()).toContain('todo.sort.dueDate');
     expect(wrapper.find('[aria-haspopup="menu"]').attributes('aria-expanded')).toBe('false');
   });
@@ -77,15 +83,15 @@ describe('TodoSortMenu', () => {
   });
 
   it('marks the active option with aria-checked="true"', async () => {
-    const wrapper = factory({ sortBy: 'oldest' });
+    const wrapper = factory({ modelValue: 'oldest' });
     await open(wrapper);
 
     const checked = menuEl()!.querySelector('[aria-checked="true"]');
     expect(checked?.textContent).toContain('todo.sort.oldest');
   });
 
-  it('emits update:sortBy with the chosen value and closes', async () => {
-    const wrapper = factory({ sortBy: 'dueDate' });
+  it('emits update:modelValue with the chosen value and closes', async () => {
+    const wrapper = factory({ modelValue: 'dueDate' });
     await open(wrapper);
 
     // Options render in order: dueDate, newest, oldest → index 1 is "newest".
@@ -93,7 +99,7 @@ describe('TodoSortMenu', () => {
     items[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
 
-    expect(wrapper.emitted('update:sortBy')?.[0]).toEqual(['newest']);
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['newest']);
     expect(menuEl()).toBeNull(); // closed after selection
   });
 
