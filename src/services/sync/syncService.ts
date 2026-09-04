@@ -39,7 +39,7 @@ import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import { preserveLocalKeyDicts } from './envelopeMerge';
+import { preserveLocalKeyDicts, withoutPayload } from './envelopeMerge';
 import { setFlushProvider } from './offlineQueue';
 import {
   usePollWhileVisible,
@@ -565,11 +565,13 @@ function persistEnvelopeSafely(envelope: BeanpodFileV4): void {
  */
 export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): void {
   currentFamilyKey = familyKey;
-  currentEnvelope = envelope;
   noKeyWarnedOnce = false; // Reset so future skips can warn again
-  // Post the key to the worker (once at unlock) + seed the envelope cache.
+  // Post the key to the worker (once at unlock).
   void docClient.setFamilyKey(familyKey);
-  persistEnvelopeSafely(envelope);
+  // Route through `setEnvelope` rather than assigning `currentEnvelope` here:
+  // that keeps ONE write path for the in-memory envelope, so the payload strip
+  // (and the cache seed) cannot be applied on one path and missed on the other.
+  setEnvelope(envelope);
 }
 
 /**
@@ -599,10 +601,12 @@ export function getEnvelope(): BeanpodFileV4 | null {
  * without an `as unknown` cast.
  */
 export function setEnvelope(envelope: BeanpodFileV4 | null): void {
-  currentEnvelope = envelope;
+  // Long-lived: no payload. See `withoutPayload`. Applied here rather than at
+  // the callers because this is the single write path for `currentEnvelope`.
+  currentEnvelope = envelope ? withoutPayload(envelope) : null;
   // Keep the worker's envelope cache in sync (every currentEnvelope mutation
   // funnels here) so a cold start unlocks after a peer key-add / rotation.
-  if (envelope) persistEnvelopeSafely(envelope);
+  if (currentEnvelope) persistEnvelopeSafely(currentEnvelope);
 }
 
 /**

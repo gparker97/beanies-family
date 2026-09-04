@@ -96,9 +96,8 @@ import {
   tryUnwrapFamilyKey,
   envelopeNeedsRecovery,
   reEncryptEnvelope,
-  detectFileVersion,
 } from '@/services/sync/fileSync';
-import { preserveLocalKeyDicts, keyDictSize } from '@/services/sync/envelopeMerge';
+import { preserveLocalKeyDicts, keyDictSize, withoutPayload } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
   deriveMemberKey,
@@ -201,7 +200,10 @@ export const useSyncStore = defineStore('sync', () => {
    * callers can pass the same reference onward.
    */
   function replaceEnvelope(incoming: BeanpodFileV4): BeanpodFileV4 {
-    const merged = preserveLocalKeyDicts(incoming, envelope.value);
+    // Stripped: this is the long-lived copy, and nothing reads the payload back
+    // off it (verified — the only readers are worker-side, fed a freshly-parsed
+    // envelope, plus `reEncryptEnvelope`, which overwrites the field).
+    const merged = withoutPayload(preserveLocalKeyDicts(incoming, envelope.value));
     envelope.value = merged;
     syncService.setEnvelope(merged);
     return merged;
@@ -969,12 +971,10 @@ export const useSyncStore = defineStore('sync', () => {
         };
       }
 
-      const version = detectFileVersion(text);
-      if (version !== '4.0') {
-        error.value = `Unsupported file version: ${version ?? 'unknown'}`;
-        return { success: false };
-      }
-
+      // `parseBeanpodV4` validates the version itself and throws a BETTER
+      // message ("Unsupported beanpod version: X. Expected 4.0."), so the old
+      // `detectFileVersion` pre-call was a second full JSON.parse of the whole
+      // multi-megabyte file purely to read one field, then thrown away.
       const remoteEnvelope = parseBeanpodV4(text);
 
       // If we already have a family key, the worker decrypts + merges/adopts.
@@ -3563,12 +3563,7 @@ export const useSyncStore = defineStore('sync', () => {
         return { success: false, reason: 'error' };
       }
 
-      const version = detectFileVersion(text);
-      if (version !== '4.0') {
-        error.value = `Unsupported file version: ${version ?? 'unknown'}`;
-        return { success: false, reason: 'error' };
-      }
-
+      // Same as `fetchAndMergeRemote`: one parse, not two. See the note there.
       const env = parseBeanpodV4(text);
 
       const loadedInviteKeyCount = env.inviteKeys ? Object.keys(env.inviteKeys).length : 0;
