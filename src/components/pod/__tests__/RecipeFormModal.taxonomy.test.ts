@@ -97,6 +97,49 @@ describe('RecipeFormModal — sectioned layout', () => {
     expect(first.find('input[type="url"]').exists()).toBe(true);
   });
 
+  it('groups the fields with role="group", not as four nested landmarks', async () => {
+    const { wrapper } = await mountModal();
+    // A <section> WITH an accessible name maps to role="region" — a landmark — which would put
+    // four regions in the screen-reader rotor inside a single dialog.
+    const sections = wrapper.findAll('section[aria-labelledby]');
+    expect(sections).toHaveLength(4);
+    sections.forEach((s) => expect(s.attributes('role')).toBe('group'));
+  });
+
+  it('never shows two url inputs at once on a blank new recipe', async () => {
+    // RecipeSourceStrip is itself a type="url" input. Before this guard, a user pasted their
+    // recipe URL into the labelled "Link" field, tabbed away, and nothing happened — capture
+    // only fires from the strip.
+    setActivePinia(createPinia());
+    const store = useRecipesStore();
+    store.recipes = [];
+    const wrapper = mount(RecipeFormModal, {
+      props: { open: true, recipe: null },
+      global: {
+        stubs: {
+          BeanieFormModal: {
+            props: ['saveDisabled', 'isSubmitting', 'showDelete', 'title'],
+            template: '<div><slot /></div>',
+          },
+          PhotoAttachments: true,
+          AiDocumentPicker: true,
+          DocumentExtractConsentModal: true,
+          // Stubbed so the ONLY url input this can find is the standalone "Link" field —
+          // the strip has one of its own, which is exactly the collision being guarded.
+          RecipeSourceStrip: true,
+        },
+      },
+    });
+    await nextTick();
+    expect(wrapper.findComponent({ name: 'RecipeSourceStrip' }).exists()).toBe(true);
+    expect(wrapper.find('input[type="url"]').exists()).toBe(false);
+
+    // Once a name exists the strip retires and the link field takes over the provenance job.
+    await wrapper.find('input[type="text"]').setValue('Nana pie');
+    await nextTick();
+    expect(wrapper.find('input[type="url"]').exists()).toBe(true);
+  });
+
   it('puts course, meals and tags together under one purpose-named heading', async () => {
     const { wrapper } = await mountModal();
     const filing = wrapper.findAll('section[aria-labelledby]')[2]!;

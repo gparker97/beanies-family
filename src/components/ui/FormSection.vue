@@ -18,8 +18,12 @@ import { useTranslation } from '@/composables/useTranslation';
  * `text-sm`, sentence case, no tracking: clearly one tier ABOVE, and the only place in the
  * form using that combination.
  *
- * Renders a real `<section>` with `aria-labelledby`, so the grouping reaches a screen reader
- * as grouping rather than as decoration — which is most of the point of adding it.
+ * ⚠️ `role="group"`, and the role is load-bearing. A `<section>` that HAS an accessible name
+ * maps to `role="region"` — an ARIA **landmark** — so four of these inside a dialog would put
+ * four regions in the screen-reader rotor and announce "region … end of region" at every
+ * section crossing while tabbing. Landmarks are for page-level navigation, not for grouping a
+ * few fields. `role="group"` carries exactly the label association we want and none of the
+ * navigational weight.
  */
 withDefaults(
   defineProps<{
@@ -37,7 +41,7 @@ const headingId = useId();
 </script>
 
 <template>
-  <section :aria-labelledby="headingId" :class="first ? 'mb-6' : 'mt-7 mb-6'">
+  <section role="group" :aria-labelledby="headingId" :class="first ? 'mb-6' : 'mt-7 mb-6'">
     <div class="mb-3 flex items-center gap-2">
       <span v-if="emoji" class="text-sm" aria-hidden="true">{{ emoji }}</span>
       <h3

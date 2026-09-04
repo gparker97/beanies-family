@@ -48,6 +48,8 @@ const draft = ref('');
 const status = ref<AddTagStatus | null>(null);
 /** -1 = nothing highlighted, so Enter commits what was typed rather than a suggestion. */
 const active = ref(-1);
+/** Escape closes the popup for this draft (APG combobox), until the text changes again. */
+const dismissed = ref(false);
 const listboxId = `tag-ac-${Math.random().toString(36).slice(2, 9)}`;
 
 const atLimit = computed(() => props.modelValue.length >= MAX_TAGS);
@@ -56,18 +58,6 @@ const atLimit = computed(() => props.modelValue.length >= MAX_TAGS);
 const matches = computed(() =>
   props.disabled || atLimit.value ? [] : matchTags(props.suggestions ?? [], draft.value)
 );
-const showAutocomplete = computed(() => matches.value.length > 0);
-
-/** The quiet "used before" row: only while the field is empty, so it never fights the matches. */
-const idleSuggestions = computed(() =>
-  draft.value.trim() || atLimit.value ? [] : (props.suggestions ?? []).slice(0, MAX_SUGGESTIONS)
-);
-
-// A highlight that outlives its list would send Enter to the wrong tag.
-watch(matches, () => {
-  active.value = -1;
-});
-
 /**
  * Only the statuses a USER needs to act on get a message. 'added'/'empty' are self-evident.
  *
@@ -86,6 +76,32 @@ const message = computed(() => {
   return '';
 });
 
+/**
+ * ⚠️ Yields to `message`. The listbox is absolutely positioned over the space the hint and the
+ * `role="status"` rejection line occupy, so an open dropdown paints over "you already have that
+ * tag" — and a duplicate does NOT clear the draft, so the two would otherwise always coincide.
+ * A rejection nobody can see is the swallowed-tag-vs-dead-key failure the status codes exist to
+ * prevent, reintroduced by a z-index.
+ */
+const showAutocomplete = computed(
+  () => matches.value.length > 0 && !dismissed.value && !message.value
+);
+
+/** The quiet "used before" row: only while the field is empty, so it never fights the matches. */
+const idleSuggestions = computed(() =>
+  draft.value.trim() || atLimit.value ? [] : (props.suggestions ?? []).slice(0, MAX_SUGGESTIONS)
+);
+
+// A highlight that outlives its list would send Enter to the wrong tag.
+watch(matches, () => {
+  active.value = -1;
+});
+
+// Escape dismisses the popup for the text as it stood; typing on makes it a new query.
+watch(draft, () => {
+  dismissed.value = false;
+});
+
 function commit(raw: string) {
   if (props.disabled) return;
   const result = addTag(props.modelValue, raw);
@@ -100,7 +116,19 @@ function commit(raw: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (showAutocomplete.value) {
+  // Captured BEFORE the status clear below, which can itself reopen the popup.
+  const wasOpen = showAutocomplete.value;
+
+  // A rejection is about the entry that caused it. Any key that is not itself a commit
+  // invalidates it — arrowing the list included, where a stale "you already have that tag"
+  // reads as a complaint about the option being highlighted.
+  //
+  // ⚠️ This must stay ABOVE the Enter/arrow branches. It previously sat below them, where
+  // every path returned first and the condition could never be false — dead code with a
+  // comment still explaining an ordering that no longer existed.
+  if (e.key !== 'Enter' && e.key !== ',') status.value = null;
+
+  if (wasOpen) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       active.value = (active.value + 1) % matches.value.length;
@@ -112,11 +140,13 @@ function onKeydown(e: KeyboardEvent) {
         active.value <= 0 ? matches.value.length - 1 : (active.value - 1) % matches.value.length;
       return;
     }
-    if (e.key === 'Escape' && active.value >= 0) {
-      // Dismiss the highlight, NOT the modal — only when it is actually doing something, so a
-      // user who reaches for Escape to close the form still can.
+    if (e.key === 'Escape') {
+      // APG combobox: Escape CLOSES the popup. Unconditional `stopPropagation` while it is
+      // open, so the press that dismisses the list cannot also discard the whole form; a
+      // second Escape, with the list closed, propagates normally.
       e.preventDefault();
       e.stopPropagation();
+      dismissed.value = true;
       active.value = -1;
       return;
     }
@@ -125,21 +155,40 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
     // A highlighted match wins over the raw text — that IS the point of the autocomplete.
-    commit(active.value >= 0 ? (matches.value[active.value] ?? draft.value) : draft.value);
+    commit(
+      wasOpen && active.value >= 0 ? (matches.value[active.value] ?? draft.value) : draft.value
+    );
     return;
   }
-
-  // A rejection is about the entry that caused it. Once the user types the next character it
-  // is stale, and leaving it up reads as a complaint about what they are typing NOW.
-  // Cleared here rather than in a `watch(draft)` because `commit` blanks the draft on success,
-  // which would wipe the 'truncated' notice the moment it appeared.
-  if (e.key !== 'Enter' && e.key !== ',') status.value = null;
 
   // Backspace on an empty field removes the last tag — the token-input idiom.
   if (e.key === 'Backspace' && draft.value === '' && props.modelValue.length > 0) {
     e.preventDefault();
     drop(props.modelValue[props.modelValue.length - 1]!);
   }
+}
+
+/**
+ * Pasting a list adds a tag per entry.
+ *
+ * The `,` separator only ever existed on keydown, so pasting `quick, easy, vegan` — the most
+ * natural way to move tags in from anywhere else — produced one literal tag containing commas.
+ */
+function onPaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text') ?? '';
+  if (!/[,\n]/.test(text)) return; // a single token: let the browser paste it and carry on
+  e.preventDefault();
+  let next = [...props.modelValue];
+  let last: AddTagStatus = 'empty';
+  for (const part of text.split(/[,\n]+/)) {
+    const result = addTag(next, part);
+    next = result.tags;
+    last = result.status;
+    if (result.status === 'limit') break;
+  }
+  status.value = last;
+  emit('update:modelValue', next);
+  draft.value = '';
 }
 
 function drop(tag: string) {
@@ -185,13 +234,13 @@ function onBlur() {
           class="font-inter min-w-[8rem] flex-1 bg-transparent px-1 py-0.5 text-sm text-[var(--color-text)] outline-none"
           :placeholder="atLimit ? '' : t('recipes.tags.placeholder')"
           :disabled="disabled || atLimit"
-          :maxlength="MAX_TAG_LENGTH"
           role="combobox"
           autocomplete="off"
           :aria-expanded="showAutocomplete"
           :aria-controls="listboxId"
           :aria-activedescendant="active >= 0 ? `${listboxId}-${active}` : undefined"
           @keydown="onKeydown"
+          @paste="onPaste"
           @blur="onBlur"
         />
       </div>
