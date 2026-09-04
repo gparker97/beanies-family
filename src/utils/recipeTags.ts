@@ -75,7 +75,12 @@ export function suggestTags(
 ): string[] {
   const counts = new Map<string, number>();
   for (const recipe of allRecipes) {
-    for (const tag of recipe.tags ?? []) {
+    // Array.isArray, not `?? []`: this walks EVERY recipe in the family, so a single corrupt
+    // `tags` value anywhere in the cookbook would throw here and take out the recipe FORM for
+    // every recipe — the widest blast radius of any of these guards, and the reason the
+    // container is checked rather than assumed.
+    if (!Array.isArray(recipe.tags)) continue;
+    for (const tag of recipe.tags) {
       if (current.includes(tag)) continue;
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }

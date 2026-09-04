@@ -29,9 +29,12 @@ const props = withDefaults(
 
 const { courseLabel, courseEmoji } = useRecipeCourseLabel();
 
-const shownTags = computed(() => (props.tags ?? []).slice(0, props.maxTags));
-const overflow = computed(() => Math.max(0, (props.tags ?? []).length - props.maxTags));
-const hasAnything = computed(() => Boolean(props.course) || (props.tags?.length ?? 0) > 0);
+// Array.isArray rather than `?? []`: a corrupt stored string satisfies `.slice` and `.length`
+// and would render one pill PER CHARACTER.
+const safeTags = computed(() => (Array.isArray(props.tags) ? props.tags : []));
+const shownTags = computed(() => safeTags.value.slice(0, props.maxTags));
+const overflow = computed(() => Math.max(0, safeTags.value.length - props.maxTags));
+const hasAnything = computed(() => Boolean(props.course) || safeTags.value.length > 0);
 </script>
 
 <template>
