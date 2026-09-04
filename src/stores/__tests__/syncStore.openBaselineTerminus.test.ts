@@ -99,6 +99,10 @@ vi.mock('@/services/sync/fileSync', () => ({
 vi.mock('@/services/sync/envelopeMerge', () => ({
   preserveLocalKeyDicts: vi.fn((remote: unknown) => remote),
   keyDictSize: vi.fn(() => 0),
+  // Real behaviour, not a pass-through: `replaceEnvelope` strips the payload
+  // from the long-lived envelope, and a stub that skipped it would hide a
+  // regression in exactly the invariant this change introduces.
+  withoutPayload: vi.fn((env: Record<string, unknown>) => ({ ...env, encryptedPayload: '' })),
 }));
 
 vi.mock('@/services/recurring/recurringProcessor', () => ({
