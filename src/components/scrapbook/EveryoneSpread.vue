@@ -23,6 +23,7 @@
  * background (page-level), Caveat handwriting for headers and labels.
  */
 import { computed, ref, watch } from 'vue';
+import { stableFraction } from '@/utils/stableVariant';
 import ScrapbookEntryCard from '@/components/scrapbook/ScrapbookEntryCard.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -154,11 +155,12 @@ const familyNameDisplay = computed(() => {
  * Stable per-id rotation (–2.5° to +2.5°). Hash means rotations are
  * identical across re-renders and never reshuffle when new entries
  * arrive at the top of the feed.
+ *
+ * The hash itself lives in `stableVariant` (#86) — this file and
+ * `ScrapbookSpine` had written the same loop byte-for-byte.
  */
 function rotationFor(id: string, scale = 5): number {
-  let hash = 0;
-  for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) | 0;
-  return ((Math.abs(hash) % 100) / 100) * scale - scale / 2;
+  return stableFraction(id) * scale - scale / 2;
 }
 
 function nameFor(name: string): string {
