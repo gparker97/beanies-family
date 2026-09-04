@@ -230,6 +230,10 @@ export function normalizeRecipeNode(node) {
     // both safeHttpsUrl and screenUrl reject at 2000, which reads as "the image was
     // unreachable" rather than "we sent something too long to be a URL".
     imageUrl: text(firstImageUrl(node.image), 2000),
+    // The last rung of the #86 image ladder. Reuses the same depth-bounded reader as `image`
+    // rather than a second parse, and is deliberately LAST in the ladder: publishers commonly
+    // set thumbnailUrl to a cropped square, which is a poor hero but far better than nothing.
+    thumbnailUrl: text(firstImageUrl(node.thumbnailUrl), 2000),
   };
 }
 

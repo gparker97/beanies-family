@@ -8,7 +8,7 @@
  * Returning `{ok:false, code}` rather than throwing keeps the dispatcher a pure mapping.
  */
 import { asciiLower } from '../asciiLower.mjs';
-import { guardedFetch } from '../guardedFetch.mjs';
+import { guardedFetch, screenUrl } from '../guardedFetch.mjs';
 import { extractRecipeFromHtml } from '../recipeJsonLd.mjs';
 import { decodeEntities } from '../entities.mjs';
 
@@ -107,31 +107,47 @@ function stripTags(text) {
   }
 }
 
-/** Find one meta tag's content by property/name. Linear scan — see dropTag on why not regex. */
-export function findMeta(html, key) {
-  const lower = asciiLower(html);
+/**
+ * Find one tag's attribute value by a QUOTED key. Linear scan — see dropTag on why not regex.
+ *
+ * ⚠️ `lower` is a PARAMETER, not computed here, and that is load-bearing. `asciiLower` is a
+ * whole-string replace over a body capped at 2MB; the image ladder calls this six times, so
+ * computing it internally would lowercase 12MB per page. `collectImageCandidates` computes it
+ * once and passes it down. Do not "simplify" this back.
+ *
+ * ⚠️ The key is matched WITH ITS QUOTES (`"og:image"`, not `og:image`). That is what stops the
+ * `og:image` rung also matching `property="og:image:secure_url"` and collapsing two ladder
+ * rungs into one. Every row of IMAGE_LADDER depends on it; asserted in the tests.
+ */
+export function findTagAttr(html, lower, tagOpen, key, attr) {
   const needle = `"${key}"`;
   const alt = `'${key}'`;
   let cursor = 0;
   for (;;) {
-    const at = lower.indexOf('<meta', cursor);
+    const at = lower.indexOf(tagOpen, cursor);
     if (at === -1) return '';
     const end = lower.indexOf('>', at);
     if (end === -1) return '';
     const tag = html.slice(at, end);
     const tagLower = tag.toLowerCase();
     if (tagLower.includes(needle) || tagLower.includes(alt)) {
-      const ci = tagLower.indexOf('content=');
+      const ci = tagLower.indexOf(attr);
       if (ci !== -1) {
-        const q = tag[ci + 8];
+        const valueAt = ci + attr.length;
+        const q = tag[valueAt];
         if (q === '"' || q === "'") {
-          const close = tag.indexOf(q, ci + 9);
-          if (close !== -1) return tag.slice(ci + 9, close);
+          const close = tag.indexOf(q, valueAt + 1);
+          if (close !== -1) return tag.slice(valueAt + 1, close);
         }
       }
     }
     cursor = end + 1;
   }
+}
+
+/** Find one meta tag's content by property/name. Kept for its existing callers and tests. */
+export function findMeta(html, key) {
+  return findTagAttr(html, asciiLower(html), '<meta', key, 'content=');
 }
 
 /**
@@ -171,8 +187,8 @@ export function htmlToText(html) {
  * and returns a 404 or a non-image — so the dish photo silently never attaches, with only an
  * `attach_failed` info log to show for it. This is the common case, not an exotic one.
  */
-function metaContent(html, property) {
-  return decodeEntities(findMeta(html, property)).trim();
+function metaContent(html, lower, property) {
+  return decodeEntities(findTagAttr(html, lower, '<meta', property, 'content=')).trim();
 }
 
 /**
@@ -191,6 +207,60 @@ function absolutize(raw, base) {
   } catch {
     return '';
   }
+}
+
+/**
+ * The dish-image ladder, in preference order (#86).
+ *
+ * Every rung here is AUTHOR-DECLARED: a tag whose entire purpose is "this is the picture for
+ * this page". That is why none of them needs an AI relevance check — the page's own canonical
+ * image, on a page the user deliberately chose, is not a guess. The deferred in-body `<img>`
+ * rung would be a guess, which is exactly why it is gated differently (see the plan's
+ * Appendix A).
+ *
+ * Order matters and is not arbitrary: structured data first (a publisher stating the recipe's
+ * image), then Open Graph (stated for sharing, near-universal on food blogs), then Twitter,
+ * then the legacy `link rel`, then the JSON-LD thumbnail — which is last because it is
+ * routinely a cropped square.
+ */
+const IMAGE_LADDER = Object.freeze([
+  { source: 'jsonld', read: (_h, _l, jsonld) => jsonld?.imageUrl ?? '' },
+  { source: 'og_image', read: (h, l) => metaContent(h, l, 'og:image') },
+  { source: 'og_secure', read: (h, l) => metaContent(h, l, 'og:image:secure_url') },
+  { source: 'twitter', read: (h, l) => metaContent(h, l, 'twitter:image') },
+  { source: 'twitter_src', read: (h, l) => metaContent(h, l, 'twitter:image:src') },
+  {
+    source: 'link_rel',
+    read: (h, l) => decodeEntities(findTagAttr(h, l, '<link', 'image_src', 'href=')).trim(),
+  },
+  { source: 'thumbnail', read: (_h, _l, jsonld) => jsonld?.thumbnailUrl ?? '' },
+]);
+
+/** At most this many candidates cross the wire; the client tries a smaller number still. */
+const MAX_IMAGE_CANDIDATES = 5;
+
+/**
+ * Collect the page's declared images, best first, absolutised, deduped and pre-screened.
+ *
+ * PRE-SCREENING IS NOT THE AUTHORISATION. `screenUrl` is synchronous and purely syntactic
+ * (https, no credentials, port 443, length) — it does no DNS and no private-range test. The
+ * real SSRF control is `resolvePublicAddress`, which still runs inside `guardedFetch` on every
+ * candidate we actually fetch, on every redirect hop. Screening here only spares the client a
+ * round trip for a URL that could never have been fetched. Do not read this as the check that
+ * matters, and do not delete the one that does.
+ */
+export function collectImageCandidates(html, lower, finalUrl, jsonld) {
+  const out = [];
+  const seen = new Set();
+  for (const rung of IMAGE_LADDER) {
+    if (out.length >= MAX_IMAGE_CANDIDATES) break;
+    const url = absolutize(rung.read(html, lower, jsonld), finalUrl);
+    if (!url || seen.has(url)) continue;
+    if (!screenUrl(url).ok) continue;
+    seen.add(url);
+    out.push({ url, source: rung.source });
+  }
+  return out;
 }
 
 export function pageTitle(html) {
@@ -222,11 +292,33 @@ export async function fetchPage(url) {
 
   const html = res.body.toString('utf8');
 
+  // Lowered ONCE for the whole ladder — see the warning on findTagAttr.
+  const lower = asciiLower(html);
   const jsonld = extractRecipeFromHtml(html);
+
+  // ⚠️ The JSON-LD branch must NOT return before this runs. It used to, and that was the
+  // second-largest cause of missing dish photos (#86): a Recipe node carrying no `image` key
+  // yielded nothing at all, while the page's own `og:image` sat in this very string. The
+  // ladder reads both, so structured data and meta tags now cooperate instead of competing.
+  const imageCandidates = collectImageCandidates(html, lower, res.finalUrl, jsonld);
+
   if (jsonld) {
     // Structured-data `image` is relative just as often as og:image is.
     jsonld.imageUrl = absolutize(jsonld.imageUrl, res.finalUrl);
-    return { ok: true, data: { kind: 'jsonld', recipe: jsonld, finalUrl: res.finalUrl } };
+    return {
+      ok: true,
+      data: {
+        kind: 'jsonld',
+        recipe: jsonld,
+        imageCandidates,
+        // COMPATIBILITY SHIM, one release only. A client built before #86 reads `imageUrl`
+        // and ignores `imageCandidates`, so the Lambda can deploy first with no broken
+        // intermediate state. Delete both this and the `imageUrl` on the text branch in the
+        // release after — tracked in CHANGELOG.md.
+        imageUrl: imageCandidates[0]?.url ?? '',
+        finalUrl: res.finalUrl,
+      },
+    };
   }
 
   const text = htmlToText(html);
@@ -238,7 +330,9 @@ export async function fetchPage(url) {
       kind: 'text',
       text,
       title: pageTitle(html),
-      imageUrl: absolutize(metaContent(html, 'og:image'), res.finalUrl),
+      imageCandidates,
+      /** Compatibility shim — see the note on the jsonld branch. */
+      imageUrl: imageCandidates[0]?.url ?? '',
       finalUrl: res.finalUrl,
     },
   };
