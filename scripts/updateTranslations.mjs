@@ -392,7 +392,11 @@ async function updateTranslations(language, sourceStrings) {
       fellBack++;
       const existing = translationFile.translations[key];
       if (existing?.translation && existing.translation !== text) {
+        // Keep the good translation, but CLEAR its hash so the next run retries
+        // rather than leaving the stale one in place to be re-requested forever
+        // while the summary claims otherwise.
         console.warn(`   ⚠ Keeping the existing translation for ${key} (API fell back to English)`);
+        translationFile.translations[key] = { ...existing, hash: '' };
       } else {
         // No hash: the next run sees it as outdated and retries.
         translationFile.translations[key] = {
@@ -402,6 +406,10 @@ async function updateTranslations(language, sourceStrings) {
         };
       }
       completed++;
+      // Skip the "English → English" progress line, which read as a successful
+      // translation for a key that deliberately was not written.
+      if (completed < toTranslate.length) await sleep(REQUEST_DELAY_MS);
+      continue;
       // Fall through to the sleep below. An early `continue` skipped it, so once
       // MyMemory starts refusing (quota) every remaining key fired back to back
       // with no throttle — the traffic shape that turns a soft quota into a

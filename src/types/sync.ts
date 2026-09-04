@@ -274,7 +274,7 @@ export function payloadErrorMessageKey(
   // and says "try again, or load a different copy": UI these slots do not have,
   // and a retype loop for a failure no password can fix. A join INVITEE has no
   // copy of the family file at all.
-  return err instanceof PayloadTooLargeError ? 'podTooLarge.inline' : 'podCorrupted.inline';
+  return err.deviceCannotOpen ? 'podTooLarge.inline' : 'podCorrupted.inline';
 }
 
 /**

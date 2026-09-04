@@ -94,3 +94,10 @@ export const setSessionPassword = vi.fn();
 export const getSessionPassword = vi.fn(() => null);
 export const getSessionFileHandle = vi.fn(() => null);
 export const setPasskeySecrets = vi.fn();
+
+/**
+ * The remote-unreadable latch (see the real module). Null = readable, which is
+ * what every existing suite assumes; a suite that wants the latched behaviour
+ * overrides it with `vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(err)`.
+ */
+export const isRemoteUnreadable = vi.fn<() => Error | null>(() => null);

@@ -179,18 +179,18 @@ function resetPodUnopenable(): void {
   podUnopenableHere.value = false;
 }
 
-/**
- * Open the recovery-kit form. Clears a CREDENTIAL error (the user is switching
- * method, so "wrong password" is stale) but keeps a payload one: that message
- * explains why nothing is working, and wiping it left a kit form with no
- * explanation — on the one escape hatch this whole path exists to preserve.
- */
 /** Leave the kit form. Mirrors `openKitEntry`: a payload explanation survives. */
 function closeKitEntry(): void {
   showKitEntry.value = false;
   if (!podUnopenableHere.value) formError.value = null;
 }
 
+/**
+ * Open the recovery-kit form. Clears a CREDENTIAL error (the user is switching
+ * method, so "wrong password" is stale) but keeps a payload one: that message
+ * explains why nothing is working, and wiping it left a kit form with no
+ * explanation — on the one escape hatch this whole path exists to preserve.
+ */
 function openKitEntry(): void {
   showKitEntry.value = true;
   // Keep a payload explanation. The user is switching method because nothing is
@@ -222,18 +222,17 @@ async function tryAutoDecrypt(): Promise<boolean> {
         // single derivation (see `PayloadLoadError`): true only for a
         // corrupt-class failure at the decrypt step, because that is the only
         // shape where the AES-GCM tag was actually checked and rejected.
-        if (result.payloadError.keyMayBeWrong) {
-          // A stale/rotated key. Do NOT show the "damaged, contact support"
-          // copy — the password form below opens the pod on the first try. Fall
-          // through to `clearCachedFamilyKey` so the bad key does not persist.
-        } else {
+        if (!result.payloadError.keyMayBeWrong) {
           // The key is provably fine (or was never checked, because the device
-          // ran out of memory). Deleting it would cost trusted-device
-          // auto-open permanently for a problem it has nothing to do with.
+          // ran out of memory). Deleting it would cost trusted-device auto-open
+          // permanently for a problem it has nothing to do with.
           formError.value = t(payloadErrorMessageKey(result.payloadError));
           podUnopenableHere.value = true;
           return false;
         }
+        // Otherwise a stale/rotated key: say nothing here (the password form
+        // below opens the pod on the first try) and fall through to
+        // `clearCachedFamilyKey` so the bad key does not persist.
       }
     } catch (e) {
       // Never silent: this deletes a credential.
@@ -400,7 +399,7 @@ async function handleGrantPermission() {
         fileId: syncStore.driveFileId ?? null,
         familyId: syncStore.pendingEncryptedFile?.envelope?.familyId ?? null,
       });
-    } else if (result.granted) {
+    } else if (result.granted && (result.loaded || syncStore.hasPendingEncryptedFile)) {
       if (syncStore.hasPendingEncryptedFile) {
         await handlePendingPassword(syncStore.fileName);
       } else {
@@ -545,7 +544,7 @@ async function handleKitRedeem() {
     if (!dec.success) {
       // 'wrong recovery code' would be a lie when the kit unwrapped fine and it
       // was the pod that would not fit in memory.
-      if (dec.payloadError) podUnopenableHere.value = true;
+      if (dec.payloadError && !dec.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
       formError.value = dec.payloadError
         ? t(payloadErrorMessageKey(dec.payloadError))
         : t('password.decryptionError');
@@ -617,7 +616,12 @@ async function handleDecrypt() {
       // raw Automerge/WASM string ("error inflating document chunk ops: out of
       // memory") was rendered untranslated under the password field.
       formError.value = t(payloadErrorMessageKey(result.payloadError));
-      podUnopenableHere.value = true;
+      // Only latch when a credential CANNOT be the cause. A stale wrap (a peer
+      // rotated the family key) unwraps with the old key and then fails the
+      // AES-GCM tag — `keyMayBeWrong` — and latching that would early-return
+      // `handlePendingPassword` forever, so the password and kit forms never
+      // reopen for the rest of the session.
+      if (!result.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
     } else {
       formError.value = result.error ?? t('password.decryptionError');
     }

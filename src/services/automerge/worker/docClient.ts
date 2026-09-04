@@ -30,7 +30,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
-import { PayloadLoadError, PayloadTooLargeError } from '@/types/sync';
+import { PayloadLoadError } from '@/types/sync';
 import { deviceMemoryScalar } from '@/utils/diagnostics';
 import { getPlatform } from '@/services/sync/capabilities';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
@@ -898,7 +898,7 @@ function surface(
   // rides in `perf_doc_bytes` — because `errorReporter` buckets its dedup on
   // (surface, normalizeMessage) and a per-pod byte figure would give every pod
   // its own bucket, defeating the throttle entirely.
-  if (error instanceof PayloadTooLargeError) {
+  if (error instanceof PayloadLoadError && error.deviceCannotOpen) {
     reportError({
       surface: 'pod-load-memory',
       message: `Automerge ${error.step} ran out of memory loading a pod`,

@@ -38,3 +38,14 @@ describe('presentRefreshOutcome', () => {
     }
   });
 });
+
+describe('skipped-unopenable', () => {
+  it('toasts, because nothing else will', () => {
+    // The other silent outcomes are silent because `BackgroundSyncBar` toasts
+    // for them. This one returns before anything sets `backgroundSyncError`, so
+    // a silent no-op would leave the user tapping Refresh and getting nothing.
+    expect(presentRefreshOutcome('skipped-unopenable')).toEqual({
+      toast: { type: 'warning', key: 'header.refreshUnopenable' },
+    });
+  });
+});
