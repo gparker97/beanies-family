@@ -62,6 +62,37 @@ export function removeTag(tags: readonly string[], tag: string): string[] {
 }
 
 /**
+ * Previously-used tags matching what the user is typing, for the autocomplete.
+ *
+ * Prefix matches lead, then substring matches — typing "we" should offer "weeknight" before
+ * "sweet", because the head of a word is what a person thinks they are typing. Within each
+ * band the incoming order (most-used first) is preserved, so ranking survives filtering.
+ *
+ * ⚠️ Callers must pass the UNCAPPED candidate list. Filtering an already-capped list would
+ * silently hide a matching tag that happened to rank 9th, which is precisely the tag the user
+ * needs help finding — the common ones they can already remember.
+ *
+ * Matching goes through `normaliseTag` so it is case- and whitespace-insensitive the same way
+ * storage is: typing "Quick" finds "quick".
+ */
+export function matchTags(
+  candidates: readonly string[],
+  query: string,
+  limit: number = MAX_SUGGESTIONS
+): string[] {
+  const q = normaliseTag(query);
+  if (!q) return [];
+  const prefix: string[] = [];
+  const contains: string[] = [];
+  for (const tag of candidates) {
+    if (tag === q) continue; // an exact match needs no completing
+    if (tag.startsWith(q)) prefix.push(tag);
+    else if (tag.includes(q)) contains.push(tag);
+  }
+  return [...prefix, ...contains].slice(0, Math.max(0, limit));
+}
+
+/**
  * Tags this family has used before, most-used first, excluding ones already on this recipe.
  *
  * ⚠️ The limit is not decoration. A family with 200 distinct tags would otherwise render 200

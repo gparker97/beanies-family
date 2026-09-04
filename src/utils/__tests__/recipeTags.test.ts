@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  matchTags,
   normaliseTag,
   addTag,
   removeTag,
@@ -120,4 +121,45 @@ describe('suggestTags', () => {
       expect(suggestTags(recipes, [])).toEqual(['quick']);
     }
   );
+});
+
+describe('matchTags', () => {
+  const all = ['quick', 'weeknight', 'sweet', 'vegan', 'quick lunch'];
+
+  it('returns nothing for an empty query, so the row stays quiet until typing', () => {
+    expect(matchTags(all, '')).toEqual([]);
+    expect(matchTags(all, '   ')).toEqual([]);
+  });
+
+  it('puts prefix matches before substring matches', () => {
+    // "we" starts "weeknight" and merely appears inside "sweet".
+    expect(matchTags(all, 'we')).toEqual(['weeknight', 'sweet']);
+  });
+
+  it('matches case-insensitively, the way storage normalises', () => {
+    expect(matchTags(all, 'QUICK')).toEqual(['quick lunch']);
+  });
+
+  it('skips an exact match, which needs no completing', () => {
+    expect(matchTags(all, 'quick')).toEqual(['quick lunch']);
+  });
+
+  it('preserves the incoming most-used-first ranking within each band', () => {
+    expect(matchTags(['zeta quick', 'alpha quick'], 'quick')).toEqual([
+      'zeta quick',
+      'alpha quick',
+    ]);
+  });
+
+  it('respects the limit', () => {
+    expect(matchTags(all, 'e', 2)).toHaveLength(2);
+  });
+
+  it('returns nothing when nothing matches', () => {
+    expect(matchTags(all, 'zzz')).toEqual([]);
+  });
+
+  it('handles an empty candidate list', () => {
+    expect(matchTags([], 'quick')).toEqual([]);
+  });
 });
