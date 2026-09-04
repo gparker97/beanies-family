@@ -431,7 +431,81 @@ Applied at the three **true** sinks:
 
 ## Outcome
 
-_(to be completed during implementation — must include the diagnostic's numbers against the real production pod: `numChanges`, `numOps`, `numActors`, full vs compacted size, ratio, load time, peak RSS; and the CloudWatch rate query.)_
+Shipped 2026-09-04 in five commits: `913d22c7` (§1-§4), `7f92a635` (§5),
+`a6742dc7` (§6a), `422d234f` (§6b), `beaec77b` (skip-message fix).
+
+### The real pod, measured
+
+Run against the actual Parker Meng Beanies production file (4.27MB on disk):
+
+```
+  encrypted payload   4.26MB (base64)
+  decrypted binary    3.20MB
+
+  changes             14,570
+  ops                 3,725,253
+  actors              4,214
+
+  save() full         3.20MB
+  save() compacted    0.21MB
+  history multiple    15.1x
+
+  load time           4,269ms      (desktop, 64GB, warm)
+  peak RSS            706.93MB
+```
+
+**Assumption 2 is CONFIRMED — history dominates.** 3.20MB collapses to 0.21MB,
+so **93% of the file is history**. Tier 2's premise holds and its shape does not
+need revisiting.
+
+**The memory ratio held too.** 706.93MB peak for a 3.20MB decrypted document is
+**221×** — against the 212× this plan was designed on from a synthetic. That is
+close enough to treat the synthetic as having been a fair model, and it settles
+why a 3-4GB Android tablet cannot open this file: 707MB of WASM linear memory is
+far beyond what an Android WebView will allocate, regardless of the two-doc
+question. It also confirms Tier 1 could never have fixed it — the ~21MB of
+JS-heap waste §6 removed is 3% of the peak.
+
+### The finding nobody was looking for: actor churn
+
+**4,214 actors for a family of five**, across only 14,570 changes — _3.5 changes
+per actor_. Verified in code why: `Automerge.load()` mints a **fresh random
+actorId on every call**, and there is no way to pin one:
+
+```
+load() actor 1: f76647adcc81ed07eea72688ae523989
+load() actor 2: 2a6ff2537ace9e775fc824c75f34e532
+same actor across loads? false
+```
+
+So every cold start, every cache load and every poll-merge that subsequently
+writes leaves a **permanent** actor lane in the document. The actor count grows
+with SESSIONS, not with data — an unbounded axis that no amount of user
+restraint bounds. `mergeDocs` already fixed one instance of this (its comment
+records dropping a `fork()` that minted an actor per poll-merge); the remaining
+4,214 say the source is upstream of that, in `load` itself.
+
+An attempt to quantify the actor-lane cost separately from op count failed — the
+synthetic used to isolate it hit an unrelated Automerge load error and was
+abandoned rather than reported half-verified. **The mechanism is verified; its
+share of the 15.1× is not.** Worth measuring properly in Tier 2's planning,
+because it changes the design: if actor lanes are a large fraction, then pinning
+a stable per-device actor is a cheap, non-lineage-breaking mitigation that could
+slow growth WITHOUT the merge-safety risk compaction carries.
+
+### CloudWatch rate query
+
+```
+count(surface='pod-load-memory') / count(perf_op='automerge.remoteLoad')
+```
+
+Both sides already ship; no new counter was added.
+
+### Still owed
+
+- On-device verification on the Tab A9+ / Tab A7 (the honest message, the cache
+  surviving, exactly one event in CloudWatch, and the inline-mode variant).
+- Tier 2: merge-safe history compaction, now calibrated by the numbers above.
 
 ## Prompt Log
 
