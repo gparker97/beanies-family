@@ -101,3 +101,12 @@ export const setPasskeySecrets = vi.fn();
  * overrides it with `vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(err)`.
  */
 export const isRemoteUnreadable = vi.fn<() => Error | null>(() => null);
+
+/**
+ * The provisional-marker handshake (see the real module). `load()` stamps the
+ * remote's revision before the caller merges; the caller then confirms or rolls
+ * back. No-ops here — a suite that cares asserts on the calls.
+ */
+export const confirmRemoteMerged = vi.fn();
+export const rollbackRemoteMarker = vi.fn();
+export const noteRemoteUnreadable = vi.fn();
