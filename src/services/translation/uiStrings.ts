@@ -9979,6 +9979,15 @@ const STRING_DEFS = {
     beanie: 'that tag got shortened to fit ({max} characters).',
   },
 
+  // Recipe form sections (#87 follow-up) — the form grew to eleven field groups in one flat
+  // scroll. "Finding it again" is deliberately phrased as a PURPOSE, not a category name:
+  // course/meals/tags are not self-evident fields, and saying what they are for does more for
+  // discoverability than any layout change.
+  'recipes.section.dish': { en: 'The dish', beanie: 'the dish' },
+  'recipes.section.method': { en: 'How to make it', beanie: 'how to make it' },
+  'recipes.section.filing': { en: 'Finding it again', beanie: 'finding it again' },
+  'recipes.section.personal': { en: 'Your own touch', beanie: 'your own touch' },
+
   // Cookbook controls.
   'cookbook.group.none': { en: 'Everything', beanie: 'everything' },
   'cookbook.group.meal': { en: 'By meal', beanie: 'by meal' },

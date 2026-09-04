@@ -72,6 +72,40 @@ async function save(wrapper: Awaited<ReturnType<typeof mountModal>>['wrapper']) 
   await nextTick();
 }
 
+describe('RecipeFormModal — sectioned layout', () => {
+  it('groups the eleven fields into four labelled sections', async () => {
+    const { wrapper } = await mountModal();
+    const sections = wrapper.findAll('section[aria-labelledby]');
+    expect(sections).toHaveLength(4);
+    expect(sections.map((s) => s.find('h3').text())).toEqual([
+      'recipes.section.dish',
+      'recipes.section.method',
+      'recipes.section.filing',
+      'recipes.section.personal',
+    ]);
+  });
+
+  it('keeps the required name field in the first section, never nested away', async () => {
+    const { wrapper } = await mountModal();
+    const first = wrapper.findAll('section[aria-labelledby]')[0]!;
+    expect(first.text()).toContain('recipes.field.name');
+  });
+
+  it('puts the source link with the dish, not adrift between steps and course', async () => {
+    const { wrapper } = await mountModal();
+    const first = wrapper.findAll('section[aria-labelledby]')[0]!;
+    expect(first.find('input[type="url"]').exists()).toBe(true);
+  });
+
+  it('puts course, meals and tags together under one purpose-named heading', async () => {
+    const { wrapper } = await mountModal();
+    const filing = wrapper.findAll('section[aria-labelledby]')[2]!;
+    expect(filing.find('select').exists()).toBe(true);
+    expect(filing.text()).toContain('recipes.field.meals');
+    expect(filing.text()).toContain('recipes.field.tags');
+  });
+});
+
 describe('RecipeFormModal — course, meals and tags round-trip', () => {
   beforeEach(() => vi.clearAllMocks());
 
