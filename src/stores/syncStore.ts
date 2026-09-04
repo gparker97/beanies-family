@@ -3136,7 +3136,7 @@ export const useSyncStore = defineStore('sync', () => {
     // MIRROR the service's actual answer — do not assert it. `noteRemoteUnreadable`
     // declines to latch a `keyMayBeWrong` failure (a routine key rotation), so
     // asserting `true` here set the UI mirror and stopped the poller while the
-    // authoritative latch stayed null — and `backgroundSyncFromFile`'s own
+    // authoritative latch stayed null — and the background refresh's own
     // `finally` then re-armed the 10s timer straight through a guard that saw
     // null, which is the download loop this whole mechanism exists to stop.
     podUnopenable.value = !!syncService.isRemoteUnreadable();
