@@ -157,7 +157,15 @@ async function post<T>(
   let body: unknown;
   try {
     body = await res.json();
-  } catch {
+  } catch (err) {
+    // An abort landing while the BODY is still streaming rejects HERE, not at the fetch —
+    // and reporting that as `malformed_output` blames a broken Lambda response for what is
+    // actually a slow connection. That matters more since #86 roughly doubled the payload an
+    // image response has to stream: a family on mobile data would see a server-side JSON
+    // regression in CloudWatch when the real cause was the size cap.
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      return { success: false, errorCode: 'timeout', error: 'Content fetch timed out' };
+    }
     return {
       success: false,
       errorCode: 'malformed_output',

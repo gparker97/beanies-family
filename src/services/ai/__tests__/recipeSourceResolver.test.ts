@@ -220,3 +220,69 @@ describe('the youtube ladder', () => {
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('the imageUrl compatibility shim works in BOTH deploy directions (#86)', () => {
+  // The Lambda-side shim protected old-client/new-Lambda. This is the other direction, which
+  // matters because both deploy workflows are manual and the client ships separately: a
+  // client that lands first, or a Lambda rolled back, would otherwise log
+  // `image_none / no_candidates` on every capture — indistinguishable in CloudWatch from a
+  // page that genuinely declared nothing, the one diagnosis this issue exists to enable.
+  it('falls back to imageUrl when a pre-#86 Lambda sends no candidates', async () => {
+    const fetchService = svc({
+      fetchPage: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          kind: 'text',
+          text: 'x'.repeat(400),
+          title: 'Cake',
+          imageUrl: 'https://cdn.test/legacy.jpg',
+          finalUrl: 'https://food.test/cake',
+        },
+      }),
+    });
+    const r = await resolveRecipeSource('https://food.test/cake', { fetchService });
+    expect(r).toMatchObject({
+      kind: 'text',
+      imageCandidates: [{ url: 'https://cdn.test/legacy.jpg', source: 'other' }],
+    });
+  });
+
+  it('prefers candidates when both are present, and tolerates an empty list', async () => {
+    const page = (over: object) => ({
+      success: true,
+      data: {
+        kind: 'text',
+        text: 'x'.repeat(400),
+        title: 'Cake',
+        finalUrl: 'https://food.test/cake',
+        ...over,
+      },
+    });
+    const both = await resolveRecipeSource('https://food.test/cake', {
+      fetchService: svc({
+        fetchPage: vi.fn().mockResolvedValue(
+          page({
+            imageCandidates: [{ url: 'https://cdn.test/new.jpg', source: 'og_image' }],
+            imageUrl: 'https://cdn.test/legacy.jpg',
+          })
+        ),
+      }),
+    });
+    expect(both).toMatchObject({
+      imageCandidates: [{ url: 'https://cdn.test/new.jpg', source: 'og_image' }],
+    });
+
+    // An EMPTY candidates array is a real answer ("the page declared nothing") and must not
+    // fall back to the shim, or that outcome becomes unobservable again.
+    const empty = await resolveRecipeSource('https://food.test/cake', {
+      fetchService: svc({
+        fetchPage: vi
+          .fn()
+          .mockResolvedValue(
+            page({ imageCandidates: [], imageUrl: 'https://cdn.test/legacy.jpg' })
+          ),
+      }),
+    });
+    expect(empty).toMatchObject({ imageCandidates: [] });
+  });
+});

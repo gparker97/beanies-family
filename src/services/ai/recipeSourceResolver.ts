@@ -19,6 +19,7 @@ import { pickRecipeLinks, routeUrl } from '@/utils/recipeSourceUrl';
 // it is erased at compile time and there is no runtime cycle. Verified with `npm run build`,
 // whose whole-graph import analysis is the thing that would catch a real one.
 import { screenCandidates } from '@/utils/shareLink';
+import { MAX_IMAGE_ATTEMPTS } from './attachDishImage';
 import type { ImageCandidate } from '@/types/magicPayload';
 import {
   recipeFetchService,
@@ -137,6 +138,24 @@ function createFetchBudget(max: number = MAX_FETCHES_PER_CAPTURE): { take: () =>
 }
 
 /** Turn a successful page fetch into a resolved source. */
+/**
+ * Read the Lambda's candidates, falling back to the one-release `imageUrl` shim.
+ *
+ * The shim protected old-client/new-Lambda; this protects the other direction. Both deploy
+ * workflows are manual `workflow_dispatch` and the client ships separately, so a client that
+ * lands first — or a Lambda rolled back — would otherwise see `imageCandidates: undefined`,
+ * normalise to `[]`, and log `image_none / no_candidates` on every capture. That is
+ * indistinguishable in CloudWatch from a page that genuinely declared nothing, which is the
+ * one diagnosis this whole issue exists to make possible.
+ *
+ * It also makes the shim self-deleting: when `imageUrl` goes, this reads `?? []` and nothing
+ * else changes.
+ */
+function candidatesFrom(data: { imageCandidates?: unknown; imageUrl?: string }) {
+  if (data.imageCandidates !== undefined) return screenCandidates(data.imageCandidates);
+  return data.imageUrl ? screenCandidates([{ url: data.imageUrl, source: 'other' }]) : [];
+}
+
 function fromPage(
   data: Extract<Awaited<ReturnType<RecipeFetchService['fetchPage']>>['data'], object>,
   path: { jsonld: ExtractionPath; text: ExtractionPath }
@@ -150,7 +169,7 @@ function fromPage(
       recipe: data.recipe,
       path: path.jsonld,
       sourceUrl: data.finalUrl,
-      imageCandidates: screenCandidates(data.imageCandidates),
+      imageCandidates: candidatesFrom(data),
     };
   }
   return {
@@ -159,7 +178,7 @@ function fromPage(
     text: data.title ? `${data.title}\n\n${data.text}` : data.text,
     path: path.text,
     sourceUrl: data.finalUrl,
-    imageCandidates: screenCandidates(data.imageCandidates),
+    imageCandidates: candidatesFrom(data),
   };
 }
 
@@ -211,9 +230,16 @@ export async function resolveRecipeSource(
         jsonld: 'youtube_link_followed',
         text: 'youtube_link_followed',
       });
-      // The blog's own candidates come FIRST: its hero is the finished dish, whereas a video
-      // thumbnail is usually a face and a caption. The thumbnails ride along as a fallback.
-      return { ...page, imageCandidates: [...page.imageCandidates, ...thumbs] };
+      // The blog's own candidates come FIRST — its hero is the finished dish, whereas a
+      // video thumbnail is usually a face and a caption — but they are TRIMMED so at least
+      // one thumbnail sits inside the client's attempt cap. Appending after all five page
+      // candidates made the documented fallback unreachable in the common case: three
+      // attempts, five blog candidates, and `hqdefault.jpg` (which always exists) never
+      // fetched when the blog's CDN refused us.
+      return {
+        ...page,
+        imageCandidates: [...page.imageCandidates.slice(0, MAX_IMAGE_ATTEMPTS - 1), ...thumbs],
+      };
     }
     // Deliberately NOT fatal: a dead blog link should not cost us the captions. The
     // outcome is still recorded by the caller's telemetry via `extraction_path`.

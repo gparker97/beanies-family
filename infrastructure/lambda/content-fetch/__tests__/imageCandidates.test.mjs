@@ -5,6 +5,7 @@ import { Buffer } from 'node:buffer';
 import { collectImageCandidates, findMeta, findTagAttr } from '../modes/page.mjs';
 import { sniffImageType } from '../modes/image.mjs';
 import { asciiLower } from '../asciiLower.mjs';
+import { screenUrl } from '../guardedFetch.mjs';
 
 const BASE = 'https://food.test/recipes/cake';
 
@@ -173,6 +174,34 @@ describe('findTagAttr / findMeta', () => {
     );
   });
 
+  test('an EMPTY value keeps scanning to the next tag', () => {
+    // WordPress food blogs routinely emit two og:image tags — the theme's and the SEO
+    // plugin's — and the first is often blank. Returning '' there reported "the page
+    // declared no image" while the real hero sat in the very next tag.
+    const html =
+      '<meta property="og:image" content=""><meta property="og:image" content="https://cdn.test/hero.jpg">';
+    assert.equal(findMeta(html, 'og:image'), 'https://cdn.test/hero.jpg');
+    assert.deepEqual(collect(html), [{ url: 'https://cdn.test/hero.jpg', source: 'og_image' }]);
+  });
+
+  test('does NOT match an attribute name as a bare substring (data-content=)', () => {
+    // `indexOf('content=')` also matches `data-content=`, and absolutize would launder the
+    // junk value into a plausible same-origin URL that screenUrl cannot reject — shipping
+    // as candidate #1 and burning one of only three client attempts.
+    const html =
+      '<meta property="og:image" data-content="junk-value" content="https://cdn.test/hero.jpg">';
+    assert.equal(findMeta(html, 'og:image'), 'https://cdn.test/hero.jpg');
+  });
+
+  test('survives a non-ASCII attribute earlier in the tag', () => {
+    // U+0130 lowercases to TWO UTF-16 units, so an offset found in a `toLowerCase()` copy
+    // indexes one character off in the original and the quote guard fails. Ordinary on
+    // Turkish recipe sites; it used to zero the whole ladder.
+    const html =
+      '<meta property="og:image" title="\u0130zmir K\u00f6fte" content="https://cdn.test/x.jpg">';
+    assert.equal(findMeta(html, 'og:image'), 'https://cdn.test/x.jpg');
+  });
+
   test('an unterminated tag terminates the scan instead of hanging', () => {
     assert.equal(findMeta('<meta property="og:image" content="x', 'og:image'), '');
   });
@@ -193,11 +222,32 @@ describe('sniffImageType', () => {
     );
   });
 
-  test('accepts AVIF across its three brands', () => {
-    for (const brand of ['avif', 'avis', 'mif1']) {
+  test('accepts AVIF still and sequence brands', () => {
+    for (const brand of ['avif', 'avis']) {
       const buf = Buffer.concat([Buffer.alloc(4), Buffer.from('ftyp'), Buffer.from(brand)]);
       assert.equal(sniffImageType(buf), 'image/avif', brand);
     }
+  });
+
+  test('REJECTS the generic mif1 brand, because an Apple HEIC also matches it', () => {
+    // The sniffed mime NAMES the file, so accepting mif1 as AVIF would store a HEIC as
+    // `dish-<id>.avif` — a filename that lies to every later reader. HEIC has its own
+    // accepted type on the client; a genuine mif1-major AVIF just falls to the next rung.
+    const heic = Buffer.concat([Buffer.alloc(4), Buffer.from('ftyp'), Buffer.from('mif1')]);
+    assert.equal(sniffImageType(heic), null);
+  });
+
+  test('the high bit is NOT masked — latin1, never ascii', () => {
+    // Node's 'ascii' decoder masks the high bit, so these bytes decode as 'RIFF'/'WEBP' and
+    // every string-based magic check written that way matches 2^N sequences instead of one.
+    const highBit = Buffer.from([0xd2, 0xc9, 0xc6, 0xc6, 0, 0, 0, 0, 0xd7, 0xc5, 0xc2, 0xd0]);
+    assert.equal(sniffImageType(highBit), null);
+    const ftypish = Buffer.concat([
+      Buffer.alloc(4),
+      Buffer.from([0xe6, 0xf4, 0xf9, 0xf0]),
+      Buffer.from('avif'),
+    ]);
+    assert.equal(sniffImageType(ftypish), null);
   });
 
   test('accepts both GIF versions', () => {
@@ -214,5 +264,29 @@ describe('sniffImageType', () => {
     assert.equal(sniffImageType(Buffer.alloc(0)), null);
     assert.equal(sniffImageType(null), null);
     assert.equal(sniffImageType(pad('<!DOCTYPE html><html>')), null);
+  });
+});
+
+describe('the Referer is screened before it reaches the wire', () => {
+  // guardedFetch's own request path needs a socket, so this pins the SCREEN — the part that
+  // decides what may become a header — rather than mocking https.
+  test('a CRLF-bearing referer is normalised, never passed through raw', () => {
+    // `new URL()` silently strips tab/CR/LF, so this PASSES screening. Sending the raw string
+    // afterwards made https.request throw ERR_INVALID_CHAR synchronously, rejecting out of a
+    // function contracted never to throw and bypassing the whole typed error taxonomy.
+    const raw = 'https://food.test/r\r\nX-Injected: 1';
+    const screened = screenUrl(raw);
+    assert.equal(screened.ok, true);
+    const onTheWire = screened.url.toString();
+    assert.ok(!onTheWire.includes('\r'));
+    assert.ok(!onTheWire.includes('\n'));
+    assert.notEqual(onTheWire, raw);
+  });
+
+  test('an unusable referer is rejected by the same screen the fetch uses', () => {
+    // eslint-disable-next-line @microsoft/sdl/no-insecure-url -- the point of the test
+    assert.equal(screenUrl('http://food.test/r').ok, false);
+    assert.equal(screenUrl('javascript:alert(1)').ok, false);
+    assert.equal(screenUrl('https://u:p@food.test/r').ok, false);
   });
 });

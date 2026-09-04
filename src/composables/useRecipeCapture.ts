@@ -251,9 +251,13 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     }
 
     if (link) {
-      // Relabel AFTER mapping — see the note above. For a video we store the VIDEO the user
-      // shared, not the blog the ladder followed out of its description: they chose the
-      // video, they recognise it, and its description links the blog anyway.
+      // Relabel AFTER mapping. For a video we store the VIDEO the user shared, not the blog
+      // the ladder followed out of its description: they chose the video, they recognise it,
+      // and its description links the blog anyway.
+      //
+      // (`pageUrl` is no longer an image BOUND — #86 removed that — but the two URLs remain
+      // distinct: `pageUrl` is what we read and what the Referer reports, `provenanceUrl` is
+      // what we store and show.)
       prefill.fields.sourceUrl = link.provenanceUrl;
       // THE ONE PLACE `dishImage` IS ASSIGNED (#86). Three write sites collapsed to this one,
       // and it sits inside the `if (link)` that already knows both the link and its kind —
@@ -587,6 +591,22 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         photos,
         fetchImage: (url, opts) => recipeFetchService.fetchImage(url, opts),
         pageUrl: dishImage.pageUrl,
+        // THE LADDER ITSELF, not just its verdict. Without this the retry behaviour — the
+        // whole feature — is the one thing the firehose cannot see: when a site's og:image
+        // starts 403ing but its twitter:image still works, every capture silently burns an
+        // extra round trip and CloudWatch shows only a clean success on another rung.
+        onAttemptFailed: ({ source, errorCode }) =>
+          logEvent({
+            level: 'info',
+            surface: SURFACE,
+            message: 'dish image candidate failed, trying the next',
+            context: {
+              action: 'image_attempt_failed',
+              kind: dishImage.kind,
+              detail: source,
+              ...(errorCode ? { error_code: errorCode } : {}),
+            },
+          }),
       });
       if (outcome.ok) {
         logEvent({
@@ -597,7 +617,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             action: 'image_resolved',
             kind: dishImage.kind,
             detail: outcome.source,
-            count: dishImage.candidates.length,
+            // Candidates TRIED, not offered. The server may send five and the client tries
+            // three, so logging the offered count read as "we tried five" and contradicted
+            // the failure table. `image_attempt_failed` above accounts for the rest.
+            count: outcome.attempts,
           },
         });
       } else {
@@ -612,7 +635,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             action: 'image_none',
             kind: dishImage.kind,
             detail: outcome.reason,
-            count: dishImage.candidates.length,
+            // Tried, not offered — except for `no_candidates`, where `attempts` is 0 and that
+            // zero IS the signal ("the page declared nothing").
+            count: outcome.attempts,
             ...(outcome.errorCode ? { error_code: outcome.errorCode } : {}),
           },
         });
