@@ -22,6 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The recipe form no longer shows two link boxes at once.** On a new recipe, the "paste a link and I'll fill this in" strip and the plain "Link" field could both be on screen, and pasting a recipe URL into the wrong one did nothing — which made the whole capture feature read as broken. Only one appears at a time now.
+- **The tag box explains itself when it's full.** Reaching the twelve-tag limit used to leave the field quietly dead with an empty placeholder. It now says so, as do duplicate and shortened tags — and screen readers hear all three.
 - **Downloads work in the apps.** Saving or sharing a file from the iPhone or Android app did nothing at all: the recovery kit, meal-plan PDFs and images, data exports, and saved photos all reported success and produced no file. Every one of them now opens the share sheet, where "Save to Files" (or "Save to device" on Android) puts the file where you want it. A failure is now visible rather than silent, and cancelling the sheet is treated as cancelling, not as a failure.
 
 - **Deleting your family no longer skips the backup.** Ticking "export my data first" was not checked before the deletion ran, so on the apps, where the export produced nothing, the data went anyway. The deletion now stops and tells you if the export did not produce a file. On the apps it also asks you to confirm the export really saved before anything is deleted, because Android reports a share as successful even when the receiving app throws it away.
