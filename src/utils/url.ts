@@ -178,14 +178,23 @@ export function safeHttpsUrl(raw: string | null | undefined): string | null {
 /**
  * Do two URLs share a registrable domain? (`cdn.site.com` vs `www.site.com` → yes.)
  *
- * SECURITY (#72). This is the control that narrows a MODEL-supplied or PAGE-supplied image
- * URL down to the site the user actually asked us to read. Without it, a hostile recipe page
- * can name any host it likes as its `og:image` and we will fetch it server-side — a per-victim
- * confirmation ping from our AWS egress IP, an arbitrary-public-URL fetch on demand, and, if
- * the bytes carry image magic numbers, up to 1.5 MB of attacker-chosen content written into
- * the family's Drive and rendered as their dish photo. `guardedFetch` blocks PRIVATE
- * addresses; nothing else narrows PUBLIC ones. No prompt injection is even required — the
- * page's own og:image is copied straight through.
+ * ⚠️ NO LONGER USED FOR DISH IMAGES — read this before reinstating it there (#86).
+ *
+ * It WAS the control that narrowed a model- or page-supplied image URL to the site the user
+ * asked us to read, and the reasoning was sound: a hostile page could name any host as its
+ * `og:image` and we would fetch it server-side, giving a per-victim ping from our AWS egress
+ * and attacker-chosen bytes in the family's Drive. It was removed only because the thing it
+ * guarded no longer exists — the model does not supply image URLs at all now, and candidates
+ * are extracted server-side from the markup of the page we actually fetched.
+ *
+ * ⚠️ THE RESIDUAL IS REAL AND WAS ACCEPTED, not eliminated: beanies will now fetch any HTTPS
+ * URL a fetched page names in its meta tags. What bounds it is `screenUrl` plus
+ * `resolvePublicAddress` (private ranges, cloud metadata), the redirect cap, the byte cap and
+ * the wall-clock budget — all per hop, all unchanged. `guardedFetch` blocks PRIVATE addresses;
+ * nothing narrows PUBLIC ones any more. See docs/plans/2026-09-04-recipe-dish-image-ladder.md
+ * §2 and docs/STATUS.md.
+ *
+ * The function is retained for other callers and its own tests.
  *
  * Deliberately a suffix match on the last two labels, not a full public-suffix-list
  * implementation: recipe sites serve images from `cdn.` / `images.` / `static.` subdomains

@@ -128,24 +128,64 @@ export function findTagAttr(html, lower, tagOpen, key, attr) {
     if (at === -1) return '';
     const end = lower.indexOf('>', at);
     if (end === -1) return '';
+    // ⚠️ SLICE THE LOWERED STRING, never `tag.toLowerCase()`. Full Unicode lowercasing is NOT
+    // length-preserving — U+0130 (İ, ordinary on Turkish recipe sites) becomes two UTF-16
+    // units — so an offset found in a `toLowerCase()`d copy indexes one character off in the
+    // original, the quote guard below fails, and the rung silently returns ''. That is the
+    // exact hazard `asciiLower.mjs` exists to prevent, and its docblock records this class
+    // already costing a page its whole JSON-LD recipe once. `lower` is ascii-only and
+    // index-safe by construction, which is the other reason it is a parameter.
     const tag = html.slice(at, end);
-    const tagLower = tag.toLowerCase();
+    const tagLower = lower.slice(at, end);
     if (tagLower.includes(needle) || tagLower.includes(alt)) {
-      const ci = tagLower.indexOf(attr);
-      if (ci !== -1) {
-        const valueAt = ci + attr.length;
-        const q = tag[valueAt];
-        if (q === '"' || q === "'") {
-          const close = tag.indexOf(q, valueAt + 1);
-          if (close !== -1) return tag.slice(valueAt + 1, close);
-        }
-      }
+      const value = readAttr(tag, tagLower, attr);
+      // A MATCH WITH AN EMPTY VALUE IS NOT AN ANSWER — keep scanning. WordPress food blogs
+      // routinely emit two `og:image` tags (the theme's and the SEO plugin's) and the first
+      // is often blank; returning '' here reported "the page declared no image" while the
+      // real hero sat in the very next tag.
+      if (value) return value;
     }
     cursor = end + 1;
   }
 }
 
-/** Find one meta tag's content by property/name. Kept for its existing callers and tests. */
+/**
+ * Read `attr`'s quoted value out of one tag, matching the attribute NAME at a real boundary.
+ *
+ * The boundary check is the point. A bare `indexOf('content=')` also matches `data-content=`,
+ * so `<meta property="og:image" data-content="junk" content="…hero.jpg">` returned `junk` —
+ * which `absolutize` then laundered into a plausible same-origin URL that `screenUrl` cannot
+ * reject, shipping as candidate #1 and burning one of only three client fetch attempts while
+ * the real hero went unread. The quoted-needle defence was applied to the key but not to the
+ * attribute; this closes the other half.
+ */
+function readAttr(tag, tagLower, attr) {
+  let from = 0;
+  for (;;) {
+    const ci = tagLower.indexOf(attr, from);
+    if (ci === -1) return '';
+    const before = ci === 0 ? ' ' : tagLower[ci - 1];
+    // Only whitespace or a closing quote may precede an attribute name.
+    if (before === ' ' || before === '\t' || before === '\n' || before === '\r' || before === '/') {
+      const valueAt = ci + attr.length;
+      const q = tag[valueAt];
+      if (q === '"' || q === "'") {
+        const close = tag.indexOf(q, valueAt + 1);
+        if (close !== -1) return tag.slice(valueAt + 1, close);
+      }
+    }
+    from = ci + attr.length;
+  }
+}
+
+/**
+ * Find one meta tag's content by property/name.
+ *
+ * ⚠️ NO PRODUCTION CALLER since #86 — the ladder goes through `findTagAttr` with a `lower`
+ * computed once. Retained because it is the narrow, well-tested surface those tests exercise,
+ * but note it lowercases the WHOLE (up to 2MB) body on every call: reintroducing it in a hot
+ * path is how the ladder would silently start costing ~150ms of Lambda CPU per rung.
+ */
 export function findMeta(html, key) {
   return findTagAttr(html, asciiLower(html), '<meta', key, 'content=');
 }
@@ -263,10 +303,13 @@ export function collectImageCandidates(html, lower, finalUrl, jsonld) {
   return out;
 }
 
-export function pageTitle(html) {
+export function pageTitle(html, lower = asciiLower(html)) {
   // Linear — `/<title[^>]*>([\s\S]*?)<\/title>/i` measured 420KB → 9.25s on
   // `'<title>'.repeat(n)` with no closing tag.
-  const lower = asciiLower(html);
+  //
+  // `lower` is a parameter for the same reason it is on findTagAttr: `fetchPage` has already
+  // lowercased the (up to 2MB) body, and recomputing it here cost ~150ms of Lambda CPU per
+  // text-branch fetch for no benefit.
   const open = lower.indexOf('<title');
   if (open === -1) return '';
   const openEnd = lower.indexOf('>', open);
@@ -329,7 +372,7 @@ export async function fetchPage(url) {
     data: {
       kind: 'text',
       text,
-      title: pageTitle(html),
+      title: pageTitle(html, lower),
       imageCandidates,
       /** Compatibility shim — see the note on the jsonld branch. */
       imageUrl: imageCandidates[0]?.url ?? '',

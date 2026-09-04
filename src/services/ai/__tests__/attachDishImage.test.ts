@@ -97,6 +97,75 @@ describe('attachDishImage', () => {
     expect(out).toEqual({ ok: false, reason: 'store_rejected', attempts: 1 });
   });
 
+  it('CONTINUES past a store rejection to the next candidate', async () => {
+    // The two candidate-INDEPENDENT refusals (cloud off, at cap) are ruled out before the
+    // loop, so a rejection here is per-FILE — a codec the engine could not decode — which is
+    // exactly the class where the next rung works. Returning let one un-storable image kill
+    // the whole ladder, removing the fallback this feature exists to add.
+    const photos = sink({
+      add: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce(['photo-2']),
+    });
+    const out = await attachDishImage(
+      'r1',
+      candidates('https://a.test/1.avif', 'https://a.test/2.jpg'),
+      { photos, fetchImage: vi.fn().mockResolvedValue(okImage) }
+    );
+
+    expect(out).toEqual({ ok: true, source: 'og_image', attempts: 2 });
+    expect(photos.add).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports store_rejected only once the ladder is exhausted', async () => {
+    const photos = sink({ add: vi.fn().mockResolvedValue([]) });
+    const out = await attachDishImage(
+      'r1',
+      candidates('https://a.test/1.jpg', 'https://a.test/2.jpg'),
+      { photos, fetchImage: vi.fn().mockResolvedValue(okImage) }
+    );
+
+    expect(out).toEqual({ ok: false, reason: 'store_rejected', attempts: 2 });
+  });
+
+  it('REPORTS a throw rather than swallowing it', async () => {
+    // A bare catch here deleted the only path by which a dish-attach stack trace reached
+    // CloudWatch, so a deterministic decode bug on candidate 1 would hide behind a success
+    // on candidate 2 — a 100% hit rate concealing a permanent extra round trip.
+    const failed: unknown[] = [];
+    const out = await attachDishImage('r1', candidates('https://a.test/1.jpg'), {
+      photos: sink(),
+      fetchImage: vi.fn().mockRejectedValue(new Error('boom')),
+      onAttemptFailed: (a) => failed.push(a),
+    });
+
+    expect(failed).toEqual([{ source: 'og_image', errorCode: 'threw' }]);
+    expect(out).toMatchObject({ ok: false, reason: 'all_failed', errorCode: 'threw' });
+  });
+
+  it('treats a data URL with no comma as a failed candidate, not an exception', async () => {
+    const out = await attachDishImage('r1', candidates('https://a.test/1.jpg'), {
+      photos: sink(),
+      fetchImage: vi
+        .fn()
+        .mockResolvedValue({ success: true, data: { mime: 'image/jpeg', dataUrl: 'nonsense' } }),
+    });
+
+    expect(out).toMatchObject({ ok: false, errorCode: 'malformed_data_url' });
+  });
+
+  it('emits an attempt event per failed rung, so the LADDER is visible', async () => {
+    const failed: unknown[] = [];
+    await attachDishImage('r1', candidates('https://a.test/1.jpg', 'https://a.test/2.jpg'), {
+      photos: sink(),
+      fetchImage: vi
+        .fn()
+        .mockResolvedValueOnce({ success: false, errorCode: 'site_refused' })
+        .mockResolvedValueOnce(okImage),
+      onAttemptFailed: (a) => failed.push(a),
+    });
+
+    expect(failed).toEqual([{ source: 'og_image', errorCode: 'site_refused' }]);
+  });
+
   it('counts a QUEUED offline upload as success, and stops', async () => {
     // `add` returns completed and queued ids together. Without this an offline family would
     // queue one photo per candidate — three photos for one recipe.

@@ -12,6 +12,7 @@
  * `logEvent` for this surface stays in one place.
  */
 import { base64ToFile } from '@/utils/base64ToFile';
+import { reportError } from '@/utils/errorReporter';
 import type { ImageCandidate, ImageNoneReason, ImageSource } from '@/types/magicPayload';
 
 /**
@@ -37,6 +38,14 @@ export interface DishPhotoSink {
 
 export interface AttachDishImageDeps {
   photos: DishPhotoSink;
+  /**
+   * Records a candidate that failed so the RETRY LADDER is visible, not just its verdict.
+   *
+   * Without it the one thing the firehose could not see was the feature itself: when a site's
+   * og:image starts 403ing but its twitter:image still works, every capture silently burns an
+   * extra round trip and CloudWatch shows only a clean success on a different rung.
+   */
+  onAttemptFailed?: (attempt: { source: ImageSource; errorCode?: string }) => void;
   fetchImage: (
     url: string,
     opts?: { pageUrl?: string }
@@ -78,6 +87,9 @@ export async function attachDishImage(
 
   let attempts = 0;
   let lastErrorCode: string | undefined;
+  // Distinguishes "everything we tried failed to arrive" from "something arrived but the
+  // store kept nothing" when the ladder is exhausted — they point at different fixes.
+  let lastReason: ImageNoneReason = 'all_failed';
 
   for (const candidate of candidates.slice(0, MAX_IMAGE_ATTEMPTS)) {
     attempts += 1;
@@ -87,14 +99,22 @@ export async function attachDishImage(
         // Not fatal — the next rung may well work. A 404 on `maxresdefault` falling through
         // to `hqdefault` is the designed-for case, not an exception.
         lastErrorCode = img.errorCode;
+        deps.onAttemptFailed?.({ source: candidate.source, errorCode: img.errorCode });
         continue;
       }
 
       const { mime, dataUrl } = img.data;
-      // `base64ToFile` takes RAW BASE64, not a data URL. Handing it the whole `data:…;base64,`
-      // string makes `atob` throw, which this try would swallow into a generic failure and the
-      // photo would silently never attach. Strip the prefix here, at the one call site.
-      const payload = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      // `base64ToFile` takes RAW BASE64, not a data URL — handing it the whole
+      // `data:…;base64,` string makes `atob` throw. `indexOf` returns -1 when there is no
+      // comma at all, and `slice(0)` would do exactly that, so a malformed data URL is
+      // treated as a failed candidate rather than an exception.
+      const comma = dataUrl.indexOf(',');
+      if (comma === -1) {
+        lastErrorCode = 'malformed_data_url';
+        deps.onAttemptFailed?.({ source: candidate.source, errorCode: 'malformed_data_url' });
+        continue;
+      }
+      const payload = dataUrl.slice(comma + 1);
       // Named from the SNIFFED mime, never the URL: a filename taken from an attacker-supplied
       // path is how an svg ends up called .jpg, and `usePhotos`' accept test ORs the extension.
       const file = base64ToFile(payload, `dish-${recipeId}.${extensionFor(mime)}`, mime);
@@ -109,14 +129,31 @@ export async function attachDishImage(
       if (added.length > 0) {
         return { ok: true, source: candidate.source, attempts };
       }
-      lastErrorCode = undefined;
-      return { ok: false, reason: 'store_rejected', attempts };
-    } catch {
+      // CONTINUE, do not return. The two candidate-INDEPENDENT reasons for a refusal (cloud
+      // off, at cap) were already ruled out before the loop, so every rejection reaching here
+      // is per-FILE — a codec the engine could not decode, or a failed upload — which is
+      // exactly the class where the next rung is likely to work. Returning here let one
+      // un-storable image kill the whole ladder, removing the fallback this feature exists
+      // to add.
+      lastReason = 'store_rejected';
+      deps.onAttemptFailed?.({ source: candidate.source, errorCode: 'store_rejected' });
+    } catch (err) {
       // A throw from one candidate must not cost the others. The recipe is already saved; a
-      // missing photo is cosmetic.
+      // missing photo is cosmetic. But it must not be SILENT either — a bare catch here
+      // deleted the only path by which a dish-attach stack trace reached CloudWatch, so a
+      // deterministic decode bug on candidate 1 would hide behind a success on candidate 2.
       lastErrorCode = 'threw';
+      lastReason = 'all_failed';
+      deps.onAttemptFailed?.({ source: candidate.source, errorCode: 'threw' });
+      reportError({
+        surface: 'recipe-extract',
+        message: 'a dish image candidate threw',
+        severity: 'warning',
+        error: err,
+        context: { action: 'attach_failed', kind: 'dish_image', detail: candidate.source },
+      });
     }
   }
 
-  return { ok: false, reason: 'all_failed', errorCode: lastErrorCode, attempts };
+  return { ok: false, reason: lastReason, errorCode: lastErrorCode, attempts };
 }

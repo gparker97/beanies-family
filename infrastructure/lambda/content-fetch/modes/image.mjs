@@ -23,6 +23,18 @@ import { guardedFetch } from '../guardedFetch.mjs';
 const MAX_BYTES = 3 * 1024 * 1024;
 
 /**
+ * Wall-clock budget for an image fetch, raised with the byte cap.
+ *
+ * The default is 9s and covers DNS, connect, TLS and up to three redirect hops as well as the
+ * body — so 3MB inside what remains needs a sustained ~3 Mbps from the origin. Doubling the
+ * size cap without this meant the full-resolution heroes the raise was written to rescue were
+ * precisely the ones that could not arrive in time: they would hold one of five reserved
+ * concurrency slots for the full budget and then return `timeout` instead of the photo.
+ * 12s still sits inside the function's own 15s timeout.
+ */
+const IMAGE_BUDGET_MS = 12_000;
+
+/**
  * Formats we accept, as ONE table so the header test and the byte sniffer cannot drift apart.
  *
  * AVIF and GIF were added in #86. AVIF matters most: it is now the default output of
@@ -50,16 +62,20 @@ const ACCEPTED = Object.freeze([
   },
   {
     mime: 'image/webp',
-    matches: (b) => b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP',
+    matches: (b) => tag(b, 0, 4) === 'RIFF' && tag(b, 8, 12) === 'WEBP',
   },
   {
     // ISO-BMFF: bytes 4-8 are the 'ftyp' box type, 8-12 the major brand. `avif` is a still
-    // image, `avis` an image sequence, `mif1` the generic HEIF-family brand AVIF encoders
-    // also emit. All three decode as an image in the engines we target.
+    // image, `avis` an image sequence.
+    //
+    // `mif1` is deliberately NOT accepted. It is the generic HEIF-family brand, so an Apple
+    // HEIC matches it too — and since the sniffed mime is what NAMES the file, a HEIC would
+    // be stored as `dish-<id>.avif`, a filename that lies about its contents to every later
+    // reader. HEIC already has its own accepted type on the client; an AVIF whose major brand
+    // is `mif1` (rare) simply falls through to the next ladder rung.
     mime: 'image/avif',
     matches: (b) =>
-      b.toString('ascii', 4, 8) === 'ftyp' &&
-      ['avif', 'avis', 'mif1'].includes(b.toString('ascii', 8, 12)),
+      tag(b, 4, 8) === 'ftyp' && (tag(b, 8, 12) === 'avif' || tag(b, 8, 12) === 'avis'),
   },
   {
     // An animated GIF is stored as its FIRST FRAME — the client re-encodes to JPEG. That is
@@ -70,8 +86,29 @@ const ACCEPTED = Object.freeze([
   },
 ]);
 
-/** `image/jpg` is not the registered type, but plenty of older hosts send it. */
-const CONTENT_TYPE_RE = /^image\/(jpeg|jpg|png|webp|avif|gif)\b/i;
+/**
+ * Read a fixed-width byte tag as text, byte-for-byte.
+ *
+ * ⚠️ `latin1`, NEVER `ascii`. Node's 'ascii' decoder MASKS THE HIGH BIT, so
+ * `Buffer.from([0xD2,0xC9,0xC6,0xC6]).toString('ascii')` is `'RIFF'` — every string-based
+ * magic-number check written that way matches 2^N byte sequences instead of the one it names,
+ * which turns the control documented above as "what stops SVG" into a sieve. `latin1` maps
+ * each byte to the code point of the same value and is a drop-in fix.
+ */
+function tag(buf, start, end) {
+  return buf.toString('latin1', start, end);
+}
+
+/**
+ * The header test, DERIVED from ACCEPTED rather than hand-maintained beside it.
+ *
+ * Two lists under a comment promising they cannot drift is how they drift. `image/jpg` is not
+ * the registered type but plenty of older hosts send it, so it is the one manual addition.
+ */
+const CONTENT_TYPE_RE = new RegExp(
+  `^(?:${[...ACCEPTED.map((a) => a.mime), 'image/jpg'].join('|').replace(/\//g, '\\/')})\\b`,
+  'i'
+);
 
 /**
  * Magic-number sniffing, because Content-Type is attacker-controlled.
@@ -89,7 +126,12 @@ export function sniffImageType(buf) {
  * @param {{pageUrl?: string}} [opts]  the page the URL was found on, sent as `Referer` (#86)
  */
 export async function fetchImage(url, opts = {}) {
-  const res = await guardedFetch(url, { maxBytes: MAX_BYTES, referer: opts.pageUrl });
+  const res = await guardedFetch(url, {
+    maxBytes: MAX_BYTES,
+    totalBudgetMs: IMAGE_BUDGET_MS,
+    asImage: true,
+    referer: opts.pageUrl,
+  });
   if (!res.ok) return res;
 
   // BOTH checks. The header alone is attacker-controlled; the bytes alone would accept an
