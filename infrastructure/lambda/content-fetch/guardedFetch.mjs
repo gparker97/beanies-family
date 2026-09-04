@@ -351,7 +351,38 @@ function postHeaders(post) {
   return headers;
 }
 
-function requestPinned(url, address, family, budgetMs, post) {
+/**
+ * Headers for an IMAGE fetch, optionally carrying a `Referer` (#86).
+ *
+ * Why a `Referer` at all: CDNs in front of recipe blogs routinely gate on it, so a request
+ * with none looks like a scraper and gets a 403 — which surfaced to the user as "the photo
+ * just didn't appear". Sending the page we were asked to read is both the honest value and
+ * the one that passes.
+ *
+ * Why a NARROW option and not a headers bag: see POST_HEADER_ALLOWLIST above. The caller
+ * supplies one URL string and nothing else; every other header is derived here, so a caller
+ * still cannot reach `host`, `cookie`, `authorization` or `content-length`.
+ *
+ * The referer is held CONSTANT across redirect hops. A browser would recompute it per hop
+ * under strict-origin-when-cross-origin; holding it is simpler, is what the hotlink check
+ * actually reads, and can only ever be the page the user themselves opened.
+ */
+function imageHeaders(referer) {
+  return {
+    'User-Agent': BROWSER_HEADERS['User-Agent'],
+    'Accept-Language': BROWSER_HEADERS['Accept-Language'],
+    'Accept-Encoding': BROWSER_HEADERS['Accept-Encoding'],
+    // Image-first, and it already advertised AVIF before image mode could accept it (#86).
+    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    // A subresource load, not a navigation — so no Upgrade-Insecure-Requests here.
+    'Sec-Fetch-Dest': 'image',
+    'Sec-Fetch-Mode': 'no-cors',
+    'Sec-Fetch-Site': 'cross-site',
+    ...(referer ? { Referer: referer } : {}),
+  };
+}
+
+function requestPinned(url, address, family, budgetMs, post, referer) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (v) => {
@@ -378,7 +409,7 @@ function requestPinned(url, address, family, budgetMs, post) {
         // passed, because none of them opens a real socket.
         lookup: (_hostname, opts, cb) =>
           opts && opts.all ? cb(null, [{ address, family }]) : cb(null, address, family),
-        headers: post ? postHeaders(post) : BROWSER_HEADERS,
+        headers: post ? postHeaders(post) : referer ? imageHeaders(referer) : BROWSER_HEADERS,
       },
       (res) => finish({ ok: true, res })
     );
@@ -420,10 +451,17 @@ function requestPinned(url, address, family, budgetMs, post) {
  */
 export async function guardedFetch(
   rawUrl,
-  { maxBytes = DEFAULT_MAX_BYTES, totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS, post } = {}
+  { maxBytes = DEFAULT_MAX_BYTES, totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS, post, referer } = {}
 ) {
   const deadline = Date.now() + totalBudgetMs;
   let current = rawUrl;
+
+  // A referer that does not survive our own screen is DROPPED, not fatal. It is a courtesy
+  // header: fetching without one may still succeed, whereas refusing the fetch guarantees the
+  // user loses a photo over a header. Screened because it is caller-supplied and ends up on
+  // the wire — an unscreened value is a way to smuggle a `javascript:` or credentialed URL
+  // into a request log.
+  const safeReferer = typeof referer === 'string' && screenUrl(referer).ok ? referer : undefined;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const remaining = deadline - Date.now();
@@ -439,7 +477,8 @@ export async function guardedFetch(
       resolved.address,
       resolved.family,
       deadline - Date.now(),
-      post
+      post,
+      safeReferer
     );
     if (!attempt.ok) return attempt;
     const res = attempt.res;
