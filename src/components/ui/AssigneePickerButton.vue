@@ -187,7 +187,7 @@ onUnmounted(() => {
         v-if="show"
         ref="popoverRef"
         :style="popoverStyle"
-        class="z-50 max-w-[280px] min-w-[200px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-slate-600 dark:bg-slate-700"
+        class="dark:border-line-strong dark:bg-surface-overlay z-50 max-w-[280px] min-w-[200px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
         @click.stop
       >
         <FamilyChipPicker

@@ -128,7 +128,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
       :class="
         modelValue
           ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-          : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+          : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
       "
       @click="toggleDropdown"
     >
@@ -156,10 +156,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
     >
       <div
         v-if="isOpen"
-        class="absolute left-0 z-50 mt-1.5 w-44 overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800"
+        class="dark:border-line-strong dark:bg-surface-raised absolute left-0 z-50 mt-1.5 w-44 overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-lg"
       >
         <!-- Custom time option (pinned at top) -->
-        <div class="border-b border-[var(--tint-slate-10)] px-2 py-1.5 dark:border-slate-600">
+        <div class="dark:border-line-strong border-b border-[var(--tint-slate-10)] px-2 py-1.5">
           <button
             v-if="!showCustomInput"
             type="button"
@@ -178,7 +178,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
               ref="customInputRef"
               v-model="customValue"
               type="time"
-              class="font-outfit border-primary-500 flex-1 rounded-lg border-2 bg-white px-2 py-1 text-base outline-none dark:bg-slate-700 dark:text-gray-200"
+              class="font-outfit border-primary-500 dark:bg-surface-overlay dark:text-ink flex-1 rounded-lg border-2 bg-white px-2 py-1 text-base outline-none"
               @keydown.enter="applyCustom"
             />
             <button
@@ -202,7 +202,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
             :class="
               modelValue === time
                 ? 'text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
-                : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
+                : 'dark:text-ink-soft dark:hover:bg-surface-hover text-[var(--color-text)] hover:bg-[var(--tint-slate-5)]'
             "
             @click="selectPreset(time)"
           >

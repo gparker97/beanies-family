@@ -389,14 +389,14 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
   position: absolute;
 }
 
-:global(.dark) .jar-bean {
-  background: rgb(36 51 66);
+html.dark .jar-bean {
+  background: #26343f;
   box-shadow:
     0 6px 14px rgb(0 0 0 / 40%),
     inset 0 0 0 1px rgb(255 255 255 / 8%);
 }
 
-:global(.dark) .jar-bean::before {
+html.dark .jar-bean::before {
   background: radial-gradient(circle at 30% 30%, rgb(255 255 255 / 18%), transparent 55%);
 }
 
@@ -427,8 +427,8 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
   position: relative;
 }
 
-:global(.dark) .jar-text {
-  background: rgb(36 51 66);
+html.dark .jar-text {
+  background: #26343f;
   border-color: rgb(236 240 241 / 8%);
 }
 
@@ -451,8 +451,8 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
   width: 8px;
 }
 
-:global(.dark) .jar-text::after {
-  background: rgb(36 51 66);
+html.dark .jar-text::after {
+  background: #26343f;
   border-color: rgb(236 240 241 / 8%);
 }
 
@@ -492,7 +492,7 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
   white-space: nowrap;
 }
 
-:global(.dark) .jar-hint {
+html.dark .jar-hint {
   color: rgb(236 240 241 / 65%);
 }
 

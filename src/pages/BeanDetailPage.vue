@@ -163,13 +163,13 @@ function selectTab(tab: BeanTabId): void {
     </template>
     <div
       v-else
-      class="flex flex-col items-center justify-center gap-3 rounded-[var(--sq)] bg-white/60 py-16 text-center dark:bg-slate-800/60"
+      class="dark:bg-surface-raised/60 flex flex-col items-center justify-center gap-3 rounded-[var(--sq)] bg-white/60 py-16 text-center"
     >
       <span class="text-5xl" aria-hidden="true">🫘</span>
-      <h1 class="font-outfit text-secondary-500 text-xl font-bold dark:text-gray-100">
+      <h1 class="font-outfit text-secondary-500 dark:text-ink text-xl font-bold">
         {{ t('bean.notFound.title') }}
       </h1>
-      <p class="text-secondary-500/60 text-sm">{{ t('bean.notFound.body') }}</p>
+      <p class="text-secondary-500/60 dark:text-ink-soft text-sm">{{ t('bean.notFound.body') }}</p>
       <button
         type="button"
         class="font-outfit text-primary-500 inline-flex items-center gap-1 text-sm font-semibold hover:underline"

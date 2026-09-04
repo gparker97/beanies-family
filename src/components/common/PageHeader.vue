@@ -30,10 +30,10 @@ onMounted(() => {
         <BeanieIcon :name="icon" size="lg" class="text-primary-500" />
       </div>
       <div>
-        <h1 class="font-outfit text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 class="font-outfit dark:text-ink text-2xl font-bold text-gray-900">
           {{ title }}
         </h1>
-        <p v-if="subtitle" class="text-sm text-gray-500 dark:text-gray-400">
+        <p v-if="subtitle" class="dark:text-ink-soft text-sm text-gray-500">
           {{ subtitle }}
         </p>
       </div>

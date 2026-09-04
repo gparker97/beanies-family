@@ -35,7 +35,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       :class="
         focused === null
           ? 'bg-secondary-500 text-white'
-          : 'text-secondary-500 bg-white dark:bg-slate-800 dark:text-gray-100'
+          : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
       "
       :aria-pressed="focused === null"
       @click="emit('select', null)"
@@ -50,7 +50,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       :class="
         focused === member.id
           ? 'bg-secondary-500 text-white'
-          : 'text-secondary-500 bg-white dark:bg-slate-800 dark:text-gray-100'
+          : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
       "
       :aria-pressed="focused === member.id"
       @click="emit('select', focused === member.id ? null : member.id)"

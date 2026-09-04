@@ -69,10 +69,10 @@ const tintBg = computed(() => {
 
     <!-- Info + progress -->
     <div class="min-w-0 flex-1">
-      <div class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-100">
+      <div class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
         {{ name }}
       </div>
-      <div class="text-secondary-500/40 mt-0.5 text-xs dark:text-gray-400">
+      <div class="text-secondary-500/40 dark:text-ink-soft mt-0.5 text-xs">
         <template v-if="isUnlocked">
           {{
             fillTemplate(t('goals.progressOf'), {
@@ -99,7 +99,7 @@ const tintBg = computed(() => {
 
     <!-- Percentage -->
     <div
-      class="font-outfit text-secondary-500 flex-shrink-0 text-right text-sm font-bold dark:text-gray-200"
+      class="font-outfit text-secondary-500 dark:text-ink flex-shrink-0 text-right text-sm font-bold"
     >
       {{ progress }}%
     </div>

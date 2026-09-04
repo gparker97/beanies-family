@@ -298,7 +298,7 @@ function getAccountTypeConfig(type: AccountType): {
       other: {
         bgColor: 'bg-gray-100',
         iconColor: 'text-gray-600',
-        darkBgColor: 'dark:bg-gray-700',
+        darkBgColor: 'dark:bg-surface-overlay',
       },
     };
   return configs[type] || configs.other;
@@ -401,7 +401,7 @@ async function deleteAccount(id: string) {
   <div class="space-y-6">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ subtitleText }}
       </p>
       <button
@@ -421,7 +421,7 @@ async function deleteAccount(id: string) {
         @select-all="onSelectAll"
         @select-member="onSelectMember"
       />
-      <p v-if="isFiltered" class="text-secondary-500/70 mt-1 text-xs">
+      <p v-if="isFiltered" class="text-secondary-500/70 dark:text-ink-soft mt-1 text-xs">
         {{ t('filter.filteredTo').replace('{names}', activeMemberNames.join(', ')) }}
       </p>
     </div>
@@ -476,21 +476,21 @@ async function deleteAccount(id: string) {
         <!-- Liability breakdown -->
         <div
           v-if="isUnlocked"
-          class="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-slate-700"
+          class="dark:border-line mt-3 space-y-2 border-t border-gray-100 pt-3"
         >
           <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
+            <span class="dark:text-ink-soft text-xs text-gray-500">
               {{ t('accounts.liabilityClass.creditCards') }}
             </span>
-            <span class="font-outfit text-xs font-semibold text-gray-700 dark:text-gray-300">
+            <span class="font-outfit dark:text-ink-soft text-xs font-semibold text-gray-700">
               {{ formatInDisplayCurrency(liabilityBreakdown.creditCards, baseCurrency) }}
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
+            <span class="dark:text-ink-soft text-xs text-gray-500">
               {{ t('accounts.liabilityClass.loans') }}
             </span>
-            <span class="font-outfit text-xs font-semibold text-gray-700 dark:text-gray-300">
+            <span class="font-outfit dark:text-ink-soft text-xs font-semibold text-gray-700">
               {{ formatInDisplayCurrency(liabilityBreakdown.loans, baseCurrency) }}
             </span>
           </div>
@@ -506,10 +506,10 @@ async function deleteAccount(id: string) {
     <!-- Empty State -->
     <div v-if="accounts.length === 0" class="py-16 text-center">
       <EmptyStateIllustration variant="accounts" class="mb-6" />
-      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+      <h3 class="dark:text-ink text-lg font-medium text-gray-900">
         {{ t('accounts.noAccounts') }}
       </h3>
-      <p class="mt-1 mb-4 text-gray-500 dark:text-gray-400">{{ t('accounts.getStarted') }}</p>
+      <p class="dark:text-ink-soft mt-1 mb-4 text-gray-500">{{ t('accounts.getStarted') }}</p>
       <button
         type="button"
         class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
@@ -533,16 +533,16 @@ async function deleteAccount(id: string) {
               size="sm"
               @photo-error="markMemberAvatarError(getMemberForAccount(section.header.memberId)!)"
             />
-            <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
               {{ section.label }}
             </h2>
-            <span class="text-sm text-gray-500 dark:text-gray-400"
+            <span class="dark:text-ink-soft text-sm text-gray-500"
               >({{ section.accounts.length }})</span
             >
           </div>
           <span
             v-if="isUnlocked"
-            class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-300"
+            class="font-outfit text-secondary-500 dark:text-ink-soft text-sm font-semibold"
           >
             {{ formatInDisplayCurrency(sectionMemberTotal(section), baseCurrency) }}
           </span>
@@ -563,10 +563,10 @@ async function deleteAccount(id: string) {
               :class="getAccountTypeConfig(section.header.accountType).iconColor"
             />
           </div>
-          <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <h2 class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ section.label }}
           </h2>
-          <span class="text-sm text-gray-500 dark:text-gray-400"
+          <span class="dark:text-ink-soft text-sm text-gray-500"
             >({{ section.accounts.length }})</span
           >
         </div>
@@ -577,7 +577,7 @@ async function deleteAccount(id: string) {
             v-for="account in section.accounts"
             :key="account.id"
             data-testid="account-card"
-            class="cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
             :class="[
               { 'opacity-60': !account.isActive },
               { 'border-l-primary-500 border-l-4': isLiabilityType(account.type) },
@@ -603,8 +603,8 @@ async function deleteAccount(id: string) {
                   />
                 </div>
                 <div>
-                  <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ account.name }}</h3>
-                  <p v-if="account.institution" class="text-sm text-gray-500 dark:text-gray-400">
+                  <h3 class="dark:text-ink font-semibold text-gray-900">{{ account.name }}</h3>
+                  <p v-if="account.institution" class="dark:text-ink-soft text-sm text-gray-500">
                     {{ account.institution
                     }}<span v-if="account.institutionCountry">
                       &middot; {{ account.institutionCountry }}</span
@@ -632,7 +632,7 @@ async function deleteAccount(id: string) {
 
             <!-- Balance Display -->
             <div class="mb-4">
-              <p class="mb-1 text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
+              <p class="dark:text-ink-soft mb-1 text-xs tracking-wide text-gray-500 uppercase">
                 {{ t('form.balance') }}
               </p>
               <div class="font-outfit text-2xl font-extrabold">
@@ -647,7 +647,7 @@ async function deleteAccount(id: string) {
 
             <!-- Card Footer -->
             <div
-              class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-t border-gray-100 pt-3"
             >
               <!-- Left: Owner avatar (category view) or type badge (member view) -->
               <div class="flex items-center gap-2">
@@ -660,7 +660,7 @@ async function deleteAccount(id: string) {
                     size="xs"
                     @photo-error="markMemberAvatarError(getMemberForAccount(account.memberId)!)"
                   />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                  <span class="dark:text-ink-soft text-sm text-gray-600">{{
                     getMemberName(account.memberId)
                   }}</span>
                 </template>
@@ -682,13 +682,13 @@ async function deleteAccount(id: string) {
               <div class="flex items-center gap-2">
                 <span
                   v-if="!account.isActive"
-                  class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500"
                 >
                   {{ t('status.inactive') }}
                 </span>
                 <span
                   v-if="!account.includeInNetWorth"
-                  class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                  class="dark:text-terracotta-lift rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600 dark:bg-amber-900/30"
                   :title="t('status.excluded')"
                 >
                   {{ t('status.excluded') }}
@@ -701,7 +701,7 @@ async function deleteAccount(id: string) {
           <button
             type="button"
             data-testid="add-account-card"
-            class="hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors dark:border-slate-600 dark:text-gray-500"
+            class="hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-accent-lift dark:border-line-strong dark:text-ink-faint flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors"
             @click="openAddWithDefaults(section.addDefaults)"
           >
             <BeanieIcon name="plus" size="lg" />

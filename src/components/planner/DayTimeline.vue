@@ -224,10 +224,10 @@ const { identityFor } = useActivityIdentity();
     <!-- Untimed / all-day row -->
     <div
       v-if="hasUntimedRow"
-      class="mb-3 space-y-1.5 rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] p-2 dark:border-slate-600/40 dark:bg-slate-700/30"
+      class="dark:border-line-strong/40 dark:bg-surface-overlay/30 mb-3 space-y-1.5 rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] p-2"
     >
       <div
-        class="font-outfit text-secondary-500/40 text-[0.625rem] font-semibold tracking-[0.14em] uppercase dark:text-gray-500"
+        class="font-outfit text-secondary-500/40 dark:text-ink-faint text-[0.625rem] font-semibold tracking-[0.14em] uppercase"
       >
         {{ t('planner.allDay') }}
       </div>
@@ -303,19 +303,19 @@ const { identityFor } = useActivityIdentity();
           class="absolute right-0 pr-2"
           :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
         >
-          <span class="text-secondary-500/30 text-xs leading-none dark:text-gray-600">
+          <span class="text-secondary-500/30 dark:text-ink-faint text-xs leading-none">
             {{ formatHourLabel(hour) }}
           </span>
         </div>
       </div>
 
       <!-- Single event column -->
-      <div class="relative border-l border-gray-200/40 dark:border-slate-600/30">
+      <div class="dark:border-line-strong/30 relative border-l border-gray-200/40">
         <!-- Hour row borders (tappable to add) -->
         <div
           v-for="(hour, hi) in hours"
           :key="'slot-' + hour"
-          class="group/slot absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.06)] dark:border-slate-700/50 dark:hover:bg-[rgba(241,93,34,0.12)]"
+          class="group/slot dark:border-line/50 absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.06)] dark:hover:bg-[rgba(241,93,34,0.12)]"
           :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
           @click="handleSlotClick(hour)"
         />
@@ -335,7 +335,7 @@ const { identityFor } = useActivityIdentity();
           v-for="ev in positionedEvents"
           :key="ev.occurrence.activity.id"
           type="button"
-          class="absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md dark:bg-slate-800"
+          class="dark:bg-surface-raised absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md"
           :class="
             identityFor(ev.occurrence.activity).celebration.celebrating ? 'is-celebration' : ''
           "
@@ -358,7 +358,7 @@ const { identityFor } = useActivityIdentity();
           <div class="flex items-start gap-1">
             <div class="min-w-0 flex-1">
               <div
-                class="font-outfit flex items-center truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
+                class="font-outfit dark:text-ink flex items-center truncate text-xs font-semibold text-gray-900"
               >
                 <span aria-hidden="true">{{ identityFor(ev.occurrence.activity).emoji }}</span>
                 <span class="truncate">{{ ev.occurrence.activity.title }}</span>
@@ -368,7 +368,7 @@ const { identityFor } = useActivityIdentity();
                   class="ml-1"
                 />
               </div>
-              <div class="text-secondary-500/60 truncate text-[0.625rem] dark:text-gray-400">
+              <div class="text-secondary-500/60 dark:text-ink-soft truncate text-[0.625rem]">
                 {{ eventTimeLabel(ev.occurrence.activity)
                 }}<template v-if="ev.occurrence.activity.location">
                   · 📍 {{ ev.occurrence.activity.location }}</template
@@ -413,7 +413,7 @@ const { identityFor } = useActivityIdentity();
           "
           class="pointer-events-none absolute inset-0 flex items-center justify-center"
         >
-          <p class="font-outfit text-secondary-500/30 text-sm dark:text-gray-500">
+          <p class="font-outfit text-secondary-500/30 dark:text-ink-faint text-sm">
             {{ t('planner.noActivities') }}
           </p>
         </div>

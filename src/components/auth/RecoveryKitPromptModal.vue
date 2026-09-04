@@ -74,13 +74,13 @@ async function handleStored() {
           alt=""
           class="mx-auto mb-4 h-16 w-16"
         />
-        <h2 class="font-outfit mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink mb-2 text-lg font-semibold text-gray-900">
           {{ t('recovery.kitPromptTitle') }}
         </h2>
-        <p class="mb-6 text-sm text-gray-600 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-6 text-sm text-gray-600">
           {{ t('recovery.kitPromptBody') }}
         </p>
-        <p v-if="formError" class="mb-3 text-sm text-red-600 dark:text-red-400" role="alert">
+        <p v-if="formError" class="dark:text-danger-lift mb-3 text-sm text-red-600" role="alert">
           {{ formError }}
         </p>
         <div class="flex flex-col gap-3">

@@ -171,7 +171,7 @@ watch(recipe, (now, before) => {
     <template v-if="recipe">
       <button
         type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 mb-3 flex items-center gap-1 text-xs font-semibold transition-colors"
+        class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-3 flex items-center gap-1 text-xs font-semibold transition-colors"
         @click="router.push('/pod/cookbook')"
       >
         <BeanieIcon name="chevron-left" size="xs" />
@@ -180,7 +180,7 @@ watch(recipe, (now, before) => {
 
       <!-- Hero -->
       <section
-        class="mb-6 grid gap-5 rounded-[var(--sq)] border border-[rgb(230_126_34_/_12%)] bg-[#fbf3e3] p-4 sm:gap-6 sm:p-6 lg:grid-cols-[1.1fr_1fr]"
+        class="dark:bg-surface-paper mb-6 grid gap-5 rounded-[var(--sq)] border border-[rgb(230_126_34_/_12%)] bg-[#fbf3e3] p-4 sm:gap-6 sm:p-6 lg:grid-cols-[1.1fr_1fr] dark:border-[rgb(240_160_90_/_16%)]"
       >
         <!--
           Hero polaroid is clickable when a photo exists — opens the
@@ -196,7 +196,7 @@ watch(recipe, (now, before) => {
         <button
           v-if="heroUrl"
           type="button"
-          class="group relative block rounded-[var(--sq)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbf3e3]"
+          class="group relative block rounded-[var(--sq)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbf3e3] dark:focus-visible:ring-offset-[#2a2119]"
           :aria-label="
             photoCount > 1
               ? fillTemplate(t('recipes.detail.openPhotos'), { count: String(photoCount) })
@@ -234,35 +234,37 @@ watch(recipe, (now, before) => {
         />
         <div class="flex flex-col">
           <h1
-            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl"
+            class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl"
           >
             {{ recipe.name }}
           </h1>
           <p v-if="recipe.subtitle" class="font-caveat mt-1 text-xl text-[#E67E22]">
             {{ recipe.subtitle }}
           </p>
-          <div class="font-inter text-secondary-500/70 mt-3 flex flex-wrap gap-3 text-xs">
+          <div
+            class="font-inter text-secondary-500/70 dark:text-ink-soft mt-3 flex flex-wrap gap-3 text-xs"
+          >
             <span v-if="recipe.prepTime">
               🕐
-              <strong class="font-outfit text-secondary-500 font-semibold">{{
+              <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
                 recipe.prepTime
               }}</strong>
             </span>
             <span v-if="recipe.cookTime">
               🔥
-              <strong class="font-outfit text-secondary-500 font-semibold">{{
+              <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
                 recipe.cookTime
               }}</strong>
             </span>
             <span v-if="recipe.servings">
               🍽️
-              <strong class="font-outfit text-secondary-500 font-semibold">{{
+              <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
                 recipe.servings
               }}</strong>
             </span>
             <span v-if="recipe.ingredients?.length">
               🌿
-              <strong class="font-outfit text-secondary-500 font-semibold">
+              <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">
                 {{ recipe.ingredients.length }} {{ t('cookbook.card.ingredients') }}
               </strong>
             </span>
@@ -278,7 +280,7 @@ watch(recipe, (now, before) => {
             :href="recipeSourceHref"
             target="_blank"
             rel="noopener noreferrer"
-            class="font-inter text-secondary-500/70 hover:text-primary-500 mt-2 inline-flex w-fit items-center gap-1.5 text-xs transition-colors"
+            class="font-inter text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft mt-2 inline-flex w-fit items-center gap-1.5 text-xs transition-colors"
           >
             <span aria-hidden="true">🔗</span>
             <span>{{ t('recipes.detail.source') }}</span>
@@ -290,7 +292,7 @@ watch(recipe, (now, before) => {
           <div v-if="canEditActivities" class="mt-auto flex flex-wrap gap-2 pt-4">
             <button
               type="button"
-              class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white dark:bg-slate-800/80 dark:text-gray-100"
+              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
               @click="editRecipeOpen = true"
             >
               <BeanieIcon name="edit" size="xs" />
@@ -309,33 +311,33 @@ watch(recipe, (now, before) => {
 
       <!-- Ingredients + Steps -->
       <section class="mb-6 grid gap-5 md:grid-cols-[0.85fr_1.15fr]">
-        <div class="rounded-[20px] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <h3 class="font-outfit text-secondary-500 mb-3 text-sm font-bold dark:text-gray-100">
+        <div class="dark:bg-surface-raised rounded-[20px] bg-white p-5 shadow-[var(--card-shadow)]">
+          <h3 class="font-outfit text-secondary-500 dark:text-ink mb-3 text-sm font-bold">
             🌿 {{ t('recipes.detail.ingredients') }}
           </h3>
           <ul v-if="recipe.ingredients?.length" class="space-y-1">
             <li
               v-for="(ing, i) in recipe.ingredients"
               :key="i"
-              class="font-inter text-secondary-500/80 text-sm leading-relaxed dark:text-gray-300"
+              class="font-inter text-secondary-500/80 dark:text-ink-soft text-sm leading-relaxed"
             >
               · {{ ing }}
             </li>
           </ul>
-          <p v-else class="font-inter text-secondary-500/50 text-sm italic">
+          <p v-else class="font-inter text-secondary-500/50 dark:text-ink-soft text-sm italic">
             {{ t('recipes.detail.noIngredients') }}
           </p>
         </div>
 
-        <div class="rounded-[20px] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <h3 class="font-outfit text-secondary-500 mb-3 text-sm font-bold dark:text-gray-100">
+        <div class="dark:bg-surface-raised rounded-[20px] bg-white p-5 shadow-[var(--card-shadow)]">
+          <h3 class="font-outfit text-secondary-500 dark:text-ink mb-3 text-sm font-bold">
             📋 {{ t('recipes.detail.steps') }}
           </h3>
           <ol v-if="recipe.steps?.length" class="space-y-2">
             <li
               v-for="(step, i) in recipe.steps"
               :key="i"
-              class="font-inter text-secondary-500/80 flex gap-3 text-sm leading-relaxed dark:text-gray-300"
+              class="font-inter text-secondary-500/80 dark:text-ink-soft flex gap-3 text-sm leading-relaxed"
             >
               <span class="font-outfit text-primary-500 flex-shrink-0 text-xs leading-5 font-bold"
                 >{{ i + 1 }}.</span
@@ -343,7 +345,7 @@ watch(recipe, (now, before) => {
               <span>{{ step }}</span>
             </li>
           </ol>
-          <p v-else class="font-inter text-secondary-500/50 text-sm italic">
+          <p v-else class="font-inter text-secondary-500/50 dark:text-ink-soft text-sm italic">
             {{ t('recipes.detail.noSteps') }}
           </p>
         </div>
@@ -352,7 +354,7 @@ watch(recipe, (now, before) => {
       <!-- Notes -->
       <section
         v-if="recipe.notes"
-        class="font-caveat text-secondary-500 mb-6 rounded-[20px] bg-[#fff7c8] p-6 text-lg leading-snug"
+        class="font-caveat text-secondary-500 dark:text-ink mb-6 rounded-[20px] bg-[#fff7c8] p-6 text-lg leading-snug"
         style="box-shadow: var(--card-shadow); transform: rotate(-0.4deg)"
       >
         📝 {{ recipe.notes }}
@@ -361,7 +363,7 @@ watch(recipe, (now, before) => {
       <!-- Cook Log -->
       <section class="mb-6">
         <div class="mb-3 flex items-center justify-between">
-          <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
             🍳 {{ t('recipes.detail.cookLog') }}
           </h2>
         </div>
@@ -371,7 +373,7 @@ watch(recipe, (now, before) => {
             v-for="e in cookLogs"
             :key="e.id"
             type="button"
-            class="flex flex-col items-start gap-1 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised flex flex-col items-start gap-1 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
             @click="openEditCookLog(e)"
           >
             <div class="flex w-full items-center justify-between">
@@ -380,30 +382,32 @@ watch(recipe, (now, before) => {
                   <span :class="e.rating >= n ? '' : 'opacity-30 grayscale'">⭐</span>
                 </span>
               </div>
-              <span class="font-outfit text-secondary-500/60 text-[0.6875rem] font-semibold">
+              <span
+                class="font-outfit text-secondary-500/60 dark:text-ink-soft text-[0.6875rem] font-semibold"
+              >
                 {{ e.cookedOn }}
               </span>
             </div>
             <p
               v-if="e.wentWell"
-              class="font-inter text-secondary-500/80 text-sm dark:text-gray-300"
+              class="font-inter text-secondary-500/80 dark:text-ink-soft text-sm"
             >
               ✅ {{ e.wentWell }}
             </p>
             <p
               v-if="e.toImprove"
-              class="font-inter text-secondary-500/60 text-sm italic dark:text-gray-400"
+              class="font-inter text-secondary-500/60 dark:text-ink-soft text-sm italic"
             >
               ✏️ {{ e.toImprove }}
             </p>
-            <span class="font-inter text-secondary-500/50 mt-1 text-[0.6875rem]">
+            <span class="font-inter text-secondary-500/50 dark:text-ink-soft mt-1 text-[0.6875rem]">
               {{ t('cookLog.byline.cookedBy') }} {{ memberName(e.cookedBy) }}
             </span>
           </button>
         </div>
         <div
           v-else
-          class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+          class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
         >
           <EmptyState
             emoji="🍳"
@@ -444,13 +448,15 @@ watch(recipe, (now, before) => {
     </template>
     <div
       v-else
-      class="flex flex-col items-center justify-center gap-3 rounded-[var(--sq)] bg-white/60 py-16 text-center dark:bg-slate-800/60"
+      class="dark:bg-surface-raised/60 flex flex-col items-center justify-center gap-3 rounded-[var(--sq)] bg-white/60 py-16 text-center"
     >
       <span class="text-5xl" aria-hidden="true">🍝</span>
-      <h1 class="font-outfit text-secondary-500 text-xl font-bold dark:text-gray-100">
+      <h1 class="font-outfit text-secondary-500 dark:text-ink text-xl font-bold">
         {{ t('recipes.detail.notFound.title') }}
       </h1>
-      <p class="text-secondary-500/60 text-sm">{{ t('recipes.detail.notFound.body') }}</p>
+      <p class="text-secondary-500/60 dark:text-ink-soft text-sm">
+        {{ t('recipes.detail.notFound.body') }}
+      </p>
       <button
         type="button"
         class="font-outfit text-primary-500 text-sm font-semibold hover:underline"

@@ -623,7 +623,7 @@ function onStripDayClick(dateStr: string) {
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     style="touch-action: pan-y; will-change: transform"
   >
     <!-- 2-week date navigator — MOBILE ONLY. Desktop already shows the
@@ -635,7 +635,7 @@ function onStripDayClick(dateStr: string) {
          below. -->
     <div
       v-if="isMobile"
-      class="sticky z-20 -mx-5 bg-white px-5 dark:bg-slate-800"
+      class="dark:bg-surface-raised sticky z-20 -mx-5 bg-white px-5"
       style="top: var(--planner-cmdbar-h, 0)"
     >
       <WeekStripNav
@@ -653,7 +653,7 @@ function onStripDayClick(dateStr: string) {
            date context never scrolls away. Wrapper bleeds over the card
            padding (bg) while the inner grid stays aligned with the timeline. -->
       <div
-        class="sticky z-20 -mx-5 bg-white px-5 dark:bg-slate-800"
+        class="dark:bg-surface-raised sticky z-20 -mx-5 bg-white px-5"
         style="top: var(--planner-cmdbar-h, 0)"
       >
         <div class="mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px">
@@ -666,14 +666,14 @@ function onStripDayClick(dateStr: string) {
             :class="[
               holidayForDay(day.dateStr)
                 ? 'bg-[var(--holiday-clay-tint)]'
-                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
+                : 'dark:hover:bg-surface-hover/50 hover:bg-gray-50',
               selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : '',
             ]"
             :title="holidayForDay(day.dateStr)?.name"
             @click="emit('select-date', day.dateStr)"
           >
             <span
-              class="font-outfit text-secondary-500/50 block text-xs font-semibold uppercase dark:text-gray-500"
+              class="font-outfit text-secondary-500/50 dark:text-ink-faint block text-xs font-semibold uppercase"
             >
               {{ dayAbbrev(day.date) }}
             </span>
@@ -682,7 +682,7 @@ function onStripDayClick(dateStr: string) {
               :class="
                 day.isToday
                   ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
-                  : 'text-secondary-500 dark:text-gray-200'
+                  : 'text-secondary-500 dark:text-ink'
               "
             >
               {{ day.date.getDate() }}
@@ -694,11 +694,11 @@ function onStripDayClick(dateStr: string) {
       <!-- Untimed / all-day items row -->
       <div
         v-if="hasAnyUntimedContent"
-        class="relative mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5 dark:border-slate-600/40 dark:bg-slate-700/30"
+        class="dark:border-line-strong/40 dark:bg-surface-overlay/30 relative mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5"
       >
         <div class="flex items-center justify-center">
           <span
-            class="font-outfit text-secondary-500/40 text-xs font-semibold uppercase dark:text-gray-500"
+            class="font-outfit text-secondary-500/40 dark:text-ink-faint text-xs font-semibold uppercase"
           >
             {{ t('planner.allDay') }}
           </span>
@@ -802,7 +802,7 @@ function onStripDayClick(dateStr: string) {
               class="absolute right-0 pr-2"
               :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
             >
-              <span class="text-secondary-500/30 text-xs leading-none dark:text-gray-600">
+              <span class="text-secondary-500/30 dark:text-ink-faint text-xs leading-none">
                 {{ formatHourLabel(hour) }}
               </span>
             </div>
@@ -814,7 +814,7 @@ function onStripDayClick(dateStr: string) {
             <div
               v-for="(hour, hi) in hours"
               :key="hour"
-              class="group/slot absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.08)] dark:border-slate-700/50 dark:hover:bg-[rgba(241,93,34,0.12)]"
+              class="group/slot dark:border-line/50 absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.08)] dark:hover:bg-[rgba(241,93,34,0.12)]"
               :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
               @click="handleEmptySlotClick(day.dateStr, hour)"
             >
@@ -873,7 +873,7 @@ function onStripDayClick(dateStr: string) {
                   </span>
                   <span
                     v-if="activity.location"
-                    class="text-secondary-500/60 min-w-0 flex-1 truncate text-[0.6875rem] leading-tight dark:text-gray-400"
+                    class="text-secondary-500/60 dark:text-ink-soft min-w-0 flex-1 truncate text-[0.6875rem] leading-tight"
                   >
                     · 📍 {{ activity.location }}
                   </span>

@@ -268,7 +268,7 @@ function handleBack(): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .picker-back {
+html.dark .picker-back {
   color: rgb(241 242 244 / 80%);
 }
 
@@ -280,7 +280,7 @@ function handleBack(): void {
   margin: 0;
 }
 
-:global(.dark) .picker-title {
+html.dark .picker-title {
   color: rgb(241 242 244);
 }
 
@@ -324,12 +324,12 @@ function handleBack(): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .picker-tile {
-  background: rgb(30 41 59);
+html.dark .picker-tile {
+  background: #1e2a36;
   border-color: rgb(241 242 244 / 10%);
 }
 
-:global(.dark) .picker-tile:hover {
+html.dark .picker-tile:hover {
   background: rgb(241 93 34 / 10%);
 }
 
@@ -372,7 +372,7 @@ function handleBack(): void {
   white-space: nowrap;
 }
 
-:global(.dark) .picker-label {
+html.dark .picker-label {
   color: rgb(241 242 244);
 }
 
@@ -385,7 +385,7 @@ function handleBack(): void {
   white-space: nowrap;
 }
 
-:global(.dark) .picker-subtitle {
+html.dark .picker-subtitle {
   color: rgb(241 242 244 / 60%);
 }
 
@@ -399,7 +399,7 @@ function handleBack(): void {
   text-align: center;
 }
 
-:global(.dark) .picker-empty {
+html.dark .picker-empty {
   color: rgb(241 242 244 / 65%);
 }
 

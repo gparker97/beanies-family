@@ -121,7 +121,7 @@ function goToWelcome(): void {
     class="bg-cloud-white dark:bg-secondary-900 flex min-h-screen items-center justify-center p-4"
   >
     <div
-      class="w-full max-w-[420px] rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+      class="dark:bg-surface-raised w-full max-w-[420px] rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     >
       <!-- Beanie icon (consistent with LoadPodView's password-decrypt screen) -->
       <img
@@ -134,10 +134,10 @@ function goToWelcome(): void {
       <template v-if="status === 'loading'">
         <div class="text-center">
           <BeanieSpinner size="md" class="mx-auto mb-3" />
-          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
             {{ t('openFromDrive.loading') }}
           </h2>
-          <p class="text-secondary-500/60 mt-2 text-sm dark:text-gray-400">
+          <p class="text-secondary-500/60 dark:text-ink-soft mt-2 text-sm">
             {{ t('openFromDrive.loadingHint') }}
           </p>
         </div>
@@ -146,10 +146,10 @@ function goToWelcome(): void {
       <!-- Popup blocked: requires a user-gesture click to proceed -->
       <template v-else-if="status === 'popup-blocked'">
         <div class="text-center">
-          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
             {{ t('openFromDrive.popupBlockedTitle') }}
           </h2>
-          <p class="text-secondary-500/70 mt-2 text-sm leading-relaxed dark:text-gray-300">
+          <p class="text-secondary-500/70 dark:text-ink-soft mt-2 text-sm leading-relaxed">
             {{ t('openFromDrive.popupBlockedHint') }}
           </p>
         </div>
@@ -161,7 +161,7 @@ function goToWelcome(): void {
         </BaseButton>
         <button
           type="button"
-          class="text-secondary-500/55 hover:text-primary-500 font-outfit mt-4 block w-full text-center text-xs font-semibold transition-colors dark:text-gray-400"
+          class="text-secondary-500/55 hover:text-primary-500 font-outfit dark:text-ink-soft mt-4 block w-full text-center text-xs font-semibold transition-colors"
           @click="goToWelcome"
         >
           {{ t('openFromDrive.useDifferentFile') }}
@@ -171,10 +171,10 @@ function goToWelcome(): void {
       <!-- Error: download failed, file inaccessible, or invalid state -->
       <template v-else-if="status === 'error'">
         <div class="text-center">
-          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
             {{ t('openFromDrive.errorTitle') }}
           </h2>
-          <p class="text-secondary-500/70 mt-2 text-sm leading-relaxed dark:text-gray-300">
+          <p class="text-secondary-500/70 dark:text-ink-soft mt-2 text-sm leading-relaxed">
             {{ errorMessage }}
           </p>
         </div>
@@ -186,7 +186,7 @@ function goToWelcome(): void {
         </BaseButton>
         <button
           type="button"
-          class="text-secondary-500/55 hover:text-primary-500 font-outfit mt-4 block w-full text-center text-xs font-semibold transition-colors dark:text-gray-400"
+          class="text-secondary-500/55 hover:text-primary-500 font-outfit dark:text-ink-soft mt-4 block w-full text-center text-xs font-semibold transition-colors"
           @click="goToWelcome"
         >
           {{ t('openFromDrive.useDifferentFile') }}
@@ -196,10 +196,10 @@ function goToWelcome(): void {
       <!-- Unsupported: Drive sync not configured in this build -->
       <template v-else>
         <div class="text-center">
-          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
             {{ t('openFromDrive.unsupportedTitle') }}
           </h2>
-          <p class="text-secondary-500/70 mt-2 text-sm leading-relaxed dark:text-gray-300">
+          <p class="text-secondary-500/70 dark:text-ink-soft mt-2 text-sm leading-relaxed">
             {{ errorMessage }}
           </p>
         </div>

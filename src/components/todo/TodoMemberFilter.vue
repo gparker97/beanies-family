@@ -32,7 +32,7 @@ function select(value: string) {
       {{ t('todo.showingLabel') }}
     </span>
     <div
-      class="flex max-w-full items-center gap-1 overflow-x-auto rounded-[14px] bg-[var(--tint-slate-5)] p-1 dark:bg-slate-700"
+      class="dark:bg-surface-overlay flex max-w-full items-center gap-1 overflow-x-auto rounded-[14px] bg-[var(--tint-slate-5)] p-1"
     >
       <!-- Everyone (default) -->
       <button
@@ -40,8 +40,8 @@ function select(value: string) {
         class="font-outfit shrink-0 rounded-[11px] px-3 py-1.5 text-xs font-semibold transition-all duration-200"
         :class="
           modelValue === 'all'
-            ? 'bg-white text-[var(--color-text)] shadow-sm dark:bg-slate-600 dark:text-white'
-            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] dark:text-gray-400 dark:hover:text-gray-200'
+            ? 'dark:bg-surface-hover bg-white text-[var(--color-text)] shadow-sm dark:text-white'
+            : 'dark:text-ink-soft dark:hover:text-ink text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
         "
         :aria-pressed="modelValue === 'all' ? 'true' : 'false'"
         @click="emit('update:modelValue', 'all')"
@@ -57,7 +57,7 @@ function select(value: string) {
         class="flex shrink-0 items-center rounded-[11px] px-2.5 py-1.5 transition-all duration-200"
         :class="
           modelValue === member.id
-            ? 'bg-white shadow-sm dark:bg-slate-600'
+            ? 'dark:bg-surface-hover bg-white shadow-sm'
             : 'hover:bg-[var(--tint-slate-5)]'
         "
         :aria-pressed="modelValue === member.id ? 'true' : 'false'"

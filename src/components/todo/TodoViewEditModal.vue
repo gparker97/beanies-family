@@ -285,7 +285,7 @@ async function handleDelete() {
       >
         <template #view>
           <span
-            class="font-outfit text-xl font-bold text-[var(--color-text)] dark:text-gray-100"
+            class="font-outfit dark:text-ink text-xl font-bold text-[var(--color-text)]"
             :class="[
               todo.completed ? 'line-through opacity-50' : '',
               'border-b border-dotted border-transparent group-hover/field:border-[var(--color-text-muted)]',
@@ -300,7 +300,7 @@ async function handleDelete() {
               ref="titleInputRef"
               v-model="draftTitle"
               type="text"
-              class="font-outfit w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-purple-500/30 outline-none dark:text-gray-100"
+              class="font-outfit dark:text-ink w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-purple-500/30 outline-none"
               @keydown="handleTitleKeydown"
             />
             <button
@@ -473,7 +473,7 @@ async function handleDelete() {
                 ✓
               </button>
               <button
-                class="rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                class="dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300"
                 @click="cancelEdit"
               >
                 ✕
@@ -494,7 +494,7 @@ async function handleDelete() {
           <template #view>
             <p
               v-if="todo.description"
-              class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
+              class="dark:text-ink-soft text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)]"
             >
               {{ todo.description }}
             </p>
@@ -508,7 +508,7 @@ async function handleDelete() {
                 ref="descriptionRef"
                 v-model="draftDescription"
                 rows="3"
-                class="w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-base text-[var(--color-text)] ring-2 ring-purple-500/30 transition-all focus:border-purple-500 focus:shadow-[0_0_0_3px_rgba(155,89,182,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+                class="dark:bg-surface-overlay dark:text-ink w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-base text-[var(--color-text)] ring-2 ring-purple-500/30 transition-all focus:border-purple-500 focus:shadow-[0_0_0_3px_rgba(155,89,182,0.1)] focus:outline-none"
                 :placeholder="t('todo.description')"
                 @keydown="handleDescriptionKeydown"
               />
@@ -556,7 +556,7 @@ async function handleDelete() {
               class="h-4 w-4 shrink-0 rounded-sm"
               loading="lazy"
             />
-            <span class="min-w-0 flex-1 truncate font-medium text-purple-600 dark:text-purple-400">
+            <span class="dark:text-purple-lift min-w-0 flex-1 truncate font-medium text-purple-600">
               {{ link.label }}
             </span>
             <svg
@@ -576,7 +576,7 @@ async function handleDelete() {
 
       <!-- Done by — non-editable (only once completed) -->
       <FormFieldGroup v-if="todo.completed && viewCompletedBy" :label="t('todo.doneBy')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+        <span class="dark:text-ink-soft text-sm text-[var(--color-text)]">
           {{ viewCompletedBy.name }}
         </span>
       </FormFieldGroup>

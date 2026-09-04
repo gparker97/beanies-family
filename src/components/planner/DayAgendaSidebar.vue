@@ -162,7 +162,7 @@ function formatGroupDate(dateStr: string): string {
   <BaseSidePanel :open="open" :title="t('planner.dayAgenda')" @close="emit('close')">
     <!-- Date header -->
     <div class="mb-5">
-      <h3 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
+      <h3 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
         {{ dateHeader }}
       </h3>
     </div>
@@ -218,8 +218,8 @@ function formatGroupDate(dateStr: string): string {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="rounded-2xl bg-gray-50 py-8 text-center dark:bg-slate-700/50">
-      <p class="text-secondary-500/40 text-sm dark:text-gray-500">
+    <div v-else class="dark:bg-surface-overlay/50 rounded-2xl bg-gray-50 py-8 text-center">
+      <p class="text-secondary-500/40 dark:text-ink-faint text-sm">
         {{ t('planner.noActivitiesForDay') }}
       </p>
     </div>
@@ -259,14 +259,14 @@ function formatGroupDate(dateStr: string): string {
 
     <!-- Upcoming activities after this day -->
     <div v-if="upcomingActivities.length > 0" class="mt-8">
-      <h3 class="font-outfit text-secondary-500 mb-3 text-base font-bold dark:text-gray-100">
+      <h3 class="font-outfit text-secondary-500 dark:text-ink mb-3 text-base font-bold">
         {{ t('planner.upcomingAfterDay') }}
       </h3>
 
       <div class="space-y-3">
         <div v-for="group in groupedUpcoming" :key="group.date">
           <p
-            class="font-outfit text-secondary-500/50 mb-1.5 text-xs font-semibold tracking-wide uppercase dark:text-gray-500"
+            class="font-outfit text-secondary-500/50 dark:text-ink-faint mb-1.5 text-xs font-semibold tracking-wide uppercase"
           >
             {{ group.label }}
           </p>

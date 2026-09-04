@@ -52,7 +52,7 @@ function rowError(wallet: CryptoWallet): string {
     <div
       v-for="(wallet, index) in wallets"
       :key="wallet.id"
-      class="rounded-2xl border border-[var(--divider,rgba(44,62,80,0.08))] bg-white p-3.5 shadow-sm dark:border-slate-600 dark:bg-slate-700"
+      class="dark:border-line-strong dark:bg-surface-overlay rounded-2xl border border-[var(--divider,rgba(44,62,80,0.08))] bg-white p-3.5 shadow-sm"
     >
       <div class="mb-2.5 flex items-center gap-2">
         <span
@@ -62,13 +62,13 @@ function rowError(wallet: CryptoWallet): string {
           {{ index + 1 }}
         </span>
         <span
-          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+          class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
         >
           {{ t('accountDetails.wallets.walletLabel') }}
         </span>
         <button
           type="button"
-          class="hover:text-primary-500 ml-auto grid h-6 w-6 place-items-center rounded-lg bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] transition-colors hover:bg-[rgba(241,93,34,0.12)] dark:bg-slate-600"
+          class="hover:text-primary-500 dark:bg-surface-hover ml-auto grid h-6 w-6 place-items-center rounded-lg bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] transition-colors hover:bg-[rgba(241,93,34,0.12)]"
           :aria-label="t('accountDetails.wallets.remove')"
           :title="t('accountDetails.wallets.remove')"
           @click="removeWallet(index)"
@@ -105,7 +105,7 @@ function rowError(wallet: CryptoWallet): string {
           </FormFieldGroup>
         </div>
 
-        <p v-if="rowError(wallet)" class="text-sm text-red-600 dark:text-red-400">
+        <p v-if="rowError(wallet)" class="dark:text-danger-lift text-sm text-red-600">
           {{ rowError(wallet) }}
         </p>
       </div>

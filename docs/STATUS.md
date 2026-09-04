@@ -1774,6 +1774,56 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+### ⭐ Session 2026-09-04 — dark-mode remediation + tablet landscape (UNDEPLOYED) ⭐
+
+On `main`'s working tree, **not committed, not deployed**. 5763 unit tests green, type-check
+
+- lint + stylelint clean, production build clean.
+
+**Dark mode.** Brendan's Discord report ("text is gray") measured out at **630 strings below
+the WCAG AA floor**, three of them literally invisible. Fixed via a measured semantic scale
+in `packages/brand/theme.css` (4 surfaces, 3 inks, 2 lines, 5 lifted accents, + a warm
+`surface-paper` for the scrapbook surfaces), a 2,284-utility codemod, and a
+`vue/no-restricted-class` gate. Full record: `docs/plans/2026-09-04-dark-mode-remediation.md`.
+
+⚠️ **The finding worth carrying forward:** Vue compiles `:global(.dark) .x` to a bare
+`.dark { … }` — it DROPS the descendant and paints the declarations onto `<html>`. That form
+was live in **86 rules across 31 components** and none of it had ever applied. All are now
+plain scoped `html.dark .x`, which keeps scoping AND wins on specificity; only two rules
+legitimately need `:global()`. Do not reintroduce the old form — see `docs/lessons.md`.
+
+⚠️ `primary-900`, `secondary-900` and `cloud-white` were referenced by 14 utilities but
+**defined nowhere**, so those rules silently emitted nothing. Now in the scale. Worth a
+periodic sweep for other undefined token references — nothing warns about them.
+
+**Tablet landscape.** The app was portrait-locked on every device. Now: Android reads
+`R.bool.allow_rotation` (`values/` false, `values-sw600dp/` true) in `MainActivity`; iPad was
+already correct in `Info.plist`; the installed PWA releases the manifest lock at boot when
+`min(screen.width, screen.height) >= 600`. Phones are unchanged — the smallest-side rule means
+a phone held sideways is still a phone. `useWallOrientation` now owns the whole policy and
+restores to _the device's base orientation_ on wall exit rather than always portrait.
+**Needs an on-device check on a real Android tablet and an iPad** — the native half cannot be
+verified from here, and it requires new store builds to reach users.
+
+**Beanie wall** now shows a "needs a wider screen" message instead of a squashed wall. The
+gate is **not** an orientation test: the wall renders fine in portrait (`wall-portrait`, 8
+style rules), so it asks for a minimum on the SMALLER side,
+`(min-width: 600px) and (min-height: 600px)`. A width-only threshold got it wrong in both
+directions: an iPad mini in portrait (744px wide) was refused a wall it renders perfectly,
+while a phone held sideways (844px wide, 390px tall) was handed one. 600px is the same
+`sw600dp` number the orientation policy uses, so "big enough to rotate" and "big enough for
+a wall" stay one idea. Verified across 9 viewport shapes.
+
+**Still owed:** `useWakeLock` is still called on the wall's too-narrow gate screen (harmless,
+but it holds a lock on a screen the user leaves immediately); ~59 heavy `opacity-` dimmed
+text instances remain where the inherited base colour is light (visible but below AA);
+`--color-border` stays at `line` (2.08 on raised) for dividers, with the three interactive
+list tiles given an explicit `line-strong` edge instead.
+
+⚠️ **E2E is red locally (17 failed / 4 passed) and it is NOT from this change** — a clean
+`git worktree` at `4b491872` fails identically, and CI is green on that SHA. Environmental on
+this machine; `app-content` never becomes visible in `bypassLoginIfNeeded`. Worth its own look.
+
 **Validated 2026-09-03 (session 3):** re-checked the blocks below; **none** were stale,
 **none removed**. #66 still has no `weeklyAgenda`/`agendaShare` fingerprint in `src/` or
 `web/src/`; travel decomposition has no new fingerprint; the #65/#61 open-guard validation

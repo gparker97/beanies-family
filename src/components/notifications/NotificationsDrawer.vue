@@ -89,20 +89,18 @@ function onToggleRead(id: string) {
         <div v-if="store.view === 'detail'" key="detail" class="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            class="text-secondary-500/70 hover:text-secondary-500 -ml-1 flex h-8 w-8 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+            class="text-secondary-500/70 hover:text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover -ml-1 flex h-8 w-8 items-center justify-center rounded-xl transition-colors hover:bg-gray-100"
             :aria-label="t('notifications.back')"
             @click="store.back()"
           >
             <BeanieIcon name="chevron-left" size="md" />
           </button>
-          <h2
-            class="font-outfit text-secondary-500 truncate text-lg font-semibold dark:text-gray-100"
-          >
+          <h2 class="font-outfit text-secondary-500 dark:text-ink truncate text-lg font-semibold">
             {{ detailTitle }}
           </h2>
         </div>
         <div v-else key="list" class="flex min-w-0 flex-1 items-center justify-between gap-2 pr-2">
-          <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
             {{ t('notifications.title') }}
           </h2>
           <button
@@ -143,10 +141,10 @@ function onToggleRead(id: string) {
               alt=""
               class="h-28 w-28 opacity-95"
             />
-            <p class="font-outfit text-secondary-500 text-base font-semibold dark:text-gray-200">
+            <p class="font-outfit text-secondary-500 dark:text-ink text-base font-semibold">
               {{ t('notifications.empty') }}
             </p>
-            <p class="text-secondary-500/55 max-w-[16rem] text-sm dark:text-gray-400">
+            <p class="text-secondary-500/55 dark:text-ink-soft max-w-[16rem] text-sm">
               {{ t('notifications.emptyHint') }}
             </p>
           </div>
@@ -155,7 +153,7 @@ function onToggleRead(id: string) {
           <div v-else class="-mx-2 space-y-4">
             <div v-for="group in groups" :key="group.day">
               <div
-                class="font-outfit text-secondary-500/40 mb-1 px-3 text-[0.6875rem] font-bold tracking-[0.08em] uppercase dark:text-gray-500"
+                class="font-outfit text-secondary-500/40 dark:text-ink-faint mb-1 px-3 text-[0.6875rem] font-bold tracking-[0.08em] uppercase"
               >
                 {{ group.label }}
               </div>

@@ -78,7 +78,7 @@ function handleMute() {
         </div>
 
         <!-- Message -->
-        <p class="text-secondary-500/75 text-sm leading-relaxed dark:text-gray-300/80">
+        <p class="text-secondary-500/75 dark:text-ink-soft text-sm leading-relaxed">
           {{ txt(tip.message) }}
         </p>
 
@@ -102,7 +102,7 @@ function handleMute() {
   <!-- Missing-tip fallback — tip was removed from tips.ts since issuance. -->
   <!-- The deriver already console.warned the skip; no second log here. -->
   <div v-else class="tip-missing space-y-4">
-    <p class="text-secondary-500/70 text-sm dark:text-gray-300">
+    <p class="text-secondary-500/70 dark:text-ink-soft text-sm">
       {{ t('tips.unavailable') }}
     </p>
     <button class="beanie-tip-gotit" @click="handleGotIt">
@@ -186,12 +186,12 @@ function handleMute() {
 }
 
 /* ───── Dark mode (card-level) ───── */
-:global(.dark) .beanie-tip {
+html.dark .beanie-tip {
   background: linear-gradient(135deg, #2a3845 0%, #263240 40%, #2d2f3d 100%);
   box-shadow: 0 6px 28px rgb(0 0 0 / 20%);
 }
 
-:global(.dark) .beanie-tip::after {
+html.dark .beanie-tip::after {
   background: radial-gradient(circle, rgb(174 214 241 / 5%) 1px, transparent 1px);
   background-size: 16px 16px;
 }
@@ -298,7 +298,7 @@ function handleMute() {
   opacity: 0.85;
 }
 
-:global(.dark) .beanie-tip-mute {
+html.dark .beanie-tip-mute {
   color: rgb(107 114 128 / 70%);
 }
 
@@ -352,17 +352,13 @@ function handleMute() {
   transform: translateY(-1px);
 }
 
-:global(.dark) .beanie-tip-tryit {
+html.dark .beanie-tip-tryit {
   background: rgb(241 93 34 / 10%);
   color: #f15d22;
 }
 
-:global(.dark) .beanie-tip-tryit:hover {
+html.dark .beanie-tip-tryit:hover {
   background: rgb(241 93 34 / 18%);
-}
-
-:global(.dark) .beanie-tip-gotit {
-  box-shadow: 0 3px 12px rgb(241 93 34 / 15%);
 }
 
 /* ───── Missing-tip fallback ───── */
@@ -373,6 +369,10 @@ function handleMute() {
 
 .tip-missing .beanie-tip-gotit {
   margin: 0 auto;
+}
+
+html.dark .beanie-tip-gotit {
+  box-shadow: 0 3px 12px rgb(241 93 34 / 15%);
 }
 
 /* ───── Reduced motion ───── */

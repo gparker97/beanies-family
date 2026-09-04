@@ -184,7 +184,7 @@ onUnmounted(() => {
         :style="popoverStyle"
         role="dialog"
         :aria-label="popoverTitle"
-        class="z-50 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-[var(--soft-shadow)] dark:border-slate-600 dark:bg-slate-800"
+        class="dark:border-line-strong dark:bg-surface-raised z-50 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-[var(--soft-shadow)]"
         @click.stop
       >
         <p class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{ popoverTitle }}</p>
@@ -201,7 +201,7 @@ onUnmounted(() => {
           />
         </div>
 
-        <div class="mt-2.5 space-y-1.5 border-t border-gray-100 pt-2.5 dark:border-slate-700">
+        <div class="dark:border-line mt-2.5 space-y-1.5 border-t border-gray-100 pt-2.5">
           <!-- Connection line: Drive only (local files have no connection). -->
           <div v-if="isDrive" class="flex items-center justify-between gap-3 text-xs">
             <span class="text-[var(--color-text-muted)]">{{ t('saveStatus.connection') }}</span>

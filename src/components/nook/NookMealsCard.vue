@@ -49,7 +49,7 @@ function cookFor(m: MealPlanEntry) {
   <NookSectionCard :title="`🍲 ${t('mealPlanner.nook.title')}`">
     <p
       v-if="!meals.length"
-      class="font-inter py-2 text-sm text-[rgba(44,62,80,0.5)] dark:text-slate-400"
+      class="font-inter dark:text-ink-soft py-2 text-sm text-[rgba(44,62,80,0.5)]"
     >
       {{ t('mealPlanner.nook.empty') }}
     </p>
@@ -61,7 +61,7 @@ function cookFor(m: MealPlanEntry) {
           @click="emit('openMeal', m)"
         >
           <span
-            class="font-outfit w-14 flex-none text-xs font-semibold tracking-[0.05em] text-[rgba(44,62,80,0.45)] uppercase"
+            class="font-outfit dark:text-ink-faint w-14 flex-none text-xs font-semibold tracking-[0.05em] text-[rgba(44,62,80,0.45)] uppercase"
           >
             {{ t(`mealPlanner.slot.${m.slot}`) }}
           </span>
@@ -77,7 +77,7 @@ function cookFor(m: MealPlanEntry) {
             :size-rem="1.6"
           />
           <span
-            class="font-outfit text-secondary-500 min-w-0 flex-1 truncate text-sm font-semibold dark:text-slate-100"
+            class="font-outfit text-secondary-500 dark:text-ink min-w-0 flex-1 truncate text-sm font-semibold"
           >
             {{ nameFor(m) }}
           </span>

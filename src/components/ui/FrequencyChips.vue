@@ -40,8 +40,8 @@ const selectedClass = computed(() =>
           modelValue === opt.value
             ? selectedClass
             : opt.disabled
-              ? 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] opacity-40 dark:bg-slate-700 dark:text-gray-500'
-              : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400',
+              ? 'dark:bg-surface-overlay dark:text-ink-faint border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] opacity-40'
+              : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]',
           opt.disabled ? 'cursor-not-allowed' : '',
         ]"
         :disabled="disabled || opt.disabled"
@@ -53,7 +53,7 @@ const selectedClass = computed(() =>
       <!-- Disabled hint tooltip -->
       <span
         v-if="opt.disabled && opt.disabledHint"
-        class="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 rounded-lg bg-gray-800 px-2.5 py-1 text-[0.625rem] font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-slate-600"
+        class="dark:bg-surface-hover pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 rounded-lg bg-gray-800 px-2.5 py-1 text-[0.625rem] font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
       >
         {{ opt.disabledHint }}
       </span>

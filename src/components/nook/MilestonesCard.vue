@@ -184,13 +184,13 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
 
         <!-- Content -->
         <div class="min-w-0 flex-1">
-          <div class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-100">
+          <div class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
             {{ milestone.name }}
           </div>
           <div v-if="milestone.type === 'completed'" class="text-xs text-[#27AE60]">
             {{ t('nook.completedRecently') }}
           </div>
-          <div v-else class="font-outfit mt-0.5 text-xs font-medium opacity-50 dark:text-gray-400">
+          <div v-else class="font-outfit dark:text-ink-soft mt-0.5 text-xs font-medium opacity-50">
             <span v-if="milestone.date">{{ formatNookDate(milestone.date) }}</span>
             <span v-if="milestone.date"> · </span>
             {{ t('nook.daysAway').replace('{days}', String(milestone.daysAway)) }}
@@ -200,7 +200,7 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
     </div>
 
     <!-- Empty state -->
-    <div v-else class="text-secondary-500/40 py-6 text-center text-sm dark:text-gray-500">
+    <div v-else class="text-secondary-500/40 dark:text-ink-faint py-6 text-center text-sm">
       {{ '🏆' }} {{ t('nook.noMilestones') }}
     </div>
   </NookSectionCard>
@@ -209,5 +209,9 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
 <style scoped>
 .nook-milestones-card {
   background: linear-gradient(135deg, white 85%, rgb(230 126 34 / 5%));
+}
+
+html.dark .nook-milestones-card {
+  background: linear-gradient(135deg, #1e2a36 85%, rgb(240 160 90 / 10%));
 }
 </style>

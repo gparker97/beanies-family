@@ -78,7 +78,7 @@ function handleDeleteIdea(index: number) {
   <!-- Step header -->
   <div class="mb-5 text-center">
     <div class="text-3xl">🌟</div>
-    <h2 class="font-outfit text-lg font-bold text-[var(--color-text)] dark:text-gray-100">
+    <h2 class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
       {{ t('vacation.step5.title') }}
     </h2>
     <p class="text-xs text-[var(--color-text-muted)]">

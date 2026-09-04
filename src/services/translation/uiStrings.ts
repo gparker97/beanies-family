@@ -5542,6 +5542,16 @@ const STRING_DEFS = {
   // One contiguous block: uiStrings.ts is ~9.6k lines and a feature's copy
   // scattered through it is unfindable. Keep new wall copy HERE.
   'wall.name': { en: 'Beanie Wall', beanie: 'beanie wall' },
+  'wall.tooNarrow.title': {
+    en: 'The wall needs a wider screen',
+    beanie: 'the wall needs a wider screen',
+  },
+  'wall.tooNarrow.body': {
+    en: 'The beanie wall is built for a tablet on the kitchen wall, so the whole family can read it from across the room. Open it on a tablet (either way up), or in a bigger window, and it will be here.',
+    beanie:
+      'the beanie wall is built for a tablet on the kitchen wall, so the whole family can read it from across the room. open it on a tablet (either way up), or in a bigger window, and it will be here.',
+  },
+  'wall.tooNarrow.back': { en: 'Take Me Back', beanie: 'take me back' },
   'wall.view.days': { en: 'The week', beanie: 'the week' },
   'wall.view.lanes': { en: 'Each bean', beanie: 'each bean' },
   'wall.view.today': { en: 'Today', beanie: 'today' },

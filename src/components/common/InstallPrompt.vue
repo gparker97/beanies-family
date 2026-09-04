@@ -47,7 +47,7 @@ function handleDismiss() {
   >
     <div
       v-if="showPrompt"
-      class="w-[calc(100vw-2rem)] max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg md:w-auto dark:border-slate-700 dark:bg-slate-800"
+      class="dark:border-line dark:bg-surface-raised w-[calc(100vw-2rem)] max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg md:w-auto"
       role="alert"
     >
       <div class="flex items-start gap-3">
@@ -57,10 +57,10 @@ function handleDismiss() {
           class="h-10 w-10 flex-shrink-0"
         />
         <div class="min-w-0 flex-1">
-          <p class="font-semibold text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink font-semibold text-gray-900">
             {{ t('pwa.installTitle') }}
           </p>
-          <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-0.5 text-sm text-gray-500">
             {{ t('pwa.installDescription') }}
           </p>
           <div class="mt-3 flex gap-2">
@@ -71,7 +71,7 @@ function handleDismiss() {
               {{ t('pwa.installButton') }}
             </button>
             <button
-              class="rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              class="dark:text-ink-soft dark:hover:text-ink rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
               @click="handleDismiss"
             >
               {{ t('pwa.installDismiss') }}
@@ -79,7 +79,7 @@ function handleDismiss() {
           </div>
         </div>
         <button
-          class="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+          class="dark:hover:text-ink-soft flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600"
           :aria-label="t('action.close')"
           @click="handleDismiss"
         >

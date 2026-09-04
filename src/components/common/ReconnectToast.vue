@@ -50,11 +50,11 @@ defineEmits<{
 
 <template>
   <div
-    class="border-primary-500 ring-primary-500/15 dark:ring-primary-500/25 flex items-center gap-3 rounded-2xl border-l-4 bg-white px-4 py-3 shadow-[var(--soft-shadow)] ring-1 dark:bg-slate-800"
+    class="border-primary-500 ring-primary-500/15 dark:ring-primary-500/25 dark:bg-surface-raised flex items-center gap-3 rounded-2xl border-l-4 bg-white px-4 py-3 shadow-[var(--soft-shadow)] ring-1"
     role="status"
   >
     <span
-      class="bg-primary-500/12 text-primary-600 dark:text-primary-300 grid h-9 w-9 flex-shrink-0 place-items-center rounded-[12px]"
+      class="bg-primary-500/12 text-primary-600 dark:text-accent-lift grid h-9 w-9 flex-shrink-0 place-items-center rounded-[12px]"
       aria-hidden="true"
     >
       <slot name="icon">
@@ -71,7 +71,7 @@ defineEmits<{
     </span>
 
     <div class="flex min-w-0 flex-1 flex-col">
-      <p class="font-outfit text-sm font-semibold text-slate-700 dark:text-slate-100">
+      <p class="font-outfit dark:text-ink text-sm font-semibold text-slate-700">
         {{ title }}
       </p>
       <p
@@ -79,8 +79,8 @@ defineEmits<{
         class="text-xs"
         :class="
           subtitleIsError
-            ? 'text-primary-600 dark:text-primary-300'
-            : 'text-slate-500 dark:text-slate-400'
+            ? 'text-primary-600 dark:text-accent-lift'
+            : 'dark:text-ink-soft text-slate-500'
         "
       >
         {{ subtitle }}
@@ -99,7 +99,7 @@ defineEmits<{
     <button
       v-if="dismissible"
       type="button"
-      class="flex-shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+      class="dark:hover:text-ink flex-shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-slate-600"
       :aria-label="dismissLabel"
       @click="$emit('dismiss')"
     >

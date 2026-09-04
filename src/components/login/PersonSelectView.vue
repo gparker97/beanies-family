@@ -31,10 +31,10 @@ function roleLabel(person: PersonCard): string {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="dark:bg-surface-raised mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl">
     <!-- Back button -->
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="dark:text-ink-soft dark:hover:text-ink mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
       @click="emit('back')"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,7 +47,7 @@ function roleLabel(person: PersonCard): string {
     <div class="mb-6 text-center">
       <div v-if="familyName" class="mx-auto mb-3 flex flex-col items-center gap-1">
         <div
-          class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-400"
+          class="dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600"
         >
           <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -68,10 +68,10 @@ function roleLabel(person: PersonCard): string {
         />
       </div>
 
-      <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
         {{ t('loginV6.pickBeanTitle') }}
       </h2>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
         {{ t('loginV6.pickBeanSubtitle') }}
       </p>
     </div>
@@ -96,7 +96,7 @@ function roleLabel(person: PersonCard): string {
         />
         <div class="text-center">
           <p
-            class="font-outfit max-w-[88px] truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+            class="font-outfit dark:text-ink max-w-[88px] truncate text-sm font-semibold text-gray-900"
           >
             {{ person.name }}
           </p>
@@ -110,7 +110,7 @@ function roleLabel(person: PersonCard): string {
     <!-- Info bubble -->
     <div
       v-if="people.length > 0"
-      class="mt-6 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
+      class="dark:bg-surface-overlay/50 mt-6 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px]"
     >
       <div
         class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"

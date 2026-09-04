@@ -37,8 +37,8 @@ const cardClass = computed(() => {
   if (props.hint || props.status === 'pending')
     return 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-900/5';
   if (props.past)
-    return 'border-[var(--tint-slate-10)] bg-[var(--tint-slate-5)] dark:border-slate-700 dark:bg-slate-800/60';
-  return 'border-[var(--tint-slate-10)] bg-white dark:border-slate-700 dark:bg-slate-800';
+    return 'border-[var(--tint-slate-10)] bg-[var(--tint-slate-5)] dark:border-line dark:bg-surface-raised/60';
+  return 'border-[var(--tint-slate-10)] bg-white dark:border-line dark:bg-surface-raised';
 });
 
 const emit = defineEmits<{
@@ -52,7 +52,7 @@ const statusConfig = computed(() => {
   const map: Record<VacationSegmentStatus, { bg: string; text: string; key: string }> = {
     booked: {
       bg: 'bg-[var(--tint-success-10)]',
-      text: 'text-green-700 dark:text-green-400',
+      text: 'text-green-700 dark:text-success-lift',
       key: 'vacation.status.booked',
     },
     pending: {
@@ -94,12 +94,12 @@ async function handleDelete() {
 
         <!-- Title (read-only display) -->
         <span
-          class="font-outfit min-w-0 shrink truncate text-sm font-semibold text-slate-900 dark:text-gray-100"
+          class="font-outfit dark:text-ink min-w-0 shrink truncate text-sm font-semibold text-slate-900"
         >
           {{ title }}
         </span>
 
-        <span v-if="subtitle" class="hidden text-xs text-gray-500 sm:inline dark:text-gray-400">
+        <span v-if="subtitle" class="dark:text-ink-soft hidden text-xs text-gray-500 sm:inline">
           {{ subtitle }}
         </span>
 
@@ -112,7 +112,7 @@ async function handleDelete() {
         <!-- Attachment indicator — 📎 N chip (Treatment A) -->
         <span
           v-if="attachmentCount && attachmentCount > 0"
-          class="font-outfit inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold text-[#5a6b7a] dark:bg-slate-700 dark:text-gray-300"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold text-[#5a6b7a]"
           :title="t('vacation.documentsCount').replace('{n}', String(attachmentCount))"
         >
           📎 {{ attachmentCount }}
@@ -129,7 +129,7 @@ async function handleDelete() {
 
         <!-- Chevron -->
         <button
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-base text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+          class="dark:hover:bg-surface-hover dark:hover:text-ink-soft flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-base text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600"
           @click.stop="toggleCollapse"
         >
           <span class="transition-transform" :class="{ 'rotate-90': !collapsed }">▸</span>
@@ -139,7 +139,7 @@ async function handleDelete() {
       <!-- Key info line — shown below title when collapsed -->
       <div
         v-if="keyValue && collapsed"
-        class="mt-1 truncate pl-8 text-xs text-gray-400 dark:text-gray-500"
+        class="dark:text-ink-faint mt-1 truncate pl-8 text-xs text-gray-400"
       >
         {{ keyValue }}
       </div>
@@ -157,7 +157,7 @@ async function handleDelete() {
           class="mb-3 flex items-start gap-2 rounded-xl border border-amber-200/40 bg-amber-50/60 px-3 py-2 dark:border-amber-500/10 dark:bg-amber-900/10"
         >
           <span class="mt-0.5 text-sm">⚠️</span>
-          <span class="text-xs text-amber-800 dark:text-amber-300">
+          <span class="dark:text-terracotta-lift text-xs text-amber-800">
             <template v-if="hint">{{ hint }}</template>
             <template v-else
               >{{ t('vacation.status.pending') }} — {{ t('travel.needsBooking') }}</template
@@ -173,7 +173,7 @@ async function handleDelete() {
     <!-- Edit / Delete actions — outside overflow container to avoid click issues -->
     <div
       v-if="!collapsed && (showEdit || (deletable && !readOnly))"
-      class="flex items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-slate-700/40"
+      class="dark:border-line/40 flex items-center gap-2 border-t border-gray-100 px-4 py-2"
     >
       <button
         v-if="showEdit"

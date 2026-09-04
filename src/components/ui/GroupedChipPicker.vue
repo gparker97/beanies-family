@@ -62,7 +62,7 @@ const expandedIcon = () => props.groups.find((g) => g.name === expandedGroup.val
         v-for="group in groups"
         :key="group.name"
         type="button"
-        class="font-outfit rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)] transition-all duration-150 hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400"
+        class="font-outfit dark:bg-surface-overlay dark:text-ink-soft rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)] transition-all duration-150 hover:bg-[var(--tint-slate-10)]"
         @click="selectGroup(group.name)"
       >
         <span class="mr-1">{{ group.icon }}</span>
@@ -96,7 +96,7 @@ const expandedIcon = () => props.groups.find((g) => g.name === expandedGroup.val
           :class="
             modelValue === item.value
               ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-              : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+              : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
           "
           @click="selectItem(item.value)"
         >

@@ -208,8 +208,8 @@ withDefaults(
   z-index: 2;
 }
 
-:global(.dark) .wn-content {
-  background: #1e293b;
+html.dark .wn-content {
+  background: #1e2a36;
 }
 
 /* The region is a flex column so slotted content can top-align (a list) or
@@ -260,8 +260,8 @@ withDefaults(
   text-align: right;
 }
 
-:global(.dark) .wn-sign {
-  color: #94a3b8;
+html.dark .wn-sign {
+  color: #9aa9b4;
 }
 
 /* ===== FOOTER ===== */
@@ -273,8 +273,8 @@ withDefaults(
   text-align: center;
 }
 
-:global(.dark) .wn-foot {
-  background: #1e293b;
+html.dark .wn-foot {
+  background: #1e2a36;
   border-top-color: rgb(255 255 255 / 8%);
 }
 

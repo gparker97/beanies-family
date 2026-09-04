@@ -417,7 +417,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
  * swap is a visual change needing design sign-off. One place for a future migration.
  */
 const LIST_TEXTAREA_CLASS =
-  'focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100';
+  'focus:border-primary-500 focus:ring-primary-500 font-inter w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-relaxed text-[var(--color-text)] outline-none focus:ring-1 dark:border-line-strong dark:bg-surface-overlay dark:text-ink';
 </script>
 
 <template>
@@ -451,11 +451,11 @@ const LIST_TEXTAREA_CLASS =
            user type meanwhile would only throw their work away. -->
       <div
         v-if="capture.isProcessing.value"
-        class="absolute inset-0 z-10 grid place-items-center rounded-[var(--sq)] bg-white/85 backdrop-blur-sm dark:bg-slate-900/85"
+        class="dark:bg-surface-ground/85 absolute inset-0 z-10 grid place-items-center rounded-[var(--sq)] bg-white/85 backdrop-blur-sm"
       >
         <div class="flex flex-col items-center gap-3">
           <BeanieSpinner size="lg" :halo="true" />
-          <p class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+          <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
             {{ t('ai.processing') }}
           </p>
         </div>
@@ -529,7 +529,7 @@ const LIST_TEXTAREA_CLASS =
         <textarea
           v-model="notes"
           rows="3"
-          class="focus:border-primary-500 focus:ring-primary-500 font-caveat w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-lg leading-snug text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+          class="focus:border-primary-500 focus:ring-primary-500 font-caveat dark:border-line-strong dark:bg-surface-overlay dark:text-ink w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-lg leading-snug text-[var(--color-text)] outline-none focus:ring-1"
           :placeholder="t('recipes.placeholder.notes')"
         />
       </FormFieldGroup>

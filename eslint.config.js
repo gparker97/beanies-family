@@ -158,6 +158,7 @@ export default [
             '‹', // meal-planner nav prev arrow (aria-labelled button)
             '⌫', // PIN keypad backspace (aria-labelled button)
             '🛫', // beanie wall trip card
+            '🧱', // beanie wall's "needs a wider screen" gate
             '⧉', // meal-planner copy-week action glyph
             '🍲', // meal planner
             '👥', // "who's eating" guests glyph
@@ -281,7 +282,37 @@ export default [
       // the Large reading mode (see .claude/skills/beanies-theme/SKILL.md
       // § Text-size accessibility mode). Use standard Tailwind text-* classes
       // (text-xs through text-4xl) or text-[X.Xrem] for sub-text-xs ornament.
-      'vue/no-restricted-class': ['error', '/^text-\\[\\d+px\\]$/'],
+      // Text-size accessibility mode (Large reading mode) — px text breaks the
+      // rem-based root scale. Plus the dark-mode semantic scale: dark colour
+      // comes from the tokens in packages/brand/theme.css (ink / ink-soft /
+      // ink-faint, surface-*, line, line-strong, *-lift), never Tailwind's raw
+      // grey ramp. 580 hand-written `dark:text-gray-*` utilities had drifted
+      // below the WCAG AA 4.5:1 floor before this rule existed — see
+      // `.claude/skills/beanies-theme/SKILL.md` § Dark mode.
+      // Covers static `class` AND `:class` bindings (the plugin walks object
+      // keys, array elements, template quasis and `+` concatenation), but not
+      // .ts files or a class name built at runtime — so review still matters.
+      //
+      // Each pattern allows variants on BOTH sides of `dark:` (`sm:dark:`,
+      // `dark:hover:`) and an optional `/NN` opacity modifier, because those
+      // were the shapes that slipped through the first version of this rule.
+      // `bg` starts at 300: `bg-slate-100/200` stay legal as deliberate light
+      // pills (e.g. a selected day chip that is light-on-dark by design).
+      'vue/no-restricted-class': [
+        'error',
+        '/^text-\\[\\d+px\\]$/',
+        // colour properties that carry TEXT
+        '/^(?:[a-z-]+:)*dark:(?:[a-z-]+:)*(?:text|placeholder|decoration)-(?:gray|slate|zinc|neutral|stone)-\\d+(?:\\/\\d+)?$/',
+        // surfaces
+        '/^(?:[a-z-]+:)*dark:(?:[a-z-]+:)*bg-(?:gray|slate|zinc|neutral|stone)-(?:300|400|500|600|700|800|900|950)(?:\\/\\d+)?$/',
+        // every edge-ish property, including per-side borders and dividers
+        '/^(?:[a-z-]+:)*dark:(?:[a-z-]+:)*(?:border|border-[lrtbxyse]|divide|divide-[xy]|outline|ring|ring-offset)-(?:gray|slate|zinc|neutral|stone)-\\d+(?:\\/\\d+)?$/',
+        // gradient stops
+        '/^(?:[a-z-]+:)*dark:(?:[a-z-]+:)*(?:from|via|to)-(?:gray|slate|zinc|neutral|stone)-\\d+(?:\\/\\d+)?$/',
+        // opacity modifiers on the ink tiers: dimming an ink is how text drops
+        // back below the floor. If it must recede, step down a tier instead.
+        '/^(?:[a-z-]+:)*dark:(?:[a-z-]+:)*text-ink(?:-soft|-faint)?\\/\\d+$/',
+      ],
 
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [

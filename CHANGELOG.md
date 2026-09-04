@@ -12,7 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Dark mode is readable again.** An early adopter reported that text was grey and hard to read after dark, and he was right: six hundred and thirty pieces of text across the app sat below the contrast floor, and a few were the same colour as the card behind them. The whole palette after sunset has been rebuilt on measured values, so every shade of text now reads clearly on every surface it can land on. The worst of it was on the pages you use most: the cookbook title had vanished into its own header, the milestones and recent-activity cards on your nook were white slabs with unreadable text, and the recipe cards' descriptions were invisible. Bright colours stay bright, and warm surfaces like the cookbook and scrapbook keep their warmth rather than turning grey.
+
+- **The beanie wall says so when the screen is too small.** The wall is built to be read from across the kitchen, so it needs room on both sides of the screen, not just width. Opening it on a phone used to show a squashed, unusable wall; it now explains where the wall lives and offers a way back. A tablet works either way up, portrait or landscape, and a phone gets the message whichever way it is held.
+
 - The iOS release now checks its version against the App Store before it starts building, so a version number that has already been used fails in seconds with a note on how to fix it, instead of five minutes into a signed build.
+
+### Changed
+
+- **Tablets can now be used in landscape.** The app was locked to portrait on every device. On an iPad or an Android tablet, where landscape is arguably the better way to hold it (and the only sensible way to mount a beanie wall), it now rotates freely and follows your own rotation-lock setting. Phones stay portrait, as before.
 
 ## 2026-09-03
 

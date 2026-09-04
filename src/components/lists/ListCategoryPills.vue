@@ -39,7 +39,7 @@ const activeClass = computed(() =>
     : 'border-[var(--color-primary-500)] bg-[var(--tint-orange-12)] text-[var(--color-primary-500)]'
 );
 const INACTIVE_CLASS =
-  'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-slate-800';
+  'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-surface-raised';
 
 function pick(id: ListCategory): void {
   emit('update:modelValue', props.clearable && props.modelValue === id ? null : id);

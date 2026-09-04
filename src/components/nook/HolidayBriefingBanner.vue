@@ -278,7 +278,7 @@ const themeClass = computed(() =>
 
 /* Dark mode — only adjusts the default Sky Silk theme. Each festive theme
  * below already declares deep enough colours to carry through both modes. */
-:global(.dark) .holiday-banner.theme-default {
+html.dark .holiday-banner.theme-default {
   --banner-bg-start: rgb(174 214 241 / 12%);
   --banner-bg-end: rgb(241 93 34 / 8%);
   --banner-border: rgb(174 214 241 / 22%);

@@ -72,12 +72,12 @@ const containerClass = computed(() => {
     return `${pad} border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50`;
   }
   if (!isHintRow.value && isDueToday.value) {
-    return `${pad} border-[var(--color-primary-500)] bg-white shadow-[0_0_0_3px_rgba(241,93,34,0.12)] hover:bg-[var(--tint-orange-8)] dark:bg-slate-800`;
+    return `${pad} border-[var(--color-primary-500)] bg-white shadow-[0_0_0_3px_rgba(241,93,34,0.12)] hover:bg-[var(--tint-orange-8)] dark:bg-surface-raised`;
   }
   if (props.compact) {
-    return `${pad} border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-700 dark:hover:bg-slate-600`;
+    return `${pad} border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-surface-overlay dark:hover:bg-surface-hover`;
   }
-  return `${pad} border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-800`;
+  return `${pad} border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-surface-raised`;
 });
 
 const checkboxClass = computed(() => {

@@ -128,7 +128,7 @@ function cellBgClass(cell: { date: string; weekRow: number; isCurrentMonth: bool
   if (holidayDateSet.value.has(cell.date)) return 'md:bg-[var(--holiday-clay-tint)]';
   if (cell.weekRow === todayWeekRow.value && cell.isCurrentMonth)
     return 'md:bg-[rgba(241,93,34,0.04)]';
-  return 'md:hover:bg-gray-50 md:dark:hover:bg-slate-700/50';
+  return 'md:hover:bg-gray-50 md:dark:hover:bg-surface-hover/50';
 }
 
 function handleDayClick(date: string) {
@@ -171,7 +171,7 @@ useCalendarSlide(swipeRef, {
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     style="touch-action: pan-y; will-change: transform"
   >
     <!-- Desktop-only day-of-week column headers -->
@@ -179,7 +179,7 @@ useCalendarSlide(swipeRef, {
       <div
         v-for="label in dayLabels"
         :key="label"
-        class="font-outfit text-secondary-500/40 py-2 text-center text-xs font-semibold tracking-wide uppercase dark:text-gray-500"
+        class="font-outfit text-secondary-500/40 dark:text-ink-faint py-2 text-center text-xs font-semibold tracking-wide uppercase"
       >
         {{ label }}
       </div>

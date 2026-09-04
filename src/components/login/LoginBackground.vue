@@ -40,7 +40,7 @@ async function selectLanguage(code: LanguageCode) {
     <!-- Language switcher -->
     <div class="absolute top-4 right-4 z-10">
       <button
-        class="flex items-center gap-1 rounded-full bg-white/80 px-3 py-1.5 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+        class="dark:bg-surface-raised/80 dark:hover:bg-surface-hover flex items-center gap-1 rounded-full bg-white/80 px-3 py-1.5 shadow-sm backdrop-blur-sm transition-colors hover:bg-white"
         @click="showLangMenu = !showLangMenu"
         @blur="showLangMenu = false"
       >
@@ -51,14 +51,14 @@ async function selectLanguage(code: LanguageCode) {
           class="h-4 w-5"
         />
         <span v-else class="text-sm">{{ currentLanguageInfo?.flag || '🌐' }}</span>
-        <span class="text-xs text-gray-600 dark:text-gray-300">{{
+        <span class="dark:text-ink-soft text-xs text-gray-600">{{
           currentLanguageInfo?.nativeName
         }}</span>
         <span class="text-xs text-gray-400">▼</span>
       </button>
       <div
         v-if="showLangMenu"
-        class="absolute right-0 mt-1 w-40 rounded-xl bg-white p-1 shadow-lg dark:bg-slate-800"
+        class="dark:bg-surface-raised absolute right-0 mt-1 w-40 rounded-xl bg-white p-1 shadow-lg"
       >
         <button
           v-for="lang in LANGUAGES"
@@ -67,7 +67,7 @@ async function selectLanguage(code: LanguageCode) {
           :class="
             lang.code === settingsStore.language
               ? 'bg-primary-500/10 text-primary-500'
-              : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700'
+              : 'dark:text-ink-soft dark:hover:bg-surface-hover text-gray-700 hover:bg-gray-50'
           "
           @mousedown.prevent="selectLanguage(lang.code)"
         >
@@ -86,7 +86,7 @@ async function selectLanguage(code: LanguageCode) {
           class="mx-auto -mb-[7.5rem] w-full max-w-sm"
         />
         <h1 class="font-outfit text-5xl font-bold">
-          <span class="text-secondary-500 dark:text-gray-100">beanies</span
+          <span class="text-secondary-500 dark:text-ink">beanies</span
           ><span class="text-primary-500">.family</span>
         </h1>
         <!-- Tagline: Outfit italic + tracked + lighter gray, with the single
@@ -95,7 +95,7 @@ async function selectLanguage(code: LanguageCode) {
              on a different word position so the two highlights don't pattern-
              match. -->
         <p
-          class="font-outfit mt-2 text-base font-normal tracking-[0.04em] text-gray-500 italic dark:text-gray-400"
+          class="font-outfit dark:text-ink-soft mt-2 text-base font-normal tracking-[0.04em] text-gray-500 italic"
         >
           <template v-for="(part, i) in [taglineParts()]" :key="i">
             {{ part.lead

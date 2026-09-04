@@ -33,7 +33,7 @@ function onCurrencyChange(event: Event) {
     <div class="relative flex-shrink-0">
       <select
         :value="currency"
-        class="focus:border-primary-500 font-outfit h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-base font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+        class="focus:border-primary-500 font-outfit dark:bg-surface-overlay dark:text-ink h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-base font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none"
         @change="onCurrencyChange"
       >
         <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">

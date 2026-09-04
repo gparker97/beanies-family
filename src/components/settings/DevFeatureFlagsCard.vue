@@ -53,14 +53,14 @@ function reload(): void {
 <template>
   <section>
     <h2
-      class="font-outfit mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase dark:text-slate-500"
+      class="font-outfit dark:text-ink-faint mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase"
     >
       🚩 Feature Flags · dev only
     </h2>
     <div
-      class="rounded-[var(--sq)] bg-white px-6 py-2 shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-2 shadow-[0_2px_12px_rgba(44,62,80,0.04)]"
     >
-      <p class="py-3 text-xs leading-snug text-[var(--deep-slate)]/60 dark:text-slate-400">
+      <p class="dark:text-ink-soft py-3 text-xs leading-snug text-[var(--deep-slate)]/60">
         These toggles control <strong>production</strong> availability. Toggling rewrites the
         committed config (<code>featureFlags.committed.ts</code>) — commit + deploy to apply for all
         users. In development every flag is always on regardless of these switches. Changes apply
@@ -77,7 +77,7 @@ function reload(): void {
         @update:model-value="(v: boolean) => onToggle(row.id, v)"
       />
       <div v-if="showReload" class="flex items-center justify-between py-3.5">
-        <p class="text-xs text-[var(--deep-slate)]/60 dark:text-slate-400">
+        <p class="dark:text-ink-soft text-xs text-[var(--deep-slate)]/60">
           Saved. Reload to apply the change in this session.
         </p>
         <BaseButton variant="primary" size="sm" @click="reload">Reload to apply</BaseButton>

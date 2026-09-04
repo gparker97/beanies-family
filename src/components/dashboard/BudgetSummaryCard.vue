@@ -78,12 +78,12 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
 
 <template>
   <div
-    class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
     data-testid="budget-summary-card"
   >
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
-      <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+      <div class="nook-section-label text-secondary-500 dark:text-ink-soft">
         {{ t('dashboard.budgetSummary') }}
       </div>
       <router-link
@@ -97,7 +97,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
     <!-- Empty state: no active budget -->
     <div v-if="!hasBudget" class="py-8 text-center">
       <EmptyStateIllustration variant="budget" class="mb-4" />
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('dashboard.noBudget') }}
       </p>
       <button
@@ -115,17 +115,17 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
         <div class="mb-2 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="text-lg">{{ paceEmoji }}</span>
-            <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-100">
+            <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
               {{ t(paceMessageKey) }}
             </span>
           </div>
-          <span class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-200">
+          <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
             {{ progress }}%
           </span>
         </div>
 
         <!-- Progress bar -->
-        <div class="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-600/40">
+        <div class="dark:bg-surface-hover/40 h-2.5 overflow-hidden rounded-full bg-slate-100">
           <div
             class="h-full rounded-full transition-all duration-500"
             :class="progressBarColor"
@@ -135,14 +135,14 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
 
         <!-- Spent / Budget amounts -->
         <div class="mt-2 flex items-center justify-between text-xs">
-          <span class="text-secondary-500/50 dark:text-gray-400">
+          <span class="text-secondary-500/50 dark:text-ink-soft">
             <template v-if="isUnlocked">
               {{ formatInDisplayCurrency(spent, settingsStore.baseCurrency) }}
               {{ t('dashboard.budgetSpent') }}
             </template>
             <template v-else>{{ MASK }}</template>
           </span>
-          <span class="text-secondary-500/50 dark:text-gray-400">
+          <span class="text-secondary-500/50 dark:text-ink-soft">
             <template v-if="isUnlocked">
               {{ formatInDisplayCurrency(remaining, settingsStore.baseCurrency) }}
               {{ t('dashboard.budgetRemaining') }}
@@ -154,8 +154,8 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
 
       <!-- Top categories -->
       <div v-if="topCategories.length > 0">
-        <div class="mb-2 border-t border-[var(--tint-slate-5)] pt-3 dark:border-slate-700">
-          <span class="text-secondary-500/40 text-xs font-medium dark:text-gray-500">
+        <div class="dark:border-line mb-2 border-t border-[var(--tint-slate-5)] pt-3">
+          <span class="text-secondary-500/40 dark:text-ink-faint text-xs font-medium">
             {{ t('dashboard.budgetCategories') }}
           </span>
         </div>
@@ -168,7 +168,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
             :class="
               cat.status === 'over'
                 ? 'bg-[#F15D22]/5 dark:bg-[#F15D22]/10'
-                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                : 'dark:hover:bg-surface-hover/50 hover:bg-gray-50'
             "
             @click="router.push('/budgets')"
           >
@@ -178,9 +178,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
                 <span
                   class="text-xs font-medium"
                   :class="
-                    cat.status === 'over'
-                      ? 'text-[#F15D22]'
-                      : 'text-secondary-500 dark:text-gray-200'
+                    cat.status === 'over' ? 'text-[#F15D22]' : 'text-secondary-500 dark:text-ink'
                   "
                 >
                   {{ budgetCategoryLabel(cat.categoryId) }}
@@ -189,9 +187,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
               <span
                 v-if="isUnlocked"
                 class="font-outfit text-xs font-semibold"
-                :class="
-                  cat.status === 'over' ? 'text-[#F15D22]' : 'text-slate-700 dark:text-slate-200'
-                "
+                :class="cat.status === 'over' ? 'text-[#F15D22]' : 'dark:text-ink text-slate-700'"
               >
                 {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
                 <span
@@ -201,7 +197,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
                   / {{ formatInDisplayCurrency(cat.budgeted, settingsStore.baseCurrency) }}
                 </span>
               </span>
-              <span v-else class="text-secondary-500/40 text-xs dark:text-gray-400">{{
+              <span v-else class="text-secondary-500/40 dark:text-ink-soft text-xs">{{
                 MASK
               }}</span>
             </div>
@@ -211,7 +207,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
               :class="
                 cat.status === 'over'
                   ? 'h-2.5 bg-[#F15D22]/20'
-                  : 'h-1.5 bg-slate-100 dark:bg-slate-600/40'
+                  : 'dark:bg-surface-hover/40 h-1.5 bg-slate-100'
               "
             >
               <div

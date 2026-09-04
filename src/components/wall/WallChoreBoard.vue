@@ -136,12 +136,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     <div class="flex shrink-0 items-center gap-4">
       <button
         type="button"
-        class="font-outfit text-secondary-500 wall-back shrink-0 rounded-2xl bg-white px-4 py-2.5 font-bold shadow-[var(--card-shadow)] dark:bg-slate-800 dark:text-gray-100"
+        class="font-outfit text-secondary-500 wall-back dark:bg-surface-raised dark:text-ink shrink-0 rounded-2xl bg-white px-4 py-2.5 font-bold shadow-[var(--card-shadow)]"
         @click="emit('back')"
       >
         ‹ {{ fillTemplate(t('wall.jobsBoard.back'), { view: backLabel }) }}
       </button>
-      <h2 class="font-outfit text-secondary-500 wall-board-title font-extrabold dark:text-gray-100">
+      <h2 class="font-outfit text-secondary-500 wall-board-title dark:text-ink font-extrabold">
         {{ t('wall.jobsBoard.title') }}
       </h2>
       <p class="font-inter wall-board-sum text-[var(--muted-text,#4d5d6c)]">
@@ -169,7 +169,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <div
         v-for="member in members"
         :key="member.id"
-        class="flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
         :class="
           columnFor(member.id).total && columnFor(member.id).done === columnFor(member.id).total
             ? 'ring-[2.5px] ring-[#27AE60]'
@@ -177,12 +177,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         "
       >
         <div
-          class="flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center dark:border-slate-700"
+          class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
           :style="{ background: `${member.color}2e` }"
         >
           <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
           <div>
-            <p class="font-outfit text-secondary-500 wall-bean-name font-bold dark:text-gray-100">
+            <p class="font-outfit text-secondary-500 wall-bean-name dark:text-ink font-bold">
               {{ member.name }}
             </p>
             <p class="font-inter wall-bean-count text-[var(--muted-text,#4d5d6c)]">
@@ -263,10 +263,10 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <!-- lists whose owner the wall cannot resolve — labelled, not hidden -->
       <div
         v-if="orphanLists.length"
-        class="ring-dashed flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)] dark:bg-slate-800"
+        class="ring-dashed dark:bg-surface-raised flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
       >
         <div
-          class="flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center dark:border-slate-700"
+          class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
         >
           <!-- a neutral disc, to match the initials the real columns now use -->
           <span
@@ -274,7 +274,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
             aria-hidden="true"
             >📦</span
           >
-          <p class="font-outfit text-secondary-500 wall-bean-name font-bold dark:text-gray-100">
+          <p class="font-outfit text-secondary-500 wall-bean-name dark:text-ink font-bold">
             {{ t('wall.orphanLists') }}
           </p>
         </div>

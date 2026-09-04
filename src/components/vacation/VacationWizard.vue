@@ -281,7 +281,7 @@ const saveLabel = computed(() => {
         <button
           v-if="currentStep > 1"
           type="button"
-          class="font-outfit rounded-2xl border border-[var(--tint-slate-10)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--color-text-muted)] transition-all hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-400"
+          class="font-outfit dark:border-line-strong dark:text-ink-soft rounded-2xl border border-[var(--tint-slate-10)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--color-text-muted)] transition-all hover:bg-[var(--tint-slate-5)]"
           @click="goBack"
         >
           ← {{ t('vacation.back') }}
@@ -403,7 +403,7 @@ const saveLabel = computed(() => {
 
       <!-- Title & subtitle -->
       <div class="font-outfit mb-1 text-xl font-bold">{{ t('vacation.bonVoyage') }}</div>
-      <div class="mb-4 text-sm text-[rgba(44,62,80,0.45)] dark:text-gray-400">
+      <div class="dark:text-ink-soft mb-4 text-sm text-[rgba(44,62,80,0.45)]">
         {{ t('vacation.savedMessage') }}
       </div>
 

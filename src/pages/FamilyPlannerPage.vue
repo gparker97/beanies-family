@@ -847,7 +847,7 @@ function handleActivitySwapped(newId: string) {
     <div v-if="activeView === 'month' && activityStore.inactiveActivities.length > 0" class="mt-4">
       <button
         type="button"
-        class="text-secondary-500/50 hover:text-secondary-500 flex items-center gap-2 text-sm transition-colors dark:text-gray-500 dark:hover:text-gray-300"
+        class="text-secondary-500/50 hover:text-secondary-500 dark:text-ink-faint dark:hover:text-ink-soft flex items-center gap-2 text-sm transition-colors"
         @click="showInactive = !showInactive"
       >
         <span class="text-xs opacity-50">{{ showInactive ? '&#x25B2;' : '&#x25BC;' }}</span>
@@ -862,7 +862,7 @@ function handleActivitySwapped(newId: string) {
           v-for="activity in activityStore.inactiveActivities"
           :key="activity.id"
           type="button"
-          class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white/60 px-3 py-2.5 text-left opacity-60 shadow-[0_2px_10px_rgba(44,62,80,0.03)] transition-all hover:opacity-100 hover:shadow-[0_4px_16px_rgba(44,62,80,0.06)] dark:bg-slate-800/60"
+          class="dark:bg-surface-raised/60 flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white/60 px-3 py-2.5 text-left opacity-60 shadow-[0_2px_10px_rgba(44,62,80,0.03)] transition-all hover:opacity-100 hover:shadow-[0_4px_16px_rgba(44,62,80,0.06)]"
           style="border-left-color: #95a5a6"
           @click="openViewModal(activity.id)"
         >
@@ -870,11 +870,11 @@ function handleActivitySwapped(newId: string) {
             {{ activity.icon ?? getActivityFallbackEmoji(activity.category) }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 min-w-0 flex-1 truncate text-sm font-semibold dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 dark:text-ink-soft min-w-0 flex-1 truncate text-sm font-semibold"
           >
             {{ activity.title }}
           </span>
-          <span class="text-secondary-500/30 flex-shrink-0 text-xs dark:text-gray-500">
+          <span class="text-secondary-500/30 dark:text-ink-faint flex-shrink-0 text-xs">
             {{ t('planner.showInactive') }}
           </span>
         </button>

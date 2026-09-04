@@ -315,7 +315,7 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
   <!-- Step header -->
   <div class="mb-5 text-center">
     <div class="text-3xl">✈️</div>
-    <h2 class="font-outfit text-lg font-bold text-[var(--color-text)] dark:text-gray-100">
+    <h2 class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
       {{ t('vacation.step2.title') }}
     </h2>
     <p class="text-xs text-[var(--color-text-muted)]">
@@ -396,11 +396,11 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
 
         <div>
           <div
-            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit dark:text-ink-faint mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
-          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+          <div class="dark:border-line space-y-3 rounded-xl border border-gray-200 p-3">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
               <BaseCombobox
                 :model-value="seg.airline ?? ''"
@@ -454,7 +454,7 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                     :class="
                       seg.arrivesNextDay
                         ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
-                        : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+                        : 'dark:bg-surface-overlay dark:text-ink-soft border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
                     "
                     @click="updateSegment(idx, 'arrivesNextDay', !(seg.arrivesNextDay ?? false))"
                   >
@@ -525,11 +525,11 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
 
         <div>
           <div
-            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit dark:text-ink-faint mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
-          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+          <div class="dark:border-line space-y-3 rounded-xl border border-gray-200 p-3">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <BaseCombobox
                 :model-value="seg.cruiseLine ?? ''"
@@ -668,11 +668,11 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
 
         <div>
           <div
-            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit dark:text-ink-faint mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
-          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+          <div class="dark:border-line space-y-3 rounded-xl border border-gray-200 p-3">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormFieldGroup
                 :label="
@@ -747,7 +747,7 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
             :value="seg.notes ?? ''"
             :placeholder="t('vacation.field.notesPlaceholder')"
             rows="2"
-            class="w-full rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-2 text-base text-[var(--color-text)] placeholder:text-gray-400 focus:border-[var(--vacation-teal)] focus:ring-2 focus:ring-[var(--vacation-teal-tint)] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100 dark:placeholder:text-gray-500"
+            class="dark:border-line-strong dark:bg-surface-overlay dark:text-ink dark:placeholder:text-ink-faint w-full rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-2 text-base text-[var(--color-text)] placeholder:text-gray-400 focus:border-[var(--vacation-teal)] focus:ring-2 focus:ring-[var(--vacation-teal-tint)] focus:outline-none"
             @input="updateSegment(idx, 'notes', ($event.target as HTMLTextAreaElement).value)"
           />
         </FormFieldGroup>
@@ -775,11 +775,11 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
       v-for="card in segmentTypeCards"
       :key="card.type"
       type="button"
-      class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-3 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+      class="dark:bg-surface-raised relative flex flex-col items-center rounded-xl border border-transparent bg-white p-3 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)]"
       @click="addSegment(card.type)"
     >
       <span class="text-2xl">{{ card.emoji }}</span>
-      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+      <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
         {{ t(card.key as any) }}
       </span>
     </button>
@@ -790,28 +790,28 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
     <div class="grid grid-cols-2 gap-2">
       <button
         type="button"
-        class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-4 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+        class="dark:bg-surface-raised relative flex flex-col items-center rounded-xl border border-transparent bg-white p-4 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)]"
         @click="addFlightSegments(false)"
       >
         <span class="text-2xl">✈️</span>
-        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+        <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
           {{ t('vacation.travel.oneWay') }}
         </span>
       </button>
       <button
         type="button"
-        class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-4 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+        class="dark:bg-surface-raised relative flex flex-col items-center rounded-xl border border-transparent bg-white p-4 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)]"
         @click="addFlightSegments(true)"
       >
         <span class="text-2xl">🔄</span>
-        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+        <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
           {{ t('vacation.travel.return') }}
         </span>
       </button>
     </div>
     <button
       type="button"
-      class="mx-auto block text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+      class="dark:hover:text-ink-soft mx-auto block text-xs text-gray-400 transition-colors hover:text-gray-600"
       @click="showFlightTypeChoice = false"
     >
       ← {{ t('vacation.back') }}
@@ -827,21 +827,21 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
         <span class="text-xs text-teal-600 dark:text-teal-400">✈️</span>
         <button
           type="button"
-          class="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm transition-colors hover:bg-teal-100 dark:bg-slate-700 dark:text-teal-300 dark:hover:bg-slate-600"
+          class="dark:bg-surface-overlay dark:hover:bg-surface-hover rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm transition-colors hover:bg-teal-100 dark:text-teal-300"
           @click="addFlightSegments(false)"
         >
           {{ t('vacation.travel.oneWay') }}
         </button>
         <button
           type="button"
-          class="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm transition-colors hover:bg-teal-100 dark:bg-slate-700 dark:text-teal-300 dark:hover:bg-slate-600"
+          class="dark:bg-surface-overlay dark:hover:bg-surface-hover rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm transition-colors hover:bg-teal-100 dark:text-teal-300"
           @click="addFlightSegments(true)"
         >
           {{ t('vacation.travel.return') }}
         </button>
         <button
           type="button"
-          class="ml-0.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          class="dark:hover:text-ink-soft ml-0.5 text-xs text-gray-400 hover:text-gray-600"
           @click="showFlightTypeChoice = false"
         >
           ✕
@@ -851,35 +851,35 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
     <button
       v-else
       type="button"
-      class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+      class="dark:border-line-strong rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('flight_outbound')"
     >
       + ✈️ {{ t('vacation.travel.flights') }}
     </button>
     <button
       type="button"
-      class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+      class="dark:border-line-strong rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('cruise')"
     >
       + 🚢 {{ t('vacation.segment.cruise') }}
     </button>
     <button
       type="button"
-      class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+      class="dark:border-line-strong rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('car')"
     >
       + 🚗 {{ t('vacation.travel.addCar') }}
     </button>
     <button
       type="button"
-      class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+      class="dark:border-line-strong rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('train')"
     >
       + 🚅 {{ t('vacation.segment.train') }}
     </button>
     <button
       type="button"
-      class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+      class="dark:border-line-strong rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('ferry')"
     >
       + ⛴️ {{ t('vacation.segment.ferry') }}

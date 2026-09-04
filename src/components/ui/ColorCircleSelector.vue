@@ -120,7 +120,7 @@ function titleFor(value: string): string {
       -->
       <span
         v-if="holderOf(color.value) && color.value !== modelValue"
-        class="pointer-events-none absolute -right-1 -bottom-1 rounded-full ring-2 ring-white dark:ring-slate-800"
+        class="dark:ring-surface-raised pointer-events-none absolute -right-1 -bottom-1 rounded-full ring-2 ring-white"
       >
         <BeanieAvatar
           v-bind="memberAvatarBindings(holderOf(color.value)!)"

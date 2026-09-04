@@ -117,7 +117,7 @@ const changeColor = computed(() => {
     :class="[
       dark
         ? 'from-secondary-500 bg-gradient-to-br to-[#3D5368] text-white'
-        : 'bg-white dark:bg-slate-800',
+        : 'dark:bg-surface-raised bg-white',
       clickable ? 'cursor-pointer select-none' : '',
       activeRing,
     ]"
@@ -175,7 +175,11 @@ const changeColor = computed(() => {
         <div class="flex items-center gap-1.5">
           <div
             class="font-outfit truncate text-xs font-semibold tracking-[0.08em] uppercase"
-            :class="dark ? 'opacity-50' : 'text-secondary-500 opacity-45 dark:text-gray-300'"
+            :class="
+              dark
+                ? 'opacity-50'
+                : 'text-secondary-500 dark:text-ink-soft opacity-45 dark:opacity-100'
+            "
           >
             {{ label }}
           </div>
@@ -183,8 +187,8 @@ const changeColor = computed(() => {
         </div>
         <div
           v-if="subtitle"
-          class="font-outfit truncate text-xs opacity-40"
-          :class="dark ? '' : 'text-secondary-500'"
+          class="font-outfit truncate text-xs opacity-40 dark:opacity-100"
+          :class="dark ? '' : 'text-secondary-500 dark:text-ink-faint'"
         >
           {{ subtitle }}
         </div>
@@ -196,7 +200,7 @@ const changeColor = computed(() => {
       <div
         data-testid="stat-amount"
         class="font-outfit text-2xl font-extrabold"
-        :class="dark ? '' : 'text-secondary-500 dark:text-gray-100'"
+        :class="dark ? '' : 'text-secondary-500 dark:text-ink'"
       >
         <template v-if="rawValue !== undefined">{{ rawValue }}</template>
         <template v-else>{{ isUnlocked ? animatedFormatted : MASK }}</template>
@@ -212,7 +216,7 @@ const changeColor = computed(() => {
       </span>
       <span
         class="text-xs"
-        :class="dark ? 'opacity-35' : 'text-secondary-500 opacity-30 dark:text-gray-400'"
+        :class="dark ? 'opacity-35' : 'text-secondary-500 dark:text-ink-soft opacity-30'"
       >
         {{ displayChangeLabel }}
       </span>

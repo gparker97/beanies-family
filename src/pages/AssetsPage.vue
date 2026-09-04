@@ -143,7 +143,7 @@ function getAssetTypeConfig(type: AssetType): {
     electronics: {
       bgColor: 'bg-slate-100',
       iconColor: 'text-slate-600',
-      darkBgColor: 'dark:bg-slate-700',
+      darkBgColor: 'dark:bg-surface-overlay',
     },
     equipment: {
       bgColor: 'bg-orange-100',
@@ -156,7 +156,11 @@ function getAssetTypeConfig(type: AssetType): {
       iconColor: 'text-secondary-400',
       darkBgColor: 'dark:bg-secondary-400/30',
     },
-    other: { bgColor: 'bg-gray-100', iconColor: 'text-gray-600', darkBgColor: 'dark:bg-gray-700' },
+    other: {
+      bgColor: 'bg-gray-100',
+      iconColor: 'text-gray-600',
+      darkBgColor: 'dark:bg-surface-overlay',
+    },
   };
   return configs[type] || configs.other;
 }
@@ -337,10 +341,10 @@ const appreciationSubtitle = computed(() => {
     <!-- Empty State -->
     <div v-if="assets.length === 0" class="py-16 text-center">
       <EmptyStateIllustration variant="assets" class="mb-6" />
-      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+      <h3 class="dark:text-ink text-lg font-medium text-gray-900">
         {{ t('assets.noAssets') }}
       </h3>
-      <p class="mt-1 mb-4 text-gray-500 dark:text-gray-400">{{ t('assets.getStarted') }}</p>
+      <p class="dark:text-ink-soft mt-1 mb-4 text-gray-500">{{ t('assets.getStarted') }}</p>
       <button
         type="button"
         class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
@@ -368,10 +372,10 @@ const appreciationSubtitle = computed(() => {
               :style="{ color: getAssetTypeIcon(group.type)?.color }"
             />
           </div>
-          <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <h2 class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ group.label }}
           </h2>
-          <span class="text-sm text-gray-500 dark:text-gray-400">({{ group.assets.length }})</span>
+          <span class="dark:text-ink-soft text-sm text-gray-500">({{ group.assets.length }})</span>
         </div>
 
         <!-- Asset Cards Grid -->
@@ -380,7 +384,7 @@ const appreciationSubtitle = computed(() => {
             v-for="(asset, assetIndex) in group.assets"
             :key="asset.id"
             data-testid="asset-card"
-            class="group cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="group dark:bg-surface-raised cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
             :class="syncHighlightClass(asset.id)"
             :style="{
               animation: 'fade-slide-up 0.5s ease-out both',
@@ -406,8 +410,8 @@ const appreciationSubtitle = computed(() => {
                   />
                 </div>
                 <div>
-                  <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ asset.name }}</h3>
-                  <p v-if="asset.purchaseDate" class="text-sm text-gray-500 dark:text-gray-400">
+                  <h3 class="dark:text-ink font-semibold text-gray-900">{{ asset.name }}</h3>
+                  <p v-if="asset.purchaseDate" class="dark:text-ink-soft text-sm text-gray-500">
                     {{ t('common.purchased') }} {{ formatPurchaseDate(asset.purchaseDate) }}
                   </p>
                 </div>
@@ -425,7 +429,7 @@ const appreciationSubtitle = computed(() => {
             <!-- Value Display -->
             <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <p class="mb-1 text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                <p class="dark:text-ink-soft mb-1 text-xs tracking-wide text-gray-500 uppercase">
                   {{ t('common.currentValue') }}
                 </p>
                 <div class="font-outfit text-xl font-extrabold">
@@ -438,10 +442,10 @@ const appreciationSubtitle = computed(() => {
                 </div>
               </div>
               <div>
-                <p class="mb-1 text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                <p class="dark:text-ink-soft mb-1 text-xs tracking-wide text-gray-500 uppercase">
                   {{ t('common.purchaseValue') }}
                 </p>
-                <div class="text-lg text-gray-600 dark:text-gray-400">
+                <div class="dark:text-ink-soft text-lg text-gray-600">
                   <CurrencyAmount
                     :amount="asset.purchaseValue"
                     :currency="asset.currency"
@@ -476,7 +480,7 @@ const appreciationSubtitle = computed(() => {
             <!-- Equity Bar (for assets with loans) -->
             <div v-if="asset.loan?.hasLoan && asset.loan.outstandingBalance" class="mb-4">
               <div class="mb-1.5 flex items-center justify-between">
-                <span class="font-outfit text-xs font-semibold text-gray-500 dark:text-gray-400">{{
+                <span class="font-outfit dark:text-ink-soft text-xs font-semibold text-gray-500">{{
                   t('assets.equity')
                 }}</span>
                 <span class="font-outfit text-xs font-bold text-[#27AE60]"
@@ -514,7 +518,9 @@ const appreciationSubtitle = computed(() => {
                 </div>
               </div>
               <!-- 2-col detail grid -->
-              <div class="text-primary-500/75 mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              <div
+                class="text-primary-500/75 dark:text-ink-soft mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs"
+              >
                 <div v-if="asset.loan.monthlyPayment">
                   <CurrencyAmount
                     :amount="asset.loan.monthlyPayment"
@@ -544,7 +550,7 @@ const appreciationSubtitle = computed(() => {
                 asset.loan?.hasLoan &&
                 (getLinkedRecurringItem(asset) || getRecentLoanTransactions(asset).length > 0)
               "
-              class="mb-4 rounded-xl border border-gray-100 bg-[var(--tint-slate-5)] p-3 dark:border-slate-700 dark:bg-slate-800/50"
+              class="dark:border-line dark:bg-surface-raised/50 mb-4 rounded-xl border border-gray-100 bg-[var(--tint-slate-5)] p-3"
             >
               <!-- Monthly Transaction -->
               <div v-if="getLinkedRecurringItem(asset)">
@@ -595,7 +601,7 @@ const appreciationSubtitle = computed(() => {
                 v-if="getRecentLoanTransactions(asset).length > 0"
                 :class="
                   getLinkedRecurringItem(asset)
-                    ? 'mt-3 border-t border-gray-200/60 pt-2 dark:border-slate-700'
+                    ? 'dark:border-line mt-3 border-t border-gray-200/60 pt-2'
                     : ''
                 "
               >
@@ -636,14 +642,14 @@ const appreciationSubtitle = computed(() => {
             <!-- Notes (if any) -->
             <div
               v-if="asset.notes"
-              class="mb-4 border-l-2 border-gray-200 pl-3 text-sm text-gray-500 italic dark:border-slate-600 dark:text-gray-400"
+              class="dark:border-line-strong dark:text-ink-soft mb-4 border-l-2 border-gray-200 pl-3 text-sm text-gray-500 italic"
             >
               {{ asset.notes }}
             </div>
 
             <!-- Card Footer -->
             <div
-              class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-t border-gray-100 pt-3"
             >
               <!-- Owner Badge -->
               <div class="flex items-center gap-2">
@@ -653,7 +659,7 @@ const appreciationSubtitle = computed(() => {
                 >
                   <BeanieIcon name="user" size="xs" />
                 </div>
-                <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                <span class="dark:text-ink-soft text-sm text-gray-600">{{
                   getMemberName(asset.memberId)
                 }}</span>
               </div>
@@ -662,7 +668,7 @@ const appreciationSubtitle = computed(() => {
               <div class="flex items-center gap-2">
                 <span
                   v-if="!asset.includeInNetWorth"
-                  class="font-outfit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                  class="font-outfit dark:text-terracotta-lift rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-900/30"
                   :title="t('status.excluded')"
                 >
                   {{ t('status.excluded') }}
@@ -675,7 +681,7 @@ const appreciationSubtitle = computed(() => {
           <button
             type="button"
             data-testid="add-asset-card"
-            class="hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 flex min-h-[280px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors dark:border-slate-600 dark:text-gray-500"
+            class="hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-accent-lift dark:border-line-strong dark:text-ink-faint flex min-h-[280px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors"
             @click="openAddWithDefaults({ type: group.type })"
           >
             <BeanieIcon name="plus" size="lg" />

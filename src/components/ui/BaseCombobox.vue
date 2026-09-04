@@ -341,7 +341,7 @@ function clearSelection() {
     <!-- Label -->
     <label
       v-if="label"
-      class="font-outfit block text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+      class="font-outfit dark:text-ink-soft block text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
     >
       {{ label }}
       <span v-if="required" class="text-primary-500">*</span>
@@ -358,7 +358,7 @@ function clearSelection() {
           ? 'border-red-500 focus:border-red-500'
           : 'focus:border-primary-500 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-        'bg-[var(--tint-slate-5)] dark:bg-slate-700',
+        'dark:bg-surface-overlay bg-[var(--tint-slate-5)]',
       ]"
       :disabled="disabled"
       @click="toggleDropdown"
@@ -367,7 +367,7 @@ function clearSelection() {
         class="font-outfit flex-1 truncate text-sm font-semibold"
         :class="
           hasSelection
-            ? 'text-[var(--color-text)] dark:text-gray-100'
+            ? 'dark:text-ink text-[var(--color-text)]'
             : 'text-[var(--color-text-muted)] opacity-30'
         "
       >
@@ -377,7 +377,7 @@ function clearSelection() {
         <!-- Custom badge -->
         <span
           v-if="isOtherMode && customText"
-          class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+          class="dark:bg-surface-overlay dark:text-ink-soft rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500"
         >
           {{ t('combobox.custom') }}
         </span>
@@ -386,7 +386,7 @@ function clearSelection() {
           v-if="hasSelection && !disabled"
           type="button"
           data-testid="combobox-clear"
-          class="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          class="dark:hover:text-ink-soft rounded p-0.5 text-gray-400 hover:text-gray-600"
           @click.stop="clearSelection"
         >
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,7 +423,7 @@ function clearSelection() {
       v-model="customText"
       type="text"
       data-testid="combobox-custom-input"
-      class="focus:border-primary-500 font-outfit block w-full rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+      class="focus:border-primary-500 font-outfit dark:bg-surface-overlay dark:text-ink block w-full rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none"
       :placeholder="otherPlaceholder"
       @blur="handleCustomBlur"
       @keydown="handleCustomKeydown"
@@ -439,19 +439,19 @@ function clearSelection() {
         ref="popoverRef"
         data-testid="combobox-dropdown"
         :style="popoverStyle"
-        class="z-[9999] overflow-y-auto rounded-[16px] border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
+        class="dark:border-line dark:bg-surface-raised z-[9999] overflow-y-auto rounded-[16px] border border-gray-200 bg-white shadow-lg"
       >
         <!-- Search input. z-10 keeps the sticky header above scrolled options
              (without it, options scroll on top of the bg-white search wrapper). -->
         <div
-          class="sticky top-0 z-10 border-b border-gray-100 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"
+          class="dark:border-line dark:bg-surface-raised sticky top-0 z-10 border-b border-gray-100 bg-white p-2"
         >
           <input
             ref="searchInputRef"
             v-model="searchQuery"
             type="text"
             data-testid="combobox-search"
-            class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-base text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100"
+            class="focus:border-primary-500 focus:ring-primary-500 dark:border-line-strong dark:bg-surface-ground dark:text-ink w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-base text-gray-900 focus:ring-1 focus:outline-none"
             :placeholder="searchPlaceholder"
             @keydown.stop
           />
@@ -464,12 +464,12 @@ function clearSelection() {
             :key="option.value"
             type="button"
             :data-testid="`combobox-option-${option.value}`"
-            class="flex w-full items-center gap-2 px-3 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            class="dark:hover:bg-surface-hover flex w-full items-center gap-2 px-3 text-left text-sm transition-colors hover:bg-gray-100"
             :class="[
               option.rich ? 'py-2.5' : 'py-2',
               option.value === modelValue && !isOtherMode
-                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-                : 'text-gray-700 dark:text-gray-300',
+                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-accent-lift'
+                : 'dark:text-ink-soft text-gray-700',
             ]"
             @click="selectOption(option)"
           >
@@ -495,14 +495,14 @@ function clearSelection() {
             <span v-else class="flex-1 truncate">{{ option.label }}</span>
             <span v-if="option.isCustom" class="flex items-center gap-1">
               <span
-                class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+                class="dark:bg-surface-overlay dark:text-ink-soft rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500"
               >
                 {{ t('combobox.custom') }}
               </span>
               <button
                 type="button"
                 :data-testid="`combobox-remove-${option.value}`"
-                class="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                class="dark:hover:text-danger-lift rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
                 :title="t('combobox.removeCustom')"
                 @click.stop="removeCustomOption(option)"
               >
@@ -519,7 +519,7 @@ function clearSelection() {
             <!-- Checkmark for selected -->
             <svg
               v-if="option.value === modelValue && !isOtherMode"
-              class="text-primary-600 dark:text-primary-400 h-4 w-4 flex-shrink-0"
+              class="text-primary-600 dark:text-accent-lift h-4 w-4 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -536,7 +536,7 @@ function clearSelection() {
           <!-- Empty state -->
           <div
             v-if="filteredOptions.items.length === 0"
-            class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+            class="dark:text-ink-soft px-3 py-2 text-sm text-gray-500"
           >
             {{ t('combobox.noResults') }}
           </div>
@@ -546,7 +546,7 @@ function clearSelection() {
                Sized small + muted so it doesn't compete with options. -->
           <div
             v-if="hintText"
-            class="font-outfit border-t border-gray-100 px-3 py-2 text-center text-xs text-gray-500 italic dark:border-slate-700 dark:text-gray-400"
+            class="font-outfit dark:border-line dark:text-ink-soft border-t border-gray-100 px-3 py-2 text-center text-xs text-gray-500 italic"
             data-testid="combobox-cap-hint"
           >
             {{ hintText }}
@@ -557,11 +557,11 @@ function clearSelection() {
             v-if="otherValue"
             type="button"
             data-testid="combobox-other"
-            class="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:border-slate-700 dark:hover:bg-slate-700"
+            class="dark:border-line dark:hover:bg-surface-hover flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100"
             :class="
               isOtherMode
-                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-                : 'text-gray-500 dark:text-gray-400'
+                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-accent-lift'
+                : 'dark:text-ink-soft text-gray-500'
             "
             @click="selectOther"
           >
@@ -572,10 +572,10 @@ function clearSelection() {
     </Teleport>
 
     <!-- Error/Hint -->
-    <p v-if="error" class="text-sm text-red-600 dark:text-red-400">
+    <p v-if="error" class="dark:text-danger-lift text-sm text-red-600">
       {{ error }}
     </p>
-    <p v-else-if="hint" class="text-sm text-gray-500 dark:text-gray-400">
+    <p v-else-if="hint" class="dark:text-ink-soft text-sm text-gray-500">
       {{ hint }}
     </p>
   </div>

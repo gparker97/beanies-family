@@ -298,7 +298,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
          string. Hidden when 'Other' selected (they're typing it themselves). -->
     <p
       v-if="dosesPerDay !== null"
-      class="font-outfit -mt-2 text-xs text-[var(--color-text-muted)] italic dark:text-gray-400"
+      class="font-outfit dark:text-ink-soft -mt-2 text-xs text-[var(--color-text-muted)] italic"
     >
       {{ t('medications.willDisplayAs') }} "{{ frequency }}"
     </p>
@@ -322,7 +322,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <TogglePillGroup v-model="schedule" :options="scheduleOptions" />
       <p
         v-if="ongoing"
-        class="font-outfit mt-2 text-xs text-[var(--color-text-muted)] dark:text-gray-400"
+        class="font-outfit dark:text-ink-soft mt-2 text-xs text-[var(--color-text-muted)]"
       >
         {{ t('medications.schedule.ongoingHint') }}
       </p>

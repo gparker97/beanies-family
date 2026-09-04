@@ -79,7 +79,7 @@ async function handleSave() {
 
 <template>
   <BaseCard :title="hasPin ? t('pin.changeTitle') : t('pin.setTitle')">
-    <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+    <p class="dark:text-ink-soft mb-4 text-sm text-gray-600">
       {{ t('pin.settingsDescription') }}
     </p>
 
@@ -89,8 +89,8 @@ async function handleSave() {
       class="mb-4 rounded-xl p-3 text-sm"
       :class="
         statusMessage.type === 'success'
-          ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-          : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+          ? 'dark:text-success-lift bg-green-50 text-green-700 dark:bg-green-900/20'
+          : 'dark:text-danger-lift bg-red-50 text-red-600 dark:bg-red-900/20'
       "
     >
       {{ statusMessage.text }}
@@ -104,7 +104,7 @@ async function handleSave() {
 
     <form v-else class="space-y-4" @submit.prevent="handleSave">
       <div v-if="hasPin">
-        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
           {{ t('pin.currentPin') }}
         </p>
         <PinInput
@@ -115,7 +115,7 @@ async function handleSave() {
         />
       </div>
       <div>
-        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
           {{ t('pin.newPin') }}
         </p>
         <PinInput
@@ -126,7 +126,7 @@ async function handleSave() {
         />
       </div>
       <div>
-        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
           {{ t('pin.confirmPin') }}
         </p>
         <PinInput v-model="confirmPin" :disabled="isSaving" :label="t('pin.confirmPin')" />

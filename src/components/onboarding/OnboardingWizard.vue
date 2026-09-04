@@ -374,7 +374,7 @@ const transitionName = computed(() =>
 }
 
 .dark .ob-nav-back {
-  color: #94a3b8;
+  color: #9aa9b4;
 }
 
 .ob-nav-skip {
@@ -391,7 +391,7 @@ const transitionName = computed(() =>
 }
 
 .dark .ob-nav-skip {
-  color: #94a3b8;
+  color: #9aa9b4;
 }
 
 .ob-nav-next {

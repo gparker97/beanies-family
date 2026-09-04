@@ -167,7 +167,7 @@ const delayStep = computed(() => (props.variant === 'drawer' ? 60 : 18));
   width: 10px;
 }
 
-:global(.dark) .confetti-bean {
+html.dark .confetti-bean {
   background: var(--bean-dark);
   box-shadow: 0 0 0 1.25px rgb(30 41 59 / 85%);
 }

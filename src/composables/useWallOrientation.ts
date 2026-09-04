@@ -33,6 +33,62 @@ function screenOrientation(): OrientationLike | null {
 }
 
 /**
+ * Android's own tablet threshold, and the one iPadOS effectively agrees with.
+ * Measured on the SMALLEST screen dimension so a phone held sideways — which
+ * can easily exceed 768px of width — is still a phone.
+ */
+const TABLET_MIN_SIDE_PX = 600;
+
+/**
+ * True on a device big enough that landscape is a reasonable way to hold the
+ * whole app, not just the wall.
+ *
+ * `screen.width/height` are the DEVICE dimensions, not the viewport, so this
+ * does not change when a browser window is resized — which is what we want: a
+ * narrow window on a desktop is not a phone.
+ */
+export function isRotatableFormFactor(): boolean {
+  if (typeof screen === 'undefined') return false;
+  const { width, height } = screen;
+  if (!width || !height) return false;
+  return Math.min(width, height) >= TABLET_MIN_SIDE_PX;
+}
+
+/**
+ * The orientation the app returns to when it is not on the wall.
+ *
+ * On a phone that is portrait, because every layout is portrait-first and the
+ * installed PWA manifest overrides the OS rotation lock (the 2026-06-12
+ * regression). On a tablet it is "whatever the device wants" — landscape is
+ * arguably the better way to use the app there, and the manifest cannot say
+ * so per-device because it is one static file.
+ */
+function applyBaseOrientation(onFail?: () => void): void {
+  const o = screenOrientation();
+  if (!o) return;
+  try {
+    if (isRotatableFormFactor()) {
+      o.unlock?.();
+      return;
+    }
+    // `lock()` REJECTS routinely — on desktop, when superseded, or where the
+    // API wants fullscreen. Swallow it explicitly or it surfaces unhandled.
+    o.lock?.('portrait')?.catch(() => onFail?.());
+  } catch {
+    onFail?.();
+  }
+}
+
+/**
+ * Called once at boot. On a phone this is a no-op beyond re-stating the
+ * declarative default; on a tablet it releases the manifest's portrait lock so
+ * the app can be held either way.
+ */
+export function applyOrientationPolicy(): void {
+  applyBaseOrientation();
+}
+
+/**
  * Restore the declarative default from OUTSIDE a component scope.
  *
  * The router calls this on every navigation away from the wall, because "we
@@ -42,18 +98,10 @@ function screenOrientation(): OrientationLike | null {
  * no-op rather than a conflict.
  */
 export function restoreWallOrientation(): void {
-  const o = screenOrientation();
-  try {
-    // `lock()` returns a promise and REJECTS routinely — on desktop, when a
-    // newer lock/unlock supersedes this one, or where the API needs
-    // fullscreen. A sync try/catch cannot catch that, so the rejection must be
-    // swallowed explicitly or it becomes an unhandled rejection.
-    o?.lock?.('portrait')?.catch(() => {
-      /* orientation is a nice-to-have; never let it break a navigation */
-    });
-  } catch {
-    // `lock` itself threw synchronously (very old engines).
-  }
+  // Back to the app's base orientation for THIS device — portrait on a phone,
+  // free on a tablet. Restoring to portrait unconditionally would have fought
+  // the tablet policy every time someone left the wall.
+  applyBaseOrientation();
 }
 
 export function useWallOrientation(surface = 'beanie-wall') {
@@ -97,14 +145,10 @@ export function useWallOrientation(surface = 'beanie-wall') {
   function restore(): void {
     if (!supported || !released.value) return;
     released.value = false;
-    try {
-      // See restoreWallOrientation: the rejection is asynchronous, so it needs
-      // its own handler. A failed restore is reported (the app is left
-      // rotatable until the next cold start) but must never throw at a user.
-      o?.lock?.('portrait')?.catch(() => report('orientation_restore_failed'));
-    } catch {
-      report('orientation_restore_failed');
-    }
+    // Same policy as a cold start: portrait on a phone, free on a tablet. A
+    // failed restore is reported (the app is left rotatable until the next
+    // cold start) but must never throw at a user.
+    applyBaseOrientation(() => report('orientation_restore_failed'));
   }
 
   onScopeDispose(restore);

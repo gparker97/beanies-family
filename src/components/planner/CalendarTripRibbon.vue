@@ -135,7 +135,7 @@ const toggleAria = computed(() =>
     <button
       v-if="inline"
       type="button"
-      class="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-[var(--vacation-teal-15)] py-1.5 pr-2 pl-2.5 transition-colors hover:border-[var(--vacation-teal)] dark:border-slate-600"
+      class="dark:border-line-strong flex flex-shrink-0 items-center gap-1.5 rounded-full border border-[var(--vacation-teal-15)] py-1.5 pr-2 pl-2.5 transition-colors hover:border-[var(--vacation-teal)]"
       style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 5%))"
       :aria-label="
         soonest ? `${soonest.name}, ${soonest.ariaCountdown}` : t('planner.tripRibbonShow')
@@ -143,11 +143,9 @@ const toggleAria = computed(() =>
       @click="soonest && emit('vacation-click', soonest.id)"
     >
       <span aria-hidden="true" class="text-sm leading-none">✈️</span>
-      <span
-        v-if="soonest"
-        class="font-outfit text-secondary-500 text-xs font-bold dark:text-gray-100"
-        >{{ soonest.countdownText }}</span
-      >
+      <span v-if="soonest" class="font-outfit text-secondary-500 dark:text-ink text-xs font-bold">{{
+        soonest.countdownText
+      }}</span>
       <span aria-hidden="true" class="text-xs font-bold text-[var(--vacation-teal)]">&rsaquo;</span>
     </button>
 
@@ -155,18 +153,18 @@ const toggleAria = computed(() =>
     <button
       v-else-if="isMobile && !mobileExpanded"
       type="button"
-      class="flex w-full items-center gap-2 rounded-full border border-[var(--vacation-teal-15)] px-3 py-2 text-left transition-colors hover:border-[var(--vacation-teal)] dark:border-slate-600"
+      class="dark:border-line-strong flex w-full items-center gap-2 rounded-full border border-[var(--vacation-teal-15)] px-3 py-2 text-left transition-colors hover:border-[var(--vacation-teal)]"
       style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 5%))"
       :aria-label="t('planner.tripRibbonShow')"
       @click="mobileExpanded = true"
     >
       <span aria-hidden="true" class="text-sm">✈️</span>
-      <span class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">{{
+      <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">{{
         tripsCountLabel
       }}</span>
       <span
         v-if="soonest"
-        class="text-secondary-500/70 truncate text-xs font-medium dark:text-gray-400"
+        class="text-secondary-500/70 dark:text-ink-soft truncate text-xs font-medium"
       >
         · {{ soonest.name }} · {{ soonest.countdownText }}
       </span>
@@ -178,7 +176,7 @@ const toggleAria = computed(() =>
     <!-- Expanded (mobile) or the standard desktop row -->
     <div v-else class="flex w-full min-w-0 items-center gap-3">
       <span
-        class="font-outfit text-secondary-500/60 flex flex-shrink-0 items-center gap-1.5 text-xs font-bold tracking-[0.06em] uppercase dark:text-gray-400"
+        class="font-outfit text-secondary-500/60 dark:text-ink-soft flex flex-shrink-0 items-center gap-1.5 text-xs font-bold tracking-[0.06em] uppercase"
       >
         <span aria-hidden="true">✈️</span>{{ t('planner.tripRibbonLabel') }}
       </span>
@@ -188,13 +186,13 @@ const toggleAria = computed(() =>
           v-for="p in pills"
           :key="p.id"
           type="button"
-          class="group flex flex-shrink-0 items-center gap-2 rounded-full border border-[var(--vacation-teal-15)] py-1 pr-1.5 pl-3 transition-all hover:-translate-y-px hover:border-[var(--vacation-teal)] hover:shadow-sm dark:border-slate-600"
+          class="group dark:border-line-strong flex flex-shrink-0 items-center gap-2 rounded-full border border-[var(--vacation-teal-15)] py-1 pr-1.5 pl-3 transition-all hover:-translate-y-px hover:border-[var(--vacation-teal)] hover:shadow-sm"
           style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 5%))"
           :aria-label="`${p.name}, ${p.ariaCountdown}`"
           @click="emit('vacation-click', p.id)"
         >
           <span aria-hidden="true" class="text-sm leading-none">{{ p.emoji }}</span>
-          <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-100">{{
+          <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">{{
             p.name
           }}</span>
           <span
@@ -208,7 +206,7 @@ const toggleAria = computed(() =>
 
       <button
         type="button"
-        class="font-outfit text-secondary-500/50 hover:text-secondary-500 hover:bg-secondary-500/5 flex-shrink-0 rounded-lg px-2 py-1 text-xs font-semibold transition-colors dark:text-gray-500 dark:hover:text-gray-300"
+        class="font-outfit text-secondary-500/50 hover:text-secondary-500 hover:bg-secondary-500/5 dark:text-ink-faint dark:hover:text-ink-soft flex-shrink-0 rounded-lg px-2 py-1 text-xs font-semibold transition-colors"
         :aria-label="toggleAria"
         @click="onToggle"
       >

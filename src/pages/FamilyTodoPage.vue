@@ -269,7 +269,7 @@ async function handleAcknowledge(id: string) {
         v-if="displayedCompletedTodos.length > 0"
         v-model:collapsed="completedCollapsed"
         :label="t('todo.section.completed')"
-        label-class="text-green-600 dark:text-green-400"
+        label-class="text-green-600 dark:text-success-lift"
         :todos="displayedCompletedTodos"
         collapsible
         @toggle="handleToggle"

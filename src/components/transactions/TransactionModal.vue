@@ -731,7 +731,7 @@ function dismissLinkPrompt() {
     >
       <div class="flex items-center gap-2">
         <span class="text-base">📅</span>
-        <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+        <span class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
           {{ t('transactions.editingProjected').replace('{date}', formatNookDate(projectedDate)) }}
         </span>
       </div>
@@ -740,7 +740,7 @@ function dismissLinkPrompt() {
     <!-- 0. Recurring / One-time tab bar (hidden for recurring-item edits and transfers) -->
     <div
       v-if="!isEditingRecurring && !isTransfer"
-      class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50"
+      class="dark:bg-surface-overlay/50 rounded-2xl bg-[var(--tint-slate-5)] p-1.5"
     >
       <div class="grid grid-cols-2 gap-1.5">
         <button
@@ -763,8 +763,8 @@ function dismissLinkPrompt() {
           class="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200"
           :class="
             recurrenceMode === opt.value
-              ? 'border-primary-500 border-2 bg-white shadow-sm dark:bg-slate-600'
-              : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-slate-600/40'
+              ? 'border-primary-500 dark:bg-surface-hover border-2 bg-white shadow-sm'
+              : 'dark:hover:bg-surface-hover/40 border-2 border-transparent hover:bg-white/60'
           "
           @click="recurrenceMode = opt.value as 'recurring' | 'one-time'"
         >
@@ -773,8 +773,8 @@ function dismissLinkPrompt() {
             class="font-outfit text-xs font-bold"
             :class="
               recurrenceMode === opt.value
-                ? 'text-[var(--color-text)] dark:text-gray-100'
-                : 'text-[var(--color-text)] opacity-35 dark:text-gray-400'
+                ? 'dark:text-ink text-[var(--color-text)]'
+                : 'dark:text-ink-soft text-[var(--color-text)] opacity-35'
             "
           >
             {{ opt.label }}
@@ -784,7 +784,7 @@ function dismissLinkPrompt() {
             :class="
               recurrenceMode === opt.value
                 ? 'text-[var(--color-text-muted)]'
-                : 'opacity-25 dark:text-gray-500'
+                : 'dark:text-ink-faint opacity-25'
             "
           >
             {{ opt.desc }}
@@ -897,7 +897,7 @@ function dismissLinkPrompt() {
         <button
           v-if="hasLinkableActivities"
           type="button"
-          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-lg bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md"
           @click="selectQuickLink('activity')"
         >
           📋 {{ t('txLink.activity') }}
@@ -905,14 +905,14 @@ function dismissLinkPrompt() {
         <button
           v-if="hasLinkableLoans"
           type="button"
-          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-lg bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md"
           @click="selectQuickLink('loan')"
         >
           🏦 {{ t('txLink.loan') }}
         </button>
         <button
           type="button"
-          class="rounded-lg px-1.5 py-1 text-[0.6875rem] text-[var(--color-text-muted)] transition-colors hover:bg-gray-100 dark:hover:bg-slate-600"
+          class="dark:hover:bg-surface-hover rounded-lg px-1.5 py-1 text-[0.6875rem] text-[var(--color-text-muted)] transition-colors hover:bg-gray-100"
           @click="dismissLinkPrompt"
         >
           ✕
@@ -923,12 +923,12 @@ function dismissLinkPrompt() {
     <!-- 3. Description -->
     <FormFieldGroup :label="t('form.description')" :required="!isTransfer">
       <div
-        class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+        class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
       >
         <input
           v-model="description"
           type="text"
-          class="font-outfit w-full border-none bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+          class="font-outfit dark:text-ink w-full border-none bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
           :placeholder="t('form.description')"
         />
       </div>
@@ -939,7 +939,7 @@ function dismissLinkPrompt() {
       <!-- Amount field with optional locking -->
       <div v-if="isAmountLocked" class="space-y-1">
         <div
-          class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3"
         >
           <span class="font-outfit text-[1.8rem] font-bold text-[var(--color-text)]">
             {{ currency }} {{ amount?.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
@@ -951,7 +951,7 @@ function dismissLinkPrompt() {
       <!-- Linked but amount not locked (one-time extra payment): currency locked, amount editable -->
       <div v-else-if="hasActiveLink" class="flex items-stretch gap-2">
         <div
-          class="font-outfit flex h-full w-[82px] flex-shrink-0 items-center justify-center gap-1 rounded-[16px] bg-[var(--tint-slate-5)] px-3 text-center text-sm font-bold text-[var(--color-text)] dark:bg-slate-700"
+          class="font-outfit dark:bg-surface-overlay flex h-full w-[82px] flex-shrink-0 items-center justify-center gap-1 rounded-[16px] bg-[var(--tint-slate-5)] px-3 text-center text-sm font-bold text-[var(--color-text)]"
         >
           {{ currency }} 🔒
         </div>
@@ -979,7 +979,7 @@ function dismissLinkPrompt() {
         <template v-if="hasActiveLink">
           <FormFieldGroup :label="t('modal.howOften')">
             <div
-              class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+              class="dark:bg-surface-overlay flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3"
             >
               <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{
                 lockedRecurrenceSummary
@@ -990,7 +990,7 @@ function dismissLinkPrompt() {
           </FormFieldGroup>
           <FormFieldGroup :label="t('form.startDate')">
             <div
-              class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+              class="dark:bg-surface-overlay flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3"
             >
               <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{
                 startDate
@@ -1029,7 +1029,7 @@ function dismissLinkPrompt() {
             :label="t('txLink.linkedActivity')"
           >
             <div
-              class="flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)] dark:bg-slate-700"
+              class="dark:bg-surface-overlay flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)]"
             >
               <span>📋</span>
               <span class="font-semibold">{{
@@ -1051,7 +1051,7 @@ function dismissLinkPrompt() {
           </FormFieldGroup>
           <FormFieldGroup v-if="linkType === 'loan' && linkedLoan" :label="t('txLink.linkedLoan')">
             <div
-              class="flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)] dark:bg-slate-700"
+              class="dark:bg-surface-overlay flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)]"
             >
               <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }}</span>
               <span class="font-semibold">{{ linkedLoan.name }}</span>
@@ -1079,7 +1079,7 @@ function dismissLinkPrompt() {
           <div>
             <div class="mb-2 flex items-center gap-1.5">
               <label
-                class="font-outfit text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+                class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-[var(--color-text)] uppercase opacity-35"
               >
                 {{ t('txLink.linkPayment') }}
               </label>
@@ -1127,7 +1127,7 @@ function dismissLinkPrompt() {
         <div>
           <div class="mb-2 flex items-center gap-1.5">
             <label
-              class="font-outfit text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+              class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-[var(--color-text)] uppercase opacity-35"
             >
               {{ t('goalLink.title') }}
             </label>
@@ -1201,9 +1201,9 @@ function dismissLinkPrompt() {
     <!-- 9. Active toggle (recurring edit only) -->
     <div
       v-if="isEditingRecurring"
-      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+      class="dark:bg-surface-overlay flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
     >
-      <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
+      <span class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
         {{ t('recurring.active') }}
       </span>
       <ToggleSwitch v-model="isActive" size="sm" />

@@ -52,7 +52,7 @@ const identity = computed(() => identityFor(props.activity));
 <template>
   <button
     type="button"
-    class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-800"
+    class="dark:bg-surface-raised flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)]"
     :class="[
       identity.dashed ? 'border-dashed' : '',
       identity.celebration.celebrating ? 'is-celebration' : '',
@@ -85,7 +85,7 @@ const identity = computed(() => identityFor(props.activity));
       <!-- Line 1: Title + photo indicator + optional date -->
       <div class="flex items-center justify-between gap-2">
         <h4
-          class="font-outfit text-secondary-500 flex min-w-0 items-center truncate text-sm font-semibold dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink flex min-w-0 items-center truncate text-sm font-semibold"
         >
           <span class="truncate">{{ activity.title }}</span>
           <PhotoIndicator :photo-ids="activity.photoIds" />
@@ -93,7 +93,7 @@ const identity = computed(() => identityFor(props.activity));
         </h4>
         <span
           v-if="showDate"
-          class="text-secondary-500/40 flex-shrink-0 text-xs dark:text-gray-500"
+          class="text-secondary-500/40 dark:text-ink-faint flex-shrink-0 text-xs"
         >
           {{ formatDisplayDate(date) }}
         </span>
@@ -118,14 +118,14 @@ const identity = computed(() => identityFor(props.activity));
         -->
         <span
           v-if="activity.recurrence !== 'none'"
-          class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 max-w-[10rem] truncate rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"
+          class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 dark:text-ink-soft max-w-[10rem] truncate rounded-full px-1.5 py-px text-xs font-semibold"
           :title="describeActivity(activity)"
         >
           {{ describeActivity(activity) }}
         </span>
         <span
           v-if="showReminder && activity.reminderMinutes > 0"
-          class="text-secondary-500/30 text-xs dark:text-gray-500"
+          class="text-secondary-500/30 dark:text-ink-faint text-xs"
           :title="t('planner.reminderSet')"
           aria-hidden="true"
         >

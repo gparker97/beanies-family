@@ -109,15 +109,15 @@ const stats = computed(() => [
 const SEVERITY_STYLE: Record<AllergySeverity, { bar: string; badge: string }> = {
   severe: {
     bar: 'bg-red-500',
-    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-danger-lift',
   },
   moderate: {
     bar: 'bg-amber-500',
-    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-terracotta-lift',
   },
   mild: {
     bar: 'bg-green-500',
-    badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-success-lift',
   },
 };
 
@@ -140,20 +140,22 @@ function openMedication(m: Medication): void {
       class="mb-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-5 py-5 sm:px-8 sm:py-7"
     >
       <h1
-        class="font-outfit text-secondary-500 text-2xl leading-tight font-bold sm:text-3xl dark:text-gray-100"
+        class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-bold sm:text-3xl"
       >
         🩺 {{ t('careSafety.title') }}
       </h1>
-      <p class="text-secondary-500/70 mt-1 text-sm">{{ t('careSafety.subtitle') }}</p>
+      <p class="text-secondary-500/70 dark:text-ink-soft mt-1 text-sm">
+        {{ t('careSafety.subtitle') }}
+      </p>
     </header>
 
     <StatStrip :stats="stats" class="mb-6" />
 
     <section
-      class="mb-6 rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised mb-6 rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)]"
     >
       <div class="mb-3 flex items-center justify-between gap-2">
-        <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+        <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
           ⚠️ {{ t('careSafety.section.allergies') }}
         </h2>
         <SectionAddButton
@@ -166,7 +168,7 @@ function openMedication(m: Medication): void {
         <li
           v-for="a in allergies"
           :key="a.id"
-          class="group relative flex cursor-pointer flex-col gap-1 overflow-hidden rounded-xl bg-[var(--tint-slate-5)] px-4 py-3 pl-5 transition-colors hover:bg-[var(--tint-orange-4)] dark:bg-slate-700/40"
+          class="group dark:bg-surface-overlay/40 relative flex cursor-pointer flex-col gap-1 overflow-hidden rounded-xl bg-[var(--tint-slate-5)] px-4 py-3 pl-5 transition-colors hover:bg-[var(--tint-orange-4)]"
           @click="openAllergy(a)"
         >
           <span
@@ -176,10 +178,12 @@ function openMedication(m: Medication): void {
           />
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <h3 class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
+              <h3 class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
                 {{ a.name }}
               </h3>
-              <p class="text-secondary-500/60 text-xs">{{ memberFor(a.memberId)?.name ?? '—' }}</p>
+              <p class="text-secondary-500/60 dark:text-ink-soft text-xs">
+                {{ memberFor(a.memberId)?.name ?? '—' }}
+              </p>
             </div>
             <span
               class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase"
@@ -190,7 +194,7 @@ function openMedication(m: Medication): void {
           </div>
           <p
             v-if="a.reaction"
-            class="font-outfit text-secondary-500/70 line-clamp-2 text-xs dark:text-gray-400"
+            class="font-outfit text-secondary-500/70 dark:text-ink-soft line-clamp-2 text-xs"
           >
             {{ a.reaction }}
           </p>
@@ -200,10 +204,10 @@ function openMedication(m: Medication): void {
     </section>
 
     <section
-      class="mb-6 rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised mb-6 rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)]"
     >
       <div class="mb-3 flex items-center justify-between gap-2">
-        <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+        <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
           💊 {{ t('careSafety.section.medications') }}
         </h2>
         <SectionAddButton
@@ -216,26 +220,30 @@ function openMedication(m: Medication): void {
         <li
           v-for="m in activeMeds"
           :key="m.id"
-          class="flex cursor-pointer flex-col gap-0.5 rounded-xl bg-[var(--tint-slate-5)] px-4 py-3 transition-colors hover:bg-[var(--tint-orange-4)] dark:bg-slate-700/40"
+          class="dark:bg-surface-overlay/40 flex cursor-pointer flex-col gap-0.5 rounded-xl bg-[var(--tint-slate-5)] px-4 py-3 transition-colors hover:bg-[var(--tint-orange-4)]"
           @click="openMedication(m)"
         >
           <div class="flex items-start justify-between gap-2">
-            <h3 class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
+            <h3 class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
               {{ m.name }}
             </h3>
-            <span class="text-secondary-500/60 text-[0.6875rem]">{{
+            <span class="text-secondary-500/60 dark:text-ink-soft text-[0.6875rem]">{{
               memberFor(m.memberId)?.name ?? '—'
             }}</span>
           </div>
-          <p class="font-outfit text-secondary-500/70 text-xs">{{ m.dose }} · {{ m.frequency }}</p>
+          <p class="font-outfit text-secondary-500/70 dark:text-ink-soft text-xs">
+            {{ m.dose }} · {{ m.frequency }}
+          </p>
         </li>
       </ul>
       <EmptyState v-else emoji="💊" :message="t('careSafety.empty.medications')" />
     </section>
 
-    <section class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800">
+    <section
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)]"
+    >
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+        <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
           🆘 {{ t('careSafety.section.keyContacts') }}
         </h2>
         <div class="flex flex-shrink-0 items-center gap-3">
@@ -257,22 +265,20 @@ function openMedication(m: Medication): void {
         <li
           v-for="c in previewContacts"
           :key="c.id"
-          class="flex cursor-pointer items-start gap-3 rounded-xl bg-[var(--tint-slate-5)] px-3 py-2.5 transition-colors hover:bg-[var(--tint-orange-4)] dark:bg-slate-700/40"
+          class="dark:bg-surface-overlay/40 flex cursor-pointer items-start gap-3 rounded-xl bg-[var(--tint-slate-5)] px-3 py-2.5 transition-colors hover:bg-[var(--tint-orange-4)]"
           @click="router.push('/pod/contacts')"
         >
           <div
-            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white text-base dark:bg-slate-800"
+            class="dark:bg-surface-raised flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white text-base"
             aria-hidden="true"
           >
             {{ CATEGORY_EMOJI[c.category] }}
           </div>
           <div class="min-w-0 flex-1">
-            <h3
-              class="font-outfit text-secondary-500 truncate text-sm font-bold dark:text-gray-100"
-            >
+            <h3 class="font-outfit text-secondary-500 dark:text-ink truncate text-sm font-bold">
               {{ c.name }}
             </h3>
-            <p v-if="c.phone" class="font-inter text-secondary-500/70 text-xs dark:text-gray-400">
+            <p v-if="c.phone" class="font-inter text-secondary-500/70 dark:text-ink-soft text-xs">
               📞 {{ c.phone }}
             </p>
           </div>

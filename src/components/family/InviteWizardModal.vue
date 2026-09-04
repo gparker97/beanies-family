@@ -231,7 +231,7 @@ function handleClose() {
       >
         <button
           type="button"
-          class="absolute top-3 right-3 z-10 rounded-full bg-white/80 p-1.5 text-gray-500 backdrop-blur-sm transition-all hover:bg-white hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800/80 dark:hover:bg-slate-800"
+          class="dark:bg-surface-raised/80 dark:hover:bg-surface-hover absolute top-3 right-3 z-10 rounded-full bg-white/80 p-1.5 text-gray-500 backdrop-blur-sm transition-all hover:bg-white hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           :aria-label="t('action.close')"
           :disabled="inviteFlow.isGenerating.value"
           @click="handleClose"
@@ -247,10 +247,10 @@ function handleClose() {
             aria-hidden="true"
             class="wizard-bean-active mx-auto mb-2 h-16 w-16 object-contain"
           />
-          <h2 class="font-outfit text-secondary-500 text-xl font-bold dark:text-gray-100">
+          <h2 class="font-outfit text-secondary-500 dark:text-ink text-xl font-bold">
             {{ t('inviteWizard.picker.title') }}
           </h2>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-1 text-xs text-gray-500">
             {{ t('inviteWizard.picker.subhead') }}
           </p>
         </div>
@@ -278,7 +278,7 @@ function handleClose() {
           </div>
 
           <div
-            class="mb-6 h-[3px] w-12 overflow-hidden rounded-sm bg-gray-200/80 dark:bg-slate-600"
+            class="dark:bg-surface-hover mb-6 h-[3px] w-12 overflow-hidden rounded-sm bg-gray-200/80"
           >
             <div
               class="from-primary-500 to-terracotta-400 h-full bg-gradient-to-r transition-transform duration-500 ease-out"
@@ -319,10 +319,10 @@ function handleClose() {
     <!-- Step 1 — Confirm Email -->
     <div v-else-if="currentStep === 1" data-testid="invite-wizard-step-1" class="space-y-4">
       <div>
-        <h2 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
+        <h2 class="font-outfit text-secondary-500 dark:text-ink text-2xl font-bold">
           {{ heroTitle }}
         </h2>
-        <p class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-2 text-sm leading-relaxed text-gray-500">
           {{ t('inviteWizard.step1.subhead') }}
         </p>
       </div>
@@ -340,13 +340,13 @@ function handleClose() {
         >
           {{ t('inviteWizard.invitee.label') }}
         </span>
-        <span class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
+        <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
           {{ invitee.memberName }}
         </span>
         <button
           v-if="showChangeLink"
           type="button"
-          class="font-outfit ml-auto rounded-full border border-[var(--color-primary)]/25 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--tint-orange-8)] dark:bg-slate-800"
+          class="font-outfit dark:bg-surface-raised ml-auto rounded-full border border-[var(--color-primary)]/25 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--tint-orange-8)]"
           data-testid="invite-wizard-change"
           @click="changeRecipient"
         >
@@ -361,7 +361,7 @@ function handleClose() {
         autocomplete="off"
         :placeholder="t('invite.shareEmail.placeholder')"
         data-testid="invite-email-input"
-        class="font-inter w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-base font-medium text-gray-900 transition-all outline-none placeholder:font-normal placeholder:text-gray-400 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--tint-orange-15)] dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        class="font-inter dark:border-line-strong dark:bg-surface-overlay dark:text-ink w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-base font-medium text-gray-900 transition-all outline-none placeholder:font-normal placeholder:text-gray-400 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--tint-orange-15)]"
       />
 
       <!-- No-default-email warning chip + child-hint disclosure: only when the
@@ -383,7 +383,7 @@ function handleClose() {
           @toggle="childHintOpen = ($event.target as HTMLDetailsElement).open"
         >
           <summary
-            class="font-outfit inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-1 text-xs font-semibold text-gray-500 transition-colors hover:text-[var(--color-primary)] dark:text-gray-400"
+            class="font-outfit dark:text-ink-soft inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-1 text-xs font-semibold text-gray-500 transition-colors hover:text-[var(--color-primary)]"
             data-testid="invite-wizard-child-hint-toggle"
           >
             <span
@@ -396,7 +396,7 @@ function handleClose() {
           <div
             class="mt-2 rounded-r-xl border-l-2 border-[#E67E22] bg-[var(--tint-orange-8)] px-3.5 py-2.5"
           >
-            <p class="text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+            <p class="dark:text-ink-soft text-xs leading-relaxed text-gray-700">
               {{ t('inviteWizard.step1.childHint.body1') }}
               <a
                 href="https://families.google/familylink/"
@@ -455,13 +455,13 @@ function handleClose() {
           data-testid="invite-wizard-confirm-checkbox"
         />
         <span
-          class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 border-gray-300 bg-white transition-all peer-checked:border-[var(--color-primary)] peer-checked:bg-[var(--color-primary)] dark:border-slate-500 dark:bg-slate-700"
+          class="dark:border-line-strong dark:bg-surface-overlay mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 border-gray-300 bg-white transition-all peer-checked:border-[var(--color-primary)] peer-checked:bg-[var(--color-primary)]"
         >
           <BeanieIcon v-if="confirmed" name="check" size="sm" class="text-white" />
         </span>
-        <span class="text-sm leading-relaxed font-medium text-gray-700 dark:text-gray-300">
+        <span class="dark:text-ink-soft text-sm leading-relaxed font-medium text-gray-700">
           <span
-            class="rounded-md border border-[var(--color-primary)]/30 bg-white px-1.5 py-0.5 font-semibold text-[var(--color-primary)] dark:bg-slate-800"
+            class="dark:bg-surface-raised rounded-md border border-[var(--color-primary)]/30 bg-white px-1.5 py-0.5 font-semibold text-[var(--color-primary)]"
           >
             {{ trimmedEmail }}
           </span>
@@ -474,7 +474,7 @@ function handleClose() {
            Drive-only — local-provider invites don't trigger a Google email. -->
       <div
         v-if="isDriveProvider"
-        class="flex items-start gap-2 rounded-2xl px-4 py-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300"
+        class="dark:text-ink-soft flex items-start gap-2 rounded-2xl px-4 py-3 text-sm leading-relaxed text-gray-600"
         :style="{ backgroundColor: 'var(--tint-orange-8)' }"
         data-testid="invite-wizard-next-hint"
       >
@@ -485,7 +485,7 @@ function handleClose() {
       <!-- Primary CTA -->
       <button
         type="button"
-        class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold text-white shadow-md transition-all enabled:bg-gradient-to-br enabled:from-[var(--color-primary)] enabled:to-[#E67E22] enabled:shadow-[var(--color-primary)]/30 enabled:hover:-translate-y-0.5 enabled:hover:from-[#D14D1A] enabled:hover:to-[#D86E15] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+        class="font-outfit dark:disabled:bg-surface-overlay dark:disabled:text-ink-faint flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold text-white shadow-md transition-all enabled:bg-gradient-to-br enabled:from-[var(--color-primary)] enabled:to-[#E67E22] enabled:shadow-[var(--color-primary)]/30 enabled:hover:-translate-y-0.5 enabled:hover:from-[#D14D1A] enabled:hover:to-[#D86E15] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
         :disabled="!canSubmit"
         data-testid="invite-wizard-submit"
         @click="handleSubmit"
@@ -520,7 +520,7 @@ function handleClose() {
       <div class="pt-2">
         <button
           type="button"
-          class="font-outfit inline-flex items-center gap-1.5 text-sm font-bold text-gray-700 transition-colors hover:text-[var(--color-primary)] dark:text-gray-200"
+          class="font-outfit dark:text-ink inline-flex items-center gap-1.5 text-sm font-bold text-gray-700 transition-colors hover:text-[var(--color-primary)]"
           data-testid="invite-wizard-faq"
           @click="faqOpen = !faqOpen"
         >
@@ -541,7 +541,7 @@ function handleClose() {
           >
             <details class="group border-b border-[var(--color-primary)]/10 last:border-0">
               <summary
-                class="font-outfit flex cursor-pointer list-none items-center justify-between py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="font-outfit dark:text-ink-soft flex cursor-pointer list-none items-center justify-between py-3 text-sm font-medium text-gray-700"
               >
                 <span>{{ t('inviteWizard.step1.faq.q1') }}</span>
                 <span
@@ -549,13 +549,13 @@ function handleClose() {
                   >+</span
                 >
               </summary>
-              <p class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+              <p class="dark:text-ink-soft pb-3 text-sm leading-relaxed text-gray-600">
                 {{ t('inviteWizard.step1.faq.a1') }}
               </p>
             </details>
             <details class="group border-b border-[var(--color-primary)]/10 last:border-0">
               <summary
-                class="font-outfit flex cursor-pointer list-none items-center justify-between py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="font-outfit dark:text-ink-soft flex cursor-pointer list-none items-center justify-between py-3 text-sm font-medium text-gray-700"
               >
                 <span>{{ t('inviteWizard.step1.faq.q2') }}</span>
                 <span
@@ -564,13 +564,13 @@ function handleClose() {
                 >
               </summary>
               <p
-                class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400"
+                class="dark:text-ink-soft pb-3 text-sm leading-relaxed text-gray-600"
                 v-html="t('inviteWizard.step1.faq.a2')"
               />
             </details>
             <details class="group">
               <summary
-                class="font-outfit flex cursor-pointer list-none items-center justify-between py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="font-outfit dark:text-ink-soft flex cursor-pointer list-none items-center justify-between py-3 text-sm font-medium text-gray-700"
               >
                 <span>{{ t('inviteWizard.step1.faq.q3') }}</span>
                 <span
@@ -579,7 +579,7 @@ function handleClose() {
                 >
               </summary>
               <p
-                class="pb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400"
+                class="dark:text-ink-soft pb-3 text-sm leading-relaxed text-gray-600"
                 v-html="t('inviteWizard.step1.faq.a3')"
               />
             </details>
@@ -591,10 +591,10 @@ function handleClose() {
     <!-- Step 2 -->
     <div v-else data-testid="invite-wizard-step-2" class="space-y-4">
       <div>
-        <h2 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
+        <h2 class="font-outfit text-secondary-500 dark:text-ink text-2xl font-bold">
           {{ heroTitle }}
         </h2>
-        <p class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-2 text-sm leading-relaxed text-gray-500">
           {{ step2Caption }}
         </p>
       </div>
@@ -604,7 +604,7 @@ function handleClose() {
            not. Drive-only (local invites don't trigger a Google email). -->
       <div
         v-if="isDriveProvider"
-        class="text-secondary-500 flex items-start gap-2 rounded-2xl border border-[var(--color-primary)]/25 px-4 py-3 text-sm leading-relaxed dark:text-gray-200"
+        class="text-secondary-500 dark:text-ink flex items-start gap-2 rounded-2xl border border-[var(--color-primary)]/25 px-4 py-3 text-sm leading-relaxed"
         :style="{ backgroundColor: 'var(--tint-orange-8)' }"
         data-testid="invite-wizard-use-this-link"
       >
@@ -616,7 +616,7 @@ function handleClose() {
         class="rounded-3xl px-5 py-5 text-center"
         :style="{ backgroundColor: 'var(--tint-orange-8)' }"
       >
-        <p class="font-outfit text-secondary-500 mb-3 text-sm font-semibold dark:text-gray-200">
+        <p class="font-outfit text-secondary-500 dark:text-ink mb-3 text-sm font-semibold">
           {{ t('inviteWizard.step2.qr.title') }}
           <span class="font-caveat ml-1 text-base text-[var(--color-primary)]">
             {{ t('inviteWizard.step2.qr.accent') }}
@@ -638,7 +638,7 @@ function handleClose() {
           {{ t('inviteWizard.step2.qr.unavailable') }}
         </div>
 
-        <p class="mt-3 text-xs text-gray-500 italic dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-3 text-xs text-gray-500 italic">
           {{ t('inviteWizard.step2.qr.help') }}
         </p>
       </div>
@@ -650,23 +650,23 @@ function handleClose() {
         hide-expiry-note
       />
 
-      <p v-if="!isDriveProvider" class="text-center text-xs text-gray-500 dark:text-gray-400">
+      <p v-if="!isDriveProvider" class="dark:text-ink-soft text-center text-xs text-gray-500">
         {{ t('inviteWizard.local.reminder') }}
       </p>
 
       <div
-        class="flex items-center justify-between border-t border-dashed border-gray-200 pt-3 dark:border-slate-600"
+        class="dark:border-line-strong flex items-center justify-between border-t border-dashed border-gray-200 pt-3"
       >
         <button
           type="button"
-          class="font-outfit inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-[var(--color-primary)] dark:text-gray-400"
+          class="font-outfit dark:text-ink-soft inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-[var(--color-primary)]"
           data-testid="invite-wizard-back"
           @click="goBackToStep1"
         >
           <span>←</span>
           <span>{{ t('inviteWizard.step2.useDifferent') }}</span>
         </button>
-        <p class="text-xs text-gray-400 dark:text-gray-500">🔒 {{ t('family.linkExpiry') }}</p>
+        <p class="dark:text-ink-faint text-xs text-gray-400">🔒 {{ t('family.linkExpiry') }}</p>
       </div>
     </div>
 

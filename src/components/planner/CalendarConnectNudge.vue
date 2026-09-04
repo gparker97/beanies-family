@@ -71,7 +71,7 @@ function connect(): void {
   position: relative;
 }
 
-:global(.dark) .cal-nudge {
+html.dark .cal-nudge {
   border-color: rgb(174 214 241 / 25%);
 }
 
@@ -89,8 +89,8 @@ function connect(): void {
   width: 2.5rem;
 }
 
-:global(.dark) .cal-nudge-icon {
-  background: #243342;
+html.dark .cal-nudge-icon {
+  background: #26343f;
 }
 
 .cal-nudge-bean {
@@ -116,7 +116,7 @@ function connect(): void {
   letter-spacing: -0.01em;
 }
 
-:global(.dark) .cal-nudge-title {
+html.dark .cal-nudge-title {
   color: rgb(241 242 244);
 }
 
@@ -127,7 +127,7 @@ function connect(): void {
   margin-top: 0.05rem;
 }
 
-:global(.dark) .cal-nudge-sub {
+html.dark .cal-nudge-sub {
   color: rgb(241 242 244 / 65%);
 }
 
@@ -188,7 +188,7 @@ function connect(): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .cal-nudge-dismiss {
+html.dark .cal-nudge-dismiss {
   background: rgb(255 255 255 / 10%);
   color: rgb(241 242 244 / 72%);
 }

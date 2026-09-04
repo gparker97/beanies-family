@@ -51,7 +51,7 @@ function formatDate(iso: string): string {
           />
         </svg>
       </div>
-      <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+      <h3 class="font-outfit dark:text-ink text-lg font-bold text-gray-900">
         {{ t('googleDrive.filePickerTitle') }}
       </h3>
     </div>
@@ -63,7 +63,7 @@ function formatDate(iso: string): string {
 
     <!-- Empty state -->
     <div v-else-if="files.length === 0" class="py-8 text-center">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('googleDrive.noFilesFound') }}
       </p>
     </div>
@@ -73,7 +73,7 @@ function formatDate(iso: string): string {
       <button
         v-for="file in files"
         :key="file.fileId"
-        class="hover:border-primary-500/40 hover:bg-primary-500/5 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/10 flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 text-left transition-colors dark:border-slate-600"
+        class="hover:border-primary-500/40 hover:bg-primary-500/5 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/10 dark:border-line-strong flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 text-left transition-colors"
         @click="emit('select', { fileId: file.fileId, fileName: file.name })"
       >
         <div
@@ -94,10 +94,10 @@ function formatDate(iso: string): string {
           </svg>
         </div>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink truncate text-sm font-medium text-gray-900">
             {{ file.name }}
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-xs text-gray-500">
             {{ t('googleDrive.lastModified') }}: {{ formatDate(file.modifiedTime) }}
           </p>
         </div>

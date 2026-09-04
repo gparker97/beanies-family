@@ -302,7 +302,7 @@ function cancel() {
 <template>
   <div class="space-y-4">
     <!-- Description -->
-    <p class="text-sm text-gray-600 dark:text-gray-400">
+    <p class="dark:text-ink-soft text-sm text-gray-600">
       {{ t(props.descriptionKey ?? 'reauth.description') }}
     </p>
 
@@ -312,7 +312,7 @@ function cancel() {
       class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
       data-testid="reauth-no-credential"
     >
-      <p class="text-sm text-amber-800 dark:text-amber-200">
+      <p class="dark:text-terracotta-lift text-sm text-amber-800">
         {{ t(props.noCredentialKey ?? 'reauth.noCredential') }}
       </p>
       <div class="mt-3 flex justify-end">
@@ -335,7 +335,7 @@ function cancel() {
       </BaseButton>
 
       <div v-if="hasPin && showPinEntry" class="space-y-2">
-        <p class="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+        <p class="dark:text-ink-soft text-center text-sm font-medium text-gray-600">
           {{ t('pin.enterPin') }}
         </p>
         <PinInput
@@ -346,7 +346,11 @@ function cancel() {
           :label="t('pin.enterPin')"
           @complete="handlePinComplete"
         />
-        <p v-if="pinError" class="text-center text-sm text-red-600 dark:text-red-400" role="alert">
+        <p
+          v-if="pinError"
+          class="dark:text-danger-lift text-center text-sm text-red-600"
+          role="alert"
+        >
           <!-- Live-counting while the cooldown runs, so the wait is visibly finite. -->
           {{
             pinLimit.inCooldown.value
@@ -376,7 +380,7 @@ function cancel() {
       </BaseButton>
 
       <div v-if="inlineError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-        <p class="text-sm text-red-600 dark:text-red-400">{{ inlineError }}</p>
+        <p class="dark:text-danger-lift text-sm text-red-600">{{ inlineError }}</p>
       </div>
 
       <div class="flex justify-end pt-2">

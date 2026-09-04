@@ -209,7 +209,7 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="dark:bg-surface-raised mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl">
     <!--
       Always "not you?", never a bare "back": every arrival here follows a person pick
       (or an auto-select), so this is the shared-device escape hatch. Disabled while a
@@ -217,7 +217,7 @@ function handleSubmit() {
       screen no longer shows).
     -->
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-300"
+      class="dark:text-ink-soft dark:hover:text-ink mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:opacity-40"
       :disabled="isBusy"
       @click="emit('back')"
     >
@@ -236,10 +236,10 @@ function handleSubmit() {
         :photo-url="person.photoUrl ?? null"
         size="xl"
       />
-      <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
         {{ fillTemplate(t('fastLogin.welcomeBackName'), { name: person.name }) }}
       </h2>
-      <p v-if="familyName" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <p v-if="familyName" class="dark:text-ink-soft mt-1 text-sm text-gray-500">
         {{ familyName }}
       </p>
     </div>
@@ -248,7 +248,7 @@ function handleSubmit() {
     <div
       v-if="shownError"
       role="alert"
-      class="mb-4 rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
+      class="dark:text-danger-lift mb-4 rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20"
     >
       {{ shownError }}
     </div>
@@ -262,17 +262,17 @@ function handleSubmit() {
         class="space-y-4"
         @submit.prevent="handleResetPinSubmit"
       >
-        <p class="text-center text-sm text-gray-600 dark:text-gray-400">
+        <p class="dark:text-ink-soft text-center text-sm text-gray-600">
           {{ t('recovery.resetPinBody') }}
         </p>
         <div>
-          <p class="mb-2 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft mb-2 text-center text-sm font-medium text-gray-700">
             {{ t('pin.newPin') }}
           </p>
           <PinInput v-model="resetPin" :disabled="isBusy" autofocus :label="t('pin.newPin')" />
         </div>
         <div>
-          <p class="mb-2 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft mb-2 text-center text-sm font-medium text-gray-700">
             {{ t('pin.confirmPin') }}
           </p>
           <PinInput v-model="resetPinConfirm" :disabled="isBusy" :label="t('pin.confirmPin')" />
@@ -286,7 +286,7 @@ function handleSubmit() {
       <button
         v-else-if="activeMethod === 'biometric'"
         :disabled="isBusy"
-        class="group bg-secondary-500 flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 dark:bg-slate-700"
+        class="group bg-secondary-500 dark:bg-surface-overlay flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50"
         @click="emit('biometric')"
       >
         <template v-if="isBusy">
@@ -308,7 +308,7 @@ function handleSubmit() {
 
       <!-- PIN -->
       <div v-else-if="activeMethod === 'pin'" class="space-y-2">
-        <p class="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+        <p class="dark:text-ink-soft text-center text-sm font-medium text-gray-600">
           {{ t('pin.enterPin') }}
         </p>
         <PinInput
@@ -340,7 +340,7 @@ function handleSubmit() {
         has no password.
       -->
       <div v-else-if="messageOnlyBody" class="space-y-3 text-center">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
+        <p class="dark:text-ink-soft text-sm text-gray-600">
           {{ messageOnlyBody }}
         </p>
       </div>
@@ -354,7 +354,7 @@ function handleSubmit() {
           :placeholder="t('auth.enterYourPassword')"
           required
         />
-        <p v-if="hasPassphrase && !podOpen" class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+        <p v-if="hasPassphrase && !podOpen" class="dark:text-ink-faint mt-2 text-xs text-gray-400">
           {{ t('recovery.passphraseHint') }}
         </p>
 
@@ -369,7 +369,7 @@ function handleSubmit() {
           v-for="method in switchTargets"
           :key="method"
           type="button"
-          class="w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-300"
+          class="dark:text-ink-soft dark:hover:text-ink w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 disabled:opacity-40"
           :disabled="isBusy"
           @click="switchTo(method)"
         >

@@ -74,16 +74,16 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
     <div
       class="font-outfit mt-4 flex items-center gap-3 text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase opacity-60"
     >
-      <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+      <span class="dark:bg-surface-overlay h-px flex-1 bg-gray-200"></span>
       {{ t('ai.magic.orAddYourself') }}
-      <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+      <span class="dark:bg-surface-overlay h-px flex-1 bg-gray-200"></span>
     </div>
   </div>
 
   <!-- Step header -->
   <div class="mb-5 text-center">
     <div class="text-3xl">🗺️</div>
-    <h2 class="font-outfit text-lg font-bold text-[var(--color-text)] dark:text-gray-100">
+    <h2 class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
       {{ t('vacation.step1.title') }}
     </h2>
     <p class="text-xs text-[var(--color-text-muted)]">
@@ -113,7 +113,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
           :class="
             tripType === tt.value
               ? 'border-2 border-[var(--vacation-teal)] bg-[var(--vacation-teal-tint)] dark:bg-[var(--vacation-teal-15)]'
-              : 'border-transparent bg-white hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800'
+              : 'dark:bg-surface-raised border-transparent bg-white hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)]'
           "
           @click="emit('update:tripType', tt.value)"
         >
@@ -125,9 +125,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
             ✓
           </span>
           <span class="text-2xl">{{ tt.emoji }}</span>
-          <span
-            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100"
-          >
+          <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
             {{ t(`vacation.type.${tt.key}` as any) }}
           </span>
           <span class="text-[0.625rem] text-[var(--color-text-muted)]">
@@ -153,7 +151,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
           :class="
             tripPurpose === purpose
               ? purpose === 'business'
-                ? 'border-[var(--color-text)] bg-[var(--tint-slate-10)] text-[var(--color-text)] dark:border-gray-400 dark:bg-slate-700 dark:text-gray-200'
+                ? 'dark:border-line-strong dark:bg-surface-overlay dark:text-ink border-[var(--color-text)] bg-[var(--tint-slate-10)] text-[var(--color-text)]'
                 : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-tint)] text-[var(--vacation-teal)]'
               : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
           "

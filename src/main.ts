@@ -8,6 +8,7 @@ import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardRel
 import { isIdbTransientError } from './utils/idbTransient';
 import { isBenignBrowserError } from './utils/benignBrowserError';
 import { bootstrapDocClient } from './services/automerge/worker/bootstrap';
+import { applyOrientationPolicy } from './composables/useWallOrientation';
 import './style.css';
 
 initAnalytics();
@@ -126,4 +127,11 @@ if (import.meta.env.DEV) {
 // `BiometricKeystore` Capacitor plugin (registered natively; see nativeBiometric.ts,
 // ADR-029 2026-07-14). Nothing to install at boot; web/PWA use the real browser
 // WebAuthn untouched.
+// Orientation policy: portrait on a phone (the installed PWA manifest says
+// `portrait`, which overrides the OS rotation lock — that is deliberate), free
+// rotation on a tablet, where landscape is arguably the better way to hold the
+// app. The manifest is one static file and cannot vary by device, so the tablet
+// half has to be done here. Guarded internally; orientation is a nice-to-have.
+applyOrientationPolicy();
+
 app.mount('#app');

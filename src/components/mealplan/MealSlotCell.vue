@@ -112,7 +112,7 @@ async function onDrop(): Promise<void> {
          space droppable (it inherits the root's drag handlers). -->
     <button
       type="button"
-      class="font-outfit flex min-h-[2.75rem] items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.55)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:border-[#F15D22] focus-visible:text-[#F15D22] dark:border-slate-600 dark:text-slate-400"
+      class="font-outfit dark:border-line-strong dark:text-ink-soft flex min-h-[2.75rem] items-center justify-center rounded-[13px] border border-dashed border-[rgba(44,62,80,0.18)] text-xs font-semibold text-[rgba(44,62,80,0.55)] transition-colors hover:border-[#F15D22] hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:border-[#F15D22] focus-visible:text-[#F15D22]"
       :class="isEmpty ? 'flex-1' : 'shrink-0'"
       :aria-label="addLabel"
       @click="emit('addMeal', date, mealSlot)"

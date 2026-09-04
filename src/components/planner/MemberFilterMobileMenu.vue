@@ -54,7 +54,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-2.5 py-2 text-sm font-medium transition-all"
       :class="
         props.isAllActive
-          ? 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
+          ? 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-5)] text-[var(--color-text)]/65'
           : 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
       "
       :aria-label="t('filter.allMembers')"
@@ -81,7 +81,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     >
       <div
         v-if="open"
-        class="absolute top-full left-0 z-30 mt-1.5 min-w-[200px] rounded-2xl border border-gray-200/60 bg-white p-2 shadow-lg dark:border-slate-600 dark:bg-slate-800"
+        class="dark:border-line-strong dark:bg-surface-raised absolute top-full left-0 z-30 mt-1.5 min-w-[200px] rounded-2xl border border-gray-200/60 bg-white p-2 shadow-lg"
       >
         <button
           type="button"
@@ -89,7 +89,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           :class="
             props.isAllActive
               ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-              : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
+              : 'dark:text-ink-soft dark:hover:bg-surface-hover text-[var(--color-text)] hover:bg-[var(--tint-slate-5)]'
           "
           @click="selectAll"
         >
@@ -104,7 +104,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           :class="
             props.isMemberActive(member.id)
               ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-              : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
+              : 'dark:text-ink-soft dark:hover:bg-surface-hover text-[var(--color-text)] hover:bg-[var(--tint-slate-5)]'
           "
           @click="selectMember(member.id)"
         >

@@ -120,7 +120,7 @@ const chipClass = computed(() => [
 
     <div class="flex flex-wrap items-center gap-2">
       <span
-        class="font-outfit text-xs font-medium tracking-[0.1em] text-gray-500 uppercase dark:text-gray-400"
+        class="font-outfit dark:text-ink-soft text-xs font-medium tracking-[0.1em] text-gray-500 uppercase"
       >
         {{ t('travel.dates.quickAdd') }}
       </span>
@@ -131,7 +131,7 @@ const chipClass = computed(() => [
         :class="[
           ...chipClass,
           chipsDisabled
-            ? 'cursor-not-allowed border-gray-200 text-gray-300 dark:border-slate-700 dark:text-slate-600'
+            ? 'dark:border-line dark:text-ink-faint cursor-not-allowed border-gray-200 text-gray-300'
             : 'border-[var(--vacation-teal)]/30 text-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-5)]',
         ]"
         :disabled="chipsDisabled"
@@ -145,12 +145,12 @@ const chipClass = computed(() => [
     <p
       v-if="errorMessage"
       :id="errorId"
-      class="text-xs text-red-600 dark:text-red-400"
+      class="dark:text-danger-lift text-xs text-red-600"
       role="alert"
     >
       {{ errorMessage }}
     </p>
-    <p v-else-if="summary" class="font-outfit text-xs text-gray-500 dark:text-gray-400">
+    <p v-else-if="summary" class="font-outfit dark:text-ink-soft text-xs text-gray-500">
       {{ summary }}
     </p>
   </div>

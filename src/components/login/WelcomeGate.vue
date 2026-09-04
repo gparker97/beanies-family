@@ -67,7 +67,7 @@ function promptParts() {
         {{ t('loginV6.welcomeEyebrow') }}
       </p>
       <h1
-        class="font-outfit text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl dark:text-gray-100"
+        class="font-outfit dark:text-ink text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl"
       >
         <template v-for="(part, i) in [promptParts()]" :key="i">
           {{ part.lead
@@ -162,15 +162,15 @@ function promptParts() {
          ──────────────────────────────────────────────────────────────── -->
     <div class="flex items-center gap-3" aria-hidden="true">
       <span
-        class="h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent dark:via-gray-500/30"
+        class="dark:via-ink-faint/30 h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent"
       ></span>
       <span
-        class="font-outfit text-xs font-medium tracking-[0.15em] text-gray-500/70 uppercase dark:text-gray-400/70"
+        class="font-outfit dark:text-ink-faint text-xs font-medium tracking-[0.15em] text-gray-500/70 uppercase"
       >
         {{ t('loginV6.orDivider') }}
       </span>
       <span
-        class="h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent dark:via-gray-500/30"
+        class="dark:via-ink-faint/30 h-px flex-1 bg-gradient-to-r from-transparent via-gray-400/30 to-transparent"
       ></span>
     </div>
 
@@ -185,7 +185,7 @@ function promptParts() {
       <!-- Sign In (welcome back, waving hand emoji) -->
       <LoginChoiceCard
         :aria-label="t('loginV6.signInTitle')"
-        class="hover:border-primary-500/20 relative overflow-hidden rounded-[18px] border border-gray-200/80 bg-white p-4 shadow-[0_6px_24px_-8px_rgba(44,62,80,0.12)] hover:shadow-[0_12px_32px_-8px_rgba(44,62,80,0.18)] dark:border-slate-600 dark:bg-slate-800"
+        class="hover:border-primary-500/20 dark:border-line-strong dark:bg-surface-raised relative overflow-hidden rounded-[18px] border border-gray-200/80 bg-white p-4 shadow-[0_6px_24px_-8px_rgba(44,62,80,0.12)] hover:shadow-[0_12px_32px_-8px_rgba(44,62,80,0.18)]"
         @click="emit('navigate', 'load-pod')"
       >
         <!-- 3px left accent strip in slate (foundation colour). -->
@@ -201,15 +201,15 @@ function promptParts() {
         ></span>
         <div class="relative">
           <div
-            class="bg-secondary-500/[0.07] mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg dark:bg-slate-700"
+            class="bg-secondary-500/[0.07] dark:bg-surface-overlay mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg"
             aria-hidden="true"
           >
             {{ '👋' }}
           </div>
-          <p class="font-outfit text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">
+          <p class="font-outfit dark:text-ink text-sm font-bold tracking-tight text-gray-900">
             {{ t('loginV6.signInTitle') }}
           </p>
-          <p class="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-0.5 text-xs leading-snug text-gray-500">
             {{ t('loginV6.signInSubtitle') }}
           </p>
         </div>
@@ -218,7 +218,7 @@ function promptParts() {
       <!-- Join (heart letter emoji = "someone sent you a join link") -->
       <LoginChoiceCard
         :aria-label="t('loginV6.joinTitle')"
-        class="hover:border-primary-500/20 relative overflow-hidden rounded-[18px] border border-gray-200/80 bg-white p-4 shadow-[0_6px_24px_-8px_rgba(44,62,80,0.12)] hover:shadow-[0_12px_32px_-8px_rgba(44,62,80,0.18)] dark:border-slate-600 dark:bg-slate-800"
+        class="hover:border-primary-500/20 dark:border-line-strong dark:bg-surface-raised relative overflow-hidden rounded-[18px] border border-gray-200/80 bg-white p-4 shadow-[0_6px_24px_-8px_rgba(44,62,80,0.12)] hover:shadow-[0_12px_32px_-8px_rgba(44,62,80,0.18)]"
         @click="emit('navigate', 'join')"
       >
         <!-- 3px left accent strip in Sky Silk. -->
@@ -239,10 +239,10 @@ function promptParts() {
           >
             {{ '💌' }}
           </div>
-          <p class="font-outfit text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">
+          <p class="font-outfit dark:text-ink text-sm font-bold tracking-tight text-gray-900">
             {{ t('loginV6.joinTitle') }}
           </p>
-          <p class="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-0.5 text-xs leading-snug text-gray-500">
             {{ t('loginV6.joinSubtitle') }}
           </p>
         </div>
@@ -254,7 +254,7 @@ function promptParts() {
            the Vue app. Cross-origin nav via anchor — no SPA routing. -->
       <a
         :href="MARKETING_HOME_URL"
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 no-underline shadow-sm transition-all hover:border-[var(--heritage-orange)] hover:text-[var(--heritage-orange)] hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:text-gray-400 dark:hover:border-[var(--heritage-orange)] dark:hover:text-[var(--heritage-orange)]"
+        class="font-outfit dark:border-line-strong dark:bg-surface-raised dark:text-ink-soft inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 no-underline shadow-sm transition-all hover:border-[var(--heritage-orange)] hover:text-[var(--heritage-orange)] hover:shadow-md dark:hover:border-[var(--heritage-orange)] dark:hover:text-[var(--heritage-orange)]"
       >
         <svg
           class="h-3.5 w-3.5"
@@ -279,7 +279,7 @@ function promptParts() {
     <div v-if="isReviewDemoAvailable()" class="mt-3 text-center">
       <button
         type="button"
-        class="font-outfit rounded-full px-3 py-1.5 text-xs font-semibold text-gray-400 underline-offset-2 transition-colors hover:text-[var(--heritage-orange)] hover:underline dark:text-gray-500 dark:hover:text-[var(--heritage-orange)]"
+        class="font-outfit dark:text-ink-faint rounded-full px-3 py-1.5 text-xs font-semibold text-gray-400 underline-offset-2 transition-colors hover:text-[var(--heritage-orange)] hover:underline dark:hover:text-[var(--heritage-orange)]"
         @click="emit('navigate', 'review-demo')"
       >
         {{ t('reviewDemo.entry') }}
@@ -291,7 +291,7 @@ function promptParts() {
          cached version). The short SHA matches the `Build:` field in the error
          reporter, so a Slack alert can be cross-referenced against the running
          build. Decorative/diagnostic value — not translated. -->
-    <p class="mt-1 text-center text-xs tracking-wide text-gray-400 select-all dark:text-gray-600">
+    <p class="dark:text-ink-faint mt-1 text-center text-xs tracking-wide text-gray-400 select-all">
       {{ buildVersion }}
     </p>
   </div>

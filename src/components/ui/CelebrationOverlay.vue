@@ -66,14 +66,14 @@ onBeforeUnmount(() => {
         >
           <div
             v-if="activeModal"
-            class="relative w-full max-w-sm rounded-3xl bg-white px-8 py-10 text-center shadow-2xl dark:bg-slate-800"
+            class="dark:bg-surface-raised relative w-full max-w-sm rounded-3xl bg-white px-8 py-10 text-center shadow-2xl"
           >
             <img
               :src="activeModal.asset"
               :alt="activeModal.message"
               class="mx-auto mb-6 w-full max-w-xs object-contain"
             />
-            <p class="font-outfit text-secondary-500 text-xl font-bold dark:text-gray-100">
+            <p class="font-outfit text-secondary-500 dark:text-ink text-xl font-bold">
               {{ activeModal.message }}
             </p>
             <button
@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
             <button
               v-if="activeModal.onUndo && modalAllowsUndo"
               type="button"
-              class="font-outfit mt-3 block w-full text-xs font-medium text-gray-400 transition-colors hover:text-[var(--heritage-orange)] dark:text-gray-500"
+              class="font-outfit dark:text-ink-faint mt-3 block w-full text-xs font-medium text-gray-400 transition-colors hover:text-[var(--heritage-orange)]"
               @click="
                 activeModal.onUndo?.();
                 dismissModal();
@@ -112,11 +112,11 @@ onBeforeUnmount(() => {
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="flex items-center gap-4 rounded-2xl bg-white px-5 py-4 shadow-lg dark:bg-slate-800"
+          class="dark:bg-surface-raised flex items-center gap-4 rounded-2xl bg-white px-5 py-4 shadow-lg"
           style="pointer-events: auto"
         >
           <img :src="toast.asset" :alt="toast.message" class="h-20 w-20 object-contain" />
-          <p class="text-secondary-500 font-medium dark:text-gray-100">{{ toast.message }}</p>
+          <p class="text-secondary-500 dark:text-ink font-medium">{{ toast.message }}</p>
         </div>
       </TransitionGroup>
     </div>

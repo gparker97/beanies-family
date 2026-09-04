@@ -151,13 +151,13 @@ function getNextColor(): string {
 
 <template>
   <div>
-    <h2 class="font-outfit mb-6 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+    <h2 class="font-outfit dark:text-ink mb-6 text-center text-xl font-bold text-gray-900">
       {{ t('loginV6.addBeansTitle') }}
     </h2>
 
     <div
       v-if="formError"
-      class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+      class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
     >
       {{ formError }}
     </div>
@@ -167,7 +167,7 @@ function getNextColor(): string {
       <!-- Owner (always shown, non-removable) -->
       <div
         v-if="familyStore.owner"
-        class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50"
+        class="dark:bg-surface-overlay/50 flex items-center gap-3 rounded-xl bg-gray-50 p-3"
       >
         <BeanieAvatar
           :variant="getMemberAvatarVariant(familyStore.owner)"
@@ -175,14 +175,14 @@ function getNextColor(): string {
           size="sm"
         />
         <div class="flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink text-sm font-medium text-gray-900">
             {{ familyStore.owner.name }}
             <span
               class="bg-primary-500/15 text-primary-500 ml-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
               >{{ t('loginV6.you') }}</span
             >
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-xs text-gray-500">
             {{
               familyStore.owner.ageGroup === 'child'
                 ? '🌱 ' + t('loginV6.littleBean')
@@ -196,12 +196,12 @@ function getNextColor(): string {
       <div
         v-for="member in addedMembers"
         :key="member.id"
-        class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50"
+        class="dark:bg-surface-overlay/50 flex items-center gap-3 rounded-xl bg-gray-50 p-3"
       >
         <BeanieAvatar :variant="getMemberAvatarVariant(member)" :color="member.color" size="sm" />
         <div class="flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ member.name }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink text-sm font-medium text-gray-900">{{ member.name }}</p>
+          <p class="dark:text-ink-soft text-xs text-gray-500">
             {{
               member.ageGroup === 'child'
                 ? '🌱 ' + t('loginV6.littleBean')
@@ -234,11 +234,11 @@ function getNextColor(): string {
          one member has been added and the form collapsed). -->
     <div
       v-if="!showMemberForm"
-      class="rounded-2xl border-2 border-dashed border-gray-200 p-4 text-center dark:border-slate-600"
+      class="dark:border-line-strong rounded-2xl border-2 border-dashed border-gray-200 p-4 text-center"
     >
       <p
         v-if="addedMembers.length > 0"
-        class="font-outfit mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400"
+        class="font-outfit dark:text-ink-soft mb-3 text-sm font-semibold text-gray-500"
       >
         {{ t('loginV6.addAnotherBeanie') }}
       </p>
@@ -261,14 +261,14 @@ function getNextColor(): string {
       <div class="flex justify-center gap-2">
         <button
           type="button"
-          class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink-soft dark:hover:bg-surface-hover dark:hover:border-line-strong flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50"
           @click="openAddMemberForm('parent')"
         >
           🫘 {{ t('loginV6.addAnAdult') }}
         </button>
         <button
           type="button"
-          class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink-soft dark:hover:bg-surface-hover dark:hover:border-line-strong flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50"
           @click="openAddMemberForm('child')"
         >
           🌱 {{ t('loginV6.addALittleBean') }}
@@ -279,7 +279,7 @@ function getNextColor(): string {
     <!-- Add member form. Field order: Role → Name → Birthday. -->
     <div
       v-if="showMemberForm"
-      class="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-slate-600"
+      class="dark:border-line-strong space-y-3 rounded-2xl border border-gray-200 p-4"
     >
       <!-- Role chips — pre-selected from the opening chip click; user can flip. -->
       <div class="flex gap-2">
@@ -289,7 +289,7 @@ function getNextColor(): string {
           :class="
             newMemberRole === 'parent'
               ? 'bg-secondary-500 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
+              : 'dark:bg-surface-overlay dark:text-ink-soft bg-gray-100 text-gray-600 hover:bg-gray-200'
           "
           @click="newMemberRole = 'parent'"
         >
@@ -301,7 +301,7 @@ function getNextColor(): string {
           :class="
             newMemberRole === 'child'
               ? 'bg-secondary-500 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
+              : 'dark:bg-surface-overlay dark:text-ink-soft bg-gray-100 text-gray-600 hover:bg-gray-200'
           "
           @click="newMemberRole = 'child'"
         >
@@ -318,7 +318,7 @@ function getNextColor(): string {
       <!-- Birthday (month & day required, year optional) -->
       <div>
         <span
-          class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+          class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
           >🎂 {{ t('modal.birthday') }}</span
         >
         <div class="mt-1 grid grid-cols-[1fr_0.6fr_0.7fr] gap-1.5">

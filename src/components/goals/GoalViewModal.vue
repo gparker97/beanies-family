@@ -217,7 +217,7 @@ watch(
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1 space-y-1">
             <p
-              class="font-outfit text-xs tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+              class="font-outfit dark:text-ink-faint text-xs tracking-[0.08em] text-[#2C3E50]/50 uppercase"
             >
               {{ t('goalView.progressLabel') }}
             </p>
@@ -228,7 +228,9 @@ watch(
                 type="neutral"
                 size="lg"
               />
-              <span class="text-secondary-500/50 text-base font-medium"> / </span>
+              <span class="text-secondary-500/50 dark:text-ink-soft text-base font-medium">
+                /
+              </span>
               <CurrencyAmount
                 :amount="goal.targetAmount"
                 :currency="goal.currency"
@@ -253,13 +255,15 @@ watch(
 
         <!-- Progress bar -->
         <div class="space-y-1">
-          <div class="h-2 overflow-hidden rounded-full bg-[var(--tint-slate-5)] dark:bg-slate-700">
+          <div
+            class="dark:bg-surface-overlay h-2 overflow-hidden rounded-full bg-[var(--tint-slate-5)]"
+          >
             <div
               class="from-primary-500 to-terracotta-400 h-full rounded-full bg-gradient-to-r transition-all duration-500"
               :style="{ width: `${Math.min(100, progressPct)}%` }"
             />
           </div>
-          <p class="font-outfit text-xs text-[#2C3E50]/60 dark:text-gray-400">
+          <p class="font-outfit dark:text-ink-soft text-xs text-[#2C3E50]/60">
             {{ Math.round(progressPct) }}%
           </p>
         </div>
@@ -276,7 +280,7 @@ watch(
           </span>
           <span
             v-if="goal.deadline"
-            class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-xs font-semibold text-[#2C3E50]/70 dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-xs font-semibold text-[#2C3E50]/70"
           >
             <span>📅</span>
             <span>{{ goal.deadline }}</span>
@@ -287,7 +291,7 @@ watch(
       <!-- Activity section -->
       <div class="space-y-3">
         <h3
-          class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+          class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
         >
           {{ t('goalView.activity') }}
         </h3>
@@ -306,7 +310,7 @@ watch(
     <template #footer-start>
       <button
         type="button"
-        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50"
         @click="emit('close')"
       >
         {{ t('action.close') }}

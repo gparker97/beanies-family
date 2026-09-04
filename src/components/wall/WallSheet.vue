@@ -300,7 +300,7 @@ const { identityFor } = useActivityIdentity();
     @click.self="emit('close')"
   >
     <div
-      class="flex h-[84%] w-full flex-col overflow-hidden rounded-t-[30px] bg-[var(--cloud-white,#F8F9FA)] px-7 pt-6 pb-6 dark:bg-slate-900"
+      class="dark:bg-surface-ground flex h-[84%] w-full flex-col overflow-hidden rounded-t-[30px] bg-[var(--cloud-white,#F8F9FA)] px-7 pt-6 pb-6"
     >
       <div class="mb-4 flex shrink-0 items-center gap-3.5">
         <!--
@@ -315,14 +315,12 @@ const { identityFor } = useActivityIdentity();
           aria-hidden="true"
           >{{ activityEmoji(activity) }}</span
         >
-        <h2
-          class="font-outfit text-secondary-500 wall-sheet-title font-extrabold dark:text-gray-100"
-        >
+        <h2 class="font-outfit text-secondary-500 wall-sheet-title dark:text-ink font-extrabold">
           {{ sheetTitle }}
         </h2>
         <button
           type="button"
-          class="wall-sheet-close ml-auto grid shrink-0 place-items-center rounded-2xl bg-white shadow-[var(--card-shadow)] dark:bg-slate-800"
+          class="wall-sheet-close dark:bg-surface-raised ml-auto grid shrink-0 place-items-center rounded-2xl bg-white shadow-[var(--card-shadow)]"
           :aria-label="t('action.close')"
           @click="emit('close')"
         >
@@ -337,7 +335,7 @@ const { identityFor } = useActivityIdentity();
             v-for="entry in dayEvents"
             :key="entry.activity.id + entry.date"
             type="button"
-            class="flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0 dark:border-slate-700"
+            class="dark:border-line flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0"
             @click="
               emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
             "
@@ -347,7 +345,7 @@ const { identityFor } = useActivityIdentity();
             </span>
             <span class="min-w-0 flex-1">
               <span
-                class="font-outfit wall-slot-title text-secondary-500 block font-bold dark:text-gray-100"
+                class="font-outfit wall-slot-title text-secondary-500 dark:text-ink block font-bold"
               >
                 {{ entry.activity.title }}
               </span>
@@ -372,7 +370,7 @@ const { identityFor } = useActivityIdentity();
           -->
           <div
             v-if="activity"
-            class="rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)]"
             :class="identityFor(activity).celebration.celebrating ? 'is-celebration' : ''"
           >
             <CelebrationConfetti
@@ -463,7 +461,7 @@ const { identityFor } = useActivityIdentity();
                   <span>{{ t(row.labelKey) }}</span>
                 </dt>
                 <dd
-                  class="font-inter wall-sheet-line text-secondary-500 flex items-center gap-2 dark:text-gray-200"
+                  class="font-inter wall-sheet-line text-secondary-500 dark:text-ink flex items-center gap-2"
                 >
                   <!-- `memberId` has been on the row type all along; the wall ignored it. -->
                   <BeanieAvatar
@@ -489,7 +487,7 @@ const { identityFor } = useActivityIdentity();
                 {{ t('wall.notes') }}
               </p>
               <p
-                class="font-inter wall-sheet-line text-secondary-500 mt-1 whitespace-pre-line dark:text-gray-200"
+                class="font-inter wall-sheet-line text-secondary-500 dark:text-ink mt-1 whitespace-pre-line"
               >
                 {{ activity.description }}
               </p>
@@ -520,8 +518,8 @@ const { identityFor } = useActivityIdentity();
             class="mb-3 overflow-hidden rounded-[20px] shadow-[var(--card-shadow)]"
             :class="
               group.bucket === 'overdue' || group.bucket === 'today'
-                ? 'bg-white ring-2 ring-[var(--heritage-orange)] dark:bg-slate-800'
-                : 'bg-white dark:bg-slate-800'
+                ? 'dark:bg-surface-raised bg-white ring-2 ring-[var(--heritage-orange)]'
+                : 'dark:bg-surface-raised bg-white'
             "
           >
             <!--
@@ -570,7 +568,7 @@ const { identityFor } = useActivityIdentity();
               :placeholder="t('wall.todo.add')"
               :aria-label="t('wall.todo.add')"
               :disabled="addingTodo"
-              class="font-inter wall-sheet-line min-w-0 flex-1 rounded-xl border border-[rgba(44,62,80,0.15)] bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
+              class="font-inter wall-sheet-line dark:border-line-strong dark:bg-surface-ground min-w-0 flex-1 rounded-xl border border-[rgba(44,62,80,0.15)] bg-white px-3 py-2"
             />
             <button
               type="submit"
@@ -591,11 +589,9 @@ const { identityFor } = useActivityIdentity();
             <div
               v-for="{ list, jobs } in sheetLists"
               :key="list.id"
-              class="rounded-[20px] bg-white p-4 shadow-[var(--card-shadow)] dark:bg-slate-800"
+              class="dark:bg-surface-raised rounded-[20px] bg-white p-4 shadow-[var(--card-shadow)]"
             >
-              <p
-                class="font-outfit text-secondary-500 wall-sheet-line font-bold dark:text-gray-100"
-              >
+              <p class="font-outfit text-secondary-500 wall-sheet-line dark:text-ink font-bold">
                 <span aria-hidden="true">{{ list.emoji }}</span>
                 {{ list.title }}
                 <span
@@ -620,7 +616,7 @@ const { identityFor } = useActivityIdentity();
                   :placeholder="t('wall.list.addItem')"
                   :aria-label="t('wall.list.addItem')"
                   :disabled="adding === list.id"
-                  class="font-inter wall-sheet-line min-w-0 flex-1 rounded-xl border border-[rgba(44,62,80,0.15)] bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
+                  class="font-inter wall-sheet-line dark:border-line-strong dark:bg-surface-ground min-w-0 flex-1 rounded-xl border border-[rgba(44,62,80,0.15)] bg-white px-3 py-2"
                   @input="
                     draft = { ...draft, [list.id]: ($event.target as HTMLInputElement).value }
                   "
@@ -650,7 +646,7 @@ const { identityFor } = useActivityIdentity();
           <div
             v-for="meal in mealsToday"
             :key="meal.id"
-            class="mb-2.5 flex items-center gap-4 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised mb-2.5 flex items-center gap-4 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
           >
             <!--
               The slot is the label people scan for — "what's for dinner?" — so
@@ -669,7 +665,7 @@ const { identityFor } = useActivityIdentity();
             </span>
             <span class="min-w-0 flex-1 py-3 pr-4">
               <span
-                class="font-outfit wall-slot-title text-secondary-500 block font-bold dark:text-gray-100"
+                class="font-outfit wall-slot-title text-secondary-500 dark:text-ink block font-bold"
               >
                 {{ meal.name }}
               </span>
@@ -690,7 +686,7 @@ const { identityFor } = useActivityIdentity();
         <template v-else-if="target.kind === 'trip'">
           <div
             v-if="trip"
-            class="rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)]"
           >
             <!--
               The countdown is the headline. On a wall the trip card is not a
@@ -728,7 +724,7 @@ const { identityFor } = useActivityIdentity();
               -->
               <span
                 v-if="tripDetail.unbooked"
-                class="font-outfit wall-card-sub rounded-lg bg-[var(--vacation-gold-tint,rgba(255,217,61,0.18))] px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-300"
+                class="font-outfit wall-card-sub dark:text-terracotta-lift rounded-lg bg-[var(--vacation-gold-tint,rgba(255,217,61,0.18))] px-2 py-0.5 font-semibold text-amber-700"
               >
                 <span aria-hidden="true">⏳</span>
                 {{
@@ -794,7 +790,7 @@ const { identityFor } = useActivityIdentity();
                 </span>
                 <span
                   v-if="!leg.booked"
-                  class="font-outfit wall-card-sub ml-auto rounded-lg bg-[var(--vacation-gold-tint,rgba(255,217,61,0.18))] px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-300"
+                  class="font-outfit wall-card-sub dark:text-terracotta-lift ml-auto rounded-lg bg-[var(--vacation-gold-tint,rgba(255,217,61,0.18))] px-2 py-0.5 font-semibold text-amber-700"
                 >
                   <span aria-hidden="true">⏳</span> {{ t('wall.trip.unbookedLeg') }}
                 </span>
@@ -850,7 +846,7 @@ const { identityFor } = useActivityIdentity();
   margin-top: 0.1rem;
 }
 
-:global(.dark) .wall-hero-cell {
+html.dark .wall-hero-cell {
   background: rgb(255 255 255 / 6%);
 }
 </style>

@@ -234,11 +234,11 @@ const typeBadge = computed(() => {
   const map: Record<string, { label: string; class: string }> = {
     income: {
       label: t('transactions.type.income'),
-      class: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+      class: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-success-lift',
     },
     expense: {
       label: t('transactions.type.expense'),
-      class: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400',
+      class: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-accent-lift',
     },
     transfer: {
       label: t('transactions.type.transfer'),
@@ -246,7 +246,7 @@ const typeBadge = computed(() => {
     },
     balance_adjustment: {
       label: t('transactions.type.balance_adjustment'),
-      class: 'bg-slate-50 text-slate-700 dark:bg-slate-900/20 dark:text-slate-300',
+      class: 'bg-slate-50 text-slate-700 dark:bg-surface-ground/20 dark:text-ink-soft',
     },
   };
   return map[transaction.value.type] ?? { label: transaction.value.type, class: '' };
@@ -328,7 +328,7 @@ async function handleDelete() {
       </span>
 
       <!-- Schedule summary box -->
-      <div class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700">
+      <div class="dark:bg-surface-overlay rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3">
         <div class="space-y-1.5">
           <template v-if="linkedRecurringItem">
             <div class="flex items-center gap-2">
@@ -336,7 +336,7 @@ async function handleDelete() {
                 {{ t('planner.field.recurrence') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ describeRecurringItem(linkedRecurringItem) }}
               </span>
@@ -346,7 +346,7 @@ async function handleDelete() {
                 {{ t('form.startDate') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ formatDate(linkedRecurringItem.startDate) }}
               </span>
@@ -356,7 +356,7 @@ async function handleDelete() {
                 {{ t('planner.field.endDate') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ formatDate(linkedRecurringItem.endDate) }}
               </span>
@@ -368,7 +368,7 @@ async function handleDelete() {
                 {{ t('form.date') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ formatDate(transaction.date) }}
               </span>
@@ -381,7 +381,7 @@ async function handleDelete() {
            Shown in place of the inline editable fields below for audit rows. -->
       <div
         v-if="!isEditable"
-        class="space-y-1.5 rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+        class="dark:bg-surface-overlay space-y-1.5 rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
       >
         <div class="font-outfit text-2xl font-extrabold">
           <CurrencyAmount
@@ -404,7 +404,7 @@ async function handleDelete() {
         @start-edit="startEdit('description')"
       >
         <template #view>
-          <span class="font-outfit text-lg font-bold text-[var(--color-text)] dark:text-gray-100">
+          <span class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
             {{ transaction.description }}
           </span>
         </template>
@@ -414,7 +414,7 @@ async function handleDelete() {
               ref="descriptionInputRef"
               v-model="draftDescription"
               type="text"
-              class="font-outfit w-full rounded-md border-none bg-transparent px-1 text-lg font-bold text-[var(--color-text)] ring-2 ring-orange-500/30 outline-none dark:text-gray-100"
+              class="font-outfit dark:text-ink w-full rounded-md border-none bg-transparent px-1 text-lg font-bold text-[var(--color-text)] ring-2 ring-orange-500/30 outline-none"
               @keydown="handleDescriptionKeydown"
             />
             <button
@@ -558,12 +558,12 @@ async function handleDelete() {
 
       <!-- Account — read-only ("From" + "To" for transfers) -->
       <FormFieldGroup :label="isTransfer ? t('transfer.from') : t('form.account')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+        <span class="dark:text-ink-soft text-sm text-[var(--color-text)]">
           {{ accountName }}
         </span>
       </FormFieldGroup>
       <FormFieldGroup v-if="isTransfer" :label="t('transfer.to')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+        <span class="dark:text-ink-soft text-sm text-[var(--color-text)]">
           {{ toAccountName }}
         </span>
       </FormFieldGroup>
@@ -572,7 +572,7 @@ async function handleDelete() {
       <FormFieldGroup v-if="linkedActivity" :label="t('planner.field.title')">
         <button
           type="button"
-          class="group hover:text-primary-500 flex items-center gap-2 text-sm text-[var(--color-text)] transition-colors dark:text-gray-300"
+          class="group hover:text-primary-500 dark:text-ink-soft flex items-center gap-2 text-sm text-[var(--color-text)] transition-colors"
           @click="emit('view-activity', linkedActivity.id)"
         >
           <span>{{ linkedActivity.icon }} {{ linkedActivity.title }}</span>
@@ -587,7 +587,7 @@ async function handleDelete() {
       <FormFieldGroup v-if="linkedLoan" :label="t('txLink.linkedLoan')">
         <button
           type="button"
-          class="group hover:text-primary-500 flex items-center gap-2 text-sm text-[var(--color-text)] transition-colors dark:text-gray-300"
+          class="group hover:text-primary-500 dark:text-ink-soft flex items-center gap-2 text-sm text-[var(--color-text)] transition-colors"
           @click="emit('view-loan', transaction.loanId!)"
         >
           <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }} {{ linkedLoan.name }}</span>
@@ -607,7 +607,7 @@ async function handleDelete() {
 
       <!-- Linked goal — read-only -->
       <FormFieldGroup v-if="linkedGoal" :label="t('goals.title')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+        <span class="dark:text-ink-soft text-sm text-[var(--color-text)]">
           {{ linkedGoal.name }}
           <span v-if="transaction.goalAllocApplied" class="text-[var(--color-text-muted)]">
             &middot; {{ currSymbol }}{{ transaction.goalAllocApplied.toLocaleString() }}
@@ -630,7 +630,7 @@ async function handleDelete() {
       <button
         v-if="isEditable"
         type="button"
-        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50"
         @click="handleOpenEdit"
       >
         ✏️ {{ t('action.edit') }}

@@ -131,7 +131,7 @@ function closeModals(): void {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="💊"
@@ -152,11 +152,11 @@ function closeModals(): void {
         @click="showEndedMedications = !showEndedMedications"
       >
         <span class="text-lg">📋</span>
-        <span class="font-outfit text-secondary-400 text-base font-semibold dark:text-gray-400">
+        <span class="font-outfit text-secondary-400 dark:text-ink-soft text-base font-semibold">
           {{ t('medications.endedSection.title') }}
         </span>
         <span
-          class="font-outfit rounded-full bg-[var(--tint-slate-10)] px-2.5 py-0.5 text-xs font-semibold text-[#2C3E50] dark:bg-slate-700 dark:text-gray-300"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-10)] px-2.5 py-0.5 text-xs font-semibold text-[#2C3E50]"
         >
           {{ endedMedications.length }}
         </span>

@@ -87,7 +87,7 @@ function labelFor(id: BeanTabId): string {
       :class="
         tab.id === active
           ? 'text-primary-500 border-primary-500 border-b-2'
-          : 'text-secondary-500/60 hover:text-secondary-500 border-b-2 border-transparent'
+          : 'text-secondary-500/60 dark:text-ink-soft hover:text-secondary-500 dark:hover:text-ink border-b-2 border-transparent'
       "
       :aria-current="tab.id === active ? 'page' : undefined"
       @click="$emit('select', tab.id)"
@@ -97,7 +97,7 @@ function labelFor(id: BeanTabId): string {
       <span
         v-if="tab.badge > 0"
         class="font-outfit inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1.5 py-0.5 text-[0.625rem] font-semibold"
-        :class="tab.id === active ? 'text-primary-500' : 'text-secondary-500/60'"
+        :class="tab.id === active ? 'text-primary-500' : 'text-secondary-500/60 dark:text-ink-soft'"
       >
         {{ tab.badge }}
       </span>

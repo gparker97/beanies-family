@@ -285,7 +285,7 @@ function getRouteForCategory(key: string): string {
   >
     <!-- Header -->
     <div class="mb-4 flex items-center gap-1.5">
-      <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+      <div class="nook-section-label text-secondary-500 dark:text-ink-soft">
         {{ t('dashboard.netWorthBreakdown') }}
       </div>
       <InfoHintBadge :text="t('hints.netWorthBreakdown')" />
@@ -313,7 +313,7 @@ function getRouteForCategory(key: string): string {
       <div
         v-for="cat in categories"
         :key="cat.key"
-        class="cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow,ring] duration-200 dark:bg-slate-800"
+        class="dark:bg-surface-raised cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow,ring] duration-200"
         :class="
           expandedCategories.has(cat.key)
             ? 'shadow-[var(--card-hover-shadow)] ring-2'
@@ -330,7 +330,7 @@ function getRouteForCategory(key: string): string {
           <div class="mb-2 flex items-center gap-1.5">
             <span class="text-base">{{ cat.emoji }}</span>
             <span
-              class="font-outfit text-secondary-500/50 truncate text-xs font-semibold tracking-wide uppercase dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:text-ink-soft truncate text-xs font-semibold tracking-wide uppercase"
             >
               {{ t(cat.labelKey) }}
             </span>
@@ -368,11 +368,11 @@ function getRouteForCategory(key: string): string {
                   :key="idx"
                   class="rounded-lg px-2 py-1.5"
                 >
-                  <div class="text-secondary-500 truncate text-xs font-medium dark:text-gray-200">
+                  <div class="text-secondary-500 dark:text-ink truncate text-xs font-medium">
                     {{ item.name }}
                   </div>
                   <div class="mt-0.5 flex items-center justify-between">
-                    <span class="truncate text-[0.6875rem] text-slate-400 dark:text-gray-500">
+                    <span class="dark:text-ink-faint truncate text-[0.6875rem] text-slate-400">
                       {{ t(item.typeLabelKey as UIStringKey) }}
                     </span>
                     <CurrencyAmount
@@ -419,7 +419,7 @@ function getRouteForCategory(key: string): string {
       <div class="flex items-center gap-3 px-4 py-3">
         <span class="text-base">🔻</span>
         <span
-          class="font-outfit text-xs font-semibold tracking-wide text-red-500/70 uppercase dark:text-red-400/70"
+          class="font-outfit dark:text-danger-lift text-xs font-semibold tracking-wide text-red-500/70 uppercase"
         >
           {{ t('dashboard.breakdown.liabilities') }}
         </span>
@@ -447,11 +447,11 @@ function getRouteForCategory(key: string): string {
                 :key="idx"
                 class="rounded-lg px-2 py-1.5"
               >
-                <div class="text-secondary-500 truncate text-xs font-medium dark:text-gray-200">
+                <div class="text-secondary-500 dark:text-ink truncate text-xs font-medium">
                   {{ item.name }}
                 </div>
                 <div class="mt-0.5 flex items-center justify-between">
-                  <span class="truncate text-[0.6875rem] text-slate-400 dark:text-gray-500">
+                  <span class="dark:text-ink-faint truncate text-[0.6875rem] text-slate-400">
                     {{ t(item.typeLabelKey as UIStringKey) }}
                   </span>
                   <CurrencyAmount

@@ -202,7 +202,7 @@ function onOpenAdd(): void {
             aria-hidden="true"
           />
           <h2
-            class="font-caveat text-secondary-500 text-4xl leading-tight font-bold sm:text-5xl dark:text-gray-100"
+            class="font-caveat text-secondary-500 dark:text-ink text-4xl leading-tight font-bold sm:text-5xl"
           >
             {{ isBeanieMode ? member.name.toLowerCase() : member.name }}
           </h2>
@@ -228,7 +228,7 @@ function onOpenAdd(): void {
           <!-- Section header — kicker + see-all link -->
           <div class="mb-3 flex items-end justify-between">
             <h3
-              class="font-outfit text-secondary-500 text-[0.6875rem] font-semibold tracking-[0.12em] uppercase dark:text-gray-300"
+              class="font-outfit text-secondary-500 dark:text-ink-soft text-[0.6875rem] font-semibold tracking-[0.12em] uppercase"
               style="
                 border-bottom: 2px dashed var(--color-primary);
                 display: inline-block;
@@ -239,7 +239,7 @@ function onOpenAdd(): void {
             </h3>
             <RouterLink
               :to="`/pod/${memberId}/${section.config.tab}`"
-              class="font-caveat text-primary-500 hover:text-primary-600 text-lg dark:text-orange-300"
+              class="font-caveat text-primary-500 hover:text-primary-600 dark:text-accent-lift text-lg"
             >
               {{ t('scrapbook.seeAll') }}
             </RouterLink>
@@ -270,7 +270,7 @@ function onOpenAdd(): void {
 
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"
     >
       <EmptyState emoji="📖" :message="emptyMessage" @action="onOpenAdd" />
     </div>

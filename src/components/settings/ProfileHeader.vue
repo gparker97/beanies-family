@@ -46,7 +46,7 @@ function editProfile() {
       >
         {{ currentMember?.name ?? '' }}
       </p>
-      <p class="truncate text-[0.8rem] text-[var(--deep-slate)]/40 dark:text-slate-500">
+      <p class="dark:text-ink-faint truncate text-[0.8rem] text-[var(--deep-slate)]/40">
         {{ currentMember?.email ?? '' }}
       </p>
       <span

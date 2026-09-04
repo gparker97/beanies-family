@@ -49,27 +49,27 @@ function handleMarkUnread() {
         <div
           class="font-outfit text-[0.6875rem] font-bold tracking-[0.06em] uppercase"
           :class="
-            notification.overdue ? 'text-primary-600' : 'text-secondary-500/45 dark:text-gray-500'
+            notification.overdue ? 'text-primary-600' : 'text-secondary-500/45 dark:text-ink-faint'
           "
         >
           {{ t(labelKey) }}
         </div>
-        <h3 class="font-outfit text-secondary-500 text-xl font-extrabold dark:text-gray-100">
+        <h3 class="font-outfit text-secondary-500 dark:text-ink text-xl font-extrabold">
           {{ title }}
         </h3>
         <div
-          class="font-outfit text-secondary-500/70 mt-0.5 text-sm font-semibold dark:text-gray-300"
+          class="font-outfit text-secondary-500/70 dark:text-ink-soft mt-0.5 text-sm font-semibold"
         >
           {{ when }}
         </div>
         <div
           v-if="summary"
-          class="text-secondary-500/60 mt-2 flex flex-wrap items-center gap-1.5 text-sm dark:text-gray-400"
+          class="text-secondary-500/60 dark:text-ink-soft mt-2 flex flex-wrap items-center gap-1.5 text-sm"
         >
           <span>{{ summary }}</span>
           <span
             v-if="roleLabel"
-            class="text-primary-600 bg-primary-500/12 font-outfit dark:text-primary-400 inline-flex items-center rounded-full px-2 py-0.5 text-[0.6875rem] font-bold"
+            class="text-primary-600 bg-primary-500/12 font-outfit dark:text-accent-lift inline-flex items-center rounded-full px-2 py-0.5 text-[0.6875rem] font-bold"
           >
             🚗 {{ roleLabel }}
           </span>
@@ -88,7 +88,7 @@ function handleMarkUnread() {
       </button>
       <button
         type="button"
-        class="text-secondary-500/40 hover:text-secondary-500/70 font-outfit mx-auto block text-xs font-medium transition-colors dark:text-gray-500"
+        class="text-secondary-500/40 hover:text-secondary-500/70 font-outfit dark:text-ink-faint mx-auto block text-xs font-medium transition-colors"
         @click="handleMarkUnread"
       >
         {{ t('notifications.markUnread') }}
@@ -98,7 +98,7 @@ function handleMarkUnread() {
     <button
       v-else
       type="button"
-      class="text-secondary-500/40 hover:text-secondary-500/70 font-outfit mx-auto block text-xs font-medium transition-colors dark:text-gray-500"
+      class="text-secondary-500/40 hover:text-secondary-500/70 font-outfit dark:text-ink-faint mx-auto block text-xs font-medium transition-colors"
       @click="handleMarkUnread"
     >
       {{ t('notifications.markUnread') }}

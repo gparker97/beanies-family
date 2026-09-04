@@ -36,17 +36,20 @@ const overNote = computed(() =>
   <div>
     <div class="flex items-center gap-2">
       <p
-        class="font-outfit text-xs font-semibold tracking-wide text-[#2C3E50]/55 uppercase dark:text-gray-400"
+        class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-wide text-[#2C3E50]/55 uppercase"
       >
         {{ label }}
       </p>
-      <span class="h-px flex-1 bg-[var(--tint-slate-8)] dark:bg-slate-700" aria-hidden="true" />
+      <span
+        class="dark:bg-surface-overlay h-px flex-1 bg-[var(--tint-slate-8)]"
+        aria-hidden="true"
+      />
       <span
         class="font-outfit inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold"
         :class="
           status.isOver
             ? 'bg-[var(--tint-orange-15)] text-[#F15D22]'
-            : 'bg-[var(--tint-slate-8)] text-[#2C3E50]/70 dark:bg-slate-700 dark:text-gray-300'
+            : 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-8)] text-[#2C3E50]/70'
         "
       >
         <span v-if="status.isOver" aria-hidden="true">⚠</span>

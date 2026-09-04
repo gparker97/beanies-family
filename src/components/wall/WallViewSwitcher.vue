@@ -11,7 +11,7 @@ const { t } = useTranslation();
 
 <template>
   <div
-    class="flex shrink-0 gap-0.5 rounded-[18px] bg-white p-1 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised flex shrink-0 gap-0.5 rounded-[18px] bg-white p-1 shadow-[var(--card-shadow)]"
   >
     <template v-for="view in WALL_VIEWS" :key="view.id">
       <span
@@ -25,7 +25,7 @@ const { t } = useTranslation();
         :class="
           active === view.id
             ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white opacity-100 shadow-[0_3px_10px_rgba(241,93,34,0.3)]'
-            : 'text-secondary-500 bg-transparent opacity-50 dark:text-gray-100'
+            : 'text-secondary-500 dark:text-ink bg-transparent opacity-50'
         "
         :title="t(view.labelKey)"
         :aria-label="t(view.labelKey)"

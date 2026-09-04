@@ -116,13 +116,13 @@ async function exportKitPdf(preferDownload: boolean) {
 <template>
   <!-- One-time kit modal: not closable except via the explicit stored confirmation -->
   <BaseModal :open="open" :title="t('recovery.kitModalTitle')" size="md" :closable="false">
-    <div ref="kitCardEl" class="rounded-2xl bg-white p-5 text-center dark:bg-slate-800">
+    <div ref="kitCardEl" class="dark:bg-surface-raised rounded-2xl bg-white p-5 text-center">
       <img
         src="/brand/beanies_logo_transparent_logo_only_192x192.png"
         alt=""
         class="mx-auto mb-2 h-12 w-12"
       />
-      <p class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+      <p class="font-outfit dark:text-ink text-lg font-bold text-gray-900">
         {{ familyContextStore.activeFamilyName }}
       </p>
       <p class="mb-3 text-xs text-gray-500">{{ t('recovery.kitIdLabel') }}: {{ kitId }}</p>
@@ -130,15 +130,15 @@ async function exportKitPdf(preferDownload: boolean) {
       <p class="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
         {{ t('recovery.kitCodeLabel') }}
       </p>
-      <div class="flex items-start gap-2 rounded-xl bg-gray-50 p-3 dark:bg-slate-700">
+      <div class="dark:bg-surface-overlay flex items-start gap-2 rounded-xl bg-gray-50 p-3">
         <p
-          class="font-outfit flex-1 text-base font-bold tracking-wider break-all text-gray-900 select-all dark:text-gray-100"
+          class="font-outfit dark:text-ink flex-1 text-base font-bold tracking-wider break-all text-gray-900 select-all"
         >
           {{ code }}
         </p>
         <button
           type="button"
-          class="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-slate-600 dark:hover:text-gray-200"
+          class="dark:hover:bg-surface-hover dark:hover:text-ink shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600"
           :title="kitCopied ? t('recovery.kitCopied') : t('recovery.kitCopyCode')"
           :aria-label="t('recovery.kitCopyCode')"
           @click="handleCopyKitCode"
@@ -168,13 +168,13 @@ async function exportKitPdf(preferDownload: boolean) {
       </div>
     </div>
 
-    <p class="mt-4 rounded-xl bg-[#F15D22]/10 p-3 text-sm text-gray-700 dark:text-gray-300">
+    <p class="dark:text-ink-soft mt-4 rounded-xl bg-[#F15D22]/10 p-3 text-sm text-gray-700">
       {{ t('recovery.kitStoreWarning') }}
     </p>
     <p
       v-if="kitPdfError"
       role="alert"
-      class="mt-2 rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
+      class="dark:text-danger-lift mt-2 rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20"
     >
       {{ t('recovery.kitPdfFailed') }}
     </p>

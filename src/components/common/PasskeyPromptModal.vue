@@ -17,10 +17,10 @@ const { t } = useTranslation();
         alt=""
         class="mx-auto mb-4 h-16 w-16"
       />
-      <h2 class="font-outfit mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink mb-2 text-lg font-semibold text-gray-900">
         {{ t('passkey.promptTitle') }}
       </h2>
-      <p class="mb-6 text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft mb-6 text-sm text-gray-600">
         {{ t('passkey.promptDescription') }}
       </p>
       <div class="flex flex-col gap-3">
@@ -31,7 +31,7 @@ const { t } = useTranslation();
           {{ t('passkey.promptDecline') }}
         </BaseButton>
       </div>
-      <p class="mt-4 text-xs text-gray-400 dark:text-gray-500">
+      <p class="dark:text-ink-faint mt-4 text-xs text-gray-400">
         {{ t('passkey.promptHint') }}
       </p>
     </div>

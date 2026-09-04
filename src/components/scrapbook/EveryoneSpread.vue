@@ -192,7 +192,7 @@ function onOpenAdd(): void {
          with section labels for visual weight. -->
     <header class="scrapbook-title">
       <h2
-        class="font-caveat text-secondary-500 inline-block text-3xl leading-tight font-medium sm:text-4xl dark:text-gray-100"
+        class="font-caveat text-secondary-500 dark:text-ink inline-block text-3xl leading-tight font-medium sm:text-4xl"
         style="transform: rotate(-1deg)"
       >
         {{ t('scrapbook.everyone.title') }}
@@ -212,7 +212,7 @@ function onOpenAdd(): void {
          treatment via :emphasize-photo. Supporting cluster shows the
          next 4 most recent items, packed densely. -->
     <section v-if="heroEntry" class="lately-block">
-      <h3 class="font-caveat text-secondary-500 mb-3 text-3xl font-bold dark:text-gray-100">
+      <h3 class="font-caveat text-secondary-500 dark:text-ink mb-3 text-3xl font-bold">
         {{ t('scrapbook.everyone.lately') }}
       </h3>
       <div class="lately-grid" :class="{ 'has-hero-photo': heroHasPhoto }">
@@ -262,11 +262,11 @@ function onOpenAdd(): void {
             :style="{ backgroundColor: section.bean.color }"
             aria-hidden="true"
           />
-          <span class="font-caveat text-secondary-500 text-3xl font-bold dark:text-gray-100">
+          <span class="font-caveat text-secondary-500 dark:text-ink text-3xl font-bold">
             {{ nameFor(section.bean.name) }}
           </span>
           <span
-            class="font-caveat text-primary-500 ml-auto text-sm hover:underline dark:text-orange-300"
+            class="font-caveat text-primary-500 dark:text-accent-lift ml-auto text-sm hover:underline"
           >
             {{ t('scrapbook.seeAll') }}
           </span>
@@ -290,9 +290,7 @@ function onOpenAdd(): void {
               :aria-label="section.bean.name"
               @photo-error="markMemberAvatarError(section.bean)"
             />
-            <span
-              class="font-caveat text-secondary-500 mt-2 text-xl font-medium dark:text-gray-100"
-            >
+            <span class="font-caveat text-secondary-500 dark:text-ink mt-2 text-xl font-medium">
               {{ nameFor(section.bean.name) }}
             </span>
           </button>
@@ -323,7 +321,7 @@ function onOpenAdd(): void {
          block. Not "anyone's corner" — these belong to all the beans. -->
     <div v-if="familyWideEntries.length" class="family-moments">
       <h3
-        class="font-caveat text-secondary-500 mb-3 flex items-center gap-2 text-3xl font-bold dark:text-gray-100"
+        class="font-caveat text-secondary-500 dark:text-ink mb-3 flex items-center gap-2 text-3xl font-bold"
       >
         <span aria-hidden="true">🏡</span>
         <span>{{ t('scrapbook.everyone.familyMoments') }}</span>
@@ -349,7 +347,7 @@ function onOpenAdd(): void {
   <!-- Truly empty — no items anywhere across the family. -->
   <div
     v-else
-    class="rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"
   >
     <EmptyState emoji="📖" :message="t('scrapbook.everyone.empty')" @action="onOpenAdd" />
   </div>

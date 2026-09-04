@@ -556,3 +556,30 @@ existing guarded helper before writing a new date calculation.
 **Also:** when a suite fails on a day your diff touched nothing relevant, check the date
 before the diff. Both of these were initially assumed to be regressions from that day's
 push; neither was.
+
+---
+
+## Vue's `:global(X) Y` silently drops `Y` and applies the declarations to `X`
+
+**Date:** 2026-09-04
+**Context:** Dark-mode remediation. An early adopter reported "text is gray, hard to read in dark mode." Measuring found 630 strings below the WCAG AA floor, but the subtlest defect was a CSS one that had been live for a long time and was invisible to every search we tried.
+
+Vue SFC scoped styles compile `:global(.dark) .my-card { … }` to **`.dark { … }`** — the descendant part is discarded and the declarations land on the `.dark` element itself, i.e. `<html>`. The intended rule never applies, and a stray `background`/`color` gets painted onto the root element instead.
+
+This was live in **86 rules across 31 components**. None of that dark styling had ever worked. `NookVacationCard.vue` even carried a confident comment explaining why its specificity was sufficient — the comment was right about specificity and irrelevant, because the selector it described was never emitted.
+
+Why it survived so long:
+
+- **It fails open, not closed.** No build error, no lint error, no console warning. The card just stays light.
+- **It is invisible to the obvious greps.** Searching `bg-white` finds nothing, because the background is set in a scoped `<style>` block via `linear-gradient(135deg, white 85%, …)`.
+- **A `dark:bg-*` utility is usually present on the same element**, so the markup reads as correctly handled. The scoped style's `[data-v]` boost silently beats it.
+- **The one component that "did it right" was the template everyone copied.** The pattern propagated.
+
+**Rules:**
+
+1. **Write it as a PLAIN scoped rule: `html.dark .my-card { … }`.** Vue appends the scope attribute to the last compound selector, so it compiles to `html.dark .my-card[data-v-…]` — dark-aware, still scoped, and (0,3,1) so it beats the light rule outright. `:global()` is not needed and is actively worse: it strips scoping, so a generic class name (`.tile`, `.name`, `.empty`) then collides app-wide with every other component that uses it, with load order deciding the winner. Reserve `:global()` for reaching inside a child component, where the target never carries this component's attribute — two rules in this codebase, and no more.
+2. **Verify compiled CSS, not source, when a style mysteriously does not apply.** `curl` the Vite module (`/src/…/X.vue?vue&type=style&index=0&scoped=<hash>&lang.css`) and read what was actually emitted. Source that looks correct is not evidence.
+3. **A restart is not a diagnosis.** The first hypothesis here was a stale dev server. Restarting changed nothing, which was the signal to go and read the compiled output instead of guessing again.
+4. **When a fix does not show up in a screenshot, believe the screenshot.** Tests, type-check and lint were all green through every iteration of this bug.
+5. **Opacity is not a text colour.** `text-secondary-500/60` and `text-[rgba(44,62,80,0.4)]` composite Deep Slate over a Deep Slate ground in dark mode and land at 1.1–1.3:1. Worse, an `opacity-40` with no colour of its own inherits — which is why one summary tile's subtitle was legible and its neighbour's was invisible. If a string needs to recede, give it a real ink tier.
+6. **Changing a surface un-masks the text on it.** Giving the cookbook hero a dark background made the title unreadable, because it was `text-secondary-500` with no dark variant — correct on cream, invisible on dark. Sweep the text of any surface whose background changes.

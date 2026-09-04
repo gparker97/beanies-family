@@ -135,7 +135,7 @@ function sayingFooter(s: SayingItem): string {
   <button
     v-else-if="favorite"
     type="button"
-    class="block w-full rounded-2xl bg-white p-4 text-left shadow-[var(--card-shadow)] transition-transform hover:scale-[1.02] dark:bg-slate-800"
+    class="dark:bg-surface-raised block w-full rounded-2xl bg-white p-4 text-left shadow-[var(--card-shadow)] transition-transform hover:scale-[1.02]"
     @click="handleCardClick"
   >
     <div class="flex items-start gap-3">
@@ -146,12 +146,12 @@ function sayingFooter(s: SayingItem): string {
         {{ FAVORITE_EMOJI[favorite.category] }}
       </span>
       <div class="min-w-0 flex-1">
-        <h4 class="font-outfit text-secondary-500 truncate text-sm font-bold dark:text-gray-100">
+        <h4 class="font-outfit text-secondary-500 dark:text-ink truncate text-sm font-bold">
           {{ favorite.name }}
         </h4>
         <p
           v-if="favorite.description"
-          class="font-inter text-secondary-500/70 mt-1 line-clamp-2 text-xs leading-snug dark:text-gray-400"
+          class="font-inter text-secondary-500/70 dark:text-ink-soft mt-1 line-clamp-2 text-xs leading-snug"
         >
           {{ favorite.description }}
         </p>
@@ -189,12 +189,12 @@ function sayingFooter(s: SayingItem): string {
     </span>
     <span class="emphasized-photo-caption block w-full text-left">
       <span
-        class="font-outfit text-primary-600 block text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
+        class="font-outfit text-primary-600 dark:text-accent-lift block text-[0.625rem] font-semibold tracking-wide uppercase"
       >
         {{ formatDateShort(milestone.occurredOn) }}
       </span>
       <span
-        class="font-caveat text-secondary-500 mt-0.5 block text-xl leading-tight font-bold dark:text-gray-100"
+        class="font-caveat text-secondary-500 dark:text-ink mt-0.5 block text-xl leading-tight font-bold"
       >
         {{ milestone.title }}
       </span>
@@ -216,18 +216,18 @@ function sayingFooter(s: SayingItem): string {
       <MilestoneThumb :milestone="milestone" size="sm" disable-lightbox />
       <div class="min-w-0 flex-1">
         <p
-          class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
+          class="font-outfit text-primary-600 dark:text-accent-lift text-[0.625rem] font-semibold tracking-wide uppercase"
         >
           {{ formatDateShort(milestone.occurredOn) }}
         </p>
         <h4
-          class="font-outfit text-secondary-500 mt-0.5 truncate text-sm leading-tight font-bold dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink mt-0.5 truncate text-sm leading-tight font-bold"
         >
           {{ milestone.title }}
         </h4>
         <p
           v-if="milestone.description"
-          class="font-inter text-secondary-500/70 mt-1 line-clamp-2 text-xs leading-snug dark:text-gray-400"
+          class="font-inter text-secondary-500/70 dark:text-ink-soft mt-1 line-clamp-2 text-xs leading-snug"
         >
           {{ milestone.description }}
         </p>
@@ -242,12 +242,12 @@ function sayingFooter(s: SayingItem): string {
     class="scrap-ripped block w-full text-left transition-transform hover:scale-[1.02]"
     @click="handleCardClick"
   >
-    <h4 class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-100">
+    <h4 class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
       {{ note.title }}
     </h4>
     <p
       v-if="note.body"
-      class="font-inter text-secondary-500/80 mt-1 line-clamp-4 text-xs leading-snug dark:text-gray-300"
+      class="font-inter text-secondary-500/80 dark:text-ink-soft mt-1 line-clamp-4 text-xs leading-snug"
     >
       {{ note.body }}
     </p>

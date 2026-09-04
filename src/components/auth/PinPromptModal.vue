@@ -58,15 +58,15 @@ async function handleSave() {
         alt=""
         class="mx-auto mb-4 h-16 w-16"
       />
-      <h2 class="font-outfit mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink mb-2 text-lg font-semibold text-gray-900">
         {{ t('pin.promptTitle') }}
       </h2>
-      <p class="mb-5 text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft mb-5 text-sm text-gray-600">
         {{ t('pin.promptBody') }}
       </p>
       <div class="space-y-4 text-left">
         <div>
-          <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
             {{ t('pin.newPin') }}
           </p>
           <PinInput
@@ -78,7 +78,7 @@ async function handleSave() {
           />
         </div>
         <div>
-          <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
             {{ t('pin.confirmPin') }}
           </p>
           <PinInput
@@ -89,7 +89,7 @@ async function handleSave() {
           />
         </div>
       </div>
-      <p v-if="formError" class="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+      <p v-if="formError" class="dark:text-danger-lift mt-3 text-sm text-red-600" role="alert">
         {{ formError }}
       </p>
       <div class="mt-5 flex flex-col gap-3">

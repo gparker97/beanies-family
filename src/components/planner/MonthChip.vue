@@ -97,7 +97,7 @@ function onClick(event: MouseEvent) {
 <template>
   <button
     type="button"
-    class="font-inter text-secondary-500 flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80 dark:text-gray-200"
+    class="font-inter text-secondary-500 dark:text-ink flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80"
     :class="[
       identity.dashed ? 'border-dashed' : '',
       // No `data-sticker` here: the chip is `overflow-hidden` for title truncation, so
@@ -123,7 +123,7 @@ function onClick(event: MouseEvent) {
          only treatment so titles aren't crowded. -->
     <span
       v-if="time"
-      class="text-secondary-500/60 hidden flex-shrink-0 font-medium tabular-nums dark:text-gray-400"
+      class="text-secondary-500/60 dark:text-ink-soft hidden flex-shrink-0 font-medium tabular-nums"
       aria-hidden="true"
     >
       {{ time }}

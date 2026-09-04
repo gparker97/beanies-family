@@ -114,7 +114,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
         v-model="query"
         type="search"
         :placeholder="t('mealPlanner.search')"
-        class="font-inter w-full rounded-xl border border-[rgba(44,62,80,0.14)] px-3 py-2.5 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1] dark:bg-slate-900 dark:text-slate-100"
+        class="font-inter dark:bg-surface-ground dark:text-ink w-full rounded-xl border border-[rgba(44,62,80,0.14)] px-3 py-2.5 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1]"
       />
 
       <div class="grid max-h-64 gap-1.5 overflow-y-auto">
@@ -127,14 +127,14 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
           @click="pickRecipe(recipe.id)"
         >
           <MealThumb :photo-ids="recipe.photoIds" fallback-emoji="🍽️" :size-rem="2" />
-          <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-slate-100">
+          <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
             {{ recipe.name }}
           </span>
         </button>
       </div>
 
       <div
-        class="rounded-[14px] border border-[rgba(241,93,34,0.3)] bg-white p-3 shadow-[var(--card-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised rounded-[14px] border border-[rgba(241,93,34,0.3)] bg-white p-3 shadow-[var(--card-shadow)]"
       >
         <p class="quick-hint text-[#F15D22]">{{ t('mealPlanner.picker.quickAddHint') }}</p>
         <div class="mt-2 flex gap-2">
@@ -142,7 +142,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
             v-model="quickName"
             type="text"
             :placeholder="t('mealPlanner.picker.quickAddPlaceholder')"
-            class="font-inter w-full rounded-xl border border-[rgba(44,62,80,0.14)] px-3 py-2 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1] dark:bg-slate-900 dark:text-slate-100"
+            class="font-inter dark:bg-surface-ground dark:text-ink w-full rounded-xl border border-[rgba(44,62,80,0.14)] px-3 py-2 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1]"
             @keydown.enter.prevent="quickAdd"
           />
           <button
@@ -159,7 +159,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
 
       <div>
         <div
-          class="font-outfit text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
+          class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
         >
           {{ t('mealPlanner.picker.alternatives') }}
         </div>
@@ -168,7 +168,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
             v-for="kind in ALT_TYPES"
             :key="kind"
             type="button"
-            class="font-outfit text-secondary-500 rounded-full bg-[var(--tint-slate-5)] px-3 py-1.5 text-xs font-semibold disabled:opacity-50 dark:text-slate-100"
+            class="font-outfit text-secondary-500 dark:text-ink rounded-full bg-[var(--tint-slate-5)] px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
             :disabled="busy"
             @click="pickType(kind)"
           >

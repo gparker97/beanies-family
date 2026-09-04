@@ -90,7 +90,7 @@ const grouped = computed(() =>
         :class="
           activeFilterId === filter.id
             ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-            : 'bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-8)] dark:bg-slate-700 dark:text-gray-300'
+            : 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-8)]'
         "
         @click="emit('filter-select', filter.id)"
       >
@@ -102,9 +102,9 @@ const grouped = computed(() =>
     <!-- Empty state -->
     <div
       v-if="entries.length === 0"
-      class="rounded-2xl border border-dashed border-[var(--tint-slate-8)] bg-[var(--tint-slate-5)] px-4 py-6 text-center dark:border-slate-600 dark:bg-slate-700/40"
+      class="dark:border-line-strong dark:bg-surface-overlay/40 rounded-2xl border border-dashed border-[var(--tint-slate-8)] bg-[var(--tint-slate-5)] px-4 py-6 text-center"
     >
-      <p class="font-outfit text-sm text-[#2C3E50]/50 dark:text-gray-400">
+      <p class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/50">
         {{ emptyStateText }}
       </p>
     </div>
@@ -113,7 +113,7 @@ const grouped = computed(() =>
     <div v-else class="space-y-3">
       <div v-for="group in grouped" :key="group.date">
         <p
-          class="font-outfit mb-1.5 text-xs font-semibold tracking-wide text-[#2C3E50]/50 uppercase dark:text-gray-500"
+          class="font-outfit dark:text-ink-faint mb-1.5 text-xs font-semibold tracking-wide text-[#2C3E50]/50 uppercase"
         >
           {{ group.label }}
         </p>
@@ -128,9 +128,9 @@ const grouped = computed(() =>
           <div
             v-for="entry in group.items"
             :key="entry.id"
-            class="flex items-stretch rounded-2xl bg-white shadow-[var(--card-shadow)] transition-colors dark:bg-slate-800"
+            class="dark:bg-surface-raised flex items-stretch rounded-2xl bg-white shadow-[var(--card-shadow)] transition-colors"
             :class="
-              entry.onClick ? 'hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700/50' : ''
+              entry.onClick ? 'dark:hover:bg-surface-hover/50 hover:bg-[var(--tint-slate-5)]' : ''
             "
           >
             <component
@@ -144,20 +144,20 @@ const grouped = computed(() =>
             >
               <span
                 v-if="entry.iconEmoji"
-                class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tint-slate-5)] text-sm dark:bg-slate-700"
+                class="dark:bg-surface-overlay mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tint-slate-5)] text-sm"
                 aria-hidden="true"
                 >{{ entry.iconEmoji }}</span
               >
               <div class="min-w-0 flex-1">
                 <p
                   v-if="entry.title"
-                  class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100"
+                  class="font-outfit dark:text-ink truncate text-sm font-semibold text-[#2C3E50]"
                 >
                   {{ entry.title }}
                 </p>
                 <p
                   v-if="entry.subtitle"
-                  class="truncate text-xs text-[#2C3E50]/60 dark:text-gray-400"
+                  class="dark:text-ink-soft truncate text-xs text-[#2C3E50]/60"
                 >
                   {{ entry.subtitle }}
                 </p>
@@ -181,7 +181,7 @@ const grouped = computed(() =>
               v-if="entry.onDelete"
               type="button"
               :aria-label="t('action.delete')"
-              class="group flex w-10 shrink-0 items-center justify-center rounded-r-2xl text-[#2C3E50]/30 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-gray-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              class="group dark:text-ink-faint dark:hover:text-danger-lift flex w-10 shrink-0 items-center justify-center rounded-r-2xl text-[#2C3E50]/30 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
               @click="entry.onDelete()"
             >
               <svg

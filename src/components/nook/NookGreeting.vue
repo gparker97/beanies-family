@@ -34,19 +34,19 @@ const captionParts = computed(() => {
 
 <template>
   <div>
-    <h1 class="font-outfit text-secondary-500 text-2xl leading-tight font-bold dark:text-gray-100">
+    <h1 class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-bold">
       {{ greetingParts.before }}<span class="text-primary-500">{{ memberName }}</span
       >{{ greetingParts.after }}
     </h1>
     <!-- Compact (mobile/tablet): date inline as part of the section caption.
          The compact AppHeader skips the date; this is the single anchor. -->
-    <p v-if="!isDesktop" class="text-secondary-500/55 mt-1 text-sm dark:text-gray-400">
+    <p v-if="!isDesktop" class="text-secondary-500/55 dark:text-ink-soft mt-1 text-sm">
       {{ captionParts.before
       }}<span class="font-outfit text-primary-500 font-semibold">{{ todayDate }}</span
       >{{ captionParts.after }}
     </p>
     <!-- Desktop: header already carries the date — body caption is just the descriptor. -->
-    <p v-else class="text-secondary-500/40 mt-1 text-sm dark:text-gray-400">
+    <p v-else class="text-secondary-500/40 dark:text-ink-soft mt-1 text-sm">
       {{ t('nook.familyAtAGlance') }}
     </p>
   </div>

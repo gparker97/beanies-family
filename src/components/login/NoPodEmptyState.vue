@@ -45,13 +45,13 @@ const { t } = useTranslation();
       >
         <span class="text-3xl">🌱</span>
       </div>
-      <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h3 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
         {{ t('loginV6.noPodOnAccount.title') }}
       </h3>
-      <p v-if="accountEmail" class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+      <p v-if="accountEmail" class="dark:text-ink-faint mt-1 text-xs text-gray-400">
         {{ accountEmail }}
       </p>
-      <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft mt-3 text-sm leading-relaxed text-gray-600">
         {{ t('loginV6.noPodOnAccount.body') }}
       </p>
     </div>
@@ -93,7 +93,7 @@ const { t } = useTranslation();
     <LoginChoiceCard
       testid="no-pod-switch-account-cta"
       :aria-label="t('loginV6.noPodOnAccount.switchCta')"
-      class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] hover:shadow-md dark:bg-slate-700/50 dark:shadow-none"
+      class="dark:bg-surface-overlay/50 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] hover:shadow-md dark:shadow-none"
       @click="emit('switch-account')"
     >
       <div class="flex items-center gap-3">
@@ -110,7 +110,7 @@ const { t } = useTranslation();
             />
           </svg>
         </div>
-        <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <p class="dark:text-ink text-sm font-semibold text-gray-900">
           {{ t('loginV6.noPodOnAccount.switchCta') }}
         </p>
       </div>
@@ -119,16 +119,16 @@ const { t } = useTranslation();
     <LoginChoiceCard
       testid="no-pod-load-local-cta"
       :aria-label="t('loginV6.noPodOnAccount.loadLocalCta')"
-      class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] hover:shadow-md dark:bg-slate-700/50 dark:shadow-none"
+      class="dark:bg-surface-overlay/50 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] hover:shadow-md dark:shadow-none"
       @click="emit('load-local')"
     >
       <div class="flex items-center gap-3">
         <div
-          class="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gray-100"
           aria-hidden="true"
         >
           <svg
-            class="h-4 w-4 text-gray-500 dark:text-gray-400"
+            class="dark:text-ink-soft h-4 w-4 text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -141,7 +141,7 @@ const { t } = useTranslation();
             />
           </svg>
         </div>
-        <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <p class="dark:text-ink text-sm font-semibold text-gray-900">
           {{ t('loginV6.noPodOnAccount.loadLocalCta') }}
         </p>
       </div>
@@ -153,13 +153,13 @@ const { t } = useTranslation();
          to Drive between attempts) — kept low-visual-weight so it doesn't
          compete with the primary Create CTA above. -->
     <div class="space-y-2 pt-1 text-center text-xs">
-      <p class="font-outfit text-gray-500 dark:text-gray-400" data-testid="no-pod-join-hint">
+      <p class="font-outfit dark:text-ink-soft text-gray-500" data-testid="no-pod-join-hint">
         {{ t('loginV6.noPodOnAccount.joinHint') }}
       </p>
       <p>
         <button
           type="button"
-          class="font-outfit hover:text-primary-500 text-gray-500 underline-offset-2 transition-colors hover:underline dark:text-gray-400"
+          class="font-outfit hover:text-primary-500 dark:text-ink-soft text-gray-500 underline-offset-2 transition-colors hover:underline"
           data-testid="no-pod-retry-hint"
           @click="emit('retry')"
         >

@@ -906,7 +906,7 @@ async function confirmReschedule() {
            Quiet, reversible: Sky Silk, never the orange CTA, never red. -->
       <div
         v-if="isOverrideInstance && !showReschedule"
-        class="flex items-center justify-between gap-2 rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2 text-xs text-[var(--deep-slate)]/80 dark:bg-slate-800 dark:text-slate-300"
+        class="dark:bg-surface-raised dark:text-ink-soft flex items-center justify-between gap-2 rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2 text-xs text-[var(--deep-slate)]/80"
       >
         <span>{{ overrideBannerText }}</span>
         <BaseButton variant="ghost" size="sm" @click="handleReset">{{ resetLabel }}</BaseButton>
@@ -925,7 +925,7 @@ async function confirmReschedule() {
         @start-edit="startEdit('title')"
       >
         <template #view>
-          <span class="font-outfit text-xl font-bold text-[var(--color-text)] dark:text-gray-100">
+          <span class="font-outfit dark:text-ink text-xl font-bold text-[var(--color-text)]">
             {{ activity.title }}
           </span>
         </template>
@@ -935,7 +935,7 @@ async function confirmReschedule() {
               ref="titleInputRef"
               v-model="draftTitle"
               type="text"
-              class="font-outfit w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-orange-500/30 outline-none dark:text-gray-100"
+              class="font-outfit dark:text-ink w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-orange-500/30 outline-none"
               @keydown="handleTitleKeydown"
             />
             <button
@@ -969,7 +969,7 @@ async function confirmReschedule() {
           class="font-outfit inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
           :class="
             activity.recurrence === 'none'
-              ? 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400'
+              ? 'dark:bg-surface-overlay dark:text-ink-soft bg-gray-100 text-gray-500'
               : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
           "
         >
@@ -986,9 +986,9 @@ async function confirmReschedule() {
         >
           <OverlapMark class="text-primary-500 mt-0.5 h-4 w-auto flex-shrink-0" />
           <div class="min-w-0 flex-1">
-            <p class="font-outfit text-sm font-bold text-[var(--color-text)] dark:text-gray-100">
+            <p class="font-outfit dark:text-ink text-sm font-bold text-[var(--color-text)]">
               {{ t('calendarSync.clash.overlapsCalendarPrefix') }}
-              <span class="text-primary-600 dark:text-primary-400">{{ clash.calendarLabel }}</span>
+              <span class="text-primary-600 dark:text-accent-lift">{{ clash.calendarLabel }}</span>
               {{ t('calendarSync.clash.calendarSuffix') }}
             </p>
             <p class="mt-0.5 text-xs text-[var(--color-text-muted)]">
@@ -1005,7 +1005,7 @@ async function confirmReschedule() {
               </button>
               <button
                 type="button"
-                class="font-outfit rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700"
+                class="font-outfit dark:border-line-strong dark:hover:bg-surface-hover rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-gray-50"
                 @click="toggleReschedule"
               >
                 {{ t('calendarSync.clash.reschedule') }}
@@ -1022,7 +1022,7 @@ async function confirmReschedule() {
         </div>
         <div
           v-else
-          class="flex items-center gap-2.5 rounded-[14px] bg-[var(--tint-slate-5)] px-3.5 py-3 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center gap-2.5 rounded-[14px] bg-[var(--tint-slate-5)] px-3.5 py-3"
           data-testid="clash-ack-line"
         >
           <OverlapMark class="text-primary-500 h-3.5 w-auto flex-shrink-0 opacity-70" />
@@ -1033,7 +1033,7 @@ async function confirmReschedule() {
           </span>
           <button
             type="button"
-            class="text-primary-600 dark:text-primary-400 font-outfit flex-shrink-0 text-xs font-semibold hover:underline"
+            class="text-primary-600 dark:text-accent-lift font-outfit flex-shrink-0 text-xs font-semibold hover:underline"
             @click="unacknowledgeClash"
           >
             {{ t('calendarSync.clash.undo') }}
@@ -1042,7 +1042,7 @@ async function confirmReschedule() {
       </div>
 
       <!-- Schedule summary box -->
-      <div class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700">
+      <div class="dark:bg-surface-overlay rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3">
         <div class="space-y-1.5">
           <!-- Recurring: show recurrence pattern -->
           <template v-if="isRecurring">
@@ -1051,7 +1051,7 @@ async function confirmReschedule() {
                 {{ t('planner.field.recurrence') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ recurrenceLabel }}
               </span>
@@ -1061,7 +1061,7 @@ async function confirmReschedule() {
                 {{ t('planner.field.endDate') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ endDateFormatted }}
               </span>
@@ -1074,7 +1074,7 @@ async function confirmReschedule() {
                 {{ t('planner.field.date') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ viewFormattedDate }}
               </span>
@@ -1084,7 +1084,7 @@ async function confirmReschedule() {
                 {{ t('planner.field.endDate') }}
               </span>
               <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ viewFormattedEndDate }}
               </span>
@@ -1104,9 +1104,7 @@ async function confirmReschedule() {
             <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
               {{ t('modal.time') }}
             </span>
-            <span
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-            >
+            <span class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
               {{ formatTime12(activity.startTime)
               }}{{ activity.endTime ? ` – ${formatTime12(activity.endTime)}` : '' }}
             </span>
@@ -1121,8 +1119,8 @@ async function confirmReschedule() {
           class="font-outfit flex w-full items-center justify-center gap-2 rounded-[14px] border px-4 py-3 text-sm font-bold transition-colors"
           :class="
             showReschedule
-              ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-              : 'border-orange-200 bg-orange-50/60 text-orange-600 hover:border-orange-300 hover:bg-orange-50 dark:border-orange-800/40 dark:bg-orange-900/10 dark:text-orange-400 dark:hover:border-orange-700 dark:hover:bg-orange-900/20'
+              ? 'dark:text-accent-lift border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20'
+              : 'dark:text-accent-lift border-orange-200 bg-orange-50/60 text-orange-600 hover:border-orange-300 hover:bg-orange-50 dark:border-orange-800/40 dark:bg-orange-900/10 dark:hover:border-orange-700 dark:hover:bg-orange-900/20'
           "
           @click="toggleReschedule"
         >
@@ -1182,7 +1180,7 @@ async function confirmReschedule() {
             </button>
             <button
               type="button"
-              class="font-outfit rounded-[14px] border border-gray-200 px-4 py-2.5 text-sm font-bold text-[var(--color-text)] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+              class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover rounded-[14px] border border-gray-200 px-4 py-2.5 text-sm font-bold text-[var(--color-text)] transition-colors hover:bg-gray-50"
               @click="showReschedule = false"
             >
               ✕
@@ -1237,7 +1235,7 @@ async function confirmReschedule() {
                   ✓
                 </button>
                 <button
-                  class="rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                  class="dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300"
                   @click="cancelEdit"
                 >
                   ✕
@@ -1329,7 +1327,7 @@ async function confirmReschedule() {
               </svg>
             </span>
             <span
-              class="text-sm text-[var(--color-text)] group-hover/loc:underline dark:text-gray-300"
+              class="dark:text-ink-soft text-sm text-[var(--color-text)] group-hover/loc:underline"
             >
               {{ activity.location }}
             </span>
@@ -1351,13 +1349,13 @@ async function confirmReschedule() {
                 <template #view>
                   <div>
                     <span
-                      class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                      class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
                     >
                       {{ getMemberName(activity.dropoffMemberId) }}
                     </span>
                     <button
                       v-if="findCompletion(activity.dropoffCompletions, occurrenceDate)"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[0.6875rem] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      class="dark:text-success-lift mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[0.6875rem] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-900/50"
                       @click.stop="toggleDuty('dropoff')"
                     >
                       <span>✓</span>
@@ -1369,7 +1367,7 @@ async function confirmReschedule() {
                     </button>
                     <button
                       v-else-if="occurrenceDate"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[0.6875rem] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
+                      class="dark:bg-surface-overlay dark:text-ink-soft dark:hover:text-accent-lift mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[0.6875rem] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:hover:bg-orange-900/20"
                       @click.stop="toggleDuty('dropoff')"
                     >
                       <span class="h-3 w-3 rounded-sm border-[1.5px] border-current" />
@@ -1385,7 +1383,7 @@ async function confirmReschedule() {
                     @update:model-value="handleDropoffChange"
                   />
                   <button
-                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                    class="dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300"
                     @click="cancelEdit"
                   >
                     ✕
@@ -1404,13 +1402,13 @@ async function confirmReschedule() {
                 <template #view>
                   <div>
                     <span
-                      class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                      class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
                     >
                       {{ getMemberName(activity.pickupMemberId) }}
                     </span>
                     <button
                       v-if="findCompletion(activity.pickupCompletions, occurrenceDate)"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[0.6875rem] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      class="dark:text-success-lift mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[0.6875rem] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-900/50"
                       @click.stop="toggleDuty('pickup')"
                     >
                       <span>✓</span>
@@ -1422,7 +1420,7 @@ async function confirmReschedule() {
                     </button>
                     <button
                       v-else-if="occurrenceDate"
-                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[0.6875rem] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
+                      class="dark:bg-surface-overlay dark:text-ink-soft dark:hover:text-accent-lift mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[0.6875rem] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:hover:bg-orange-900/20"
                       @click.stop="toggleDuty('pickup')"
                     >
                       <span class="h-3 w-3 rounded-sm border-[1.5px] border-current" />
@@ -1438,7 +1436,7 @@ async function confirmReschedule() {
                     @update:model-value="handlePickupChange"
                   />
                   <button
-                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                    class="dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300"
                     @click="cancelEdit"
                   >
                     ✕
@@ -1461,7 +1459,7 @@ async function confirmReschedule() {
               @start-edit="startEdit('instructorName')"
             >
               <template #view>
-                <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                <span class="dark:text-ink-soft text-sm text-[var(--color-text)]">
                   {{ activity.instructorName }}
                 </span>
               </template>
@@ -1505,7 +1503,7 @@ async function confirmReschedule() {
               @start-edit="startEdit('instructorContact')"
             >
               <template #view>
-                <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                <span class="dark:text-ink-soft text-sm text-[var(--color-text)]">
                   {{ activity.instructorContact }}
                 </span>
               </template>
@@ -1558,7 +1556,7 @@ async function confirmReschedule() {
           >
             <template #view>
               <p
-                class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
+                class="dark:text-ink-soft text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)]"
               >
                 {{ activity.notes }}
               </p>
@@ -1569,7 +1567,7 @@ async function confirmReschedule() {
                   ref="notesRef"
                   v-model="draftNotes"
                   rows="3"
-                  class="w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-base text-[var(--color-text)] ring-2 ring-orange-500/30 transition-all focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+                  class="dark:bg-surface-overlay dark:text-ink w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-base text-[var(--color-text)] ring-2 ring-orange-500/30 transition-all focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none"
                   :placeholder="t('planner.field.notes')"
                   @keydown="handleNotesKeydown"
                 />
@@ -1716,7 +1714,7 @@ async function confirmReschedule() {
             v-for="tx in linkedTransactions"
             :key="tx.id"
             type="button"
-            class="group flex w-full items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-8)] dark:bg-slate-700 dark:hover:bg-slate-600"
+            class="group dark:bg-surface-overlay dark:hover:bg-surface-hover flex w-full items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-8)]"
             @click="
               emit('close');
               router.push({ path: '/transactions', query: { view: tx.id } });
@@ -1754,8 +1752,8 @@ async function confirmReschedule() {
         class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold transition-all duration-300"
         :class="
           showReschedule
-            ? 'pointer-events-none cursor-not-allowed text-[var(--color-text)] opacity-25 dark:text-gray-200'
-            : 'text-[var(--color-text)] hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700'
+            ? 'dark:text-ink pointer-events-none cursor-not-allowed text-[var(--color-text)] opacity-25'
+            : 'dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover text-[var(--color-text)] hover:bg-gray-50'
         "
         :disabled="showReschedule"
         @click="handleOpenEdit"

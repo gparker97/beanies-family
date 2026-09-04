@@ -26,7 +26,7 @@ const emit = defineEmits<{
       :class="
         modelValue === opt.emoji
           ? 'border-primary-500 dark:bg-primary-500/20 scale-110 border-2 bg-[var(--tint-orange-15)] shadow-[0_0_12px_rgba(241,93,34,0.25)]'
-          : 'border-2 border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:hover:bg-slate-600'
+          : 'dark:bg-surface-overlay dark:hover:bg-surface-hover border-2 border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)]'
       "
       :title="opt.label"
       @click="emit('update:modelValue', opt.emoji)"

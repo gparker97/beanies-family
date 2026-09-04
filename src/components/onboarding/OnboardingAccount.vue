@@ -287,7 +287,7 @@ function formatBalanceMeta(currency: string, balance: number): string {
   margin: 0;
 }
 
-:global(.dark) .ob-privacy-line {
+html.dark .ob-privacy-line {
   color: rgb(255 255 255 / 70%);
 }
 
@@ -306,8 +306,8 @@ function formatBalanceMeta(currency: string, balance: number): string {
   box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
 }
 
-:global(.dark) .ob-bank-combo :deep([data-testid='combobox-trigger']) {
-  background: #243342;
+:global(html.dark .ob-bank-combo [data-testid='combobox-trigger']) {
+  background: #26343f;
   border-color: rgb(255 255 255 / 8%);
 }
 </style>

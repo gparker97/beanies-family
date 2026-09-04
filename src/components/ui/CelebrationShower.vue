@@ -136,7 +136,7 @@ function undo() {
 
       <div class="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center px-6">
         <div
-          class="flex max-w-md flex-col items-center rounded-[32px] bg-white/85 px-8 py-6 shadow-[0_18px_60px_rgba(44,62,80,0.22)] backdrop-blur-md dark:bg-slate-900/85"
+          class="dark:bg-surface-ground/85 flex max-w-md flex-col items-center rounded-[32px] bg-white/85 px-8 py-6 shadow-[0_18px_60px_rgba(44,62,80,0.22)] backdrop-blur-md"
         >
           <img
             :src="activeShower.asset"
@@ -154,7 +154,7 @@ function undo() {
         <button
           v-if="showUndo"
           type="button"
-          class="font-outfit pointer-events-auto mt-4 rounded-2xl bg-white/90 px-5 py-2 text-sm font-medium text-gray-500 shadow-sm transition-colors hover:text-[var(--heritage-orange)] dark:bg-slate-800/90 dark:text-gray-400"
+          class="font-outfit dark:bg-surface-raised/90 dark:text-ink-soft pointer-events-auto mt-4 rounded-2xl bg-white/90 px-5 py-2 text-sm font-medium text-gray-500 shadow-sm transition-colors hover:text-[var(--heritage-orange)]"
           @click="undo"
         >
           {{ t('celebration.madeMistakeUndo') }}

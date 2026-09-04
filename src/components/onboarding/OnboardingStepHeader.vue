@@ -66,6 +66,6 @@ const { t } = useTranslation();
 }
 
 .dark .ob-step-title {
-  color: #f1f5f9;
+  color: #f2f5f7;
 }
 </style>

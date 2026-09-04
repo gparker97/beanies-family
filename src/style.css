@@ -129,11 +129,14 @@
 .dark {
   color-scheme: dark;
 
-  --color-background: #1a252f;
-  --color-surface: #34495e;
-  --color-text: #ecf0f1;
-  --color-text-muted: #bdc3c7;
-  --color-border: #4a6274;
+  /* Aligned with the dark-mode semantic scale in packages/brand/theme.css.
+     These legacy aliases are read by ~500 var() call sites, so pointing them
+     at the ladder upgrades those without touching a single component. */
+  --color-background: #151e27; /* surface-ground */
+  --color-surface: #1e2a36; /* surface-raised */
+  --color-text: #f2f5f7; /* ink        13.32 on raised */
+  --color-text-muted: #c3ced6; /* ink-soft    9.11 on raised */
+  --color-border: #4a5b69; /* line */
   --card-shadow: 0 4px 20px rgb(0 0 0 / 20%);
   --card-hover-shadow: 0 8px 32px rgb(0 0 0 / 30%);
   --soft-shadow: 0 8px 40px rgb(0 0 0 / 25%);
@@ -501,9 +504,14 @@
   }
 
   .dark .beanies-input {
-    background-color: rgb(30 41 59);
-    border-color: rgb(71 85 105);
-    color: #f3f4f6;
+    background-color: #1e2a36; /* surface-raised */
+    border-color: #7a8a97; /* line-strong — clears the 3:1 UI-component floor */
+    color: #f2f5f7; /* ink */
+  }
+
+  .dark .beanies-input::placeholder {
+    /* was gray-500 at 3.02 on this surface, below the AA floor */
+    color: #9aa9b4; /* ink-faint  6.05 */
   }
 
   .dark .beanies-input:focus {
@@ -519,6 +527,12 @@
     background-size: 1rem;
     cursor: pointer;
     padding-right: 2rem;
+  }
+
+  /* The chevron is baked into a data URI, so it can't inherit currentColor.
+     Dark mode gets its own copy in ink-faint rather than the grey ramp. */
+  .dark select.beanies-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239aa9b4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
   }
 
   /* Date / time picker theming */
@@ -742,7 +756,9 @@
 }
 
 :root.dark .scrapbook-paper {
-  background-color: #2c2620;
+  /* surface-paper — the same warm dark the cookbook/recipe heroes use, so the
+     scrapbook and the cookbook are one material rather than two near-misses. */
+  background-color: #2a2119;
   background-image:
     radial-gradient(circle at 18% 12%, rgb(241 93 34 / 5%), transparent 42%),
     radial-gradient(circle at 82% 64%, rgb(174 214 241 / 4%), transparent 40%);
@@ -897,5 +913,5 @@
 }
 
 .dark .is-celebration {
-  --celebration-surface: #1e293b;
+  --celebration-surface: #1e2a36; /* surface-raised */
 }

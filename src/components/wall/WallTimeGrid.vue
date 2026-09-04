@@ -318,7 +318,7 @@ function openActivity(occurrence: WallOccurrence): void {
           v-for="(row, i) in bandRows"
           :key="`${row.occurrence.activity.id}:${row.occurrence.date}:${i}`"
           type="button"
-          class="wall-allday flex min-w-0 items-center gap-1.5 rounded-[10px] bg-white px-2 py-1 text-left dark:bg-slate-800"
+          class="wall-allday dark:bg-surface-raised flex min-w-0 items-center gap-1.5 rounded-[10px] bg-white px-2 py-1 text-left"
           :class="row.everyone ? 'justify-center' : ''"
           :style="{ gridColumn: `${row.startCol + 1} / span ${row.span}` }"
           @click="openActivity(row.occurrence)"
@@ -370,7 +370,7 @@ function openActivity(occurrence: WallOccurrence): void {
       -->
       <div
         ref="plot"
-        class="relative min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised relative min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
       >
         <template v-if="layout && !failed">
           <!--
@@ -458,7 +458,7 @@ function openActivity(occurrence: WallOccurrence): void {
             -->
             <p
               v-if="!(layout.columns[i] ?? []).length && !bandRowsFor(i).length"
-              class="font-caveat absolute top-1/2 right-0 left-0 -translate-y-1/2 text-center opacity-55 dark:text-gray-300"
+              class="font-caveat dark:text-ink-soft absolute top-1/2 right-0 left-0 -translate-y-1/2 text-center opacity-55"
             >
               {{ t('wall.day.nothingOn') }}
             </p>
@@ -470,7 +470,7 @@ function openActivity(occurrence: WallOccurrence): void {
             :style="{ top: `${fold.top + fold.height / 2}px` }"
           >
             <span
-              class="wall-fold-label font-caveat rounded-full bg-white px-3 font-bold whitespace-nowrap text-[var(--muted-text,#4d5d6c)] dark:bg-slate-800"
+              class="wall-fold-label font-caveat dark:bg-surface-raised rounded-full bg-white px-3 font-bold whitespace-nowrap text-[var(--muted-text,#4d5d6c)]"
             >
               {{ fillTemplate(t('wall.grid.quietUntil'), { time: hhmm(fold.resumeMinutes) }) }}
             </span>
@@ -489,7 +489,7 @@ function openActivity(occurrence: WallOccurrence): void {
             v-for="occ in columns.flatMap((c) => c.occurrences)"
             :key="`${occ.activity.id}:${occ.date}`"
             type="button"
-            class="wall-block-title font-outfit rounded-xl border-l-[5px] bg-white px-2 py-1 text-left dark:bg-slate-800"
+            class="wall-block-title font-outfit dark:bg-surface-raised rounded-xl border-l-[5px] bg-white px-2 py-1 text-left"
             :style="identityOf(occ.activity).edgeStyle"
             @click="openActivity(occ)"
           >
@@ -520,12 +520,12 @@ function openActivity(occurrence: WallOccurrence): void {
 }
 
 /*
- * The plot is `dark:bg-slate-800`, so Deep Slate ink at 3.5–20% over it is
+ * The plot is `dark:bg-surface-raised`, so Deep Slate ink at 3.5–20% over it is
  * invisible — the family saw a "quiet until 15:20" label floating with no band
  * around it and an axis with no rules. The wall runs on a kitchen tablet that is
  * dark half the time it is looked at.
  */
-:global(.dark) .wall-fold {
+html.dark .wall-fold {
   background: rgb(255 255 255 / 5%);
   border-bottom-color: rgb(255 255 255 / 24%);
   border-top-color: rgb(255 255 255 / 24%);
@@ -541,7 +541,7 @@ function openActivity(occurrence: WallOccurrence): void {
   background: rgb(44 62 80 / 11%);
 }
 
-:global(.dark) .wall-rule {
+html.dark .wall-rule {
   background: rgb(255 255 255 / 13%);
 }
 
@@ -551,7 +551,7 @@ function openActivity(occurrence: WallOccurrence): void {
   width: 1.5px;
 }
 
-:global(.dark) .wall-colsep {
+html.dark .wall-colsep {
   background: rgb(255 255 255 / 14%);
   box-shadow: 1px 0 0 rgb(0 0 0 / 25%);
 }

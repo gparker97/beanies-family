@@ -117,7 +117,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       :class="
         dark
           ? 'bg-white/15 text-white/60 hover:bg-white/25'
-          : 'bg-gray-200 text-gray-500 hover:bg-gray-300 dark:bg-slate-600 dark:text-gray-300 dark:hover:bg-slate-500'
+          : 'dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover bg-gray-200 text-gray-500 hover:bg-gray-300'
       "
       @click.stop="toggle"
     >
@@ -132,7 +132,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         :class="
           dark
             ? 'bg-secondary-600 border border-white/15 text-white/85'
-            : 'border border-gray-200 bg-white text-gray-600 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-300'
+            : 'dark:border-line-strong dark:bg-surface-overlay dark:text-ink-soft border border-gray-200 bg-white text-gray-600'
         "
         :style="popoverStyle"
         @click.stop
@@ -153,7 +153,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
           v-if="link"
           type="button"
           class="text-heritage-orange mt-2.5 block w-full cursor-pointer border-t pt-2.5 text-left text-xs font-semibold hover:underline"
-          :class="dark ? 'border-white/15' : 'border-gray-200 dark:border-slate-600'"
+          :class="dark ? 'border-white/15' : 'dark:border-line-strong border-gray-200'"
           @click.stop="openLink"
         >
           {{ link.text }}

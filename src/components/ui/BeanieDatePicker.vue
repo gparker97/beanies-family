@@ -282,7 +282,7 @@ const isTomorrowDisabled = computed(() => {
   <div ref="dropdownRef" class="relative inline-block w-full space-y-1">
     <label
       v-if="label"
-      class="font-outfit block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+      class="font-outfit dark:text-ink-soft block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
     >
       {{ label }}
       <span v-if="required" class="text-primary-500">*</span>
@@ -300,7 +300,7 @@ const isTomorrowDisabled = computed(() => {
           : 'rounded-full px-3.5 py-1.5 text-xs',
         modelValue
           ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-          : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400',
+          : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]',
         disabled && 'cursor-not-allowed opacity-50',
       ]"
       @click="toggle"
@@ -318,7 +318,7 @@ const isTomorrowDisabled = computed(() => {
           type="button"
           data-testid="beanie-date-picker-clear"
           :aria-label="t('date.clearAriaLabel')"
-          class="-mr-0.5 flex h-4 w-4 items-center justify-center rounded-full text-current opacity-70 transition-opacity hover:bg-[var(--tint-orange-12)] hover:opacity-100 dark:hover:bg-slate-700"
+          class="dark:hover:bg-surface-hover -mr-0.5 flex h-4 w-4 items-center justify-center rounded-full text-current opacity-70 transition-opacity hover:bg-[var(--tint-orange-12)] hover:opacity-100"
           @click.stop="clearSelection"
         >
           <svg
@@ -359,27 +359,27 @@ const isTomorrowDisabled = computed(() => {
           v-if="isOpen"
           ref="popoverRef"
           :style="popoverStyle"
-          class="z-50 w-[260px] overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:border-slate-600 dark:bg-slate-800"
+          class="dark:border-line-strong dark:bg-surface-raised z-50 w-[260px] overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)]"
         >
           <!-- Month navigator -->
           <div
-            class="flex items-center justify-between border-b border-[var(--tint-slate-10)] px-3 py-2 dark:border-slate-700"
+            class="dark:border-line flex items-center justify-between border-b border-[var(--tint-slate-10)] px-3 py-2"
           >
             <button
               type="button"
               :aria-label="t('datepicker.prevMonth')"
-              class="rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+              class="dark:hover:bg-surface-hover rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)]"
               @click="prevMonth"
             >
               <BeanieIcon name="chevron-left" size="sm" />
             </button>
-            <span class="font-outfit text-sm font-bold text-[var(--color-text)] dark:text-gray-100">
+            <span class="font-outfit dark:text-ink text-sm font-bold text-[var(--color-text)]">
               {{ formatMonthYearShort(viewMonth) }}
             </span>
             <button
               type="button"
               :aria-label="t('datepicker.nextMonth')"
-              class="rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+              class="dark:hover:bg-surface-hover rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)]"
               @click="nextMonth"
             >
               <BeanieIcon name="chevron-right" size="sm" />
@@ -388,7 +388,7 @@ const isTomorrowDisabled = computed(() => {
 
           <!-- Quick chips -->
           <div
-            class="flex gap-1.5 border-b border-[var(--tint-slate-10)] px-3 py-2 dark:border-slate-700"
+            class="dark:border-line flex gap-1.5 border-b border-[var(--tint-slate-10)] px-3 py-2"
           >
             <button
               type="button"
@@ -397,7 +397,7 @@ const isTomorrowDisabled = computed(() => {
               :class="[
                 modelValue === todayStr
                   ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
-                  : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-200',
+                  : 'dark:bg-surface-overlay dark:text-ink border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-10)]',
                 isTodayDisabled && 'cursor-not-allowed opacity-40',
               ]"
               @click="selectQuick(todayStr)"
@@ -411,7 +411,7 @@ const isTomorrowDisabled = computed(() => {
               :class="[
                 modelValue === tomorrowStr
                   ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
-                  : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-200',
+                  : 'dark:bg-surface-overlay dark:text-ink border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-10)]',
                 isTomorrowDisabled && 'cursor-not-allowed opacity-40',
               ]"
               @click="selectQuick(tomorrowStr)"
@@ -456,19 +456,19 @@ const isTomorrowDisabled = computed(() => {
                   !cell.isToday &&
                   cell.inMonth &&
                   !cell.disabled &&
-                  'dark:hover:bg-primary-500/10 text-[var(--color-text)] hover:bg-[var(--tint-orange-8)] dark:text-gray-100',
+                  'dark:hover:bg-primary-500/10 dark:text-ink text-[var(--color-text)] hover:bg-[var(--tint-orange-8)]',
                 // Out-of-month → faded
                 !cell.isSelected &&
                   !cell.inMonth &&
                   !cell.disabled &&
-                  'text-[var(--color-text-muted)] opacity-35 hover:bg-[var(--tint-slate-5)] hover:opacity-60 dark:text-gray-500 dark:hover:bg-slate-700',
+                  'dark:text-ink-faint dark:hover:bg-surface-hover text-[var(--color-text-muted)] opacity-35 hover:bg-[var(--tint-slate-5)] hover:opacity-60',
                 // Weekend subtle accent (only when in-month and not selected/today)
                 !cell.isSelected &&
                   !cell.isToday &&
                   cell.inMonth &&
                   !cell.disabled &&
                   cell.isWeekend &&
-                  'text-primary-600 dark:text-primary-400',
+                  'text-primary-600 dark:text-accent-lift',
                 cell.disabled && 'cursor-not-allowed opacity-25',
               ]"
               @click="selectDay(cell)"
@@ -484,7 +484,7 @@ const isTomorrowDisabled = computed(() => {
                - neither → footer hides entirely -->
           <div
             v-if="formatMonthYearShort(viewMonth) !== formatMonthYearShort(today) || modelValue"
-            class="flex items-center border-t border-[var(--tint-slate-10)] px-3 py-1.5 dark:border-slate-700"
+            class="dark:border-line flex items-center border-t border-[var(--tint-slate-10)] px-3 py-1.5"
             :class="
               formatMonthYearShort(viewMonth) !== formatMonthYearShort(today) && modelValue
                 ? 'justify-between'
@@ -503,7 +503,7 @@ const isTomorrowDisabled = computed(() => {
               v-if="modelValue"
               type="button"
               data-testid="beanie-date-picker-clear-link"
-              class="font-outfit text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)] dark:hover:text-gray-200"
+              class="font-outfit dark:hover:text-ink text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
               @click="clearSelection"
             >
               {{ t('date.clear') }}

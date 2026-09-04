@@ -166,7 +166,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
       </span>
       <button
         type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
+        class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
         @click="router.push('/pod')"
       >
         <BeanieIcon name="chevron-left" size="xs" />
@@ -175,7 +175,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
           <h1
-            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
+            class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none"
           >
             {{ t('scrapbook.title') }}
           </h1>

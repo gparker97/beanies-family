@@ -86,7 +86,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
         v-if="open"
         role="dialog"
         aria-modal="true"
-        class="fixed inset-y-0 flex w-full flex-col overflow-y-auto bg-white shadow-xl dark:bg-slate-800"
+        class="dark:bg-surface-raised fixed inset-y-0 flex w-full flex-col overflow-y-auto bg-white shadow-xl"
         :class="[panelZ, sizeClasses[size], side === 'right' ? 'right-0' : 'left-0']"
         :style="{
           // The panel is `inset-y-0` (full viewport height), so on native iOS its
@@ -100,17 +100,17 @@ useFullscreenOverlay(toRef(props, 'open'), close);
         <!-- Header -->
         <div
           v-if="title || $slots.header"
-          class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700"
+          class="dark:border-line flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4"
         >
           <slot name="header">
-            <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
               {{ title }}
             </h2>
           </slot>
 
           <button
             type="button"
-            class="rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+            class="dark:hover:bg-surface-hover dark:hover:text-ink-soft rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
             :disabled="!closable"
             :class="{ 'cursor-not-allowed opacity-50': !closable }"
             @click="close"
@@ -127,7 +127,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
         <!-- Footer -->
         <div
           v-if="$slots.footer"
-          class="shrink-0 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
+          class="dark:border-line dark:bg-surface-ground shrink-0 border-t border-gray-200 bg-gray-50 px-6 py-4"
         >
           <slot name="footer" />
         </div>

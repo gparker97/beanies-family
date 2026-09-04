@@ -106,11 +106,11 @@ const activityItems = computed<ActivityItem[]>(() => {
 
         <!-- Content -->
         <div class="min-w-0 flex-1">
-          <div class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
+          <div class="text-secondary-500 dark:text-ink truncate text-sm font-semibold">
             {{ item.description }}
           </div>
           <div
-            class="font-outfit text-secondary-500/50 mt-0.5 text-xs font-medium dark:text-gray-400"
+            class="font-outfit text-secondary-500/50 dark:text-ink-soft mt-0.5 text-xs font-medium"
           >
             {{ item.time }}
           </div>
@@ -128,5 +128,9 @@ const activityItems = computed<ActivityItem[]>(() => {
 <style scoped>
 .nook-activity-card {
   background: linear-gradient(135deg, white 85%, rgb(39 174 96 / 4%));
+}
+
+html.dark .nook-activity-card {
+  background: linear-gradient(135deg, #1e2a36 85%, rgb(95 208 138 / 9%));
 }
 </style>

@@ -619,7 +619,7 @@ const encryptionLabel = computed(() => {
       aria-live="polite"
     >
       <BeanieSpinner size="lg" />
-      <p class="font-outfit text-sm font-semibold text-[#2C3E50] dark:text-gray-100">
+      <p class="font-outfit dark:text-ink text-sm font-semibold text-[#2C3E50]">
         {{ t('auth.signingOut') }}
       </p>
     </div>

@@ -51,7 +51,7 @@ const { summary, when } = useNotificationPresentation(() => props.notification);
         class="rounded-full transition-all"
         :class="
           notification.read
-            ? 'h-2.5 w-2.5 border-2 border-gray-300 dark:border-slate-500'
+            ? 'dark:border-line-strong h-2.5 w-2.5 border-2 border-gray-300'
             : 'bg-primary-500 h-3 w-3 shadow-[0_0_0_4px_rgba(241,93,34,0.16)]'
         "
         :aria-label="notification.read ? '' : t('notifications.unread')"
@@ -87,7 +87,7 @@ const { summary, when } = useNotificationPresentation(() => props.notification);
   position: absolute;
 }
 
-:global(.dark) .wn-card {
+html.dark .wn-card {
   background:
     radial-gradient(120% 120% at 0% 0%, rgb(255 255 255 / 8%), transparent 55%),
     linear-gradient(135deg, rgb(241 93 34 / 18%) 0%, rgb(230 126 34 / 16%) 100%);
@@ -128,8 +128,8 @@ const { summary, when } = useNotificationPresentation(() => props.notification);
   overflow: hidden;
 }
 
-:global(.dark) .wn-title {
-  color: #ecf0f1;
+html.dark .wn-title {
+  color: #f2f5f7;
 }
 
 .wn-when {

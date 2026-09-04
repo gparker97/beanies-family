@@ -78,12 +78,12 @@ const overflowSize = computed(() => OVERFLOW_SIZE[props.size] ?? OVERFLOW_SIZE.x
       fallback="initials"
       :size="size"
       aria-hidden="true"
-      class="-ml-1.5 ring-2 ring-white first:ml-0 dark:ring-slate-800"
+      class="dark:ring-surface-raised -ml-1.5 ring-2 ring-white first:ml-0"
     />
     <span
       v-if="overflow"
       :class="overflowSize"
-      class="font-outfit -ml-1.5 grid place-items-center rounded-full bg-[var(--tint-slate-10)] text-xs font-bold text-[var(--color-text-muted)] ring-2 ring-white dark:bg-slate-600 dark:text-gray-200 dark:ring-slate-800"
+      class="font-outfit dark:bg-surface-hover dark:text-ink dark:ring-surface-raised -ml-1.5 grid place-items-center rounded-full bg-[var(--tint-slate-10)] text-xs font-bold text-[var(--color-text-muted)] ring-2 ring-white"
       aria-hidden="true"
       >+{{ overflow }}</span
     >

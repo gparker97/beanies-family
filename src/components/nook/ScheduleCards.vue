@@ -204,7 +204,7 @@ function handleClick(item: ScheduleItem) {
           </div>
           <div class="min-w-0 flex-1">
             <div
-              class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
+              class="text-secondary-500 dark:text-ink truncate text-sm leading-tight font-semibold"
             >
               {{ item.title }}
             </div>
@@ -220,7 +220,7 @@ function handleClick(item: ScheduleItem) {
           </div>
         </div>
       </div>
-      <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
+      <div v-else class="text-secondary-500/40 dark:text-ink-faint py-4 text-center text-sm">
         {{ t('nook.noEvents') }}
       </div>
     </NookSectionCard>
@@ -240,7 +240,7 @@ function handleClick(item: ScheduleItem) {
       <div v-if="weekItems.length > 0" class="flex flex-col gap-4">
         <div v-for="group in groupedWeekItems" :key="group.date">
           <p
-            class="font-outfit text-secondary-500/50 mb-1.5 text-xs font-semibold tracking-wide uppercase dark:text-gray-500"
+            class="font-outfit text-secondary-500/50 dark:text-ink-faint mb-1.5 text-xs font-semibold tracking-wide uppercase"
           >
             {{ group.label }}
           </p>
@@ -258,7 +258,7 @@ function handleClick(item: ScheduleItem) {
               </div>
               <div class="min-w-0 flex-1">
                 <div
-                  class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
+                  class="text-secondary-500 dark:text-ink truncate text-sm leading-tight font-semibold"
                 >
                   {{ item.title }}
                 </div>
@@ -282,7 +282,7 @@ function handleClick(item: ScheduleItem) {
           +{{ hiddenWeekCount }} {{ t('nook.moreItems') }} &rarr;
         </router-link>
       </div>
-      <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
+      <div v-else class="text-secondary-500/40 dark:text-ink-faint py-4 text-center text-sm">
         {{ t('nook.comingSoon') }}
       </div>
     </NookSectionCard>
@@ -294,7 +294,15 @@ function handleClick(item: ScheduleItem) {
   background: linear-gradient(135deg, white 85%, rgb(174 214 241 / 12%));
 }
 
+html.dark .nook-schedule-today {
+  background: linear-gradient(135deg, #1e2a36 85%, rgb(174 214 241 / 14%));
+}
+
 .nook-schedule-week {
   background: linear-gradient(135deg, white 85%, rgb(241 93 34 / 4%));
+}
+
+html.dark .nook-schedule-week {
+  background: linear-gradient(135deg, #1e2a36 85%, rgb(255 139 94 / 9%));
 }
 </style>

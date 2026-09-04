@@ -28,8 +28,8 @@ defineEmits<{ open: [] }>();
       dark
         ? 'bg-gradient-to-br from-[#33475b] to-[var(--deep-slate,#2C3E50)] text-[#ecf0f1] shadow-[var(--card-shadow)]'
         : tone === 'chores'
-          ? 'bg-gradient-to-br from-[#eaf4fc] to-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(174,214,241,0.9)] dark:from-slate-800 dark:to-slate-800 dark:ring-slate-600'
-          : 'bg-white shadow-[var(--card-shadow)] dark:bg-slate-800'
+          ? 'dark:from-surface-raised dark:to-surface-raised dark:ring-surface-hover bg-gradient-to-br from-[#eaf4fc] to-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(174,214,241,0.9)]'
+          : 'dark:bg-surface-raised bg-white shadow-[var(--card-shadow)]'
     "
     @click="$emit('open')"
   >

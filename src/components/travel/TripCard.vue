@@ -75,7 +75,7 @@ const gapLabel = computed(() =>
 
 <template>
   <div
-    class="focus-visible:ring-primary-500 cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white shadow-[var(--card-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,180,216,0.2)] hover:shadow-[0_6px_24px_rgba(0,180,216,0.08)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-slate-800"
+    class="focus-visible:ring-primary-500 dark:bg-surface-raised cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white shadow-[var(--card-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(0,180,216,0.2)] hover:shadow-[0_6px_24px_rgba(0,180,216,0.08)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
     role="button"
     tabindex="0"
     :aria-label="fillTemplate(t('travel.openTrip'), { name: vacation.name })"
@@ -94,7 +94,7 @@ const gapLabel = computed(() =>
     </div>
 
     <div class="p-4">
-      <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+      <h3 class="font-outfit dark:text-ink text-base font-bold text-gray-900">
         {{ vacation.name }}
       </h3>
       <div
@@ -112,7 +112,7 @@ const gapLabel = computed(() =>
         <span
           v-for="member in assignees"
           :key="member.id"
-          class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center gap-1 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600"
         >
           <span
             class="flex h-[22px] w-[22px] items-center justify-center rounded-full text-xs font-bold text-white"

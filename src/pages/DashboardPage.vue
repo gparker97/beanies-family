@@ -207,9 +207,11 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
     <!-- ── Row 1: Recent Transactions + Coming Up ────────────────────── -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <!-- Recent Transactions -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+      <div
+        class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+      >
         <div class="mb-4 flex items-center justify-between">
-          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <div class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ t('dashboard.recentTransactions') }}
           </div>
           <router-link
@@ -222,7 +224,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
 
         <div v-if="recentTransactions.length === 0" class="py-8 text-center">
           <EmptyStateIllustration variant="transactions" class="mb-4" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('dashboard.noTransactions') }}
           </p>
         </div>
@@ -230,7 +232,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
           <div
             v-for="transaction in recentTransactions"
             :key="transaction.id"
-            class="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            class="dark:hover:bg-surface-hover/50 flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50"
             :class="syncHighlightClass(transaction.id)"
             @click="router.push({ path: '/transactions', query: { view: transaction.id } })"
           >
@@ -238,10 +240,10 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
               <CategoryIcon :category="transaction.category" size="md" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
+              <p class="text-secondary-500 dark:text-ink truncate text-sm font-semibold">
                 {{ transaction.description }}
               </p>
-              <p class="text-secondary-500/35 text-xs dark:text-gray-500">
+              <p class="text-secondary-500/35 dark:text-ink-faint text-xs">
                 {{ formatDate(transaction.date) }} · {{ transaction.category }}
               </p>
             </div>
@@ -257,9 +259,11 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
       </div>
 
       <!-- Coming Up -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+      <div
+        class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+      >
         <div class="mb-4 flex items-center justify-between">
-          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <div class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ t('dashboard.comingUp') }}
           </div>
           <router-link
@@ -272,7 +276,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
 
         <div v-if="upcomingTransactions.length === 0" class="py-8 text-center">
           <EmptyStateIllustration variant="recurring" class="mb-4" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noUpcoming') }}</p>
+          <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('dashboard.noUpcoming') }}</p>
         </div>
         <div v-else>
           <div
@@ -298,9 +302,11 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
     <!-- ── Row 2: Your Assets + Your Accounts ────────────────────────── -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <!-- Your Assets -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+      <div
+        class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+      >
         <div class="mb-4 flex items-center justify-between">
-          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <div class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ t('dashboard.yourAssets') }}
           </div>
           <router-link
@@ -313,13 +319,13 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
 
         <div v-if="topAssets.length === 0" class="py-8 text-center">
           <EmptyStateIllustration variant="assets" class="mb-4" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noAssets') }}</p>
+          <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('dashboard.noAssets') }}</p>
         </div>
         <div v-else class="space-y-1">
           <div
             v-for="asset in topAssets"
             :key="asset.id"
-            class="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            class="dark:hover:bg-surface-hover/50 flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50"
             :class="syncHighlightClass(asset.id)"
             @click="router.push({ path: '/assets', query: { view: asset.id } })"
           >
@@ -336,10 +342,10 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
               />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
+              <p class="text-secondary-500 dark:text-ink truncate text-sm font-semibold">
                 {{ asset.name }}
               </p>
-              <p class="text-secondary-500/35 text-xs dark:text-gray-500">
+              <p class="text-secondary-500/35 dark:text-ink-faint text-xs">
                 {{ t(`assets.type.${asset.type}`) }}
               </p>
             </div>
@@ -354,9 +360,11 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
       </div>
 
       <!-- Your Accounts -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+      <div
+        class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+      >
         <div class="mb-4 flex items-center justify-between">
-          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <div class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ t('dashboard.yourAccounts') }}
           </div>
           <router-link
@@ -369,13 +377,13 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
 
         <div v-if="topAccounts.length === 0" class="py-8 text-center">
           <EmptyStateIllustration variant="accounts" class="mb-4" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noAccounts') }}</p>
+          <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('dashboard.noAccounts') }}</p>
         </div>
         <div v-else class="space-y-1">
           <div
             v-for="account in topAccounts"
             :key="account.id"
-            class="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            class="dark:hover:bg-surface-hover/50 flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50"
             :class="syncHighlightClass(account.id)"
             @click="router.push({ path: '/accounts', query: { view: account.id } })"
           >
@@ -396,10 +404,10 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
               />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
+              <p class="text-secondary-500 dark:text-ink truncate text-sm font-semibold">
                 {{ account.name }}
               </p>
-              <p class="text-secondary-500/35 text-xs dark:text-gray-500">
+              <p class="text-secondary-500/35 dark:text-ink-faint text-xs">
                 {{
                   account.institution ||
                   t(('accounts.type.' + account.type) as UIStringKey) ||

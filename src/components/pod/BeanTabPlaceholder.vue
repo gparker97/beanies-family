@@ -14,7 +14,7 @@ defineProps<{
 
 <template>
   <div
-    class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
   >
     <EmptyState :emoji="emoji" :message="message" />
   </div>

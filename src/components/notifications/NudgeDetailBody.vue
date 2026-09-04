@@ -59,7 +59,7 @@ defineEmits<{ cta: [] }>();
   text-align: center;
 }
 
-:global(.dark) .nudge-message {
+html.dark .nudge-message {
   color: rgb(226 232 240 / 82%);
 }
 
@@ -122,7 +122,7 @@ defineEmits<{ cta: [] }>();
   color: #f15d22;
 }
 
-:global(.dark) .nudge-secondary {
+html.dark .nudge-secondary {
   color: rgb(226 232 240 / 60%);
 }
 </style>

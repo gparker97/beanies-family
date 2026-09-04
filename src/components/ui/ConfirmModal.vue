@@ -24,17 +24,17 @@ const { state, handleConfirm, handleCancel } = useConfirm();
         class="flex h-12 w-12 items-center justify-center rounded-2xl"
         :class="
           state.variant === 'danger'
-            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-            : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+            ? 'dark:text-danger-lift bg-red-100 text-red-600 dark:bg-red-900/30'
+            : 'dark:text-accent-lift bg-orange-100 text-orange-600 dark:bg-orange-900/30'
         "
       >
         <BeanieIcon :name="state.variant === 'danger' ? 'trash' : 'info'" size="lg" />
       </div>
 
-      <p class="text-sm text-gray-600 dark:text-gray-300">
+      <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t(state.message) }}
       </p>
-      <p v-if="state.detail" class="text-xs text-gray-500 dark:text-gray-400">
+      <p v-if="state.detail" class="dark:text-ink-soft text-xs text-gray-500">
         {{ state.detail }}
       </p>
     </div>
@@ -45,7 +45,7 @@ const { state, handleConfirm, handleCancel } = useConfirm();
         <button
           v-if="state.showCancel"
           type="button"
-          class="inline-flex items-center justify-center rounded-2xl bg-transparent px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+          class="dark:text-ink-soft dark:hover:bg-surface-hover inline-flex items-center justify-center rounded-2xl bg-transparent px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
           @click="handleCancel"
         >
           {{ state.cancelLabel ? t(state.cancelLabel) : t('action.cancel') }}

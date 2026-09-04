@@ -115,14 +115,14 @@ defineExpose({ focus: focusInput });
           hasError
             ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-900/20'
             : digit
-              ? 'border-[#F15D22]/60 bg-white dark:bg-slate-700'
+              ? 'dark:bg-surface-overlay border-[#F15D22]/60 bg-white'
               : caretActive && i === modelValue.length
-                ? 'border-[#AED6F1] bg-white ring-2 ring-[#AED6F1]/40 dark:bg-slate-700'
-                : 'border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700',
+                ? 'dark:bg-surface-overlay border-[#AED6F1] bg-white ring-2 ring-[#AED6F1]/40'
+                : 'dark:border-line-strong dark:bg-surface-overlay border-gray-200 bg-white',
           disabled ? 'opacity-50' : '',
         ]"
       >
-        <span class="text-gray-900 dark:text-gray-100">{{ digit ? '●' : '' }}</span>
+        <span class="dark:text-ink text-gray-900">{{ digit ? '●' : '' }}</span>
       </div>
     </div>
   </div>

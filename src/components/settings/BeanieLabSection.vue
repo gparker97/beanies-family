@@ -49,8 +49,8 @@ async function onToggleLab(enabled: boolean): Promise<void> {
     class="overflow-hidden rounded-[var(--sq)] border transition-colors duration-300"
     :class="
       expanded
-        ? 'border-solid border-[var(--tint-slate-10)] bg-white shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:border-slate-700 dark:bg-slate-800'
-        : 'border-dashed border-[var(--deep-slate)]/15 dark:border-slate-600'
+        ? 'dark:border-line dark:bg-surface-raised border-solid border-[var(--tint-slate-10)] bg-white shadow-[0_2px_12px_rgba(44,62,80,0.04)]'
+        : 'dark:border-line-strong border-dashed border-[var(--deep-slate)]/15'
     "
   >
     <!-- Disclosure header — always visible, quiet when collapsed -->
@@ -59,8 +59,8 @@ async function onToggleLab(enabled: boolean): Promise<void> {
       class="flex w-full items-center gap-2.5 px-4 py-3.5 text-left transition-colors"
       :class="
         expanded
-          ? 'text-[var(--deep-slate)] dark:text-slate-200'
-          : 'text-[var(--deep-slate)]/60 dark:text-slate-400'
+          ? 'dark:text-ink text-[var(--deep-slate)]'
+          : 'dark:text-ink-soft text-[var(--deep-slate)]/60'
       "
       :aria-expanded="expanded"
       aria-controls="beanie-lab-body"
@@ -100,12 +100,12 @@ async function onToggleLab(enabled: boolean): Promise<void> {
     <!-- Collapsible body -->
     <SmoothHeight :revision="expanded">
       <div v-show="expanded" id="beanie-lab-body" class="px-4 pb-4">
-        <p class="mb-3.5 text-xs leading-relaxed text-[var(--deep-slate)]/45 dark:text-slate-500">
+        <p class="dark:text-ink-faint mb-3.5 text-xs leading-relaxed text-[var(--deep-slate)]/45">
           {{ t('settings.beanieLab.blurb') }}
         </p>
 
         <!-- Master toggle -->
-        <div class="rounded-[14px] bg-slate-50 px-4 dark:bg-slate-900/40">
+        <div class="dark:bg-surface-ground/40 rounded-[14px] bg-slate-50 px-4">
           <SettingToggleRow
             testid="beanie-lab-master"
             :title="t('settings.beanieLab.enableLabel')"
@@ -137,7 +137,7 @@ async function onToggleLab(enabled: boolean): Promise<void> {
         <!-- Empty state when the Lab is off -->
         <p
           v-if="!labEnabled"
-          class="px-1 py-1.5 text-center text-xs text-[var(--deep-slate)]/45 italic dark:text-slate-500"
+          class="dark:text-ink-faint px-1 py-1.5 text-center text-xs text-[var(--deep-slate)]/45 italic"
         >
           {{ t('settings.beanieLab.empty') }}
         </p>

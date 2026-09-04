@@ -105,12 +105,12 @@ const screenshot = computed<string | null>(() => {
             >
               <span class="text-lg">📲</span>
             </div>
-            <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+            <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
               {{ t('pwaReinstall.title') }}
             </h2>
           </div>
           <button
-            class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[rgba(44,62,80,0.05)] text-gray-400 transition-all hover:bg-[rgba(44,62,80,0.1)] dark:bg-white/5 dark:text-gray-500 dark:hover:bg-white/10"
+            class="dark:text-ink-faint flex h-8 w-8 items-center justify-center rounded-[10px] bg-[rgba(44,62,80,0.05)] text-gray-400 transition-all hover:bg-[rgba(44,62,80,0.1)] dark:bg-white/5 dark:hover:bg-white/10"
             @click="handleDismiss"
           >
             ✕
@@ -123,24 +123,22 @@ const screenshot = computed<string | null>(() => {
     <div class="-mx-6 -mt-6 -mb-6 px-7 py-6">
       <!-- Reassurance banner -->
       <div class="pwa-reassure mb-4">
-        <div class="font-outfit text-secondary-500 mb-1 text-sm font-semibold dark:text-gray-100">
+        <div class="font-outfit text-secondary-500 dark:text-ink mb-1 text-sm font-semibold">
           🫘 {{ t('pwaReinstall.reassuranceTitle') }}
         </div>
-        <div class="text-secondary-500/75 text-[0.8125rem] leading-relaxed dark:text-gray-300/80">
+        <div class="text-secondary-500/75 dark:text-ink-soft text-[0.8125rem] leading-relaxed">
           {{ t('pwaReinstall.reassurance') }}
         </div>
       </div>
 
       <!-- Context -->
-      <div
-        class="text-secondary-500/75 mb-5 text-[0.8125rem] leading-relaxed dark:text-gray-300/80"
-      >
+      <div class="text-secondary-500/75 dark:text-ink-soft mb-5 text-[0.8125rem] leading-relaxed">
         {{ t('pwaReinstall.context') }}
       </div>
 
       <!-- Steps heading -->
       <div
-        class="font-outfit text-secondary-500 mb-3 text-xs font-semibold tracking-[0.06em] uppercase dark:text-gray-300"
+        class="font-outfit text-secondary-500 dark:text-ink-soft mb-3 text-xs font-semibold tracking-[0.06em] uppercase"
       >
         {{ t('pwaReinstall.stepsHeading') }}
       </div>
@@ -157,7 +155,7 @@ const screenshot = computed<string | null>(() => {
           >
             {{ i + 1 }}
           </span>
-          <span class="text-secondary-500/85 dark:text-gray-200/90" v-html="step" />
+          <span class="text-secondary-500/85 dark:text-ink" v-html="step" />
         </li>
       </ol>
 
@@ -171,7 +169,7 @@ const screenshot = computed<string | null>(() => {
       />
 
       <!-- One-time-promise footer note -->
-      <div class="text-secondary-500/45 mt-3 text-center text-xs italic dark:text-gray-400/50">
+      <div class="text-secondary-500/45 dark:text-ink-faint mt-3 text-center text-xs italic">
         {{ t('pwaReinstall.oneTimeNote') }}
       </div>
     </div>
@@ -189,7 +187,7 @@ const screenshot = computed<string | null>(() => {
           :href="guideUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-primary-500 dark:hover:text-primary-400 text-[0.8125rem] text-gray-400/60 transition-all dark:text-gray-500/50"
+          class="hover:text-primary-500 dark:hover:text-accent-lift dark:text-ink-faint text-[0.8125rem] text-gray-400/60 transition-all"
           @click="trackInstallClicked"
         >
           {{ t('pwaReinstall.seeFullGuide') }}
@@ -212,7 +210,7 @@ const screenshot = computed<string | null>(() => {
   padding: 12px 14px;
 }
 
-:global(.dark) .pwa-reassure {
+html.dark .pwa-reassure {
   background: rgb(255 255 255 / 4%);
 }
 </style>

@@ -109,7 +109,7 @@ const accessibleName = computed(() => `${props.timeRange} ${props.activity.title
     :class="[
       // A washed block's background IS the owner's wash, so it must not also
       // carry `bg-white` — `background` is a shorthand and the class would win.
-      washed ? '' : 'bg-white dark:bg-slate-800',
+      washed ? '' : 'dark:bg-surface-raised bg-white',
       density === 'sliver'
         ? 'wall-tblock-sliver items-center justify-center px-0.5 py-1'
         : 'px-2 py-1',
@@ -141,7 +141,7 @@ const accessibleName = computed(() => `${props.timeRange} ${props.activity.title
       {{ t('wall.grid.runningNow') }}
     </span>
     <span
-      class="wall-block-title font-outfit text-secondary-500 block overflow-hidden leading-tight font-bold dark:text-gray-100"
+      class="wall-block-title font-outfit text-secondary-500 dark:text-ink block overflow-hidden leading-tight font-bold"
       :class="[
         density === 'sliver' ? 'wall-block-sliver' : '',
         density === 'tight' ? 'wall-block-title-tight line-clamp-2' : '',

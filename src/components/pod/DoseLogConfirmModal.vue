@@ -149,14 +149,14 @@ function onSave(): void {
         >
         <div class="min-w-0 flex-1 pr-5">
           <p class="font-outfit text-sm font-bold text-[#F15D22]">{{ overWarningTitle }}</p>
-          <p class="font-inter mt-1 text-xs leading-relaxed text-[#2C3E50]/75 dark:text-gray-300">
+          <p class="font-inter dark:text-ink-soft mt-1 text-xs leading-relaxed text-[#2C3E50]/75">
             {{ overWarningBody }}
           </p>
         </div>
         <button
           type="button"
           :aria-label="t('action.dismiss')"
-          class="absolute top-2.5 right-2.5 rounded-lg p-1 text-[#2C3E50]/40 transition-colors hover:bg-[var(--tint-orange-15)] hover:text-[#F15D22] focus:bg-[var(--tint-orange-15)] focus:text-[#F15D22] focus:outline-none dark:text-gray-400"
+          class="dark:text-ink-soft absolute top-2.5 right-2.5 rounded-lg p-1 text-[#2C3E50]/40 transition-colors hover:bg-[var(--tint-orange-15)] hover:text-[#F15D22] focus:bg-[var(--tint-orange-15)] focus:text-[#F15D22] focus:outline-none"
           @click="dismissed = true"
         >
           <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -170,15 +170,15 @@ function onSave(): void {
       <!-- ── Today's doses for this medication ────────────────── -->
       <section>
         <h3
-          class="font-outfit mb-2 text-xs font-semibold tracking-[0.14em] text-[#2C3E50]/55 uppercase dark:text-gray-400"
+          class="font-outfit dark:text-ink-soft mb-2 text-xs font-semibold tracking-[0.14em] text-[#2C3E50]/55 uppercase"
         >
           {{ t('medicationLog.givenTodayHeader') }}
         </h3>
         <div
           v-if="todaysDoses.length === 0"
-          class="rounded-2xl bg-[var(--tint-slate-5)] px-3 py-3 text-center dark:bg-slate-800/60"
+          class="dark:bg-surface-raised/60 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-3 text-center"
         >
-          <p class="font-inter text-sm text-[#2C3E50]/60 italic dark:text-gray-400">
+          <p class="font-inter dark:text-ink-soft text-sm text-[#2C3E50]/60 italic">
             {{ t('medicationLog.noneYetToday') }}
           </p>
         </div>
@@ -190,7 +190,7 @@ function onSave(): void {
       <!-- ── When was this dose given? ────────────────────────── -->
       <section>
         <h3
-          class="font-outfit mb-2 text-xs font-semibold tracking-[0.14em] text-[#2C3E50]/55 uppercase dark:text-gray-400"
+          class="font-outfit dark:text-ink-soft mb-2 text-xs font-semibold tracking-[0.14em] text-[#2C3E50]/55 uppercase"
         >
           {{ t('medicationLog.whenHeader') }}
         </h3>

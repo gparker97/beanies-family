@@ -322,16 +322,18 @@ watch(
       </div>
 
       <!-- Title -->
-      <h2 class="font-outfit text-center text-xl font-bold text-[#2C3E50] dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink text-center text-xl font-bold text-[#2C3E50]">
         {{ fillTemplate(t('setupProgress.title'), { name: familyName }) }}
       </h2>
-      <p class="mb-6 text-center text-sm text-gray-400 dark:text-gray-500">
+      <p class="dark:text-ink-faint mb-6 text-center text-sm text-gray-400">
         {{ t('setupProgress.subtitle') }}
       </p>
 
       <!-- Progress bar -->
       <div class="mb-4">
-        <div class="h-1.5 overflow-hidden rounded-full bg-[rgba(44,62,80,0.05)] dark:bg-slate-700">
+        <div
+          class="dark:bg-surface-overlay h-1.5 overflow-hidden rounded-full bg-[rgba(44,62,80,0.05)]"
+        >
           <div
             class="progress-shimmer h-full rounded-full bg-gradient-to-r from-[#F15D22] to-[#E67E22] transition-all duration-600 ease-out"
             :style="{ width: `${progressPercent}%` }"
@@ -349,7 +351,7 @@ watch(
           :key="i"
           class="flex items-center gap-3 rounded-2xl px-4 py-3 transition-all duration-300"
           :class="{
-            'bg-[#F8F9FA] dark:bg-slate-700/30': status === 'pending',
+            'dark:bg-surface-overlay/30 bg-[#F8F9FA]': status === 'pending',
             'bg-[#FFF8F0] shadow-[0_0_0_1.5px_rgba(241,93,34,0.15)] dark:bg-orange-950/20':
               status === 'active',
             'bg-[#f0faf4] dark:bg-emerald-950/20': status === 'done',
@@ -360,7 +362,7 @@ watch(
           <div
             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-base transition-all duration-300"
             :class="{
-              'bg-gray-200/60 dark:bg-slate-600/40': status === 'pending',
+              'dark:bg-surface-hover/40 bg-gray-200/60': status === 'pending',
               'bg-gradient-to-br from-[#F15D22] to-[#E67E22] shadow-[0_3px_12px_rgba(241,93,34,0.3)]':
                 status === 'active',
               'bg-[#27AE60] shadow-[0_3px_12px_rgba(39,174,96,0.25)]': status === 'done',
@@ -398,9 +400,9 @@ watch(
             <p
               class="font-outfit text-sm font-semibold transition-colors duration-300"
               :class="{
-                'text-gray-400 dark:text-gray-500': status === 'pending',
-                'text-[#2C3E50] dark:text-gray-100': status === 'active' || status === 'done',
-                'text-red-600 dark:text-red-400': status === 'error',
+                'dark:text-ink-faint text-gray-400': status === 'pending',
+                'dark:text-ink text-[#2C3E50]': status === 'active' || status === 'done',
+                'dark:text-danger-lift text-red-600': status === 'error',
               }"
             >
               {{ t(steps[i].labelKey) }}
@@ -408,10 +410,10 @@ watch(
             <p
               class="text-xs transition-colors duration-300"
               :class="{
-                'text-gray-400 dark:text-gray-500': status === 'pending',
-                'font-medium text-[#E67E22] dark:text-orange-400': status === 'active',
-                'text-[#27AE60] dark:text-emerald-400': status === 'done',
-                'text-red-500 dark:text-red-400': status === 'error',
+                'dark:text-ink-faint text-gray-400': status === 'pending',
+                'dark:text-accent-lift font-medium text-[#E67E22]': status === 'active',
+                'dark:text-success-lift text-[#27AE60]': status === 'done',
+                'dark:text-danger-lift text-red-500': status === 'error',
               }"
             >
               <span
@@ -427,20 +429,20 @@ watch(
       <!-- Bottom message (progress) or Error state -->
       <p
         v-if="phase === 'progress'"
-        class="text-center text-xs text-gray-400 italic dark:text-gray-500"
+        class="dark:text-ink-faint text-center text-xs text-gray-400 italic"
       >
         {{ t(steps[Math.max(0, currentStep)].msgKey) }}
       </p>
 
       <!-- Error state -->
       <div v-if="phase === 'error'" class="mt-2 rounded-2xl bg-red-50 p-4 dark:bg-red-950/30">
-        <p class="font-outfit mb-1 text-sm font-bold text-red-600 dark:text-red-400">
+        <p class="font-outfit dark:text-danger-lift mb-1 text-sm font-bold text-red-600">
           {{ t('setupProgress.error.title') }}
         </p>
-        <p v-if="errorMessage" class="mb-2 text-xs text-red-500/80 dark:text-red-400/70">
+        <p v-if="errorMessage" class="dark:text-danger-lift mb-2 text-xs text-red-500/80">
           {{ errorMessage }}
         </p>
-        <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-4 text-xs text-gray-500">
           {{ t('setupProgress.error.description') }}
         </p>
         <div class="flex flex-col gap-2">
@@ -452,7 +454,7 @@ watch(
           </BaseButton>
           <button
             type="button"
-            class="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+            class="dark:hover:text-ink-soft text-xs text-gray-400 transition-colors hover:text-gray-600"
             @click="handleGoBack"
           >
             {{ t('setupProgress.error.back') }}
@@ -477,10 +479,10 @@ watch(
             class="mx-auto mb-5 w-full max-w-[220px] object-contain"
           />
 
-          <h2 class="font-outfit text-2xl font-extrabold text-[#2C3E50] dark:text-gray-100">
+          <h2 class="font-outfit dark:text-ink text-2xl font-extrabold text-[#2C3E50]">
             {{ t('setupProgress.success.title') }}
           </h2>
-          <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">
+          <p class="dark:text-ink-faint mt-1 text-sm text-gray-400">
             {{ fillTemplate(t('setupProgress.success.subtitle'), { name: familyName }) }}
           </p>
 

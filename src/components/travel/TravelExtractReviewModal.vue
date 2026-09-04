@@ -262,7 +262,7 @@ function onSave(): void {
         <div class="space-y-3">
           <div v-for="name in distinctNames" :key="name">
             <div class="mb-1.5 flex items-center gap-2">
-              <span class="font-outfit text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <span class="font-outfit dark:text-ink text-sm font-semibold text-gray-900">
                 {{ name }}
               </span>
               <span
@@ -301,7 +301,7 @@ function onSave(): void {
             :class="
               isNewTrip
                 ? 'bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white shadow-sm'
-                : 'bg-white text-gray-500 ring-1 ring-[var(--tint-slate-10)] hover:text-gray-700 dark:bg-slate-700 dark:text-gray-300'
+                : 'dark:bg-surface-overlay dark:text-ink-soft bg-white text-gray-500 ring-1 ring-[var(--tint-slate-10)] hover:text-gray-700'
             "
             @click="mode = 'new'"
           >
@@ -315,7 +315,7 @@ function onSave(): void {
             :class="
               !isNewTrip
                 ? 'bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white shadow-sm'
-                : 'bg-white text-gray-500 ring-1 ring-[var(--tint-slate-10)] hover:text-gray-700 dark:bg-slate-700 dark:text-gray-300'
+                : 'dark:bg-surface-overlay dark:text-ink-soft bg-white text-gray-500 ring-1 ring-[var(--tint-slate-10)] hover:text-gray-700'
             "
             @click="mode = 'existing'"
           >

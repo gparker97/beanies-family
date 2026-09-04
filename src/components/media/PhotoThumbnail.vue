@@ -101,7 +101,7 @@ watch(
          so the motion is unmistakable at 80px tile size. -->
     <div
       v-if="isPending"
-      class="border-primary-500/40 bg-primary-500/10 text-primary-600 dark:text-primary-300 flex h-full w-full animate-pulse flex-col items-center justify-center gap-1 border-2 border-dashed"
+      class="border-primary-500/40 bg-primary-500/10 text-primary-600 dark:text-accent-lift flex h-full w-full animate-pulse flex-col items-center justify-center gap-1 border-2 border-dashed"
     >
       <BeanieSpinner size="sm" />
       <span class="font-outfit text-[0.5625rem] leading-tight font-semibold">{{

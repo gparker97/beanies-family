@@ -66,7 +66,7 @@ const quoteSize = computed(() => {
       </blockquote>
       <footer
         v-if="footerText || $slots.footer"
-        class="font-outfit text-secondary-500/60 mt-2.5 text-[0.6875rem] font-semibold tracking-wide uppercase"
+        class="font-outfit text-secondary-500/60 dark:text-ink-soft mt-2.5 text-[0.6875rem] font-semibold tracking-wide uppercase"
       >
         <slot name="footer">{{ footerText }}</slot>
       </footer>

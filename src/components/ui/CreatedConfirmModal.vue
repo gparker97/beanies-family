@@ -45,12 +45,12 @@ const { t } = useTranslation();
         alt=""
         class="-mb-2 w-full max-w-[200px]"
       />
-      <p class="font-outfit text-sm font-semibold text-gray-700 dark:text-gray-200">
+      <p class="font-outfit dark:text-ink text-sm font-semibold text-gray-700">
         {{ message }}
       </p>
 
       <div
-        class="mt-2 w-full rounded-2xl bg-gray-50 px-4 py-3 text-left text-sm dark:bg-slate-700/50"
+        class="dark:bg-surface-overlay/50 mt-2 w-full rounded-2xl bg-gray-50 px-4 py-3 text-left text-sm"
       >
         <div class="space-y-2">
           <div
@@ -58,10 +58,10 @@ const { t } = useTranslation();
             :key="detail.label"
             class="flex items-center justify-between"
           >
-            <span class="text-xs text-gray-400 dark:text-gray-500">{{ detail.label }}</span>
+            <span class="dark:text-ink-faint text-xs text-gray-400">{{ detail.label }}</span>
             <span
               class="font-outfit max-w-[60%] truncate text-right font-semibold"
-              :class="detail.highlight ? 'text-[#27ae60]' : 'text-gray-800 dark:text-gray-100'"
+              :class="detail.highlight ? 'text-[#27ae60]' : 'dark:text-ink text-gray-800'"
             >
               {{ detail.value }}
             </span>
@@ -78,7 +78,7 @@ const { t } = useTranslation();
         <button
           v-if="allowCreateAnother"
           type="button"
-          class="text-secondary-500/55 hover:text-primary-500 font-outfit text-xs font-semibold transition-colors dark:text-gray-400"
+          class="text-secondary-500/55 hover:text-primary-500 font-outfit dark:text-ink-soft text-xs font-semibold transition-colors"
           @click="emit('create-another')"
         >
           {{ createAnotherLabel || t('planner.addAnotherActivity') }}

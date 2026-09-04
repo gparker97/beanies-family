@@ -266,7 +266,7 @@ function handleSave() {
             :class="
               category === cat.key
                 ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             @click="category = cat.key"
           >
@@ -329,7 +329,7 @@ function handleSave() {
           :href="normalizedLink"
           target="_blank"
           rel="noopener noreferrer"
-          class="mt-2 flex overflow-hidden rounded-xl border border-gray-200/80 bg-white transition-all hover:border-[rgba(0,180,216,0.3)] hover:shadow-sm dark:border-slate-700 dark:bg-slate-800"
+          class="dark:border-line dark:bg-surface-raised mt-2 flex overflow-hidden rounded-xl border border-gray-200/80 bg-white transition-all hover:border-[rgba(0,180,216,0.3)] hover:shadow-sm"
         >
           <img
             v-if="previewImage"
@@ -353,13 +353,13 @@ function handleSave() {
             </div>
             <div
               v-if="linkPreview.title"
-              class="font-outfit truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
+              class="font-outfit dark:text-ink truncate text-xs font-semibold text-gray-900"
             >
               {{ linkPreview.title }}
             </div>
             <div
               v-if="linkPreview.description"
-              class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-relaxed text-gray-400 dark:text-gray-500"
+              class="dark:text-ink-faint mt-0.5 line-clamp-2 text-[0.6875rem] leading-relaxed text-gray-400"
             >
               {{ linkPreview.description }}
             </div>
@@ -381,7 +381,7 @@ function handleSave() {
                   ? ct === 'free'
                     ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                     : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                  : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="costType = ct"
             >
@@ -399,7 +399,7 @@ function handleSave() {
               :class="
                 duration === dur
                   ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                  : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="duration = dur"
             >
@@ -427,7 +427,7 @@ function handleSave() {
               :class="
                 needsBooking === false
                   ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
-                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                  : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="needsBooking = false"
             >
@@ -439,7 +439,7 @@ function handleSave() {
               :class="
                 needsBooking === true
                   ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                  : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="needsBooking = true"
             >
@@ -455,7 +455,7 @@ function handleSave() {
               :class="
                 isPlanned
                   ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
-                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                  : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="togglePlanned"
             >
@@ -466,8 +466,8 @@ function handleSave() {
               class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
               :class="
                 isSkipped
-                  ? 'border-gray-400 bg-gray-100 text-gray-600 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-300'
-                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                  ? 'dark:border-line-strong dark:bg-surface-overlay dark:text-ink-soft border-gray-400 bg-gray-100 text-gray-600'
+                  : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="toggleSkipped"
             >
@@ -492,7 +492,7 @@ function handleSave() {
           <span
             v-for="voter in voters"
             :key="voter!.id"
-            class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[0.6875rem] font-medium text-gray-600"
           >
             <span
               class="flex h-[22px] w-[22px] items-center justify-center rounded-full text-xs font-bold text-white"

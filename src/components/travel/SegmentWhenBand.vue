@@ -116,8 +116,8 @@ const hasEnd = computed(() => !!props.band.end);
   padding: 0 0.375rem;
 }
 
-:global(.dark) .when-cell,
-:global(.dark) .when-arrow {
+html.dark .when-cell,
+html.dark .when-arrow {
   background: rgb(0 180 216 / 10%);
 }
 </style>

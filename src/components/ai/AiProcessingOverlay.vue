@@ -25,10 +25,10 @@ const { t } = useTranslation();
     class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
   >
     <div
-      class="flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised flex flex-col items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)]"
     >
       <BeanieSpinner size="lg" :halo="true" />
-      <p class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+      <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
         {{ t('ai.processing') }}
       </p>
     </div>

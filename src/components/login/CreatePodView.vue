@@ -432,12 +432,12 @@ function handleBack() {
     `packages/brand/theme.css` instead of inline-copying the literal.
   -->
   <div
-    class="mx-auto max-w-[540px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl dark:bg-slate-800 dark:from-slate-800 dark:to-slate-800"
+    class="dark:bg-surface-raised dark:from-surface-raised dark:to-surface-raised mx-auto max-w-[540px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl"
     @focusin="handleFieldFocus"
   >
     <!-- Back button -->
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="dark:text-ink-soft dark:hover:text-ink mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
       @click="handleBack"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -453,7 +453,7 @@ function handleBack() {
         alt=""
         class="mx-auto h-[100px] w-[100px]"
       />
-      <p class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-200">
+      <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
         beanies<span class="text-primary-500">.family</span>
       </p>
     </div>
@@ -468,8 +468,8 @@ function handleBack() {
               step === currentStep
                 ? 'bg-primary-500 text-white'
                 : step < currentStep
-                  ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-gray-500'
+                  ? 'dark:text-success-lift bg-green-100 text-green-600 dark:bg-green-900/30'
+                  : 'dark:bg-surface-overlay dark:text-ink-faint bg-gray-100 text-gray-400'
             "
           >
             <svg
@@ -494,7 +494,7 @@ function handleBack() {
             :class="
               step < currentStep
                 ? 'bg-green-300 dark:bg-green-600'
-                : 'bg-gray-200 dark:bg-slate-600'
+                : 'dark:bg-surface-hover bg-gray-200'
             "
           ></div>
         </template>
@@ -514,14 +514,14 @@ function handleBack() {
     <!-- Error -->
     <div
       v-if="formError"
-      class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+      class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
     >
       {{ formError }}
     </div>
 
     <!-- Step 1: About You -->
     <div v-if="currentStep === 1">
-      <h2 class="font-outfit mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink mb-6 text-xl font-bold text-gray-900">
         {{ t('loginV6.growPodTitle') }}
       </h2>
 
@@ -543,7 +543,7 @@ function handleBack() {
             <!-- Role dropdown -->
             <div>
               <label
-                class="font-outfit mb-1 block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+                class="font-outfit dark:text-ink-soft mb-1 block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
               >
                 {{ t('form.type') }}
               </label>
@@ -567,7 +567,7 @@ function handleBack() {
             type="checkbox"
             class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
           />
-          <span class="text-sm text-gray-500 dark:text-gray-400">
+          <span class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('auth.subscribeNewsletter') }}
           </span>
         </label>
@@ -580,7 +580,7 @@ function handleBack() {
 
     <!-- Step 2: Save & Secure -->
     <div v-else-if="currentStep === 2">
-      <h2 class="font-outfit mb-6 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink mb-6 text-center text-xl font-bold text-gray-900">
         {{ t('loginV6.storageSectionLabel') }}
       </h2>
 
@@ -607,13 +607,13 @@ function handleBack() {
               :class="
                 driveCardState === 'connecting'
                   ? ''
-                  : 'bg-white shadow-[0_2px_8px_rgba(44,62,80,0.08)] dark:bg-slate-800'
+                  : 'dark:bg-surface-raised bg-white shadow-[0_2px_8px_rgba(44,62,80,0.08)]'
               "
             >
               <BeanieSpinner v-if="driveCardState === 'connecting'" size="sm" />
               <svg
                 v-else-if="driveCardState === 'connected'"
-                class="h-5 w-5 text-green-600 dark:text-green-400"
+                class="dark:text-success-lift h-5 w-5 text-green-600"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2.5"
@@ -650,27 +650,27 @@ function handleBack() {
             </div>
 
             <div v-if="driveCardState === 'connected'" class="min-w-0 flex-1">
-              <p class="font-outfit text-base font-semibold text-green-700 dark:text-green-400">
+              <p class="font-outfit dark:text-success-lift text-base font-semibold text-green-700">
                 {{ t('googleDrive.fileCreated') }}
               </p>
-              <p class="text-secondary-500/70 mt-0.5 text-sm leading-snug dark:text-gray-400">
+              <p class="text-secondary-500/70 dark:text-ink-soft mt-0.5 text-sm leading-snug">
                 {{ t('googleDrive.fileCreatedSubtitle') }}
               </p>
             </div>
             <div v-else-if="driveCardState === 'connecting'" class="min-w-0 flex-1">
-              <p class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
+              <p class="font-outfit dark:text-ink text-base font-semibold text-gray-900">
                 {{ t('googleDrive.connecting') }}
               </p>
             </div>
             <div v-else class="min-w-0 flex-1">
-              <p class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
+              <p class="font-outfit dark:text-ink text-base font-semibold text-gray-900">
                 {{ t('googleDrive.storageLabel') }}
                 <span
                   class="bg-primary-500/15 text-primary-500 ml-1.5 rounded-full px-2 py-0.5 align-middle text-xs font-bold"
                   >{{ t('storage.recommended') }}</span
                 >
               </p>
-              <p class="text-secondary-500/70 mt-0.5 text-sm leading-snug dark:text-gray-400">
+              <p class="text-secondary-500/70 dark:text-ink-soft mt-0.5 text-sm leading-snug">
                 {{ t('storage.driveSyncsWithFamily') }}
               </p>
               <p class="text-primary-500 font-outfit mt-1.5 text-xs font-semibold">
@@ -682,7 +682,7 @@ function handleBack() {
           <div class="mt-3 text-center">
             <p
               v-if="storageType === 'local'"
-              class="font-outfit inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 dark:text-green-400"
+              class="font-outfit dark:text-success-lift inline-flex items-center gap-1.5 text-sm font-semibold text-green-600"
             >
               <svg
                 class="h-3.5 w-3.5"
@@ -701,7 +701,7 @@ function handleBack() {
             <button
               v-else-if="canUseLocalFiles()"
               type="button"
-              class="font-outfit text-secondary-500/60 hover:text-secondary-500 cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-400 dark:hover:text-gray-200"
+              class="font-outfit text-secondary-500/60 hover:text-secondary-500 dark:text-ink-soft dark:hover:text-ink cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="isSavingStorage"
               @click="handleLocalFileClick"
             >
@@ -714,7 +714,7 @@ function handleBack() {
              proxy): local file is the only option, shown as a normal card. -->
         <div v-else class="grid grid-cols-2 gap-2">
           <div
-            class="flex h-[88px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 opacity-50 dark:bg-slate-700/40"
+            class="dark:bg-surface-overlay/40 flex h-[88px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 opacity-50"
             :title="t('selfHost.driveUnavailableTooltip')"
           >
             <svg
@@ -728,7 +728,7 @@ function handleBack() {
               />
             </svg>
             <span
-              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
+              class="font-outfit dark:text-ink-soft text-center text-xs font-semibold whitespace-nowrap text-gray-600"
               >{{ t('googleDrive.storageLabel') }}</span
             >
             <span
@@ -743,7 +743,7 @@ function handleBack() {
                it — direct the user to a Chromium desktop browser instead). -->
           <div
             v-if="!canUseLocalFiles()"
-            class="font-outfit flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 text-center text-xs text-gray-500 dark:bg-slate-700/40 dark:text-gray-400"
+            class="font-outfit dark:bg-surface-overlay/40 dark:text-ink-soft flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 text-center text-xs text-gray-500"
           >
             {{ t('selfHost.localUnsupported') }}
           </div>
@@ -753,14 +753,14 @@ function handleBack() {
             :class="
               storageType === 'local'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
-                : 'border-gray-200 bg-gray-50/80 text-gray-400 hover:border-gray-300 hover:bg-gray-100/80 dark:border-slate-600/50 dark:bg-slate-700/30 dark:hover:border-slate-500/50'
+                : 'dark:border-line-strong/50 dark:bg-surface-overlay/30 dark:hover:border-line-strong/50 border-gray-200 bg-gray-50/80 text-gray-400 hover:border-gray-300 hover:bg-gray-100/80'
             "
             :disabled="isSavingStorage"
             @click="handleLocalFileClick"
           >
             <svg
               v-if="storageType === 'local'"
-              class="mb-1.5 h-6 w-6 text-green-600 dark:text-green-400"
+              class="dark:text-success-lift mb-1.5 h-6 w-6 text-green-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -774,7 +774,7 @@ function handleBack() {
             </svg>
             <svg
               v-else
-              class="mb-1.5 h-6 w-6 text-gray-400 dark:text-gray-500"
+              class="dark:text-ink-faint mb-1.5 h-6 w-6 text-gray-400"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -789,8 +789,8 @@ function handleBack() {
               class="font-outfit text-xs font-semibold"
               :class="
                 storageType === 'local'
-                  ? 'text-green-700 dark:text-green-400'
-                  : 'text-gray-500 dark:text-gray-400'
+                  ? 'dark:text-success-lift text-green-700'
+                  : 'dark:text-ink-soft text-gray-500'
               "
               >{{ t('storage.localFile') }}</span
             >
@@ -804,7 +804,7 @@ function handleBack() {
              have distinct visual contexts. -->
         <details class="group mt-3">
           <summary
-            class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
+            class="font-outfit text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors"
           >
             <span
               class="text-primary-500 inline-block text-xs transition-transform group-open:rotate-90"
@@ -813,9 +813,9 @@ function handleBack() {
             >
             <span>{{ t('loginV6.howThisWorks.toggle') }}</span>
           </summary>
-          <div class="text-secondary-500/70 pb-2 pl-4 text-sm leading-relaxed dark:text-gray-400">
+          <div class="text-secondary-500/70 dark:text-ink-soft pb-2 pl-4 text-sm leading-relaxed">
             <p class="mb-2">
-              <strong class="text-secondary-500 dark:text-gray-200">{{
+              <strong class="text-secondary-500 dark:text-ink">{{
                 t('loginV6.howThisWorks.leadStrong')
               }}</strong>
               {{ t('loginV6.howThisWorks.lead') }}
@@ -832,7 +832,7 @@ function handleBack() {
              instead of 3 disabled full-size cards. -->
         <details class="group">
           <summary
-            class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
+            class="font-outfit text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors"
           >
             <span
               class="text-primary-500 inline-block text-xs transition-transform group-open:rotate-90"
@@ -843,15 +843,15 @@ function handleBack() {
           </summary>
           <div class="flex gap-2 pb-2 pl-4">
             <span
-              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:border-line-strong dark:bg-surface-overlay/30 dark:text-ink-soft flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold"
               >📦 {{ t('storage.dropbox') }}</span
             >
             <span
-              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:border-line-strong dark:bg-surface-overlay/30 dark:text-ink-soft flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold"
               >☁️ {{ t('storage.iCloud') }}</span
             >
             <span
-              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:border-line-strong dark:bg-surface-overlay/30 dark:text-ink-soft flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold"
               >🪟 OneDrive</span
             >
           </div>
@@ -865,7 +865,7 @@ function handleBack() {
 
     <!-- Footer link -->
     <div class="mt-6 text-center">
-      <span class="text-sm text-gray-500 dark:text-gray-400">
+      <span class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('loginV6.alreadyHavePod') }}
       </span>
       {{ ' ' }}
@@ -896,7 +896,7 @@ function handleBack() {
             class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
           >
             <svg
-              class="h-6 w-6 text-green-600 dark:text-green-400"
+              class="dark:text-success-lift h-6 w-6 text-green-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -909,10 +909,10 @@ function handleBack() {
               />
             </svg>
           </div>
-          <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+          <h3 class="font-outfit dark:text-ink text-lg font-bold text-gray-900">
             {{ t('googleDrive.fileCreated') }}
           </h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
             {{ t('googleDrive.fileCreatedSubtitle') }}
           </p>
         </div>
@@ -922,7 +922,7 @@ function handleBack() {
                instructions, and other Drive-side details intentionally
                omitted from this success moment; they're available in
                Settings → Family Data and via the Pod page invite flow. -->
-          <div class="rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50">
+          <div class="dark:bg-surface-overlay/50 rounded-xl bg-gray-50 p-3">
             <CloudProviderBadge
               provider-type="google_drive"
               :file-name="syncStore.fileName"
@@ -946,7 +946,7 @@ function handleBack() {
           "
           target="_blank"
           rel="noopener noreferrer"
-          class="mt-2 flex items-center justify-center gap-1.5 text-xs text-gray-400 transition-colors hover:text-blue-500 dark:text-gray-500"
+          class="dark:text-ink-faint mt-2 flex items-center justify-center gap-1.5 text-xs text-gray-400 transition-colors hover:text-blue-500"
         >
           {{ t('googleDrive.openInDrive') }}
           <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -967,7 +967,7 @@ function handleBack() {
             class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
           >
             <svg
-              class="h-6 w-6 text-red-600 dark:text-red-400"
+              class="dark:text-danger-lift h-6 w-6 text-red-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -980,10 +980,10 @@ function handleBack() {
               />
             </svg>
           </div>
-          <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+          <h3 class="font-outfit dark:text-ink text-lg font-bold text-gray-900">
             {{ t('googleDrive.authFailed') }}
           </h3>
-          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-2 text-sm text-gray-500">
             {{ driveResultError }}
           </p>
         </div>

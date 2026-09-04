@@ -36,9 +36,9 @@ const iconColorClass: Record<ToastType, string> = {
 };
 
 const titleColorClass: Record<ToastType, string> = {
-  success: 'text-emerald-800 dark:text-emerald-200',
-  error: 'text-red-800 dark:text-red-200',
-  warning: 'text-amber-800 dark:text-amber-200',
+  success: 'text-emerald-800 dark:text-success-lift',
+  error: 'text-red-800 dark:text-danger-lift',
+  warning: 'text-amber-800 dark:text-terracotta-lift',
   info: 'text-sky-800 dark:text-sky-200',
 };
 </script>
@@ -70,10 +70,10 @@ const titleColorClass: Record<ToastType, string> = {
         <p class="font-outfit text-sm font-semibold" :class="titleColorClass[toast.type]">
           {{ toast.title }}
         </p>
-        <p v-if="toast.message" class="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+        <p v-if="toast.message" class="dark:text-ink-soft mt-0.5 text-xs text-gray-600">
           {{ toast.message }}
         </p>
-        <p v-if="toast.reported" class="mt-1 text-xs text-gray-500 italic dark:text-gray-500">
+        <p v-if="toast.reported" class="dark:text-ink-faint mt-1 text-xs text-gray-500 italic">
           {{ t('error.supportNotified') }}
         </p>
       </div>
@@ -85,7 +85,7 @@ const titleColorClass: Record<ToastType, string> = {
         {{ toast.actionLabel }}
       </button>
       <button
-        class="shrink-0 rounded-lg p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+        class="dark:hover:text-ink-soft shrink-0 rounded-lg p-1 text-gray-400 transition-colors hover:text-gray-600"
         @click="dismissToast(toast.id)"
       >
         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

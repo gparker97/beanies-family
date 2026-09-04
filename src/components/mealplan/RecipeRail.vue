@@ -81,13 +81,13 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
 
 <template>
   <aside
-    class="relative flex h-full flex-col border-b border-[rgba(44,62,80,0.06)] p-4 transition-colors md:border-r md:border-b-0 dark:border-slate-700"
+    class="dark:border-line relative flex h-full flex-col border-b border-[rgba(44,62,80,0.06)] p-4 transition-colors md:border-r md:border-b-0"
     @dragover="onRemoveDragOver"
     @dragenter="onRemoveDragOver"
     @dragleave="removeOver = false"
     @drop="onRemoveDrop"
   >
-    <div class="font-outfit text-secondary-500 text-sm font-bold dark:text-slate-100">
+    <div class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
       📖 {{ t('mealPlanner.cookbook') }}
     </div>
     <p class="welcome-hint mt-0.5 text-[#F15D22]">{{ t('mealPlanner.railHint') }}</p>
@@ -96,7 +96,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
       v-model="query"
       type="search"
       :placeholder="t('mealPlanner.search')"
-      class="font-inter text-secondary-500 mt-3 w-full rounded-xl border border-[rgba(44,62,80,0.14)] bg-white px-3 py-2 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1] dark:bg-slate-900 dark:text-slate-100"
+      class="font-inter text-secondary-500 dark:bg-surface-ground dark:text-ink mt-3 w-full rounded-xl border border-[rgba(44,62,80,0.14)] bg-white px-3 py-2 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1]"
     />
 
     <button
@@ -115,16 +115,16 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
         v-for="recipe in results"
         :key="recipe.id"
         draggable="true"
-        class="flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
+        class="dark:bg-surface-raised flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px"
         @dragstart="startDrag({ source: 'recipe', recipeId: recipe.id }, $event)"
         @dragend="endDrag"
       >
         <MealThumb :photo-ids="recipe.photoIds" fallback-emoji="🍽️" :size-rem="2.125" />
         <div class="min-w-0">
-          <div class="font-outfit text-secondary-500 text-sm font-semibold dark:text-slate-100">
+          <div class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
             {{ recipe.name }}
           </div>
-          <div class="truncate text-xs text-[rgba(44,62,80,0.45)] dark:text-slate-400">
+          <div class="dark:text-ink-soft truncate text-xs text-[rgba(44,62,80,0.45)]">
             {{ recipe.subtitle }}
           </div>
         </div>
@@ -137,7 +137,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
          cards, so they read as the same draggable object and never truncate. -->
     <div class="flex-none">
       <div
-        class="font-outfit mt-4 text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
+        class="font-outfit dark:text-ink-faint mt-4 text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
       >
         {{ t('mealPlanner.picker.alternatives') }}
       </div>
@@ -146,7 +146,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
           v-for="alt in ALT_TYPES"
           :key="alt.kind"
           draggable="true"
-          class="flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px dark:bg-slate-800"
+          class="dark:bg-surface-raised flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgba(44,62,80,0.08)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px"
           @dragstart="startDrag({ source: 'type', kind: alt.kind }, $event)"
           @dragend="endDrag"
         >
@@ -157,7 +157,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
             aria-hidden="true"
             >{{ alt.emoji }}</span
           >
-          <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-slate-100">
+          <span class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
             {{ t(`mealPlanner.kind.${alt.kind}`) }}
           </span>
         </div>

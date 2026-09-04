@@ -138,7 +138,7 @@ function handleDiscord(): void {
           <div v-if="!sendAnonymously">
             <button
               type="button"
-              class="font-outfit flex items-center gap-2 text-sm text-[color:rgba(44,62,80,0.7)] dark:text-gray-300"
+              class="font-outfit dark:text-ink-soft flex items-center gap-2 text-sm text-[color:rgba(44,62,80,0.7)]"
               :aria-expanded="showContact"
               @click="showContact = !showContact"
             >
@@ -152,7 +152,7 @@ function handleDiscord(): void {
             </button>
             <ConditionalSection :show="showContact">
               <div class="space-y-3 pt-3">
-                <p class="text-xs text-[color:rgba(44,62,80,0.55)] dark:text-gray-400">
+                <p class="dark:text-ink-soft text-xs text-[color:rgba(44,62,80,0.55)]">
                   {{ t('feedback.form.contactHelp') }}
                 </p>
                 <BaseInput
@@ -172,22 +172,22 @@ function handleDiscord(): void {
           <label class="flex cursor-pointer items-start gap-2.5">
             <input v-model="sendAnonymously" type="checkbox" class="peer sr-only" />
             <span
-              class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 border-gray-300 bg-white transition-all peer-checked:border-[var(--color-primary)] peer-checked:bg-[var(--color-primary)] peer-focus-visible:ring-2 peer-focus-visible:ring-[#AED6F1] peer-focus-visible:ring-offset-1 dark:border-slate-500 dark:bg-slate-700"
+              class="dark:border-line-strong dark:bg-surface-overlay mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 border-gray-300 bg-white transition-all peer-checked:border-[var(--color-primary)] peer-checked:bg-[var(--color-primary)] peer-focus-visible:ring-2 peer-focus-visible:ring-[#AED6F1] peer-focus-visible:ring-offset-1"
             >
               <BeanieIcon v-if="sendAnonymously" name="check" size="sm" class="text-white" />
             </span>
             <span
-              class="text-sm leading-relaxed text-[color:rgba(44,62,80,0.75)] dark:text-gray-300"
+              class="dark:text-ink-soft text-sm leading-relaxed text-[color:rgba(44,62,80,0.75)]"
             >
               {{ t('feedback.form.anonymousLabel') }}
-              <span class="block text-xs text-[color:rgba(44,62,80,0.5)] dark:text-gray-400">
+              <span class="dark:text-ink-soft block text-xs text-[color:rgba(44,62,80,0.5)]">
                 {{ t('feedback.form.anonymousHint') }}
               </span>
             </span>
           </label>
 
           <p
-            class="flex items-center gap-1.5 text-xs text-[color:rgba(44,62,80,0.5)] dark:text-gray-400"
+            class="dark:text-ink-soft flex items-center gap-1.5 text-xs text-[color:rgba(44,62,80,0.5)]"
           >
             <span aria-hidden="true">🔒</span> {{ t('feedback.form.privacyNote') }}
           </p>
@@ -206,7 +206,7 @@ function handleDiscord(): void {
   >
     <div class="space-y-4 py-2 text-center">
       <p class="text-4xl" aria-hidden="true"><span>🫘</span><span>💛</span></p>
-      <p class="text-sm text-[color:rgba(44,62,80,0.7)] dark:text-gray-300">{{ thanksBody }}</p>
+      <p class="dark:text-ink-soft text-sm text-[color:rgba(44,62,80,0.7)]">{{ thanksBody }}</p>
       <button
         type="button"
         class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br px-6 py-3 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
@@ -216,7 +216,7 @@ function handleDiscord(): void {
       </button>
       <button
         type="button"
-        class="block w-full text-xs text-[color:rgba(44,62,80,0.5)] underline underline-offset-2 dark:text-gray-400"
+        class="dark:text-ink-soft block w-full text-xs text-[color:rgba(44,62,80,0.5)] underline underline-offset-2"
         @click="close"
       >
         {{ t('feedback.thanks.dismiss') }}

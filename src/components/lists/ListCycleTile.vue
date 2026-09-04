@@ -55,7 +55,7 @@ const whenLabel = computed(() =>
 <template>
   <button
     type="button"
-    class="group flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-800"
+    class="group dark:bg-surface-raised dark:border-line-strong flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     @click="emit('open', cycle.id)"
   >
     <div

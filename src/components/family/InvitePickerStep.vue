@@ -92,7 +92,7 @@ function handleSelect(tile: Tile): void {
           :data-testid="`invite-picker-tile-${tile.member.id}`"
           :data-state="tile.state ?? 'selectable'"
           :disabled="tile.state !== null"
-          class="member-tile group flex w-full items-center gap-3.5 rounded-2xl border-2 border-gray-200 bg-white px-3 py-3 text-left transition-all dark:border-slate-700 dark:bg-slate-800"
+          class="member-tile group dark:border-line dark:bg-surface-raised flex w-full items-center gap-3.5 rounded-2xl border-2 border-gray-200 bg-white px-3 py-3 text-left transition-all"
           :class="
             tile.state === 'owner'
               ? 'is-owner cursor-not-allowed opacity-80'
@@ -118,12 +118,12 @@ function handleSelect(tile: Tile): void {
           />
           <div class="min-w-0 flex-1">
             <div
-              class="font-outfit text-secondary-500 truncate text-[0.9375rem] font-bold dark:text-gray-100"
+              class="font-outfit text-secondary-500 dark:text-ink truncate text-[0.9375rem] font-bold"
             >
               {{ tile.member.name }}
             </div>
             <div
-              class="font-inter text-secondary-500/60 mt-0.5 flex flex-wrap items-center gap-x-1.5 truncate text-xs dark:text-gray-400"
+              class="font-inter text-secondary-500/60 dark:text-ink-soft mt-0.5 flex flex-wrap items-center gap-x-1.5 truncate text-xs"
             >
               <span>{{ roleLabel(tile.member) }}</span>
               <template v-if="ageOf(tile.member) !== null">
@@ -173,7 +173,7 @@ function handleSelect(tile: Tile): void {
 
     <p
       v-if="isEmpty"
-      class="font-inter text-center text-xs text-gray-400 italic dark:text-gray-500"
+      class="font-inter dark:text-ink-faint text-center text-xs text-gray-400 italic"
     >
       {{ t('inviteWizard.picker.empty') }}
     </p>

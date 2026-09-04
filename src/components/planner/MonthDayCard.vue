@@ -146,11 +146,11 @@ function onMoreClick(event: MouseEvent) {
   <button
     :data-date="cell.date"
     type="button"
-    class="font-outfit relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl border bg-white p-2.5 text-left transition-colors md:h-auto md:min-h-[140px] md:flex-col md:items-center md:gap-1 md:rounded-xl md:border-0 md:bg-transparent md:px-1.5 md:pt-1.5 md:pb-1 dark:bg-slate-800/40 md:dark:bg-transparent"
+    class="font-outfit dark:bg-surface-raised/40 relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl border bg-white p-2.5 text-left transition-colors md:h-auto md:min-h-[140px] md:flex-col md:items-center md:gap-1 md:rounded-xl md:border-0 md:bg-transparent md:px-1.5 md:pt-1.5 md:pb-1 md:dark:bg-transparent"
     :class="[
       cell.isCurrentMonth
-        ? 'text-secondary-500 dark:text-gray-200'
-        : 'text-secondary-500/30 md:bg-transparent dark:text-gray-600',
+        ? 'text-secondary-500 dark:text-ink'
+        : 'text-secondary-500/30 dark:text-ink-faint md:bg-transparent',
       bgClass,
       // Today on mobile gets a 3px orange left bar + soft orange wash so it
       // stands out in the vertical day-stack even when there are zero events.
@@ -158,7 +158,7 @@ function onMoreClick(event: MouseEvent) {
       // the gradient day-number pill below already carries the today marker.
       cell.isToday
         ? 'border-primary-500 border-l-[3px] bg-[rgba(241,93,34,0.04)] md:!border-transparent md:!bg-transparent'
-        : 'border-gray-200/60 dark:border-slate-700/60',
+        : 'dark:border-line/60 border-gray-200/60',
       selected ? 'ring-primary-500 ring-2 ring-inset' : '',
     ]"
     @click="onCellClick"
@@ -167,7 +167,7 @@ function onMoreClick(event: MouseEvent) {
     <div class="flex w-10 flex-shrink-0 flex-col items-center gap-0.5 pt-0.5 md:hidden">
       <span
         class="text-[0.625rem] font-bold tracking-[0.14em] uppercase"
-        :class="cell.isToday ? 'text-primary-500' : 'text-secondary-500/50 dark:text-gray-500'"
+        :class="cell.isToday ? 'text-primary-500' : 'text-secondary-500/50 dark:text-ink-faint'"
       >
         {{ dowLabel }}
       </span>
@@ -229,7 +229,7 @@ function onMoreClick(event: MouseEvent) {
         />
         <span
           v-if="allDayOverflow > 0"
-          class="text-secondary-500/40 px-0.5 text-[0.5625rem] leading-tight dark:text-gray-500"
+          class="text-secondary-500/40 dark:text-ink-faint px-0.5 text-[0.5625rem] leading-tight"
           aria-hidden="true"
         >
           +{{ allDayOverflow }}
@@ -246,7 +246,7 @@ function onMoreClick(event: MouseEvent) {
       <button
         v-if="timedOverflow > 0"
         type="button"
-        class="font-outfit text-secondary-500/50 hover:text-primary-500 self-start rounded-md px-1 py-0.5 text-[0.625rem] font-semibold tracking-wide transition-colors dark:text-gray-500"
+        class="font-outfit text-secondary-500/50 hover:text-primary-500 dark:text-ink-faint self-start rounded-md px-1 py-0.5 text-[0.625rem] font-semibold tracking-wide transition-colors"
         :aria-label="t('planner.moreEvents').replace('{count}', String(timedOverflow))"
         @click="onMoreClick"
       >
@@ -263,7 +263,7 @@ function onMoreClick(event: MouseEvent) {
         />
         <span
           v-if="cell.segments.length > 2"
-          class="text-secondary-500/40 text-[0.5625rem]"
+          class="text-secondary-500/40 dark:text-ink-faint text-[0.5625rem]"
           aria-hidden="true"
         >
           +{{ cell.segments.length - 2 }}
@@ -274,7 +274,7 @@ function onMoreClick(event: MouseEvent) {
            busy days stand out in the agenda. Today is never collapsed. -->
       <span
         v-if="isEmptyDay && !cell.isToday"
-        class="font-inter text-secondary-500/40 self-start text-xs italic md:hidden dark:text-gray-600"
+        class="font-inter text-secondary-500/40 dark:text-ink-faint self-start text-xs italic md:hidden"
       >
         {{ t('planner.nothingPlanned') }}
       </span>

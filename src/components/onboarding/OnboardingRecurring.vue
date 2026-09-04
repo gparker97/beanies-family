@@ -336,8 +336,8 @@ function perPeriodSuffix(freq: RecurringFrequency): string {
   font-weight: 600;
 }
 
-:global(.dark) .ob-account-select :deep(select) {
-  background: #243342;
+:global(html.dark .ob-account-select select) {
+  background: #26343f;
   border-color: rgb(255 255 255 / 8%);
 }
 </style>

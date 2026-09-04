@@ -19,7 +19,7 @@ defineEmits<{
 <template>
   <div class="flex flex-col items-center justify-center gap-2 py-6 text-center">
     <span v-if="emoji" class="text-3xl leading-none" aria-hidden="true">{{ emoji }}</span>
-    <p class="font-outfit text-secondary-500/60 text-sm dark:text-gray-400">
+    <p class="font-outfit text-secondary-500/60 dark:text-ink-soft text-sm">
       {{ message }}
     </p>
     <button

@@ -786,13 +786,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ── Install App Banner ──────────────────────────────────────────── -->
     <div
       v-if="canInstall || isInstalled"
-      class="flex items-center justify-between rounded-3xl bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised flex items-center justify-between rounded-3xl bg-white p-5 shadow-[var(--card-shadow)]"
     >
       <div>
-        <p class="font-outfit text-sm font-bold text-slate-700 dark:text-slate-200">
+        <p class="font-outfit dark:text-ink text-sm font-bold text-slate-700">
           {{ t('settings.installApp') }}
         </p>
-        <p class="text-xs text-slate-400 dark:text-slate-500">
+        <p class="dark:text-ink-faint text-xs text-slate-400">
           {{ isInstalled ? t('settings.appInstalled') : t('settings.installAppDesc') }}
         </p>
       </div>
@@ -806,7 +806,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </BaseButton>
       <span
         v-else-if="isInstalled"
-        class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+        class="dark:text-success-lift inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30"
       >
         &#x2713;
       </span>
@@ -815,12 +815,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     <!-- ── Quick Toggles ───────────────────────────────────────────────── -->
     <div>
       <p
-        class="font-outfit mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase dark:text-slate-500"
+        class="font-outfit dark:text-ink-faint mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase"
       >
         {{ t('settings.quickToggles') }}
       </p>
       <div
-        class="rounded-[var(--sq)] bg-white px-6 shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:bg-slate-800"
+        class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 shadow-[0_2px_12px_rgba(44,62,80,0.04)]"
       >
         <SettingToggleRow
           divider
@@ -840,7 +840,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         >
           <p
             v-if="!translationStore.isEnglish"
-            class="text-[0.65rem] text-amber-600 dark:text-amber-400"
+            class="dark:text-terracotta-lift text-[0.65rem] text-amber-600"
           >
             {{ t('settings.beanieModeDisabled') }}
           </p>
@@ -910,7 +910,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
          the pill is presentational. -->
     <button
       type="button"
-      class="group relative w-full cursor-pointer overflow-hidden rounded-[var(--sq)] bg-[var(--tint-silk-20)] p-5 text-left ring-1 ring-[var(--deep-slate)]/5 transition-all duration-200 hover:-translate-y-px hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] focus-visible:ring-2 focus-visible:ring-[var(--heritage-orange)] focus-visible:outline-none motion-reduce:transform-none motion-reduce:transition-none dark:bg-slate-800 dark:ring-white/5"
+      class="group dark:bg-surface-raised relative w-full cursor-pointer overflow-hidden rounded-[var(--sq)] bg-[var(--tint-silk-20)] p-5 text-left ring-1 ring-[var(--deep-slate)]/5 transition-all duration-200 hover:-translate-y-px hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] focus-visible:ring-2 focus-visible:ring-[var(--heritage-orange)] focus-visible:outline-none motion-reduce:transform-none motion-reduce:transition-none dark:ring-white/5"
       @click="openDiscord('settings')"
     >
       <!-- A line of beanies, already holding hands — the community you're being
@@ -929,10 +929,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         >
         <span class="min-w-0 flex-1">
           <span
-            class="font-outfit block text-sm font-bold text-[var(--deep-slate)] dark:text-slate-100"
+            class="font-outfit dark:text-ink block text-sm font-bold text-[var(--deep-slate)]"
             >{{ t('settings.discordCta') }}</span
           >
-          <span class="mt-0.5 block text-xs text-[var(--deep-slate)]/55 dark:text-slate-400">{{
+          <span class="dark:text-ink-soft mt-0.5 block text-xs text-[var(--deep-slate)]/55">{{
             t('settings.discordCtaDesc')
           }}</span>
         </span>
@@ -944,10 +944,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     </button>
 
     <!-- ── About Footer ────────────────────────────────────────────────── -->
-    <div class="px-2 pb-4 text-center text-xs text-slate-400 dark:text-slate-500">
+    <div class="dark:text-ink-faint px-2 pb-4 text-center text-xs text-slate-400">
       <p>
         <span class="opacity-60">🫘</span>
-        <strong class="text-slate-500 dark:text-slate-400">{{ t('settings.appName') }}</strong>
+        <strong class="dark:text-ink-soft text-slate-500">{{ t('settings.appName') }}</strong>
         · {{ fullVersionLabel }}
       </p>
       <p class="mt-1"><span class="opacity-60">🔒</span> {{ t('settings.privacyNote') }}</p>
@@ -1000,16 +1000,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
             />
           </svg>
-          <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+          <h3 class="font-outfit dark:text-ink text-base font-bold text-gray-900">
             {{ t('settings.baseCurrency') }}
           </h3>
         </div>
-        <p class="mb-4 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-4 text-sm leading-relaxed text-gray-600">
           {{ t('settings.noRatesWarning') }}
         </p>
         <div
           v-if="ratesFetchError"
-          class="mb-3 rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400"
+          class="dark:text-danger-lift mb-3 rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-900/20"
         >
           {{ ratesFetchError }}
         </div>
@@ -1102,10 +1102,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
       <!-- Preferred Currencies -->
       <div>
-        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label class="dark:text-ink-soft mb-1 block text-sm font-medium text-gray-700">
           {{ t('settings.preferredCurrencies') }}
         </label>
-        <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-2 text-xs text-gray-500">
           {{ t('settings.preferredCurrenciesHint') }}
         </p>
 
@@ -1134,7 +1134,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <input
             v-model="currencySearch"
             type="text"
-            class="font-outfit w-full rounded-xl border border-gray-200 bg-white py-2 pr-3 pl-9 text-base text-gray-700 placeholder-gray-400 transition-colors outline-none focus:border-[#F15D22]/40 focus:ring-2 focus:ring-[#F15D22]/10 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-200 dark:placeholder-gray-500"
+            class="font-outfit dark:border-line-strong dark:bg-surface-overlay dark:text-ink dark:placeholder-ink-faint w-full rounded-xl border border-gray-200 bg-white py-2 pr-3 pl-9 text-base text-gray-700 placeholder-gray-400 transition-colors outline-none focus:border-[#F15D22]/40 focus:ring-2 focus:ring-[#F15D22]/10"
             :placeholder="t('settings.searchCurrencies')"
           />
           <svg
@@ -1151,26 +1151,26 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <!-- Search results dropdown -->
           <div
             v-if="currencySearch.trim().length > 0 && searchResults.length > 0"
-            class="absolute top-full left-0 z-10 mt-1.5 max-h-[200px] w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700"
+            class="dark:border-line-strong dark:bg-surface-overlay absolute top-full left-0 z-10 mt-1.5 max-h-[200px] w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg"
           >
             <button
               v-for="curr in searchResults"
               :key="curr.code"
               type="button"
-              class="font-outfit flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(241,93,34,0.04)] dark:hover:bg-slate-600"
+              class="font-outfit dark:hover:bg-surface-hover flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(241,93,34,0.04)]"
               @click="
                 togglePreferredCurrency(curr.code);
                 currencySearch = '';
               "
             >
               <span
-                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-base dark:bg-slate-600"
+                class="dark:bg-surface-hover flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-base"
               >
                 {{ curr.symbol }}
               </span>
               <div>
-                <span class="font-semibold text-gray-800 dark:text-gray-100">{{ curr.code }}</span>
-                <span class="ml-1.5 text-gray-400 dark:text-gray-400">{{ curr.name }}</span>
+                <span class="dark:text-ink font-semibold text-gray-800">{{ curr.code }}</span>
+                <span class="dark:text-ink-soft ml-1.5 text-gray-400">{{ curr.name }}</span>
               </div>
             </button>
           </div>
@@ -1178,20 +1178,20 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <!-- No results -->
           <div
             v-if="currencySearch.trim().length > 0 && searchResults.length === 0"
-            class="absolute top-full left-0 z-10 mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-4 text-center shadow-lg dark:border-slate-600 dark:bg-slate-700"
+            class="dark:border-line-strong dark:bg-surface-overlay absolute top-full left-0 z-10 mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-4 text-center shadow-lg"
           >
-            <p class="text-xs text-gray-400 dark:text-gray-500">{{ t('empty.noResults') }}</p>
+            <p class="dark:text-ink-faint text-xs text-gray-400">{{ t('empty.noResults') }}</p>
           </div>
         </div>
 
         <!-- Selection count -->
-        <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+        <p class="dark:text-ink-faint mt-2 text-xs text-gray-400">
           {{ t('settings.preferredSelectedCount').replace('{count}', String(preferredCount)) }}
         </p>
       </div>
 
       <!-- Exchange Rates (inline, no BaseCard wrapper) -->
-      <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
+      <div class="dark:border-line border-t border-gray-200 pt-4">
         <ExchangeRateSettings :standalone="false" :read-only="!canManagePod" />
       </div>
     </BeanieFormModal>
@@ -1220,19 +1220,19 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         @update:model-value="onPickCountry"
       />
 
-      <p v-if="showHolidayRetryHint" class="text-secondary-500/70 text-xs dark:text-gray-400">
+      <p v-if="showHolidayRetryHint" class="text-secondary-500/70 dark:text-ink-soft text-xs">
         {{ t('holiday.loadFailedRetryHint') }}
       </p>
 
       <!-- Show / hide public holidays on the planner -->
       <div
-        class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+        class="dark:border-line flex items-center justify-between rounded-lg border border-gray-200 p-4"
       >
         <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink font-medium text-gray-900">
             {{ t('settings.showPublicHolidays') }}
           </p>
-          <p v-if="!settingsStore.country" class="text-sm text-gray-500 dark:text-gray-400">
+          <p v-if="!settingsStore.country" class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('settings.showPublicHolidaysNeedsCountry') }}
           </p>
         </div>
@@ -1286,13 +1286,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     >
       <!-- Trusted device toggle -->
       <div
-        class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+        class="dark:border-line flex items-center justify-between rounded-lg border border-gray-200 p-4"
       >
         <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink font-medium text-gray-900">
             {{ t('trust.settingsLabel') }}
           </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('trust.settingsDesc') }}
           </p>
         </div>
@@ -1320,7 +1320,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       @close="showFamilyData = false"
       @save="showFamilyData = false"
     >
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('settings.familyDataDescription') }}
       </p>
 
@@ -1337,19 +1337,19 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <!-- Reconnecting: a lost data-file connection is being re-established
                silently from the registry (never flash the "save your data" copy). -->
           <template v-if="syncStore.reconnecting">
-            <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink mb-2 font-medium text-gray-900">
               {{ t('settings.dataReconnecting') }}
             </p>
-            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft mb-4 text-sm text-gray-500">
               {{ t('settings.dataReconnectingDesc') }}
             </p>
           </template>
 
           <template v-else>
-            <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink mb-2 font-medium text-gray-900">
               {{ t('settings.saveDataToFile') }}
             </p>
-            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft mb-4 text-sm text-gray-500">
               {{ t('settings.createOrLoadDataFile') }}
             </p>
             <div class="flex flex-col gap-3">
@@ -1371,7 +1371,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             v-if="showLoadFileConfirm"
             class="mt-4 rounded-lg bg-yellow-50 p-4 text-left dark:bg-yellow-900/20"
           >
-            <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
+            <p class="dark:text-terracotta-lift mb-3 text-sm text-yellow-800">
               {{ t('settings.loadFileConfirmation') }}
             </p>
             <div class="flex gap-2">
@@ -1391,7 +1391,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             v-if="syncStore.needsPermission"
             class="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
           >
-            <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
+            <p class="dark:text-terracotta-lift mb-3 text-sm text-yellow-800">
               {{ t('settings.grantPermissionPrompt') }}
             </p>
             <BaseButton variant="primary" @click="handleRequestPermission">
@@ -1402,10 +1402,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           <div v-else>
             <!-- My Family's Data -->
             <div
-              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
             >
               <div class="min-w-0 flex-1">
-                <p class="font-medium text-gray-900 dark:text-gray-100">
+                <p class="dark:text-ink font-medium text-gray-900">
                   {{ t('settings.myFamilyData') }}
                 </p>
                 <CloudProviderBadge
@@ -1416,7 +1416,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                 />
                 <p
                   v-if="syncStore.isGoogleDriveConnected"
-                  class="mt-0.5 text-xs text-gray-400 dark:text-gray-500"
+                  class="dark:text-ink-faint mt-0.5 text-xs text-gray-400"
                 >
                   {{ t('googleDrive.savedTo') }}
                 </p>
@@ -1425,11 +1425,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                 <span
                   class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                   :class="{
-                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400':
+                    'dark:text-success-lift bg-green-100 text-green-800 dark:bg-green-900/30':
                       syncStore.syncStatus === 'ready',
-                    'bg-sky-silk-100 text-secondary-500 dark:bg-primary-900/30 dark:text-primary-400':
+                    'bg-sky-silk-100 text-secondary-500 dark:bg-primary-900/30 dark:text-accent-lift':
                       syncStore.syncStatus === 'syncing',
-                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400':
+                    'dark:text-danger-lift bg-red-100 text-red-800 dark:bg-red-900/30':
                       syncStore.syncStatus === 'error',
                   }"
                 >
@@ -1447,9 +1447,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             <!-- Google Drive info -->
             <div
               v-if="syncStore.isGoogleDriveConnected"
-              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
             >
-              <p class="text-sm text-gray-500 dark:text-gray-400">
+              <p class="dark:text-ink-soft text-sm text-gray-500">
                 {{ t('googleDrive.fileLocation') }}
               </p>
               <a
@@ -1480,13 +1480,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                 syncStore.isGoogleDriveConnected &&
                 (syncStore.sessionAccountEmail ?? syncStore.providerAccountEmail)
               "
-              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
             >
               <div class="min-w-0 flex-1">
-                <p class="text-sm text-gray-500 dark:text-gray-400">
+                <p class="dark:text-ink-soft text-sm text-gray-500">
                   {{ t('settings.familyData.signedInAs') }}
                 </p>
-                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p class="dark:text-ink truncate text-sm font-medium text-gray-900">
                   {{ syncStore.sessionAccountEmail ?? syncStore.providerAccountEmail }}
                 </p>
               </div>
@@ -1502,13 +1502,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
             <!-- Last Saved -->
             <div
-              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
             >
               <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">
+                <p class="dark:text-ink font-medium text-gray-900">
                   {{ t('settings.lastSaved') }}
                 </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
+                <p class="dark:text-ink-soft text-sm text-gray-500">
                   {{ formatLastSync(syncStore.lastSync) }}
                 </p>
               </div>
@@ -1520,17 +1520,17 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               v-if="
                 isOwner && !(syncStore.storageProviderType === 'local' && isRedirectAuthBrowser)
               "
-              class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
             >
               <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">
+                <p class="dark:text-ink font-medium text-gray-900">
                   {{
                     syncStore.storageProviderType === 'local'
                       ? t('settings.familyData.migrate.moveToGoogleDrive')
                       : t('settings.familyData.migrate.moveToLocalFile')
                   }}
                 </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
+                <p class="dark:text-ink-soft text-sm text-gray-500">
                   {{
                     syncStore.storageProviderType === 'local'
                       ? t('settings.familyData.migrate.moveToGoogleDriveDesc')
@@ -1551,10 +1551,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             <!-- Load another file -->
             <div class="flex items-center justify-between py-3">
               <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">
+                <p class="dark:text-ink font-medium text-gray-900">
                   {{ t('settings.loadAnotherDataFile') }}
                 </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
+                <p class="dark:text-ink-soft text-sm text-gray-500">
                   {{ t('settings.switchDataFile') }}
                 </p>
               </div>
@@ -1573,7 +1573,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               v-if="showLoadFileConfirm"
               class="mt-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
             >
-              <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
+              <p class="dark:text-terracotta-lift mb-3 text-sm text-yellow-800">
                 {{ t('settings.switchFileConfirmation') }}
               </p>
               <div class="flex gap-2">
@@ -1591,7 +1591,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               v-if="syncStore.error"
               class="mt-4 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
             >
-              <p class="text-sm text-amber-800 dark:text-amber-300">{{ syncStore.error }}</p>
+              <p class="dark:text-terracotta-lift text-sm text-amber-800">{{ syncStore.error }}</p>
               <div class="mt-2 flex gap-2">
                 <BaseButton
                   v-if="syncStore.isGoogleDriveConnected"
@@ -1606,7 +1606,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   {{ t('settings.forceSave') }}
                 </BaseButton>
               </div>
-              <p v-if="reconnectError" class="mt-2 text-xs text-amber-700 dark:text-amber-400">
+              <p
+                v-if="reconnectError"
+                class="dark:text-terracotta-lift mt-2 text-xs text-amber-700"
+              >
                 {{ t('googleDrive.reconnectFailed') }}: {{ reconnectError }}
               </p>
             </div>
@@ -1616,36 +1619,36 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               v-if="syncStore.cachePersistFailed"
               class="mt-2 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
             >
-              <p class="text-sm text-amber-700 dark:text-amber-300">
+              <p class="dark:text-terracotta-lift text-sm text-amber-700">
                 {{ t('settings.cachePersistWarning') }}
               </p>
             </div>
 
             <!-- Success message -->
             <div v-if="importSuccess" class="mt-4 rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
-              <p class="text-sm text-green-600 dark:text-green-400">
+              <p class="dark:text-success-lift text-sm text-green-600">
                 {{ t('settings.dataLoadedSuccess') }}
               </p>
             </div>
 
             <!-- Family key status -->
-            <div class="mt-4 border-t border-gray-200 pt-4 dark:border-slate-700">
+            <div class="dark:border-line mt-4 border-t border-gray-200 pt-4">
               <div class="flex items-center gap-3">
                 <div
                   class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-green-100 dark:bg-green-900/30"
                 >
-                  <BeanieIcon name="lock" size="md" class="text-green-600 dark:text-green-400" />
+                  <BeanieIcon name="lock" size="md" class="dark:text-success-lift text-green-600" />
                 </div>
                 <div>
-                  <p class="font-medium text-gray-900 dark:text-gray-100">
+                  <p class="dark:text-ink font-medium text-gray-900">
                     {{ t('settings.familyKeyStatus') }}
                     <span
-                      class="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      class="dark:text-success-lift ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30"
                     >
                       {{ t('settings.familyKeyActive') }}
                     </span>
                   </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                  <p class="dark:text-ink-soft text-sm text-gray-500">
                     {{ t('settings.familyKeyDescription') }}
                   </p>
                 </div>
@@ -1657,17 +1660,17 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
       <!-- Fallback for older browsers -->
       <div v-else class="space-y-4">
-        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-4 text-sm text-gray-500">
           {{ t('settings.noAutoSyncWarning') }}
         </p>
         <div
-          class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+          class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
         >
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink font-medium text-gray-900">
               {{ t('settings.downloadYourData') }}
             </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('settings.downloadDataDescription') }}
             </p>
           </div>
@@ -1677,10 +1680,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         </div>
         <div class="flex items-center justify-between py-3">
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink font-medium text-gray-900">
               {{ t('settings.loadDataFile') }}
             </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('settings.loadDataFileDescription') }}
             </p>
           </div>
@@ -1690,10 +1693,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         </div>
 
         <div v-if="importError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-          <p class="text-sm text-red-600 dark:text-red-400">{{ importError }}</p>
+          <p class="dark:text-danger-lift text-sm text-red-600">{{ importError }}</p>
         </div>
         <div v-if="importSuccess" class="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
-          <p class="text-sm text-green-600 dark:text-green-400">
+          <p class="dark:text-success-lift text-sm text-green-600">
             {{ t('settings.dataLoadedSuccess') }}
           </p>
         </div>
@@ -1703,19 +1706,19 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
            Owner-only. Rare action (once-per-pod-lifetime), so it lives
            inside Family Data rather than getting its own Settings tile.
            Members never see this section at all. -->
-      <div v-if="isOwner" class="mt-6 border-t border-gray-200 pt-4 dark:border-slate-700">
-        <h3 class="font-outfit mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
+      <div v-if="isOwner" class="dark:border-line mt-6 border-t border-gray-200 pt-4">
+        <h3 class="font-outfit dark:text-ink mb-3 text-base font-semibold text-gray-900">
           👑 {{ t('settings.podOwnershipSection') }}
         </h3>
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 flex-1">
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-xs text-gray-500">
               {{ t('settings.currentOwner') }}
             </p>
-            <p class="truncate font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink truncate font-medium text-gray-900">
               {{ currentOwnerName ?? '—' }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft mt-1 text-xs text-gray-500">
               {{ t('settings.transferOwnershipDesc') }}
             </p>
           </div>
@@ -1734,13 +1737,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
            Lives in Family Data so it doesn't crowd the Appearance drawer
            with a one-off action. Visible to anyone who can manage the pod
            (the drawer's own v-if). -->
-      <div class="mt-6 border-t border-gray-200 pt-4 dark:border-slate-700">
+      <div class="dark:border-line mt-6 border-t border-gray-200 pt-4">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 flex-1">
-            <p class="font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink font-medium text-gray-900">
               {{ t('onboarding.restartOnboarding') }}
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-xs text-gray-500">
               {{ t('onboarding.restartOnboardingDescription') }}
             </p>
           </div>
@@ -1774,14 +1777,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       @close="showDataManagement = false"
       @save="showDataManagement = false"
     >
-      <div
-        class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
-      >
+      <div class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3">
         <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink font-medium text-gray-900">
             {{ t('settings.exportData') }}
           </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('settings.exportDataDescription') }}
           </p>
         </div>
@@ -1789,14 +1790,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           {{ t('action.export') }}
         </BaseButton>
       </div>
-      <div
-        class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
-      >
+      <div class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3">
         <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink font-medium text-gray-900">
             {{ t('settings.exportAsJson') }}
           </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('settings.exportAsJsonDesc') }}
           </p>
         </div>
@@ -1806,10 +1805,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
       <div class="flex items-center justify-between py-3">
         <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
+          <p class="dark:text-ink font-medium text-gray-900">
             {{ t('settings.clearAllData') }}
           </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('settings.clearAllDataDescription') }}
           </p>
         </div>
@@ -1819,7 +1818,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
 
       <div v-if="showClearConfirm" class="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
-        <p class="mb-3 text-sm text-red-800 dark:text-red-200">
+        <p class="dark:text-danger-lift mb-3 text-sm text-red-800">
           {{ t('settings.clearDataConfirmation') }}
         </p>
         <div class="flex gap-2">
@@ -1836,10 +1835,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       <div class="mt-6 rounded-lg border-2 border-[#F15D22]/40 p-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink font-medium text-gray-900">
               {{ t('settings.deleteFamily') }}
             </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('settings.deleteFamilyDesc') }}
             </p>
           </div>
@@ -1863,7 +1862,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     >
       <div class="space-y-4">
         <div class="rounded-lg bg-[#F15D22]/10 p-4">
-          <p class="text-sm text-gray-800 dark:text-gray-200">
+          <p class="dark:text-ink text-sm text-gray-800">
             {{ t('settings.deleteFamilyWarning') }}
           </p>
         </div>
@@ -1874,7 +1873,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             type="checkbox"
             class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
           />
-          <span class="text-sm text-gray-700 dark:text-gray-300">
+          <span class="dark:text-ink-soft text-sm text-gray-700">
             {{ t('settings.deleteFamilyExport') }}
           </span>
         </label>
@@ -1888,7 +1887,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             type="checkbox"
             class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
           />
-          <span class="text-sm text-gray-700 dark:text-gray-300">
+          <span class="dark:text-ink-soft text-sm text-gray-700">
             {{ t('settings.deleteFamilyDriveDelete') }}
           </span>
         </label>
@@ -1948,13 +1947,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       <div class="flex items-start gap-3">
         <BeanieIcon name="exclamation-circle" size="md" class="mt-0.5 flex-shrink-0 text-red-500" />
         <div>
-          <p class="text-sm font-medium text-red-800 dark:text-red-200">
+          <p class="dark:text-danger-lift text-sm font-medium text-red-800">
             {{ t('password.encryptionError') }}
           </p>
-          <p class="mt-1 text-sm text-red-600 dark:text-red-300">{{ encryptionError }}</p>
+          <p class="dark:text-danger-lift mt-1 text-sm text-red-600">{{ encryptionError }}</p>
         </div>
         <button
-          class="text-red-400 hover:text-red-600 dark:hover:text-red-200"
+          class="dark:hover:text-danger-lift text-red-400 hover:text-red-600"
           @click="encryptionError = null"
         >
           <BeanieIcon name="close" size="sm" />

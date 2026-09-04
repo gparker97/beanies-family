@@ -880,7 +880,7 @@ async function addQuickIdea() {
           <div
             v-for="vacation in pastVacations"
             :key="vacation.id"
-            class="focus-visible:ring-primary-500 cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white opacity-50 shadow-[var(--card-shadow)] transition-all duration-200 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-slate-800"
+            class="focus-visible:ring-primary-500 dark:bg-surface-raised cursor-pointer overflow-hidden rounded-3xl border-[1.5px] border-[var(--tint-slate-5)] bg-white opacity-50 shadow-[var(--card-shadow)] transition-all duration-200 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             role="button"
             tabindex="0"
             :aria-label="fillTemplate(t('travel.openTrip'), { name: vacation.name })"
@@ -897,7 +897,7 @@ async function addQuickIdea() {
               </span>
             </div>
             <div class="p-4">
-              <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+              <h3 class="font-outfit dark:text-ink text-base font-bold text-gray-900">
                 {{ vacation.name }}
               </h3>
               <div
@@ -922,10 +922,10 @@ async function addQuickIdea() {
           class="rounded-3xl border-2 border-dashed border-[rgba(0,180,216,0.15)] py-16 text-center"
         >
           <span class="mb-3 block text-5xl">✈️</span>
-          <h3 class="font-outfit mb-1 text-lg font-bold text-gray-900 dark:text-gray-100">
+          <h3 class="font-outfit dark:text-ink mb-1 text-lg font-bold text-gray-900">
             {{ t('travel.empty') }}
           </h3>
-          <p class="mx-auto mb-5 max-w-sm text-sm text-gray-400 dark:text-gray-500">
+          <p class="dark:text-ink-faint mx-auto mb-5 max-w-sm text-sm text-gray-400">
             {{ t('travel.emptySubtitle') }}
           </p>
           <button
@@ -1068,7 +1068,7 @@ async function addQuickIdea() {
           <!-- Progress banner -->
           <div
             v-if="vacationProgress(selectedVacation).total > 0"
-            class="mb-5 flex items-center gap-3 rounded-2xl bg-[var(--tint-slate-5)] p-3 dark:bg-slate-800"
+            class="dark:bg-surface-raised mb-5 flex items-center gap-3 rounded-2xl bg-[var(--tint-slate-5)] p-3"
           >
             <span class="text-base">📋</span>
             <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--tint-slate-5)]">
@@ -1100,7 +1100,7 @@ async function addQuickIdea() {
             @keydown.space.prevent="scrollToIdeas"
           >
             <span class="text-2xl">🌟</span>
-            <div class="font-outfit flex-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+            <div class="font-outfit dark:text-ink flex-1 text-sm font-semibold text-gray-900">
               {{ selectedVacation.ideas.length }} {{ t('travel.ideasTeaser').toLowerCase() }}
               <span class="mt-0.5 block text-[0.6875rem] font-normal text-gray-400">
                 {{ t('travel.ideasTeaserHint') }}
@@ -1111,7 +1111,7 @@ async function addQuickIdea() {
 
           <!-- Timeline header -->
           <div class="mb-4 flex items-center gap-1.5">
-            <span class="font-outfit text-sm font-bold text-gray-900 dark:text-gray-100">
+            <span class="font-outfit dark:text-ink text-sm font-bold text-gray-900">
               📅 {{ t('travel.timeline') }}
             </span>
           </div>
@@ -1152,7 +1152,7 @@ async function addQuickIdea() {
                        below still convey "no accommodation that night". -->
                   <div
                     :class="[
-                      'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
+                      'dark:bg-surface-raised absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs',
                       classifyTripDay(entry.date, todayISO) === 'past'
                         ? 'border-[#00B4D8] shadow-[0_2px_8px_rgba(0,180,216,0.12)]'
                         : 'border-dashed border-[var(--heritage-orange)]',
@@ -1202,7 +1202,7 @@ async function addQuickIdea() {
                   <div class="relative flex items-center pt-3 pb-1">
                     <div
                       :class="[
-                        'absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs dark:bg-slate-800',
+                        'dark:bg-surface-raised absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs',
                         classifyTripDay(entry.data.date, todayISO) === 'today'
                           ? 'today-date-circle'
                           : classifyTripDay(entry.data.date, todayISO) === 'past'
@@ -1219,7 +1219,7 @@ async function addQuickIdea() {
                       :class="
                         classifyTripDay(entry.data.date, todayISO) === 'past'
                           ? 'text-[var(--color-text-muted)]'
-                          : 'text-gray-900 dark:text-gray-100'
+                          : 'dark:text-ink text-gray-900'
                       "
                     >
                       <span
@@ -1236,7 +1236,7 @@ async function addQuickIdea() {
                       {{ entry.data.label }}
                       <span
                         v-if="classifyTripDay(entry.data.date, todayISO) === 'past'"
-                        class="font-outfit ml-1 rounded-full bg-[var(--tint-success-10)] px-2 py-0.5 text-[0.625rem] font-semibold text-green-700 dark:text-green-400"
+                        class="font-outfit dark:text-success-lift ml-1 rounded-full bg-[var(--tint-success-10)] px-2 py-0.5 text-[0.625rem] font-semibold text-green-700"
                       >
                         {{ t('travel.timeline.done') }}
                       </span>
@@ -1317,25 +1317,25 @@ async function addQuickIdea() {
             >
               <div v-if="showAddMenu" class="flex flex-wrap gap-1.5">
                 <button
-                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
                   @click="addSegmentViaWizard(2)"
                 >
                   ✈️ {{ t('vacation.step.travel') }}
                 </button>
                 <button
-                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
                   @click="addSegmentViaWizard(3)"
                 >
                   🏨 {{ t('vacation.step.stay') }}
                 </button>
                 <button
-                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
                   @click="addSegmentViaWizard(4)"
                 >
                   🚗 {{ t('vacation.step.gettingAround') }}
                 </button>
                 <button
-                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
                   @click="addActivitySegment"
                 >
                   🎭 {{ t('vacation.segment.activity') }}
@@ -1480,7 +1480,7 @@ async function addQuickIdea() {
     >
       <div
         v-if="copied"
-        class="font-outfit fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 rounded-lg bg-[var(--color-text)] px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
+        class="font-outfit dark:text-surface-ground fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 rounded-lg bg-[var(--color-text)] px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
       >
         {{ t('vacation.copied') }}
       </div>

@@ -14,11 +14,11 @@ defineProps<{
 
 <template>
   <div
-    class="flex items-center gap-3 rounded-2xl border border-[var(--tint-slate-5)] bg-white px-3 py-2.5 dark:bg-slate-800"
+    class="dark:bg-surface-raised flex items-center gap-3 rounded-2xl border border-[var(--tint-slate-5)] bg-white px-3 py-2.5"
   >
     <span class="text-xl leading-none" aria-hidden="true">{{ emoji }}</span>
     <div class="min-w-0 flex-1">
-      <div class="font-outfit truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+      <div class="font-outfit dark:text-ink truncate text-sm font-semibold text-gray-900">
         {{ title }}
       </div>
       <div v-if="detail" class="font-inter mt-0.5 truncate text-xs text-gray-400">

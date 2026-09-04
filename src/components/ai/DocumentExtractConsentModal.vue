@@ -98,7 +98,7 @@ function onConfirm(): void {
     <!-- "secure, private" becomes an inline link to the privacy article once it
          ships (PRIVACY_ARTICLE_LIVE); until then it renders as plain emphasised
          text so the sentence still reads correctly. -->
-    <p class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
+    <p class="font-inter dark:text-ink text-sm text-[var(--color-text)]">
       <span>{{ introParts.lead }}</span
       ><button
         v-if="introParts.accent && PRIVACY_ARTICLE_LIVE"
@@ -120,7 +120,7 @@ function onConfirm(): void {
           >
             {{ item.label }}
           </p>
-          <p class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
+          <p class="font-inter dark:text-ink text-sm text-[var(--color-text)]">
             {{ item.value }}
           </p>
         </div>
@@ -150,7 +150,7 @@ function onConfirm(): void {
         :class="
           remember
             ? 'border-[#F15D22] bg-[#F15D22]'
-            : 'border-[var(--color-border)] bg-white dark:bg-slate-700'
+            : 'dark:bg-surface-overlay border-[var(--color-border)] bg-white'
         "
       >
         <svg
@@ -167,7 +167,7 @@ function onConfirm(): void {
           />
         </svg>
       </span>
-      <span class="font-inter text-sm text-[var(--color-text)] dark:text-gray-200">
+      <span class="font-inter dark:text-ink text-sm text-[var(--color-text)]">
         {{ t('ai.consent.remember') }}
       </span>
     </label>

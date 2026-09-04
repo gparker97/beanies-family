@@ -22,7 +22,7 @@ const { t } = useTranslation();
       <div class="relative inline-block">
         <!-- Warm gradient frame -->
         <div
-          class="rounded-3xl bg-gradient-to-br from-[var(--tint-orange-8)] via-white to-[var(--tint-silk-20)] p-3 shadow-[0_4px_20px_rgba(241,93,34,0.08)] dark:from-slate-700/60 dark:via-slate-800 dark:to-slate-700/40"
+          class="dark:from-surface-overlay/60 dark:via-surface-raised dark:to-surface-overlay/40 rounded-3xl bg-gradient-to-br from-[var(--tint-orange-8)] via-white to-[var(--tint-silk-20)] p-3 shadow-[0_4px_20px_rgba(241,93,34,0.08)]"
         >
           <img
             :src="qrUrl"
@@ -40,7 +40,7 @@ const { t } = useTranslation();
     </div>
 
     <!-- Scan/share hint -->
-    <p class="text-center text-sm text-gray-500 dark:text-gray-400">
+    <p class="dark:text-ink-soft text-center text-sm text-gray-500">
       {{ t('family.scanOrShare') }}
     </p>
 
@@ -48,7 +48,7 @@ const { t } = useTranslation();
     <slot name="actions" />
 
     <!-- Expiry note -->
-    <p class="text-center text-xs text-gray-400 dark:text-gray-500">
+    <p class="dark:text-ink-faint text-center text-xs text-gray-400">
       {{ t('family.linkExpiry') }}
     </p>
   </div>

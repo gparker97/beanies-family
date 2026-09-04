@@ -1,5 +1,6 @@
 package family.beanies.app;
 
+import android.content.pm.ActivityInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
@@ -24,6 +25,17 @@ public class MainActivity extends BridgeActivity {
         // the intent via onNewIntent, which Capacitor routes to the plugin.
         registerPlugin(ShareIntentPlugin.class);
         super.onCreate(savedInstanceState);
+        // Portrait on phones, free rotation on tablets. The manifest used to carry a
+        // blanket android:screenOrientation="portrait", which locked tablets too — but a
+        // 10" tablet in landscape is arguably the best way to use the app, and it is the
+        // only sensible orientation for a wall-mounted beanie wall. The bool comes from
+        // res/values/bools.xml with a res/values-sw600dp override; sw600dp is measured on
+        // the SMALLEST screen dimension, so a phone held sideways never matches it.
+        // FULL_USER (not SENSOR) still honours the user's own rotation-lock setting.
+        setRequestedOrientation(
+                getResources().getBoolean(R.bool.allow_rotation)
+                        ? ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+                        : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         // Edge-to-edge system bars, done natively. The @capacitor/status-bar plugin
         // only uses deprecated APIs (setSystemUiVisibility / setStatusBarColor) that
         // are no-ops on Android 15+, and the app targets SDK 36, where edge-to-edge

@@ -58,7 +58,7 @@ const kickerText = computed(() => summary.value || t('notifications.kindAnnounce
         class="rounded-full transition-all"
         :class="
           notification.read
-            ? 'h-2.5 w-2.5 border-2 border-gray-300 dark:border-slate-500'
+            ? 'dark:border-line-strong h-2.5 w-2.5 border-2 border-gray-300'
             : 'bg-primary-500 h-3 w-3 shadow-[0_0_0_4px_rgba(241,93,34,0.16)]'
         "
         :aria-label="notification.read ? '' : t('notifications.unread')"
@@ -106,7 +106,7 @@ const kickerText = computed(() => summary.value || t('notifications.kindAnnounce
   position: absolute;
 }
 
-:global(.dark) .ann-card {
+html.dark .ann-card {
   background:
     radial-gradient(120% 120% at 0% 0%, rgb(255 255 255 / 6%), transparent 60%),
     linear-gradient(135deg, rgb(241 93 34 / 10%) 0%, rgb(230 126 34 / 10%) 100%);
@@ -147,8 +147,8 @@ const kickerText = computed(() => summary.value || t('notifications.kindAnnounce
   overflow: hidden;
 }
 
-:global(.dark) .ann-title {
-  color: #ecf0f1;
+html.dark .ann-title {
+  color: #f2f5f7;
 }
 
 .ann-when {
@@ -160,7 +160,7 @@ const kickerText = computed(() => summary.value || t('notifications.kindAnnounce
   margin-top: 0.3125rem;
 }
 
-:global(.dark) .ann-when {
+html.dark .ann-when {
   color: rgb(226 232 240 / 55%);
 }
 </style>

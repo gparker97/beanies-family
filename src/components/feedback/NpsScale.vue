@@ -66,7 +66,7 @@ function onKeydown(e: KeyboardEvent): void {
       </button>
     </div>
     <div
-      class="mt-2 flex justify-between text-xs text-[color:rgba(44,62,80,0.5)] dark:text-gray-400"
+      class="dark:text-ink-soft mt-2 flex justify-between text-xs text-[color:rgba(44,62,80,0.5)]"
     >
       <span>{{ t('feedback.nps.low') }}</span>
       <span>{{ t('feedback.nps.high') }}</span>

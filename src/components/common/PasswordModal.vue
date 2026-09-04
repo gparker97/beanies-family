@@ -90,7 +90,7 @@ function resetForm() {
     @close="handleClose"
   >
     <form class="space-y-4" @submit.prevent="handleSubmit">
-      <p class="text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ resolvedDescription }}
       </p>
 
@@ -104,7 +104,7 @@ function resetForm() {
         />
         <button
           type="button"
-          class="absolute top-8 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          class="dark:hover:text-ink-soft absolute top-8 right-3 text-gray-400 hover:text-gray-600"
           @click="showPassword = !showPassword"
         >
           <!-- Eye icon -->
@@ -154,7 +154,7 @@ function resetForm() {
       </div>
 
       <div v-if="error || externalError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-        <p class="text-sm text-red-600 dark:text-red-400">{{ error || externalError }}</p>
+        <p class="dark:text-danger-lift text-sm text-red-600">{{ error || externalError }}</p>
       </div>
 
       <div class="flex justify-end gap-3 pt-4">

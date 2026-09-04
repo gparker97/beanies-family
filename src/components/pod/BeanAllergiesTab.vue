@@ -49,15 +49,15 @@ const TYPE_EMOJI: Record<AllergyType, string> = {
 const SEVERITY_STYLE: Record<AllergySeverity, { bar: string; badge: string }> = {
   severe: {
     bar: 'bg-red-500',
-    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-danger-lift',
   },
   moderate: {
     bar: 'bg-amber-500',
-    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-terracotta-lift',
   },
   mild: {
     bar: 'bg-green-500',
-    badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-success-lift',
   },
 };
 
@@ -84,7 +84,7 @@ function closeModal(): void {
         v-for="a in allergies"
         :key="a.id"
         type="button"
-        class="relative flex flex-col items-start gap-2 overflow-hidden rounded-[var(--sq)] bg-white p-4 pl-5 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised relative flex flex-col items-start gap-2 overflow-hidden rounded-[var(--sq)] bg-white p-4 pl-5 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
         @click="openEdit(a)"
       >
         <span
@@ -96,12 +96,12 @@ function closeModal(): void {
           <div class="flex min-w-0 flex-col">
             <div class="flex items-center gap-2">
               <span class="text-xl" aria-hidden="true">{{ TYPE_EMOJI[a.allergyType] }}</span>
-              <h4 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
+              <h4 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
                 {{ a.name }}
               </h4>
             </div>
             <span
-              class="font-outfit text-secondary-500/60 mt-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase"
+              class="font-outfit text-secondary-500/60 dark:text-ink-soft mt-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase"
             >
               {{ t(`allergies.type.${a.allergyType}`) }}
             </span>
@@ -115,13 +115,13 @@ function closeModal(): void {
         </div>
         <p
           v-if="a.reaction"
-          class="font-outfit text-secondary-500/70 line-clamp-2 text-sm dark:text-gray-400"
+          class="font-outfit text-secondary-500/70 dark:text-ink-soft line-clamp-2 text-sm"
         >
           {{ a.reaction }}
         </p>
         <p
           v-if="a.emergencyResponse"
-          class="font-outfit text-secondary-500/80 mt-1 text-xs font-semibold dark:text-gray-300"
+          class="font-outfit text-secondary-500/80 dark:text-ink-soft mt-1 text-xs font-semibold"
         >
           🚨 {{ a.emergencyResponse }}
         </p>
@@ -130,7 +130,7 @@ function closeModal(): void {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="⚠️"

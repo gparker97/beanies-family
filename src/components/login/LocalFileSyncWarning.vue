@@ -38,17 +38,17 @@ const { t } = useTranslation();
         >
           {{ '💾' }}
         </div>
-        <h3 class="font-outfit text-base leading-snug font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit dark:text-ink text-base leading-snug font-bold text-gray-900">
           {{ t('storage.localFileWarningTitle') }}
         </h3>
       </div>
-      <p class="mb-2.5 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+      <p class="dark:text-ink-soft mb-2.5 text-sm leading-relaxed text-gray-600">
         {{ t('storage.localFileWarning') }}
       </p>
-      <p class="mb-2.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft mb-2.5 text-sm leading-relaxed text-gray-500">
         <span aria-hidden="true">{{ '💻' }}</span> {{ t('storage.localFileBestOnDesktop') }}
       </p>
-      <p class="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft mb-4 text-sm leading-relaxed text-gray-500">
         🔒 {{ t('storage.localFileWarningEncryption') }}
       </p>
       <div class="space-y-2">

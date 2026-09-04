@@ -152,7 +152,7 @@ async function handleSubmit(): Promise<void> {
     @save="handleSubmit"
   >
     <div class="space-y-4">
-      <p class="text-sm text-gray-600 dark:text-gray-300">
+      <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t('reviewDemo.description') }}
       </p>
       <BaseInput

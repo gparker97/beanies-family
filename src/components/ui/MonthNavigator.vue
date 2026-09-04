@@ -37,12 +37,12 @@ function goToToday() {
 
 <template>
   <div
-    class="inline-flex items-center gap-1 rounded-[14px] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="dark:bg-surface-raised inline-flex items-center gap-1 rounded-[14px] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.05)]"
   >
     <button
       type="button"
       :aria-label="t('datepicker.prevMonth')"
-      class="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
+      class="dark:text-ink-soft dark:hover:bg-surface-hover dark:hover:text-ink rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
       @click="prev"
     >
       <BeanieIcon name="chevron-left" size="sm" />
@@ -55,7 +55,7 @@ function goToToday() {
     <button
       type="button"
       :aria-label="t('datepicker.nextMonth')"
-      class="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
+      class="dark:text-ink-soft dark:hover:bg-surface-hover dark:hover:text-ink rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
       @click="next"
     >
       <BeanieIcon name="chevron-right" size="sm" />

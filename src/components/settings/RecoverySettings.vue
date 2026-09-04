@@ -103,8 +103,8 @@ async function handleSavePassphrase() {
       class="mb-4 rounded-xl p-3 text-sm"
       :class="
         statusMessage.type === 'success'
-          ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-          : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+          ? 'dark:text-success-lift bg-green-50 text-green-700 dark:bg-green-900/20'
+          : 'dark:text-danger-lift bg-red-50 text-red-600 dark:bg-red-900/20'
       "
     >
       {{ statusMessage.text }}
@@ -112,10 +112,10 @@ async function handleSavePassphrase() {
 
     <!-- Recovery kit -->
     <div class="mb-6">
-      <h4 class="font-outfit mb-1 text-base font-semibold text-gray-900 dark:text-gray-100">
+      <h4 class="font-outfit dark:text-ink mb-1 text-base font-semibold text-gray-900">
         {{ t('recovery.kitTitle') }}
       </h4>
-      <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft mb-3 text-sm text-gray-600">
         {{ t('recovery.kitDescription') }}
       </p>
       <p class="mb-3 text-xs" :class="kitCount === 0 ? 'text-[#F15D22]' : 'text-gray-500'">
@@ -132,10 +132,10 @@ async function handleSavePassphrase() {
 
     <!-- Recovery passphrase -->
     <div>
-      <h4 class="font-outfit mb-1 text-base font-semibold text-gray-900 dark:text-gray-100">
+      <h4 class="font-outfit dark:text-ink mb-1 text-base font-semibold text-gray-900">
         {{ t('recovery.passphraseTitle') }}
       </h4>
-      <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft mb-3 text-sm text-gray-600">
         {{ t('recovery.passphraseDescription') }}
       </p>
       <p class="mb-3 text-xs text-gray-500">
@@ -148,11 +148,11 @@ async function handleSavePassphrase() {
 
       <div v-else class="space-y-3">
         <template v-if="!useOwn">
-          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft text-sm font-medium text-gray-700">
             {{ t('recovery.passphraseSuggestion') }}
           </p>
           <p
-            class="font-outfit rounded-xl bg-gray-50 p-3 text-center text-lg font-bold tracking-wide text-gray-900 select-all dark:bg-slate-700 dark:text-gray-100"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-xl bg-gray-50 p-3 text-center text-lg font-bold tracking-wide text-gray-900 select-all"
           >
             {{ suggested }}
           </p>
@@ -172,7 +172,7 @@ async function handleSavePassphrase() {
             type="text"
             autocomplete="off"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mt-2 text-xs text-gray-500">
             {{ t('recovery.passphraseRules') }}
           </p>
         </template>

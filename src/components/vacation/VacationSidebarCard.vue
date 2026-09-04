@@ -39,7 +39,7 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
 
 <template>
   <div
-    class="group relative cursor-pointer overflow-hidden rounded-2xl border border-[var(--vacation-teal-15)] p-4 transition-all hover:-translate-y-px hover:border-[var(--vacation-teal)] hover:shadow-md dark:border-slate-600 dark:bg-slate-800/50"
+    class="group dark:border-line-strong dark:bg-surface-raised/50 relative cursor-pointer overflow-hidden rounded-2xl border border-[var(--vacation-teal-15)] p-4 transition-all hover:-translate-y-px hover:border-[var(--vacation-teal)] hover:shadow-md"
     style="background: linear-gradient(135deg, rgb(0 180 216 / 5%), rgb(255 217 61 / 4%))"
     @click="$emit('click')"
   >
@@ -52,10 +52,9 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
     <!-- Name row -->
     <div class="flex items-center gap-2">
       <span class="text-2xl leading-none">{{ emoji }}</span>
-      <span
-        class="font-outfit truncate text-sm font-bold text-[var(--color-text)] dark:text-gray-100"
-        >{{ vacation.name }}</span
-      >
+      <span class="font-outfit dark:text-ink truncate text-sm font-bold text-[var(--color-text)]">{{
+        vacation.name
+      }}</span>
     </div>
 
     <!-- Date row -->
@@ -78,7 +77,7 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
         <span
           v-for="(m, i) in assignees"
           :key="m!.id"
-          class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.5rem] font-bold text-white ring-1 ring-white dark:ring-slate-800"
+          class="dark:ring-surface-raised inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.5rem] font-bold text-white ring-1 ring-white"
           :class="{ '-ml-1': i > 0 }"
           :style="{ backgroundColor: m!.color }"
           >{{ m!.name.charAt(0) }}</span
@@ -88,7 +87,7 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
 
     <!-- Progress bar -->
     <div v-if="progress.total > 0" class="mt-2 flex items-center gap-2">
-      <div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-slate-700">
+      <div class="dark:bg-surface-overlay h-1.5 flex-1 rounded-full bg-gray-200">
         <div
           class="h-full rounded-full transition-all"
           style="background: var(--vacation-teal)"
@@ -104,7 +103,7 @@ const gapCount = computed(() => computeAccommodationGaps(props.vacation).length)
     <div v-if="unbookedCount > 0 || gapCount > 0" class="mt-2 flex flex-wrap gap-1.5">
       <span
         v-if="unbookedCount > 0"
-        class="inline-flex items-center rounded-lg bg-[var(--vacation-gold-tint)] px-2 py-0.5 text-[0.625rem] font-semibold text-amber-700 dark:text-amber-300"
+        class="dark:text-terracotta-lift inline-flex items-center rounded-lg bg-[var(--vacation-gold-tint)] px-2 py-0.5 text-[0.625rem] font-semibold text-amber-700"
       >
         ⏳
         {{

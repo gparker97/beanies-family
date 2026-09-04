@@ -28,7 +28,7 @@ const { t } = useTranslation();
 
 <template>
   <section
-    class="about-ribbon mb-5 overflow-hidden rounded-[var(--sq)] border border-[rgb(44_62_80_/_6%)] bg-gradient-to-br from-[var(--tint-slate-5)] to-[rgb(174_214_241_/_12%)] dark:border-white/5 dark:from-slate-700/40 dark:to-slate-700/20"
+    class="about-ribbon dark:from-surface-overlay/40 dark:to-surface-overlay/20 mb-5 overflow-hidden rounded-[var(--sq)] border border-[rgb(44_62_80_/_6%)] bg-gradient-to-br from-[var(--tint-slate-5)] to-[rgb(174_214_241_/_12%)] dark:border-white/5"
   >
     <!-- Kicker: explicit "About" label makes the ribbon's purpose
          unmissable + visually distinguishes the row from the dashboard
@@ -36,7 +36,7 @@ const { t } = useTranslation();
     <div class="flex items-center gap-1.5 px-5 pt-3 pb-1">
       <span class="text-xs leading-none" aria-hidden="true">🫘</span>
       <span
-        class="font-outfit text-secondary-500/55 text-[0.625rem] font-semibold tracking-[0.14em] uppercase dark:text-gray-400"
+        class="font-outfit text-secondary-500/55 dark:text-ink-soft text-[0.625rem] font-semibold tracking-[0.14em] uppercase"
       >
         {{ t('bean.overview.about') }}
       </span>
@@ -49,16 +49,16 @@ const { t } = useTranslation();
     >
       <div v-for="(stat, i) in stats" :key="i" class="about-cell flex flex-col gap-0.5 px-4 py-2">
         <span
-          class="font-outfit text-secondary-500/55 text-[0.625rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+          class="font-outfit text-secondary-500/55 dark:text-ink-soft text-[0.625rem] font-semibold tracking-[0.08em] uppercase"
         >
           {{ stat.label }}
         </span>
         <span
-          class="font-outfit text-secondary-500 text-base leading-tight font-bold dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink text-base leading-tight font-bold"
         >
           {{ stat.value }}
         </span>
-        <span v-if="stat.sub" class="text-secondary-500/60 text-[0.6875rem] dark:text-gray-400">
+        <span v-if="stat.sub" class="text-secondary-500/60 dark:text-ink-soft text-[0.6875rem]">
           {{ stat.sub }}
         </span>
       </div>
@@ -91,7 +91,7 @@ const { t } = useTranslation();
    wrap adds minor visual variance but never doubles up. Acceptable
    for a 2–4 stat ribbon. */
 
-:global(.dark) .about-cell:not(:first-child)::before {
+html.dark .about-cell:not(:first-child::before) {
   background: rgb(255 255 255 / 8%);
 }
 </style>

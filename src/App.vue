@@ -1667,10 +1667,10 @@ watch(
 
 <template>
   <!-- #53: this root background paints edge-to-edge behind the native Android
-       status bar. Keep bg-gray-50 / dark:bg-slate-900 in sync with the native
+       status bar. Keep bg-gray-50 / dark:bg-surface-ground in sync with the native
        @color/windowBackground (android/app/src/main/res/values{,-night}/colors.xml)
        so the pre-paint strip and the WebView show one colour (no seam). -->
-  <div class="min-h-screen bg-gray-50 dark:bg-slate-900">
+  <div class="dark:bg-surface-ground min-h-screen bg-gray-50">
     <!-- Loading overlay with pod spinner -->
     <Transition
       enter-active-class="transition-opacity duration-200"
@@ -1693,7 +1693,7 @@ watch(
       v-if="initError"
       class="fixed inset-0 z-[300] flex items-center justify-center bg-[#2C3E50] p-4"
     >
-      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-800">
+      <div class="dark:bg-surface-raised w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div class="mb-4 text-center">
           <div
             class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30"
@@ -1715,14 +1715,14 @@ watch(
           <h2 class="font-outfit text-xl font-semibold text-[#2C3E50] dark:text-white">
             {{ t('app.initError.title') }}
           </h2>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <p class="dark:text-ink-soft mt-2 text-sm text-gray-600">
             {{ t('app.initError.description') }}
           </p>
         </div>
 
         <!-- Error message -->
         <div class="mb-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-          <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ initError }}</p>
+          <p class="dark:text-danger-lift text-sm font-medium text-red-800">{{ initError }}</p>
         </div>
 
         <!-- Action buttons -->
@@ -1734,7 +1734,7 @@ watch(
             {{ t('app.initError.reload') }}
           </button>
           <button
-            class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-[#2C3E50] transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-slate-700"
+            class="dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-[#2C3E50] transition-colors hover:bg-gray-50"
             @click="showClearConfirm = true"
           >
             {{ t('app.initError.clearData') }}
@@ -1746,7 +1746,7 @@ watch(
           v-if="showClearConfirm"
           class="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3 dark:border-orange-700 dark:bg-orange-900/20"
         >
-          <p class="mb-2 text-sm text-orange-800 dark:text-orange-200">
+          <p class="dark:text-accent-lift mb-2 text-sm text-orange-800">
             {{ t('app.initError.clearConfirm') }}
           </p>
           <div class="flex gap-2">
@@ -1757,7 +1757,7 @@ watch(
               {{ t('app.initError.clearData') }}
             </button>
             <button
-              class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-slate-700"
+              class="dark:border-line-strong dark:text-ink-soft dark:hover:bg-surface-hover rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
               @click="showClearConfirm = false"
             >
               {{ t('common.cancel') }}
@@ -1768,20 +1768,20 @@ watch(
         <!-- Expandable technical details -->
         <details class="group">
           <summary
-            class="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            class="dark:text-ink-soft dark:hover:text-ink cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700"
           >
             {{ t('app.initError.details') }}
           </summary>
           <pre
             v-if="initErrorDetail"
-            class="mt-2 max-h-32 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
+            class="dark:bg-surface-ground dark:text-ink-soft mt-2 max-h-32 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700"
             >{{ initErrorDetail }}</pre>
           <div class="mt-2">
-            <p class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft mb-1 text-xs font-medium text-gray-500">
               {{ t('app.initError.diagnostics') }}
             </p>
             <pre
-              class="max-h-24 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
+              class="dark:bg-surface-ground dark:text-ink-soft max-h-24 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700"
               >{{ getDeviceDiagnostics() }}</pre>
           </div>
         </details>

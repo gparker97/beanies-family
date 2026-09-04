@@ -20,7 +20,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
     <select
       :value="modelValue ?? ''"
       :aria-label="ariaLabel"
-      class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+      class="focus:border-primary-500 font-outfit dark:bg-surface-overlay dark:text-ink w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none"
       @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
