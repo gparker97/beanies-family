@@ -13,7 +13,9 @@ import * as Automerge from '@automerge/automerge';
 import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/types/automerge';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
-import { CorruptPayloadError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import type { PayloadLoadError } from '@/types/sync';
+import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import {
   calculateAmortization,
   calculateExtraPayment,
@@ -217,29 +219,39 @@ export function projectionDeltasBetween(
  * check the Drive read path has always had; this is now its ONLY home, the old
  * main-thread `fileSync.decryptBeanpodPayload` copy having been deleted).
  * Does NOT migrate — the caller replaces/merges then migrates. Throws
- * `CorruptPayloadError` (reconstructed across `postMessage` via the protocol
- * error registry, so `instanceof` recovery dispatch on main keeps working).
+ * `CorruptPayloadError` for bad bytes, or `PayloadTooLargeError` when this
+ * device simply could not allocate enough memory to inflate them (both
+ * reconstructed across `postMessage` via the protocol error registry, so
+ * `instanceof` recovery dispatch on main keeps working).
  */
 export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc {
+  /**
+   * ONE classifier for both steps, so the "is this bad data or a small device?"
+   * decision cannot drift between them.
+   *
+   * `payloadBytes` is the DECRYPTED length — the number that actually predicts
+   * the WASM inflation cost, and a better signal than the base64 length the
+   * perf sample carries.
+   */
+  const fail = (step: 'load' | 'materialize', e: unknown): PayloadLoadError => {
+    const what = step === 'load' ? 'Automerge.load' : 'Automerge materialize';
+    const message = `${what} failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`;
+    return isAllocationFailure(e)
+      ? new PayloadTooLargeError(message, step, familyId, binary.byteLength)
+      : new CorruptPayloadError(message, step, familyId, binary.byteLength);
+  };
+
   let doc: Doc;
   try {
     doc = Automerge.load<FamilyDocument>(binary);
   } catch (e) {
-    throw new CorruptPayloadError(
-      `Automerge.load failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
-      'load',
-      familyId
-    );
+    throw fail('load', e);
   }
   // Touching `familyMembers` (always a Record) forces the first materialize.
   try {
     Object.keys(doc.familyMembers ?? {});
   } catch (e) {
-    throw new CorruptPayloadError(
-      `Automerge materialize failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`,
-      'materialize',
-      familyId
-    );
+    throw fail('materialize', e);
   }
   return doc;
 }

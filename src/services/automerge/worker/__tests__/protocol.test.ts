@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CorruptPayloadError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
 import {
   serializeError,
   reconstructError,
@@ -15,7 +15,7 @@ describe('protocol — error transport', () => {
     expect(wire).toEqual({
       name: 'CorruptPayloadError',
       message: 'materialize blew up',
-      data: { step: 'materialize', familyId: 'fam-123' },
+      data: { step: 'materialize', familyId: 'fam-123', payloadBytes: null },
     });
 
     const rebuilt = reconstructError(wire);
@@ -24,6 +24,39 @@ describe('protocol — error transport', () => {
     expect((rebuilt as CorruptPayloadError).step).toBe('materialize');
     expect((rebuilt as CorruptPayloadError).familyId).toBe('fam-123');
     expect(rebuilt.message).toBe('materialize blew up');
+  });
+
+  it('round-trips PayloadTooLargeError as its OWN class, never as corruption', () => {
+    // The whole point of the sibling class: an out-of-memory failure must not
+    // arrive on main as a CorruptPayloadError, because the recovery dispatch
+    // there DELETES the local cache.
+    const original = new PayloadTooLargeError('oom', 'load', 'fam-9', 3_145_728);
+    const wire = serializeError(original);
+    expect(wire).toEqual({
+      name: 'PayloadTooLargeError',
+      message: 'oom',
+      data: { step: 'load', familyId: 'fam-9', payloadBytes: 3_145_728 },
+    });
+
+    const rebuilt = reconstructError(wire);
+    expect(rebuilt).toBeInstanceOf(PayloadTooLargeError);
+    expect(rebuilt).not.toBeInstanceOf(CorruptPayloadError);
+    // Still a PayloadLoadError, which is what `surface()` keys its
+    // expected-degradation (no-toast) check on.
+    expect(rebuilt).toBeInstanceOf(PayloadLoadError);
+    expect((rebuilt as PayloadTooLargeError).payloadBytes).toBe(3_145_728);
+    expect((rebuilt as PayloadTooLargeError).step).toBe('load');
+  });
+
+  it('keys the registry on LITERAL names, so a minified build still reconstructs', () => {
+    // If a registry key were ever derived from `Ctor.name`, terser would mangle
+    // it and every typed error would silently degrade to DocWorkerError.
+    for (const err of [
+      new CorruptPayloadError('a', 'load', null),
+      new PayloadTooLargeError('b', 'load', null),
+    ]) {
+      expect(reconstructError(serializeError(err))).toBeInstanceOf(err.constructor);
+    }
   });
 
   it('reconstructs an unregistered error as DocWorkerError carrying the name + op', () => {

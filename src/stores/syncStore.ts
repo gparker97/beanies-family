@@ -118,6 +118,8 @@ import {
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
   CorruptPayloadError,
+  PayloadLoadError,
+  PayloadTooLargeError,
 } from '@/types/sync';
 
 /**
@@ -1203,10 +1205,16 @@ export const useSyncStore = defineStore('sync', () => {
     /** True when the FAMILY RECOVERY PASSPHRASE (not a member password) unlocked the
      *  file — identity is NOT established; callers must route to a person pick/prove. */
     viaRecoveryPassphrase?: boolean;
-    /** Set when the envelope decrypted but the payload bytes aren't a usable
-     *  Automerge doc. Lets the caller distinguish corruption from wrong
-     *  password / network failure when picking the user-facing message. */
-    corrupted?: CorruptPayloadError;
+    /**
+     * Set when the envelope decrypted but the payload could not be loaded as a
+     * usable Automerge doc. Lets the caller distinguish that from a wrong
+     * password / network failure when picking the user-facing message.
+     *
+     * Carries the ERROR, not a flag per class: consumers branch on
+     * `instanceof` (`CorruptPayloadError` = bad bytes, `PayloadTooLargeError` =
+     * this device ran out of memory), so a future sibling needs no new field.
+     */
+    payloadError?: PayloadLoadError;
   }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) {
@@ -1359,8 +1367,8 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: true, memberIds, viaRecoveryPassphrase };
     } catch (e) {
       const errorMessage = (e as Error).message;
-      if (e instanceof CorruptPayloadError) {
-        return { success: false, error: errorMessage, corrupted: e };
+      if (e instanceof PayloadLoadError) {
+        return { success: false, error: errorMessage, payloadError: e };
       }
       if (errorMessage.includes('Incorrect password')) {
         return { success: false, error: 'Incorrect password' };
@@ -1662,7 +1670,11 @@ export const useSyncStore = defineStore('sync', () => {
     // from the worker's `loadAndVerify` — if we see it anywhere, it's a verify
     // failure regardless of the step marker. (Defensive: the marker should
     // already be 'verify' by the time that throw happens.)
-    if (e instanceof CorruptPayloadError) return 'verify';
+    // Either payload failure means the verify step failed. An OOM on a
+    // just-created empty doc is effectively impossible, so a dedicated
+    // CreatePodFailureReason would be unused surface area — the defensive
+    // catch-all is the right answer here.
+    if (e instanceof PayloadLoadError) return 'verify';
     return step;
   }
 
@@ -3723,16 +3735,33 @@ export const useSyncStore = defineStore('sync', () => {
       criticalWriteState.value = { kind: 'loading' };
     }
 
+    /**
+     * Split a payload failure into its result kind. A memory limit is NOT
+     * corruption: telling the user their file is damaged when it is fine is
+     * the lie this whole change exists to remove.
+     */
+    const payloadFailureResult = (err: PayloadLoadError): CompleteAutoLoadResult =>
+      err instanceof PayloadTooLargeError
+        ? {
+            kind: 'too-large',
+            fileId: pending.driveFileId ?? '',
+            familyId: pending.envelope.familyId ?? '',
+            error: err,
+          }
+        : {
+            kind: 'corrupted',
+            fileId: pending.driveFileId ?? '',
+            familyId: pending.envelope.familyId ?? '',
+            error: err as CorruptPayloadError,
+          };
+
     try {
       const decryptResult = await decryptPendingFile(password);
 
-      if (decryptResult.corrupted) {
-        return {
-          kind: 'corrupted',
-          fileId: pending.driveFileId ?? '',
-          familyId: pending.envelope.familyId ?? '',
-          error: decryptResult.corrupted,
-        };
+      // THE live payload-failure path — `decryptPendingFile` catches and
+      // RETURNS, so the catch below is only a contract-drift backstop.
+      if (decryptResult.payloadError) {
+        return payloadFailureResult(decryptResult.payloadError);
       }
 
       if (!decryptResult.success) {
@@ -3753,13 +3782,8 @@ export const useSyncStore = defineStore('sync', () => {
       // `decryptPendingFile` catches its own errors and returns a result,
       // but defensively handle a future contract drift.
       const err = e instanceof Error ? e : new Error(String(e));
-      if (err instanceof CorruptPayloadError) {
-        return {
-          kind: 'corrupted',
-          fileId: pending.driveFileId ?? '',
-          familyId: pending.envelope.familyId ?? '',
-          error: err,
-        };
+      if (err instanceof PayloadLoadError) {
+        return payloadFailureResult(err);
       }
       return { kind: 'network-error', error: err };
     } finally {
