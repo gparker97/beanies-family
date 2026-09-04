@@ -34,6 +34,21 @@ grid. Rejected: a sticky filter/sort bar, and a collapsed filter tray.)
 > the design and plan and workds as expected and does not introduce any new bugs, side
 > effects, or security concerns
 
+**Follow-ups, same session**
+
+> small change - on the input form for recipe tags, i notices you have a list of "used before"
+> tags but when typing the tags, it is easy to make a typo or to miss that list. can you include
+> an autocomplete so an existing tag can be more easily selected?
+>
+> also with /frontend-design:frontend-design can you do a quick review and validate the field
+> ordering on the recipe modal? it's getting longer, so it may benefit from having categories
+> (i.e. main recipe, notes, other info, etc) or something to that effect to make it easier to
+> take in everything an dbreak up the long list of fields. what are your thoughts?
+
+Then, on the sectioning study:
+
+> sure let's go with A
+
 ## Outcome
 
 Shipped to `main` as three independently-revertable commits, each fully gated:
