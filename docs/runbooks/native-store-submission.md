@@ -190,10 +190,13 @@ provision it automatically; if distribution signing rejects it, enable it manual
 - **Privacy manifest:** `PrivacyInfo.xcprivacy` is bundled; App Store Connect's automated check runs at
   the **first TestFlight upload** — treat that as the confirmation gate. If it flags a required-reason
   API the app reaches but the manifest omits (or a plugin missing its own manifest), add it then.
-  Plugin manifest status (audited 2026-07-08): only `@capacitor/ios` (Capacitor core) ships manifests,
-  both with empty API lists; `@capacitor/{app,browser,filesystem,local-notifications,splash-screen,
+  Plugin manifest status (audited 2026-07-08, `@capacitor/share` added 2026-09-04): only
+  `@capacitor/ios` (Capacitor core) ships manifests, both with empty API lists;
+  `@capacitor/{app,browser,filesystem,local-notifications,share,splash-screen,
 status-bar}` and `@capgo/capacitor-passkey` ship none — the app-level manifest declares the
   required-reason APIs (UserDefaults `CA92.1`, File-timestamp `C617.1`, Disk-space `E174.1`).
+  `@capacitor/share` was verified to ship an EMPTY `AndroidManifest.xml` (no `<provider>`), so it
+  reuses the app's own `${applicationId}.fileprovider` and cannot conflict with it during merge.
 
 ### 4b. Google — Play Console
 
