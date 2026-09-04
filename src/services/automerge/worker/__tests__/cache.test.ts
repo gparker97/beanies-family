@@ -129,20 +129,30 @@ describe('worker/cache', () => {
     await expect(loadCachedDoc(key, FAMILY_ID)).rejects.toBeInstanceOf(CorruptPayloadError);
   });
 
-  it('round-trips the V4 envelope', async () => {
+  it('round-trips the V4 envelope WITHOUT its payload', async () => {
+    // The cached envelope is a KEY-MATERIAL carrier, never a source of document
+    // bytes: the doc comes from `loadCachedDoc`, and the one reader bails unless
+    // that cache hit too. Storing the payload meant JSON.stringify'ing a
+    // multi-megabyte base64 string into IndexedDB on every key change.
     const envelope = {
       version: '4.0',
       familyId: FAMILY_ID,
       familyName: 'Test',
       keyId: 'k1',
-      wrappedKeys: {},
+      wrappedKeys: { m1: { salt: 's', wrapped: 'w' } },
       passkeyWrappedKeys: {},
       inviteKeys: {},
       encryptedPayload: 'deadbeef',
     } as unknown as BeanpodFileV4;
 
     await persistEnvelope(envelope);
-    expect(await loadCachedEnvelope()).toEqual(envelope);
+    const loaded = await loadCachedEnvelope();
+
+    expect(loaded?.encryptedPayload).toBe('');
+    // Everything else survives — this is what the cache exists for.
+    expect(loaded).toEqual({ ...envelope, encryptedPayload: '' });
+    // And the caller's object is untouched (`withoutPayload` never mutates).
+    expect(envelope.encryptedPayload).toBe('deadbeef');
   });
 
   it('persistDocBinary throws if the DB was never initialized', async () => {

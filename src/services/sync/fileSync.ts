@@ -77,7 +77,12 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
   if (typeof obj.familyId !== 'string') throw new Error('Invalid beanpod: missing familyId');
   if (typeof obj.familyName !== 'string') throw new Error('Invalid beanpod: missing familyName');
   if (typeof obj.keyId !== 'string') throw new Error('Invalid beanpod: missing keyId');
-  if (typeof obj.encryptedPayload !== 'string')
+  // NON-EMPTY, not merely a string. A long-lived in-memory envelope carries a
+  // blank payload by design (`withoutPayload`), so accepting '' here would let
+  // a stripped envelope be written to a file and silently produce a zero-byte
+  // decrypt much later — surfacing as "corruption", which then CLEARS the
+  // user's cache. Fail at the boundary that owns the format instead.
+  if (typeof obj.encryptedPayload !== 'string' || obj.encryptedPayload.length === 0)
     throw new Error('Invalid beanpod: missing encryptedPayload');
   if (!obj.wrappedKeys || typeof obj.wrappedKeys !== 'object')
     throw new Error('Invalid beanpod: missing wrappedKeys');

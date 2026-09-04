@@ -19,6 +19,7 @@
  * both available in a Web Worker.
  */
 import { openDB, type IDBPDatabase } from 'idb';
+import { withoutPayload } from '@/services/sync/envelopeMerge';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
@@ -343,8 +344,22 @@ export async function persistEnvelope(envelope: BeanpodFileV4): Promise<void> {
   if (!cacheDb) return; // silently skip if not initialized (matches legacy behaviour)
   const db = cacheDb;
 
+  // Strip the payload HERE, not at the callers: `createNewFile` reaches this
+  // through `docClient.persistEnvelope` directly, bypassing `syncService`
+  // entirely, so a caller-side strip would leave a payload-bearing row behind.
+  // Without this, every key change JSON.stringify'd a multi-megabyte base64
+  // string into IndexedDB — on the poll path.
+  //
+  // Safe because the cached envelope is only ever a key-material carrier: the
+  // document itself comes from `loadCachedDoc`, and the one reader bails unless
+  // that doc-cache hit too.
+  const withoutBytes = withoutPayload(envelope);
   await withIdbRetry('persistEnvelope', () =>
-    db.put(STORE_NAME, { id: ENVELOPE_KEY, payload: JSON.stringify(envelope), updatedAt: nowIso() })
+    db.put(STORE_NAME, {
+      id: ENVELOPE_KEY,
+      payload: JSON.stringify(withoutBytes),
+      updatedAt: nowIso(),
+    })
   );
 }
 

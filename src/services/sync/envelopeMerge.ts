@@ -22,6 +22,26 @@
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
 /**
+ * The same envelope WITHOUT its encrypted payload.
+ *
+ * A long-lived or CACHED in-memory envelope has no business holding the bytes:
+ * the payload is the worker's concern, and re-serialisation always supplies
+ * fresh bytes via `reEncryptEnvelope`, which overwrites the field anyway.
+ * Keeping it pinned a ~5.5MB base64 string for the whole session — and worse,
+ * `cache.persistEnvelope` JSON.stringify'd the entire thing into IndexedDB on
+ * every key change, so it was a multi-megabyte write on the poll path too.
+ *
+ * Returns a fresh envelope — never mutates its input, matching `mergeKeyDict`.
+ *
+ * Guarded at both boundaries so a stripped envelope can never be mistaken for a
+ * real one: `parseBeanpodV4` rejects an empty payload from a FILE, and
+ * `docClient.postRaw` rejects one crossing the worker RPC.
+ */
+export function withoutPayload(env: BeanpodFileV4): BeanpodFileV4 {
+  return { ...env, encryptedPayload: '' };
+}
+
+/**
  * Merge two key dictionaries with local-wins semantics. Returns a fresh
  * object — never mutates inputs. Either side may be undefined.
  */
