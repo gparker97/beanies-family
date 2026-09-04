@@ -106,7 +106,7 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
-  const { mode, url } = parsed || {};
+  const { mode, url, pageUrl } = parsed || {};
   // Object.hasOwn, not truthiness: MODES is a plain object literal, so 'constructor' and
   // friends resolve up the prototype chain to a truthy function and would sail past a
   // `!MODES[mode]` check straight into an unhandled TypeError.
@@ -117,8 +117,15 @@ export async function handler(event) {
     return response(400, { error: 'Missing url', code: 'bad_url' }, event);
   }
 
+  // Optional, and only `image` mode reads it (#86): the page the image URL was found on,
+  // forwarded as a `Referer` so hotlink-protected CDNs serve us. Validated as a string here
+  // and screened as a URL inside guardedFetch; a bad value is dropped, never fatal, because
+  // losing a photo over a courtesy header would be the wrong trade. Extra arguments are
+  // ignored in JS, so no other mode's signature changes. MAX_BODY_BYTES already bounds it.
+  const opts = { pageUrl: typeof pageUrl === 'string' ? pageUrl : undefined };
+
   try {
-    const result = await MODES[mode](url);
+    const result = await MODES[mode](url, opts);
     if (result.ok) return response(200, result.data, event);
 
     const status = STATUS_FOR_CODE[result.code] ?? 502;
