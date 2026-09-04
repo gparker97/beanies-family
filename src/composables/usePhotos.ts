@@ -23,7 +23,25 @@ import type { QueuedPhotoUpload } from '@/services/sync/photoUploadQueue';
 import { trackFeature } from '@/services/analytics/plausible';
 
 export const MAX_PHOTOS_PER_SET = 4;
-const ACCEPTED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+/**
+ * ⚠️ MUST STAY IN STEP WITH `sniffImageType` IN THE CONTENT-FETCH LAMBDA (#86).
+ *
+ * `avif` and `gif` were added when the Lambda learned to fetch them. Widening one side alone
+ * is worse than widening neither: the server happily returns a 3MB AVIF, the client names the
+ * File `dish-<id>.avif`, this gate rejects it, and the family gets a "Only JPEG, PNG, and HEIC
+ * photos are supported" toast seconds after saving a recipe they never attached a file to.
+ * Every dish photo from a Cloudflare-Images or Next.js-optimizer blog would have been lost
+ * that way, which is the exact population the format widening existed to rescue.
+ */
+const ACCEPTED_MIMES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/avif',
+  'image/gif',
+];
 
 /** PDFs aren't compressed (stored raw), so cap their size. Booking docs are
  *  comfortably under this; oversized ones get a distinct toast. */
@@ -149,7 +167,12 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     const rejectedOversize: File[] = []; // PDF over the size cap
     for (const file of files) {
       const isImage =
-        ACCEPTED_MIMES.includes(file.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+        // The two halves are ORed, so BOTH must be widened — changing only the mime list
+        // leaves the looser gate closed against a user-picked `.avif` from a phone gallery.
+        // Everything is re-encoded to JPEG by `photoCompression` before storage, so accepting
+        // a wider set here costs nothing downstream.
+        ACCEPTED_MIMES.includes(file.type) ||
+        /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(file.name);
       const isPdfCandidate =
         allowPdf && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name));
       if (isImage) {

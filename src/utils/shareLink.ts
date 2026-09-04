@@ -75,14 +75,17 @@ export function screenCandidates(raw: unknown): ImageCandidate[] {
  * that is exactly when swapping them is silent.
  */
 export function toShareLink(
-  resolved: { path: ExtractionPath; sourceUrl: string; imageCandidates: ImageCandidate[] },
+  resolved: { path: ExtractionPath; sourceUrl: string; imageCandidates?: ImageCandidate[] },
   route: { kind: 'youtube' | 'page' | 'invalid'; url?: string }
 ): ShareLink {
   const isVideo = route.kind === 'youtube';
   return {
     pageUrl: resolved.sourceUrl,
     provenanceUrl: isVideo && route.url ? route.url : resolved.sourceUrl,
-    imageCandidates: resolved.imageCandidates,
+    // `?? []` because a hand-built resolved source (a test fixture, or a future rung that
+    // forgets the field) would otherwise put `undefined` on the ShareLink and the attach
+    // would throw reading `.length`. An absent list means the same as an empty one here.
+    imageCandidates: resolved.imageCandidates ?? [],
     path: resolved.path,
     kind: isVideo ? 'youtube' : 'page',
   };

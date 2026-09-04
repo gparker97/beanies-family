@@ -53,9 +53,15 @@ const glyph = computed(() =>
  * `currentColor`, so the glyph would quietly inherit whatever colour the parent happens to
  * have — a subtly wrong tint that no unit test can catch.
  */
+/**
+ * ⚠️ SALTED. Drawing glyph and tint from the same unsalted hash makes the tint a pure function
+ * of the glyph — `h % 2 === (h % 4) % 2` — so only 4 of the 8 intended combinations could ever
+ * render (cloche and bowl always Terracotta, pot and whisk always Heritage Orange) and the
+ * tint dimension was pure redundancy. The salt decorrelates them.
+ */
 const tint = computed(() =>
   props.variantSeed
-    ? PLACEHOLDER_TINTS[stableIndex(props.variantSeed, PLACEHOLDER_TINTS.length)]
+    ? PLACEHOLDER_TINTS[stableIndex(`${props.variantSeed}:tint`, PLACEHOLDER_TINTS.length)]
     : PLACEHOLDER_TINTS[0]
 );
 

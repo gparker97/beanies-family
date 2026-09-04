@@ -367,7 +367,19 @@ function postHeaders(post) {
  * under strict-origin-when-cross-origin; holding it is simpler, is what the hotlink check
  * actually reads, and can only ever be the page the user themselves opened.
  */
-function imageHeaders(referer) {
+function imageHeaders(url, referer) {
+  let site = 'none';
+  if (referer) {
+    try {
+      // Real browsers report same-origin for the majority case — a WordPress hero at
+      // `food.test/wp-content/dish.jpg` referred from `food.test/recipes/cake`. Hardcoding
+      // cross-site there produced a Referer/Sec-Fetch-Site pairing no browser ever emits,
+      // on exactly the CDNs that fingerprint these headers.
+      site = new URL(referer).origin === url.origin ? 'same-origin' : 'cross-site';
+    } catch {
+      site = 'cross-site';
+    }
+  }
   return {
     'User-Agent': BROWSER_HEADERS['User-Agent'],
     'Accept-Language': BROWSER_HEADERS['Accept-Language'],
@@ -377,12 +389,12 @@ function imageHeaders(referer) {
     // A subresource load, not a navigation — so no Upgrade-Insecure-Requests here.
     'Sec-Fetch-Dest': 'image',
     'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'cross-site',
+    'Sec-Fetch-Site': site,
     ...(referer ? { Referer: referer } : {}),
   };
 }
 
-function requestPinned(url, address, family, budgetMs, post, referer) {
+function requestPinned(url, address, family, budgetMs, post, asImage, referer) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (v) => {
@@ -409,7 +421,13 @@ function requestPinned(url, address, family, budgetMs, post, referer) {
         // passed, because none of them opens a real socket.
         lookup: (_hostname, opts, cb) =>
           opts && opts.all ? cb(null, [{ address, family }]) : cb(null, address, family),
-        headers: post ? postHeaders(post) : referer ? imageHeaders(referer) : BROWSER_HEADERS,
+        // KEYED ON THE MODE, never on whether an optional courtesy value happens to be
+        // present. Binding it to `referer` meant an image fetch with no usable pageUrl —
+        // an old client mid-deploy, or a referer that failed screening — silently went out
+        // with page-NAVIGATION headers (`Sec-Fetch-Dest: document`, `Accept: text/html…`),
+        // which is a bot signal on precisely the CDNs this feature has to get past, and can
+        // return an HTML interstitial that then reports as `not_image`.
+        headers: post ? postHeaders(post) : asImage ? imageHeaders(url, referer) : BROWSER_HEADERS,
       },
       (res) => finish({ ok: true, res })
     );
@@ -451,7 +469,13 @@ function requestPinned(url, address, family, budgetMs, post, referer) {
  */
 export async function guardedFetch(
   rawUrl,
-  { maxBytes = DEFAULT_MAX_BYTES, totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS, post, referer } = {}
+  {
+    maxBytes = DEFAULT_MAX_BYTES,
+    totalBudgetMs = DEFAULT_TOTAL_BUDGET_MS,
+    post,
+    asImage = false,
+    referer,
+  } = {}
 ) {
   const deadline = Date.now() + totalBudgetMs;
   let current = rawUrl;
@@ -461,7 +485,15 @@ export async function guardedFetch(
   // user loses a photo over a header. Screened because it is caller-supplied and ends up on
   // the wire — an unscreened value is a way to smuggle a `javascript:` or credentialed URL
   // into a request log.
-  const safeReferer = typeof referer === 'string' && screenUrl(referer).ok ? referer : undefined;
+  // ⚠️ THE NORMALISED URL GOES ON THE WIRE, NOT THE CALLER'S STRING. `new URL()` silently
+  // strips tab/CR/LF before parsing, so `https://food.test/r\r\nX: 1` PASSES this screen and
+  // then makes `https.request` throw ERR_INVALID_CHAR synchronously inside requestPinned's
+  // promise executor — rejecting out of a function contracted never to throw, bypassing the
+  // whole typed taxonomy for a raw 500, and burning a DNS resolve plus one of five reserved
+  // concurrency slots. Screening a value and sending a different one is the bug; send what
+  // was screened.
+  const screenedReferer = typeof referer === 'string' ? screenUrl(referer) : { ok: false };
+  const safeReferer = screenedReferer.ok ? screenedReferer.url.toString() : undefined;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const remaining = deadline - Date.now();
@@ -478,6 +510,7 @@ export async function guardedFetch(
       resolved.family,
       deadline - Date.now(),
       post,
+      asImage,
       safeReferer
     );
     if (!attempt.ok) return attempt;

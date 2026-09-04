@@ -206,7 +206,6 @@ export const REQUIRED_KEYS = [
 export const MODEL_FIELD_MAX = 200; // short scalars (title, date, location, …)
 export const MODEL_TEXT_MAX = 4000; // free text (description, notes)
 export const MODEL_LIST_MAX = 100; // entries in any model-returned array
-export const MODEL_URL_MAX = 2000; // any model-returned URL, before it is screened
 
 /**
  * Coerce to string and BOUND it. Defaults to the generous free-text cap so a caller that

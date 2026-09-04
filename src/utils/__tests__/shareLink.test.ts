@@ -13,13 +13,21 @@
  *    them and a video capture stores the wrong provenance.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Assert the REJECTION EVENT, not console noise. The previous `expect(warn).toHaveBeenCalled()`
+// was actually catching a one-shot "[telemetry] endpoint not set" latch from logQueue: two
+// sequential rejections gave warn counts of 1 then 0, so it was order-dependent and asserted
+// nothing about the surface, action or detail.
+const logEvent = vi.fn();
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: (...a: unknown[]) => logEvent(...a) }));
+
 import { screenCandidates, toShareLink } from '../shareLink';
 import type { ImageCandidate } from '@/types/magicPayload';
 
 const candidate = (url: string, source = 'og_image'): unknown => ({ url, source });
 
 describe('screenCandidates', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => logEvent.mockClear());
 
   it('keeps well-formed candidates in order', () => {
     const raw = [
@@ -50,20 +58,29 @@ describe('screenCandidates', () => {
     expect(screenCandidates(raw)).toEqual([{ url: 'https://cdn.test/new.jpg', source: 'other' }]);
   });
 
-  it('rejects a non-https candidate, and says so', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('rejects a non-https candidate, and LOGS a diagnosable event', () => {
     // The http:// URL is the POINT here: it must be rejected, not fetched.
     // eslint-disable-next-line @microsoft/sdl/no-insecure-url
     expect(screenCandidates([candidate('http://cook.example.com/x.jpg')])).toEqual([]);
     // A rejection must be diagnosable: "this site never gets photos" is otherwise
     // indistinguishable from "this site has no photos".
-    expect(warn).toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'recipe-extract',
+        context: expect.objectContaining({ action: 'image_rejected', detail: 'unsafe_candidate' }),
+      })
+    );
   });
 
   it('rejects javascript: and data: URLs', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(screenCandidates([candidate('javascript:alert(1)')])).toEqual([]);
     expect(screenCandidates([candidate('data:image/png;base64,AAAA')])).toEqual([]);
+    expect(logEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it('never logs the URL itself — it is a page-authored value', () => {
+    screenCandidates([candidate('javascript:alert(1)')]);
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain('alert(1)');
   });
 
   it('NEVER THROWS on a malformed or absent field', () => {
@@ -79,7 +96,6 @@ describe('screenCandidates', () => {
   });
 
   it('filters the bad and keeps the good from the same list', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const raw = [
       { url: 42 },
       candidate('https://cdn.test/good.jpg'),

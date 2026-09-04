@@ -25,9 +25,13 @@ export interface PlaceholderPath {
 
 export interface PlaceholderGlyph {
   paths: PlaceholderPath[];
-  /** Names the shape for assistive tech via a translated key chosen by the caller. */
-  key: 'cloche' | 'pot' | 'bowl' | 'whisk';
 }
+
+/*
+ * No `key`/name field: the svg is `aria-hidden`, the frame already carries a translated
+ * caption, and an unread field is a standing invitation to bit-rot. The comment above each
+ * entry is for humans reading the table.
+ */
 
 /**
  * ⚠️ ENTRY ZERO IS THE EXISTING ARTWORK, COPIED VERBATIM.
@@ -38,7 +42,7 @@ export interface PlaceholderGlyph {
  */
 export const PLACEHOLDER_GLYPHS: readonly PlaceholderGlyph[] = Object.freeze([
   {
-    key: 'cloche',
+    // cloche
     paths: [
       { d: 'M14 30h36a2 2 0 0 1 2 2v2a18 18 0 0 1-18 18h-4a18 18 0 0 1-18-18v-2a2 2 0 0 1 2-2z' },
       { d: 'M24 22c0-2 2-3 4-3s4 1 4 3' },
@@ -48,7 +52,7 @@ export const PLACEHOLDER_GLYPHS: readonly PlaceholderGlyph[] = Object.freeze([
     ],
   },
   {
-    key: 'pot',
+    // pot
     paths: [
       { d: 'M16 28h32v14a12 12 0 0 1-12 12h-8a12 12 0 0 1-12-12z' },
       { d: 'M12 28h40' },
@@ -59,7 +63,7 @@ export const PLACEHOLDER_GLYPHS: readonly PlaceholderGlyph[] = Object.freeze([
     ],
   },
   {
-    key: 'bowl',
+    // bowl
     paths: [
       { d: 'M12 32h40a20 20 0 0 1-20 20 20 20 0 0 1-20-20z' },
       { d: 'M24 24c0-2 2-4 4-4' },
@@ -68,7 +72,7 @@ export const PLACEHOLDER_GLYPHS: readonly PlaceholderGlyph[] = Object.freeze([
     ],
   },
   {
-    key: 'whisk',
+    // whisk
     paths: [
       { d: 'M32 12v14' },
       { d: 'M32 26c-8 4-12 12-10 22' },
