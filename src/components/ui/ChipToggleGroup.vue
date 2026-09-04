@@ -17,6 +17,15 @@ import type { ChipOption } from './FrequencyChips.vue';
  */
 interface Props {
   modelValue: readonly string[];
+  /**
+   * Names the group for assistive tech.
+   *
+   * ⚠️ Not optional in spirit. `FormFieldGroup.associateLabel()` queries
+   * `input, select, textarea, [contenteditable]` and returns early when it matches nothing —
+   * and this component renders only spans and buttons, so a `FormFieldGroup` label above it is
+   * decorative and the control reaches a screen reader unnamed.
+   */
+  ariaLabel?: string;
   options: ChipOption[];
   disabled?: boolean;
   accent?: 'orange' | 'purple';
@@ -44,7 +53,7 @@ function toggle(value: string) {
 </script>
 
 <template>
-  <div :class="rowClass">
+  <div :class="rowClass" role="group" :aria-label="ariaLabel">
     <ChipButton
       v-for="opt in options"
       :key="opt.value"
@@ -52,6 +61,7 @@ function toggle(value: string) {
       :icon="opt.icon"
       :badge="opt.badge"
       :selected="modelValue.includes(opt.value)"
+      :pressed="modelValue.includes(opt.value)"
       :disabled="disabled || opt.disabled"
       :disabled-hint="opt.disabledHint"
       :accent="accent"

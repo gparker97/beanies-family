@@ -69,6 +69,9 @@ export function isMealSlot(value: unknown): value is MealSlot {
  * would write. Both `baselinePayload` and `buildPayload` canonicalise through THIS function so
  * they cannot disagree.
  */
-export function sortSlots(slots: readonly MealSlot[]): MealSlot[] {
+export function sortSlots(slots: readonly MealSlot[] | undefined): MealSlot[] {
+  // Guarded, not assumed: a corrupt stored value reaches this from the recipe form's seed and
+  // baseline paths, and a bare string satisfies `.includes` while meaning something else.
+  if (!Array.isArray(slots)) return [];
   return MEAL_SLOTS.filter((slot) => slots.includes(slot));
 }

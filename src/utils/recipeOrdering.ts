@@ -85,7 +85,11 @@ export function buildShelves(recipes: Recipe[], groupBy: CookbookGroup): Shelf[]
   if (groupBy === 'meal') {
     const buckets = new Map(MEAL_SLOTS.map((slot) => [slot, [] as Recipe[]]));
     for (const recipe of recipes) {
-      const slots = (recipe.mealSlots ?? []).filter(isMealSlot);
+      // Array.isArray, not `?? []`: a non-array `mealSlots` (a downgrade, a hand-merged
+      // .beanpod, a future writer storing one slot bare) would make `.filter` THROW and the
+      // cookbook render nothing — losing every recipe, which is strictly worse than the
+      // wrong-bucket outcome this invariant is written to prefer.
+      const slots = (Array.isArray(recipe.mealSlots) ? recipe.mealSlots : []).filter(isMealSlot);
       if (slots.length === 0) {
         unfiled.push(recipe);
         continue;

@@ -162,10 +162,28 @@ function applyPrefill(prefill: RecipePrefill | null): void {
   stepsText.value = (f?.steps ?? []).join('\n');
   notes.value = f?.notes ?? '';
   sourceUrl.value = f?.sourceUrl ?? '';
-  // Site 2 of 4. `applyPrefill(null)` IS the blank reset, so these must clear here too.
-  course.value = f?.course ?? '';
-  mealSlots.value = sortSlots(f?.mealSlots ?? []);
-  tags.value = [];
+  // 🚨 SITES 2 AND 5 OF 5. `applyPrefill` has TWO callers with OPPOSITE intents, and the
+  // plan's four-site analysis missed the second one:
+  //   - `onNew` passes null — the blank reset. Everything must clear.
+  //   - `onRecipeReady` passes a real prefill INTO A FORM THE USER MAY ALREADY HAVE TYPED IN.
+  //     `showSourceStrip` (:240) only hides once `name` is non-empty, so ticking "Dinner" and
+  //     typing a tag BEFORE pasting a recipe URL is a perfectly normal order of operations.
+  //
+  // Every other field above is replaced by a value the model supplies — that is what capture
+  // means. These three cannot be treated the same way:
+  //   - `tags` are NEVER supplied by a prefill (`RecipePrefill.fields` has no `tags` member),
+  //     so clearing them is a pure destroy with nothing to replace them and no undo.
+  //   - `course`/`mealSlots` ARE supplied, but only when the model was confident. Overwriting
+  //     the user's own ticks with "the model declined" is a loss, not an update.
+  if (!prefill) {
+    course.value = '';
+    mealSlots.value = [];
+    tags.value = [];
+    return;
+  }
+  if (f?.course) course.value = f.course;
+  if (f?.mealSlots?.length) mealSlots.value = sortSlots(f.mealSlots);
+  // `tags` deliberately untouched on a merge — see above.
 }
 
 /**
@@ -194,7 +212,7 @@ const { isEditing, isSubmitting } = useFormModal(
       // Site 1 of 4 — the ONLY path that seeds from an existing recipe. See the refs above.
       course.value = r.course ?? '';
       mealSlots.value = sortSlots(r.mealSlots ?? []);
-      tags.value = [...(r.tags ?? [])];
+      tags.value = Array.isArray(r.tags) ? [...r.tags] : [];
     },
     // ONE reset path. A separate `watch(() => props.prefill)` would RACE this callback
     // (useFormModal fires it when `open` flips), and the resulting "sometimes the form
@@ -344,7 +362,7 @@ function baselinePayload(r: Recipe) {
     // a change and make a no-op save write.
     course: r.course,
     mealSlots: sortSlots(r.mealSlots ?? []),
-    tags: r.tags ?? [],
+    tags: Array.isArray(r.tags) ? r.tags : [],
   };
 }
 
@@ -621,7 +639,11 @@ const LIST_TEXTAREA_CLASS =
       </FormFieldGroup>
 
       <FormFieldGroup :label="t('recipes.field.meals')" optional>
-        <ChipToggleGroup v-model="mealSlots" :options="mealOptions" />
+        <ChipToggleGroup
+          v-model="mealSlots"
+          :options="mealOptions"
+          :aria-label="t('recipes.field.meals')"
+        />
       </FormFieldGroup>
 
       <FormFieldGroup :label="t('recipes.field.tags')" optional>

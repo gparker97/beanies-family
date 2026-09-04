@@ -147,6 +147,27 @@ describe('buildShelves', () => {
     expect(shelves.at(-1)!.key).toBe('unfiled');
   });
 
+  // The invariant guards bad ELEMENTS; these guard a bad CONTAINER. A non-array reaching the
+  // doc (a downgrade, a hand-merged .beanpod, a future writer storing one slot bare) would make
+  // `.filter` throw and render NOTHING — losing every recipe, strictly worse than the
+  // wrong-bucket outcome this function is written to prefer.
+  it('buckets a non-array mealSlots rather than throwing and losing the whole cookbook', () => {
+    const corrupt = recipe({ id: 'c', name: 'Corrupt', mealSlots: 'dinner' as never });
+    expect(() => buildShelves([corrupt], 'meal')).not.toThrow();
+    const shelves = buildShelves([corrupt, breakfast], 'meal');
+    expect(shelves.flatMap((s) => s.items.map((r) => r.id))).toContain('c');
+    expect(shelves.flatMap((s) => s.items.map((r) => r.id))).toContain('b');
+  });
+
+  it.each([[null], [42], [{}], ['dinner']])(
+    'survives mealSlots = %p without dropping the recipe',
+    (bad) => {
+      const corrupt = recipe({ id: 'c', name: 'Corrupt', mealSlots: bad as never });
+      const shelves = buildShelves([corrupt], 'meal');
+      expect(shelves.flatMap((s) => s.items.map((r) => r.id))).toEqual(['c']);
+    }
+  );
+
   it('treats an EMPTY array as unset, not as a group', () => {
     const empty = recipe({ id: 'e', name: 'Empty', mealSlots: [], tags: [] });
     expect(buildShelves([empty], 'meal').map((s) => s.key)).toEqual(['unfiled']);

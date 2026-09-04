@@ -26,6 +26,13 @@ interface Props {
   accent?: 'orange' | 'purple';
   /** Dimmed trailing count, e.g. how many recipes carry this course. */
   badge?: string | number;
+  /**
+   * Emits `aria-pressed` for toggle-button semantics.
+   *
+   * Opt-in, and left undefined by `FrequencyChips`: that is a single-select group where every
+   * one of its 16 call sites would otherwise gain toggle semantics it never had.
+   */
+  pressed?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -56,6 +63,7 @@ const hasBadge = computed(() => props.badge !== undefined && props.badge !== nul
         disabled ? 'cursor-not-allowed' : '',
       ]"
       :disabled="disabled"
+      :aria-pressed="pressed"
       @click="!disabled && $emit('click')"
     >
       <span v-if="icon" class="mr-1">{{ icon }}</span>

@@ -108,4 +108,16 @@ describe('suggestTags', () => {
   it('tolerates recipes with no tags at all', () => {
     expect(suggestTags([{}, { tags: [] }], [])).toEqual([]);
   });
+
+  // This walks every recipe in the family, so one corrupt value anywhere would otherwise throw
+  // and take out the recipe FORM for every recipe — the widest blast radius of any of the
+  // container guards.
+  it.each([[42], ['autumn'], [null], [{}]])(
+    'skips a recipe whose tags are not an array (%p) rather than throwing',
+    (bad) => {
+      const recipes = [{ tags: ['quick'] }, { tags: bad as never }, { tags: ['quick'] }];
+      expect(() => suggestTags(recipes, [])).not.toThrow();
+      expect(suggestTags(recipes, [])).toEqual(['quick']);
+    }
+  );
 });

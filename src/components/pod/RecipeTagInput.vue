@@ -29,8 +29,17 @@ const status = ref<AddTagStatus | null>(null);
 
 const atLimit = computed(() => props.modelValue.length >= MAX_TAGS);
 
-/** Only the statuses a USER needs to act on get a message. 'added'/'empty' are self-evident. */
+/**
+ * Only the statuses a USER needs to act on get a message. 'added'/'empty' are self-evident.
+ *
+ * `atLimit` is checked FIRST and independently of `status`, because reaching the cap disables
+ * the input and hides the suggestions — so `addTag` can never return 'limit' from this UI, and
+ * without this the field would simply go dead with an empty placeholder and no explanation.
+ * That is the silent failure `addTag`'s status codes exist to prevent, arriving by the back
+ * door. The util keeps its 'limit' branch as defence for non-UI callers.
+ */
 const message = computed(() => {
+  if (atLimit.value) return fillTemplate(t('recipes.tags.limit'), { max: MAX_TAGS });
   if (status.value === 'duplicate') return t('recipes.tags.duplicate');
   if (status.value === 'limit') return fillTemplate(t('recipes.tags.limit'), { max: MAX_TAGS });
   if (status.value === 'truncated')
@@ -51,6 +60,12 @@ function commit(raw: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // A rejection is about the entry that caused it. Once the user types the next character it
+  // is stale, and leaving it up reads as a complaint about what they are typing NOW.
+  // Cleared here rather than in a `watch(draft)` because `commit` blanks the draft on success,
+  // which would wipe the 'truncated' notice the moment it appeared.
+  if (e.key !== 'Enter' && e.key !== ',') status.value = null;
+
   if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
     commit(draft.value);
@@ -113,10 +128,18 @@ function onBlur() {
       {{ t('recipes.tags.hint') }}
     </p>
 
-    <!-- Rejections are SPOKEN, never swallowed. aria-live so it reaches a screen reader too. -->
+    <!--
+      Rejections are SPOKEN, never swallowed.
+
+      ⚠️ Rendered UNCONDITIONALLY, with only its text toggling. A `v-if` here would insert the
+      element and its content in the same mutation, and screen readers do not announce a live
+      region's INITIAL content — so every rejection would have been silent to exactly the users
+      who cannot see the pills fail to appear, which is the failure these statuses exist to
+      prevent.
+    -->
     <p
-      v-if="message"
-      class="font-inter dark:text-accent-lift mt-1 text-xs font-semibold text-[#F15D22]"
+      class="font-inter dark:text-accent-lift mt-1 text-xs font-semibold text-[#F15D22] empty:mt-0"
+      role="status"
       aria-live="polite"
     >
       {{ message }}
