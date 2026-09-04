@@ -844,6 +844,17 @@ export const useSyncStore = defineStore('sync', () => {
       const cacheResult = await docClient.initAndLoadCache(familyId);
       loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
     } catch (e) {
+      // An out-of-memory failure must NOT fall through to the adopt-remote path
+      // below. `initAndLoadCache` deliberately KEPT the cache in that case; the
+      // fall-through then calls `dropDoc()` + `mergeRemoteEnvelope`, whose
+      // full-adopt branch leaves `lastPersistedHeads` null, so the next persist
+      // writes a fresh BASE — which clears every increment the preserve branch
+      // just protected. Any mutation not yet on Drive would be gone, silently,
+      // on the one device that change exists to protect. Re-downloading the
+      // (usually larger) remote to inflate it on a device that just ran out of
+      // room is futile anyway, so surface it and let the caller show the honest
+      // message.
+      if (e instanceof PayloadTooLargeError) throw e;
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
     if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
@@ -1103,6 +1114,15 @@ export const useSyncStore = defineStore('sync', () => {
           await runPostLoadDriveHousekeeping();
           return { success: true };
         } catch (e) {
+          // A payload failure is NOT a credential problem, and swallowing it
+          // here is what made the honest message unreachable on the path a
+          // memory-limited tablet actually takes: this catch turned it into a
+          // console.warn, then returned `needsPassword: true` — a lie, the key
+          // was in hand — which routed the user to a password prompt for a
+          // failure no password can fix, and pinned the multi-megabyte envelope
+          // in `pendingEncryptedFile` on the way. Let it out; App.vue and the
+          // resume flow both classify it.
+          if (e instanceof PayloadLoadError) throw e;
           console.warn('[syncStore] Failed to decrypt with current FK, may need re-auth:', e);
         }
       }
@@ -1367,15 +1387,15 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       const errorMessage = (e as Error).message;
       if (e instanceof PayloadLoadError) {
-        if (e instanceof PayloadTooLargeError) {
-          // Release the pending envelope. It carries the multi-megabyte base64
-          // payload, and holding it in a ref pins that memory for the rest of
-          // the session — on the one device that just proved it has none to
-          // spare, behind an overlay whose only action is a reload. Nothing can
-          // retry from it either: a different password cannot make the document
-          // smaller.
-          pendingEncryptedFile.value = null;
-        }
+        // ⚠️ DO NOT null `pendingEncryptedFile` here to release the payload.
+        // It looks like an easy memory win and it breaks the UI that is on
+        // screen at that exact moment: `LoadPodView` keeps its decrypt modal
+        // open (it only closes on success) and every computed it binds reads
+        // through this ref, so the family name, the member count and — the one
+        // that matters — the recovery-kit escape hatch all vanish just as the
+        // user needs them, and a retry renders the untranslated
+        // 'No pending encrypted file'. The envelope is released normally when
+        // the flow ends.
         return { success: false, error: errorMessage, payloadError: e };
       }
       if (errorMessage.includes('Incorrect password')) {
@@ -1410,7 +1430,7 @@ export const useSyncStore = defineStore('sync', () => {
     keyB64: string,
     activeFamilyId: string,
     options?: { preservePermissionState?: boolean; onEarlyPaint?: () => void }
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; payloadError?: PayloadLoadError }> {
     let paintedFromSnapshot = false;
     try {
       // Import family key directly from base64 (not password-derived), post it to
@@ -1507,6 +1527,16 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       if (paintedFromSnapshot) isBackgroundSyncing.value = false;
       console.warn('[syncStore] loadFromPersistenceCache failed:', e);
+      if (e instanceof PayloadLoadError) {
+        // Carry the class out. Flattened to a bare `{success:false}`, App.vue's
+        // path 2 falls through to path 3, which calls `initDoc()` — a FRESH
+        // EMPTY doc — while the cache DB is still open on this family because
+        // the too-large branch deliberately did not clear it. The next mutation
+        // then writes that empty doc as the BASE and deletes every preserved
+        // increment. Flattening it is also a silent failure: the step, the byte
+        // count and the whole telemetry trail die in a console.warn.
+        return { success: false, payloadError: e };
+      }
       return { success: false };
     }
   }
@@ -2032,7 +2062,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function decryptPendingFileWithKey(
     fk: CryptoKey
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; payloadError?: PayloadLoadError }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) return { success: false, error: 'No pending file' };
 
@@ -2163,6 +2193,15 @@ export const useSyncStore = defineStore('sync', () => {
       useAuthStore().markPodCreated();
       return { success: true };
     } catch (e) {
+      // Carry the class out, exactly as `decryptPendingFile` does. This is the
+      // BUSIER of the two: it backs the trusted-device auto-open, the PIN cold
+      // path (the default sign-in since 0.13R2), kit redeem and the invite
+      // join. Without it every one of those reads an out-of-memory failure as a
+      // bad credential — and `LoadPodView.tryAutoDecrypt` responds by DELETING
+      // the device's cached family key, which was perfectly valid.
+      if (e instanceof PayloadLoadError) {
+        return { success: false, error: (e as Error).message, payloadError: e };
+      }
       return { success: false, error: (e as Error).message };
     }
   }

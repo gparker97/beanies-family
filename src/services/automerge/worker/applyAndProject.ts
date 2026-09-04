@@ -506,13 +506,22 @@ export async function initAndLoadCache(
     // key errors, and flipping to an allowlist would silently change their
     // behaviour too. Narrow change, one class. Do not "simplify" this.
     //
-    // The cursor reset is UNCONDITIONAL and comes first. `initPersistenceDB(id)`
+    // DROP THE DOC — do not merely reset the cursors. `initPersistenceDB(id)`
     // above already re-pointed the DB at THIS family, so on every failure path
-    // the cursors still describe the PREVIOUS family's doc — including the
-    // too-large path, which skips the clear. Leaving them would let a later
-    // persist for this family write against a cursor from another one. Only the
-    // destructive clear below is conditional.
-    resetDocCursors();
+    // whatever `currentDoc` holds belongs to a DIFFERENT family and must never
+    // be written here. A bare `resetDocCursors()` would be actively worse than
+    // leaving them stale: it nulls `lastPersistedHeads`, and `persistOnce`
+    // reads exactly that to decide to write a BASE — and `persistDocBinary`
+    // deletes every `inc:*` row in the same transaction. On the too-large
+    // branch, which skips the clear precisely to KEEP those bytes, that would
+    // hand the next flush a mandate to delete them (and to write the other
+    // family's document as this family's base).
+    //
+    // `dropDoc()` resets the cursors too, and `persistOnce` early-returns on a
+    // null `currentDoc`, so no write can target this DB until a real load
+    // installs a real doc. All three callers are cold-open paths that hold no
+    // doc worth keeping.
+    dropDoc();
     if (!(e instanceof PayloadTooLargeError)) {
       // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
       // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.

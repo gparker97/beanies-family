@@ -521,11 +521,17 @@ async function handleDecryptFile(password: string) {
       importSuccess.value = false;
     }, 3000);
   } else if (result.payloadError) {
-    // A memory limit or a damaged payload, not a wrong password — re-prompting
+    // A memory limit or a damaged payload, not a wrong password. Re-prompting
     // would loop. Same classification the login and join flows use.
     encryptionError.value = t(payloadErrorMessageKey(result.payloadError));
   } else {
-    encryptionError.value = result.error ?? 'Failed to decrypt file';
+    // `result.error` is a developer-facing string (it can be a raw exception
+    // message), so it is not rendered here: a non-English user would get a
+    // wall of English. The one case worth distinguishing is a wrong password,
+    // which `decryptPendingFile` reports by that exact literal.
+    encryptionError.value = t(
+      result.error === 'Incorrect password' ? 'password.decryptionError' : 'settings.decryptFailed'
+    );
   }
 }
 

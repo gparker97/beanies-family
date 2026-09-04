@@ -179,6 +179,14 @@ async function tryAutoDecrypt(): Promise<boolean> {
       const fk = await importFamilyKey(raw);
       const result = await syncStore.decryptPendingFileWithKey(fk);
       if (result.success) return true;
+      // The key was FINE — the device could not inflate the pod. Deleting it
+      // here would destroy a valid credential over a memory limit and force a
+      // full password re-entry on the next open. Surface the honest message and
+      // leave the key alone.
+      if (result.payloadError) {
+        formError.value = t(payloadErrorMessageKey(result.payloadError));
+        return false;
+      }
     } catch {
       // Cached key invalid — clear it
     }
@@ -461,7 +469,11 @@ async function handleKitRedeem() {
     }
     const dec = await syncStore.decryptPendingFileWithKey(result.familyKey);
     if (!dec.success) {
-      formError.value = t('password.decryptionError');
+      // 'wrong recovery code' would be a lie when the kit unwrapped fine and it
+      // was the pod that would not fit in memory.
+      formError.value = dec.payloadError
+        ? t(payloadErrorMessageKey(dec.payloadError))
+        : t('password.decryptionError');
       return;
     }
     logEvent({
