@@ -44,7 +44,8 @@ export type SignOutStepName =
   | 'removeRosterAll'
   | 'reclaimAllPasskeys'
   | 'untrustDevice'
-  | 'reArmTrustPrompt';
+  | 'reArmTrustPrompt'
+  | 'sweepHandoffFiles';
 
 /** Tier 2, trusted device: silent-reconnect sign-out — tokens, caches, wraps all kept. */
 export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
@@ -53,6 +54,7 @@ export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
   'clearGoogleSessionKeepTokens',
   'resetSyncState',
   'resetDocClient',
+  'sweepHandoffFiles',
 ];
 
 /** Tier 2, untrusted device: full family-scoped local teardown (still NO revoke). */
@@ -70,6 +72,7 @@ export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'removePinWrapsFamily',
   'removeRosterFamily',
   'reArmTrustPrompt',
+  'sweepHandoffFiles',
 ];
 
 /** Tier 3: clean-device promise — everything, every family (still NO revoke). */
@@ -88,6 +91,7 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'removePinWrapsAll',
   'reclaimAllPasskeys',
   'removeRosterAll',
+  'sweepHandoffFiles',
 ];
 
 export type SignOutStepImpls = Record<SignOutStepName, () => Promise<void> | void>;

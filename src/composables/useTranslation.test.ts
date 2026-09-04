@@ -18,7 +18,6 @@ vi.mock('@/services/translation/translationFiles', () => ({
   loadTranslationFile: vi.fn().mockResolvedValue(null),
   createEmptyTranslationFile: vi.fn(),
   updateTranslationFile: vi.fn(),
-  downloadTranslationFile: vi.fn(),
   getTranslation: vi.fn(),
 }));
 

@@ -19,8 +19,10 @@ import {
   findOrCreateFolder,
   getFileMetadata,
   setPublicLinkPermission,
+  DriveApiError,
   DriveFileNotFoundError,
 } from '@/services/google/driveService';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { requestAccessToken } from '@/services/google/googleAuth';
 import { compress, CompressionError } from '@/services/photos/photoCompression';
 import {
@@ -172,10 +174,44 @@ export const usePhotoStore = defineStore('photos', () => {
    * Blob URL cache for the `alt=media` download path, keyed by driveFileId.
    * Blob URLs live in-process (no token, no CDN handoff) so they never
    * rotate — perfect for avatars where Drive's `thumbnailLink` tokens
-   * have proven unreliable across page reloads. Entries are revoked on
-   * deactivate() and on explicit invalidation.
+   * have proven unreliable across page reloads. Cleared on deactivate() and on
+   * explicit invalidation.
+   *
+   * Holds the BLOB rather than an object URL: an object URL pins its blob
+   * anyway, so this costs no more memory per entry, and it lets the PDF
+   * renderer and the save-to-device action share one download instead of one
+   * going blob -> objectURL -> fetch -> blob. It also deletes an entire class
+   * of object-URL lifetime bugs rather than moving them.
+   *
+   * BOUNDED, because "no more memory per entry" is not the same as no more
+   * memory for the SET. Only PDFs used to reach this cache (images render from
+   * the CDN thumbnail and retain nothing), so it was effectively self-limiting;
+   * now every save-to-device tap adds one. Thirty photos would otherwise pin
+   * ~150MB for the life of the tab, and `deactivate()` — the documented
+   * clearing point — has no caller anywhere in the app.
    */
-  const blobUrlCache = new Map<string, string>();
+  const BLOB_CACHE_MAX_BYTES = 32 * 1024 * 1024;
+  const blobCache = new Map<string, Blob>();
+
+  /**
+   * Insert, evicting oldest-first until the set fits the budget. `Map`
+   * iterates in insertion order, so re-inserting on hit would give true LRU —
+   * deliberately not done: these are re-fetchable bytes and an approximate
+   * bound is worth more than exact recency.
+   */
+  function cacheBlob(driveFileId: string, blob: Blob): void {
+    blobCache.delete(driveFileId);
+    blobCache.set(driveFileId, blob);
+    let total = 0;
+    for (const b of blobCache.values()) total += b.size;
+    for (const key of blobCache.keys()) {
+      if (total <= BLOB_CACHE_MAX_BYTES) break;
+      // Never evict the entry just inserted — the caller is about to use it.
+      if (key === driveFileId) continue;
+      total -= blobCache.get(key)?.size ?? 0;
+      blobCache.delete(key);
+    }
+  }
 
   // Reactive projection of the `photos` collection. Depends on the photos map ref
   // specifically (NOT `docVersion`), so it re-derives ONLY when a photos delta
@@ -210,8 +246,7 @@ export const usePhotoStore = defineStore('photos', () => {
     canonicalFolderId.value = null;
     photosFolderIdByFamily.clear();
     thumbUrlCache.clear();
-    for (const url of blobUrlCache.values()) URL.revokeObjectURL(url);
-    blobUrlCache.clear();
+    blobCache.clear();
     pendingUploads.value = [];
   }
 
@@ -513,35 +548,60 @@ export const usePhotoStore = defineStore('photos', () => {
   }
 
   /**
-   * Reliable image URL via authorized `alt=media` + `URL.createObjectURL`.
+   * The single authorized `alt=media` download. Returns BYTES, not a URL, so
+   * callers that want bytes (the PDF renderer, the save-to-device action) stop
+   * round-tripping through an object URL.
    *
-   * @deprecated Use `getPublicUrl` instead. Public-link rendering (ADR-021)
-   * removes the OAuth dependency entirely — photos render without an
-   * access-token round-trip, which also means family members whose
-   * `drive.file` scope doesn't cover other-owned files can still see
-   * photos. This function is kept for the transition only and will be
-   * removed in a follow-up once every call site has migrated.
+   * Replaces the former `getBlobUrl`, which returned an object URL and was
+   * `@deprecated` pending the ADR-021 public-link migration. Its only caller
+   * moved here, so keeping a wrapper would have left an unused deprecated
+   * export — dead code the next reader has to prove is dead.
+   *
+   * NOTE (ADR-021): a family member whose `drive.file` scope doesn't cover an
+   * other-owned file can still SEE it (via the public-link grant that
+   * `getPublicUrl` uses) but may not be able to download it here. That resolves
+   * to `null` → the existing missing-photo state, never a dead button.
    */
-  async function getBlobUrl(photoId: UUID): Promise<string | null> {
+  async function getFileBlob(photoId: UUID): Promise<Blob | null> {
     const photo = photos.value[photoId];
     if (!photo || photo.deletedAt) return null;
 
-    const cached = blobUrlCache.get(photo.driveFileId);
+    const cached = blobCache.get(photo.driveFileId);
     if (cached) return cached;
 
     try {
       const token = await requestAccessToken();
       const blob = await downloadFileBlob(token, photo.driveFileId);
-      const url = URL.createObjectURL(blob);
-      blobUrlCache.set(photo.driveFileId, url);
+      cacheBlob(photo.driveFileId, blob);
       unresolvedIds.value.delete(photoId);
-      return url;
+      return blob;
     } catch (e) {
-      if (e instanceof DriveFileNotFoundError) {
+      // 404 ONLY, deliberately narrower than the rest of this store.
+      // `driveService` raises `DriveFileNotFoundError` for 403 as well as 404,
+      // and 403 is the ADR-021 case: member B fetching member A's photo, which
+      // renders perfectly well through its public link. Marking that unresolved
+      // from a save-to-device tap would flip the photo to "missing" app-wide —
+      // the button vanishes, the footer offers "Replace photo", the bin becomes
+      // an unlink, and every thumbnail of a healthy photo blanks. Images only
+      // started taking this path when the save button began fetching bytes.
+      const status = e instanceof DriveApiError ? e.status : undefined;
+      if (e instanceof DriveFileNotFoundError && status === 404) {
         markUnresolved(photoId);
-        return null;
       }
-      console.warn('[photoStore] getBlobUrl download failed', photoId, e);
+      // Was a bare `console.warn`, which never leaves the device — and this is
+      // now the only record of why a save-to-device tap failed.
+      logEvent({
+        level: 'warn',
+        surface: 'file-delivery',
+        message: 'photo bytes could not be fetched',
+        context: {
+          action: 'delivery-failed',
+          kind: 'photo',
+          stage: 'source',
+          http_status: status,
+        },
+        error: e,
+      });
       return null;
     }
   }
@@ -621,7 +681,7 @@ export const usePhotoStore = defineStore('photos', () => {
 
   /**
    * Drop this photo's cached image URLs (both thumbnailLink and blob)
-   * so the next `getImageUrl` / `getBlobUrl` call re-fetches. Useful
+   * so the next `getImageUrl` / `getFileBlob` call re-fetches. Useful
    * when an `<img>` fires `error` on a previously-valid URL — Drive
    * CDN tokens rotate, blob URLs can go bad if the backing file was
    * replaced. Safe to call even with no cached entry.
@@ -630,11 +690,7 @@ export const usePhotoStore = defineStore('photos', () => {
     const photo = photos.value[photoId];
     if (!photo) return;
     thumbUrlCache.delete(photo.driveFileId);
-    const cachedBlob = blobUrlCache.get(photo.driveFileId);
-    if (cachedBlob) {
-      URL.revokeObjectURL(cachedBlob);
-      blobUrlCache.delete(photo.driveFileId);
-    }
+    blobCache.delete(photo.driveFileId);
   }
 
   /**
@@ -941,7 +997,7 @@ export const usePhotoStore = defineStore('photos', () => {
     linkPhotoToEntity,
     addAvatarPhoto,
     getImageUrl,
-    getBlobUrl,
+    getFileBlob,
     isUnresolved,
     markUnresolved,
     getPublicUrl,

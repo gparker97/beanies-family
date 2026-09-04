@@ -150,28 +150,3 @@ export function createEmptyTranslationFile(
     translations: {},
   };
 }
-
-/**
- * Serialize translation file to JSON string.
- * Pretty-printed for easy editing.
- */
-export function serializeTranslationFile(file: TranslationFile): string {
-  return JSON.stringify(file, null, 2);
-}
-
-/**
- * Download translation file as JSON.
- * This allows developers to save updated translations to the file system.
- */
-export function downloadTranslationFile(file: TranslationFile, filename: string): void {
-  const json = serializeTranslationFile(file);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-
-  URL.revokeObjectURL(url);
-}

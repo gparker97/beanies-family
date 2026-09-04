@@ -21,7 +21,6 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTranslationStore } from '@/stores/translationStore';
-import { isIosOrIpadOs } from '@/services/sync/capabilities';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { mealDisplayName } from '@/utils/mealDisplayName';
@@ -35,7 +34,7 @@ import {
   ExportError,
   type ExportStage,
 } from '@/composables/useSheetExport';
-import { shareOrDownloadFile, downloadFile } from '@/utils/shareOrDownloadFile';
+import { deliverFile } from '@/utils/deliverFile';
 import {
   buildMealExportRows,
   type MealResolvers,
@@ -306,34 +305,26 @@ async function runExport(format: ExportFormat): Promise<void> {
       mime = 'application/pdf';
     }
 
-    // 4. Deliver. Image → always the OS share sheet. PDF → a straight download
-    //    where the browser honours it (desktop/Android), but the share sheet on
-    //    iOS/iPadOS, where `<a download>` saves nothing — its "Save to Files"
-    //    is the only way to land the file.
+    // 4. Deliver. The seam decides the mechanism per platform — the old
+    //    `format === 'pdf' && !isIosOrIpadOs()` branch sent Android PDFs to a
+    //    `<a download>` that does nothing in a WebView. `deliverFile` also owns
+    //    the toast, the report and the delivery telemetry (surface
+    //    `file-delivery`), so the three export-* logEvents that used to live
+    //    here are gone; `export-start` above is retained and is what the
+    //    absence-detection triage keys off.
     stage = 'deliver';
     const filename = `beanies-meal-plan-${weekDates.value[0]}.${ext}`;
-    const result =
-      format === 'pdf' && !isIosOrIpadOs()
-        ? downloadFile(blob, filename)
-        : await shareOrDownloadFile(blob, filename, mime, t('mealPlanner.share.title'));
-    if (result.outcome === 'failed') throw new ExportError('deliver', result.error);
-    if (result.outcome === 'cancelled') {
-      logEvent({
-        level: 'info',
-        surface: 'plan-export',
-        message: 'export cancelled',
-        context: { action: 'export-cancelled', format },
-      });
-      return;
-    }
-    logEvent({
-      level: 'info',
-      surface: 'plan-export',
-      message: 'export delivered',
-      context: {
-        action: result.outcome === 'shared' ? 'export-shared' : 'export-downloaded',
-        format,
-      },
+    // The return value is deliberately unused: `deliverFile` owns the toast,
+    // the report and the telemetry for every outcome, and there is nothing
+    // after this step to gate. (The `if (!result.delivered) return` that used
+    // to sit below was the try block's last statement, so it read as a gate
+    // while doing nothing.)
+    await deliverFile({
+      blob,
+      filename,
+      mimeType: mime,
+      title: t('mealPlanner.share.title'),
+      kind: format === 'pdf' ? 'meal-plan-pdf' : 'meal-plan-png',
     });
   } catch (err) {
     const failStage = err instanceof ExportError ? err.stage : stage;

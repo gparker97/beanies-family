@@ -1,3 +1,14 @@
+/**
+ * The WEB delivery paths.
+ *
+ * Note what this file does NOT mock: `@capacitor/share` and
+ * `@capacitor/filesystem`. That is a deliberate assertion in itself — the
+ * plugins are imported dynamically inside the native branch, so a web-path test
+ * never reaches them. If either import were ever hoisted to the top of
+ * `shareOrDownloadFile.ts`, every test here would fail to resolve, which is the
+ * warning we want. The native branch is covered in
+ * `shareOrDownloadFile.native.test.ts`, which mocks `isNative` to true.
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { shareOrDownloadFile, downloadFile } from '@/utils/shareOrDownloadFile';
 
@@ -35,6 +46,8 @@ describe('shareOrDownloadFile', () => {
     const result = await shareOrDownloadFile(blob, 'plan.png', 'image/png', 'Meal plan');
 
     expect(result.outcome).toBe('shared');
+    expect(result.delivered).toBe(true);
+    expect(result.mechanism).toBe('web-share');
     expect(share).toHaveBeenCalledTimes(1);
     const arg = share.mock.calls[0]![0] as unknown as { files: File[]; title: string };
     expect(arg.files[0]).toBeInstanceOf(File);
@@ -50,6 +63,8 @@ describe('shareOrDownloadFile', () => {
     const result = await shareOrDownloadFile(blob, 'plan.pdf', 'application/pdf', 'Meal plan');
 
     expect(result.outcome).toBe('downloaded');
+    expect(result.delivered).toBe(true);
+    expect(result.mechanism).toBe('anchor');
     expect(clickSpy).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     // Revoke is deferred so WebKit/Firefox can read the blob first.
@@ -66,6 +81,8 @@ describe('shareOrDownloadFile', () => {
 
     const result = await shareOrDownloadFile(blob, 'plan.png', 'image/png', 'Meal plan');
     expect(result.outcome).toBe('cancelled');
+    // The gate the delete-family flow reads: a dismissed sheet delivered nothing.
+    expect(result.delivered).toBe(false);
     expect(result.error).toBeUndefined();
   });
 
@@ -78,6 +95,8 @@ describe('shareOrDownloadFile', () => {
 
     const result = await shareOrDownloadFile(blob, 'plan.png', 'image/png', 'Meal plan');
     expect(result.outcome).toBe('failed');
+    expect(result.delivered).toBe(false);
+    expect(result.stage).toBe('share');
     expect(result.error).toBe(boom);
   });
 
