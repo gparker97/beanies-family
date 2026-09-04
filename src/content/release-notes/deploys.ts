@@ -17,6 +17,66 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.04',
+    date: '2026-09-04',
+    month: '4 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'A cookbook you can actually navigate, a dark mode you can read, and downloads that work in the apps.',
+      beanie:
+        'a cookbook you can actually navigate, a dark mode you can read, and downloads that work in the apps.',
+    },
+    features: [
+      {
+        icon: '\u{1F4D6}',
+        title: { en: 'Find any recipe fast', beanie: 'find any recipe fast' },
+        description: {
+          en: 'Recipes can now carry a course, any number of your own tags, and the meals they suit. Group the cookbook by meal or by course, filter by course, and sort by A-Z, recently added or most cooked. Your grouping is remembered on that device; the filter is not, so the cookbook always opens showing everything.',
+          beanie:
+            'recipes can now carry a course, any number of your own tags, and the meals they suit. group the cookbook by meal or by course, filter by course, and sort by a-z, recently added or most cooked. your grouping is remembered on that device; the filter is not, so the cookbook always opens showing everything.',
+        },
+        tryItRoute: '/pod/cookbook',
+        tryItLabel: { en: 'Open the cookbook', beanie: 'open the cookbook' },
+      },
+      {
+        icon: '\u{1F319}',
+        title: { en: 'Dark mode you can read', beanie: 'dark mode you can read' },
+        description: {
+          en: 'The whole palette after sunset has been rebuilt on measured contrast, so every shade of text now reads clearly on every surface it can land on. Bright colours stay bright, and warm places like the cookbook and the scrapbook keep their warmth rather than turning grey.',
+          beanie:
+            'the whole palette after sunset has been rebuilt on measured contrast, so every shade of text now reads clearly on every surface it can land on. bright colours stay bright, and warm places like the cookbook and the scrapbook keep their warmth rather than turning grey.',
+        },
+      },
+      {
+        icon: '\u{1F4E5}',
+        title: { en: 'Downloads work in the apps', beanie: 'downloads work in the apps' },
+        description: {
+          en: 'Saving or sharing a file from the iPhone and Android apps did nothing at all: the recovery kit, meal-plan PDFs, data exports and saved photos all reported success and produced no file. They now open the share sheet, where "Save to Files" (or "Save to device" on Android) puts the file where you want it.',
+          beanie:
+            'saving or sharing a file from the iphone and android apps did nothing at all: the recovery kit, meal-plan pdfs, data exports and saved photos all reported success and produced no file. they now open the share sheet, where "save to files" (or "save to device" on android) puts the file where you want it.',
+        },
+      },
+      {
+        icon: '\u{1F5BC}\u{FE0F}',
+        title: { en: 'Recipes arrive with their photo', beanie: 'recipes arrive with their photo' },
+        description: {
+          en: 'A recipe captured from a web link now picks up the dish photo far more often. beanies works through the page\u2019s own images in order and accepts modern formats it used to refuse. A recipe with no photo gets an on-brand illustration instead of an empty card.',
+          beanie:
+            'a recipe captured from a web link now picks up the dish photo far more often. beanies works through the page\u2019s own images in order and accepts modern formats it used to refuse. a recipe with no photo gets an on-brand illustration instead of an empty card.',
+        },
+      },
+      {
+        icon: '\u{1F504}',
+        title: { en: 'Tablets can turn sideways', beanie: 'tablets can turn sideways' },
+        description: {
+          en: 'On an iPad or an Android tablet the app now rotates freely and follows your own rotation-lock setting, which is the only sensible way to mount a beanie wall. Phones stay portrait, as before.',
+          beanie:
+            'on an ipad or an android tablet the app now rotates freely and follows your own rotation-lock setting, which is the only sensible way to mount a beanie wall. phones stay portrait, as before.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.03',
     date: '2026-09-03',
     month: '3 september 2026',
