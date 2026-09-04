@@ -549,7 +549,7 @@ async function handleSave() {
             :class="
               activityCategory === cat.value
                 ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             @click="activityCategory = cat.value"
           >
@@ -569,7 +569,7 @@ async function handleSave() {
       </FormFieldGroup>
       <div
         v-else
-        class="font-outfit rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800 dark:bg-slate-700 dark:text-gray-200"
+        class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800"
       >
         {{ autoTitle }}
       </div>
@@ -620,11 +620,11 @@ async function handleSave() {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit dark:text-ink-faint mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
-          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+          <div class="dark:border-line space-y-3 rounded-xl border border-gray-200 p-3">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
               <FormFieldGroup
                 :label="t('vacation.field.airline')"
@@ -674,7 +674,7 @@ async function handleSave() {
                     :class="
                       arrivesNextDay
                         ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
-                        : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+                        : 'dark:bg-surface-overlay dark:text-ink-soft border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
                     "
                     @click="arrivesNextDay = !arrivesNextDay"
                   >
@@ -742,11 +742,11 @@ async function handleSave() {
 
         <div>
           <div
-            class="font-outfit mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+            class="font-outfit dark:text-ink-faint mb-2 text-[0.625rem] font-semibold tracking-[0.14em] text-gray-400 uppercase"
           >
             {{ t('vacation.bookingDetails') }}
           </div>
-          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+          <div class="dark:border-line space-y-3 rounded-xl border border-gray-200 p-3">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormFieldGroup
                 :label="t('vacation.field.cruiseLine')"

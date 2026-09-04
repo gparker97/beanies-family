@@ -117,16 +117,14 @@ const containerProps = computed(() => {
         <!-- Title. Additive `title-content` slot lets a caller supply an
              inline-editable title (e.g. ListDetailModal); fallback renders the
              identical static text so every other caller is unchanged. -->
-        <h2
-          class="font-outfit flex-1 text-lg font-bold text-[var(--color-text)] dark:text-gray-100"
-        >
+        <h2 class="font-outfit dark:text-ink flex-1 text-lg font-bold text-[var(--color-text)]">
           <slot name="title-content">{{ title }}</slot>
         </h2>
       </div>
     </template>
 
     <!-- Body: Cloud White bg, scrollable -->
-    <div class="-mx-6 -my-6 bg-[#F8F9FA] px-6 py-5 dark:bg-slate-800/50">
+    <div class="dark:bg-surface-raised/50 -mx-6 -my-6 bg-[#F8F9FA] px-6 py-5">
       <div class="space-y-5">
         <slot />
       </div>

@@ -134,11 +134,11 @@ function handleClose() {
     @save="handleSave"
   >
     <div class="space-y-4">
-      <p class="text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ fillTemplate(t('family.resetPin.modalDescription'), { name: memberName }) }}
       </p>
       <div>
-        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
           {{ t('pin.newPin') }}
         </p>
         <PinInput
@@ -150,7 +150,7 @@ function handleClose() {
         />
       </div>
       <div>
-        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
           {{ t('pin.confirmPin') }}
         </p>
         <PinInput
@@ -160,10 +160,10 @@ function handleClose() {
           @update:model-value="formError = null"
         />
       </div>
-      <p v-if="formError" class="text-sm text-red-600 dark:text-red-400" role="alert">
+      <p v-if="formError" class="dark:text-danger-lift text-sm text-red-600" role="alert">
         {{ formError }}
       </p>
-      <p class="text-xs text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-xs text-gray-500">
         {{ fillTemplate(t('family.resetPin.warning'), { name: memberName }) }}
       </p>
     </div>

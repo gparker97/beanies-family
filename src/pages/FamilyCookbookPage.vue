@@ -189,7 +189,7 @@ async function handleSaved(id: string): Promise<void> {
 <template>
   <div class="space-y-6">
     <header
-      class="relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-5 py-6 sm:px-9 sm:py-8"
+      class="dark:bg-surface-paper relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-5 py-6 sm:px-9 sm:py-8 dark:border-[rgb(240_160_90_/_18%)]"
     >
       <span
         class="pointer-events-none absolute top-2.5 right-8 text-[9.375rem] opacity-[0.09]"
@@ -200,14 +200,14 @@ async function handleSaved(id: string): Promise<void> {
       </span>
       <button
         type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
+        class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
         @click="router.push('/pod')"
       >
         <BeanieIcon name="chevron-left" size="xs" />
         <span>{{ t('bean.backToPod') }}</span>
       </button>
       <h1
-        class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
+        class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none"
       >
         {{ t('cookbook.title') }}
       </h1>
@@ -219,7 +219,7 @@ async function handleSaved(id: string): Promise<void> {
             {{ recipes.length }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 dark:text-ink-soft mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
           >
             {{ t('cookbook.stats.recipes') }}
           </span>
@@ -229,7 +229,7 @@ async function handleSaved(id: string): Promise<void> {
             {{ totalCookCount }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 dark:text-ink-soft mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
           >
             {{ t('cookbook.stats.cooked') }}
           </span>
@@ -239,7 +239,7 @@ async function handleSaved(id: string): Promise<void> {
             ⭐ {{ avgRating }}
           </span>
           <span
-            class="font-outfit text-secondary-500/60 mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 dark:text-ink-soft mt-1 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
           >
             {{ t('cookbook.stats.avgRating') }}
           </span>
@@ -270,7 +270,7 @@ async function handleSaved(id: string): Promise<void> {
       <article
         v-for="r in recipes"
         :key="r.id"
-        class="group cursor-pointer overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] transition-all hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+        class="group dark:bg-surface-raised cursor-pointer overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] transition-all hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)]"
         @click="openRecipe(r)"
       >
         <PolaroidImage
@@ -286,34 +286,39 @@ async function handleSaved(id: string): Promise<void> {
           aspect-ratio="16 / 10"
         />
         <div class="p-4">
-          <h3 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
+          <h3 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
             {{ r.name }}
           </h3>
-          <p v-if="r.subtitle" class="font-inter text-secondary-500/60 mt-1 text-xs">
+          <p
+            v-if="r.subtitle"
+            class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1 text-xs"
+          >
             {{ r.subtitle }}
           </p>
-          <div class="font-inter text-secondary-500/60 mt-3 flex flex-wrap gap-4 text-xs">
+          <div
+            class="font-inter text-secondary-500/60 dark:text-ink-soft mt-3 flex flex-wrap gap-4 text-xs"
+          >
             <span v-if="r.cookTime"
               >🔥
-              <strong class="font-outfit text-secondary-500 font-semibold">{{
+              <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
                 r.cookTime
               }}</strong></span
             >
             <span v-if="r.prepTime"
               >🕐
-              <strong class="text-secondary-500 font-outfit font-semibold">{{
+              <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
                 r.prepTime
               }}</strong></span
             >
             <span v-if="r.servings"
               >🍽️
-              <strong class="text-secondary-500 font-outfit font-semibold">{{
+              <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
                 r.servings
               }}</strong></span
             >
             <span v-if="r.ingredients?.length">
               🌿
-              <strong class="text-secondary-500 font-outfit font-semibold">
+              <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">
                 {{ r.ingredients.length }} {{ t('cookbook.card.ingredients') }}
               </strong>
             </span>
@@ -330,7 +335,7 @@ async function handleSaved(id: string): Promise<void> {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="🍝"

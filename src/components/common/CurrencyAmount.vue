@@ -46,9 +46,9 @@ const primaryClasses = computed(() => {
     xl: 'text-xl',
   };
   const colors: Record<string, string> = {
-    income: 'text-green-600 dark:text-green-400',
-    expense: 'text-red-600 dark:text-red-400',
-    neutral: 'text-gray-900 dark:text-gray-100',
+    income: 'text-green-600 dark:text-success-lift',
+    expense: 'text-red-600 dark:text-danger-lift',
+    neutral: 'text-gray-900 dark:text-ink',
   };
   return `${base} ${sizes[props.size]} ${colors[props.type]}`;
 });
@@ -60,7 +60,7 @@ const secondaryClasses = computed(() => {
     lg: 'text-sm',
     xl: 'text-sm',
   };
-  return `${sizes[props.size]} text-gray-400 dark:text-gray-500`;
+  return `${sizes[props.size]} text-gray-400 dark:text-ink-faint`;
 });
 
 const prefix = computed(() => {

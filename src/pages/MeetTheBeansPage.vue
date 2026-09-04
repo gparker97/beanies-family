@@ -368,13 +368,13 @@ function cancelEditFamilyName() {
     <header class="flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0 flex-1">
         <div
-          class="font-outfit text-secondary-500/60 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+          class="font-outfit text-secondary-500/60 dark:text-ink-soft text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
         >
           {{ t('family.hub.kicker') }}
         </div>
         <div class="mt-1 flex flex-wrap items-center gap-2">
           <h1
-            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl dark:text-gray-100"
+            class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl"
           >
             {{ familyContextStore.activeFamilyName || t('family.title') }}
           </h1>
@@ -382,7 +382,7 @@ function cancelEditFamilyName() {
             <input
               v-model="editFamilyName"
               type="text"
-              class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none sm:w-48 sm:flex-initial dark:border-slate-600 dark:bg-slate-800"
+              class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 dark:border-line-strong dark:bg-surface-raised w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none sm:w-48 sm:flex-initial"
               @keyup.enter="saveFamilyName"
               @keyup.escape="cancelEditFamilyName"
             />
@@ -393,7 +393,7 @@ function cancelEditFamilyName() {
               <BeanieIcon name="check" size="md" />
             </button>
             <button
-              class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+              class="dark:hover:bg-surface-hover rounded p-1 text-gray-400 hover:bg-gray-100"
               @click="cancelEditFamilyName"
             >
               <BeanieIcon name="close" size="md" />
@@ -401,14 +401,14 @@ function cancelEditFamilyName() {
           </div>
           <button
             v-if="!isEditingFamilyName && familyContextStore.activeFamilyName && canManagePod"
-            class="text-secondary-500/40 hover:text-primary-500 rounded p-0.5 transition-colors"
+            class="text-secondary-500/40 hover:text-primary-500 dark:text-ink-faint rounded p-0.5 transition-colors"
             :title="t('family.editFamilyName')"
             @click="startEditFamilyName"
           >
             <BeanieIcon name="edit" size="sm" />
           </button>
         </div>
-        <p class="font-inter text-secondary-500/60 mt-1 text-sm dark:text-gray-400">
+        <p class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1 text-sm">
           {{ headerStats }}
         </p>
       </div>
@@ -470,7 +470,7 @@ function cancelEditFamilyName() {
         <!-- Recent family sayings rail -->
         <section>
           <div class="mb-3 flex items-baseline justify-between gap-2">
-            <h2 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-200">
+            <h2 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
               {{ t('family.hub.recentSayings') }}
             </h2>
             <router-link
@@ -499,12 +499,14 @@ function cancelEditFamilyName() {
               <blockquote class="text-secondary-500 line-clamp-4 text-lg leading-snug font-medium">
                 "{{ saying.words }}"
               </blockquote>
-              <footer class="font-inter text-secondary-500/60 mt-3 text-[0.6875rem] font-semibold">
+              <footer
+                class="font-inter text-secondary-500/60 dark:text-ink-soft mt-3 text-[0.6875rem] font-semibold"
+              >
                 — {{ memberFor(saying.memberId)?.name ?? t('family.title') }}
               </footer>
             </button>
           </div>
-          <p v-else class="font-inter text-secondary-500/40 text-sm italic dark:text-gray-500">
+          <p v-else class="font-inter text-secondary-500/40 dark:text-ink-faint text-sm italic">
             {{ t('family.hub.recentSayings.empty') }}
           </p>
         </section>
@@ -606,17 +608,17 @@ function cancelEditFamilyName() {
               </span>
               <div class="min-w-0 flex-1">
                 <div
-                  class="font-outfit text-secondary-500 truncate text-xs font-bold dark:text-gray-200"
+                  class="font-outfit text-secondary-500 dark:text-ink truncate text-xs font-bold"
                 >
                   {{ a.name }}
                 </div>
-                <div class="text-secondary-500/50 truncate text-[0.6875rem] dark:text-gray-500">
+                <div class="text-secondary-500/50 dark:text-ink-faint truncate text-[0.6875rem]">
                   {{ memberFor(a.memberId)?.name ?? '—' }}
                 </div>
               </div>
             </li>
           </ul>
-          <p v-else class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500">
+          <p v-else class="font-inter text-secondary-500/50 dark:text-ink-faint text-xs italic">
             {{ t('family.hub.sidebar.noAllergies') }}
           </p>
           <router-link
@@ -643,14 +645,14 @@ function cancelEditFamilyName() {
             <li v-for="m in sidebarMedications" :key="m.id" class="flex items-start gap-2">
               <div class="min-w-0 flex-1">
                 <div
-                  class="font-outfit text-secondary-500 truncate text-xs font-bold dark:text-gray-200"
+                  class="font-outfit text-secondary-500 dark:text-ink truncate text-xs font-bold"
                 >
                   {{ m.name }}
                 </div>
-                <div class="text-secondary-500/60 truncate text-[0.6875rem] dark:text-gray-400">
+                <div class="text-secondary-500/60 dark:text-ink-soft truncate text-[0.6875rem]">
                   {{ m.dose }} · {{ m.frequency }}
                 </div>
-                <div class="text-secondary-500/40 truncate text-[0.625rem] dark:text-gray-500">
+                <div class="text-secondary-500/40 dark:text-ink-faint truncate text-[0.625rem]">
                   {{ memberFor(m.memberId)?.name ?? '—' }}
                 </div>
               </div>
@@ -669,7 +671,7 @@ function cancelEditFamilyName() {
           </router-link>
           <p
             v-if="sidebarMedications.length === 0"
-            class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500"
+            class="font-inter text-secondary-500/50 dark:text-ink-faint text-xs italic"
           >
             {{ t('family.hub.sidebar.noMeds') }}
           </p>
@@ -677,10 +679,10 @@ function cancelEditFamilyName() {
 
         <!-- Events this week (compact) -->
         <section v-if="upcomingThisWeek.length > 0">
-          <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
+          <div class="nook-section-label text-secondary-500 dark:text-ink-soft mb-3">
             {{ t('family.hub.eventsThisWeek') }}
           </div>
-          <ul class="divide-y divide-[var(--tint-slate-5)] dark:divide-slate-700">
+          <ul class="dark:divide-surface-overlay divide-y divide-[var(--tint-slate-5)]">
             <li
               v-for="event in upcomingThisWeek.slice(0, 4)"
               :key="event.activity.id + event.date"
@@ -691,12 +693,12 @@ function cancelEditFamilyName() {
                 :style="{ backgroundColor: getEventBarColor(event.activity.category) }"
               />
               <div class="min-w-0 flex-1">
-                <div class="text-secondary-500/40 text-[0.625rem] dark:text-gray-500">
+                <div class="text-secondary-500/40 dark:text-ink-faint text-[0.625rem]">
                   {{ event.date
                   }}{{ event.activity.startTime ? ', ' + event.activity.startTime : '' }}
                 </div>
                 <div
-                  class="font-outfit text-secondary-500 truncate text-xs font-semibold dark:text-gray-200"
+                  class="font-outfit text-secondary-500 dark:text-ink truncate text-xs font-semibold"
                 >
                   {{ event.activity.title }}
                 </div>

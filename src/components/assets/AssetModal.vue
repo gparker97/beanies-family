@@ -274,7 +274,7 @@ function handleDelete() {
       <input
         v-model="name"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-lg font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit dark:text-ink w-full border-none bg-transparent text-lg font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
         :placeholder="t('assets.assetName')"
       />
     </FormFieldGroup>
@@ -303,7 +303,7 @@ function handleDelete() {
       <input
         v-model="notes"
         type="text"
-        class="w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="dark:text-ink w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
         :placeholder="t('assets.notesPlaceholder')"
       />
     </FormFieldGroup>
@@ -321,12 +321,10 @@ function handleDelete() {
       <div v-if="showMoreDetails" class="mt-3 space-y-3">
         <!-- Include in Net Worth toggle -->
         <div
-          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-800"
+          class="dark:bg-surface-raised flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
         >
           <div>
-            <div
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-            >
+            <div class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
               {{ t('form.includeInNetWorth') }}
             </div>
             <div class="text-xs text-[var(--color-text-muted)]">
@@ -340,11 +338,11 @@ function handleDelete() {
 
     <!-- 9. Has a Loan toggle -->
     <div
-      class="flex cursor-pointer items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-800"
+      class="dark:bg-surface-raised flex cursor-pointer items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
       @click="hasLoan = !hasLoan"
     >
       <div>
-        <div class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+        <div class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
           {{ t('assets.hasLoan') }}
         </div>
         <div class="text-xs text-[var(--color-text-muted)]">
@@ -366,7 +364,7 @@ function handleDelete() {
             v-model="loanAmount"
             :currency-symbol="currency || settingsStore.displayCurrency"
             font-size="1rem"
-            bg-class="bg-white/70 dark:bg-slate-800/70"
+            bg-class="bg-white/70 dark:bg-surface-raised/70"
           />
         </FormFieldGroup>
         <FormFieldGroup :label="t('assets.outstandingBalance')">
@@ -374,7 +372,7 @@ function handleDelete() {
             v-model="outstandingBalance"
             :currency-symbol="currency || settingsStore.displayCurrency"
             font-size="1rem"
-            bg-class="bg-white/70 dark:bg-slate-800/70"
+            bg-class="bg-white/70 dark:bg-surface-raised/70"
           />
         </FormFieldGroup>
       </div>
@@ -388,7 +386,7 @@ function handleDelete() {
             v-model="monthlyPayment"
             :currency-symbol="currency || settingsStore.displayCurrency"
             font-size="1rem"
-            bg-class="bg-white/70 dark:bg-slate-800/70"
+            bg-class="bg-white/70 dark:bg-surface-raised/70"
           />
         </FormFieldGroup>
       </div>

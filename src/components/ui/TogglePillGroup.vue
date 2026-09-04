@@ -26,13 +26,13 @@ function getSelectedClasses(variant?: string): string {
     case 'orange':
       return 'bg-gradient-to-r from-primary-500 to-terracotta-400 text-white shadow-sm';
     default:
-      return 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-slate-900';
+      return 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-surface-ground';
   }
 }
 </script>
 
 <template>
-  <div class="inline-flex rounded-[14px] bg-[var(--tint-slate-5)] p-1 dark:bg-slate-700">
+  <div class="dark:bg-surface-overlay inline-flex rounded-[14px] bg-[var(--tint-slate-5)] p-1">
     <button
       v-for="opt in options"
       :key="opt.value"
@@ -41,7 +41,7 @@ function getSelectedClasses(variant?: string): string {
       :class="
         modelValue === opt.value
           ? getSelectedClasses(opt.variant)
-          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] dark:text-gray-400 dark:hover:text-gray-200'
+          : 'dark:text-ink-soft dark:hover:text-ink text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
       "
       @click="
         emit('update:modelValue', props.clearable && modelValue === opt.value ? '' : opt.value)

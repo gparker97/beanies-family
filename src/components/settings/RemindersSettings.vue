@@ -227,7 +227,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     @save="$emit('close')"
   >
     <template #icon><BeanieBellIcon :size="26" /></template>
-    <p class="-mt-1 text-sm text-[var(--deep-slate)]/45 dark:text-slate-500">
+    <p class="dark:text-ink-faint -mt-1 text-sm text-[var(--deep-slate)]/45">
       {{ t('reminders.description') }}
     </p>
 
@@ -242,7 +242,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
 
     <!-- Lead-time controls -->
     <p
-      class="font-outfit mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase dark:text-slate-500"
+      class="font-outfit dark:text-ink-faint mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase"
     >
       {{ t('reminders.howMuchNotice') }}
     </p>
@@ -255,10 +255,10 @@ async function onOpenExactAlarmSettings(): Promise<void> {
       <div class="flex items-center gap-2.5">
         <span class="text-base" aria-hidden="true">{{ ACTIVITIES_EMOJI }}</span>
         <div>
-          <p class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+          <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
             {{ t('reminders.activities') }}
           </p>
-          <p class="text-xs text-[var(--deep-slate)]/40 dark:text-slate-500">
+          <p class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/40">
             {{ t('reminders.activitiesHint') }}
           </p>
         </div>
@@ -280,7 +280,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     >
       <div class="flex items-center gap-2.5">
         <span class="text-base" aria-hidden="true">{{ row.emoji }}</span>
-        <p class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+        <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
           {{ t(row.labelKey) }}
         </p>
       </div>
@@ -298,10 +298,10 @@ async function onOpenExactAlarmSettings(): Promise<void> {
       <div class="flex items-center gap-2.5">
         <span class="text-base" aria-hidden="true">{{ TODO_EMOJI }}</span>
         <div>
-          <p class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+          <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
             {{ t('reminders.timedTodos') }}
           </p>
-          <p class="text-xs text-[var(--deep-slate)]/40 dark:text-slate-500">
+          <p class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/40">
             {{ t('reminders.timedTodosHint') }}
           </p>
         </div>
@@ -318,7 +318,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     <!-- #40: Helpful Hints — master (family-synced) + per-device per-type mutes -->
     <template v-if="helpfulHintsFlagOn">
       <p
-        class="font-outfit mt-5 mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase dark:text-slate-500"
+        class="font-outfit dark:text-ink-faint mt-5 mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase"
       >
         {{ t('settings.helpfulHints.title') }}
         <InfoHintBadge :text="t('settings.helpfulHints.perDeviceHint')" />
@@ -339,19 +339,17 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           <div class="flex items-center gap-2.5">
             <span class="text-base" aria-hidden="true">{{ row.emoji }}</span>
             <div class="min-w-0">
-              <p
-                class="font-outfit text-sm font-semibold text-[var(--deep-slate)] dark:text-slate-200"
-              >
+              <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
                 {{ t(row.labelKey) }}
               </p>
-              <p class="text-xs text-[var(--deep-slate)]/45 dark:text-slate-500">
+              <p class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/45">
                 {{ t(row.descKey) }}
               </p>
             </div>
           </div>
           <!-- How far ahead (family-synced) -->
           <div class="mt-2.5 flex items-center justify-between gap-4 pl-[2.1rem]">
-            <span class="text-xs font-medium text-[var(--deep-slate)]/60 dark:text-slate-400">
+            <span class="dark:text-ink-soft text-xs font-medium text-[var(--deep-slate)]/60">
               {{ t('settings.helpfulHints.howFarAhead') }}
             </span>
             <BaseSelect
@@ -364,7 +362,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           </div>
           <!-- Notify me on this device (per-device) -->
           <div class="mt-2 flex items-center justify-between gap-4 pl-[2.1rem]">
-            <span class="text-xs font-medium text-[var(--deep-slate)]/60 dark:text-slate-400">
+            <span class="dark:text-ink-soft text-xs font-medium text-[var(--deep-slate)]/60">
               {{ t('settings.helpfulHints.notifyOnDevice') }}
             </span>
             <ToggleSwitch
@@ -384,7 +382,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
       role="status"
     >
       <span class="flex-none text-base text-[var(--heritage-orange)]" aria-hidden="true">🔔</span>
-      <p class="text-xs text-[var(--deep-slate)] dark:text-slate-300">
+      <p class="dark:text-ink-soft text-xs text-[var(--deep-slate)]">
         {{ t('reminders.permissionNudge') }}
       </p>
     </div>
@@ -400,7 +398,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     >
       <span class="flex-none text-base text-[var(--heritage-orange)]" aria-hidden="true">⏰</span>
       <div class="min-w-0">
-        <p class="text-xs text-[var(--deep-slate)] dark:text-slate-300">
+        <p class="dark:text-ink-soft text-xs text-[var(--deep-slate)]">
           {{ t('reminders.exactAlarmHelp') }}
         </p>
         <button

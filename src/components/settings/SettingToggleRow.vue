@@ -26,16 +26,16 @@ defineEmits<{ 'update:modelValue': [boolean] }>();
   <div
     :class="[
       'flex items-center justify-between py-3.5',
-      divider ? 'border-b border-[var(--tint-slate-05)] dark:border-slate-700' : '',
+      divider ? 'dark:border-line border-b border-[var(--tint-slate-05)]' : '',
     ]"
   >
     <div>
-      <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+      <p class="dark:text-ink text-[0.8rem] font-semibold text-[var(--deep-slate)]">
         {{ title }}
       </p>
       <p
         v-if="hint"
-        class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500"
+        class="dark:text-ink-faint text-[0.65rem] leading-snug text-[var(--deep-slate)]/40"
       >
         {{ hint }}
       </p>

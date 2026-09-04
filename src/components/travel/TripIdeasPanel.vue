@@ -52,7 +52,7 @@ const currentMemberId = computed(() => familyStore.currentMemberId);
 
 <template>
   <div
-    class="mt-6 min-w-0 rounded-3xl border-t border-gray-100 p-5 lg:mt-0 lg:border-t-0 lg:border-l lg:border-gray-100 dark:border-slate-700"
+    class="dark:border-line mt-6 min-w-0 rounded-3xl border-t border-gray-100 p-5 lg:mt-0 lg:border-t-0 lg:border-l lg:border-gray-100"
     style="background: linear-gradient(180deg, rgb(255 217 61 / 3%), rgb(0 180 216 / 2%))"
   >
     <!-- Ideas header -->
@@ -66,7 +66,7 @@ const currentMemberId = computed(() => familyStore.currentMemberId);
         🌟
       </div>
       <div>
-        <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit dark:text-ink text-base font-bold text-gray-900">
           {{ t('travel.ideas') }}
         </h3>
         <div class="text-[0.6875rem] text-gray-400">
@@ -106,7 +106,7 @@ const currentMemberId = computed(() => familyStore.currentMemberId);
     <!-- Planned section -->
     <template v-if="plannedIdeas.length > 0">
       <div
-        class="font-outfit mt-5 mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.08em] text-green-600 uppercase dark:text-green-400"
+        class="font-outfit dark:text-success-lift mt-5 mb-2 flex items-center gap-1.5 text-[0.625rem] font-semibold tracking-[0.08em] text-green-600 uppercase"
       >
         ✓ {{ t('vacation.ideas.plannedSection') }}
       </div>
@@ -131,7 +131,7 @@ const currentMemberId = computed(() => familyStore.currentMemberId);
         v-model="quickIdeaText"
         type="text"
         :placeholder="t('travel.quickAddIdea')"
-        class="flex-1 rounded-xl border-[1.5px] border-[var(--tint-slate-5)] bg-white px-3.5 py-2.5 text-base text-gray-900 transition-all outline-none focus:border-[#00B4D8] focus:shadow-[0_0_0_3px_rgba(0,180,216,0.08)] dark:bg-slate-800 dark:text-gray-100"
+        class="dark:bg-surface-raised dark:text-ink flex-1 rounded-xl border-[1.5px] border-[var(--tint-slate-5)] bg-white px-3.5 py-2.5 text-base text-gray-900 transition-all outline-none focus:border-[#00B4D8] focus:shadow-[0_0_0_3px_rgba(0,180,216,0.08)]"
         @keydown.enter="emit('add-idea')"
       />
       <button

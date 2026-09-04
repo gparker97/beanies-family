@@ -229,7 +229,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-title {
-  color: #f1f5f9;
+  color: #f2f5f7;
 }
 
 @media (width >= 640px) {
@@ -249,7 +249,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-description {
-  color: #cbd5e1;
+  color: #c3ced6;
 }
 
 @media (width >= 640px) {
@@ -284,7 +284,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-summary-card {
-  background: #243342;
+  background: #26343f;
   box-shadow: 0 2px 12px rgb(0 0 0 / 20%);
 }
 
@@ -402,7 +402,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-discord-title {
-  color: #f1f5f9;
+  color: #f2f5f7;
 }
 
 .ob-discord-body {
@@ -414,7 +414,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-discord-body {
-  color: #cbd5e1;
+  color: #c3ced6;
 }
 
 /* ── "Maybe later" skip ── */
@@ -437,7 +437,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-skip {
-  color: #94a3b8;
+  color: #9aa9b4;
 }
 
 .ob-cta:hover {
@@ -461,7 +461,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-subtitle {
-  color: #94a3b8;
+  color: #9aa9b4;
 }
 
 @media (width >= 640px) {

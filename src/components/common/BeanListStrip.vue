@@ -50,7 +50,7 @@ const { t } = useTranslation();
 
 <template>
   <div>
-    <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
+    <div class="nook-section-label text-secondary-500 dark:text-ink-soft mb-3">
       {{ t(props.labelKey) }}
     </div>
     <div class="flex gap-4 overflow-x-auto" :class="density === 'sm' ? 'py-2' : 'py-5'">
@@ -78,13 +78,13 @@ const { t } = useTranslation();
           />
           <!-- Online indicator -->
           <div
-            class="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#27AE60] dark:border-slate-800"
+            class="dark:border-line absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#27AE60]"
           />
         </div>
-        <div class="font-outfit text-secondary-500 text-xs font-semibold dark:text-gray-200">
+        <div class="font-outfit text-secondary-500 dark:text-ink text-xs font-semibold">
           {{ member.name }}
         </div>
-        <div class="text-secondary-500/35 text-xs dark:text-gray-500">
+        <div class="text-secondary-500/35 dark:text-ink-faint text-xs">
           {{ getMemberRoleLabel(member, t) }}
         </div>
       </button>
@@ -96,11 +96,11 @@ const { t } = useTranslation();
         @click="emit('add-member')"
       >
         <div
-          class="border-secondary-500/15 flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-dashed bg-[var(--tint-slate-5)] text-xl dark:border-gray-600"
+          class="border-secondary-500/15 dark:border-line-strong flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-dashed bg-[var(--tint-slate-5)] text-xl"
         >
           ➕
         </div>
-        <div class="font-outfit text-secondary-500/30 text-xs font-semibold dark:text-gray-500">
+        <div class="font-outfit text-secondary-500/30 dark:text-ink-faint text-xs font-semibold">
           {{ t(props.addLabelKey) }}
         </div>
       </button>

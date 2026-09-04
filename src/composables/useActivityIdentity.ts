@@ -55,7 +55,7 @@ export interface ActivityIdentity {
    * Wash + edge, for surfaces whose background IS the wash (grid blocks, chips).
    *
    * `background` is a SHORTHAND and beats any class, so binding this on a card that
-   * carries its own `bg-white dark:bg-slate-800` silently replaces that surface — a
+   * carries its own `bg-white dark:bg-surface-raised` silently replaces that surface — a
    * 13% tint straight onto the page, with a shadow tuned for white. Those surfaces
    * want `edgeStyle` instead.
    */

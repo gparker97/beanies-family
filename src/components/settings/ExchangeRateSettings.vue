@@ -66,19 +66,19 @@ function formatRate(rate: number): string {
       <!-- Last update info -->
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-sm text-gray-500">
             {{ t('settings.exchangeRates.lastUpdated') }}
             <span
               :class="
                 isStale
-                  ? 'text-yellow-600 dark:text-yellow-400'
-                  : 'text-gray-700 dark:text-gray-300'
+                  ? 'dark:text-terracotta-lift text-yellow-600'
+                  : 'dark:text-ink-soft text-gray-700'
               "
             >
               {{ lastUpdateFormatted }}
             </span>
           </p>
-          <p v-if="isStale" class="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+          <p v-if="isStale" class="dark:text-terracotta-lift mt-1 text-xs text-yellow-600">
             {{ t('settings.exchangeRates.stale') }}
           </p>
         </div>
@@ -98,18 +98,16 @@ function formatRate(rate: number): string {
 
       <!-- Error message -->
       <div v-if="updateError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-        <p class="text-sm text-red-700 dark:text-red-300">{{ updateError }}</p>
+        <p class="dark:text-danger-lift text-sm text-red-700">{{ updateError }}</p>
       </div>
 
       <!-- Auto-update toggle -->
-      <div
-        class="flex items-center justify-between border-t border-gray-100 py-2 dark:border-slate-700"
-      >
+      <div class="dark:border-line flex items-center justify-between border-t border-gray-100 py-2">
         <div>
-          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft text-sm font-medium text-gray-700">
             {{ t('settings.exchangeRates.autoUpdate') }}
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft text-xs text-gray-500">
             {{ t('settings.exchangeRates.autoUpdateHint') }}
           </p>
         </div>
@@ -120,7 +118,7 @@ function formatRate(rate: number): string {
           :disabled="props.readOnly"
           :class="[
             'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none',
-            autoUpdateEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700',
+            autoUpdateEnabled ? 'bg-blue-600' : 'dark:bg-surface-overlay bg-gray-200',
             props.readOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           ]"
           @click="toggleAutoUpdate"
@@ -135,34 +133,31 @@ function formatRate(rate: number): string {
       </div>
 
       <!-- Exchange rates table -->
-      <div
-        v-if="exchangeRates.length > 0"
-        class="border-t border-gray-100 pt-4 dark:border-slate-700"
-      >
-        <p class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div v-if="exchangeRates.length > 0" class="dark:border-line border-t border-gray-100 pt-4">
+        <p class="dark:text-ink-soft mb-3 text-sm font-medium text-gray-700">
           {{
             t('settings.exchangeRates.currentRates').replace('{base}', settingsStore.baseCurrency)
           }}
         </p>
         <div class="max-h-64 overflow-y-auto">
           <table class="w-full text-sm">
-            <thead class="sticky top-0 bg-white dark:bg-slate-800">
-              <tr class="text-left text-gray-500 dark:text-gray-400">
+            <thead class="dark:bg-surface-raised sticky top-0 bg-white">
+              <tr class="dark:text-ink-soft text-left text-gray-500">
                 <th class="pb-2 font-medium">{{ t('settings.exchangeRates.currency') }}</th>
                 <th class="pb-2 text-right font-medium">
                   {{ t('settings.exchangeRates.rate') }}
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
+            <tbody class="dark:divide-surface-overlay divide-y divide-gray-100">
               <tr
                 v-for="rate in exchangeRates"
                 :key="`${rate.from}-${rate.to}`"
-                class="text-gray-700 dark:text-gray-300"
+                class="dark:text-ink-soft text-gray-700"
               >
                 <td class="py-2">
                   <span class="font-medium">{{ rate.to }}</span>
-                  <span class="ml-1 text-xs text-gray-400 dark:text-gray-500">
+                  <span class="dark:text-ink-faint ml-1 text-xs text-gray-400">
                     {{ getCurrencyInfo(rate.to)?.name }}
                   </span>
                 </td>
@@ -176,9 +171,9 @@ function formatRate(rate: number): string {
       </div>
 
       <!-- Empty state -->
-      <div v-else class="border-t border-gray-100 py-6 text-center dark:border-slate-700">
+      <div v-else class="dark:border-line border-t border-gray-100 py-6 text-center">
         <svg
-          class="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600"
+          class="dark:text-ink-faint mx-auto mb-3 h-10 w-10 text-gray-300"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -190,7 +185,7 @@ function formatRate(rate: number): string {
             d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-3 text-sm text-gray-500">
           {{ t('settings.exchangeRates.empty') }}
         </p>
         <BaseButton variant="secondary" size="sm" :disabled="isUpdating" @click="handleRefresh">

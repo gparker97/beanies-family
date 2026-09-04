@@ -28,7 +28,7 @@ const iconClass = computed(() => {
 const textClass = computed(() => {
   const sizeMap = { xs: 'text-xs', sm: 'text-xs', md: 'text-sm' };
   const colorMap = {
-    light: 'text-gray-500 dark:text-gray-400',
+    light: 'text-gray-500 dark:text-ink-soft',
     dark: 'text-white/30',
   };
   return `${sizeMap[props.size]} ${colorMap[props.variant]}`;
@@ -37,7 +37,7 @@ const textClass = computed(() => {
 const emailClass = computed(() => {
   const sizeMap = { xs: 'text-xs', sm: 'text-xs', md: 'text-xs' };
   const colorMap = {
-    light: 'text-gray-400 dark:text-gray-500',
+    light: 'text-gray-400 dark:text-ink-faint',
     dark: 'text-white/20',
   };
   return `${sizeMap[props.size]} ${colorMap[props.variant]}`;
@@ -48,7 +48,7 @@ const driveIconColor = computed(() => {
 });
 
 const localIconColor = computed(() => {
-  return props.variant === 'dark' ? 'text-white/30' : 'text-gray-400 dark:text-gray-500';
+  return props.variant === 'dark' ? 'text-white/30' : 'text-gray-400 dark:text-ink-faint';
 });
 
 const tooltip = computed(() => {

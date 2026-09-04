@@ -92,8 +92,8 @@ function patch(fields: Partial<VacationIdea>) {
     class="rounded-2xl border transition-shadow"
     :class="
       expanded
-        ? 'border-2 border-[var(--vacation-teal)] bg-[rgba(0,180,216,0.02)] shadow-sm dark:bg-slate-800/80'
-        : 'border-[var(--tint-slate-5)] bg-white hover:shadow-sm dark:bg-slate-800'
+        ? 'dark:bg-surface-raised/80 border-2 border-[var(--vacation-teal)] bg-[rgba(0,180,216,0.02)] shadow-sm'
+        : 'dark:bg-surface-raised border-[var(--tint-slate-5)] bg-white hover:shadow-sm'
     "
   >
     <!-- Card content — matching mockup layout -->
@@ -153,7 +153,7 @@ function patch(fields: Partial<VacationIdea>) {
           </span>
           <span
             v-if="idea.isSkipped"
-            class="rounded-full bg-gray-100 px-2 py-0.5 text-[0.5625rem] font-semibold text-gray-600 dark:bg-slate-700 dark:text-slate-300"
+            class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-gray-100 px-2 py-0.5 text-[0.5625rem] font-semibold text-gray-600"
           >
             {{ t('vacation.ideas.skippedPill') }}
           </span>
@@ -214,7 +214,7 @@ function patch(fields: Partial<VacationIdea>) {
             :class="
               idea.category === cat.key
                 ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             :disabled="readOnly"
             @click="patch({ category: cat.key })"
@@ -231,7 +231,7 @@ function patch(fields: Partial<VacationIdea>) {
           :placeholder="t('vacation.ideas.descriptionPlaceholder')"
           :disabled="readOnly"
           rows="2"
-          class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          class="dark:border-line-strong dark:bg-surface-overlay w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-[var(--vacation-teal)] dark:text-white"
           @input="patch({ description: ($event.target as HTMLTextAreaElement).value })"
         />
       </FormFieldGroup>
@@ -267,7 +267,7 @@ function patch(fields: Partial<VacationIdea>) {
                 ? ct === 'free'
                   ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                   : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             :disabled="readOnly"
             @click="patch({ costType: ct })"
@@ -295,7 +295,7 @@ function patch(fields: Partial<VacationIdea>) {
             :class="
               idea.duration === dur
                 ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             :disabled="readOnly"
             @click="patch({ duration: dur })"
@@ -313,7 +313,7 @@ function patch(fields: Partial<VacationIdea>) {
             :class="
               idea.needsBooking === false
                 ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             :disabled="readOnly"
             @click="patch({ needsBooking: false })"
@@ -325,7 +325,7 @@ function patch(fields: Partial<VacationIdea>) {
             :class="
               idea.needsBooking === true
                 ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+                : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             :disabled="readOnly"
             @click="patch({ needsBooking: true })"
@@ -342,7 +342,7 @@ function patch(fields: Partial<VacationIdea>) {
           :placeholder="t('vacation.field.notesPlaceholder')"
           :disabled="readOnly"
           rows="2"
-          class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          class="dark:border-line-strong dark:bg-surface-overlay w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-[var(--vacation-teal)] dark:text-white"
           @input="patch({ notes: ($event.target as HTMLTextAreaElement).value })"
         />
       </FormFieldGroup>

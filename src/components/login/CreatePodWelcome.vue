@@ -101,7 +101,7 @@ function openSafetyHelp() {
       <!-- Cancel — always available so the user is never trapped. -->
       <button
         type="button"
-        class="absolute top-0 right-0 rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+        class="dark:text-ink-faint dark:hover:bg-surface-hover dark:hover:text-ink-soft absolute top-0 right-0 rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
         :aria-label="t('action.close')"
         data-testid="create-welcome-cancel"
         @click="cancel"
@@ -120,10 +120,10 @@ function openSafetyHelp() {
           <PageWelcomeSubtitle :text="t('createWelcome.eyebrow')" />
           <span aria-hidden="true">🌱</span>
         </div>
-        <h2 class="font-outfit mt-1 mb-1.5 text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink mt-1 mb-1.5 text-xl font-bold text-gray-900">
           {{ t('createWelcome.title') }}
         </h2>
-        <p class="mx-auto max-w-xs text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mx-auto max-w-xs text-sm text-gray-500">
           {{ t('createWelcome.subtitle') }}
         </p>
       </div>
@@ -154,16 +154,16 @@ function openSafetyHelp() {
           </div>
           <div class="pt-0.5">
             <h3
-              class="font-outfit flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100"
+              class="font-outfit dark:text-ink flex items-center gap-2 text-sm font-semibold text-gray-900"
             >
               {{ t(step.titleKey) }}
               <span
                 v-if="i === 2"
-                class="font-outfit rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[#2C3E50] dark:text-slate-200"
+                class="font-outfit dark:text-ink rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[#2C3E50]"
                 >{{ t('onboarding.invite.optional') }}</span
               >
             </h3>
-            <p class="text-xs leading-snug text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-xs leading-snug text-gray-500">
               {{ t(step.bodyKey) }}
             </p>
           </div>
@@ -178,7 +178,7 @@ function openSafetyHelp() {
           aria-hidden="true"
           class="h-10 w-10 shrink-0"
         />
-        <p class="text-xs leading-snug text-gray-600 dark:text-gray-300">
+        <p class="dark:text-ink-soft text-xs leading-snug text-gray-600">
           {{ t('createWelcome.safeText') }}
           <button
             type="button"
@@ -201,7 +201,7 @@ function openSafetyHelp() {
       >
         {{ t('createWelcome.cta') }}
       </button>
-      <p class="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+      <p class="dark:text-ink-faint mt-2 text-center text-xs text-gray-400">
         {{ t('createWelcome.ctaHint') }}
       </p>
     </div>

@@ -180,4 +180,8 @@ async function toggleComplete(todoId: string) {
 .nook-todo-card {
   background: linear-gradient(135deg, white 85%, rgb(155 89 182 / 6%));
 }
+
+html.dark .nook-todo-card {
+  background: linear-gradient(135deg, #1e2a36 85%, rgb(203 149 221 / 11%));
+}
 </style>

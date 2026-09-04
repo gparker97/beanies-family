@@ -25,7 +25,9 @@ const { presentation, tintClass, title, summary, when, roleLabel } = useNotifica
   <div
     class="relative flex items-stretch transition-colors"
     :class="
-      notification.read ? 'hover:bg-gray-50 dark:hover:bg-slate-700/30' : 'bg-primary-500/[0.045]'
+      notification.read
+        ? 'dark:hover:bg-surface-hover/30 hover:bg-gray-50'
+        : 'bg-primary-500/[0.045]'
     "
   >
     <!-- Body: opens the detail -->
@@ -48,19 +50,19 @@ const { presentation, tintClass, title, summary, when, roleLabel } = useNotifica
 
       <span class="min-w-0 flex-1">
         <span
-          class="font-outfit text-secondary-500 block truncate text-sm dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink block truncate text-sm"
           :class="notification.read ? 'font-medium opacity-75' : 'font-bold'"
         >
           {{ title }}
         </span>
         <span
           v-if="summary"
-          class="text-secondary-500/60 mt-0.5 flex flex-wrap items-center gap-1.5 text-xs dark:text-gray-400"
+          class="text-secondary-500/60 dark:text-ink-soft mt-0.5 flex flex-wrap items-center gap-1.5 text-xs"
         >
           <span class="truncate">{{ summary }}</span>
           <span
             v-if="roleLabel"
-            class="text-primary-600 bg-primary-500/12 font-outfit dark:text-primary-400 inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold"
+            class="text-primary-600 bg-primary-500/12 font-outfit dark:text-accent-lift inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold"
           >
             🚗 {{ roleLabel }}
           </span>
@@ -68,7 +70,7 @@ const { presentation, tintClass, title, summary, when, roleLabel } = useNotifica
         <span
           class="font-outfit mt-1 block text-[0.6875rem] font-semibold"
           :class="
-            notification.overdue ? 'text-primary-600' : 'text-secondary-500/45 dark:text-gray-500'
+            notification.overdue ? 'text-primary-600' : 'text-secondary-500/45 dark:text-ink-faint'
           "
         >
           {{ when }}
@@ -88,7 +90,7 @@ const { presentation, tintClass, title, summary, when, roleLabel } = useNotifica
         class="rounded-full transition-all"
         :class="
           notification.read
-            ? 'h-2.5 w-2.5 border-2 border-gray-300 dark:border-slate-500'
+            ? 'dark:border-line-strong h-2.5 w-2.5 border-2 border-gray-300'
             : 'bg-primary-500 h-3 w-3 shadow-[0_0_0_4px_rgba(241,93,34,0.14)]'
         "
         :aria-label="notification.read ? '' : t('notifications.unread')"

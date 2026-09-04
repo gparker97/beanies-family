@@ -177,7 +177,7 @@ function onAddButtonClick(): void {
     <!-- Top-left back link (breadcrumb-style; sits above the avatar + name row) -->
     <button
       type="button"
-      class="font-outfit text-secondary-500/60 hover:text-primary-500 -ml-1 inline-flex w-fit items-center gap-1 text-xs font-semibold transition-colors"
+      class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft -ml-1 inline-flex w-fit items-center gap-1 text-xs font-semibold transition-colors"
       @click="router.push('/pod')"
     >
       <BeanieIcon name="chevron-left" size="xs" />
@@ -187,7 +187,7 @@ function onAddButtonClick(): void {
     <div class="flex flex-wrap items-center gap-4 sm:gap-6">
       <button
         type="button"
-        class="focus:ring-primary-500 flex-shrink-0 rounded-full focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-slate-800"
+        class="focus:ring-primary-500 dark:focus:ring-offset-surface-raised flex-shrink-0 rounded-full focus:ring-offset-2 focus:outline-none"
         :class="member.avatarPhotoId ? 'cursor-zoom-in focus:ring-2' : 'cursor-default'"
         :disabled="!member.avatarPhotoId"
         :aria-label="member.avatarPhotoId ? t('photos.avatar.viewLarger') : member.name"
@@ -204,11 +204,13 @@ function onAddButtonClick(): void {
       </button>
       <div class="min-w-0 flex-1">
         <h1
-          class="font-outfit text-secondary-500 text-2xl leading-tight font-bold break-words sm:text-3xl dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-bold break-words sm:text-3xl"
         >
           {{ member.name }}
         </h1>
-        <div class="text-secondary-500/70 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+        <div
+          class="text-secondary-500/70 dark:text-ink-soft mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm"
+        >
           <span>{{ roleLabel }}</span>
           <span v-if="birthdayLabel" aria-hidden="true" class="opacity-40">·</span>
           <span v-if="birthdayLabel">
@@ -221,7 +223,7 @@ function onAddButtonClick(): void {
       <div v-if="canManage" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
         <button
           type="button"
-          class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+          class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 sm:flex-initial"
           @click="emit('edit')"
         >
           <BeanieIcon name="edit" size="xs" />
@@ -235,9 +237,9 @@ function onAddButtonClick(): void {
           type="button"
           :disabled="!inviteAvailable"
           :class="[
-            'font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100',
+            'font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors sm:flex-initial',
             inviteAvailable
-              ? 'hover:text-primary-500 hover:bg-white/90 dark:hover:bg-slate-800'
+              ? 'hover:text-primary-500 dark:hover:bg-surface-hover hover:bg-white/90'
               : 'cursor-not-allowed opacity-50',
           ]"
           :title="
@@ -264,7 +266,7 @@ function onAddButtonClick(): void {
           </button>
           <div
             v-if="addMenuOpen"
-            class="absolute top-full right-0 z-10 mt-2 w-48 overflow-hidden rounded-2xl bg-white shadow-[var(--soft-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised absolute top-full right-0 z-10 mt-2 w-48 overflow-hidden rounded-2xl bg-white shadow-[var(--soft-shadow)]"
             role="menu"
           >
             <button
@@ -272,7 +274,7 @@ function onAddButtonClick(): void {
               :key="opt.tab"
               type="button"
               role="menuitem"
-              class="font-outfit text-secondary-500 hover:text-primary-500 block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[var(--tint-orange-4)] dark:text-gray-100 dark:hover:bg-slate-700"
+              class="font-outfit text-secondary-500 hover:text-primary-500 dark:text-ink dark:hover:bg-surface-hover block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[var(--tint-orange-4)]"
               @click="addFor(opt)"
             >
               {{ opt.label }}

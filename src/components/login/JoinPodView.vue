@@ -267,10 +267,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="dark:bg-surface-raised mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl">
     <!-- Back button -->
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="dark:text-ink-soft dark:hover:text-ink mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
       @click="handleBack"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,8 +296,8 @@ onMounted(() => {
         class="mb-3 text-sm"
         :class="
           currentErrorView.severity === 'critical'
-            ? 'text-red-800 dark:text-red-300'
-            : 'text-amber-800 dark:text-amber-300'
+            ? 'dark:text-danger-lift text-red-800'
+            : 'dark:text-terracotta-lift text-amber-800'
         "
       >
         {{ currentErrorView.message }}
@@ -318,8 +318,8 @@ onMounted(() => {
         class="mt-3 text-xs underline opacity-60 hover:opacity-100"
         :class="
           currentErrorView.severity === 'critical'
-            ? 'text-red-700 dark:text-red-400'
-            : 'text-amber-700 dark:text-amber-400'
+            ? 'dark:text-danger-lift text-red-700'
+            : 'dark:text-terracotta-lift text-amber-700'
         "
         @click="openDiagnostic"
       >
@@ -345,10 +345,10 @@ onMounted(() => {
           alt=""
           class="mx-auto mb-3 h-24 w-24"
         />
-        <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{ t('join.verifyTitle') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
           {{ verifySubtitle }}
         </p>
       </div>
@@ -356,7 +356,7 @@ onMounted(() => {
       <!-- Busy spinner -->
       <div v-if="isBusy && !currentErrorView" class="py-12 text-center">
         <BeanieSpinner size="md" class="mx-auto mb-3" />
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ busyLabel }}</p>
+        <p class="dark:text-ink-soft text-sm text-gray-500">{{ busyLabel }}</p>
       </div>
 
       <!-- Awaiting user gesture: show family-found card + Picker CTA / drop zone -->
@@ -371,7 +371,7 @@ onMounted(() => {
               class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-100 dark:bg-green-800/30"
             >
               <svg
-                class="h-5 w-5 text-green-600 dark:text-green-400"
+                class="dark:text-success-lift h-5 w-5 text-green-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -385,10 +385,10 @@ onMounted(() => {
               </svg>
             </div>
             <div>
-              <p class="text-sm font-semibold text-green-800 dark:text-green-300">
+              <p class="dark:text-success-lift text-sm font-semibold text-green-800">
                 {{ t('join.familyFound') }}
               </p>
-              <p class="font-outfit text-lg font-bold text-green-900 dark:text-green-200">
+              <p class="font-outfit dark:text-success-lift text-lg font-bold text-green-900">
                 {{ flow.registryEntry.value.familyName }}
               </p>
             </div>
@@ -400,17 +400,17 @@ onMounted(() => {
              carried the file name) names the exact .beanpod to pick. -->
         <template v-if="flow.targetProvider.value === 'google_drive'">
           <div class="space-y-3">
-            <p class="text-center text-sm text-slate-600 dark:text-slate-400">
+            <p class="dark:text-ink-soft text-center text-sm text-slate-600">
               {{ t('join.pickerPrompt.description') }}
             </p>
             <div
               v-if="flow.expectedFileName.value"
-              class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-700/50"
+              class="dark:bg-surface-overlay/50 rounded-xl bg-slate-100 px-3 py-2"
             >
-              <p class="text-xs text-slate-500 dark:text-slate-400">
+              <p class="dark:text-ink-soft text-xs text-slate-500">
                 {{ t('join.pickerPrompt.fileHint') }}
               </p>
-              <p class="font-mono text-sm font-medium text-slate-800 dark:text-slate-100">
+              <p class="dark:text-ink font-mono text-sm font-medium text-slate-800">
                 {{ flow.expectedFileName.value }}
               </p>
             </div>
@@ -422,7 +422,7 @@ onMounted(() => {
 
         <!-- Local-provider drop zone -->
         <template v-else-if="flow.targetFamilyId.value">
-          <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+          <div class="bg-secondary-500 dark:bg-surface-overlay rounded-2xl p-5">
             <p class="mb-3 text-sm font-semibold text-white">{{ t('join.needsFile') }}</p>
             <p class="mb-4 text-sm text-white/70">{{ t('join.needsFileDesc') }}</p>
             <div v-if="flow.expectedFileName.value" class="mb-4 rounded-xl bg-white/10 px-3 py-2">
@@ -477,7 +477,7 @@ onMounted(() => {
 
         <!-- No URL params — instructions for getting a magic link -->
         <template v-else>
-          <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+          <div class="bg-secondary-500 dark:bg-surface-overlay rounded-2xl p-5">
             <p class="mb-3 text-sm font-semibold text-white">{{ t('join.howToJoinTitle') }}</p>
             <div class="space-y-2.5">
               <div
@@ -499,7 +499,7 @@ onMounted(() => {
             </div>
           </div>
           <div
-            class="mt-4 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
+            class="dark:bg-surface-overlay/50 mt-4 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px]"
           >
             <div
               class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"
@@ -525,7 +525,7 @@ onMounted(() => {
 
       <!-- Footer link (always visible at the bottom of step 1) -->
       <div class="mt-6 text-center">
-        <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('loginV6.wantYourOwn') }}</span>
+        <span class="dark:text-ink-soft text-sm text-gray-500">{{ t('loginV6.wantYourOwn') }}</span>
         {{ ' ' }}
         <button
           type="button"
@@ -544,7 +544,7 @@ onMounted(() => {
       <div class="mb-6 text-center">
         <div
           v-if="flow.registryEntry.value?.familyName"
-          class="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-400"
+          class="dark:bg-surface-overlay dark:text-ink-soft mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600"
         >
           <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -556,10 +556,10 @@ onMounted(() => {
           </svg>
           {{ flow.registryEntry.value.familyName }}
         </div>
-        <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{ t('join.pickMemberTitle') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
           {{ t('join.pickMemberSubtitle') }}
         </p>
       </div>
@@ -581,14 +581,14 @@ onMounted(() => {
               size="xl"
             />
             <div
-              class="bg-primary-500 absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-slate-800"
+              class="bg-primary-500 dark:border-line absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
             >
               +
             </div>
           </div>
           <div class="text-center">
             <p
-              class="font-outfit max-w-[88px] truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+              class="font-outfit dark:text-ink max-w-[88px] truncate text-sm font-semibold text-gray-900"
             >
               {{ member.name }}
             </p>
@@ -597,7 +597,7 @@ onMounted(() => {
         </button>
       </div>
       <div v-else class="py-8 text-center">
-        <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('join.noUnclaimedMembers') }}</p>
+        <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('join.noUnclaimedMembers') }}</p>
       </div>
     </template>
 
@@ -608,17 +608,19 @@ onMounted(() => {
       v-else-if="flow.currentStep.value === 'set-password' || flow.currentStep.value === 'joining'"
     >
       <div class="mb-6 text-center">
-        <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{ t('join.setPasswordTitle') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
           {{ t('join.setPasswordSubtitle') }}
         </p>
       </div>
 
       <form @submit.prevent="handleCreatePin">
         <!-- Selected member card -->
-        <div class="mb-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-4 dark:bg-slate-700/50">
+        <div
+          class="dark:bg-surface-overlay/50 mb-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-4"
+        >
           <BeanieAvatar
             v-if="flow.selectedMember.value"
             :variant="getMemberAvatarVariant(flow.selectedMember.value)"
@@ -626,7 +628,7 @@ onMounted(() => {
             size="lg"
           />
           <div class="flex-1">
-            <p class="font-outfit font-semibold text-gray-900 dark:text-gray-100">
+            <p class="font-outfit dark:text-ink font-semibold text-gray-900">
               {{ flow.selectedMember.value?.name }}
             </p>
             <p
@@ -634,7 +636,7 @@ onMounted(() => {
                 flow.selectedMember.value?.email &&
                 !isTemporaryEmail(flow.selectedMember.value.email)
               "
-              class="text-xs text-gray-500 dark:text-gray-400"
+              class="dark:text-ink-soft text-xs text-gray-500"
             >
               {{ flow.selectedMember.value.email }}
             </p>
@@ -650,22 +652,22 @@ onMounted(() => {
         </div>
 
         <div>
-          <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
             {{ t('join.choosePinLabel') }}
           </p>
           <PinInput v-model="pin" :label="t('join.choosePinLabel')" autofocus />
         </div>
         <div class="mt-3">
-          <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
             {{ t('pin.confirmPin') }}
           </p>
           <PinInput v-model="confirmPin" :label="t('pin.confirmPin')" />
         </div>
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-2 text-xs text-gray-500">
           {{ t('join.pinHint') }}
         </p>
 
-        <p v-if="pinError" class="mt-2 text-xs text-red-600 dark:text-red-400">
+        <p v-if="pinError" class="dark:text-danger-lift mt-2 text-xs text-red-600">
           {{ pinError }}
         </p>
 
@@ -687,7 +689,7 @@ onMounted(() => {
     <!-- ============================================ -->
     <BaseModal :open="showDecryptModal" @close="showDecryptModal = false">
       <div class="text-center">
-        <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{ t('loginV6.unlockTitle') }}
         </h3>
         <p class="mt-1 text-xs opacity-40">{{ t('loginV6.unlockSubtitle') }}</p>
@@ -716,16 +718,16 @@ onMounted(() => {
     <!-- ============================================ -->
     <BaseModal :open="showDiagnosticModal" @close="showDiagnosticModal = false">
       <div class="text-center">
-        <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{ t('join.diagnostic.title') }}
         </h3>
-        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-1 text-xs text-gray-500">
           {{ t('join.diagnostic.subtitle') }}
         </p>
       </div>
 
       <pre
-        class="mt-4 max-h-64 overflow-auto rounded-lg bg-gray-100 p-3 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
+        class="dark:bg-surface-ground dark:text-ink-soft mt-4 max-h-64 overflow-auto rounded-lg bg-gray-100 p-3 text-xs text-gray-700"
         >{{ diagnosticReport }}</pre>
 
       <div class="mt-4 flex justify-end">

@@ -146,15 +146,15 @@ async function handleRequest() {
 
 <template>
   <div
-    class="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm dark:bg-slate-900/80"
+    class="dark:bg-surface-ground/80 absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm"
   >
-    <div class="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-800">
+    <div class="dark:bg-surface-raised relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
       <!-- Close button — returns the user to the create/join chooser. Always
            visible across all modes (token / request / confirmed) so they
            can never get trapped in the gate. -->
       <button
         type="button"
-        class="absolute top-3 right-3 rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+        class="dark:text-ink-faint dark:hover:bg-surface-hover dark:hover:text-ink-soft absolute top-3 right-3 rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
         :aria-label="t('action.close')"
         data-testid="invite-gate-close"
         @click="emit('cancel')"
@@ -168,10 +168,10 @@ async function handleRequest() {
           :alt="t('login.beaniesFamilyIconAlt')"
           class="mx-auto mb-3 h-28 w-28"
         />
-        <h2 class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink mb-1 text-center text-xl font-bold text-gray-900">
           {{ t('inviteGate.title') }}
         </h2>
-        <p class="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-4 text-center text-sm text-gray-500">
           {{ t('inviteGate.description') }}
         </p>
 
@@ -198,11 +198,11 @@ async function handleRequest() {
              POST guards a missing webhook at submit time (handleRequest), so the
              link is never hidden behind an env var. -->
         <div
-          class="font-outfit mt-5 mb-3 flex items-center gap-3 text-xs font-semibold tracking-wide text-gray-400 dark:text-gray-500"
+          class="font-outfit dark:text-ink-faint mt-5 mb-3 flex items-center gap-3 text-xs font-semibold tracking-wide text-gray-400"
         >
-          <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+          <span class="dark:bg-surface-overlay h-px flex-1 bg-gray-200"></span>
           {{ t('inviteGate.notInvitedYet') }}
-          <span class="h-px flex-1 bg-gray-200 dark:bg-slate-700"></span>
+          <span class="dark:bg-surface-overlay h-px flex-1 bg-gray-200"></span>
         </div>
 
         <InviteDiscordButton
@@ -210,11 +210,11 @@ async function handleRequest() {
           data-testid="invite-gate-discord"
           @click="handleRequestOnDiscord"
         />
-        <p class="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+        <p class="dark:text-ink-faint mt-2 text-center text-xs text-gray-400">
           {{ t('inviteGate.discordHint') }}
         </p>
 
-        <p class="mt-3 text-center text-sm text-gray-400 dark:text-gray-500">
+        <p class="dark:text-ink-faint mt-3 text-center text-sm text-gray-400">
           {{ t('inviteGate.noDiscord') }}
           <button
             class="text-primary-500 hover:text-primary-600 font-medium"
@@ -227,10 +227,10 @@ async function handleRequest() {
 
       <!-- Request mode -->
       <template v-else-if="mode === 'request'">
-        <h2 class="font-outfit mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink mb-1 text-xl font-bold text-gray-900">
           {{ t('inviteGate.requestTitle') }}
         </h2>
-        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-4 text-sm text-gray-500">
           {{ t('inviteGate.requestDescription') }}
         </p>
 
@@ -255,7 +255,7 @@ async function handleRequest() {
           />
         </div>
 
-        <p v-if="reqError" class="mt-2 text-sm text-red-600 dark:text-red-400">
+        <p v-if="reqError" class="dark:text-danger-lift mt-2 text-sm text-red-600">
           {{ reqError }}
         </p>
 
@@ -269,7 +269,7 @@ async function handleRequest() {
         </BaseButton>
 
         <div
-          class="mt-3 flex items-start gap-2 rounded-xl bg-sky-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-sky-900/20 dark:text-gray-400"
+          class="dark:text-ink-soft mt-3 flex items-start gap-2 rounded-xl bg-sky-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-sky-900/20"
         >
           <span aria-hidden="true">🔒</span>
           <span>{{ t('inviteGate.privacyNote') }}</span>
@@ -286,7 +286,7 @@ async function handleRequest() {
           </p>
           <p>
             <button
-              class="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              class="dark:text-ink-faint dark:hover:text-ink-soft text-sm text-gray-400 hover:text-gray-600"
               @click="mode = 'token'"
             >
               {{ t('inviteGate.haveToken') }}
@@ -299,10 +299,10 @@ async function handleRequest() {
       <template v-else>
         <div class="py-4 text-center">
           <p class="mb-2 text-3xl">🫘</p>
-          <h2 class="font-outfit mb-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+          <h2 class="font-outfit dark:text-ink mb-2 text-xl font-bold text-gray-900">
             {{ t('inviteGate.confirmedTitle') }}
           </h2>
-          <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
+          <p class="dark:text-ink-soft mb-6 text-sm text-gray-500">
             {{ t('inviteGate.confirmedDescription') }}
           </p>
           <InviteDiscordButton

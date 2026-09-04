@@ -56,7 +56,7 @@ async function handleDisconnect() {
 
 <template>
   <BaseCard :title="t('googleDisconnect.title')">
-    <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+    <p class="dark:text-ink-soft mb-4 text-sm text-gray-600">
       {{ t('googleDisconnect.description') }}
     </p>
     <BaseButton variant="danger" :disabled="isDisconnecting" @click="handleDisconnect">

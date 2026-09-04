@@ -28,7 +28,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   maxLines: 2,
-  textClass: 'font-outfit text-sm font-medium text-gray-900 dark:text-gray-100',
+  textClass: 'font-outfit text-sm font-medium text-gray-900 dark:text-ink',
 });
 
 const { t } = useTranslation();

@@ -128,7 +128,7 @@ function colourFor(activity: FamilyActivity) {
         :class="
           ymd === todayYmd
             ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
-            : 'text-secondary-500 dark:text-gray-100'
+            : 'text-secondary-500 dark:text-ink'
         "
         @click="emit('openDay', ymd)"
       >
@@ -162,11 +162,11 @@ function colourFor(activity: FamilyActivity) {
         v-for="ymd in rest"
         :key="ymd"
         type="button"
-        class="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)]"
         @click="emit('openDay', ymd)"
       >
         <span
-          class="font-outfit text-secondary-500 wall-rest-day font-bold uppercase dark:text-gray-100"
+          class="font-outfit text-secondary-500 wall-rest-day dark:text-ink font-bold uppercase"
         >
           {{ weekdayShort(ymd) }} {{ dayOfMonth(ymd) }}
         </span>

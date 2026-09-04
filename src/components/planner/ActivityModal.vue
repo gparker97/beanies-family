@@ -861,9 +861,7 @@ function handleSave() {
       >
         <div class="flex items-center gap-2">
           <span class="text-base">📅</span>
-          <span
-            class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-          >
+          <span class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
             {{ t('planner.editingOccurrence').replace('{date}', formatNookDate(occurrenceDate)) }}
           </span>
         </div>
@@ -908,7 +906,7 @@ function handleSave() {
            decision. Frequency chips (weekly / biweekly / monthly variants)
            live inside the Schedule field group below, only visible when
            recurring is selected. -->
-      <div class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50">
+      <div class="dark:bg-surface-overlay/50 rounded-2xl bg-[var(--tint-slate-5)] p-1.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button
             v-for="opt in [
@@ -930,8 +928,8 @@ function handleSave() {
             class="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200"
             :class="
               (opt.value === 'recurring' ? isRecurring : !isRecurring)
-                ? 'border-primary-500 border-2 bg-white shadow-sm dark:bg-slate-600'
-                : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-slate-600/40'
+                ? 'border-primary-500 dark:bg-surface-hover border-2 bg-white shadow-sm'
+                : 'dark:hover:bg-surface-hover/40 border-2 border-transparent hover:bg-white/60'
             "
             @click="setRecurrenceMode(opt.value as 'recurring' | 'one-off')"
           >
@@ -940,8 +938,8 @@ function handleSave() {
               class="font-outfit text-xs font-bold"
               :class="
                 (opt.value === 'recurring' ? isRecurring : !isRecurring)
-                  ? 'text-[var(--color-text)] dark:text-gray-100'
-                  : 'text-[var(--color-text)] opacity-35 dark:text-gray-400'
+                  ? 'dark:text-ink text-[var(--color-text)]'
+                  : 'dark:text-ink-soft text-[var(--color-text)] opacity-35'
               "
             >
               {{ opt.label }}
@@ -951,7 +949,7 @@ function handleSave() {
               :class="
                 (opt.value === 'recurring' ? isRecurring : !isRecurring)
                   ? 'text-[var(--color-text-muted)]'
-                  : 'opacity-25 dark:text-gray-500'
+                  : 'dark:text-ink-faint opacity-25'
               "
             >
               {{ opt.desc }}
@@ -967,12 +965,12 @@ function handleSave() {
       <!-- 2. Activity title -->
       <FormFieldGroup :label="t('modal.whatsTheActivity')" required :error="errorTitle">
         <div
-          class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+          class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
         >
           <input
             v-model="title"
             type="text"
-            class="font-outfit w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+            class="font-outfit dark:text-ink w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
             :placeholder="t('modal.whatsTheActivity')"
           />
         </div>
@@ -999,7 +997,7 @@ function handleSave() {
           <input
             v-model="isAllDay"
             type="checkbox"
-            class="text-primary-500 focus:ring-primary-500/30 h-5 w-5 rounded-lg border-gray-300 transition dark:border-slate-600 dark:bg-slate-700"
+            class="text-primary-500 focus:ring-primary-500/30 dark:border-line-strong dark:bg-surface-overlay h-5 w-5 rounded-lg border-gray-300 transition"
           />
           <span class="text-sm text-[var(--color-text-muted)]">
             {{ t('planner.allDayHint') }}
@@ -1220,7 +1218,7 @@ function handleSave() {
         </button>
         <p
           v-if="addPhotosHint"
-          class="font-outfit mt-1 text-[0.6875rem] text-[var(--color-text-muted)] italic dark:text-gray-400"
+          class="font-outfit dark:text-ink-soft mt-1 text-[0.6875rem] text-[var(--color-text-muted)] italic"
         >
           {{ addPhotosHint }}
         </p>
@@ -1273,7 +1271,7 @@ function handleSave() {
             <textarea
               v-model="notes"
               rows="2"
-              class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-base text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+              class="focus:border-primary-500 dark:bg-surface-overlay dark:text-ink w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-base text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none"
               :placeholder="t('planner.field.notes')"
             />
           </FormFieldGroup>
@@ -1287,7 +1285,7 @@ function handleSave() {
                 :href="linkHref"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--tint-slate-5)] text-sm transition-colors hover:bg-[var(--tint-slate-10)] dark:bg-slate-700"
+                class="dark:bg-surface-overlay flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--tint-slate-5)] text-sm transition-colors hover:bg-[var(--tint-slate-10)]"
                 :title="t('action.visitLink')"
                 >🔗</a
               >
@@ -1296,11 +1294,9 @@ function handleSave() {
 
           <!-- Active toggle -->
           <div
-            class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+            class="dark:bg-surface-overlay flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
           >
-            <span
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200"
-            >
+            <span class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
               {{ t('planner.field.active') }}
             </span>
             <ToggleSwitch v-model="isActive" size="sm" />

@@ -133,7 +133,7 @@ const focusLabel = computed(() =>
         class="flex shrink-0 items-center justify-between gap-3"
         :style="{ paddingLeft: `${AXIS_WIDTH_PX}px` }"
       >
-        <p class="font-outfit text-secondary-500 wall-slot-title font-bold dark:text-gray-100">
+        <p class="font-outfit text-secondary-500 wall-slot-title dark:text-ink font-bold">
           {{ focusLabel }}
         </p>
         <button
@@ -166,7 +166,7 @@ const focusLabel = computed(() =>
           :class="
             ymd === focusYmd
               ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
-              : 'bg-white dark:bg-slate-800'
+              : 'dark:bg-surface-raised bg-white'
           "
           :aria-pressed="ymd === focusYmd"
           @click="focusYmd = ymd"

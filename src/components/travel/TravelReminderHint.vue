@@ -36,7 +36,7 @@ const text = computed(() => {
     style="background-color: var(--tint-silk-20)"
   >
     <span class="text-sm" aria-hidden="true">🔔</span>
-    <p class="text-xs text-[var(--deep-slate)] dark:text-slate-200">
+    <p class="dark:text-ink text-xs text-[var(--deep-slate)]">
       {{ text }}
       <!-- Deep-links straight into the Reminders drawer — reminders are their
            own Settings category now, so a bare /settings link would land the

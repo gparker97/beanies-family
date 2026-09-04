@@ -63,7 +63,7 @@ describe('useNativeShell (ADR-029 A5)', () => {
     useNativeShell();
     expect(setStyle).toHaveBeenCalledWith({ style: 'DARK' });
     // #53: window background tracks the IN-APP theme, not OS DayNight.
-    expect(setColor).toHaveBeenCalledWith({ color: '#0F172A' });
+    expect(setColor).toHaveBeenCalledWith({ color: '#151E27' });
     document.documentElement.classList.remove('dark');
   });
 

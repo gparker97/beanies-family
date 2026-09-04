@@ -711,13 +711,13 @@ async function handleStartOver() {
         <!-- prove-loading / opening / done: brief transitions — branded spinner -->
         <div
           v-else
-          class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800"
+          class="dark:bg-surface-raised mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl"
         >
           <div class="py-12 text-center">
             <div
               class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
             ></div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+            <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('auth.loadingFile') }}</p>
           </div>
         </div>
       </template>
@@ -730,7 +730,7 @@ async function handleStartOver() {
       <!-- Branded loading spinner during auto-load -->
       <div
         v-else-if="activeView === 'loading'"
-        class="mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800"
+        class="dark:bg-surface-raised mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl"
       >
         <div class="py-12 text-center">
           <img
@@ -741,7 +741,7 @@ async function handleStartOver() {
           <div
             class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
           ></div>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+          <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('auth.loadingFile') }}</p>
         </div>
       </div>
 

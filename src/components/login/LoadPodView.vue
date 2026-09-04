@@ -890,10 +890,10 @@ async function handleDriveRefresh() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="dark:bg-surface-raised mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl">
     <!-- Back button -->
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="dark:text-ink-soft dark:hover:text-ink mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
       @click="$emit('back')"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -918,7 +918,7 @@ async function handleDriveRefresh() {
         <!-- File loaded badge -->
         <div
           v-if="loadedFileName"
-          class="mx-auto mb-4 inline-flex items-center gap-2 rounded-full bg-[#27AE60]/[0.08] px-3 py-1.5 text-xs font-semibold text-[#27AE60] dark:bg-green-900/30 dark:text-green-400"
+          class="dark:text-success-lift mx-auto mb-4 inline-flex items-center gap-2 rounded-full bg-[#27AE60]/[0.08] px-3 py-1.5 text-xs font-semibold text-[#27AE60] dark:bg-green-900/30"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -941,13 +941,13 @@ async function handleDriveRefresh() {
         <!-- Cloud account email -->
         <p
           v-if="syncStore.providerAccountEmail"
-          class="mb-2 text-xs text-gray-400 dark:text-gray-500"
+          class="dark:text-ink-faint mb-2 text-xs text-gray-400"
         >
           {{ syncStore.providerAccountEmail }}
         </p>
 
         <!-- Heading -->
-        <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{
             pendingFamilyName
               ? fillTemplate(t('loginV6.unlockTitleWithFamily'), { familyName: pendingFamilyName })
@@ -963,7 +963,7 @@ async function handleDriveRefresh() {
       <form v-if="!showKitEntry" class="mt-6" @submit.prevent="handleDecrypt">
         <div
           v-if="formError"
-          class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+          class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
         >
           {{ formError }}
         </div>
@@ -990,7 +990,7 @@ async function handleDriveRefresh() {
 
         <p
           v-if="pendingMemberCount > 0"
-          class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500"
+          class="dark:text-ink-faint mt-3 text-center text-xs text-gray-400"
         >
           {{ t('loginV6.unlockMemberCount').replace('{count}', String(pendingMemberCount)) }}
         </p>
@@ -1004,11 +1004,11 @@ async function handleDriveRefresh() {
       <form v-else class="mt-6" @submit.prevent="handleKitRedeem">
         <div
           v-if="formError"
-          class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+          class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
         >
           {{ formError }}
         </div>
-        <p class="mb-3 text-center text-sm text-gray-600 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-3 text-center text-sm text-gray-600">
           {{ t('recovery.kitEnterBody') }}
         </p>
         <BaseInput
@@ -1020,7 +1020,7 @@ async function handleDriveRefresh() {
           required
         />
         <label
-          class="mt-3 flex w-full items-center justify-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          class="dark:text-ink-soft dark:hover:text-ink mt-3 flex w-full items-center justify-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700"
           :class="isScanningKit ? 'cursor-wait opacity-70' : 'cursor-pointer'"
         >
           <BeanieSpinner v-if="isScanningKit" size="sm" />
@@ -1053,7 +1053,7 @@ async function handleDriveRefresh() {
         </BaseButton>
         <button
           type="button"
-          class="mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          class="dark:text-ink-soft dark:hover:text-ink mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700"
           @click="((showKitEntry = false), (formError = null))"
         >
           {{ t('passkey.usePassword') }}
@@ -1070,7 +1070,7 @@ async function handleDriveRefresh() {
            visual system rather than a generic SaaS info notice. The key icon
            ties semantically to "no password = no key". -->
       <div
-        class="mt-6 flex items-start gap-3 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+        class="dark:bg-surface-overlay/50 mt-6 flex items-start gap-3 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:shadow-none"
       >
         <div
           class="bg-sky-silk-300/[0.22] dark:bg-sky-silk-300/[0.15] flex h-9 w-9 flex-none items-center justify-center rounded-full"
@@ -1086,10 +1086,10 @@ async function handleDriveRefresh() {
           </svg>
         </div>
         <div class="flex-1">
-          <p class="text-secondary-500 text-sm font-bold dark:text-gray-100">
+          <p class="text-secondary-500 dark:text-ink text-sm font-bold">
             {{ t('loginV6.unlockNoPasswordTitle') }}
           </p>
-          <p class="text-secondary-500/70 mt-1 text-xs leading-relaxed dark:text-gray-300">
+          <p class="text-secondary-500/70 dark:text-ink-soft mt-1 text-xs leading-relaxed">
             {{ t('loginV6.unlockNoPasswordHint') }}
           </p>
         </div>
@@ -1103,10 +1103,10 @@ async function handleDriveRefresh() {
     <template v-else>
       <!-- Header -->
       <div class="mb-6 text-center">
-        <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
           {{ t('loginV6.loadPodTitle') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
           {{ t('loginV6.loadPodSubtitle') }}
         </p>
       </div>
@@ -1114,7 +1114,7 @@ async function handleDriveRefresh() {
       <!-- Error -->
       <div
         v-if="formError"
-        class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+        class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
       >
         {{ formError }}
       </div>
@@ -1124,13 +1124,13 @@ async function handleDriveRefresh() {
            cards, no file picker). Mirrors the permission-grant card below. -->
       <div v-if="viewState === 'reconnect'" class="space-y-4">
         <div
-          class="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center dark:border-slate-600"
+          class="dark:border-line-strong rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center"
         >
           <div
             class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30"
           >
             <svg
-              class="h-7 w-7 text-amber-600 dark:text-amber-400"
+              class="dark:text-terracotta-lift h-7 w-7 text-amber-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1143,7 +1143,7 @@ async function handleDriveRefresh() {
               />
             </svg>
           </div>
-          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{{ reconnectHeadline }}</p>
+          <p class="dark:text-ink-soft mb-4 text-sm text-gray-600">{{ reconnectHeadline }}</p>
           <BaseButton class="w-full" :loading="isReconnectBusy" @click="handleReconnectAndLoad">
             {{ t('googleDrive.reconnect') }}
           </BaseButton>
@@ -1153,19 +1153,19 @@ async function handleDriveRefresh() {
       <!-- Loading state (only for auto-load and permission grant) -->
       <div v-else-if="viewState === 'auto-loading'" class="py-12 text-center">
         <BeanieSpinner size="md" class="mx-auto mb-3" />
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+        <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('auth.loadingFile') }}</p>
       </div>
 
       <!-- Permission reconnect state -->
       <div v-else-if="viewState === 'permission-grant'" class="space-y-4">
         <div
-          class="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center dark:border-slate-600"
+          class="dark:border-line-strong rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center"
         >
           <div
             class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30"
           >
             <svg
-              class="h-7 w-7 text-amber-600 dark:text-amber-400"
+              class="dark:text-terracotta-lift h-7 w-7 text-amber-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1178,7 +1178,7 @@ async function handleDriveRefresh() {
               />
             </svg>
           </div>
-          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          <p class="dark:text-ink-soft mb-4 text-sm text-gray-600">
             {{ t('auth.reconnectFile') }}
           </p>
           <BaseButton class="w-full" @click="handleGrantPermission">
@@ -1213,10 +1213,10 @@ async function handleDriveRefresh() {
             class="relative rounded-2xl border-2 p-5"
             :class="[
               !syncStore.isGoogleDriveAvailable
-                ? 'border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
+                ? 'dark:border-line-strong dark:bg-surface-overlay/50 border-gray-200 bg-white'
                 : selectedSource === 'google_drive'
                   ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md hover:shadow-lg'
-                  : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white hover:shadow-lg dark:border-slate-600 dark:bg-slate-700/50',
+                  : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 dark:border-line-strong dark:bg-surface-overlay/50 border-gray-200 bg-white hover:shadow-lg',
             ]"
             :disabled="isDriveLoading || !syncStore.isGoogleDriveAvailable"
             :dimmed="lastDriveCheckEmpty"
@@ -1273,10 +1273,10 @@ async function handleDriveRefresh() {
                 />
               </svg>
             </div>
-            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            <p class="dark:text-ink text-sm font-semibold text-gray-900">
               {{ t('googleDrive.storageLabel') }}
             </p>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft mt-0.5 text-xs text-gray-500">
               {{ t('loginV6.googleDriveCardDesc') }}
             </p>
           </LoginChoiceCard>
@@ -1290,16 +1290,16 @@ async function handleDriveRefresh() {
              guidance, never silently hidden (which read as a dead-end). -->
         <div class="mt-4">
           <div class="mb-3 flex items-center gap-2.5" aria-hidden="true">
-            <span class="h-px flex-1 bg-gray-200 dark:bg-slate-600"></span>
+            <span class="dark:bg-surface-hover h-px flex-1 bg-gray-200"></span>
             <span
-              class="font-outfit text-secondary-500/50 text-xs font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:text-ink-soft text-xs font-semibold tracking-[0.08em] uppercase"
               >{{ t('loginV6.orDivider') }}</span
             >
-            <span class="h-px flex-1 bg-gray-200 dark:bg-slate-600"></span>
+            <span class="dark:bg-surface-hover h-px flex-1 bg-gray-200"></span>
           </div>
           <button
             type="button"
-            class="group focus-visible:ring-primary-500 hover:border-primary-500/40 dark:hover:border-primary-500/30 flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:-translate-y-0.5 hover:bg-[#FEF0E8]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700/50 dark:focus-visible:ring-offset-slate-900"
+            class="group focus-visible:ring-primary-500 hover:border-primary-500/40 dark:hover:border-primary-500/30 dark:border-line-strong dark:bg-surface-overlay/50 dark:focus-visible:ring-offset-surface-ground flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 text-left transition-all hover:-translate-y-0.5 hover:bg-[#FEF0E8]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
             :disabled="!canOpenSavedFile"
             :aria-label="t('loginV6.openSavedFileLabel')"
             data-testid="open-saved-file-aside"
@@ -1309,7 +1309,7 @@ async function handleDriveRefresh() {
               class="bg-sky-silk-300/20 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
             >
               <svg
-                class="text-secondary-500/70 group-hover:text-primary-500 h-5 w-5 transition-colors dark:text-gray-400"
+                class="text-secondary-500/70 group-hover:text-primary-500 dark:text-ink-soft h-5 w-5 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1324,17 +1324,17 @@ async function handleDriveRefresh() {
               </svg>
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">{{
+              <span class="dark:text-ink block text-sm font-semibold text-gray-900">{{
                 t('loginV6.openSavedFileLabel')
               }}</span>
-              <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{
+              <span class="dark:text-ink-soft mt-0.5 block text-xs text-gray-500">{{
                 canOpenSavedFile
                   ? t('loginV6.openSavedFileDesc')
                   : t('loginV6.openSavedFileUnavailableHint')
               }}</span>
             </span>
             <svg
-              class="group-hover:text-primary-500 h-4 w-4 shrink-0 text-gray-400 transition-colors dark:text-gray-500"
+              class="group-hover:text-primary-500 dark:text-ink-faint h-4 w-4 shrink-0 text-gray-400 transition-colors"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1354,7 +1354,7 @@ async function handleDriveRefresh() {
              instead of disabled full-size cards. Mirrors CreatePodView (setup wizard). -->
         <details class="group mt-3">
           <summary
-            class="font-outfit text-secondary-500/70 hover:text-primary-500 inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors dark:text-gray-400"
+            class="font-outfit text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft inline-flex cursor-pointer list-none items-center gap-1.5 px-1 py-2 text-xs font-semibold transition-colors"
           >
             <span
               class="text-primary-500 inline-block text-xs transition-transform group-open:rotate-90"
@@ -1365,15 +1365,15 @@ async function handleDriveRefresh() {
           </summary>
           <div class="flex gap-2 pb-2 pl-4">
             <span
-              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:border-line-strong dark:bg-surface-overlay/30 dark:text-ink-soft flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold"
               >📦 {{ t('storage.dropbox') }}</span
             >
             <span
-              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:border-line-strong dark:bg-surface-overlay/30 dark:text-ink-soft flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold"
               >☁️ {{ t('storage.iCloud') }}</span
             >
             <span
-              class="font-outfit text-secondary-500/50 flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold dark:border-slate-600 dark:bg-slate-700/30 dark:text-gray-400"
+              class="font-outfit text-secondary-500/50 dark:border-line-strong dark:bg-surface-overlay/30 dark:text-ink-soft flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-center text-xs font-semibold"
               >🪟 OneDrive</span
             >
           </div>
@@ -1402,7 +1402,7 @@ async function handleDriveRefresh() {
             :class="
               isDragging
                 ? 'bg-primary-500/15 dark:bg-primary-500/20'
-                : 'group-hover:bg-primary-500/10 bg-gray-100 dark:bg-slate-700'
+                : 'group-hover:bg-primary-500/10 dark:bg-surface-overlay bg-gray-100'
             "
           >
             <svg
@@ -1410,7 +1410,7 @@ async function handleDriveRefresh() {
               :class="
                 isDragging
                   ? 'text-primary-500'
-                  : 'group-hover:text-primary-500 text-gray-400 dark:text-gray-500'
+                  : 'group-hover:text-primary-500 dark:text-ink-faint text-gray-400'
               "
               fill="none"
               stroke="currentColor"
@@ -1424,13 +1424,13 @@ async function handleDriveRefresh() {
               />
             </svg>
           </div>
-          <p class="font-medium text-gray-700 dark:text-gray-300">
+          <p class="dark:text-ink-soft font-medium text-gray-700">
             {{ t('loginV6.dropZoneText') }}
           </p>
           <p class="text-primary-500 mt-1 text-sm">
             {{ t('loginV6.dropZoneBrowse') }}
           </p>
-          <p class="text-primary-500/70 mt-2 text-xs font-semibold">
+          <p class="text-primary-500/70 dark:text-ink-soft mt-2 text-xs font-semibold">
             {{ t('loginV6.acceptsBeanpod') }}
           </p>
         </div>
@@ -1455,7 +1455,7 @@ async function handleDriveRefresh() {
         <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <!-- Card 1: Your Data, Your Cloud -->
           <div
-            class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+            class="dark:bg-surface-overlay/50 rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:shadow-none"
           >
             <div
               class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#6EE7B7]/[0.12]"
@@ -1474,7 +1474,7 @@ async function handleDriveRefresh() {
                 />
               </svg>
             </div>
-            <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
+            <p class="dark:text-ink-soft text-xs font-bold text-gray-700">
               {{ t('loginV6.securityYourData') }}
             </p>
             <p class="mt-0.5 text-xs opacity-35">
@@ -1484,7 +1484,7 @@ async function handleDriveRefresh() {
 
           <!-- Card 2: AES-256 Encrypted -->
           <div
-            class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+            class="dark:bg-surface-overlay/50 rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:shadow-none"
           >
             <div
               class="bg-primary-500/10 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
@@ -1503,7 +1503,7 @@ async function handleDriveRefresh() {
                 />
               </svg>
             </div>
-            <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
+            <p class="dark:text-ink-soft text-xs font-bold text-gray-700">
               {{ t('loginV6.securityEncrypted') }}
             </p>
             <p class="mt-0.5 text-xs opacity-35">
@@ -1513,7 +1513,7 @@ async function handleDriveRefresh() {
 
           <!-- Card 3: Zero Servers -->
           <div
-            class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+            class="dark:bg-surface-overlay/50 rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:shadow-none"
           >
             <div
               class="bg-sky-silk-300/20 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
@@ -1532,7 +1532,7 @@ async function handleDriveRefresh() {
                 />
               </svg>
             </div>
-            <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
+            <p class="dark:text-ink-soft text-xs font-bold text-gray-700">
               {{ t('loginV6.securityZeroServers') }}
             </p>
             <p class="mt-0.5 text-xs opacity-35">

@@ -292,7 +292,7 @@ async function confirmSignOutAndClearData() {
 
       <!-- Center: Greeting or page title (truncated) -->
       <div class="mx-3 min-w-0 flex-1 text-center">
-        <h1 class="font-outfit text-secondary-500 truncate text-base font-bold dark:text-gray-100">
+        <h1 class="font-outfit text-secondary-500 dark:text-ink truncate text-base font-bold">
           {{ isNookOrDashboard ? greeting : pageTitle }}
         </h1>
       </div>
@@ -313,7 +313,7 @@ async function confirmSignOutAndClearData() {
           <button
             v-if="currentMember || authStore.isAuthenticated"
             type="button"
-            class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+            class="dark:bg-surface-raised flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:shadow-none"
             :aria-label="t('header.accountMenu')"
             :aria-expanded="showProfileDropdown"
             @click="showProfileDropdown = !showProfileDropdown"
@@ -333,7 +333,7 @@ async function confirmSignOutAndClearData() {
           <!-- Profile dropdown menu (shared styling) -->
           <div
             v-if="showProfileDropdown"
-            class="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:border-slate-700 dark:bg-slate-800 dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
+            class="dark:border-line dark:bg-surface-raised absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
           >
             <!-- Profile header -->
             <div
@@ -402,7 +402,7 @@ async function confirmSignOutAndClearData() {
               <button
                 v-if="currentMember"
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleEditProfile"
               >
                 <svg
@@ -421,7 +421,7 @@ async function confirmSignOutAndClearData() {
               <!-- Settings -->
               <button
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleOpenSettings"
               >
                 <BeanieIcon name="settings" size="sm" class="opacity-50" />
@@ -431,7 +431,7 @@ async function confirmSignOutAndClearData() {
               <!-- Help -->
               <button
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleOpenHelp"
               >
                 <svg
@@ -449,13 +449,13 @@ async function confirmSignOutAndClearData() {
               </button>
 
               <!-- Divider -->
-              <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
+              <div class="dark:border-line my-1.5 border-t border-gray-100" />
 
               <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
               <button
                 v-if="canStartWall"
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleStartWall"
               >
                 <svg
@@ -475,7 +475,7 @@ async function confirmSignOutAndClearData() {
               <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
               <button
                 type="button"
-                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-slate-700/50"
+                class="dark:text-ink dark:hover:bg-surface-hover/50 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
                 :title="t('auth.switchMemberHint')"
                 @mousedown.prevent="confirmSwitchMember"
               >
@@ -497,7 +497,7 @@ async function confirmSignOutAndClearData() {
               <!-- Sign out -->
               <button
                 type="button"
-                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
+                class="dark:text-danger-lift flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/10"
                 @mousedown.prevent="promptSignOut"
               >
                 <svg
@@ -523,7 +523,7 @@ async function confirmSignOutAndClearData() {
     <template v-else>
       <!-- Left side - Page title (or greeting on Nook/Dashboard) + today's date -->
       <div class="min-w-0">
-        <h1 class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100">
+        <h1 class="font-outfit text-secondary-500 dark:text-ink truncate text-lg font-bold">
           {{ isNookOrDashboard ? greeting : pageTitle }}
         </h1>
         <p class="font-outfit text-primary-500 text-xs font-medium">
@@ -537,7 +537,7 @@ async function confirmSignOutAndClearData() {
         <!-- Multi-chip mode: 2+ effective currencies -->
         <div
           v-if="hasMultipleCurrencies"
-          class="flex h-10 items-center gap-0.5 rounded-[14px] bg-white px-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
+          class="dark:bg-surface-raised flex h-10 items-center gap-0.5 rounded-[14px] bg-white px-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:shadow-none"
         >
           <button
             v-for="chip in currencyChips"
@@ -547,7 +547,7 @@ async function confirmSignOutAndClearData() {
             :class="
               chip.active
                 ? 'bg-primary-500 text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
-                : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-500 dark:hover:text-gray-300'
+                : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-ink-faint dark:hover:text-ink-soft'
             "
             @click="selectCurrencyChip(chip.code)"
           >
@@ -560,7 +560,7 @@ async function confirmSignOutAndClearData() {
         <div v-else class="relative">
           <button
             type="button"
-            class="font-outfit flex h-10 items-center gap-1.5 rounded-[14px] bg-white px-3 text-sm font-semibold text-gray-700 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-300 dark:shadow-none"
+            class="font-outfit dark:bg-surface-raised dark:text-ink-soft flex h-10 items-center gap-1.5 rounded-[14px] bg-white px-3 text-sm font-semibold text-gray-700 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:shadow-none"
             @click="showCurrencyDropdown = !showCurrencyDropdown"
             @blur="closeCurrencyDropdown"
           >
@@ -568,23 +568,23 @@ async function confirmSignOutAndClearData() {
               currentCurrencyInfo?.symbol || settingsStore.displayCurrency
             }}</span>
             {{ settingsStore.displayCurrency }}
-            <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
+            <span class="text-secondary-500/30 dark:text-ink-faint text-[0.5rem]">▼</span>
           </button>
 
           <!-- Dropdown menu -->
           <div
             v-if="showCurrencyDropdown"
-            class="absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            class="dark:border-line dark:bg-surface-raised absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1 shadow-lg"
           >
             <button
               v-for="chip in currencyChips"
               :key="chip.code"
               type="button"
-              class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+              class="dark:hover:bg-surface-hover w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100"
               :class="
                 chip.active
-                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
-                  : 'text-gray-700 dark:text-gray-300'
+                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-accent-lift'
+                  : 'dark:text-ink-soft text-gray-700'
               "
               @mousedown.prevent="selectCurrency(chip.code)"
             >
@@ -597,7 +597,7 @@ async function confirmSignOutAndClearData() {
         <div class="relative">
           <button
             type="button"
-            class="flex h-10 items-center gap-1 rounded-[14px] bg-white px-2 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-all hover:shadow-[0_4px_12px_rgba(44,62,80,0.1)] dark:bg-slate-800 dark:shadow-none"
+            class="dark:bg-surface-raised flex h-10 items-center gap-1 rounded-[14px] bg-white px-2 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-all hover:shadow-[0_4px_12px_rgba(44,62,80,0.1)] dark:shadow-none"
             :class="{ 'opacity-75': translationStore.isLoading }"
             @click="showLanguageDropdown = !showLanguageDropdown"
             @blur="closeLanguageDropdown"
@@ -614,13 +614,13 @@ async function confirmSignOutAndClearData() {
             <span v-else class="text-[1.625rem] leading-none">
               {{ currentLanguageInfo?.flag || '🌐' }}
             </span>
-            <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
+            <span class="text-secondary-500/30 dark:text-ink-faint text-[0.5rem]">▼</span>
           </button>
 
           <!-- Language dropdown -->
           <div
             v-if="showLanguageDropdown"
-            class="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            class="dark:border-line dark:bg-surface-raised absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-lg"
           >
             <button
               v-for="lang in LANGUAGES"
@@ -630,7 +630,7 @@ async function confirmSignOutAndClearData() {
               :class="
                 lang.code === settingsStore.language
                   ? 'bg-primary-500/10 dark:bg-primary-500/20'
-                  : 'hover:bg-gray-50 dark:hover:bg-slate-700'
+                  : 'dark:hover:bg-surface-hover hover:bg-gray-50'
               "
               @mousedown.prevent="selectLanguage(lang.code)"
             >
@@ -639,7 +639,7 @@ async function confirmSignOutAndClearData() {
                 :class="
                   lang.code === settingsStore.language
                     ? 'bg-primary-500/15 shadow-[0_2px_6px_rgba(241,93,34,0.15)]'
-                    : 'bg-gray-100 dark:bg-slate-600'
+                    : 'dark:bg-surface-hover bg-gray-100'
                 "
               >
                 <img
@@ -655,7 +655,7 @@ async function confirmSignOutAndClearData() {
                 :class="
                   lang.code === settingsStore.language
                     ? 'text-primary-500'
-                    : 'text-gray-500 dark:text-gray-400'
+                    : 'dark:text-ink-soft text-gray-500'
                 "
               >
                 {{ lang.nativeName }}
@@ -670,7 +670,7 @@ async function confirmSignOutAndClearData() {
         <!-- Privacy mode toggle (white-bg squircle) -->
         <button
           type="button"
-          class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+          class="dark:bg-surface-raised relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:shadow-none"
           :aria-label="
             isUnlocked ? t('header.hideFinancialFigures') : t('header.showFinancialFigures')
           "
@@ -730,7 +730,7 @@ async function confirmSignOutAndClearData() {
           <!-- Profile dropdown menu -->
           <div
             v-if="showProfileDropdown"
-            class="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:border-slate-700 dark:bg-slate-800 dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
+            class="dark:border-line dark:bg-surface-raised absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
           >
             <!-- Profile header with Deep Slate gradient -->
             <div
@@ -799,7 +799,7 @@ async function confirmSignOutAndClearData() {
               <button
                 v-if="currentMember"
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleEditProfile"
               >
                 <svg
@@ -818,7 +818,7 @@ async function confirmSignOutAndClearData() {
               <!-- Settings -->
               <button
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleOpenSettings"
               >
                 <BeanieIcon name="settings" size="sm" class="opacity-50" />
@@ -828,7 +828,7 @@ async function confirmSignOutAndClearData() {
               <!-- Help -->
               <button
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleOpenHelp"
               >
                 <svg
@@ -846,13 +846,13 @@ async function confirmSignOutAndClearData() {
               </button>
 
               <!-- Divider -->
-              <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
+              <div class="dark:border-line my-1.5 border-t border-gray-100" />
 
               <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
               <button
                 v-if="canStartWall"
                 type="button"
-                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                 @mousedown.prevent="handleStartWall"
               >
                 <svg
@@ -872,7 +872,7 @@ async function confirmSignOutAndClearData() {
               <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
               <button
                 type="button"
-                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-slate-700/50"
+                class="dark:text-ink dark:hover:bg-surface-hover/50 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
                 :title="t('auth.switchMemberHint')"
                 @mousedown.prevent="confirmSwitchMember"
               >
@@ -894,7 +894,7 @@ async function confirmSignOutAndClearData() {
               <!-- Sign out -->
               <button
                 type="button"
-                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
+                class="dark:text-danger-lift flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/10"
                 @mousedown.prevent="promptSignOut"
               >
                 <svg
@@ -928,7 +928,7 @@ async function confirmSignOutAndClearData() {
         <div class="flex flex-col items-center gap-4 text-center">
           <!-- Icon -->
           <div
-            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400"
+            class="dark:text-danger-lift flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-500 dark:bg-red-900/30"
           >
             <svg
               class="h-6 w-6"
@@ -943,10 +943,10 @@ async function confirmSignOutAndClearData() {
             </svg>
           </div>
 
-          <p class="text-sm text-gray-600 dark:text-gray-300">
+          <p class="dark:text-ink-soft text-sm text-gray-600">
             {{ t('auth.signOutConfirmMessage') }}
           </p>
-          <p class="text-xs text-gray-400 dark:text-gray-500">
+          <p class="dark:text-ink-faint text-xs text-gray-400">
             {{ t('auth.signOutConfirmHint') }}
           </p>
         </div>
@@ -971,7 +971,7 @@ async function confirmSignOutAndClearData() {
             <!-- Clear-data: deliberately quiet — only for shared devices / emergencies -->
             <button
               type="button"
-              class="mx-auto text-xs font-medium text-red-400 underline-offset-2 hover:text-red-500 hover:underline disabled:opacity-50 dark:text-red-500/80 dark:hover:text-red-400"
+              class="dark:text-danger-lift/80 dark:hover:text-danger-lift mx-auto text-xs font-medium text-red-400 underline-offset-2 hover:text-red-500 hover:underline disabled:opacity-50"
               :disabled="isSigningOut"
               @click="confirmSignOutAndClearData"
             >
@@ -979,7 +979,7 @@ async function confirmSignOutAndClearData() {
             </button>
             <div class="flex justify-end">
               <span class="flex items-center gap-1">
-                <span class="text-[0.625rem] text-gray-400 dark:text-gray-500">
+                <span class="dark:text-ink-faint text-[0.625rem] text-gray-400">
                   {{ t('common.whatsThis') }}
                 </span>
                 <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
@@ -990,7 +990,7 @@ async function confirmSignOutAndClearData() {
             <button
               v-if="!isSigningOut"
               type="button"
-              class="font-outfit mx-auto text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              class="font-outfit dark:text-ink-faint dark:hover:text-ink-soft mx-auto text-xs font-medium text-gray-400 hover:text-gray-600"
               @click="showSignOutModal = false"
             >
               {{ t('action.cancel') }}

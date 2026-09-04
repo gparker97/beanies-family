@@ -101,8 +101,8 @@ function onDragStart(e: DragEvent): void {
     class="cursor-pointer rounded-[13px] border p-2 transition-transform duration-150 hover:-translate-y-px"
     :class="
       isSkip
-        ? 'border-dashed border-[rgba(44,62,80,0.28)] opacity-70 dark:border-slate-500'
-        : 'border-[rgba(44,62,80,0.09)] bg-white shadow-[var(--card-shadow)] hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800'
+        ? 'dark:border-line-strong border-dashed border-[rgba(44,62,80,0.28)] opacity-70'
+        : 'dark:bg-surface-raised border-[rgba(44,62,80,0.09)] bg-white shadow-[var(--card-shadow)] hover:shadow-[var(--card-hover-shadow)]'
     "
     @click="emit('open')"
     @keydown.enter.prevent="emit('open')"
@@ -132,7 +132,7 @@ function onDragStart(e: DragEvent): void {
         -->
         <span
           v-if="isCooked"
-          class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-[#27AE60] text-white ring-2 ring-white dark:ring-slate-800"
+          class="dark:ring-surface-raised absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-[#27AE60] text-white ring-2 ring-white"
           :aria-label="t('mealPlanner.card.cooked')"
           role="img"
         >
@@ -154,7 +154,7 @@ function onDragStart(e: DragEvent): void {
       </span>
       <div class="min-w-0 flex-1">
         <div
-          class="font-outfit text-secondary-500 text-sm leading-tight font-bold break-words dark:text-slate-100"
+          class="font-outfit text-secondary-500 dark:text-ink text-sm leading-tight font-bold break-words"
         >
           {{ name }}
         </div>
@@ -178,7 +178,7 @@ function onDragStart(e: DragEvent): void {
             v-bind="memberAvatarBindings(cook)"
             fallback="initials"
             size="xs"
-            class="flex-none ring-2 ring-white dark:ring-slate-800"
+            class="dark:ring-surface-raised flex-none ring-2 ring-white"
           />
           <!--
             No cook, no label. "Anyone" filled a line on the tightest surface in the app to
@@ -188,7 +188,7 @@ function onDragStart(e: DragEvent): void {
         </div>
         <div
           v-if="guestCount || meal.serveTime"
-          class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[rgba(44,62,80,0.5)] dark:text-slate-400"
+          class="dark:text-ink-soft mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[rgba(44,62,80,0.5)]"
         >
           <!--
             No note glyph. It said "there is a note" without saying what, and at the 12px

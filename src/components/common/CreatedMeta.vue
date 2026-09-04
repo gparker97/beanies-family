@@ -28,10 +28,7 @@ const timestamp = computed(() => (props.createdAt ? formatCreatedAt(props.create
 </script>
 
 <template>
-  <div
-    v-if="creatorName || timestamp"
-    class="border-t border-gray-100 pt-2.5 dark:border-slate-700"
-  >
+  <div v-if="creatorName || timestamp" class="dark:border-line border-t border-gray-100 pt-2.5">
     <p class="font-inter text-xs text-[var(--color-text-muted)]">
       <template v-if="creatorName">{{ t('common.createdBy') }} {{ creatorName }}</template>
       <span v-if="creatorName && timestamp" class="px-1 opacity-50" aria-hidden="true">·</span>

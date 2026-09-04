@@ -152,14 +152,14 @@ async function verify(entered: string) {
       />
     </div>
     <div class="text-center">
-      <p class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+      <p class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
         {{
           candidates.length === 1
             ? fillTemplate(t('wall.unlock.title'), { name: candidates[0].name })
             : t('wall.unlock.anyGrownUp')
         }}
       </p>
-      <p v-if="hint" class="text-secondary-400 mt-1 text-sm dark:text-gray-400">{{ hint }}</p>
+      <p v-if="hint" class="text-secondary-400 dark:text-ink-soft mt-1 text-sm">{{ hint }}</p>
     </div>
 
     <PinInput
@@ -170,7 +170,7 @@ async function verify(entered: string) {
       :label="t('pin.enterPin')"
       @complete="verify"
     />
-    <p v-if="error" class="text-center text-sm text-red-600 dark:text-red-400" role="alert">
+    <p v-if="error" class="dark:text-danger-lift text-center text-sm text-red-600" role="alert">
       {{
         inCooldown ? fillTemplate(t('wall.unlock.tooMany'), { seconds: cooldownSeconds }) : error
       }}

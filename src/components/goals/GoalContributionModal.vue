@@ -88,7 +88,7 @@ async function onSubmit() {
     <template v-if="goal">
       <div class="space-y-4">
         <!-- Context: which goal we're contributing to -->
-        <p class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300">
+        <p class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/70">
           {{ goal.name }}
         </p>
 

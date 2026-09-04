@@ -29,17 +29,17 @@ const countryName = computed(() =>
 <template>
   <BaseModal :open="open" size="sm" :title="holiday?.name" @close="emit('close')">
     <div v-if="holiday" class="space-y-3">
-      <p class="text-secondary-500/70 text-sm dark:text-gray-400">
+      <p class="text-secondary-500/70 dark:text-ink-soft text-sm">
         {{ formatDateFull(holiday.date) }} · {{ countryName }} ·
         {{ t('holiday.publicHolidaySuffix') }}
       </p>
-      <p v-if="holiday.nameLocal" class="font-outfit text-sm text-gray-500 dark:text-gray-400">
+      <p v-if="holiday.nameLocal" class="font-outfit dark:text-ink-soft text-sm text-gray-500">
         {{ holiday.nameLocal }}
       </p>
-      <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-200">
+      <p class="dark:text-ink text-sm leading-relaxed text-gray-700">
         {{ t('holiday.observanceNote') }}
       </p>
-      <p class="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+      <p class="dark:text-ink-faint text-xs leading-relaxed text-gray-400">
         {{ t('holiday.referenceNote') }}
       </p>
     </div>

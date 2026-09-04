@@ -883,7 +883,7 @@ async function handleConnectLocal() {
 
 <template>
   <div
-    class="mx-auto max-w-[480px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl dark:bg-slate-800 dark:from-slate-800 dark:to-slate-800"
+    class="dark:bg-surface-raised dark:from-surface-raised dark:to-surface-raised mx-auto max-w-[480px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl"
   >
     <!-- The survey phase carries its own hero (eyebrow/title/subtitle), so the
          generic ResumeSetup header is hidden while it shows. -->
@@ -897,17 +897,17 @@ async function handleConnectLocal() {
 
     <h2
       v-if="phase !== 'survey'"
-      class="font-outfit mb-1 text-center text-xl font-bold text-gray-900 dark:text-gray-100"
+      class="font-outfit dark:text-ink mb-1 text-center text-xl font-bold text-gray-900"
     >
       {{ t('resumeSetup.title') }}
     </h2>
-    <p v-if="phase !== 'survey'" class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
+    <p v-if="phase !== 'survey'" class="dark:text-ink-soft mb-6 text-center text-sm text-gray-500">
       {{ phase === 'auto-load' ? t('resumeSetup.subtitleRecovery') : t('resumeSetup.subtitle') }}
     </p>
 
     <div
       v-if="formError"
-      class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+      class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
     >
       {{ formError }}
     </div>
@@ -915,7 +915,7 @@ async function handleConnectLocal() {
     <!-- Initial probe — short, only visible while the registry lookup runs. -->
     <div v-if="phase === 'probing'" class="py-6 text-center">
       <BeanieSpinner size="md" class="mx-auto mb-3" />
-      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('resumeSetup.checking') }}</p>
+      <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('resumeSetup.checking') }}</p>
     </div>
 
     <!-- Auto-load (non-destructive): registry knew this family had a pod. -->
@@ -925,14 +925,14 @@ async function handleConnectLocal() {
       @submit.prevent="handleAutoLoadSubmit"
     >
       <div
-        class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-slate-700/50 dark:text-gray-300"
+        class="dark:bg-surface-overlay/50 dark:text-ink-soft rounded-xl bg-gray-50 p-3 text-sm text-gray-600"
       >
         🫘 {{ autoLoadFamilyName || familyName }}
-        <span v-if="lastSavedDisplay" class="block text-xs text-gray-500 dark:text-gray-400">
+        <span v-if="lastSavedDisplay" class="dark:text-ink-soft block text-xs text-gray-500">
           {{ t('resumeSetup.lastSaved') }} {{ lastSavedDisplay }}
         </span>
       </div>
-      <p class="text-center text-sm text-gray-600 dark:text-gray-300">
+      <p class="dark:text-ink-soft text-center text-sm text-gray-600">
         {{ t('resumeSetup.foundPod') }}
       </p>
       <BaseInput
@@ -952,11 +952,11 @@ async function handleConnectLocal() {
          non-destructive re-probe; "start a new pod" is confirm-gated + secondary. -->
     <div v-else-if="phase === 'retry'" class="space-y-4">
       <div
-        class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-slate-700/50 dark:text-gray-300"
+        class="dark:bg-surface-overlay/50 dark:text-ink-soft rounded-xl bg-gray-50 p-3 text-sm text-gray-600"
       >
         🫘 {{ familyName }}
       </div>
-      <p class="text-center text-sm text-gray-600 dark:text-gray-300">
+      <p class="dark:text-ink-soft text-center text-sm text-gray-600">
         {{ t('resumeSetup.retryBody') }}
       </p>
       <BaseButton class="w-full" :disabled="busy" :loading="busy" @click="handleRetry">
@@ -964,7 +964,7 @@ async function handleConnectLocal() {
       </BaseButton>
       <button
         type="button"
-        class="w-full text-center text-xs text-gray-500 underline decoration-1 underline-offset-4 transition-colors hover:text-gray-700 disabled:opacity-60 dark:text-gray-400 dark:hover:text-gray-200"
+        class="dark:text-ink-soft dark:hover:text-ink w-full text-center text-xs text-gray-500 underline decoration-1 underline-offset-4 transition-colors hover:text-gray-700 disabled:opacity-60"
         :disabled="busy"
         @click="handleStartNewPodFromRetry"
       >
@@ -975,7 +975,7 @@ async function handleConnectLocal() {
     <!-- Identity (fallback for scenario (a)) -->
     <form v-else-if="phase === 'identity'" class="space-y-4" @submit.prevent="handleIdentityNext">
       <div
-        class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-slate-700/50 dark:text-gray-300"
+        class="dark:bg-surface-overlay/50 dark:text-ink-soft rounded-xl bg-gray-50 p-3 text-sm text-gray-600"
       >
         🫘 {{ familyName }}
       </div>
@@ -987,10 +987,10 @@ async function handleConnectLocal() {
         @input="formError = null"
       />
       <div>
-        <p class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-1 text-sm font-medium text-gray-700">
           {{ t('setup.choosePinLabel') }}
         </p>
-        <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft mb-2 text-xs text-gray-500">
           {{ t('setup.choosePinHint') }}
         </p>
         <PinInput
@@ -1001,7 +1001,7 @@ async function handleConnectLocal() {
         />
       </div>
       <div>
-        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p class="dark:text-ink-soft mb-2 text-sm font-medium text-gray-700">
           {{ t('pin.confirmPin') }}
         </p>
         <PinInput
@@ -1018,7 +1018,7 @@ async function handleConnectLocal() {
     <!-- Recovery kit (Phase 4): mandatory post-write step — the kit generated inside
          createNewFile is the envelope's ONLY wrap; confirm-stored gates progress. -->
     <div v-else-if="phase === 'recovery-kit'" class="space-y-4">
-      <p class="text-center text-sm text-gray-600 dark:text-gray-300">
+      <p class="dark:text-ink-soft text-center text-sm text-gray-600">
         {{ t('setup.kitStepIntro') }}
       </p>
       <RecoveryKitDisplay
@@ -1031,7 +1031,7 @@ async function handleConnectLocal() {
 
     <!-- Storage (fallback for scenario (a)) -->
     <div v-else-if="phase === 'storage'" class="space-y-3">
-      <p class="font-outfit text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+      <p class="font-outfit dark:text-ink-soft text-center text-sm font-semibold text-gray-700">
         {{ t('resumeSetup.storagePrompt') }}
       </p>
       <BaseButton
@@ -1058,7 +1058,7 @@ async function handleConnectLocal() {
       </BaseButton>
       <p
         v-else-if="!syncStore.isGoogleDriveAvailable"
-        class="text-center text-xs text-gray-500 dark:text-gray-400"
+        class="dark:text-ink-soft text-center text-xs text-gray-500"
       >
         {{ t('selfHost.localUnsupported') }}
       </p>
@@ -1073,7 +1073,7 @@ async function handleConnectLocal() {
     <!-- Finishing (in-flight critical write — auto-load decrypt or create-pod) -->
     <div v-else class="py-6 text-center">
       <BeanieSpinner size="md" class="mx-auto mb-3" />
-      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('resumeSetup.finishing') }}</p>
+      <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('resumeSetup.finishing') }}</p>
     </div>
 
     <!-- Start over — hidden during a critical write, on the members step (the pod
@@ -1085,7 +1085,7 @@ async function handleConnectLocal() {
     >
       <button
         type="button"
-        class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        class="dark:hover:text-ink-soft text-sm text-gray-400 hover:text-gray-600"
         :disabled="busy"
         @click="emit('start-over')"
       >

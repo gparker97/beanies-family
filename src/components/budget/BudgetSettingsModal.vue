@@ -237,12 +237,12 @@ watch(mode, () => {
       <FormFieldGroup :label="t('budget.settings.percentageLabel')" required>
         <div class="flex items-center gap-3">
           <BaseInput v-model.number="percentage" type="number" min="1" max="100" class="w-24" />
-          <span class="text-sm text-slate-500 dark:text-slate-400">%</span>
+          <span class="dark:text-ink-soft text-sm text-slate-500">%</span>
         </div>
       </FormFieldGroup>
-      <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+      <p class="dark:text-ink-soft mt-2 text-sm text-slate-500">
         {{ t('budget.settings.effectiveBudget') }}:
-        <span class="font-outfit font-bold text-slate-700 dark:text-slate-200">
+        <span class="font-outfit dark:text-ink font-bold text-slate-700">
           {{ currSymbol }}{{ effectiveAmount.toLocaleString() }}
         </span>
       </p>
@@ -264,7 +264,7 @@ watch(mode, () => {
     <div>
       <button
         type="button"
-        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
+        class="dark:text-ink-soft dark:hover:bg-surface-hover/50 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
         @click="showCategories = !showCategories"
       >
         <span class="transition-transform" :class="showCategories ? 'rotate-90' : ''">
@@ -273,7 +273,7 @@ watch(mode, () => {
         {{ t('budget.settings.categoryAllocations') }}
       </button>
 
-      <p v-if="!showCategories" class="mt-1 px-3 text-xs text-slate-400 dark:text-slate-500">
+      <p v-if="!showCategories" class="dark:text-ink-faint mt-1 px-3 text-xs text-slate-400">
         {{ t('budget.settings.categoryHint') }}
       </p>
 
@@ -281,12 +281,12 @@ watch(mode, () => {
         <div v-for="group in expenseGroups" :key="group.name">
           <!-- Group row — tappable to expand/collapse -->
           <div
-            class="flex cursor-pointer items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 transition-colors hover:bg-slate-100 dark:bg-slate-700/30 dark:hover:bg-slate-700/50"
+            class="dark:bg-surface-overlay/30 dark:hover:bg-surface-hover/50 flex cursor-pointer items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 transition-colors hover:bg-slate-100"
             @click="group.categories.length > 1 && toggleGroupExpand(group.name)"
           >
             <span class="text-base">{{ GROUP_EMOJI_MAP[group.name] || '📦' }}</span>
             <span
-              class="min-w-[80px] flex-1 text-sm font-semibold text-slate-600 dark:text-slate-300"
+              class="dark:text-ink-soft min-w-[80px] flex-1 text-sm font-semibold text-slate-600"
             >
               {{ groupLabel(group.name) }}
             </span>
@@ -297,8 +297,8 @@ watch(mode, () => {
               class="font-outfit text-sm font-bold"
               :class="
                 isGroupExpanded(group.name)
-                  ? 'text-slate-400 dark:text-slate-500'
-                  : 'text-slate-600 dark:text-slate-300'
+                  ? 'dark:text-ink-faint text-slate-400'
+                  : 'dark:text-ink-soft text-slate-600'
               "
             >
               {{ currSymbol }}{{ groupCategorySum(group).toLocaleString() }}
@@ -314,7 +314,7 @@ watch(mode, () => {
             </div>
 
             <!-- Expanded with no amounts yet: show zero sum -->
-            <span v-else class="font-outfit text-sm font-bold text-slate-400 dark:text-slate-500">
+            <span v-else class="font-outfit dark:text-ink-faint text-sm font-bold text-slate-400">
               {{ currSymbol }}0
             </span>
 
@@ -337,7 +337,7 @@ watch(mode, () => {
                 class="flex items-center gap-3 rounded-lg px-3 py-1.5"
               >
                 <span class="text-sm">{{ CATEGORY_EMOJI_MAP[cat.id] || '' }}</span>
-                <span class="min-w-[80px] flex-1 text-xs text-slate-500 dark:text-slate-400">
+                <span class="dark:text-ink-soft min-w-[80px] flex-1 text-xs text-slate-500">
                   {{ categoryLabel(cat.id) }}
                 </span>
                 <div class="w-28">

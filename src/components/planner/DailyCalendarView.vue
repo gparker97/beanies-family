@@ -286,7 +286,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
 <template>
   <div
     ref="swipeRef"
-    class="rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     style="touch-action: pan-y; will-change: transform"
   >
     <!-- Public holiday banner (desktop — mobile gets it via DayTimeline) -->
@@ -304,7 +304,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
            which person each column belongs to. Wrapper bleeds over the card
            padding (bg); the inner grid stays aligned with the timeline. -->
       <div
-        class="sticky z-20 -mx-5 bg-white px-5 dark:bg-slate-800"
+        class="dark:bg-surface-raised sticky z-20 -mx-5 bg-white px-5"
         style="top: var(--planner-cmdbar-h, 0)"
       >
         <div class="mb-0" :style="{ display: 'grid', gridTemplateColumns: gridCols }">
@@ -328,7 +328,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               aria-hidden="true"
             />
             <span
-              class="font-outfit text-secondary-500/55 text-xs font-semibold lowercase dark:text-gray-400"
+              class="font-outfit text-secondary-500/55 dark:text-ink-soft text-xs font-semibold lowercase"
             >
               {{ member.name }}
             </span>
@@ -344,12 +344,12 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
       <!-- All-day / untimed row -->
       <div
         v-if="hasAnyUntimedContent"
-        class="relative mb-1 rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5 dark:border-slate-600/40 dark:bg-slate-700/30"
+        class="dark:border-line-strong/40 dark:bg-surface-overlay/30 relative mb-1 rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5"
         :style="{ display: 'grid', gridTemplateColumns: gridCols }"
       >
         <div class="flex items-center justify-center">
           <span
-            class="font-outfit text-secondary-500/40 text-xs font-semibold uppercase dark:text-gray-500"
+            class="font-outfit text-secondary-500/40 dark:text-ink-faint text-xs font-semibold uppercase"
           >
             {{ t('planner.allDay') }}
           </span>
@@ -389,13 +389,13 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
             v-if="
               memberUntimedActivities(member.id).length > 0 || (mi === 0 && dayTodos.length > 0)
             "
-            class="min-w-0 overflow-hidden border-l border-gray-200/40 px-0.5 dark:border-slate-600/30"
+            class="dark:border-line-strong/30 min-w-0 overflow-hidden border-l border-gray-200/40 px-0.5"
             :style="{ gridColumn: `${mi + 2}` }"
           >
             <div
               v-for="occ in memberUntimedActivities(member.id)"
               :key="occ.activity.id"
-              class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 bg-white px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-slate-800"
+              class="dark:bg-surface-raised mb-0.5 cursor-pointer truncate rounded-md border-l-2 bg-white px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
               :class="[
                 identityFor(occ.activity, { laneMemberId: member.id }).dashed
                   ? 'border-dashed'
@@ -462,7 +462,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               class="absolute right-0 pr-2"
               :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
             >
-              <span class="text-secondary-500/30 text-xs leading-none dark:text-gray-600">
+              <span class="text-secondary-500/30 dark:text-ink-faint text-xs leading-none">
                 {{ formatHourLabel(hour) }}
               </span>
             </div>
@@ -472,7 +472,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
           <div
             v-for="member in visibleMembers"
             :key="'col-' + member.id"
-            class="relative border-l border-gray-200/40 dark:border-slate-600/30"
+            class="dark:border-line-strong/30 relative border-l border-gray-200/40"
           >
             <!--
               The lane IS the bean, for the whole height of the day.
@@ -493,7 +493,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
             <div
               v-for="(hour, hi) in hours"
               :key="hour"
-              class="group/slot absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.08)] dark:border-slate-700/50 dark:hover:bg-[rgba(241,93,34,0.12)]"
+              class="group/slot dark:border-line/50 absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.08)] dark:hover:bg-[rgba(241,93,34,0.12)]"
               :style="{ top: `${hi * ROW_HEIGHT}rem`, height: ROW_HEIGHT + 'rem' }"
               @click="handleSlotClick(member.id, hour)"
             >
@@ -515,7 +515,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
               <div
                 v-for="(activity, ai) in group"
                 :key="activity.id"
-                class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] bg-white px-1.5 py-1 text-xs shadow-sm transition-shadow hover:shadow-md dark:bg-slate-800"
+                class="dark:bg-surface-raised absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] bg-white px-1.5 py-1 text-xs shadow-sm transition-shadow hover:shadow-md"
                 :class="[
                   identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : '',
                   identityFor(activity, { laneMemberId: member.id }).celebration.celebrating
@@ -554,7 +554,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
                   </span>
                   <span
                     v-if="activity.location"
-                    class="text-secondary-500/60 min-w-0 flex-1 truncate text-[0.6875rem] leading-tight dark:text-gray-400"
+                    class="text-secondary-500/60 dark:text-ink-soft min-w-0 flex-1 truncate text-[0.6875rem] leading-tight"
                   >
                     · 📍 {{ activity.location }}
                   </span>

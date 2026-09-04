@@ -46,14 +46,14 @@ const selectClasses = computed(() => {
   // <select> that computes < 16px triggers iOS's stuck-zoom-on-focus. rem-based so
   // Large reading mode still scales it.
   const base =
-    'block w-full rounded-xl border pl-3 pr-8 py-2 text-base text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 transition-colors appearance-none cursor-pointer';
+    'block w-full rounded-xl border pl-3 pr-8 py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised focus:outline-none focus:ring-2 transition-colors appearance-none cursor-pointer';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
-    : 'border-gray-300 dark:border-slate-600 focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700';
+    : 'border-gray-300 dark:border-line-strong focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700';
 
   const disabled = props.disabled
-    ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-900'
+    ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-surface-ground'
     : '';
 
   return [base, states, disabled];
@@ -70,7 +70,7 @@ function handleChange(event: Event) {
     <label
       v-if="label"
       :for="selectId"
-      class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+      class="dark:text-ink-soft block text-sm font-medium text-gray-700"
     >
       {{ label }}
       <span v-if="required" class="text-red-500">*</span>
@@ -93,7 +93,7 @@ function handleChange(event: Event) {
             v-for="group in groupedOptions"
             :key="group.label"
             :label="group.label"
-            class="font-semibold text-gray-900 dark:text-gray-100"
+            class="dark:text-ink font-semibold text-gray-900"
           >
             <option
               v-for="option in group.options"
@@ -133,10 +133,10 @@ function handleChange(event: Event) {
       </div>
     </div>
 
-    <p v-if="error" class="text-sm text-red-600 dark:text-red-400">
+    <p v-if="error" class="dark:text-danger-lift text-sm text-red-600">
       {{ error }}
     </p>
-    <p v-else-if="hint" class="text-sm text-gray-500 dark:text-gray-400">
+    <p v-else-if="hint" class="dark:text-ink-soft text-sm text-gray-500">
       {{ hint }}
     </p>
   </div>

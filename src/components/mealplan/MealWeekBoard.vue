@@ -92,7 +92,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
       <div
         v-for="day in weekDays"
         :key="day.dateStr"
-        class="group relative rounded-t-[14px] border-l border-l-[rgba(44,62,80,0.05)] pb-2 text-center dark:border-l-slate-700/60"
+        class="group dark:border-l-surface-overlay/60 relative rounded-t-[14px] border-l border-l-[rgba(44,62,80,0.05)] pb-2 text-center"
         :class="day.isToday ? 'bg-[rgba(241,93,34,0.05)]' : ''"
       >
         <!--
@@ -113,7 +113,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
           <button
             v-if="hasMeals(day.dateStr)"
             type="button"
-            class="font-outfit grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 dark:text-slate-400 [@media(any-pointer:coarse)]:opacity-100"
+            class="font-outfit dark:text-ink-soft grid h-5 w-5 place-items-center rounded-full text-xs leading-none text-[rgba(44,62,80,0.4)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--tint-orange-8)] hover:text-[#F15D22] focus-visible:opacity-100 [@media(any-pointer:coarse)]:opacity-100"
             :aria-label="t('mealPlanner.clearDay')"
             :title="t('mealPlanner.clearDay')"
             @click="emit('clearDay', day.dateStr)"
@@ -123,11 +123,11 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
         </div>
         <div
           class="font-outfit text-sm font-bold"
-          :class="day.isToday ? 'text-[#F15D22]' : 'text-secondary-500 dark:text-slate-100'"
+          :class="day.isToday ? 'text-[#F15D22]' : 'text-secondary-500 dark:text-ink'"
         >
           {{ WEEKDAY_FMT.format(day.date) }}
         </div>
-        <div class="text-xs text-[rgba(44,62,80,0.45)] dark:text-slate-400">
+        <div class="dark:text-ink-soft text-xs text-[rgba(44,62,80,0.45)]">
           {{ day.date.getDate() }}
         </div>
         <div
@@ -146,7 +146,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
           label while the screen had a 9.6px pill. The paper version was the better design.
         -->
         <div
-          class="flex items-center justify-center rounded-l-[14px] border-t border-[rgba(44,62,80,0.07)] py-2 pr-1 dark:border-slate-700"
+          class="dark:border-line flex items-center justify-center rounded-l-[14px] border-t border-[rgba(44,62,80,0.07)] py-2 pr-1"
           :class="SLOT_META[slot].band"
         >
           <span class="font-outfit flex flex-col items-center gap-0.5" :class="SLOT_META[slot].ink">
@@ -159,7 +159,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
         <div
           v-for="day in weekDays"
           :key="`${slot}-${day.dateStr}`"
-          class="min-h-[4rem] border-t border-l border-t-[rgba(44,62,80,0.07)] px-1 py-2 dark:border-t-slate-700"
+          class="dark:border-t-surface-overlay min-h-[4rem] border-t border-l border-t-[rgba(44,62,80,0.07)] px-1 py-2"
           :class="[
             SLOT_META[slot].band,
             // TODAY IS AN EDGE, NOT A FILL. A cell can only have one background-color, so
@@ -169,7 +169,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
             // entirely on lunch and dinner. A border is a different property, so it layers.
             day.isToday
               ? 'border-l-2 border-l-[rgba(241,93,34,0.45)] dark:border-l-[rgba(241,93,34,0.55)]'
-              : 'border-l border-l-[rgba(44,62,80,0.05)] dark:border-l-slate-700/60',
+              : 'dark:border-l-surface-overlay/60 border-l border-l-[rgba(44,62,80,0.05)]',
             // FINDING: `last:` is `:last-child`, and `<template v-for>` makes every cell a
             // flat child of the one grid — so it matched cell 40 of 40 and rounded the
             // snack row alone. Index-tested instead.

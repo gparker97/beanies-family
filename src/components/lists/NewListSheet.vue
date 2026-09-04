@@ -78,7 +78,7 @@ const isOpen = computed(() => props.open);
             v-for="tmpl in templates"
             :key="tmpl.key"
             type="button"
-            class="flex flex-col gap-1 rounded-2xl border border-[var(--color-border)] bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--color-primary-500)] hover:shadow-md dark:bg-slate-800"
+            class="dark:bg-surface-raised dark:border-line-strong flex flex-col gap-1 rounded-2xl border border-[var(--color-border)] bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--color-primary-500)] hover:shadow-md"
             @click="pickTemplate(tmpl.key)"
           >
             <span class="text-2xl" aria-hidden="true">{{ tmpl.icon }}</span>

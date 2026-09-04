@@ -108,7 +108,7 @@ function openViewer(): void {
     <div class="relative">
       <button
         type="button"
-        class="focus:ring-primary-500 rounded-full focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-slate-800"
+        class="focus:ring-primary-500 dark:focus:ring-offset-surface-raised rounded-full focus:ring-offset-2 focus:outline-none"
         :class="[
           modelValue && !uploading && !disabled ? 'cursor-zoom-in focus:ring-2' : 'cursor-default',
         ]"
@@ -156,7 +156,7 @@ function openViewer(): void {
       <button
         v-if="modelValue"
         type="button"
-        class="font-outfit inline-flex items-center gap-1 rounded-lg border border-red-300 px-2 py-1 font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
+        class="font-outfit dark:text-danger-lift inline-flex items-center gap-1 rounded-lg border border-red-300 px-2 py-1 font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/40 dark:hover:bg-red-500/10"
         :disabled="uploading"
         @click="remove"
       >

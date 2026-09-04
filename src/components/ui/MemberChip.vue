@@ -58,7 +58,7 @@ const color = computed(() => resolveMemberColor(member.value?.color));
       fallback="initials"
       size="xs"
       :title="name"
-      class="ring-1 ring-white dark:ring-slate-800"
+      class="dark:ring-surface-raised ring-1 ring-white"
     />
     <span
       v-else

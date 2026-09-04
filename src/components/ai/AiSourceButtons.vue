@@ -34,7 +34,7 @@ const { t } = useTranslation();
     <div class="flex items-center gap-3">
       <span class="h-px flex-1 bg-[var(--divider,rgba(44,62,80,0.08))]"></span>
       <span
-        class="font-outfit text-secondary-500/50 text-xs font-semibold tracking-[0.08em] uppercase"
+        class="font-outfit text-secondary-500/50 dark:text-ink-soft text-xs font-semibold tracking-[0.08em] uppercase"
       >
         {{ t('ai.picker.orFrom') }}
       </span>
@@ -44,7 +44,7 @@ const { t } = useTranslation();
     <div class="mt-3 grid grid-cols-2 gap-2.5">
       <button
         type="button"
-        class="font-outfit text-secondary-500 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 text-sm font-semibold transition-colors hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-200"
+        class="font-outfit text-secondary-500 dark:border-line-strong dark:text-ink flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 text-sm font-semibold transition-colors hover:bg-[var(--tint-slate-5)]"
         @click="emit('camera')"
       >
         <BeanieIcon name="camera" size="sm" class="opacity-60" />
@@ -52,7 +52,7 @@ const { t } = useTranslation();
       </button>
       <button
         type="button"
-        class="font-outfit text-secondary-500 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 text-sm font-semibold transition-colors hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-200"
+        class="font-outfit text-secondary-500 dark:border-line-strong dark:text-ink flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-transparent px-3 text-sm font-semibold transition-colors hover:bg-[var(--tint-slate-5)]"
         @click="emit('file')"
       >
         <BeanieIcon name="image" size="sm" class="opacity-60" />

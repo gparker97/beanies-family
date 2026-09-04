@@ -134,10 +134,10 @@ onMounted(() => {
         <PageWelcomeSubtitle :text="t('createSurvey.eyebrow')" />
         <span aria-hidden="true">🌱</span>
       </div>
-      <h2 class="font-outfit mt-1 mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink mt-1 mb-1 text-xl font-bold text-gray-900">
         {{ t('createSurvey.title') }}
       </h2>
-      <p class="mx-auto max-w-xs text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft mx-auto max-w-xs text-sm text-gray-500">
         {{ t('createSurvey.subtitle') }}
       </p>
     </div>
@@ -153,13 +153,13 @@ onMounted(() => {
         class="font-outfit flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-3 text-left text-sm font-semibold transition-colors"
         :class="
           selectedId === opt.id
-            ? 'border-primary-500 bg-[var(--tint-orange-8)] text-gray-900 dark:text-gray-100'
-            : 'border-[var(--tint-slate-5)] text-gray-700 hover:border-[var(--silk)] dark:border-slate-600 dark:text-gray-200'
+            ? 'border-primary-500 dark:text-ink bg-[var(--tint-orange-8)] text-gray-900'
+            : 'dark:border-line-strong dark:text-ink border-[var(--tint-slate-5)] text-gray-700 hover:border-[var(--silk)]'
         "
         @click="select(opt.id)"
       >
         <span
-          class="grid h-7 w-7 shrink-0 place-items-center rounded-[10px] bg-[var(--tint-slate-5)] text-base dark:bg-slate-700"
+          class="dark:bg-surface-overlay grid h-7 w-7 shrink-0 place-items-center rounded-[10px] bg-[var(--tint-slate-5)] text-base"
           aria-hidden="true"
           >{{ opt.icon }}</span
         >
@@ -174,7 +174,7 @@ onMounted(() => {
       type="text"
       :placeholder="t('createSurvey.otherPlaceholder')"
       data-testid="survey-other-input"
-      class="mt-2.5 w-full rounded-xl border-[1.5px] border-[var(--silk)] p-3 text-base text-gray-900 normal-case focus:ring-2 focus:ring-[var(--silk)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+      class="dark:bg-surface-overlay dark:text-ink mt-2.5 w-full rounded-xl border-[1.5px] border-[var(--silk)] p-3 text-base text-gray-900 normal-case focus:ring-2 focus:ring-[var(--silk)] focus:outline-none"
     />
 
     <!-- Finish + skip (both complete the flow; the survey never blocks) -->
@@ -188,7 +188,7 @@ onMounted(() => {
     </button>
     <button
       type="button"
-      class="mt-3 w-full text-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+      class="dark:text-ink-faint dark:hover:text-ink-soft mt-3 w-full text-center text-sm text-gray-400 hover:text-gray-600"
       data-testid="survey-skip"
       @click="skip"
     >

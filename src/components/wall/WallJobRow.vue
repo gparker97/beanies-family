@@ -139,7 +139,7 @@ function onTick() {
     <span
       class="font-inter wall-job-title min-w-0 flex-1 leading-tight"
       :class="
-        isDone ? 'text-secondary-400 dark:text-gray-500' : 'text-secondary-500 dark:text-gray-100'
+        isDone ? 'text-secondary-400 dark:text-ink-faint' : 'text-secondary-500 dark:text-ink'
       "
     >
       <!--
@@ -151,7 +151,7 @@ function onTick() {
     </span>
     <span
       v-if="ownerLabel"
-      class="font-inter wall-job-done-at text-secondary-500 max-w-[7.5rem] shrink-0 truncate rounded-full px-2 py-0.5 font-semibold dark:text-gray-100"
+      class="font-inter wall-job-done-at text-secondary-500 dark:text-ink max-w-[7.5rem] shrink-0 truncate rounded-full px-2 py-0.5 font-semibold"
       :class="ownerColor ? '' : 'bg-[var(--tint-slate-10)]'"
       :style="ownerColor ? { background: `${ownerColor}2e` } : undefined"
     >

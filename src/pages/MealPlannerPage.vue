@@ -357,7 +357,7 @@ async function runExport(format: ExportFormat): Promise<void> {
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-slate-100">
+        <h1 class="font-outfit text-secondary-500 dark:text-ink text-2xl font-bold">
           🍲 {{ t('mealPlanner.title') }}
         </h1>
         <PageWelcomeSubtitle :text="t('mealPlanner.welcome')" />
@@ -366,7 +366,7 @@ async function runExport(format: ExportFormat): Promise<void> {
         <button
           v-if="isCurrentWeek"
           type="button"
-          class="font-outfit text-secondary-500 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold dark:text-slate-100"
+          class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
           @click="copyLastWeek"
         >
           ⧉ {{ t('mealPlanner.copyLastWeek') }}
@@ -374,7 +374,7 @@ async function runExport(format: ExportFormat): Promise<void> {
         <button
           v-else
           type="button"
-          class="font-outfit text-secondary-500 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold dark:text-slate-100"
+          class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
           @click="copyViewedToCurrent"
         >
           ⧉ {{ t('mealPlanner.copyHere') }}
@@ -396,7 +396,7 @@ async function runExport(format: ExportFormat): Promise<void> {
         </button>
         <button
           type="button"
-          class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60 dark:text-slate-100"
+          class="font-outfit text-secondary-500 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
           :disabled="exporting"
           @click="runExport('pdf')"
         >
@@ -418,7 +418,7 @@ async function runExport(format: ExportFormat): Promise<void> {
       <button type="button" class="mp-arrow" :aria-label="t('common.next')" @click="nextWeek">
         ›
       </button>
-      <span class="font-outfit text-secondary-500 text-base font-bold dark:text-slate-100">{{
+      <span class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">{{
         weekLabel
       }}</span>
       <button
@@ -433,7 +433,7 @@ async function runExport(format: ExportFormat): Promise<void> {
       <button
         v-if="mealPlanStore.weekHasMeals(weekDates)"
         type="button"
-        class="font-outfit text-sm font-semibold text-[rgba(44,62,80,0.5)] hover:text-[#F15D22] dark:text-slate-400"
+        class="font-outfit dark:text-ink-soft text-sm font-semibold text-[rgba(44,62,80,0.5)] hover:text-[#F15D22]"
         @click="clearWeek"
       >
         {{ t('mealPlanner.clearWeek') }}
@@ -448,7 +448,7 @@ async function runExport(format: ExportFormat): Promise<void> {
       <button type="button" class="mp-arrow" :aria-label="t('common.next')" @click="nextDay">
         ›
       </button>
-      <span class="font-outfit text-secondary-500 text-base font-bold dark:text-slate-100">{{
+      <span class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">{{
         mobileLabel
       }}</span>
     </div>
@@ -463,7 +463,7 @@ async function runExport(format: ExportFormat): Promise<void> {
          box (clipping the rail's alternatives). Constraining the single row to
          the board height forces both columns to fit and scroll internally. -->
     <div
-      class="mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:max-h-[52rem] md:min-h-0 md:flex-1 md:grid-cols-[15rem_1fr] md:grid-rows-[minmax(0,1fr)] dark:bg-slate-800"
+      class="dark:bg-surface-raised mt-4 hidden overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:grid md:max-h-[52rem] md:min-h-0 md:flex-1 md:grid-cols-[15rem_1fr] md:grid-rows-[minmax(0,1fr)]"
     >
       <RecipeRail />
       <MealWeekBoard
@@ -482,7 +482,7 @@ async function runExport(format: ExportFormat): Promise<void> {
     -->
     <div
       ref="mobileSwipeRef"
-      class="mt-4 overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:hidden dark:bg-slate-800"
+      class="dark:bg-surface-raised mt-4 overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--soft-shadow)] md:hidden"
       style="touch-action: pan-y; will-change: transform"
     >
       <MealDayStack :date="mobileDate" @open-meal="openMeal" @add-meal="openPicker" />
@@ -537,7 +537,7 @@ async function runExport(format: ExportFormat): Promise<void> {
 }
 
 .dark .mp-arrow {
-  background: var(--color-slate-800, #1e293b);
+  background: var(--color-slate-800, #1e2a36);
 }
 
 /* Off-screen host for the export sheet: kept in the layout (so fonts/images

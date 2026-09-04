@@ -31,11 +31,11 @@ const { t } = useTranslation();
     <template #header>
       <!-- Warm branded hero header -->
       <div
-        class="relative overflow-hidden rounded-t-3xl border-b border-[var(--color-sky-silk-300)]/30 dark:border-slate-600/50"
+        class="dark:border-line-strong/50 relative overflow-hidden rounded-t-3xl border-b border-[var(--color-sky-silk-300)]/30"
       >
         <!-- Background gradient -->
         <div
-          class="absolute inset-0 bg-gradient-to-br from-[var(--tint-orange-8)] via-[var(--tint-silk-10)] to-[var(--tint-orange-4)] dark:from-slate-700/80 dark:via-slate-800 dark:to-slate-700/60"
+          class="dark:from-surface-overlay/80 dark:via-surface-raised dark:to-surface-overlay/60 absolute inset-0 bg-gradient-to-br from-[var(--tint-orange-8)] via-[var(--tint-silk-10)] to-[var(--tint-orange-4)]"
         />
 
         <!-- Decorative dots -->
@@ -54,7 +54,7 @@ const { t } = useTranslation();
           <!-- Close button -->
           <button
             type="button"
-            class="absolute top-2 right-2 rounded-xl p-1.5 text-gray-400/60 transition-colors hover:bg-white/40 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-slate-700/50 dark:hover:text-gray-300"
+            class="dark:text-ink-faint dark:hover:bg-surface-hover/50 dark:hover:text-ink-soft absolute top-2 right-2 rounded-xl p-1.5 text-gray-400/60 transition-colors hover:bg-white/40 hover:text-gray-600"
             @click="emit('close')"
           >
             <BeanieIcon name="close" size="md" />
@@ -69,10 +69,10 @@ const { t } = useTranslation();
 
           <!-- Title & subtitle -->
           <div class="min-w-0 pr-6">
-            <h2 class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100">
+            <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
               {{ props.title ?? t('share.title') }}
             </h2>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-xs text-gray-500">
               {{ props.subtitle ?? t('share.subtitle') }}
             </p>
           </div>

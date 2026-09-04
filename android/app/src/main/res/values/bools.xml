@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phone default: portrait only. Every layout in the app is designed phone-first
+  and portrait, and the PWA manifest + iOS Info.plist say the same thing.
+  MainActivity reads this at startup; the tablet override lives in
+  res/values-sw600dp/bools.xml.
+-->
+<resources>
+    <bool name="allow_rotation">false</bool>
+</resources>

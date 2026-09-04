@@ -346,7 +346,7 @@ async function deleteCompletedGoal(id: string) {
   <div class="space-y-6">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ subtitleText }}
       </p>
       <button
@@ -406,10 +406,10 @@ async function deleteCompletedGoal(id: string) {
     <!-- Empty State -->
     <div v-if="goalsStore.filteredActiveGoals.length === 0" class="py-16 text-center">
       <EmptyStateIllustration variant="goals" class="mb-6" />
-      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+      <h3 class="dark:text-ink text-lg font-medium text-gray-900">
         {{ t('goals.noGoals') }}
       </h3>
-      <p class="mt-1 mb-4 text-gray-500 dark:text-gray-400">{{ t('goals.getStarted') }}</p>
+      <p class="dark:text-ink-soft mt-1 mb-4 text-gray-500">{{ t('goals.getStarted') }}</p>
       <button
         type="button"
         class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
@@ -442,10 +442,10 @@ async function deleteCompletedGoal(id: string) {
               🏠
             </div>
           </template>
-          <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <h2 class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ section.label }}
           </h2>
-          <span class="text-sm text-gray-500 dark:text-gray-400">({{ section.goals.length }})</span>
+          <span class="dark:text-ink-soft text-sm text-gray-500">({{ section.goals.length }})</span>
         </div>
 
         <!-- Section Header: Priority view -->
@@ -456,10 +456,10 @@ async function deleteCompletedGoal(id: string) {
           >
             <span class="text-sm">{{ getPriorityConfig(section.header.priority).icon }}</span>
           </div>
-          <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <h2 class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ section.label }}
           </h2>
-          <span class="text-sm text-gray-500 dark:text-gray-400">({{ section.goals.length }})</span>
+          <span class="dark:text-ink-soft text-sm text-gray-500">({{ section.goals.length }})</span>
         </div>
 
         <!-- Goal Cards Grid -->
@@ -467,7 +467,7 @@ async function deleteCompletedGoal(id: string) {
           <div
             v-for="(goal, goalIndex) in section.goals"
             :key="goal.id"
-            class="goal-card cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="goal-card dark:bg-surface-raised cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
             :class="[
               syncHighlightClass(goal.id),
               {
@@ -489,10 +489,10 @@ async function deleteCompletedGoal(id: string) {
                   <span class="emoji text-xl">{{ typeToEmoji[goal.type] || '🎯' }}</span>
                 </div>
                 <div>
-                  <h3 class="font-outfit text-base font-semibold text-gray-900 dark:text-gray-100">
+                  <h3 class="font-outfit dark:text-ink text-base font-semibold text-gray-900">
                     {{ goal.name }}
                   </h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                  <p class="dark:text-ink-soft text-sm text-gray-500">
                     {{ getGoalTypeLabel(goal.type) }}
                   </p>
                 </div>
@@ -517,12 +517,12 @@ async function deleteCompletedGoal(id: string) {
             <div class="mb-3">
               <div class="mb-1.5 flex items-center justify-between">
                 <span
-                  class="font-outfit text-xs font-semibold tracking-[0.08em] text-gray-500 uppercase dark:text-gray-400"
+                  class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-[0.08em] text-gray-500 uppercase"
                 >
                   {{ t('goals.progress') }}
                 </span>
                 <span
-                  class="font-outfit text-sm font-semibold text-gray-900 dark:text-gray-100"
+                  class="font-outfit dark:text-ink text-sm font-semibold text-gray-900"
                   :class="{ 'blur-sm': !isUnlocked }"
                 >
                   <CurrencyAmount
@@ -537,7 +537,7 @@ async function deleteCompletedGoal(id: string) {
 
               <!-- Progress bar with milestone dots -->
               <div
-                class="progress-track relative h-2.5 w-full overflow-visible rounded-full bg-[#E8ECF0] dark:bg-slate-700"
+                class="progress-track dark:bg-surface-overlay relative h-2.5 w-full overflow-visible rounded-full bg-[#E8ECF0]"
                 :class="{ 'blur-sm': !isUnlocked }"
               >
                 <div
@@ -573,7 +573,7 @@ async function deleteCompletedGoal(id: string) {
 
             <!-- Card Footer -->
             <div
-              class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between border-t border-gray-100 pt-3"
             >
               <!-- Priority badge or Almost There badge -->
               <template v-if="goalsStore.getGoalProgress(goal) >= 75 && !goal.isCompleted">
@@ -598,7 +598,7 @@ async function deleteCompletedGoal(id: string) {
               <!-- Deadline -->
               <span
                 v-if="goal.deadline"
-                class="text-xs text-gray-500 dark:text-gray-400"
+                class="dark:text-ink-soft text-xs text-gray-500"
                 :class="{
                   'goal-deadline-overdue font-medium':
                     goal.deadline && new Date(goal.deadline) < new Date(),
@@ -615,7 +615,7 @@ async function deleteCompletedGoal(id: string) {
           <!-- Dashed Add Card -->
           <button
             type="button"
-            class="add-card-dashed hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 flex min-h-[260px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors dark:border-slate-600 dark:text-gray-500"
+            class="add-card-dashed hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-accent-lift dark:border-line-strong dark:text-ink-faint flex min-h-[260px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors"
             @click="openAddWithDefaults(section.addDefaults)"
           >
             <BeanieIcon name="plus" size="lg" />
@@ -637,7 +637,7 @@ async function deleteCompletedGoal(id: string) {
         @click="showCompletedGoals = !showCompletedGoals"
       >
         <span class="text-lg">🎉</span>
-        <span class="font-outfit text-secondary-400 text-base font-semibold dark:text-gray-400">
+        <span class="font-outfit text-secondary-400 dark:text-ink-soft text-base font-semibold">
           {{ t('goals.achievedGoals') }}
         </span>
         <span

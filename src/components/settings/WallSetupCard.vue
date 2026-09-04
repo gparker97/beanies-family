@@ -53,14 +53,14 @@ watch(canEnterWall, (ready) => {
 
 <template>
   <BaseCard>
-    <h3 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+    <h3 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
       {{ t('wall.setup.title') }}
     </h3>
-    <p class="text-secondary-400 mt-1 text-sm dark:text-gray-400">
+    <p class="text-secondary-400 dark:text-ink-soft mt-1 text-sm">
       {{ t('wall.setup.description') }}
     </p>
 
-    <p v-if="!canEnterWall" class="text-secondary-400 mt-3 text-sm dark:text-gray-400">
+    <p v-if="!canEnterWall" class="text-secondary-400 dark:text-ink-soft mt-3 text-sm">
       {{ t('wall.setup.needsPin.message') }}
     </p>
 
@@ -75,7 +75,7 @@ watch(canEnterWall, (ready) => {
       @close="pinModalOpen = false"
       @save="pinModalOpen = false"
     >
-      <p class="text-secondary-400 mb-3 text-sm dark:text-gray-400">
+      <p class="text-secondary-400 dark:text-ink-soft mb-3 text-sm">
         {{ t('wall.setup.needsPin.message') }}
       </p>
       <PinSettings />

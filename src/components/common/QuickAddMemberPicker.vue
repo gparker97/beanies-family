@@ -199,8 +199,8 @@ function handlePick(memberId: string): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .back-chip {
-  background: rgb(30 41 59);
+html.dark .back-chip {
+  background: #1e2a36;
 }
 
 .picker-title-stack {
@@ -229,7 +229,7 @@ function handlePick(memberId: string): void {
   line-height: 1.2;
 }
 
-:global(.dark) .picker-for-label {
+html.dark .picker-for-label {
   color: rgb(241 242 244 / 65%);
 }
 
@@ -280,8 +280,8 @@ function handlePick(memberId: string): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .tile {
-  background: rgb(30 41 59);
+html.dark .tile {
+  background: #1e2a36;
   border-color: rgb(241 93 34 / 28%);
 }
 
@@ -298,7 +298,7 @@ function handlePick(memberId: string): void {
   white-space: nowrap;
 }
 
-:global(.dark) .name {
+html.dark .name {
   color: rgb(241 242 244);
 }
 
@@ -311,7 +311,7 @@ function handlePick(memberId: string): void {
   text-align: center;
 }
 
-:global(.dark) .empty {
+html.dark .empty {
   color: rgb(241 242 244 / 65%);
 }
 

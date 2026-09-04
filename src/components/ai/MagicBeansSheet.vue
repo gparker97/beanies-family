@@ -94,7 +94,9 @@ function handleSave(): void {
              scrolling column — no visualViewport code belongs here. -->
         <BaseTextarea v-model="text" :rows="4" :placeholder="t('ai.capture.placeholder')" />
       </div>
-      <p class="font-outfit text-secondary-500/70 mt-1.5 text-xs">{{ t('ai.capture.hint') }}</p>
+      <p class="font-outfit text-secondary-500/70 dark:text-ink-soft mt-1.5 text-xs">
+        {{ t('ai.capture.hint') }}
+      </p>
     </FormFieldGroup>
 
     <AiSourceButtons @camera="emit('camera')" @file="emit('file')" />

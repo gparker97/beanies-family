@@ -56,7 +56,7 @@ const relativeTime = computed(() => formatLogEntryTime(props.entry.administeredO
 
 <template>
   <div
-    class="group/row flex items-center gap-3 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-2 transition-colors dark:bg-slate-800/60"
+    class="group/row dark:bg-surface-raised/60 flex items-center gap-3 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-2 transition-colors"
     :data-log-id="entry.id"
   >
     <BeanieAvatar
@@ -67,10 +67,10 @@ const relativeTime = computed(() => formatLogEntryTime(props.entry.administeredO
       :aria-label="displayName"
     />
     <div class="min-w-0 flex-1">
-      <p class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100">
+      <p class="font-outfit dark:text-ink truncate text-sm font-semibold text-[#2C3E50]">
         {{ displayName }}
       </p>
-      <p class="font-inter truncate text-xs text-[#2C3E50]/60 dark:text-gray-400">
+      <p class="font-inter dark:text-ink-soft truncate text-xs text-[#2C3E50]/60">
         {{ relativeTime }}
       </p>
     </div>

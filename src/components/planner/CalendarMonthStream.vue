@@ -348,7 +348,7 @@ defineExpose({ anchorTo });
 <template>
   <div
     ref="rootRef"
-    class="rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-3xl bg-white p-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     style="touch-action: pan-y; will-change: transform"
   >
     <div class="flex flex-col gap-1.5">
@@ -377,7 +377,7 @@ defineExpose({ anchorTo });
             :class="
               weekMeta(month, cell)?.isCurrent
                 ? 'text-primary-500'
-                : 'text-secondary-500/50 dark:text-gray-500'
+                : 'text-secondary-500/50 dark:text-ink-faint'
             "
           >
             <span class="font-outfit text-[0.625rem] font-bold tracking-[0.14em] uppercase">
@@ -394,7 +394,7 @@ defineExpose({ anchorTo });
               :class="
                 weekMeta(month, cell)?.isCurrent
                   ? 'bg-primary-500/30'
-                  : 'bg-gray-200 dark:bg-slate-700'
+                  : 'dark:bg-surface-overlay bg-gray-200'
               "
             />
           </div>

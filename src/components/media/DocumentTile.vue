@@ -23,7 +23,7 @@ const ariaLabel = computed(() =>
 
 <template>
   <div
-    class="relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--card-shadow)] dark:bg-slate-700"
+    class="dark:bg-surface-overlay relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--card-shadow)]"
     role="img"
     :aria-label="ariaLabel"
   >
@@ -36,7 +36,7 @@ const ariaLabel = computed(() =>
     <div
       class="flex items-center gap-1 border-t border-dashed border-[var(--tint-slate-10)] px-1.5 py-1"
     >
-      <span class="text-primary-600 dark:text-primary-300 font-outfit text-[0.5rem] font-bold"
+      <span class="text-primary-600 dark:text-accent-lift font-outfit text-[0.5rem] font-bold"
         >PDF</span
       >
       <span

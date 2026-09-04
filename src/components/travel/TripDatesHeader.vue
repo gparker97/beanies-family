@@ -76,7 +76,7 @@ async function save(): Promise<void> {
   <div class="mb-5">
     <div v-if="!isEditing" class="flex flex-wrap items-center gap-2">
       <span
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)] dark:bg-slate-700 dark:text-gray-100"
+        class="font-outfit dark:bg-surface-overlay dark:text-ink inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)]"
       >
         📅 {{ display }}
       </span>
@@ -94,7 +94,7 @@ async function save(): Promise<void> {
     <div
       v-else
       :id="regionId"
-      class="rounded-2xl border border-[var(--vacation-teal)]/20 bg-[var(--vacation-teal-5)] p-4 dark:bg-slate-800/40"
+      class="dark:bg-surface-raised/40 rounded-2xl border border-[var(--vacation-teal)]/20 bg-[var(--vacation-teal-5)] p-4"
     >
       <TripDatesInput
         v-model:start-date="editStart"
@@ -104,7 +104,7 @@ async function save(): Promise<void> {
       <div class="mt-3 flex items-center justify-end gap-2">
         <button
           type="button"
-          class="font-outfit rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-gray-400 dark:hover:bg-slate-700"
+          class="font-outfit dark:border-line-strong dark:text-ink-soft dark:hover:bg-surface-hover rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="isSubmitting"
           @click="cancel"
         >

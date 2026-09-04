@@ -55,13 +55,13 @@ function closeModal(): void {
         v-for="n in notes"
         :key="n.id"
         type="button"
-        class="flex flex-col items-start gap-2 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised flex flex-col items-start gap-2 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
         @click="openEdit(n)"
       >
-        <h4 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
+        <h4 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
           {{ n.title }}
         </h4>
-        <p class="font-outfit text-secondary-500/70 line-clamp-4 text-sm dark:text-gray-400">
+        <p class="font-outfit text-secondary-500/70 dark:text-ink-soft line-clamp-4 text-sm">
           {{ n.body }}
         </p>
       </button>
@@ -69,7 +69,7 @@ function closeModal(): void {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="📝"

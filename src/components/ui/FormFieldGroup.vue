@@ -63,7 +63,7 @@ onUpdated(associateLabel);
       :class="
         error
           ? 'text-primary-500 opacity-100'
-          : 'text-[var(--color-text)] opacity-35 dark:text-gray-300'
+          : 'dark:text-ink-soft text-[var(--color-text)] opacity-35'
       "
     >
       {{ label }}

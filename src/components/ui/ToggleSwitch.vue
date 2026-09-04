@@ -31,7 +31,7 @@ function toggle() {
     :class="[
       modelValue
         ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r'
-        : 'bg-[var(--tint-slate-10)] dark:bg-slate-600',
+        : 'dark:bg-surface-hover bg-[var(--tint-slate-10)]',
       disabled ? 'cursor-not-allowed opacity-50' : '',
       size === 'sm' ? 'h-5 w-9' : 'h-6 w-11',
     ]"

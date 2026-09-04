@@ -67,18 +67,18 @@ const displayValue = computed(() => {
     :class="
       dark
         ? 'from-secondary-500 bg-gradient-to-br to-[#3D5368] text-white'
-        : 'bg-white dark:bg-slate-800'
+        : 'dark:bg-surface-raised bg-white'
     "
   >
     <div
       class="nook-section-label mb-3"
-      :class="dark ? 'text-white' : 'text-secondary-500 dark:text-gray-400'"
+      :class="dark ? 'text-white' : 'text-secondary-500 dark:text-ink-soft'"
     >
       {{ label }}
     </div>
     <div
       class="font-outfit text-2xl font-extrabold"
-      :class="dark ? '' : 'text-secondary-500 dark:text-gray-100'"
+      :class="dark ? '' : 'text-secondary-500 dark:text-ink'"
     >
       {{ displayValue }}
     </div>

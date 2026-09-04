@@ -170,19 +170,19 @@ function handleClose() {
   >
     <!-- Step 1: pick a recipient -->
     <div v-if="step === 'pick'" class="space-y-4">
-      <p class="text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t('transferOwnership.pickDescription') }}
       </p>
       <div
         class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
       >
-        <p class="text-sm text-amber-800 dark:text-amber-200">
+        <p class="dark:text-terracotta-lift text-sm text-amber-800">
           {{ t('transferOwnership.warning') }}
         </p>
       </div>
       <p
         v-if="eligibleRecipients.length === 0"
-        class="text-sm text-gray-500 italic dark:text-gray-400"
+        class="dark:text-ink-soft text-sm text-gray-500 italic"
       >
         {{ t('transferOwnership.noEligibleRecipients') }}
       </p>
@@ -204,11 +204,11 @@ function handleClose() {
 
     <!-- Step 3: final confirmation -->
     <div v-else-if="step === 'confirm'" class="space-y-3">
-      <p class="text-sm text-gray-700 dark:text-gray-300">
+      <p class="dark:text-ink-soft text-sm text-gray-700">
         {{ confirmMessage }}
       </p>
       <div class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-        <p class="text-sm text-red-700 dark:text-red-300">
+        <p class="dark:text-danger-lift text-sm text-red-700">
           {{ t('transferOwnership.warning') }}
         </p>
       </div>

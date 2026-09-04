@@ -44,7 +44,7 @@ function handleClick() {
     :disabled="disabled"
     :aria-label="ariaLabel"
     :data-testid="testid"
-    class="group focus-visible:ring-primary-500 relative flex w-full flex-col items-stretch text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+    class="group focus-visible:ring-primary-500 dark:focus-visible:ring-offset-surface-ground relative flex w-full flex-col items-stretch text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     :class="[
       disabled ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5',
       dimmed && !disabled ? 'opacity-60' : '',

@@ -192,7 +192,7 @@ const scheduleMeta = computed(() => {
         <button
           v-if="medicationPhotoUrl"
           type="button"
-          class="relative block h-40 w-full overflow-hidden bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#AED6F1] dark:bg-slate-900"
+          class="dark:bg-surface-ground relative block h-40 w-full overflow-hidden bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#AED6F1]"
           :aria-label="t('photos.viewer.open')"
           @click="photoLightboxOpen = true"
         >
@@ -235,7 +235,7 @@ const scheduleMeta = computed(() => {
            moved to the footer per site convention; primary action is
            the hero "Give a dose" button below the title block. -->
       <div
-        class="-mx-6 flex items-center gap-3 bg-[var(--tint-slate-5)] px-6 py-3 dark:bg-slate-800/60"
+        class="dark:bg-surface-raised/60 -mx-6 flex items-center gap-3 bg-[var(--tint-slate-5)] px-6 py-3"
       >
         <BeanieAvatar
           :variant="memberVariant"
@@ -250,39 +250,41 @@ const scheduleMeta = computed(() => {
           >
             {{ t('medications.forLabel') }}
           </p>
-          <p class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100">
+          <p class="font-outfit dark:text-ink truncate text-sm font-semibold text-[#2C3E50]">
             {{ memberName
-            }}<span v-if="roleLabel" class="text-[#2C3E50]/50"> · {{ roleLabel }}</span>
+            }}<span v-if="roleLabel" class="dark:text-ink-soft text-[#2C3E50]/50">
+              · {{ roleLabel }}</span
+            >
           </p>
         </div>
       </div>
 
       <!-- Title block -->
       <div class="space-y-1.5">
-        <h2 class="font-outfit text-2xl leading-tight font-bold text-[#2C3E50] dark:text-gray-100">
+        <h2 class="font-outfit dark:text-ink text-2xl leading-tight font-bold text-[#2C3E50]">
           {{ medication.name }}
         </h2>
-        <p class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300">
+        <p class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/70">
           <span class="font-semibold text-[#F15D22]">{{ medication.dose }}</span>
-          <span class="mx-1.5 text-[#2C3E50]/30" aria-hidden="true">·</span>
+          <span class="dark:text-ink-soft mx-1.5 text-[#2C3E50]/30" aria-hidden="true">·</span>
           <span>{{ medication.frequency }}</span>
         </p>
         <p
           v-if="scheduleMeta"
-          class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
+          class="font-outfit dark:text-ink-soft text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
         >
           {{ scheduleMeta }}
         </p>
         <p
           v-if="medication.notes"
-          class="font-inter mt-2 text-sm text-[#2C3E50]/75 italic dark:text-gray-300"
+          class="font-inter dark:text-ink-soft mt-2 text-sm text-[#2C3E50]/75 italic"
         >
           "{{ medication.notes }}"
         </p>
         <!-- Last-dose caption — contextual summary directly above the
              hero CTA so the user sees how recent the last dose was
              before tapping "Give a dose". -->
-        <p class="font-inter pt-1 text-xs text-[#2C3E50]/55 dark:text-gray-400">
+        <p class="font-inter dark:text-ink-soft pt-1 text-xs text-[#2C3E50]/55">
           <template v-if="lastDose">
             {{ t('medicationLog.lastDosePrefix') }} {{ formatLogEntryTime(lastDose) }}
             <span v-if="dosesTodayCount >= 1">
@@ -319,15 +321,15 @@ const scheduleMeta = computed(() => {
       <!-- Recent doses -->
       <div>
         <h3
-          class="font-outfit mb-2 text-xs font-semibold tracking-[0.14em] text-[#2C3E50]/55 uppercase dark:text-gray-400"
+          class="font-outfit dark:text-ink-soft mb-2 text-xs font-semibold tracking-[0.14em] text-[#2C3E50]/55 uppercase"
         >
           {{ t('medicationLog.recentHeader') }}
         </h3>
         <div
           v-if="logCount === 0"
-          class="rounded-2xl bg-[var(--tint-slate-5)] px-3 py-4 text-center dark:bg-slate-800/60"
+          class="dark:bg-surface-raised/60 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-4 text-center"
         >
-          <p class="font-inter text-sm text-[#2C3E50]/60 italic dark:text-gray-400">
+          <p class="font-inter dark:text-ink-soft text-sm text-[#2C3E50]/60 italic">
             {{ t('medicationLog.empty') }}
           </p>
         </div>
@@ -363,7 +365,7 @@ const scheduleMeta = computed(() => {
     <template #footer-start>
       <button
         type="button"
-        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50"
         @click="handleEdit"
       >
         ✏️ {{ t('action.edit') }}

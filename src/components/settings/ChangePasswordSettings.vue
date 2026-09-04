@@ -102,13 +102,13 @@ async function handleSave() {
 <template>
   <div
     v-if="hasPassword"
-    class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+    class="dark:border-line flex items-center justify-between rounded-lg border border-gray-200 p-4"
   >
     <div class="min-w-0 flex-1 pr-3">
-      <p class="font-medium text-gray-900 dark:text-gray-100">
+      <p class="dark:text-ink font-medium text-gray-900">
         {{ t('changePassword.tileTitle') }}
       </p>
-      <p class="text-sm text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('changePassword.tileDescription') }}
       </p>
     </div>
@@ -134,7 +134,7 @@ async function handleSave() {
     @save="handleSave"
   >
     <div class="space-y-4">
-      <p class="text-sm text-gray-600 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t('changePassword.modalDescription') }}
       </p>
 
@@ -163,7 +163,7 @@ async function handleSave() {
 
       <p
         v-if="formError"
-        class="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
+        class="dark:text-danger-lift rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
       >
         {{ formError }}
       </p>

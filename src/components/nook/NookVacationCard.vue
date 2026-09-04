@@ -72,7 +72,7 @@ function handleClick() {
     <div class="flex items-center gap-2.5">
       <span class="text-xl">{{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}</span>
       <div class="min-w-0 flex-1">
-        <div class="font-outfit text-sm font-bold text-gray-900 dark:text-gray-100">
+        <div class="font-outfit dark:text-ink text-sm font-bold text-gray-900">
           {{ vacation.name }}
         </div>
         <div class="font-outfit mt-0.5 text-xs text-gray-400">📅 {{ dateRange }}</div>
@@ -143,7 +143,7 @@ function handleClick() {
   background: linear-gradient(180deg, rgb(0 180 216 / 6%), rgb(0 180 216 / 14%));
 }
 
-:global(.dark) .nook-vacation-tint {
+html.dark .nook-vacation-tint {
   background: linear-gradient(180deg, rgb(0 180 216 / 8%), rgb(0 180 216 / 18%));
 }
 </style>

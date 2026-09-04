@@ -47,7 +47,7 @@ const avatarEmoji = computed(() => {
     :class="
       tone === 'dark'
         ? 'text-secondary-500 bg-white/90'
-        : 'text-secondary-500 bg-[var(--tint-slate-5)] dark:bg-slate-700/60 dark:text-gray-100'
+        : 'text-secondary-500 dark:bg-surface-overlay/60 dark:text-ink bg-[var(--tint-slate-5)]'
     "
     :style="{ boxShadow: `inset 0 0 0 1px ${member.color}30` }"
   >

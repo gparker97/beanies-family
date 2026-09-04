@@ -195,12 +195,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
   -->
   <div
     v-if="variant === 'strip'"
-    class="flex shrink-0 items-center rounded-[18px] bg-white p-1.5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised flex shrink-0 items-center rounded-[18px] bg-white p-1.5 shadow-[var(--card-shadow)]"
   >
     <button
       v-if="tonight"
       type="button"
-      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0 dark:border-slate-700"
+      class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
       @click="emit('open', { kind: 'meals', ymd: mealsYmd })"
     >
       <span aria-hidden="true">{{ tonight.emoji }}</span>
@@ -208,7 +208,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     </button>
     <button
       type="button"
-      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0 dark:border-slate-700"
+      class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
       :aria-label="t('wall.card.todos')"
       @click="emit('open', { kind: 'todos' })"
     >
@@ -218,7 +218,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     <button
       v-if="visibleLists.length"
       type="button"
-      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0 dark:border-slate-700"
+      class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
       @click="emit('openChores')"
     >
       <span aria-hidden="true">📝</span>
@@ -265,12 +265,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <span
         v-for="{ list, jobs } in visibleLists"
         :key="list.id"
-        class="flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0 dark:border-slate-700"
+        class="dark:border-line flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0"
       >
         <span class="wall-card-list-emoji leading-none" aria-hidden="true">{{ list.emoji }}</span>
         <span class="min-w-0 flex-1">
           <span
-            class="font-outfit wall-card-line text-secondary-500 block truncate font-semibold dark:text-gray-100"
+            class="font-outfit wall-card-line text-secondary-500 dark:text-ink block truncate font-semibold"
           >
             {{ list.title }}
             <span
@@ -314,7 +314,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <span
         v-for="entry in outstandingTodos"
         :key="entry.member?.id ?? 'unassigned'"
-        class="flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0 dark:border-slate-700"
+        class="dark:border-line flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0"
       >
         <BeanieAvatar
           v-if="entry.member"
@@ -329,9 +329,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           >?</span
         >
         <span class="min-w-0 flex-1">
-          <span
-            class="font-inter wall-card-line text-secondary-500 block truncate dark:text-gray-100"
-          >
+          <span class="font-inter wall-card-line text-secondary-500 dark:text-ink block truncate">
             {{ entry.jobs[0].title }}
           </span>
           <span class="font-inter wall-card-sub block text-[var(--muted-text,#4d5d6c)]">
@@ -369,7 +367,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
             {{ t(tonight.slotKey) }}
           </span>
           <span
-            class="font-outfit wall-card-meal text-secondary-500 block truncate font-bold dark:text-gray-100"
+            class="font-outfit wall-card-meal text-secondary-500 dark:text-ink block truncate font-bold"
           >
             {{ tonight.name }}
           </span>

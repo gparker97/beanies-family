@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="sticky top-0 z-30 -mx-4 mb-1 border-b border-gray-200/70 bg-white px-4 pt-3 pb-2.5 shadow-[0_4px_16px_-12px_rgba(44,62,80,0.18)] md:-mx-6 md:px-6 md:pt-4 md:pb-3 dark:border-slate-700 dark:bg-slate-900"
+    class="dark:border-line dark:bg-surface-ground sticky top-0 z-30 -mx-4 mb-1 border-b border-gray-200/70 bg-white px-4 pt-3 pb-2.5 shadow-[0_4px_16px_-12px_rgba(44,62,80,0.18)] md:-mx-6 md:px-6 md:pt-4 md:pb-3"
   >
     <!-- Top row: period hero + nav (+ mobile menu / pinned filter / search), then controls -->
     <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
@@ -129,7 +129,7 @@ onBeforeUnmount(() => {
           <Transition name="cal-label" mode="out-in">
             <h1
               :key="label"
-              class="font-outfit text-secondary-500 truncate text-xl font-extrabold sm:text-2xl dark:text-gray-100"
+              class="font-outfit text-secondary-500 dark:text-ink truncate text-xl font-extrabold sm:text-2xl"
             >
               {{ label }}
             </h1>
@@ -140,7 +140,7 @@ onBeforeUnmount(() => {
         <div class="flex flex-shrink-0 items-center gap-0.5">
           <button
             type="button"
-            class="text-secondary-500/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+            class="text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
             :aria-label="t('planner.prevPeriod')"
             @click="emit('prev')"
           >
@@ -163,7 +163,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="text-secondary-500/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+            class="text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
             :aria-label="t('planner.nextPeriod')"
             @click="emit('next')"
           >
@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
           <button
             v-if="activeView === 'day'"
             type="button"
-            class="text-secondary-500/70 hover:text-primary-500 font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+            class="text-secondary-500/70 hover:text-primary-500 font-outfit dark:text-ink-soft dark:hover:bg-surface-hover inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition-colors hover:bg-gray-100"
             :title="t('planner.openAgenda')"
             :aria-label="t('planner.openAgenda')"
             @click="emit('open-agenda')"
