@@ -4,6 +4,7 @@
  * MealSlotCell as the desktop board (shared seam), so behaviour can't drift.
  */
 import { useMealPlanStore } from '@/stores/mealPlanStore';
+import { MEAL_SLOTS, SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
 import MealSlotCell from './MealSlotCell.vue';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
 
-const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const SLOTS = MEAL_SLOTS;
 
 function mealsFor(slot: MealSlot): MealPlanEntry[] {
   return mealPlanStore.mealsForDate(props.date).filter((m) => m.slot === slot);
@@ -30,7 +31,7 @@ function mealsFor(slot: MealSlot): MealPlanEntry[] {
       <div
         class="font-outfit dark:text-ink-faint mb-1.5 text-xs font-semibold tracking-[0.06em] text-[rgba(44,62,80,0.4)] uppercase"
       >
-        {{ t(`mealPlanner.slot.${slot}`) }}
+        {{ t(SLOT_LABEL_KEYS[slot]) }}
       </div>
       <MealSlotCell
         :meal-slot="slot"

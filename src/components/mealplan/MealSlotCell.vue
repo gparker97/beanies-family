@@ -10,6 +10,7 @@ import { ref, computed } from 'vue';
 import MealCard from './MealCard.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useMealDrag } from '@/composables/useMealDrag';
+import { SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
@@ -55,7 +56,7 @@ const isEmpty = computed(() => props.meals.length === 0);
  */
 const addLabel = computed(() =>
   fillTemplate(t('mealPlanner.addMealTo'), {
-    slot: t(`mealPlanner.slot.${props.mealSlot}`),
+    slot: t(SLOT_LABEL_KEYS[props.mealSlot]),
     day: new Date(`${props.date}T00:00:00`).toLocaleDateString(undefined, {
       weekday: 'long',
       day: 'numeric',
