@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle, FileSystemHandle */
 import { ref, computed, onMounted, watch } from 'vue';
-import { payloadErrorMessageKey, PayloadTooLargeError } from '@/types/sync';
+import { payloadErrorMessageKey, PayloadLoadError } from '@/types/sync';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -166,12 +166,17 @@ const pendingMemberCount = computed(() => {
  * Returns true if decryption succeeded.
  */
 /**
- * Set when the auto-decrypt failed because this device could not inflate the
- * pod. `handlePendingPassword` reads it: opening a password (or recovery-kit)
- * form for that failure is a retype loop, since no credential makes the
- * document smaller.
+ * This pod will not open on this device, for a reason no credential can fix.
+ *
+ * Read by `handlePendingPassword` (never open a password form for it — that is
+ * a retype loop) and by `openKitEntry` (never wipe the explanation). Reset by
+ * `resetPodUnopenable()` whenever the user picks a DIFFERENT file, or the
+ * latch would silently dead-end every later selection in the session.
  */
-const podTooLargeForDevice = ref(false);
+const podUnopenableHere = ref(false);
+function resetPodUnopenable(): void {
+  podUnopenableHere.value = false;
+}
 
 /**
  * Open the recovery-kit form. Clears a CREDENTIAL error (the user is switching
@@ -181,7 +186,11 @@ const podTooLargeForDevice = ref(false);
  */
 function openKitEntry(): void {
   showKitEntry.value = true;
-  if (!podTooLargeForDevice.value) formError.value = null;
+  // Keep a payload explanation. The user is switching method because nothing is
+  // working, and this is the branch that actually reaches here: the auto-decrypt
+  // path never opens the modal at all, so the kit link is only ever visible
+  // after `handleDecrypt`/`handleKitRedeem` set the message.
+  if (!podUnopenableHere.value) formError.value = null;
 }
 
 async function tryAutoDecrypt(): Promise<boolean> {
@@ -198,22 +207,31 @@ async function tryAutoDecrypt(): Promise<boolean> {
       const fk = await importFamilyKey(raw);
       const result = await syncStore.decryptPendingFileWithKey(fk);
       if (result.success) return true;
-      // ⚠️ ONLY the too-large half skips the clear below. The key was FINE
-      // there — the device could not inflate the pod — so deleting it would
-      // destroy a valid credential over a memory limit.
-      //
-      // A CORRUPT payload must still fall through to the clear, and this is the
-      // distinction an earlier cut got wrong: a WRONG cached key (rotation,
-      // family switch, a partial IDB write) fails in `crypto.subtle.decrypt`
-      // and is classified `CorruptPayloadError`, so skipping the clear would
-      // retain the bad key permanently and dead-end every future open.
-      if (result.payloadError instanceof PayloadTooLargeError) {
+      if (result.payloadError) {
+        // Say what happened, for BOTH classes. (An earlier cut showed it only
+        // for too-large, which left the corrupt case with an empty error slot
+        // above a password form.)
         formError.value = t(payloadErrorMessageKey(result.payloadError));
-        podTooLargeForDevice.value = true;
-        return false;
+        // ⚠️ THE STEP decides whether to delete the key, NOT the class.
+        //
+        // `decryptToDoc` wraps only the decrypt; `loadAndVerify` runs outside
+        // it. So `step: 'load'` or `'materialize'` means `decryptPayload`
+        // SUCCEEDED — the AES-GCM tag verified, and this key is definitively
+        // correct; only the bytes were bad. Deleting it there destroys a valid
+        // credential over a damaged file and costs the user trusted-device
+        // auto-open permanently (a recovery kit, on a kit-only envelope).
+        //
+        // Only `step: 'decrypt'` can mean a WRONG key (rotation, family switch,
+        // a partial IDB write), and that one must still fall through to the
+        // clear or the bad key is retained forever.
+        if (result.payloadError.step !== 'decrypt') {
+          podUnopenableHere.value = true;
+          return false;
+        }
       }
-    } catch {
-      // Cached key invalid — clear it
+    } catch (e) {
+      // Never silent: this deletes a credential.
+      console.warn('[LoadPodView] cached family key discarded after a failed decrypt', e);
     }
     await settingsStore.clearCachedFamilyKey(pendingFamilyId);
   }
@@ -301,7 +319,7 @@ async function handlePendingPassword(
   // No credential can make the pod fit in this device's memory, so a password
   // form (or the kit form) here is a retype loop with the honest message
   // wiped by the first submit. Leave the message on screen instead.
-  if (podTooLargeForDevice.value) return;
+  if (podUnopenableHere.value) return;
   const pendingEnv = syncStore.pendingEncryptedFile?.envelope;
   if (pendingEnv && envelopeNeedsRecovery(pendingEnv)) {
     showKitEntry.value = true;
@@ -324,6 +342,7 @@ onMounted(async () => {
 async function autoLoadFile() {
   isLoadingFile.value = true;
   formError.value = null;
+  resetPodUnopenable(); // a different file may well open
 
   try {
     // If there's already a pending encrypted file (e.g. from loadFromNewFile() before
@@ -344,6 +363,14 @@ async function autoLoadFile() {
   } catch (e) {
     // File load failed — surface to the user (previously this was a bare
     // catch that left users stranded on the storage picker with no error).
+    // A payload failure gets the honest copy and latches, so the handoff below
+    // does not then offer a credential form for it.
+    if (e instanceof PayloadLoadError) {
+      podUnopenableHere.value = true;
+      formError.value = t(payloadErrorMessageKey(e));
+      isLoadingFile.value = false;
+      return;
+    }
     formError.value = syncStore.error ?? t('auth.fileLoadFailed');
     console.error('[LoadPodView] autoLoadFile failed:', e);
   }
@@ -448,6 +475,7 @@ async function loadSavedFileViaPicker() {
 
 async function handleLoadFile() {
   formError.value = null;
+  resetPodUnopenable(); // a different file may well open
   isLoadingFile.value = true;
 
   try {
@@ -500,6 +528,7 @@ async function handleKitRedeem() {
     if (!dec.success) {
       // 'wrong recovery code' would be a lie when the kit unwrapped fine and it
       // was the pod that would not fit in memory.
+      if (dec.payloadError) podUnopenableHere.value = true;
       formError.value = dec.payloadError
         ? t(payloadErrorMessageKey(dec.payloadError))
         : t('password.decryptionError');
@@ -571,6 +600,7 @@ async function handleDecrypt() {
       // raw Automerge/WASM string ("error inflating document chunk ops: out of
       // memory") was rendered untranslated under the password field.
       formError.value = t(payloadErrorMessageKey(result.payloadError));
+      podUnopenableHere.value = true;
     } else {
       formError.value = result.error ?? t('password.decryptionError');
     }
@@ -607,6 +637,7 @@ async function handleDrop(e: DragEvent) {
   dragCounter = 0;
   isDragging.value = false;
   formError.value = null;
+  resetPodUnopenable(); // a different file may well open
 
   const items = e.dataTransfer?.items;
   if (!items || items.length === 0) return;
@@ -902,6 +933,7 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
   reason?: 'auth' | 'not-found' | 'error';
 }> {
   showDrivePicker.value = false;
+  resetPodUnopenable(); // a different file may well open
   isLoadingFile.value = true;
   formError.value = null;
 

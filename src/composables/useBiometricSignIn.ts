@@ -22,6 +22,7 @@
  */
 import { ref, type Ref } from 'vue';
 import { payloadErrorMessageKey } from '@/types/sync';
+import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -82,6 +83,10 @@ export function useBiometricSignIn(): {
         }
         const fkResult = await syncStore.decryptPendingFileWithKey(result.familyKey);
         if (!fkResult.success) {
+          // Same gap as the password branch: nothing reported the corrupt half.
+          if (fkResult.payloadError) {
+            reportPayloadFailure(fkResult.payloadError, { source: 'biometric-unlock' });
+          }
           console.warn('[useBiometricSignIn] decryptPendingFileWithKey failed:', fkResult.error);
           return {
             ok: false,

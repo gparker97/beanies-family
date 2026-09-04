@@ -72,3 +72,21 @@ describe('suspiciousTranslationReason', () => {
     });
   });
 });
+
+describe('suspiciousTranslationReason — control characters', () => {
+  it('rejects control characters the SOURCE does not have', () => {
+    expect(suspiciousTranslationReason('Settings', '设置\n英 [ˈsetɪŋz]')).toBe(
+      'control characters'
+    );
+  });
+
+  it('ALLOWS a newline when the source is genuinely multi-line', () => {
+    // A blanket reject fell the invite message and both recipe placeholders back
+    // to English the moment the parser started resolving `\n` — and the loop
+    // then stamped the current hash on that English, so they could never be
+    // retried. Both halves of that are now fixed; this pins the first.
+    expect(
+      suspiciousTranslationReason('Hi!\nJoin here: {link}', '您好！\n点击加入：{link}')
+    ).toBeNull();
+  });
+});
