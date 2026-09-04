@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi, afterEach } from 'vitest';
 
 /**
  * Orientation policy — the rule is device-class, not viewport.
@@ -39,6 +39,18 @@ describe('orientation policy', () => {
   });
 
   describe('isRotatableFormFactor', () => {
+    // Imported ONCE for the whole block, not per case. `isRotatableFormFactor`
+    // reads `screen` at call time and the module has no load-time state that
+    // depends on it, so `vi.resetModules()` + a fresh import per case bought
+    // nothing and re-walked the whole module graph eight times — enough to blow
+    // the 5s per-test timeout on the FIRST case under parallel suite load
+    // (twice observed). The stateful `applyOrientationPolicy` block below still
+    // reloads deliberately.
+    let isRotatableFormFactor: () => boolean;
+    beforeAll(async () => {
+      ({ isRotatableFormFactor } = await load());
+    });
+
     it.each([
       ['iPhone 15 portrait', 393, 852, false],
       ['iPhone 15 held sideways', 852, 393, false],
@@ -46,23 +58,20 @@ describe('orientation policy', () => {
       ['iPad mini', 744, 1133, true],
       ['iPad Pro', 1024, 1366, true],
       ['a 600dp Android tablet, exactly on the threshold', 600, 960, true],
-    ])('%s -> %s', async (_name, w, h, expected) => {
+    ])('%s (%s x %s) rotatable: %s', (_name, w, h, expected) => {
       setScreen(w, h);
-      const { isRotatableFormFactor } = await load();
       expect(isRotatableFormFactor()).toBe(expected);
     });
 
-    it('uses the SMALLEST side, so a phone in landscape is still a phone', async () => {
+    it('uses the SMALLEST side, so a phone in landscape is still a phone', () => {
       // 852px of width comfortably clears any viewport-based tablet breakpoint;
       // only the smallest-side rule keeps this device locked.
       setScreen(852, 393);
-      const { isRotatableFormFactor } = await load();
       expect(isRotatableFormFactor()).toBe(false);
     });
 
-    it('is false when there is no screen API to measure', async () => {
+    it('is false when there is no screen API to measure', () => {
       Object.defineProperty(globalThis, 'screen', { configurable: true, value: undefined });
-      const { isRotatableFormFactor } = await load();
       expect(isRotatableFormFactor()).toBe(false);
     });
   });
