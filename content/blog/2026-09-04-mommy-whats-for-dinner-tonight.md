@@ -16,21 +16,21 @@ Have you ever stopped in the middle of a busy day at the office, felt your tummy
 
 One of my favorite publications on Substack is [The Dad Mag](https://dadmag.substack.com/) by Jack Neary. For any busy parents out there, I suggest you read it. Lots of great tips and advice.
 
-Recently, Jack posted a short blog about how he prepares the meal plan for his family every Sunday and does food shopping in advance, as a way to help relieve his wife of some of the mental load.
+Recently, Jack posted a short blog about how he prepares the meal plan for his family every Sunday and does food shopping in advance, as a way to help relieve his wife of some of the mental load (he also [interviewed me](https://dadmag.substack.com/p/vibe-coding-dad-of-three), but that’s another story).
 
 To me, this is a perfect example of the type of habit that’s great to put into practice at home (and it's something I would genuinely like to apply in my own house, if only I had the ability to cook edible food).
 
-For those of us who work in corporate (or, really, any job), this type of responsibility split is probably second nature: a clear delegation of duties, repeatable habits, and a weekly cadence, with both partners onboard and in sync. It’s a recipe (forgive the pun) for success.
+For those of us who work in corporate (or, really, any job), this type of responsibility split is probably second nature: a clear delegation of duties, repeatable habits, and a weekly cadence, with both partners onboard and in sync. It’s a recipe (forgive the pun, which was absolutely intended) for success.
 
 **Talking about the hero parent**
 
 Taking this further, in IT, there’s something called “hero syndrome”. A hero worker is a person who carries all the tribal knowledge, learned experience, and legacy information in his or her own head, and is the person everybody turns to when things go wrong. The hero worker is sometimes referred to as a “SPOF” (Single Point of Failure), and while we all love superheroes, it’s an IT anti-pattern.
 
-The “hero worker” is something to avoid: it creates bottlenecks, it’s stressful, and it usually results in burnout for the person who has all the info. Yet at home, we tend to accept it as a given that one of the parents will be the “hero” (hero moms and dads, please raise your hands ✋✋). And if you’re reading that with a sinking feeling because it’s obviously you, [I wrote a whole guide about that feeling](https://beanies.family/guides/overwhelmed-family-planning?utm_source=blog&utm_medium=post&utm_campaign=mommy-whats-for-dinner-tonight&utm_content=pillar-overwhelmed).
+The “hero worker” is something to avoid: it creates bottlenecks, it’s stressful, and it usually results in burnout for the person who has all the info. Yet at home, we tend to accept it as a given that one of the parents will be the “hero” (hero moms and dads, [please raise your hands](https://beanies.family/guides/overwhelmed-family-planning?utm_source=blog&utm_medium=post&utm_campaign=mommy-whats-for-dinner-tonight&utm_content=pillar-overwhelmed) ✋✋).
 
 Why do we allow one person to carry all the mental load at home, when we wouldn’t accept that at work? That’s actually one of the main reasons I built [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=mommy-whats-for-dinner-tonight&utm_content=why-i-built) - so that load can be _made visible_ and _shared,_ and those principles of sharing responsibility and mental load, that go without saying at work, can also be applied at home.
 
-In other words, Jack’s plan is a concrete example of how we can help “hero parents” reduce their mental load, at least a little bit. If you want the longer version of this argument, it’s the whole idea behind [building a family OS](https://beanies.family/guides/family-organization?utm_source=blog&utm_medium=post&utm_campaign=mommy-whats-for-dinner-tonight&utm_content=pillar-family-organization): a household that runs on shared information, instead of one parent’s memory.
+In other words, Jack’s plan is a concrete example of how we can help “hero parents” [reduce their mental load](https://beanies.family/guides/family-organization?utm_source=blog&utm_medium=post&utm_campaign=mommy-whats-for-dinner-tonight&utm_content=pillar-family-organization), at least a little bit.
 
 **So, how do we actually implement Jack’s meal plan idea, and relieve your partner (or yourself) of some responsibility?**
 
@@ -54,17 +54,17 @@ _does this mean the next time my kid asks me what’s for dinner, i can just tel
 
 Some of my favorite recipes are either on YouTube, bookmarked on my browser, or cut out Bon Appétit cooking magazine articles my mom has kept stored in the kitchen drawer since 1984 (the year of our lord).
 
-Remember how we just got an app with _private and secure_ AI? Well, now you can simply share those recipes with beanies, and bam! They magically appear in your cookbook, perfectly formatted, preserved forever, and ready to be added to any meal.
+Remember how we now have an app with _private and secure_ AI? Well, now you can simply share those recipes with beanies, and bam! They magically appear in your cookbook, perfectly formatted, preserved forever, and ready to be added to any meal.
 
 Add a recipe link, a YouTube url, or just a bunch of recipe text, and the beanies family cookbook will read it and add it to your cookbook. Or, even better, just share the YouTube link to beanies directly:
 
 ![Sharing a YouTube recipe link straight into beanies, which reads it and saves it to the family cookbook](/blog/recipe-share-to-cookbook.webp)
 
-_if only everything in life could be this simple_
+_if only everything in life could be this easy_
 
-_Now_ is that cool enough?!
+_Now_ are we good?!
 
-So, in summary _again_: beanies has an awesome and useful meal planner, **_and_** AI to read and store your favorite recipes in your secret family cookbook, all at the tap of a button (or the drag of a mouse)!
+So, in summary, _again_: beanies has an awesome and useful meal planner, **_and_** AI to easily read and store your favorite recipes in your secret family cookbook, all at the tap of a button (or the drag of a mouse)!
 
 So now I’d like to know: what do we all think of these new foodie features? Does this actually help to reduce the mental load, or has it just become another chore? Tell me (or just join to have a chat) in the [beanies.family discord](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=mommy-whats-for-dinner-tonight&utm_content=discord-cta).
 
