@@ -918,7 +918,7 @@ export const useSyncStore = defineStore('sync', () => {
    * file. The caller does its own setupAutoSync/return.
    */
   async function hydrateFromEnvelope(env: BeanpodFileV4): Promise<void> {
-    await docClient.setFamilyKey(familyKey.value!);
+    await docClient.setFamilyKey(familyKey.value!, env.familyId);
     const { dirty } = await docClient.mergeRemoteEnvelope(env, env.familyId);
     const merged = replaceEnvelope(env);
     syncService.setFamilyKey(familyKey.value!, merged);
@@ -1338,11 +1338,13 @@ export const useSyncStore = defineStore('sync', () => {
         viaRecoveryPassphrase,
       } = await tryUnwrapFamilyKey(pending.envelope, password);
 
-      // Post the just-unwrapped key to the worker so it can decrypt + merge.
-      await docClient.setFamilyKey(fk);
+      // Hoisted above the post so the actor can be derived for the RIGHT family
+      // — a pure move, no behaviour change.
+      const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      // Post the just-unwrapped key + the stable actor so it can decrypt + merge.
+      await docClient.setFamilyKey(fk, famId ?? '');
 
       // Adopt the payload (+ recover any unsynced cache) to prevent data loss.
-      const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
       if (famId) {
         await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
@@ -1523,7 +1525,7 @@ export const useSyncStore = defineStore('sync', () => {
       const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
       const { base64ToBuffer } = await import('@/utils/encoding');
       const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(keyB64)));
-      await docClient.setFamilyKey(fk);
+      await docClient.setFamilyKey(fk, activeFamilyId);
 
       // ADR-032 FAST FIRST PAINT: post the projection-snapshot RPC FIRST (it decrypts
       // + streams the last projection in <1s, NO Automerge rebuild) and the
@@ -1974,7 +1976,7 @@ export const useSyncStore = defineStore('sync', () => {
       // re-init here — that would wipe the owner-member writes already in the doc.
       // Post the key to the worker, then have it encrypt the doc → payload; main
       // assembles the envelope (keys never leave main).
-      await docClient.setFamilyKey(fk);
+      await docClient.setFamilyKey(fk, familyId);
       const { payload } = await docClient.exportEncryptedPayload();
       const envelopeJson = createBeanpodV4(
         familyId,
@@ -2152,10 +2154,11 @@ export const useSyncStore = defineStore('sync', () => {
     if (!pending) return { success: false, error: 'No pending file' };
 
     try {
-      // Post the key to the worker so it can decrypt + merge/adopt.
-      await docClient.setFamilyKey(fk);
-
+      // Hoisted above the post so the actor can be derived for the RIGHT family
+      // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      // Post the key + the stable actor so it can decrypt + merge/adopt.
+      await docClient.setFamilyKey(fk, famId ?? '');
       if (famId) {
         await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {

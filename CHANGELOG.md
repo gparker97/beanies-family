@@ -20,6 +20,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - When beanies captures a recipe from a web page, it now works out the course and which meals it suits at the same time, and fills them in for you to check. If it isn't sure, it leaves them blank rather than guessing.
 - Tags are saved in lowercase, so you only ever get one of each — and the recipe form says so, and tells you when a tag is a duplicate or you have reached the limit, instead of appearing to do nothing.
 
+### Changed
+
+- **beanies now keeps one identity per device instead of inventing a new one every time it opens.** Every open used to add a permanent new signature to your family file, so a file could accumulate thousands of them for a family of five, making it slower and heavier to open on every device. New opens no longer add one. This does not shrink a file that has already grown; that is the next piece of work.
+
 ### Fixed
 
 - **Chinese translations no longer break on special characters.** Dashes in about fifty phrases showed as `\u2013` instead of the character itself, and the family-invite message, the welcome button and both recipe placeholders had silently reverted to English with no way to retry them. All are fixed, and "Course" in the cookbook is no longer translated as a flight route.

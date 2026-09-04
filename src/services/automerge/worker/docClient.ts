@@ -24,6 +24,7 @@
  * completed in Task #6 (`setInlineExecutor`, `setRehydrator`).
  */
 import { withTimeout } from '@/utils/timing';
+import { deviceActorId } from '@/services/automerge/deviceActor';
 import { wasHiddenSince } from '@/utils/visibilityTracker';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { reportError } from '@/utils/errorReporter';
@@ -95,6 +96,15 @@ let mode: 'worker' | 'inline' = 'worker';
 
 // Retained across a worker re-spawn so recovery needs no re-unlock.
 let familyKey: CryptoKey | null = null;
+/**
+ * The stable device actor, retained beside the key so there is ONE lifetime.
+ *
+ * Re-posted on every realm change (respawn, inline fallback), because a realm
+ * that never received it mints a random actor per load and the churn resumes
+ * silently — the failure is invisible for weeks and only shows up as a slowly
+ * growing actor count in the pod.
+ */
+let docActor: string | null = null;
 let currentFamilyId: string | null = null;
 let rehydrator: ((familyId: string) => Promise<void>) | null = null;
 let needsRehydrate = false;
@@ -272,6 +282,15 @@ function onWorkerError(err: unknown): void {
 async function enterInlineMode(): Promise<void> {
   mode = 'inline';
   if (!inlineExecutor) return; // not wired yet (bootstrap pending / tests)
+  // ⚠️ ACTOR BEFORE KEY, and both before the rehydrator below: the rehydrator
+  // LOADS the document, and an actor arriving after that has pinned nothing.
+  if (docActor) {
+    try {
+      await inlineExecutor('setActor', { actor: docActor });
+    } catch (e) {
+      console.error('[docClient] inline setActor re-drive failed', e);
+    }
+  }
   if (familyKey) {
     try {
       await inlineExecutor('setKey', { key: familyKey });
@@ -320,7 +339,10 @@ async function spawn(): Promise<'worker' | 'inline'> {
     return 'inline';
   }
   mode = 'worker';
-  // Re-post the retained key + re-hydrate a freshly re-spawned worker.
+  // Re-post the retained actor + key, then re-hydrate a freshly re-spawned
+  // worker. ⚠️ ACTOR FIRST — the rehydrator below loads the document, so an
+  // actor posted after it has pinned nothing.
+  if (docActor) postRaw({ cid: nextCid++, method: 'setActor', args: { actor: docActor } });
   if (familyKey) postRaw({ cid: nextCid++, method: 'setKey', args: { key: familyKey } });
   if (needsRehydrate && currentFamilyId && rehydrator) {
     needsRehydrate = false;
@@ -449,6 +471,11 @@ const RETRYABLE_METHODS = new Set([
   'persistEnvelope',
   'readEnvelope',
   'setKey',
+  // Idempotent state post, exactly like `setKey` above: re-issuing it after a
+  // respawn sets the same string. NOT in HEAVY / ENVELOPE / USER_ACTION, and
+  // deliberately NOT in JSON_SAFE — its arg is a plain string, and that set
+  // means "args that could carry a Vue proxy".
+  'setActor',
   'collectReferencedPhotoIds',
   'ping',
 ]);
@@ -919,8 +946,19 @@ function surface(
 // ─── Typed method wrappers (mirror the retired docService/persistence API) ───
 
 /** Post the family key to the worker (once at unlock; re-posted on re-spawn). */
-export async function setFamilyKey(key: CryptoKey): Promise<void> {
+export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<void> {
+  // `familyId` is REQUIRED, on the seam the key already uses. Deriving the actor
+  // "beside" this call would mean five main-side call sites, five chances to
+  // forget, and five places to remember forever; one required parameter is
+  // compiler-enforced and a future sixth caller cannot omit it.
   familyKey = key;
+  // Never throws — a null actor means Automerge mints a random one, which is
+  // exactly today's behaviour. An actor-derivation failure must not be able to
+  // stop a pod from opening.
+  docActor = await deviceActorId(familyId);
+  // ⚠️ ACTOR BEFORE KEY: every doc-creating op is downstream of the key, so the
+  // actor has to be in the realm before any of them can run.
+  await request('setActor', { actor: docActor });
   await request('setKey', { key });
 }
 
@@ -1155,6 +1193,7 @@ export async function reset(): Promise<void> {
   // the next initDoc (below) re-arms normal toast policy.
   currentFamilyId = null;
   familyKey = null;
+  docActor = null;
   await request('reset');
   // Clear the main-thread mirror too — a worker-only reset would leave a stale
   // projection readable across a family-switch (cross-session data bleed).
@@ -1179,6 +1218,7 @@ export function __resetDocClientForTesting(): void {
   nextCid = 1;
   mode = 'worker';
   familyKey = null;
+  docActor = null;
   currentFamilyId = null;
   needsRehydrate = false;
   rehydrating = false;

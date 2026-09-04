@@ -706,8 +706,10 @@ function persistEnvelopeSafely(envelope: BeanpodFileV4): void {
 export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): void {
   currentFamilyKey = familyKey;
   noKeyWarnedOnce = false; // Reset so future skips can warn again
-  // Post the key to the worker (once at unlock).
-  void docClient.setFamilyKey(familyKey);
+  // Post the key + the stable device actor to the worker (once at unlock).
+  // The envelope's familyId is the authority here — it is the pod being opened,
+  // which is not necessarily the family that was active a moment ago.
+  void docClient.setFamilyKey(familyKey, envelope.familyId);
   // Route through `setEnvelope` rather than assigning `currentEnvelope` here:
   // that keeps ONE write path for the in-memory envelope, so the payload strip
   // (and the cache seed) cannot be applied on one path and missed on the other.
