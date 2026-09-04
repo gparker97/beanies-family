@@ -31,4 +31,4 @@
 // The web and Play accept any `R<n>` freely (Play keys on `versionCode`), so an R revision is
 // fine for a web-only or Play-only ship. **If a release is going to the App Store, use a new
 // numeric version** (`0.15.1`, not `0.15R3`).
-export const APP_VERSION = '0.15.1';
+export const APP_VERSION = '0.16';
