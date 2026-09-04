@@ -227,6 +227,8 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           fields: { name: source.title, ingredients: [], steps: [] },
           inferredIngredients: [],
           inferredSteps: [],
+          // No model output on this rung, so nothing was offered and nothing was rejected.
+          taxonomyRejected: [],
           dishImage: null,
           confidence: { name: 1, ingredients: 0, steps: 0 },
         };
@@ -347,6 +349,9 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     path: ExtractionPath,
     sourceFile: File | null
   ): void {
+    const gotCourse = Boolean(prefill.fields.course);
+    const gotMeals = (prefill.fields.mealSlots?.length ?? 0) > 0;
+
     logEvent({
       level: 'info',
       surface: SURFACE,
@@ -359,8 +364,40 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         extraction_path: path,
         inferred_count: prefill.inferredIngredients.length + prefill.inferredSteps.length,
         ingredient_count: prefill.fields.ingredients.length,
+        // `detail` is a per-action key across this surface; HERE it is the taxonomy outcome
+        // (#87) — which of course/meal the model filled in. Riding the existing success event
+        // rather than adding a second per-capture one keeps the firehose volume flat while
+        // still making the fill RATE measurable, which a failure-only event could never do.
+        detail:
+          gotCourse && gotMeals
+            ? 'both'
+            : gotCourse
+              ? 'course_only'
+              : gotMeals
+                ? 'meal_only'
+                : 'none',
       },
     });
+
+    // The event that matters. Without it a model drifting to "Main Course" or "brunch" is
+    // indistinguishable from one that simply declined — both present as "the AI never fills
+    // this in". The developer-facing WHY is the console.warn in `validatedTaxonomy`.
+    if (prefill.taxonomyRejected.length > 0) {
+      const rejectedCourse = prefill.taxonomyRejected.includes('course');
+      const rejectedMeal = prefill.taxonomyRejected.includes('meal');
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'model returned an unusable course or meal slot',
+        context: {
+          action: 'taxonomy_rejected',
+          kind,
+          extraction_path: path,
+          detail: rejectedCourse && rejectedMeal ? 'both' : rejectedCourse ? 'course' : 'meal',
+        },
+      });
+    }
+
     options.onRecipeReady({ prefill, sourceFile });
   }
 

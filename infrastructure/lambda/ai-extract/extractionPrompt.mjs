@@ -9,7 +9,7 @@
 // required keys, or the built messages diverge (src/services/ai/__tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
-export const PROMPT_VERSION = '2026-09-03.1';
+export const PROMPT_VERSION = '2026-09-04.1';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -253,6 +253,10 @@ export const RECIPE_JSON_SHAPE = {
     'array — one object per step, in order: { text: string (a single instruction), inferred: boolean }. Do not number them. Empty array if none.',
   notes:
     'string — every practical detail with no dedicated field above: substitutions, storage, equipment, make-ahead, allergen notes. One fact per line. "" if there is nothing.',
+  course:
+    'string — the dish\'s role in a meal, exactly one of: starter, main, side, dessert, drink, baking, sauce, other. Use "" if it is not clear. Do not guess.',
+  mealSlots:
+    'array of strings — which meals this suits, any of: breakfast, lunch, dinner, snack. Use exactly these words. Empty array if it is not clear. Do not guess.',
   confidence: 'object — a 0..1 number for each of: name, ingredients, steps',
 };
 
