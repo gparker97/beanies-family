@@ -175,14 +175,22 @@ const pendingMemberCount = computed(() => {
  * latch would silently dead-end every later selection in the session.
  */
 const podUnopenableHere = ref(false);
+/**
+ * A payload message is currently on screen (any class, latched or not). Kept
+ * separate from `podUnopenableHere`, which decides whether to STOP offering
+ * credentials: the recoverable credential case does not latch but still wants
+ * its explanation carried across when the user switches to the kit form.
+ */
+const payloadExplanationShown = ref(false);
 function resetPodUnopenable(): void {
   podUnopenableHere.value = false;
+  payloadExplanationShown.value = false;
 }
 
 /** Leave the kit form. Mirrors `openKitEntry`: a payload explanation survives. */
 function closeKitEntry(): void {
   showKitEntry.value = false;
-  if (!podUnopenableHere.value) formError.value = null;
+  if (!payloadExplanationShown.value) formError.value = null;
 }
 
 /**
@@ -194,10 +202,10 @@ function closeKitEntry(): void {
 function openKitEntry(): void {
   showKitEntry.value = true;
   // Keep a payload explanation. The user is switching method because nothing is
-  // working, and this is the branch that actually reaches here: the auto-decrypt
-  // path never opens the modal at all, so the kit link is only ever visible
-  // after `handleDecrypt`/`handleKitRedeem` set the message.
-  if (!podUnopenableHere.value) formError.value = null;
+  // working, and `podUnopenableHere` is NOT the right flag for it: the
+  // credential case deliberately does not latch, yet its message is exactly the
+  // one worth carrying across to the kit form.
+  if (!payloadExplanationShown.value) formError.value = null;
 }
 
 async function tryAutoDecrypt(): Promise<boolean> {
@@ -226,6 +234,7 @@ async function tryAutoDecrypt(): Promise<boolean> {
           // The key is provably fine (or was never checked, because the device
           // ran out of memory). Deleting it would cost trusted-device auto-open
           // permanently for a problem it has nothing to do with.
+          payloadExplanationShown.value = true;
           formError.value = t(payloadErrorMessageKey(result.payloadError));
           podUnopenableHere.value = true;
           return false;
@@ -371,7 +380,12 @@ async function autoLoadFile() {
     // A payload failure gets the honest copy and latches, so the handoff below
     // does not then offer a credential form for it.
     if (e instanceof PayloadLoadError) {
-      podUnopenableHere.value = true;
+      // Latch only when a credential CANNOT be the cause. A stale key (a peer
+      // rotated it) is recoverable through the password form below, and
+      // latching would early-return `handlePendingPassword` for the rest of the
+      // session so neither that form nor the kit form ever opens again.
+      if (!e.keyMayBeWrong) podUnopenableHere.value = true;
+      payloadExplanationShown.value = true;
       formError.value = t(payloadErrorMessageKey(e));
       isLoadingFile.value = false;
       return;
@@ -391,8 +405,9 @@ async function handleGrantPermission() {
     if (result.payloadError) {
       // Permission WAS granted; the pod could not be opened. `finishLoaded()`
       // here would drive the login flow into a signed-in state with no
-      // document, and a credential prompt cannot help.
-      podUnopenableHere.value = true;
+      // document. Latch only when no credential can help — see `tryAutoDecrypt`.
+      if (!result.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
+      payloadExplanationShown.value = true;
       formError.value = t(payloadErrorMessageKey(result.payloadError));
       reportPayloadFailure(result.payloadError, {
         source: 'reload',
@@ -544,7 +559,10 @@ async function handleKitRedeem() {
     if (!dec.success) {
       // 'wrong recovery code' would be a lie when the kit unwrapped fine and it
       // was the pod that would not fit in memory.
-      if (dec.payloadError && !dec.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
+      if (dec.payloadError) {
+        payloadExplanationShown.value = true;
+        if (!dec.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
+      }
       formError.value = dec.payloadError
         ? t(payloadErrorMessageKey(dec.payloadError))
         : t('password.decryptionError');
@@ -615,6 +633,7 @@ async function handleDecrypt() {
       // the password is, so re-prompting loops forever. Before this branch the
       // raw Automerge/WASM string ("error inflating document chunk ops: out of
       // memory") was rendered untranslated under the password field.
+      payloadExplanationShown.value = true;
       formError.value = t(payloadErrorMessageKey(result.payloadError));
       // Only latch when a credential CANNOT be the cause. A stale wrap (a peer
       // rotated the family key) unwraps with the old key and then fails the

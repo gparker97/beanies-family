@@ -9,7 +9,7 @@
  * never reached the tag check at all).
  */
 import { describe, it, expect } from 'vitest';
-import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError, payloadErrorMessageKey } from '@/types/sync';
 
 describe('keyMayBeWrong', () => {
   it('is true ONLY for a corrupt-class failure at the decrypt step', () => {
@@ -35,5 +35,32 @@ describe('deviceCannotOpen', () => {
   it('separates "this device could not" from "the data is bad"', () => {
     expect(new PayloadTooLargeError('oom', 'materialize', 'f').deviceCannotOpen).toBe(true);
     expect(new CorruptPayloadError('m', 'materialize', 'f').deviceCannotOpen).toBe(false);
+  });
+});
+
+describe('payloadErrorMessageKey', () => {
+  it('does NOT say "damaged" when a credential could be the cause', () => {
+    // At the decrypt step a stale key and damaged bytes are the same
+    // observation, and one of them is routine (a peer rotated the family key).
+    // The copy has to cover both and name the action that fixes the
+    // recoverable half.
+    expect(payloadErrorMessageKey(new CorruptPayloadError('m', 'decrypt', 'f'))).toBe(
+      'podCredentialStale.inline'
+    );
+  });
+
+  it('says damaged only once the payload has decrypted', () => {
+    expect(payloadErrorMessageKey(new CorruptPayloadError('m', 'load', 'f'))).toBe(
+      'podCorrupted.inline'
+    );
+  });
+
+  it('says out-of-memory for the device class, at every step', () => {
+    expect(payloadErrorMessageKey(new PayloadTooLargeError('m', 'decrypt', 'f'))).toBe(
+      'podTooLarge.inline'
+    );
+    expect(payloadErrorMessageKey(new PayloadTooLargeError('m', 'materialize', 'f'))).toBe(
+      'podTooLarge.inline'
+    );
   });
 });

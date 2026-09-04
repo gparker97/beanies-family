@@ -56,6 +56,11 @@ export function reportPayloadFailure(
   // ⚠️ Callers that REPLACED an existing emit with this one must keep their own
   // event for the too-large case, or that class goes dark on their path.
   if (err.deviceCannotOpen) return;
+  // Nor for a case a credential fixes. At the decrypt step a stale key and
+  // damaged bytes are indistinguishable, and the stale-key half is routine (a
+  // peer rotated the family key) — paging a human at `critical` for it, on
+  // every sign-in attempt, is noise that would train the alert to be ignored.
+  if (err.keyMayBeWrong) return;
   reportError({
     surface: 'pod-load-failure',
     // Constant per (step, source) — the byte count rides in `perf_doc_bytes`,

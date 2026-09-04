@@ -268,12 +268,17 @@ export class PayloadTooLargeError extends PayloadLoadError {
  */
 export function payloadErrorMessageKey(
   err: PayloadLoadError
-): 'podTooLarge.inline' | 'podCorrupted.inline' {
-  // Both halves are purpose-built inline copy. The corrupt half used to reuse
-  // `loginFlow.recoveryCorruptBody`, which was written for OpenRecoveryPanel
-  // and says "try again, or load a different copy": UI these slots do not have,
-  // and a retype loop for a failure no password can fix. A join INVITEE has no
-  // copy of the family file at all.
+): 'podTooLarge.inline' | 'podCorrupted.inline' | 'podCredentialStale.inline' {
+  // THREE answers, because there are three situations and the middle one was
+  // being told its data is damaged.
+  //
+  // At the decrypt step a wrong key and a damaged ciphertext are the SAME
+  // observation (an AES-GCM tag rejection) — so the honest copy is the one that
+  // covers both and points at the action that fixes the recoverable half: try
+  // your password. Telling a user their family data may be damaged and to
+  // contact support, when a peer simply rotated the family key, is the same
+  // class of lie this whole change exists to remove.
+  if (err.keyMayBeWrong) return 'podCredentialStale.inline';
   return err.deviceCannotOpen ? 'podTooLarge.inline' : 'podCorrupted.inline';
 }
 

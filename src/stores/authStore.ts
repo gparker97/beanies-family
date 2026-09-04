@@ -2353,7 +2353,29 @@ export const useAuthStore = defineStore('auth', () => {
           undefined;
       },
       deleteFamilyDb: async () => {
-        if (ctx.familyId) await deleteFamilyDatabase(ctx.familyId);
+        if (!ctx.familyId) return;
+        // ⚠️ THE LOCAL COPY IS THE ONLY ONE LEFT WHEN THE REMOTE IS UNREADABLE.
+        //
+        // Sign-out deletes the family database on the assumption the final
+        // force-save pushed everything to the remote. But when this device
+        // cannot READ the remote, `doSave` deliberately refuses (rather than
+        // overwriting a copy it never merged), so that assumption is false —
+        // and `forceSaveWithTimeout` reads the resulting `false` as "no durable
+        // state to save" and logs a console.warn. Deleting here would destroy a
+        // whole session of edits that exist nowhere else.
+        const { isRemoteUnreadable } = await import('@/services/sync/syncService');
+        const unreadable = isRemoteUnreadable();
+        if (unreadable) {
+          reportError({
+            surface: 'pod-load-failure',
+            message: 'sign-out kept the local database: the remote pod is unreadable',
+            error: unreadable,
+            severity: 'critical',
+            context: { action: 'signout-kept-local-db', error_code: unreadable.step },
+          });
+          return;
+        }
+        await deleteFamilyDatabase(ctx.familyId);
       },
       clearKeyCacheFamily: async () => {
         if (ctx.familyId) await settingsStore.clearCachedFamilyKey(ctx.familyId);

@@ -73,7 +73,11 @@ vi.mock('@/services/sync/capabilities', () => ({
   isNative: () => false,
 }));
 
-vi.mock('@/services/sync/fileSync', () => ({
+// `parseBeanpodV4` and `tryUnwrapFamilyKey` stay REAL: the marker-handshake
+// test drives `loadFromFile` all the way to the merge, and a stubbed parser
+// would fail before the branch under test.
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/sync/fileSync')>()),
   exportToFile: vi.fn(async () => {}),
   importFromFile: vi.fn(async () => ({ success: true })),
 }));

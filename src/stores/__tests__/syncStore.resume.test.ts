@@ -548,6 +548,54 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     return { syncStore, syncService };
   }
 
+  it('rolls the remote marker BACK — and latches — when the merge throws', async () => {
+    // THE data-loss path, and the one a `doSave` guard alone could not close.
+    // `syncService.load()` stamps the remote's revision BEFORE the download, but
+    // the merge happens in the store — so a payload failure used to leave that
+    // baseline standing, the next change check answered 'unchanged',
+    // `fetchAndMergeRemote` returned without throwing, and the following save
+    // wrote a full base over a revision the document never contained,
+    // destroying every peer edit that lived only in that copy.
+    const { PayloadTooLargeError } = await import('@/types/sync');
+    const syncStore = useSyncStore();
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({
+      loaded: true,
+      remoteBaseline: null,
+    });
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      heads: [],
+      dirty: false,
+      changed: false,
+      remoteHeads: [],
+    });
+    syncStore.pendingEncryptedFile = {
+      envelope: JSON.parse(envelopeJsonFor('fam-resume-1', 'LaFleur')),
+      driveFileId: 'drive-file-abc',
+      driveFileName: 'LaFleur.beanpod',
+      driveAccountEmail: 'owner@example.com',
+    };
+    await syncStore.completeAutoLoad('right-pw');
+
+    const syncService = await import('@/services/sync/syncService');
+    vi.mocked(syncService.rollbackRemoteMarker).mockClear();
+    vi.mocked(syncService.confirmRemoteMerged).mockClear();
+    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+    vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(
+      new PayloadTooLargeError('oom', 'materialize', 'fam-resume-1', 3_000_000)
+    );
+
+    await expect(syncStore.loadFromFile()).rejects.toBeInstanceOf(PayloadTooLargeError);
+
+    expect(syncService.rollbackRemoteMarker).toHaveBeenCalled();
+    expect(syncService.noteRemoteUnreadable).toHaveBeenCalled();
+    expect(syncService.confirmRemoteMerged).not.toHaveBeenCalled();
+  });
+
   it('does NOT re-upload when the merge left nothing to push back (dirty:false)', async () => {
     const { syncService } = await mergeWith({ dirty: false, changed: false });
     // A no-op write still costs a full saveDoc + encrypt + whole-file upload, and

@@ -656,3 +656,17 @@ broken again in the very next pass, twice, so two of them get sharper:
     before the merge threw. Both doors run through `syncService.fetchAndMergeRemote`,
     so one latch there closes every one of them — and "do not learn the marker
     until the merge succeeds" is the fix that made the guard mean anything.
+
+11. **A latch has to be ARMED from the paths that fail, not just read by the
+    paths that check.** Round 7 moved the read to `syncService` and left the six
+    arming sites in `syncStore` calling a function that no longer set anything,
+    so the circuit breaker became dead code — and the caller's own `finally`
+    re-armed the poller through a guard that saw `null`. The new tests missed it
+    because they stubbed the getter directly instead of driving a real failure.
+    When you move state between layers, grep for BOTH the readers and the
+    writers, and make at least one test drive the real path end to end.
+12. **`throw` inside a `try` is not an escape.** The save refusal threw from
+    inside the function's own outer `try`, whose catch converted it straight
+    back to `return false` — so the half of the fix that was supposed to stop
+    sign-out deleting the local database never landed. Trace where a throw
+    actually surfaces before relying on it.
