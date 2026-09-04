@@ -110,3 +110,6 @@ export const isRemoteUnreadable = vi.fn<() => Error | null>(() => null);
 export const confirmRemoteMerged = vi.fn();
 export const rollbackRemoteMarker = vi.fn();
 export const noteRemoteUnreadable = vi.fn();
+
+/** User-initiated half-open retry of the remote-blocked breaker. */
+export const retryAfterRemoteBlock = vi.fn();
