@@ -33,7 +33,6 @@ import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sy
 import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
-import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
 import type { RegistryEntry } from '@/types/models';
 import * as syncService from '@/services/sync/syncService';
@@ -2341,17 +2340,32 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Manual export (fallback for browsers without File System Access API)
+   * Build the encrypted `.beanpod` envelope for a manual export.
+   *
+   * Deliberately does NOT deliver the file. Delivery toasts on failure, and a
+   * Pinia store that can talk to the user is a boundary that is very hard to
+   * re-close — so the store hands back bytes and its page (SettingsPage) calls
+   * `deliverFile`, then `markExported()` only if a file actually landed.
+   *
+   * THROWS when there is no family key rather than setting `error.value` and
+   * returning: the old shape was unsurfaced (nothing rendered `error.value` on
+   * this path), so the export silently did nothing.
    */
-  async function manualExport(): Promise<void> {
+  async function buildExportEnvelope(): Promise<{ json: string; filename: string }> {
     if (!familyKey.value || !envelope.value) {
-      error.value = 'No family key — cannot export';
-      return;
+      throw new Error('No family key — cannot export');
     }
     // The worker encrypts the current doc → payload; main assembles the envelope.
     const { payload } = await docClient.exportEncryptedPayload();
-    const envelopeJson = reEncryptEnvelope(envelope.value, payload);
-    downloadAsFile(envelopeJson);
+    const date = new Date().toISOString().split('T')[0];
+    return {
+      json: reEncryptEnvelope(envelope.value, payload),
+      filename: `my-family-${date}.beanpod`,
+    };
+  }
+
+  /** Stamp the export timestamp. Called ONLY once a file genuinely landed. */
+  function markExported(): void {
     lastSync.value = toISODateString(new Date());
   }
 
@@ -4418,7 +4432,8 @@ export const useSyncStore = defineStore('sync', () => {
     addInvitePackage,
     persistFamilyName,
     disconnect,
-    manualExport,
+    buildExportEnvelope,
+    markExported,
     manualImport,
     reloadAllStores,
     setupAutoSync,

@@ -45,6 +45,7 @@ import {
 } from '@/services/auth/signOutSteps';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
+import { sweepHandoffFiles } from '@/utils/shareOrDownloadFile';
 import { useTranslationStore } from './translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { track } from '@/services/analytics/plausible';
@@ -2398,6 +2399,13 @@ export const useAuthStore = defineStore('auth', () => {
       },
       untrustDevice: () => settingsStore.setTrustedDevice(false),
       reArmTrustPrompt: () => settingsStore.resetTrustedDevicePrompt(),
+      // Native only (a no-op on web). The share hand-off directory holds the
+      // two most sensitive things this app ever writes to disk unencrypted:
+      // the readable-JSON export, which is the whole family in plaintext, and
+      // the recovery-kit PDF, which is a live credential. Nothing else deletes
+      // them — the delivery sweep is age-based and only runs on the NEXT
+      // delivery, which may never come.
+      sweepHandoffFiles: () => sweepHandoffFiles(),
     };
   }
 
