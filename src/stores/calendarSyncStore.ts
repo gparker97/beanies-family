@@ -22,7 +22,7 @@ import { computed, watch } from 'vue';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { list as projectionList } from '@/services/automerge/projection';
 import { toISODateString, localToday, addDaysYmd } from '@/utils/date';
-import { generateUUID } from '@/utils/id';
+import { getDeviceId } from '@/utils/deviceId';
 import { reportError } from '@/utils/errorReporter';
 import { isFlagEnabled } from '@/config/flags';
 import { useToday } from '@/composables/useToday';
@@ -157,19 +157,6 @@ function paddedDayWindow(occurrenceYmd: string): [string, string] {
     `${addDaysYmd(occurrenceYmd, -1)}T00:00:00Z`,
     `${addDaysYmd(occurrenceYmd, 2)}T00:00:00Z`,
   ];
-}
-
-function getDeviceId(): string {
-  try {
-    let id = localStorage.getItem('beanies:device-id');
-    if (!id) {
-      id = generateUUID();
-      localStorage.setItem('beanies:device-id', id);
-    }
-    return id;
-  } catch {
-    return 'unknown-device';
-  }
 }
 
 /**

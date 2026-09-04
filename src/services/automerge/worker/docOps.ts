@@ -16,6 +16,7 @@ import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
 import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
+import { docInitOpts } from './docActor';
 import {
   calculateAmortization,
   calculateExtraPayment,
@@ -46,7 +47,7 @@ export function migrateDoc(doc: Doc): Doc {
 }
 
 export function loadDoc(binary: Uint8Array): Doc {
-  return migrateDoc(Automerge.load<FamilyDocument>(binary));
+  return migrateDoc(Automerge.load<FamilyDocument>(binary, docInitOpts()));
 }
 
 export function saveDoc(doc: Doc): Uint8Array {
@@ -227,7 +228,7 @@ export function projectionDeltasBetween(
 export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc {
   let doc: Doc;
   try {
-    doc = Automerge.load<FamilyDocument>(binary);
+    doc = Automerge.load<FamilyDocument>(binary, docInitOpts());
   } catch (e) {
     throw payloadFailure('load', e, familyId, binary.byteLength);
   }
