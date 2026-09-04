@@ -606,7 +606,22 @@ const LIST_TEXTAREA_CLASS =
         <!-- Where this came from, visible and editable — the same affordance activities have.
              It is filled in automatically by the reader, but a hand-typed recipe can carry a
              link too, and a captured one can be corrected. -->
-        <FormFieldGroup :label="t('recipes.field.sourceUrl')" optional>
+        <!--
+          ⚠️ HIDDEN WHILE THE READER STRIP IS UP, and that is not a nicety.
+
+          `RecipeSourceStrip` is itself a `type="url"` input ("paste a link and I'll fill this
+          in"). Moving this field up into "the dish" (#87 follow-up) put the two within one
+          viewport of each other for the first time — before, they were a full scroll apart.
+          Two URL boxes doing different things, and the labelled one is the more inviting: a
+          user pastes their recipe URL into "Link", tabs away, and nothing happens, because
+          capture only fires from the strip. The AI feature reads as broken on its own primary
+          entry point.
+
+          There is nothing to attribute until the form has content anyway, and the strip
+          disappears the moment a name exists — typed or captured — at which point this field
+          appears to carry the provenance. One URL box on screen at a time, always.
+        -->
+        <FormFieldGroup v-if="!showSourceStrip" :label="t('recipes.field.sourceUrl')" optional>
           <BaseInput
             v-model="sourceUrl"
             type="url"
