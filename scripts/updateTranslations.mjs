@@ -208,13 +208,18 @@ function saveTranslationFile(language, data) {
  * Returns a reason string if suspicious, or null if the translation looks clean.
  */
 export function suspiciousTranslationReason(source, translated) {
-  // 1. Control characters MyMemory invented. A few strings legitimately contain
-  //    newlines (the invite message, the multi-line recipe placeholders), and
-  //    since the parser started resolving `\n` those reach here as real line
-  //    breaks — so a blanket reject fell every one of them back to English.
-  //    Only characters the SOURCE does not have are suspicious.
-  const controlRe = /[\t\r\n\x00-\x08\x0b\x0c]/;
-  if (controlRe.test(translated) && !controlRe.test(source)) return 'control characters';
+  // 1. Control characters MyMemory INVENTED. A few strings legitimately contain
+  //    newlines (the invite message, the multi-line recipe placeholders), so a
+  //    blanket reject fell every one of them back to English.
+  //
+  //    Compared as a character SET, not "does the source have any": gating the
+  //    whole test on one newline in the source would accept a NUL, a form feed
+  //    or a stray CR in the translation of that same key.
+  const controlRe = /[\t\r\n\x00-\x08\x0b\x0c]/g;
+  const allowed = new Set(source.match(controlRe) ?? []);
+  if ((translated.match(controlRe) ?? []).some((c) => !allowed.has(c))) {
+    return 'control characters';
+  }
 
   // 2. Markup in the translation that the English source did not have — injected.
   const tagRe = /<\/?[a-zA-Z][^>]*>|<[a-zA-Z]+\s+[a-zA-Z]/;
@@ -251,6 +256,12 @@ export function suspiciousTranslationReason(source, translated) {
 /**
  * Translate text using MyMemory API
  */
+/**
+ * @returns `{ text, fellBack }` — `fellBack` is true when the ENGLISH source is
+ * being returned because the API failed or its output was rejected. Reported
+ * explicitly rather than inferred from `result === source`, because ~50 entries
+ * are identical by design and inferring re-requests them on every run forever.
+ */
 async function translate(text, targetLang) {
   const langCode = LANGUAGES[targetLang].myMemoryCode || targetLang;
 
@@ -266,7 +277,7 @@ async function translate(text, targetLang) {
 
     if (data.responseStatus !== 200) {
       console.warn(`   ⚠ Translation failed for "${text}": ${data.responseDetails}`);
-      return text; // Fallback to original
+      return { text, fellBack: true };
     }
 
     // Decode HTML entities
@@ -282,13 +293,13 @@ async function translate(text, targetLang) {
     const reason = suspiciousTranslationReason(text, decoded);
     if (reason) {
       console.warn(`   ⚠ Rejected suspicious translation for "${text}" (${reason}): "${decoded}"`);
-      return text;
+      return { text, fellBack: true };
     }
 
-    return decoded;
+    return { text: decoded, fellBack: false };
   } catch (error) {
     console.error(`   ✗ Error translating "${text}":`, error.message);
-    return text; // Fallback to original
+    return { text, fellBack: true };
   }
 }
 
@@ -372,36 +383,42 @@ async function updateTranslations(language, sourceStrings) {
     // the JSON could recover it — and it silently REPLACED four good Chinese
     // translations that way, including the family-invite message.
     //
-    // A fallback is therefore written WITHOUT a hash, so the next run sees it
-    // as outdated and retries. An existing good translation is kept instead of
-    // being overwritten by English.
-    if (translation === text && language !== 'en') {
+    // The fallback is reported by `translate` itself rather than inferred from
+    // `translation === text`: about fifty entries are identical by design
+    // ('beanies.family', 'you@example.com', '{done}/{total}'), and inferring
+    // would re-request every one of them on every run, forever, against a
+    // rate-limited free tier.
+    if (translation.fellBack) {
       fellBack++;
       const existing = translationFile.translations[key];
       if (existing?.translation && existing.translation !== text) {
         console.warn(`   ⚠ Keeping the existing translation for ${key} (API fell back to English)`);
-        continue;
+      } else {
+        // No hash: the next run sees it as outdated and retries.
+        translationFile.translations[key] = {
+          translation: translation.text,
+          hash: '',
+          lastUpdated: new Date().toISOString().split('T')[0],
+        };
       }
+      completed++;
+      // Fall through to the sleep below. An early `continue` skipped it, so once
+      // MyMemory starts refusing (quota) every remaining key fired back to back
+      // with no throttle — the traffic shape that turns a soft quota into a
+      // block.
+    } else {
       translationFile.translations[key] = {
-        translation,
-        hash: '',
+        translation: translation.text,
+        hash,
         lastUpdated: new Date().toISOString().split('T')[0],
       };
       completed++;
-      continue;
     }
 
-    translationFile.translations[key] = {
-      translation,
-      hash,
-      lastUpdated: new Date().toISOString().split('T')[0],
-    };
-
-    completed++;
     const percentage = Math.round((completed / toTranslate.length) * 100);
     const reasonEmoji = reason === 'missing' ? '🆕' : '🔄';
     console.log(`   [${percentage}%] ${reasonEmoji} ${key}`);
-    console.log(`        "${text}" → "${translation}"`);
+    console.log(`        "${text}" → "${translation.text}"`);
 
     // Delay to be respectful to the API
     if (completed < toTranslate.length) {
@@ -415,6 +432,14 @@ async function updateTranslations(language, sourceStrings) {
   saveTranslationFile(language, translationFile);
 
   console.log(`   💾 Saved: ${translationFile.meta.translationCount}/${totalKeys} translations`);
+  if (fellBack > 0) {
+    // Loudly, because a clean-looking summary over silently-English keys is
+    // exactly how four good Chinese strings were lost without anyone noticing.
+    console.warn(
+      `   ⚠ ${fellBack} key(s) fell back to English (API failure or rejected output). ` +
+        'They are stored WITHOUT a hash and will be retried on the next run.'
+    );
+  }
 
   return { translated: toTranslate.length, staleRemoved, total: totalKeys, upToDate: false };
 }

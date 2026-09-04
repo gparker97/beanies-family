@@ -2,6 +2,7 @@
 /* global FileSystemFileHandle, FileSystemHandle */
 import { ref, computed, onMounted, watch } from 'vue';
 import { payloadErrorMessageKey, PayloadLoadError } from '@/types/sync';
+import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -184,6 +185,12 @@ function resetPodUnopenable(): void {
  * explains why nothing is working, and wiping it left a kit form with no
  * explanation — on the one escape hatch this whole path exists to preserve.
  */
+/** Leave the kit form. Mirrors `openKitEntry`: a payload explanation survives. */
+function closeKitEntry(): void {
+  showKitEntry.value = false;
+  if (!podUnopenableHere.value) formError.value = null;
+}
+
 function openKitEntry(): void {
   showKitEntry.value = true;
   // Keep a payload explanation. The user is switching method because nothing is
@@ -208,23 +215,22 @@ async function tryAutoDecrypt(): Promise<boolean> {
       const result = await syncStore.decryptPendingFileWithKey(fk);
       if (result.success) return true;
       if (result.payloadError) {
-        // Say what happened, for BOTH classes. (An earlier cut showed it only
-        // for too-large, which left the corrupt case with an empty error slot
-        // above a password form.)
-        formError.value = t(payloadErrorMessageKey(result.payloadError));
-        // ⚠️ THE STEP decides whether to delete the key, NOT the class.
+        // ⚠️ ONE question decides everything here: could the KEY be wrong?
         //
-        // `decryptToDoc` wraps only the decrypt; `loadAndVerify` runs outside
-        // it. So `step: 'load'` or `'materialize'` means `decryptPayload`
-        // SUCCEEDED — the AES-GCM tag verified, and this key is definitively
-        // correct; only the bytes were bad. Deleting it there destroys a valid
-        // credential over a damaged file and costs the user trusted-device
-        // auto-open permanently (a recovery kit, on a kit-only envelope).
-        //
-        // Only `step: 'decrypt'` can mean a WRONG key (rotation, family switch,
-        // a partial IDB write), and that one must still fall through to the
-        // clear or the bad key is retained forever.
-        if (result.payloadError.step !== 'decrypt') {
+        // Neither the class nor the step answers it alone, and both ad-hoc
+        // versions of this check shipped and were wrong. `keyMayBeWrong` is the
+        // single derivation (see `PayloadLoadError`): true only for a
+        // corrupt-class failure at the decrypt step, because that is the only
+        // shape where the AES-GCM tag was actually checked and rejected.
+        if (result.payloadError.keyMayBeWrong) {
+          // A stale/rotated key. Do NOT show the "damaged, contact support"
+          // copy — the password form below opens the pod on the first try. Fall
+          // through to `clearCachedFamilyKey` so the bad key does not persist.
+        } else {
+          // The key is provably fine (or was never checked, because the device
+          // ran out of memory). Deleting it would cost trusted-device
+          // auto-open permanently for a problem it has nothing to do with.
+          formError.value = t(payloadErrorMessageKey(result.payloadError));
           podUnopenableHere.value = true;
           return false;
         }
@@ -382,8 +388,19 @@ async function handleGrantPermission() {
   formError.value = null;
 
   try {
-    const granted = await syncStore.requestPermission();
-    if (granted) {
+    const result = await syncStore.requestPermission();
+    if (result.payloadError) {
+      // Permission WAS granted; the pod could not be opened. `finishLoaded()`
+      // here would drive the login flow into a signed-in state with no
+      // document, and a credential prompt cannot help.
+      podUnopenableHere.value = true;
+      formError.value = t(payloadErrorMessageKey(result.payloadError));
+      reportPayloadFailure(result.payloadError, {
+        source: 'reload',
+        fileId: syncStore.driveFileId ?? null,
+        familyId: syncStore.pendingEncryptedFile?.envelope?.familyId ?? null,
+      });
+    } else if (result.granted) {
       if (syncStore.hasPendingEncryptedFile) {
         await handlePendingPassword(syncStore.fileName);
       } else {
@@ -1134,7 +1151,7 @@ async function handleDriveRefresh() {
         <button
           type="button"
           class="dark:text-ink-soft dark:hover:text-ink mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700"
-          @click="((showKitEntry = false), (formError = null))"
+          @click="closeKitEntry"
         >
           {{ t('passkey.usePassword') }}
         </button>

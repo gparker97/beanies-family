@@ -29,6 +29,12 @@ export function presentRefreshOutcome(outcome: RefreshOutcome): RefreshPresentat
     // silently suppresses the critical page.
     case 'auth-failed':
       return { toast: { type: 'warning', key: 'header.refreshAuthFailed' } };
+    // The pod cannot be opened on this device, so the refresh was skipped
+    // before any work. `BackgroundSyncBar` does NOT toast for it (nothing set
+    // `backgroundSyncError` on this pass), so a silent no-op would leave the
+    // user tapping Refresh and getting nothing at all.
+    case 'skipped-unopenable':
+      return { toast: { type: 'warning', key: 'header.refreshUnopenable' } };
     // network/decrypt      → BackgroundSyncBar already toasts.
     // skipped-in-flight    → a sync is running; never report a false "refreshed".
     case 'network-failed':

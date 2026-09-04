@@ -60,7 +60,7 @@ import {
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
-import { surfacePayloadFatal, reportPayloadFailure } from '@/utils/payloadFailureSurface';
+import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { createSampler } from '@/services/telemetry/emitPolicy';
@@ -120,6 +120,7 @@ import {
   type CompleteAutoLoadResult,
   PayloadLoadError,
   PayloadTooLargeError,
+  payloadErrorMessageKey,
 } from '@/types/sync';
 
 /**
@@ -155,7 +156,13 @@ export type BackgroundSyncErrorKind = 'auth-transient' | 'decrypt' | 'network' |
  *   skipped-in-flight — a sync was already running; this call did nothing
  */
 export type RefreshOutcome =
-  'refreshed' | 'auth-failed' | 'network-failed' | 'decrypt-failed' | 'skipped-in-flight';
+  | 'refreshed'
+  | 'auth-failed'
+  | 'network-failed'
+  | 'decrypt-failed'
+  /** This device already established it cannot open the pod. See `podUnopenable`. */
+  | 'skipped-unopenable'
+  | 'skipped-in-flight';
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -630,39 +637,37 @@ export const useSyncStore = defineStore('sync', () => {
    * Request permission to access the sync file (user gesture required).
    * If permission is granted, automatically loads from file and sets up auto-sync.
    */
-  async function requestPermission(): Promise<boolean> {
+  /**
+   * Ask for file permission and, if granted, load.
+   *
+   * Returns a RESULT, not a bare boolean. A bare `true` meant "granted", and
+   * two of the three callers read it as "granted AND loaded" — driving the
+   * login flow into a signed-in state with no document, and retrying an
+   * allocation that had just failed. And the store must NOT raise the fatal
+   * overlay itself: one caller is the warm Settings button, where a
+   * `fixed inset-0 z-[300]` panel would cover an app that is painting fine.
+   */
+  async function requestPermission(): Promise<{
+    granted: boolean;
+    loaded: boolean;
+    payloadError?: PayloadLoadError;
+  }> {
     const granted = await syncService.requestPermission();
     needsPermission.value = !granted;
+    if (!granted) return { granted: false, loaded: false };
 
-    if (granted) {
-      try {
-        const loadResult = await loadFromFile();
-        if (loadResult.success) {
-          setupAutoSync();
-        }
-      } catch (e) {
-        // `loadFromFile` rethrows a payload failure so the boot path can
-        // classify it. Here there is no boot path: SettingsPage awaits this
-        // bare, so an escaping throw reached `main.ts`'s unhandledrejection
-        // handler — deliberately non-paging, no toast, no overlay — and the
-        // button appeared to succeed while nothing had loaded.
-        if (e instanceof PayloadLoadError) {
-          surfacePayloadFatal(e, {
-            fileId: driveFileId.value,
-            familyId: useFamilyContextStore().activeFamilyId,
-            source: 'reload',
-          });
-          // FALSE, not `granted`. Permission was granted but nothing loaded,
-          // and both non-Settings callers read a `true` as "granted AND
-          // loaded": one drives the login flow into a signed-in state with no
-          // document, the other retries the identical allocation.
-          return false;
-        }
-        throw e;
+    try {
+      const loadResult = await loadFromFile();
+      if (loadResult.success) {
+        setupAutoSync();
+        return { granted: true, loaded: true };
       }
+      return { granted: true, loaded: false };
+    } catch (e) {
+      // `loadFromFile` rethrows a payload failure so the caller can classify it.
+      if (e instanceof PayloadLoadError) return { granted: true, loaded: false, payloadError: e };
+      throw e;
     }
-
-    return granted;
   }
 
   /**
@@ -926,12 +931,6 @@ export const useSyncStore = defineStore('sync', () => {
    * create-recovery screen and `app.onboardingZombieState` false-fires.
    */
   async function runPostLoadDriveHousekeeping(): Promise<void> {
-    // A pod DID open, so whatever latched `podUnopenable` no longer holds —
-    // a reload freed memory, the file was replaced, a different device wrote a
-    // clean copy. Clearing it here (the single success terminus every load path
-    // funnels through) stops the latch outliving its reason and silently
-    // disabling cross-device sync for the rest of the session.
-    clearPodUnopenable();
     if (syncService.getProviderType() === 'google_drive') {
       setupTokenExpiryHandler();
       updateProviderEmailAfterLoad();
@@ -2481,6 +2480,14 @@ export const useSyncStore = defineStore('sync', () => {
    * Reload all stores from the in-memory Automerge document.
    */
   async function reloadAllStores(): Promise<void> {
+    // A doc is live and being projected into Pinia, so whatever latched
+    // `podUnopenable` no longer holds. THE chokepoint: every successful open
+    // reaches here (cold, cached, dropped, picked, decrypted, joined), and the
+    // paths that must NOT clear it do not — `shouldSkipOpenRead()`'s branch
+    // returns 'refreshed' having downloaded and materialized nothing, and an
+    // earlier attempt to clear from `runPostLoadDriveHousekeeping` disarmed the
+    // breaker there and let the poller straight back on.
+    clearPodUnopenable();
     bumpOpenCycle('storeReload'); // no-op outside an open window
     isReloading = true;
     syncService.cancelPendingSave();
@@ -2707,6 +2714,13 @@ export const useSyncStore = defineStore('sync', () => {
     openToken?: OpenToken,
     opts?: { manual?: boolean }
   ): Promise<RefreshOutcome> {
+    // ⚠️ The latch gates the WORK, not just the timer. `AppHeader`'s Refresh
+    // calls this directly and `useStaleTabRefresh` calls `reloadIfFileChanged`
+    // directly, so a latch checked only inside `startFilePolling` let every tab
+    // wake and every Refresh tap re-download the whole pod, re-hit the same
+    // allocation and fire another critical page — one per wake, indefinitely,
+    // because wakes are far outside the 60s dedup window.
+    if (podUnopenable.value) return 'skipped-unopenable';
     if (isBackgroundSyncing.value) {
       // A sync is already in flight. If an OPEN handed us its window, close it —
       // otherwise it stays open until the next `beginOpen` and is emitted as
@@ -2787,7 +2801,16 @@ export const useSyncStore = defineStore('sync', () => {
             // markPodCreated + token-expiry wiring), not a bare setupAutoSync.
             await runPostLoadDriveHousekeeping();
             return refreshResult;
-          } catch {
+          } catch (e) {
+            // A payload failure is not a key problem: falling through reaches
+            // "password may have changed", discards the envelope and re-arms
+            // the poller. The twin in `reloadIfFileChanged` was fixed a commit
+            // earlier; this one was missed, so the claim that both were done
+            // was wrong.
+            if (e instanceof PayloadLoadError) {
+              notePodUnopenable(e);
+              return refreshResult;
+            }
             // Family key doesn't work — try cached key
           }
         }
@@ -2902,6 +2925,7 @@ export const useSyncStore = defineStore('sync', () => {
    * Check if the sync file has been modified externally and reload if so.
    */
   async function reloadIfFileChanged(): Promise<boolean> {
+    if (podUnopenable.value) return false; // see backgroundSyncFromFile
     if (!isConfigured.value || needsPermission.value || isReloading || isCheckingFile) return false;
 
     isCheckingFile = true;
@@ -3012,9 +3036,7 @@ export const useSyncStore = defineStore('sync', () => {
   function notePodUnopenable(err: PayloadLoadError): void {
     podUnopenable.value = true;
     stopFilePolling();
-    backgroundSyncError.value = useTranslationStore().t(
-      err instanceof PayloadTooLargeError ? 'podTooLarge.inline' : 'podCorrupted.inline'
-    );
+    backgroundSyncError.value = useTranslationStore().t(payloadErrorMessageKey(err));
     backgroundSyncErrorKind.value = 'decrypt';
     reportPayloadFailure(err, {
       fileId: driveFileId.value,
@@ -3024,9 +3046,13 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Something changed that could plausibly change the answer — a fresh file, a
-   * sign-out, a new family. Without this the latch would outlive its reason and
-   * silently disable cross-device sync for the rest of the session.
+   * Something changed that could plausibly change the answer.
+   *
+   * Exactly two callers, and they are the two that matter: `reloadAllStores`
+   * (a doc is live and being projected, so the pod demonstrably opened) and
+   * `resetState` (sign-out / family switch — a different pod entirely).
+   * Without the second the latch outlived its reason and silently disabled
+   * cross-device sync for a healthy file for the rest of the session.
    */
   function clearPodUnopenable(): void {
     podUnopenable.value = false;
@@ -3045,8 +3071,9 @@ export const useSyncStore = defineStore('sync', () => {
     // critical report — the "forever" loop this was supposed to kill.
     //
     // This is the single site that creates the interval, so the latch cannot be
-    // walked around. It is cleared by `clearPodUnopenable()` on any path that
-    // could plausibly change the answer (a reload, a new file, a sign-out).
+    // walked around — and `backgroundSyncFromFile` / `reloadIfFileChanged`
+    // check it on entry too, because two callers invoke those directly rather
+    // than through the timer. Cleared by `clearPodUnopenable()`.
     if (podUnopenable.value) return;
     filePollingTimer = setInterval(() => {
       reloadIfFileChanged().catch(console.warn);
@@ -3110,6 +3137,10 @@ export const useSyncStore = defineStore('sync', () => {
    * Reset all sync state (used on sign-out)
    */
   function resetState() {
+    // A different family (or a fresh sign-in) is a different pod, so a latch
+    // from the previous one would silently disable cross-device sync for a
+    // perfectly healthy file — with no banner, no toast and no telemetry.
+    clearPodUnopenable();
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
