@@ -18,6 +18,7 @@
  * single main-thread buffer. See ADR-032.
  */
 import * as Automerge from '@automerge/automerge';
+import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -442,9 +443,20 @@ export function setKey(key: CryptoKey): void {
   familyKey = key;
 }
 
+/**
+ * Post the stable device actor into this realm.
+ *
+ * ⚠️ ORDERING: this must arrive BEFORE `setKey` and before the rehydrator runs.
+ * The rehydrator loads the document, and an actor that turns up after that has
+ * pinned nothing — the load has already minted a random one.
+ */
+export function setActor(actor: string | null): void {
+  setDocActor(actor);
+}
+
 /** Create a fresh empty document (create-family). Pushes the full projection. */
 export function initDoc(): { loaded: true } {
-  currentDoc = migrateDoc(Automerge.init<FamilyDocument>());
+  currentDoc = migrateDoc(Automerge.init<FamilyDocument>(docInitOpts()));
   resetDocCursors(); // fresh doc → first persist writes a base, first snapshot writes fresh
   pushProjection(currentDoc);
   scheduleSnapshotPersist();
@@ -837,6 +849,8 @@ export function reset(): void {
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;
+  // One lifetime, not two: the actor is retained beside the key and dies with it.
+  resetDocActor();
   resetDocCursors();
 }
 
@@ -876,6 +890,9 @@ export async function dispatch(
   switch (method) {
     case 'setKey':
       setKey(a.key as CryptoKey);
+      return {};
+    case 'setActor':
+      setActor((a.actor as string | null) ?? null);
       return {};
     case 'initDoc':
       return { result: initDoc() };
