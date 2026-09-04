@@ -60,7 +60,6 @@ import {
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
-import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { createSampler } from '@/services/telemetry/emitPolicy';
@@ -565,11 +564,18 @@ export const useSyncStore = defineStore('sync', () => {
    */
   const backgroundSyncErrorKind = ref<BackgroundSyncErrorKind>(null);
   /**
-   * This device cannot open the pod (out of memory, or the bytes are damaged).
-   * Latched, because every retry re-downloads megabytes and fails identically.
-   * Read by `startFilePolling`, the one place a poll timer is created.
+   * Reactive MIRROR of `syncService.isRemoteUnreadable()`, for the UI only.
+   *
+   * The authoritative latch lives in `syncService`, the layer that owns the
+   * download: the store cannot see the local-file poll tick, and a second
+   * source of truth here needed clearing from five different places and got it
+   * wrong in three of them (`reloadAllStores` proves nothing about the remote,
+   * and it runs on every tab wake). Every GUARD reads the service directly;
+   * this ref exists so the sync bar can pick the right toast.
    */
   const podUnopenable = ref(false);
+  /** The guards' authoritative read. Never the mirror. */
+  const remoteUnreadable = () => syncService.isRemoteUnreadable();
 
   /**
    * Match the message shapes produced by `TokenExpiredError` (in
@@ -888,7 +894,7 @@ export const useSyncStore = defineStore('sync', () => {
       // (usually larger) remote to inflate it on a device that just ran out of
       // room is futile anyway, so surface it and let the caller show the honest
       // message.
-      if (e instanceof PayloadTooLargeError) throw e;
+      if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
     if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
@@ -2487,7 +2493,6 @@ export const useSyncStore = defineStore('sync', () => {
     // returns 'refreshed' having downloaded and materialized nothing, and an
     // earlier attempt to clear from `runPostLoadDriveHousekeeping` disarmed the
     // breaker there and let the poller straight back on.
-    clearPodUnopenable();
     bumpOpenCycle('storeReload'); // no-op outside an open window
     isReloading = true;
     syncService.cancelPendingSave();
@@ -2720,7 +2725,15 @@ export const useSyncStore = defineStore('sync', () => {
     // wake and every Refresh tap re-download the whole pod, re-hit the same
     // allocation and fire another critical page — one per wake, indefinitely,
     // because wakes are far outside the 60s dedup window.
-    if (podUnopenable.value) return 'skipped-unopenable';
+    if (remoteUnreadable()) {
+      // Close the open cycle and log the outcome like every other terminal —
+      // an early return above the try left the window open (so the cycle shipped
+      // as `open-abandoned` with zero reads) and made this the one
+      // `RefreshOutcome` with no manual-refresh telemetry at all.
+      endOpen('open-complete', openToken);
+      if (opts?.manual) logManualRefreshOutcome('skipped-unopenable');
+      return 'skipped-unopenable';
+    }
     if (isBackgroundSyncing.value) {
       // A sync is already in flight. If an OPEN handed us its window, close it —
       // otherwise it stays open until the next `beginOpen` and is emitted as
@@ -2786,6 +2799,7 @@ export const useSyncStore = defineStore('sync', () => {
       const loadResult = await loadFromFile({ merge: true });
 
       if (loadResult.success) {
+        clearPodUnopenable(); // a read really succeeded
         setupAutoSync();
         if (fellOpen) openOutcome = 'open-fail-open';
         return refreshResult;
@@ -2802,13 +2816,21 @@ export const useSyncStore = defineStore('sync', () => {
             await runPostLoadDriveHousekeeping();
             return refreshResult;
           } catch (e) {
-            // A payload failure is not a key problem: falling through reaches
-            // "password may have changed", discards the envelope and re-arms
-            // the poller. The twin in `reloadIfFileChanged` was fixed a commit
-            // earlier; this one was missed, so the claim that both were done
-            // was wrong.
-            if (e instanceof PayloadLoadError) {
+            // ⚠️ `keyMayBeWrong` gates this. `hydrateFromEnvelope` decrypts the
+            // REMOTE envelope with the in-memory family key, which is the
+            // canonical key-mismatch site (a peer removed a member, or
+            // re-encrypted). Latching on that would kill sync for the session
+            // and tell the user their data is damaged, when falling through to
+            // the cached key and "password may have changed" is the recoverable
+            // path the code below already provides.
+            if (e instanceof PayloadLoadError && !e.keyMayBeWrong) {
               notePodUnopenable(e);
+              // Classify the terminal too. Returning the initial 'refreshed'
+              // with `openOutcome` still 'open-complete' reported a pod that
+              // just failed to open as a SUCCESSFUL refresh: a green toast, an
+              // info-level manual-refresh log, and a clean open cycle.
+              openOutcome = 'open-failed';
+              refreshResult = 'decrypt-failed';
               return refreshResult;
             }
             // Family key doesn't work — try cached key
@@ -2925,7 +2947,7 @@ export const useSyncStore = defineStore('sync', () => {
    * Check if the sync file has been modified externally and reload if so.
    */
   async function reloadIfFileChanged(): Promise<boolean> {
-    if (podUnopenable.value) return false; // see backgroundSyncFromFile
+    if (remoteUnreadable()) return false; // see backgroundSyncFromFile
     if (!isConfigured.value || needsPermission.value || isReloading || isCheckingFile) return false;
 
     isCheckingFile = true;
@@ -2952,7 +2974,10 @@ export const useSyncStore = defineStore('sync', () => {
       isCrossDeviceReload = true;
       try {
         const loadResult = await loadFromFile({ merge: true });
-        if (loadResult.success) return true;
+        if (loadResult.success) {
+          clearPodUnopenable(); // a read really succeeded
+          return true;
+        }
 
         if (loadResult.needsPassword) {
           // Try existing family key first (should work unless key was rotated)
@@ -3036,23 +3061,21 @@ export const useSyncStore = defineStore('sync', () => {
   function notePodUnopenable(err: PayloadLoadError): void {
     podUnopenable.value = true;
     stopFilePolling();
+    // Null it first. The message is CONSTANT per class, so re-assigning the
+    // same string on a second failure is `Object.is` equal and the bar's
+    // watcher never fires — every occurrence after the first was silent to the
+    // user while still paging Slack.
+    backgroundSyncError.value = null;
     backgroundSyncError.value = useTranslationStore().t(payloadErrorMessageKey(err));
     backgroundSyncErrorKind.value = 'decrypt';
-    reportPayloadFailure(err, {
-      fileId: driveFileId.value,
-      familyId: useFamilyContextStore().activeFamilyId,
-      source: 'background-sync',
-    });
+    // The report is owned by `syncService.noteRemoteUnreadable`, once per latch
+    // rather than once per attempt.
   }
 
   /**
-   * Something changed that could plausibly change the answer.
-   *
-   * Exactly two callers, and they are the two that matter: `reloadAllStores`
-   * (a doc is live and being projected, so the pod demonstrably opened) and
-   * `resetState` (sign-out / family switch — a different pod entirely).
-   * Without the second the latch outlived its reason and silently disabled
-   * cross-device sync for a healthy file for the rest of the session.
+   * A read really succeeded, so drop the UI mirror. `syncService` clears the
+   * authoritative latch itself (on a successful merge, on a provider swap —
+   * which is what makes `rebindPodFile` a genuine repair — and on reset).
    */
   function clearPodUnopenable(): void {
     podUnopenable.value = false;
@@ -3072,9 +3095,10 @@ export const useSyncStore = defineStore('sync', () => {
     //
     // This is the single site that creates the interval, so the latch cannot be
     // walked around — and `backgroundSyncFromFile` / `reloadIfFileChanged`
-    // check it on entry too, because two callers invoke those directly rather
-    // than through the timer. Cleared by `clearPodUnopenable()`.
-    if (podUnopenable.value) return;
+    // check it on entry too, because `AppHeader`'s Refresh and
+    // `useStaleTabRefresh` call those directly rather than through the timer.
+    // The latch itself is `syncService`'s; see `remoteUnreadable()`.
+    if (remoteUnreadable()) return;
     filePollingTimer = setInterval(() => {
       reloadIfFileChanged().catch(console.warn);
     }, FILE_POLL_INTERVAL);
@@ -3137,10 +3161,6 @@ export const useSyncStore = defineStore('sync', () => {
    * Reset all sync state (used on sign-out)
    */
   function resetState() {
-    // A different family (or a fresh sign-in) is a different pod, so a latch
-    // from the previous one would silently disable cross-device sync for a
-    // perfectly healthy file — with no banner, no toast and no telemetry.
-    clearPodUnopenable();
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;

@@ -69,7 +69,10 @@ vi.mock('@/stores/syncStore', () => ({
     decryptPendingFile: decryptPendingFileMock,
     decryptPendingFileWithKey: vi.fn(async () => ({ success: false })),
     verifyPodAccess: establishHomeMock,
-    requestPermission: vi.fn(),
+    // Returns the RESULT shape, not a boolean: a `vi.fn()` resolving `undefined`
+    // made the object migration invisible to this suite and would TypeError on
+    // the first test that touches Grant permission.
+    requestPermission: vi.fn(async () => ({ granted: true, loaded: true })),
     addPasskeySecret: vi.fn(),
     syncNow: vi.fn(),
     envelope: null,

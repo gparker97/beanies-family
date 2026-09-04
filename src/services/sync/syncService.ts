@@ -78,6 +78,56 @@ const DEBOUNCE_MS = 2000;
 let saveInProgress: Promise<boolean> | null = null;
 
 // Current storage provider (in-memory for session) and the family it belongs to
+/**
+ * THE remote-unreadable latch, and it lives HERE because this is the layer that
+ * owns the download.
+ *
+ * Earlier attempts put it in `syncStore` (which cannot see the local-file poll
+ * tick) and special-cased `doSave` (which only defended the first save). Both
+ * doors lead through `fetchAndMergeRemote`, so one latch at this level closes
+ * every one of them:
+ *
+ *   • `doSave` refuses rather than writing a base over a remote it never read;
+ *   • the poll tick stops re-downloading megabytes to fail identically;
+ *   • `syncStore` reads it through `isRemoteUnreadable()` instead of keeping a
+ *     second copy that had to be cleared from five different places.
+ *
+ * Cleared by a read that actually merges, and by `resetState`.
+ */
+let remoteUnreadable: PayloadLoadError | null = null;
+
+/** Has this device failed to read the remote pod? See `remoteUnreadable`. */
+export function isRemoteUnreadable(): PayloadLoadError | null {
+  return remoteUnreadable;
+}
+
+function noteRemoteUnreadable(err: PayloadLoadError): void {
+  const first = remoteUnreadable === null;
+  remoteUnreadable = err;
+  // Reported ONCE per latch, not per attempt. `setLocalChangeHandler` wires a
+  // debounced save to every keystroke-level mutation, so a per-attempt critical
+  // (which forces an immediate flush) paged roughly once a minute for the whole
+  // session. The too-large class stays out of here entirely — `docClient` is its
+  // single emitter, deliberately at non-paging severity.
+  if (first && !err.deviceCannotOpen) {
+    reportError({
+      surface: 'pod-load-failure',
+      message: `Remote pod unreadable: Automerge ${err.step}`,
+      error: err,
+      severity: 'critical',
+      context: {
+        action: 'remote-unreadable',
+        error_code: err.step,
+        perf_doc_bytes: err.payloadBytes ?? undefined,
+      },
+    });
+  }
+}
+
+function clearRemoteUnreadable(): void {
+  remoteUnreadable = null;
+}
+
 let currentProvider: StorageProvider | null = null;
 let currentProviderFamilyId: string | null = null;
 
@@ -218,6 +268,12 @@ function startPollingIfApplicable(provider: StorageProvider | null): void {
   pollScope.run(() => {
     pollHandle = usePollWhileVisible(
       async () => {
+        // A remote this device cannot read will not become readable on the next
+        // tick, and each attempt re-reads the whole multi-megabyte file to fail
+        // identically. This is the LOCAL-FILE cohort's door into that loop —
+        // `syncStore`'s latch cannot see it, because this layer owns the
+        // download and the store never runs.
+        if (remoteUnreadable) return;
         try {
           await fetchAndMergeRemote();
         } catch (e) {
@@ -226,6 +282,10 @@ function startPollingIfApplicable(provider: StorageProvider | null): void {
           // (transient errors recover on the next tick) but the failure must
           // not be silent.
           console.warn('[syncService] poll-tick fetchAndMergeRemote threw', e);
+          // A payload failure is already latched + reported once by
+          // `noteRemoteUnreadable`; a second `warning` here would file it as a
+          // poll hiccup on a surface no pod-load filter reads.
+          if (e instanceof PayloadLoadError) return;
           reportError({
             surface: 'local-file-polling',
             message: 'poll-tick merge threw',
@@ -515,6 +575,10 @@ export function getProviderFamilyId(): string | null {
  * Set the storage provider directly (used by Google Drive flow)
  */
 export function setProvider(provider: StorageProvider): void {
+  // A different (or re-bound) file may well be readable. This is what makes
+  // `rebindPodFile` — the supported repair for an unreadable pod — actually
+  // repair it, without the store needing a clearing hook of its own.
+  clearRemoteUnreadable();
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
   // #61: a new provider means a DIFFERENT file (migrate to Drive, rebind pod
@@ -624,6 +688,8 @@ export function getSessionFileHandle(): FileSystemFileHandle | null {
  * Reset the sync service state.
  */
 export function reset(): void {
+  // A different pod entirely — a latch from the previous one must not follow.
+  clearRemoteUnreadable();
   cancelPendingSave();
   stopPolling();
   currentProvider = null;
@@ -1195,19 +1261,34 @@ async function fetchAndMergeRemote(): Promise<void> {
   if (!text) return;
 
   const remoteEnvelope = parseBeanpodV4(text);
-  // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
-  // gap between the probe and the read, this records the OLDER revision → the next
-  // open re-reads (the safe direction), never a stale skip.
-  learnRemoteMarker({ revision: change.revision, modifiedTime: change.modifiedTime });
 
   // The worker decrypts + CRDT-merges the remote into its doc and returns
   // heads-derived `dirty` (did local carry unsynced changes the converged doc
   // must push back?). No suppressAutoSave bracket is needed — the worker doesn't
   // fire a main persist callback; main decides when to save via `dirty`.
-  const { dirty, remoteHeads } = await docClient.mergeRemoteEnvelope(
-    remoteEnvelope,
-    remoteEnvelope.familyId
-  );
+  let merged: { dirty: boolean; remoteHeads: string[] | null };
+  try {
+    merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
+  } catch (e) {
+    // ⚠️ THE MARKER MUST NOT BE LEARNED FOR A REMOTE WE COULD NOT READ.
+    //
+    // It used to be learned above, BEFORE the merge. So a payload failure here
+    // left the in-memory baseline claiming this revision, the next
+    // `remoteChanged()` answered 'unchanged', `fetchAndMergeRemote` returned
+    // early WITHOUT throwing — and the save that followed sailed past its own
+    // refusal and overwrote the remote anyway. The refusal defended exactly one
+    // save. Learning it only on success is what makes that guard mean anything.
+    if (e instanceof PayloadLoadError) noteRemoteUnreadable(e);
+    throw e;
+  }
+  const { dirty, remoteHeads } = merged;
+
+  // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
+  // gap between the probe and the read, this records the OLDER revision → the next
+  // open re-reads (the safe direction), never a stale skip.
+  learnRemoteMarker({ revision: change.revision, modifiedTime: change.modifiedTime });
+  // A remote we could not read a moment ago has now been read and merged.
+  clearRemoteUnreadable();
 
   // Local-wins merge of the three key dicts (wrappedKeys / inviteKeys /
   // passkeyWrappedKeys) — the local side is the just-mutated state about to
@@ -1289,15 +1370,14 @@ async function doSave(): Promise<boolean> {
       // path has to refuse instead.
       if (e instanceof PayloadLoadError) {
         console.error('[syncService] doSave: remote unreadable — refusing to overwrite it', e);
-        reportError({
-          surface: 'pod-load-failure',
-          message: `Save refused: the remote pod failed Automerge ${e.step}`,
-          error: e,
-          severity: 'critical',
-          context: { action: 'save-refused-remote-unreadable', error_code: e.step },
-        });
-        updateState({ isSyncing: false, lastError: 'Remote file could not be read' });
-        return false;
+        // THROW, do not `return false`. A bare false skips the catch below,
+        // which is the only caller of `recordSaveFailure` — the mechanism that
+        // increments the failure count, raises the save-failure banner and
+        // drives the sidebar indicator. Without it a whole session of edits
+        // went unsaved with nothing on screen, and `forceSaveWithTimeout` read
+        // the false as "nothing to save" and let sign-out delete the local DB.
+        // `noteRemoteUnreadable` has already reported it once per latch.
+        throw e;
       }
       console.warn('[syncService] fetchAndMergeRemote failed (non-fatal):', e);
     }

@@ -423,13 +423,22 @@ async function handleDriveReconnect() {
 
 async function handleRequestPermission() {
   const result = await syncStore.requestPermission();
+  // Clear first: this ref is also the "Encryption Error" panel's visibility, and
+  // an early return on success left a stale red panel pinned to the corner for
+  // the rest of the session.
+  encryptionError.value = null;
   if (!result.payloadError) return;
   // A WARM surface: the app is painting real data behind this button, so the
-  // full-screen recovery overlay would be the wrong shape entirely. Say it in
-  // the same slot the other Settings failures use, and report it — Settings had
-  // no payload reporter at all, so the corrupt half here reached CloudWatch
-  // with zero events.
-  encryptionError.value = t(payloadErrorMessageKey(result.payloadError));
+  // full-screen recovery overlay would be the wrong shape entirely. A TOAST,
+  // not `encryptionError` — that slot renders a hard-coded "Encryption Error"
+  // heading in Alert Red, and telling a user their data is damaged in red is
+  // the exact defect this whole change exists to remove (and the CIG reserves
+  // red for destructive confirmations and hard validation errors).
+  showToast('warning', t(payloadErrorMessageKey(result.payloadError)), undefined, {
+    surface: 'pod-load-failure',
+  });
+  // Settings had no payload reporter at all, so the corrupt half here reached
+  // CloudWatch with zero events.
   reportPayloadFailure(result.payloadError, {
     source: 'reload',
     fileId: syncStore.driveFileId ?? null,
