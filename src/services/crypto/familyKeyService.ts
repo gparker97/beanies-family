@@ -106,10 +106,17 @@ export async function unwrapFamilyKey(
 export async function encryptPayload(familyKey: CryptoKey, data: Uint8Array): Promise<Uint8Array> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 
+  // Pass the VIEWS, never `.buffer`. Every caller happens to pass a
+  // whole-buffer Uint8Array today so `.buffer` works by luck, but the moment
+  // anyone passes a subarray it would silently encrypt the WHOLE underlying
+  // buffer instead of the intended slice. One rule for this file: never
+  // `.buffer`.
+  // The casts are type-level only (TS models Uint8Array as ArrayBufferLike,
+  // which does not satisfy BufferSource). The runtime values stay VIEWS.
   const ciphertext = await crypto.subtle.encrypt(
-    { name: ALGORITHM, iv: iv.buffer as ArrayBuffer },
+    { name: ALGORITHM, iv: iv as BufferSource },
     familyKey,
-    data.buffer as ArrayBuffer
+    data as BufferSource
   );
 
   const result = new Uint8Array(IV_LENGTH + ciphertext.byteLength);
@@ -126,13 +133,20 @@ export async function decryptPayload(
   familyKey: CryptoKey,
   encrypted: Uint8Array
 ): Promise<Uint8Array> {
+  // `slice` on the IV is a deliberate 12-byte copy. The CIPHERTEXT is a VIEW:
+  // slicing it copied the entire payload (multiple MB on a real pod) for no
+  // reason, since `crypto.subtle.decrypt` accepts any ArrayBufferView.
+  //
+  // ⚠️ It must be passed as the VIEW. Passing `ciphertext.buffer` would hand
+  // over the whole underlying buffer — including the IV prefix this subarray
+  // exists to skip — and decrypt the wrong bytes.
   const iv = encrypted.slice(0, IV_LENGTH);
-  const ciphertext = encrypted.slice(IV_LENGTH);
+  const ciphertext = encrypted.subarray(IV_LENGTH);
 
   const plaintext = await crypto.subtle.decrypt(
-    { name: ALGORITHM, iv: iv.buffer as ArrayBuffer },
+    { name: ALGORITHM, iv: iv as BufferSource },
     familyKey,
-    ciphertext.buffer as ArrayBuffer
+    ciphertext as BufferSource
   );
 
   return new Uint8Array(plaintext);
