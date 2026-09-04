@@ -94,16 +94,43 @@ Everything below follows from one invariant:
    to publish a compaction. The guard is a no-op for a family that never
    compacts (Requirement 9).
 5. **Cross-lineage handling is a total function, and the POLICY lives in one
-   place.** Four verdicts x two phases (open, mid-session) = one exported table
-   in one module. No consumer re-derives policy; no default, no fall-through.
+   place.** Four verdicts x three CONTEXTS = one exported table in one module.
+   No consumer re-derives policy; no default, no fall-through.
+
+   > ⚠️ The context axis is **not** "open vs mid-session" (that was the draft's
+   > mistake, and it was fatal). It is _what this device can prove about its own
+   > document_: `clean` (our doc provably holds nothing the remote has not seen),
+   > `dirty` (it might), `user-file` (the human explicitly chose these bytes).
+   > A wall-clock phase gets both ends wrong: a peer's FIRST post-compaction sync
+   > arrives through `fetchAndMergeRemote` (which the draft classified `session`,
+   > i.e. `block`), so under the draft **every peer in the fleet latches and never
+   > adopts** — the compaction could never propagate. And it blocks the rollback
+   > route too; see Requirement 8 and B2.
+
 6. **A device on an older lineage ADOPTS through the path that already exists**
-   (`replaceDocWithCacheRecovery`'s cache-miss branch -> `dropDoc()` ->
-   `mergeRemoteEnvelope`'s `!currentDoc` adopt branch). No second adopt
-   implementation, and no second way to SAY "adopt".
-7. **A device that would lose unsynced work never does so silently.** It stops,
-   says so, and the only way forward is through the existing encrypted-export
-   flow — the same "refuse to destroy anything unless a file actually landed"
-   gate the delete-family flow already enforces.
+   (`dropDoc()` -> `mergeRemoteEnvelope`'s `!currentDoc` adopt branch). No second
+   adopt implementation, and no second way to SAY "adopt".
+7. **A device that would lose unsynced work never does so silently, and the
+   proof is one already-computed fact.** "Unsynced" means
+   `hasUnpushedChanges(baselineFp, headsFingerprint(heads))` — the exact #65
+   comparison `unpushedLocalChangesCheck` already makes, over the baseline row
+   `initAndLoadCache` already returns in the SAME round-trip. Unknown counts as
+   dirty (a null `baselineFp`, or a failed heads probe): the same fail-safe
+   direction that module already documents. A `dirty` device stops, says so, and
+   the only way forward is the existing encrypted-export flow — the same "refuse
+   to destroy anything unless a file actually landed" gate the delete-family flow
+   already enforces.
+
+   > **The one stated exception, and it is the reason this plan exists.** If
+   > `initAndLoadCache` throws `deviceCannotOpen` (OOM) we cannot read our own
+   > heads — but a device that cannot load its own cache also cannot push,
+   > export or even display those changes; they are already unreachable, and
+   > `block` would leave that device permanently broken, which is the exact
+   > failure Tier 2 exists to end. So on `deviceCannotOpen` + `adopt-remote` we
+   > ADOPT, and say so out loud: `surface: 'pod-lineage', action: 'adopted',
+error_code: 'unprovable'`, `severity: 'warning'`. Explicit, measurable, and
+   > never the default path.
+
 8. **The compaction is reversible from a file the user holds** — the exported
    `.beanpod`, produced by the shipped export path and proven delivered before
    anything is written. That file is the ONLY rollback route, so the gate on it
@@ -171,11 +198,20 @@ remote)` keeps `local`'s actorId, and `docOps.ts:125-138` documents why it
   guard. **This is the whole reason the guard must reach production before any
   compaction is published**, and why Phase C is flagged while Phase B is not.
 - **`dropDoc()` is already the way this codebase says "adopt".**
-  `worker/applyAndProject.ts:822` documents it as exactly that, and four call
-  sites (`syncStore.ts:889`, `:1097`, `:1329`, `:2142`) already use the
-  `dropDoc()`-then-`mergeRemoteEnvelope()` pair. A second way to express adopt —
-  a mode flag threaded through a seven-call-site API — would be a synonym, not a
-  safeguard. Give the existing pair a NAME instead (B5).
+  `worker/applyAndProject.ts` documents it as exactly that, and **three** call
+  sites use it as an UNCONDITIONAL `dropDoc()`-then-`mergeRemoteEnvelope()` pair:
+  `syncStore.ts:1103+1108` (background sync, no famId), `:1349+1350` and
+  `:2162+2163` (the two `decryptPendingFile*` no-famId branches). A second way to
+  express adopt — a mode flag threaded through a seven-call-site API — would be a
+  synonym, not a safeguard. Give the existing pair a NAME instead (B5).
+
+  ⚠️ **`syncStore.ts:902` is the fourth `dropDoc()` and it is NOT a pair.** It
+  reads `if (!loadedFromCache) await docClient.dropDoc();` — a CONDITIONAL drop
+  guarding cross-family corruption, immediately followed by the merge on the next
+  line. Collapsing it into `adoptRemoteEnvelope()` would turn the cache-recovery
+  merge into an unconditional adopt and silently discard every unsynced cached
+  change on the one path built to preserve them. It stays exactly as it is.
+
 - **The `remoteUnreadable` latch is the right mechanism and must not be
   duplicated.** `syncService.ts:97-125` already refuses saves, stops the poll and
   reports once per class. A stale-lineage device wants exactly those three
@@ -236,6 +272,21 @@ Deterministic, per-(device, family) by construction, valid hex, 128 bits, and
 localStorage simply produces a new device id and therefore one new lane — the
 same cost as a re-install, which is correct. Memoised per familyId.
 
+**Use `sha256Hex` from `src/utils/encoding.ts`** — it already exists and is
+already `crypto.subtle.digest('SHA-256', …)` + hex, so "derive with
+`crypto.subtle.digest` and hex-encode" would be a fourth hand-rolled copy of a
+two-line helper this repo has centralised.
+
+**Failure direction, stated because it is not obvious.** `crypto.subtle` is
+absent in a non-secure context and `digest` can reject (`hashedCodeGate.ts`
+already handles exactly this). `deviceActorId` therefore returns
+`Promise<string | null>` and NEVER throws: `null` means "no actor",
+`docInitOpts()` returns `undefined`, and Automerge mints a random one —
+**precisely today's behaviour**. An actor-derivation failure must never be able
+to stop a pod from opening; that would be Phase A, a pure optimisation, causing
+the outage Phase C exists to cure. The `null` case emits the `unstable`
+device-actor event.
+
 **A3. One realm-scoped holder, so a forgotten call site cannot go silent.**
 `src/services/automerge/worker/docActor.ts` — `setDocActor(actor)` /
 `docInitOpts()`, imported by `docOps` and `cache`. `docInitOpts()` returns
@@ -256,14 +307,34 @@ Wired at:
 - `applyAndProject.loadSnapshot` (`applyAndProject.ts:854`, DEV/E2E — included so
   the E2E seed path matches production)
 
-**A4. Post it the way the key is posted, including the two re-drive paths.**
-New `setActor` RPC beside `setKey` in the dispatch table, set from
-`docClient.setFamilyKey`'s neighbour and — the part the first draft missed —
-re-posted from **`spawn()` (`worker/docClient.ts:324`)** and
-**`enterInlineMode()` (`worker/docClient.ts:275`)**, which today re-drive only
-`familyKey`. Without both, the first worker crash silently un-pins the actor for
-the rest of the session. Retained in the same module-state block as `familyKey`,
-cleared by `reset()`.
+**A4. Post it through the seam the key already uses — ONE seam, not a neighbour.**
+
+`docClient.setFamilyKey(key)` becomes `setFamilyKey(key, familyId)`. It derives
+the actor, retains it beside `familyKey`, and posts `setActor` **before**
+`setKey`, in one awaited sequence. "The neighbour of `setFamilyKey`" would be
+**five** main-side call sites, five chances to forget, and five places to
+remember forever. One required parameter on the existing seam is
+compiler-enforced, touches the same five sites once, and cannot be forgotten by a
+future sixth. (Two of those sites compute `famId` just AFTER the call; hoist it
+above — a pure move, no behaviour change.) It also fixes a latent gap for free:
+`currentFamilyId` is today set only by the cache-open RPCs, so a respawn before
+one of those had no rehydrate target.
+
+Re-driven from **`spawn()`** and **`enterInlineMode()`**, which today re-drive
+only `familyKey`. Two ordering rules, both load-bearing:
+
+1. `setActor` is posted **before** `setKey` and **before** the rehydrator runs —
+   the rehydrator loads the doc, and an actor arriving after that has pinned
+   nothing;
+2. it is retained in the same module-state block as `familyKey` and cleared by
+   the same `reset()`, so there is one lifetime, not two.
+
+**Classify `setActor` in all five `docClient` sets** — the plan's own caveat, and
+the draft never applied it to its own new method. `RETRYABLE` (idempotent state
+post, exactly like `setKey`, which is already in that set); NOT `HEAVY`, NOT
+`ENVELOPE`, NOT `USER_ACTION`; `JSON_SAFE` is moot (a plain string) and it is
+left OUT, matching `setKey`'s exclusion, so that set keeps meaning "args that
+could carry a Vue proxy".
 
 **A5. Ship Phase A alone.** No migration risk; its benefit compounds from the day
 it lands; and its effect is directly measurable as `numActors` in the profiler.
@@ -295,8 +366,10 @@ src/services/sync/podLineage.ts   (pure, no I/O, no state — like remoteBaselin
   export type LineageVerdict = 'same' | 'adopt-remote' | 'ours-newer' | 'conflict';
   export type LineageAction  = 'merge' | 'adopt' | 'publish-local' | 'block';
 
+  export type LineageContext = 'clean' | 'dirty' | 'user-file';
+
   export function compareLineage(remote, local): LineageVerdict
-  export function lineageAction(verdict, phase: 'open' | 'session'): LineageAction
+  export function lineageAction(verdict, ctx: LineageContext): LineageAction
 ```
 
 `compareLineage`:
@@ -307,22 +380,37 @@ src/services/sync/podLineage.ts   (pure, no I/O, no state — like remoteBaselin
 - equal `seq`, different `id` -> `conflict` (two devices compacted concurrently —
   never guess)
 
-`lineageAction` is the whole policy, as one 8-row table:
+`lineageAction` is the whole policy, as one 12-row table:
 
-| verdict        | `open`          | `session` |
-| -------------- | --------------- | --------- |
-| `same`         | `merge`         | `merge`   |
-| `adopt-remote` | `adopt`         | `block`   |
-| `ours-newer`   | `publish-local` | `block`   |
-| `conflict`     | `block`         | `block`   |
+| verdict        | `clean`         | `dirty`         | `user-file` |
+| -------------- | --------------- | --------------- | ----------- |
+| `same`         | `merge`         | `merge`         | `merge`     |
+| `adopt-remote` | `adopt`         | `block`         | `adopt`     |
+| `ours-newer`   | `publish-local` | `publish-local` | `adopt`     |
+| `conflict`     | `block`         | `block`         | `adopt`     |
+
+Three properties this table has and the `open`/`session` one did not:
+
+1. **The whole `same` column is `merge`.** Every action for a never-compacted
+   pod is byte-for-byte today's behaviour in every context — Requirement 9,
+   discharged by the shape of the table rather than by inspection.
+2. **`adopt-remote` + `clean` is `adopt` everywhere**, including inside
+   `fetchAndMergeRemote`. That is the ONLY route by which a compaction reaches a
+   peer, and the draft closed it.
+3. **The `user-file` column never blocks.** The user picked these bytes; that IS
+   the human decision the guard exists to demand. Without this column **the
+   rollback route is blocked by the guard itself** — a device holding lineage
+   N+1 that opens the pre-compaction `.beanpod` (lineage N) reads `ours-newer`
+   and refuses the one file Requirement 8 calls the only rollback route. The
+   guard would have made the recovery it mandates impossible.
 
 **Why a table rather than an exhaustive switch at each consumer:** there are
 three consumers, and a switch at each is the same policy written three times,
-drifting independently the first time a fifth verdict or a third phase appears.
-Consumers switch on FOUR actions they can actually perform, which is the thing
-they are qualified to decide; the module owns what the verdicts MEAN. It is
-table-tested in one place (8 rows), and adding a verdict is a compile error in
-exactly one file.
+drifting independently the first time a fifth verdict or a fourth context
+appears. Consumers switch on FOUR actions they can actually perform, which is
+the thing they are qualified to decide; the module owns what the verdicts MEAN.
+It is table-tested in one place (12 rows), and adding a verdict or a context is
+a compile error in exactly one file.
 
 **B3. The local side is the CACHED ENVELOPE — no new storage.**
 `docClient.readEnvelope()` already returns it, `syncStore.ts:1553` already reads
@@ -336,28 +424,53 @@ cached, migrated or cleaned up.
 never claim a lineage the cached doc is not on. C3's ordering rule is what
 guarantees it, and the two must be read together.
 
-**B4. Adopt through the path that already adopts.**
-`syncStore.replaceDocWithCacheRecovery` — read the cached envelope's lineage
-BEFORE `initAndLoadCache`. On action `adopt`:
+**B4. Adopt through the path that already adopts — after `initAndLoadCache`, not
+before it, and without deleting anything.**
 
-1. `docClient.clearCache(familyId)` — drops the doc and deletes the stale-lineage
-   cache DB in one existing call (`applyAndProject.clearCache`);
-2. `docClient.openCache(familyId)` — the existing "open the DB, deliberately do
-   not load" primitive built for `createNewFile`, which is exactly this
-   situation;
-3. `docClient.adoptRemoteEnvelope(...)` (B5), whose `!currentDoc` branch installs
-   the remote wholesale, resets cursors and pushes a full projection.
+`syncStore.replaceDocWithCacheRecovery` keeps its existing first step verbatim:
+`initAndLoadCache(familyId)`, which returns `{ loaded, remoteBaseline }` in ONE
+round-trip. Both inputs the guard needs are already in that reply, so **the
+lineage decision costs zero new I/O**:
+
+- the local lineage is `envelope.value?.podLineage` (B3 — the in-memory
+  envelope, already populated on every path that reaches here);
+- the context is `loaded === false` -> `clean` (there is no local doc, so
+  nothing can be lost); otherwise `await docPushedAgainst(remoteBaseline)`
+  -> `clean` | `dirty` (Requirement 7's one comparison);
+- `deviceCannotOpen` from `initAndLoadCache` -> `clean`, with the
+  `error_code: 'unprovable'` warning event (Requirement 7's stated exception).
+  Every OTHER throw keeps today's `console.warn` + remote-only fall-through.
+
+On action `adopt`: `docClient.adoptRemoteEnvelope(...)` (B5) — `dropDoc()` then
+the `!currentDoc` branch, which installs the remote wholesale, resets cursors
+and pushes a full projection. **Nothing else.**
+
+> **Deliberately NOT `clearCache()` + `openCache()`, which the draft specified.**
+> Three reasons, all verified: (a) `cache.persistDocBinary` clears every existing
+> increment in the same transaction, so the fresh BASE the adopt's
+> `resetDocCursors()` guarantees already supersedes every stale-lineage row —
+> the delete is redundant; (b) `clearCache` deletes the whole DB, so a failure
+> between the delete and a successful adopt (a network drop, a decrypt failure)
+> leaves the device with **no local copy of the pod at all** — a data-void
+> window this plan has no business opening; (c) it also drops the #61
+> open-guard baseline row and the fast-paint snapshot, costing a needless full
+> read on the next open. Two RPCs removed, one failure mode removed.
 
 **Not one line of new adopt logic.** Existing RPCs in the order they were built
 for.
 
-On action `publish-local` at open (we hold an unpublished compaction): do NOT
-merge the remote, keep the local doc, and republish — but only if
+On action `publish-local` (we hold an unpublished compaction): do NOT merge the
+remote, keep the local doc, and republish — but only if
 `syncService.remoteChanged()` answers `unchanged` against the DURABLE baseline
-(the same check C3 step 2 uses, and the same one #61's open-guard already
-relies on). If the remote moved, a peer wrote on the old lineage while our
-compaction was unpublished: `block`. No new machinery — one existing call and
-the existing latch.
+(the same check C3 step 2 uses, and the same one #61's open-guard already relies
+on). If the remote moved, a peer wrote on the old lineage while our compaction
+was unpublished: `block`, and the honest exit is re-opening the `.beanpod` step 3
+proved exists — which the `user-file` column keeps open. No new machinery.
+
+The same three lines serve `hydrateFromEnvelope` (terminus 2). The two
+`decryptPendingFile*` callers pass `'user-file'` explicitly; every other caller
+lets the context be derived. The context is a required argument with no default,
+so a future caller cannot inherit `'user-file'` by omission.
 
 **B5. Name the existing adopt idiom; do not add a mode parameter.**
 Add one thin main-side composition to `worker/docClient.ts`:
@@ -371,8 +484,15 @@ export async function adoptRemoteEnvelope(envelope, familyId) {
 }
 ```
 
-Then migrate the existing `dropDoc()` + `mergeRemoteEnvelope()` pairs
-(`syncStore.ts:889-901`, `:1097-1098`, `:1329-1330`, `:2142-2143`) onto it.
+Then migrate the **three UNCONDITIONAL** `dropDoc()` + `mergeRemoteEnvelope()`
+pairs onto it: `syncStore.ts:1103+1108`, `:1349+1350`, `:2162+2163`.
+
+**`syncStore.ts:902-903` is explicitly excluded** — its `dropDoc()` is guarded by
+`if (!loadedFromCache)`, and collapsing the guard would convert a cache-recovery
+merge into an unconditional adopt. It becomes
+`loadedFromCache ? mergeRemoteEnvelope(...) : adoptRemoteEnvelope(...)` — the
+same two branches it already has, now naming the second one. A test pins that
+a cache HIT still merges.
 
 **This replaces the earlier `mode: 'merge' | 'adopt'` required-parameter design,
 for three reasons found by reading the code:**
@@ -402,17 +522,43 @@ mapping:
 
 ```ts
 /** Compare, apply policy, and THROW `PodLineageError` on `block`.
+ *  Returns one of the three NON-blocking actions, so no caller re-maps.
  *  Termini (keep this list in step with the tests):
- *    1. syncStore.replaceDocWithCacheRecovery   (open / file adopt)
+ *    1. syncStore.replaceDocWithCacheRecovery   (cache recovery + file adopt)
  *    2. syncStore.hydrateFromEnvelope           (background recovery)
  *    3. syncService.fetchAndMergeRemote         (poll + pre-save) */
-export function guardLineage(remoteEnv, localLineage, phase): LineageAction;
+export function guardLineage(
+  remoteEnv,
+  localLineage,
+  ctx: LineageContext
+): Exclude<LineageAction, 'block'>;
 ```
 
-`fetchAndMergeRemote` calls it before merging. `same` is byte-for-byte today's
-behaviour. `block` throws, and the throw lands in the latch below — which is
-also how a `PayloadLoadError` already behaves there, so the surrounding
-error path needs no new shape.
+**`fetchAndMergeRemote` must be able to ACT on the answer, not just refuse it.**
+It calls the guard immediately after `parseBeanpodV4(text)` and before the
+merge, and its existing single `docClient.mergeRemoteEnvelope(...)` call becomes
+a two-branch dispatch on the returned action:
+
+- `merge` -> today's call, unchanged, byte for byte (the whole `same` column);
+- `adopt` -> `docClient.adoptRemoteEnvelope(...)`, whose `{ dirty, remoteHeads }`
+  reply has the same shape, so **the baseline commit, `setEnvelope`, the latch
+  clear and the `if (dirty) triggerDebouncedSave()` tail all stay exactly as
+  written**. Adopting after a genuine `changed` probe is sound for precisely the
+  reason the `!currentDoc` branch already documents: the doc we install IS the
+  remote, so `remoteHeads` describes it exactly;
+- `publish-local` -> return WITHOUT merging and without learning the marker, so
+  `doSave` proceeds to write our compacted doc (if the remote already answered
+  `changed`, the guard returned `block` — see B4).
+
+The context here is `await docPushedAgainst(remoteBaseline)` — the shared helper
+B4 uses. `syncService` already owns the only copy of that comparison
+(`unpushedLocalChangesCheck`); export a one-line
+`docPushedAgainst(baselineFp): Promise<'clean' | 'dirty'>` beside it that reuses
+the same private body, rather than a second heads probe in `syncStore`.
+
+`block` throws, and the throw lands in the latch below — which is also how a
+`PayloadLoadError` already behaves there, so the surrounding error path needs no
+new shape.
 
 The latch: **widen the existing one** rather than adding a second, and widen it
 by INTERFACE rather than by union:
@@ -532,7 +678,10 @@ critical: true })` then `confirmBackupLanded()`, and **refuse to continue
    the rollback route is "open this file", which the product already supports.
    Provider-agnostic, so no dated-sibling-file write path is invented.
 4. **Compact, in the worker, verified.** One new RPC `compactDoc`:
-   `Automerge.from(toJS(doc), { actor })` -> `firstJsonDifference(toJS(before),
+   `Automerge.from(toJS(doc), docInitOpts())` (A3's holder — never a locally
+   sourced actor, or Phase C would re-introduce the churn Phase A removed, in
+   the one document that has just been stripped of its history) ->
+   `firstJsonDifference(toJS(before),
 toJS(after))` over the whole document -> install ONLY on `null`, and on
    install **`resetDocCursors()`** (see the caveat — without it the next persist
    writes an increment against an unrelated document). On any difference, **keep
@@ -664,9 +813,27 @@ All emitted **from main**, because the worker cannot telemeter.
 - [ ] Phase A ships independently and is on in production.
 - [ ] `getDeviceId` exists once, in `src/utils/deviceId.ts`, and never returns a
       shared constant.
-- [ ] `compareLineage` is total and `lineageAction` covers all 8 (verdict, phase)
-      pairs, table-tested; consumers switch on ACTIONS only and contain no
-      verdict-specific policy; the "both absent" case is byte-identical to today.
+- [ ] `compareLineage` is total and `lineageAction` covers all 12
+      (verdict, context) pairs, table-tested; consumers switch on ACTIONS only
+      and contain no verdict-specific policy; every cell of the `same` column is
+      `merge`, so a never-compacted pod is byte-identical to today.
+- [ ] A peer device on the old lineage adopts a published compaction through its
+      ORDINARY Drive sync (`fetchAndMergeRemote`), with no manual step — proven
+      end-to-end, because this is the criterion the draft failed.
+- [ ] Opening the pre-compaction `.beanpod` on a device already carrying the new
+      lineage SUCCEEDS (the `user-file` column), so the mandated rollback route
+      is not blocked by the guard that mandates it.
+- [ ] No adopt discards unsynced local work: `dirty` blocks; the only adopt
+      without proof is the `deviceCannotOpen` case, and it emits
+      `error_code: 'unprovable'`.
+- [ ] No lineage path calls `clearCache`; the device always holds either its old
+      cache or the adopted one, never neither.
+- [ ] `syncStore.ts:902`'s conditional `dropDoc` is unchanged in meaning: a cache
+      HIT still merges, pinned by a test.
+- [ ] `deviceActorId` returning `null` (no `crypto.subtle`) leaves the pod
+      opening exactly as it does today, pinned by a test.
+- [ ] `setActor` is classified in all five `docClient` sets and is posted before
+      both `setKey` and the rehydrator on `spawn()` and `enterInlineMode()`.
 - [ ] Phase B ships to production UNGATED and soaks before Phase C is enabled
       anywhere.
 - [ ] A device on the old lineage ADOPTS rather than merges — proven by a test
@@ -710,36 +877,47 @@ All emitted **from main**, because the worker cannot telemeter.
    different across families; the localStorage-throws path mints a per-session id
    and logs, never a constant.
 3. `compareLineage` table test (four verdicts + both-absent + the
-   `seq`-equal/`id`-different conflict) and `lineageAction` table test (all 8
-   pairs).
+   `seq`-equal/`id`-different conflict) and `lineageAction` table test (all 12
+   pairs), plus one assertion that the whole `same` column is `merge`.
 4. Adopt test: build a doc, compact it, have a simulated peer make an unsynced
    change on the OLD lineage, and assert the guard preserves it (refusal) while a
    naive merge loses it.
-5. `adoptRemoteEnvelope` drops the doc first — assert the doc is installed
-   wholesale and the cursors reset; and assert each of the three termini in
-   `guardLineage`'s header actually calls it (behaviour, not grep).
-6. Latch tests: each blocking action refuses `doSave`, stops the poll, reports
+5. **Propagation test (the draft's fatal gap):** a clean peer running the
+   ordinary poll path adopts the compaction through `fetchAndMergeRemote` and
+   ends on the new lineage, with `remoteHeads`, the baseline commit and the
+   `dirty` re-push tail behaving exactly as on the merge branch.
+6. **Rollback test:** a device on lineage N+1 opens the pre-compaction
+   `.beanpod` (lineage N) via `decryptPendingFile` and succeeds.
+7. **Context test:** `docPushedAgainst` answers `dirty` for a null `baselineFp`
+   and for a failed heads probe; `initAndLoadCache` throwing `deviceCannotOpen`
+   adopts and emits `error_code: 'unprovable'`; every other throw keeps today's
+   remote-only fall-through.
+8. `adoptRemoteEnvelope` drops the doc first — assert the doc is installed
+   wholesale and the cursors reset; assert each of the three termini in
+   `guardLineage`'s header actually calls it (behaviour, not grep); and assert
+   `syncStore.ts:902`'s cache-HIT branch still MERGES.
+9. Latch tests: each blocking action refuses `doSave`, stops the poll, reports
    exactly once per class, clears on a successful same-lineage merge, and clears
    the sync-bar message for kind `'lineage'` as well as `'decrypt'`.
-7. `firstJsonDifference` — equal trees, key-order-insensitive, array-order-
-   sensitive, and a path returned for a nested difference; and `compactDoc`
-   refuses + keeps the old doc when it differs.
-8. Compaction refusal matrix: not owner, flag off, not synced, backup not
-   delivered, remote changed mid-flight — each leaves the doc and the envelope
-   untouched.
-9. Ordering test (Requirement 11): fail the publish after step 5 and assert (a)
-   the cached doc and cached envelope are on the SAME lineage, (b) the next open
-   republishes when the remote is unchanged, (c) the next open blocks visibly
-   when the remote changed.
-10. `usePodExport`: the existing delete-family gate tests pass unchanged against
+10. `firstJsonDifference` — equal trees, key-order-insensitive, array-order-
+    sensitive, and a path returned for a nested difference; and `compactDoc`
+    refuses + keeps the old doc when it differs.
+11. Compaction refusal matrix: not owner, flag off, not synced, backup not
+    delivered, remote changed mid-flight — each leaves the doc and the envelope
+    untouched.
+12. Ordering test (Requirement 11): fail the publish after step 5 and assert (a)
+    the cached doc and cached envelope are on the SAME lineage, (b) the next open
+    republishes when the remote is unchanged, (c) the next open blocks visibly
+    when the remote changed.
+13. `usePodExport`: the existing delete-family gate tests pass unchanged against
     the extracted `confirmBackupLanded`, and `exportEncryptedPod` returns false
     on a cancelled share.
-11. Deep-equality gate on the real pod via the diagnostic spec (env-gated).
-12. On-device: sideload to the Tab A9+ and the Tab A7, open the compacted pod,
+14. Deep-equality gate on the real pod via the diagnostic spec (env-gated).
+15. On-device: sideload to the Tab A9+ and the Tab A7, open the compacted pod,
     confirm it loads and that a subsequent edit round-trips to another device.
-13. Rollback rehearsal: open the pre-compaction export as the pod and confirm the
+16. Rollback rehearsal: open the pre-compaction export as the pod and confirm the
     family works on it, including merging in a peer edit made after the export.
-14. Full battery: type-check, eslint, stylelint, unit suite, build.
+17. Full battery: type-check, eslint, stylelint, unit suite, build.
 
 ## Review Passes
 
@@ -790,6 +968,8 @@ All emitted **from main**, because the worker cannot telemeter.
     `instanceof` — matching the existing `deviceCannotOpen` idiom.
   - **Moved the four-verdict policy out of three exhaustive switches into one
     8-row table**; adding a verdict is now a compile error in one file.
+    (Pass 4 replaced the phase axis with a provable-safety axis and widened this
+    to 12 rows — see below.)
   - **Moved the Phase C orchestration out of the two largest files** into
     `usePodCompaction.ts`, as a flat early-return sequence with exactly one
     `try/catch`.
@@ -801,7 +981,42 @@ All emitted **from main**, because the worker cannot telemeter.
   - Kept `payloadFailureSurface.ts` un-generalised; added the `'lineage'`
     sync-bar kind and the matching `clearPodUnopenable` fix; gave the DevFlag a
     written retirement criterion; corrected several paths.
-- **Pass 4 (Fresh-eyes sweep)**: pending.
+- **Pass 4 (Fresh-eyes sweep)**: four defects found by re-reading the code
+  rather than the plan; two of them would have shipped a broken feature.
+  - **The policy axis was wrong, and it broke propagation (blocking).** With
+    context = `open` | `session`, a peer's first post-compaction sync arrives via
+    `fetchAndMergeRemote` — classified `session`, verdict `adopt-remote`, action
+    `block`. Every peer in the fleet would latch and none would ever adopt: a
+    compaction could not spread. Replaced with `clean` | `dirty` | `user-file`
+    (what the device can PROVE), a 12-row table, and an `adopt` branch inside
+    `fetchAndMergeRemote`.
+  - **The guard blocked its own rollback route (blocking).** A device on lineage
+    N+1 opening the pre-compaction `.beanpod` (lineage N) reads `ours-newer` and
+    refuses — the file Requirement 8 calls the ONLY rollback route. The
+    `user-file` column fixes it, and states why a user-chosen file is the human
+    decision the guard exists to demand.
+  - **Adopt discarded unsynced work silently, contradicting Requirement 7.** The
+    draft never checked. It now uses `hasUnpushedChanges` against the baseline
+    row `initAndLoadCache` already returns in the same round-trip — zero new I/O
+    — with unknown counting as `dirty`, and ONE stated, instrumented exception
+    for the OOM device that cannot read its own heads.
+  - **`clearCache()` before adopt was a data-void window.** A base write already
+    clears every increment, so the delete was redundant; a failure between delete
+    and adopt left the device with no local pod at all. Removed, along with two
+    RPCs and the loss of the #61 baseline row and fast-paint snapshot.
+  - **`syncStore.ts:902` is not a `dropDoc`+merge pair.** It is a CONDITIONAL
+    drop guarding cross-family corruption; the draft's "migrate all four" would
+    have turned the cache-recovery merge into an unconditional adopt. Three
+    unconditional pairs migrate; that one is explicitly excluded.
+  - Smaller: `setFamilyKey` gains `familyId` so the actor has ONE seam instead of
+    five call sites to remember; `setActor` is classified in all five `docClient`
+    sets (the plan mandated this and skipped its own method); `deviceActorId`
+    reuses `sha256Hex` and returns `null` rather than throwing, so a preventive
+    optimisation can never stop a pod opening; `compactDoc` takes its actor from
+    `docInitOpts()`.
+  - Line references in this plan are accurate as of 2026-09-05 and drift with
+    every commit — treat the NAMED function and the quoted code as the anchor,
+    the line number as a hint.
 
 ## Prompt Log
 
