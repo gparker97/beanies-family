@@ -14,7 +14,8 @@
  */
 
 import { ref, type Ref } from 'vue';
-import { PayloadTooLargeError, payloadErrorMessageKey } from '@/types/sync';
+import { PayloadTooLargeError, PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
+import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import {
   transition,
   type LoginFlowEvent,
@@ -229,15 +230,22 @@ export function useLoginFlow(opts: {
       // A fast path, not a gate — the flow works without it. But never silent (repo
       // no-silent-failures rule): a persistent failure here quietly demotes every
       // trusted-device login on this device to manual credentials.
-      logEvent({
-        level: 'warn',
-        surface: 'login-flow',
-        message: 'trusted_auto_open_failed',
-        context: {
-          action: 'auto_open_failed',
-          error_code: e instanceof Error ? e.name : 'unknown',
-        },
-      });
+      // A payload failure here is not "the fast path missed": the pod cannot be
+      // opened at all, and a `warn` on the login-flow surface hides it from
+      // every pod-load filter.
+      if (e instanceof PayloadLoadError) {
+        reportPayloadFailure(e, { source: 'boot' });
+      } else {
+        logEvent({
+          level: 'warn',
+          surface: 'login-flow',
+          message: 'trusted_auto_open_failed',
+          context: {
+            action: 'auto_open_failed',
+            error_code: e instanceof Error ? e.name : 'unknown',
+          },
+        });
+      }
     }
   }
 
@@ -417,6 +425,16 @@ export function useLoginFlow(opts: {
       dispatch({ type: 'OPEN_FAILED', reason: classifyLoadFailure(result.reason) });
       return false;
     } catch (e) {
+      // A payload failure is not a staging problem. Filed as
+      // `stage_failed`/`warning` it is invisible to every `pod-load-*` filter,
+      // and the user gets a generic open failure with none of the honest copy —
+      // on the step that runs BEFORE the prove screen.
+      if (e instanceof PayloadLoadError) {
+        reportPayloadFailure(e, { source: 'boot' });
+        proveError.value = t(payloadErrorMessageKey(e));
+        dispatch({ type: 'OPEN_FAILED', reason: 'error' });
+        return false;
+      }
       reportError({
         surface: 'login-flow',
         message: 'staging the pod file for prove failed',
@@ -631,23 +649,13 @@ export function useLoginFlow(opts: {
             false,
             dec.payloadError instanceof PayloadTooLargeError ? 'too-large' : 'corrupted'
           );
-          // Report explicitly. Returning here skips the `pin_decrypt_failed`
-          // report below, and `docClient.surface()` emits only for
-          // `PayloadTooLargeError` — so without this a CORRUPT payload on the
-          // default sign-in path reached CloudWatch with zero events.
-          if (!(dec.payloadError instanceof PayloadTooLargeError)) {
-            reportError({
-              surface: 'pod-load-failure',
-              message: `Pod payload failed Automerge ${dec.payloadError.step}`,
-              error: dec.payloadError,
-              severity: 'critical',
-              context: {
-                action: 'pod-load-corrupt:pin-unlock',
-                error_code: dec.payloadError.step,
-                perf_doc_bytes: dec.payloadError.payloadBytes ?? undefined,
-              },
-            });
-          }
+          // Report through the SHARED emitter. A hand-rolled copy here was
+          // already divergent (no `file_id_tail`) and shared the (surface,
+          // message) dedup bucket with the real one, so on the default sign-in
+          // route the only report reaching CloudWatch could be the poorer of
+          // the two. `reportPayloadFailure` also knows to stay quiet for
+          // too-large, which `docClient.surface()` already emitted.
+          reportPayloadFailure(dec.payloadError, { source: 'pin-unlock' });
           return;
         }
         if (!dec.success) {
@@ -825,6 +833,10 @@ export function useLoginFlow(opts: {
                 // compact slot with no diagnostic blob and no Clear-data button,
                 // so the overlay copy would point at UI that is not on screen.
                 proveError.value = t(payloadErrorMessageKey(dec.payloadError));
+                // The password branch emitted nothing at all, and
+                // `docClient.surface()` reports only the too-large half — so a
+                // corrupt pod on this route reached CloudWatch with zero events.
+                reportPayloadFailure(dec.payloadError, { source: 'password-unlock' });
                 emitProveOutcome({
                   method: 'password',
                   ok: false,

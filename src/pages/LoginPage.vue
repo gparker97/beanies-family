@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, watchEffect } from 'vue';
+import { PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
+import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import type { WatchStopHandle } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import LoginBackground from '@/components/login/LoginBackground.vue';
@@ -416,11 +418,18 @@ function resetLoadPodFlags() {
  */
 function enterGenericLoadFallback(
   hint: 'local' | 'google_drive' | undefined,
-  opts: { needsPermission?: boolean; autoLoad?: boolean; withError?: boolean } = {}
+  opts: {
+    needsPermission?: boolean;
+    autoLoad?: boolean;
+    withError?: boolean;
+    /** An explicit message, when the generic provider copy would be a lie. */
+    message?: string;
+  } = {}
 ) {
-  const { needsPermission = false, autoLoad = false, withError = true } = opts;
+  const { needsPermission = false, autoLoad = false, withError = true, message } = opts;
   resetLoadPodFlags();
-  if (withError) loadError.value = providerErrorMessage(hint);
+  if (message) loadError.value = message;
+  else if (withError) loadError.value = providerErrorMessage(hint);
   loadErrorProviderHint.value = hint;
   needsPermissionGrant.value = needsPermission;
   autoLoadPod.value = autoLoad;
@@ -503,7 +512,17 @@ async function handleFamilySelected(payload: {
           enterGenericLoadFallback(toProviderHint(cfg));
         }
       }
-    } catch {
+    } catch (e) {
+      // A payload failure must not be swallowed into a generic fallback: the
+      // load-pod screen would then ask for a credential that cannot help. Let
+      // `LoadPodView` classify it on the way in.
+      if (e instanceof PayloadLoadError) {
+        reportPayloadFailure(e, { source: 'boot' });
+        enterGenericLoadFallback(toProviderHint(payload.providerConfig), {
+          message: t(payloadErrorMessageKey(e)),
+        });
+        return;
+      }
       // Unexpected throw (file moved/deleted/corrupt, etc.) — generic fallback.
       enterGenericLoadFallback(toProviderHint(payload.providerConfig));
     }

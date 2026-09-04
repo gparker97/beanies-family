@@ -62,19 +62,36 @@ function hashString(str) {
  * literal like `'A\u2013Z'` arrives here as the six characters `\u2013` and
  * was shipped to the translator verbatim — a zh user then saw the literal
  * `A\ u2013Z` in the cookbook sort dropdown, and roughly fifty older entries
- * carry the same corruption from `\u2014`. Unescape before hashing, so the
- * hash tracks the RENDERED string and the fix re-translates the affected keys.
+ * carried the same corruption from `\u2014`. Unescape before hashing, so the
+ * hash tracks the RENDERED string.
  *
- * `\\` is handled last so an escaped backslash cannot swallow the next escape.
+ * ⚠️ ONE PASS, NOT A CHAIN OF `.replace()` CALLS. Sequential passes cannot see
+ * which backslashes are already spoken for: with `\\` handled last, the source
+ * `'…beef\\n3 carrots'` (an escaped backslash followed by `n`, which three
+ * recipe placeholders really contain) has its SECOND backslash matched by the
+ * `\n` pass and turned into a real newline. That corrupted text is what gets
+ * hashed and sent to the translator, and the newline then trips the
+ * suspicious-output check, so the key falls back to English.
+ *
+ * A single alternation consumes each escape exactly once, left to right, so a
+ * backslash that has already been claimed cannot start another escape.
  */
 function unescapeLiteral(raw) {
-  return raw
-    .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\\/g, '\\');
+  return raw.replace(
+    /\\(?:u\{([0-9a-fA-F]{1,6})\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|(.))/gs,
+    (match, brace, u4, x2, other) => {
+      try {
+        if (brace !== undefined) return String.fromCodePoint(parseInt(brace, 16));
+      } catch {
+        return match; // out of Unicode range — leave it alone rather than throw
+      }
+      if (u4 !== undefined) return String.fromCharCode(parseInt(u4, 16));
+      if (x2 !== undefined) return String.fromCharCode(parseInt(x2, 16));
+      const simple = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\0' };
+      // `\\` -> `\`, `\'` -> `'`, `\"` -> `"`, and any other escaped char is itself.
+      return Object.prototype.hasOwnProperty.call(simple, other) ? simple[other] : other;
+    }
+  );
 }
 
 /**
@@ -123,7 +140,7 @@ function parseUIStrings() {
     if (currentKey) {
       const enSingle = line.match(/en\s*:\s*'((?:[^'\\]|\\.)*)'/);
       if (enSingle) {
-        const text = unescapeLiteral(enSingle[1].replace(/\\'/g, "'"));
+        const text = unescapeLiteral(enSingle[1]);
         strings[currentKey] = { text, hash: hashString(text) };
         currentKey = null;
         continue;
@@ -131,7 +148,7 @@ function parseUIStrings() {
       // Double-quoted en value
       const enDouble = line.match(/en\s*:\s*"((?:[^"\\]|\\.)*)"/);
       if (enDouble) {
-        const text = unescapeLiteral(enDouble[1].replace(/\\"/g, '"'));
+        const text = unescapeLiteral(enDouble[1]);
         strings[currentKey] = { text, hash: hashString(text) };
         currentKey = null;
         continue;
@@ -191,8 +208,13 @@ function saveTranslationFile(language, data) {
  * Returns a reason string if suspicious, or null if the translation looks clean.
  */
 export function suspiciousTranslationReason(source, translated) {
-  // 1. Control characters (tabs/newlines) never belong in a UI label.
-  if (/[\t\r\n\x00-\x08\x0b\x0c]/.test(translated)) return 'control characters';
+  // 1. Control characters MyMemory invented. A few strings legitimately contain
+  //    newlines (the invite message, the multi-line recipe placeholders), and
+  //    since the parser started resolving `\n` those reach here as real line
+  //    breaks — so a blanket reject fell every one of them back to English.
+  //    Only characters the SOURCE does not have are suspicious.
+  const controlRe = /[\t\r\n\x00-\x08\x0b\x0c]/;
+  if (controlRe.test(translated) && !controlRe.test(source)) return 'control characters';
 
   // 2. Markup in the translation that the English source did not have — injected.
   const tagRe = /<\/?[a-zA-Z][^>]*>|<[a-zA-Z]+\s+[a-zA-Z]/;
@@ -340,8 +362,34 @@ async function updateTranslations(language, sourceStrings) {
 
   // Translate missing/outdated strings
   let completed = 0;
+  let fellBack = 0;
   for (const { key, text, hash, reason } of toTranslate) {
     const translation = await translate(text, language);
+
+    // ⚠️ `translate()` returns the ENGLISH text on an API failure or a rejected
+    // suspicious result. Stamping the current hash on that told the next run
+    // "up to date", so the key stayed English forever and only a hand-edit of
+    // the JSON could recover it — and it silently REPLACED four good Chinese
+    // translations that way, including the family-invite message.
+    //
+    // A fallback is therefore written WITHOUT a hash, so the next run sees it
+    // as outdated and retries. An existing good translation is kept instead of
+    // being overwritten by English.
+    if (translation === text && language !== 'en') {
+      fellBack++;
+      const existing = translationFile.translations[key];
+      if (existing?.translation && existing.translation !== text) {
+        console.warn(`   ⚠ Keeping the existing translation for ${key} (API fell back to English)`);
+        continue;
+      }
+      translationFile.translations[key] = {
+        translation,
+        hash: '',
+        lastUpdated: new Date().toISOString().split('T')[0],
+      };
+      completed++;
+      continue;
+    }
 
     translationFile.translations[key] = {
       translation,

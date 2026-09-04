@@ -4240,15 +4240,20 @@ const STRING_DEFS = {
     en: "That file couldn't be opened. Check you picked the right .beanpod file, then try again.",
     beanie: "that file couldn't be opened. check you picked the right .beanpod, then try again.",
   },
-  // The join flow's out-of-memory case. Distinct from `join.error.fileDecrypt`,
-  // which tells the joiner to ask for a new invite link: the invite is fine and
-  // a new one changes nothing.
   // The post-init health check's "we finished but there is nothing here" case.
   // Was a hardcoded English literal rendered straight into the overlay.
   'app.initError.noData': {
     en: 'beanies started up but could not find your family data.',
     beanie: 'beanies woke up but could not find your beans.',
   },
+  'join.error.fileCorrupt': {
+    en: "Your family's data could not be read and may be damaged. A new invite link points at the same file, so it will not help. Please ask whoever invited you to get in touch with support@beanies.family.",
+    beanie:
+      "your family's beans could not be read and may be damaged. a new invite link points at the same file, so it will not help. please ask whoever invited you to get in touch with support@beanies.family.",
+  },
+  // The join flow's out-of-memory case. Distinct from `join.error.fileDecrypt`,
+  // which tells the joiner to ask for a new invite link: the invite is fine and
+  // a new one changes nothing.
   'join.error.fileTooLarge': {
     en: "This device ran out of memory opening your family's data. Nothing is wrong with your invite; the pod is simply bigger than this device can open. Try again on a device with more memory.",
     beanie:
