@@ -8,20 +8,45 @@
 
 import { measureSync } from '@/utils/perfTiming';
 
+/**
+ * ⚠️ THE TWO CHUNK SIZES ARE DIFFERENT ON PURPOSE. DO NOT UNIFY THEM.
+ *
+ * Encoding chunks the BYTES and concatenates each chunk's `btoa` output, so a
+ * chunk that is not a multiple of 3 makes `btoa` emit `=` padding at every
+ * internal boundary. The result is invalid base64 — and `bufferToBase64url`
+ * strips only TRAILING padding, so the corruption survives all the way into the
+ * file. `0x8000 % 3 === 2`, so the obvious shared constant is exactly wrong
+ * here.
+ *
+ * Decoding chunks the base64 STRING, so its chunk must be a multiple of 4 to
+ * land on a group boundary.
+ */
+const B64_ENCODE_CHUNK_BYTES = 32_766; // multiple of 3 — btoa must not pad mid-string
+const B64_DECODE_CHUNK_CHARS = 0x8000; // 32768, multiple of 4 — one base64 group
+
 /** Convert an ArrayBuffer / Uint8Array to a standard base64 string. */
 export function bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  // Timed: this char-by-char loop is a suspect in the load-path freeze — it
-  // runs over the *entire* encrypted doc on every save/persist. Trivial calls
-  // (keys, tokens) stay below the console floor and are silent.
+  // Timed: this runs over the *entire* encrypted doc on every save/persist.
+  // Trivial calls (keys, tokens) stay below the console floor and are silent.
+  //
+  // Chunked because the old `binary += String.fromCharCode(...)` loop held the
+  // source bytes, a multi-megabyte rope AND the base64 result simultaneously.
   return measureSync(
     'base64.encode',
     () => {
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]!);
+      let out = '';
+      for (let i = 0; i < bytes.byteLength; i += B64_ENCODE_CHUNK_BYTES) {
+        // `apply` over a bounded subarray: 32,766 args is far below the engine's
+        // argument limit, and it avoids materialising a per-byte rope.
+        out += btoa(
+          String.fromCharCode.apply(
+            null,
+            bytes.subarray(i, i + B64_ENCODE_CHUNK_BYTES) as unknown as number[]
+          )
+        );
       }
-      return btoa(binary);
+      return out;
     },
     { perf_doc_bytes: bytes.byteLength }
   );
@@ -32,12 +57,17 @@ export function base64ToBuffer(base64: string): ArrayBuffer {
   return measureSync(
     'base64.decode',
     () => {
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
+      // Decode in chunks so only one chunk-sized binary string is alive at a
+      // time, instead of the whole `atob` output coexisting with the Uint8Array.
+      const bytes = new Uint8Array(Math.floor((base64.length * 3) / 4) + 3);
+      let written = 0;
+      for (let i = 0; i < base64.length; i += B64_DECODE_CHUNK_CHARS) {
+        const binary = atob(base64.slice(i, i + B64_DECODE_CHUNK_CHARS));
+        for (let j = 0; j < binary.length; j++) bytes[written++] = binary.charCodeAt(j);
       }
-      return bytes.buffer as ArrayBuffer;
+      // Exact length: the estimate above over-allocates by up to 3 bytes when
+      // the input carries `=` padding.
+      return bytes.buffer.slice(0, written) as ArrayBuffer;
     },
     // base64 decodes to ~3/4 its length in bytes.
     { perf_doc_bytes: Math.floor((base64.length * 3) / 4) }
