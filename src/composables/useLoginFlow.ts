@@ -208,6 +208,9 @@ export function useLoginFlow(opts: {
     } catch {
       return false;
     }
+    // NOTE: a payload failure returns `false` here on purpose — this is the
+    // SILENT trusted-device probe, and its callers fall through to a visible
+    // path that classifies it properly. Surfacing it twice would double-report.
   }
 
   /** Silently stage + cached-key-decrypt when a trusted device holds the key. */
@@ -616,6 +619,16 @@ export function useLoginFlow(opts: {
 
       if (syncStore.hasPendingEncryptedFile) {
         const dec = await syncStore.decryptPendingFileWithKey(unlock.familyKey);
+        if (dec.payloadError) {
+          // NOT a credential failure: the PIN unwrapped the key correctly and
+          // the pod would not open. `auth.signInFailed` reads as a wrong PIN,
+          // so the user retypes a correct PIN forever. Report on the pod-load
+          // surface too — `pin_decrypt_failed` at severity 'warning' would hide
+          // the incident from the CloudWatch filter built for exactly this.
+          proveError.value = t(payloadErrorMessageKey(dec.payloadError));
+          emitOutcome(false, 'decrypt-failed');
+          return;
+        }
         if (!dec.success) {
           // Review F4: do NOT destroy the wrap here. decryptPendingFileWithKey folds
           // every transient throw in its adoption pipeline (worker RPC, cache writes,

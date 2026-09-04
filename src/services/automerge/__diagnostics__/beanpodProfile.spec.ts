@@ -127,24 +127,47 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
     // sampler over there sees this thread's allocations while this thread is
     // blocked. The max goes through a SharedArrayBuffer because the worker
     // cannot post a message to a blocked main thread either.
-    const baselineRss = process.memoryUsage().rss;
-    let peakRss = baselineRss;
-    const shared = new SharedArrayBuffer(8);
-    const peakView = new Float64Array(shared);
-    peakView[0] = peakRss;
+    // A worker thread shares the process, and RSS is a per-PROCESS figure, so a
+    // sampler over there sees this thread's allocations while this thread is
+    // blocked. The max travels through a SharedArrayBuffer because the worker
+    // cannot post a message to a blocked main thread either.
+    //
+    // Units are KiB in an Int32Array, not bytes in a Float64Array: `Atomics`
+    // has no Float64 support, and plain reads/writes across threads on shared
+    // memory carry no visibility or tearing guarantee. KiB in an int32 covers
+    // 2TB, which is ample.
+    const shared = new SharedArrayBuffer(4);
+    const peakKib = new Int32Array(shared);
     let sampler: import('node:worker_threads').Worker | null = null;
     try {
       const { Worker } = await import('node:worker_threads');
       sampler = new Worker(
         `const { workerData } = require('node:worker_threads');
-         const peak = new Float64Array(workerData);
+         const peak = new Int32Array(workerData);
          setInterval(() => {
-           const rss = process.memoryUsage.rss();
-           if (rss > peak[0]) peak[0] = rss;
+           const kib = Math.ceil(process.memoryUsage.rss() / 1024);
+           // CAS loop: Atomics has no max().
+           for (;;) {
+             const seen = Atomics.load(peak, 0);
+             if (kib <= seen) break;
+             if (Atomics.compareExchange(peak, 0, seen, kib) === seen) break;
+           }
          }, 5).unref();
          setInterval(() => {}, 1 << 30);`,
         { eval: true, workerData: shared }
       );
+      // Without this listener Node re-emits an uncaught worker-script throw as
+      // an unhandled exception in the PARENT, killing vitest — instead of the
+      // warning the catch below exists to print. The catch only covers the
+      // constructor.
+      sampler.on('error', (e) => {
+        process.stdout.write(`\n  ⚠️  RSS sampler died (${String(e)}) — peak is a LOWER BOUND\n`);
+      });
+      // Wait for the worker to be RUNNING before taking the baseline. A Node
+      // worker is a full V8 isolate and costs ~19MB of the same per-process RSS
+      // this measures; baselining first folded the sampler's own cost into the
+      // figure reported as "attributable to this document".
+      await new Promise<void>((resolve) => sampler!.once('online', () => resolve()));
     } catch (e) {
       // Never fail the diagnostic over its own instrumentation — but say so
       // loudly, because the number printed below then means something weaker.
@@ -152,6 +175,18 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
         `\n  ⚠️  RSS sampler unavailable (${String(e)}) — peak is a LOWER BOUND\n`
       );
     }
+
+    // Sample RSS across the load — the peak is the number that decides whether
+    // a device can open this pod at all.
+    //
+    // ⚠️ A `setInterval` on THIS thread cannot do it. `loadAndVerify` is fully
+    // synchronous, so the event loop never turns while it runs and the timer
+    // fires exactly zero times: the "peak" would be `max(before, after)`, a
+    // lower bound that misses the point, because the peak lives INSIDE the WASM
+    // inflation and is largely released by the time the call returns.
+    const baselineRss = process.memoryUsage().rss;
+    let peakRss = baselineRss;
+    Atomics.store(peakKib, 0, Math.ceil(baselineRss / 1024));
 
     const startedAt = Date.now();
     let doc;
@@ -167,7 +202,7 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
       await sampler?.terminate();
     }
     const loadMs = Date.now() - startedAt;
-    peakRss = Math.max(peakRss, peakView[0] ?? 0, process.memoryUsage().rss);
+    peakRss = Math.max(peakRss, Atomics.load(peakKib, 0) * 1024, process.memoryUsage().rss);
 
     // `stats()` returns the counts directly. `getAllChanges(doc).length` would
     // materialise every change's BYTES — on a history-heavy pod that is itself

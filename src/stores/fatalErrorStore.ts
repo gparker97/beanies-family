@@ -22,20 +22,39 @@ import { ref } from 'vue';
 export const useFatalErrorStore = defineStore('fatalError', () => {
   const message = ref<string | null>(null);
   const detail = ref<string | null>(null);
+  /**
+   * Would "Clear data and start fresh" help?
+   *
+   * For most fatals, yes. For a PAYLOAD failure, no: an out-of-memory open
+   * leaves the file completely intact, and clearing is the one action that
+   * destroys the local copy — including edits that may never have reached
+   * Drive. The overlay's standing copy ("You can try reloading, or clear your
+   * data and start fresh") and its Clear-data button are wrong there, so the
+   * setter has to be able to say so. Defaults to `true`, which is the existing
+   * behaviour for every caller that does not pass it.
+   */
+  const clearDataHelps = ref(true);
 
-  function setFatal(msg: string, diagnosticDetail?: string | null): void {
+  function setFatal(
+    msg: string,
+    diagnosticDetail?: string | null,
+    opts?: { clearDataHelps?: boolean }
+  ): void {
     message.value = msg;
     detail.value = diagnosticDetail ?? null;
+    clearDataHelps.value = opts?.clearDataHelps ?? true;
   }
 
   function clear(): void {
     message.value = null;
     detail.value = null;
+    clearDataHelps.value = true;
   }
 
   return {
     message,
     detail,
+    clearDataHelps,
     setFatal,
     clear,
   };

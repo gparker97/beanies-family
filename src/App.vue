@@ -198,12 +198,20 @@ const initBreadcrumbs: string[] = [];
 // uses the store; init-time failures still write `initError` directly. Both
 // paths land on the same overlay UI.
 const fatalErrorStore = useFatalErrorStore();
+/**
+ * False when clearing local data cannot possibly help (a payload failure). The
+ * overlay then drops its "or clear your data and start fresh" advice and the
+ * button that acts on it, because for an out-of-memory open that button is the
+ * one action that destroys the local copy.
+ */
+const initErrorClearHelps = ref(true);
 watch(
-  () => [fatalErrorStore.message, fatalErrorStore.detail] as const,
-  ([msg, detail]) => {
+  () => [fatalErrorStore.message, fatalErrorStore.detail, fatalErrorStore.clearDataHelps] as const,
+  ([msg, detail, clearHelps]) => {
     if (msg) {
       initError.value = msg;
       initErrorDetail.value = detail;
+      initErrorClearHelps.value = clearHelps;
     }
   }
 );
@@ -525,12 +533,55 @@ watch(
   { flush: 'post' }
 );
 
+/**
+ * THE one place a payload failure becomes the init overlay.
+ *
+ * Two things it does that a bare `setFatal` would not:
+ *  - `clearDataHelps: false`, so the overlay drops the Clear-data advice and
+ *    button. Without that the honest message sits directly under "you can
+ *    clear your data and start fresh", which is wrong and destructive here.
+ *  - reports the CORRUPT half. `docClient.surface()` is the single emitter for
+ *    `PayloadTooLargeError` only, so without this a boot-path corruption
+ *    reaches CloudWatch with no event at all: a user is told their pod is
+ *    damaged and nobody is paged.
+ */
+function surfacePayloadFatal(err: PayloadLoadError): void {
+  const fileId = syncStore.driveFileId ?? null;
+  const familyId = familyContextStore.activeFamilyId;
+  if (!(err instanceof PayloadTooLargeError)) {
+    reportError({
+      surface: 'app.podCorrupted',
+      message: `Pod payload failed Automerge ${err.step} during init`,
+      error: err,
+      severity: 'critical',
+      context: {
+        action: 'pod-load-corrupt',
+        error_code: err.step,
+        file_id_tail: fileId ? fileId.slice(-6) : undefined,
+        family_id: familyId ?? undefined,
+        perf_doc_bytes: err.payloadBytes ?? undefined,
+      },
+    });
+  }
+  fatalErrorStore.setFatal(
+    t(err instanceof PayloadTooLargeError ? 'resumeSetup.podTooLarge' : 'resumeSetup.podCorrupted'),
+    payloadErrorDetail(err, fileId, familyId),
+    { clearDataHelps: false }
+  );
+}
+
 async function loadFamilyData() {
   const openToken = beginOpen();
   let handedOff = false;
   let outcome: 'open-complete' | 'open-failed' = 'open-complete';
   try {
-    handedOff = (await loadFamilyDataInner(openToken)) === 'handed-off';
+    // `'failed'` is the non-throwing failure: a payload error that has already
+    // surfaced its own honest overlay and must NOT be rethrown into the generic
+    // one. It still has to be counted, or an out-of-memory open would be
+    // recorded as a success and the failure rate would read 0%.
+    const inner = await loadFamilyDataInner(openToken);
+    handedOff = inner === 'handed-off';
+    if (inner === 'failed') outcome = 'open-failed';
   } catch (e) {
     // Both of `loadFamilyDataInner`'s failure paths rethrow, and `syncStore.initialize()`
     // can throw before any path is set. Recording those as `open-complete` would make
@@ -543,7 +594,7 @@ async function loadFamilyData() {
   }
 }
 
-async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' | void> {
+async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' | 'failed' | void> {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   const activeFamilyIdStr = getActiveIdInner();
   initBreadcrumbs.push(`loadFamilyData: activeFamily=${activeFamilyIdStr ?? 'null'}`);
@@ -613,6 +664,15 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           // the holder of this token may close this open's window.
           syncStore.backgroundSyncFromFile(openToken);
           return 'handed-off';
+        }
+        if (cacheResult.payloadError) {
+          // Do not fall through to 1b. It would re-download the (usually LARGER)
+          // Drive copy and try to inflate it on the device that has just proved
+          // it has no room, so the second attempt fails identically after a long
+          // stall. Say so once, honestly.
+          initBreadcrumbs.push(`path1a: payload ${cacheResult.payloadError.step} failure`);
+          surfacePayloadFatal(cacheResult.payloadError);
+          return 'failed';
         }
         initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');
         console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
@@ -713,15 +773,8 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       if (err instanceof PayloadLoadError) {
         initBreadcrumbs.push(`path1b: payload ${err.step} failure (${err.name})`);
         console.warn('[loadFamilyData] path1b: payload load failed', err);
-        fatalErrorStore.setFatal(
-          t(
-            err instanceof PayloadTooLargeError
-              ? 'resumeSetup.podTooLarge'
-              : 'resumeSetup.podCorrupted'
-          ),
-          payloadErrorDetail(err, syncStore.driveFileId ?? null, familyContextStore.activeFamilyId)
-        );
-        return;
+        surfacePayloadFatal(err);
+        return 'failed';
       }
       throw new Error(
         `Failed to load data from sync file: ${err instanceof Error ? err.message : String(err)}`
@@ -745,6 +798,16 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       try {
         const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId);
         initBreadcrumbs.push(`path2: cacheResult=${cacheResult.success}`);
+        // ⚠️ MUST NOT fall through. Path 3 calls `initDoc()` — a fresh EMPTY doc
+        // — while the cache DB is still open on this family, because the
+        // too-large branch deliberately did not clear it. The user's next
+        // mutation would then persist that empty doc as the BASE, deleting every
+        // increment the preserve branch just protected.
+        if (cacheResult.payloadError) {
+          initBreadcrumbs.push(`path2: payload ${cacheResult.payloadError.step} failure`);
+          surfacePayloadFatal(cacheResult.payloadError);
+          return 'failed';
+        }
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');
           memberFilterStore.initialize();
@@ -1256,6 +1319,15 @@ onMounted(async () => {
         syncStore.showGoogleReconnect ||
         syncStore.reconnecting ||
         syncStore.reconnectEscalationPending;
+      // A fatal message is already on screen (a payload failure classified by
+      // path 1b, or ResumePodSetup) and it says something TRUE and specific.
+      // The branch below would overwrite both it and its support diagnostic
+      // with 'Initialization completed but no data was loaded' + a breadcrumb
+      // dump, and fire a second `critical` report calling an out-of-memory open
+      // "data unreachable". Note the guard has to be here, not at the
+      // assignment: line 418's `if (!initError.value)` has no counterpart in
+      // that branch.
+      const alreadyExplained = !!fatalErrorStore.message;
       // The instant-open snapshot may have painted cached data into the stores even
       // though the authoritative Automerge doc rebuild produced no doc (a cache
       // hiccup, or no provider yet to re-fetch from — the `provider_type: null`
@@ -1264,10 +1336,11 @@ onMounted(async () => {
       // critical page exists for. Downgrade to non-paging telemetry and do NOT raise
       // the (wrong) "data missing" recovery overlay on top of visible data.
       const snapshotDataVisible = syncStore.snapshotPaintedThisSession;
-      if (onLoginFlowRoute || awaitingReconnect) {
+      if (onLoginFlowRoute || awaitingReconnect || alreadyExplained) {
         console.warn(
-          '[App] Post-init health check: no doc, but on a login-flow route or awaiting ' +
-            `Google reconnect (reconnect=${awaitingReconnect}) — suppressing recovery UI\n` +
+          '[App] Post-init health check: no doc, but on a login-flow route, awaiting ' +
+            `Google reconnect (reconnect=${awaitingReconnect}), or already explained ` +
+            `(fatal=${alreadyExplained}) — suppressing recovery UI\n` +
             breadcrumbLog
         );
       } else if (snapshotDataVisible) {
@@ -1735,7 +1808,7 @@ watch(
           <h2 class="font-outfit text-xl font-semibold text-[#2C3E50] dark:text-white">
             {{ t('app.initError.title') }}
           </h2>
-          <p class="dark:text-ink-soft mt-2 text-sm text-gray-600">
+          <p v-if="initErrorClearHelps" class="dark:text-ink-soft mt-2 text-sm text-gray-600">
             {{ t('app.initError.description') }}
           </p>
         </div>
@@ -1754,6 +1827,7 @@ watch(
             {{ t('app.initError.reload') }}
           </button>
           <button
+            v-if="initErrorClearHelps"
             class="dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-[#2C3E50] transition-colors hover:bg-gray-50"
             @click="showClearConfirm = true"
           >

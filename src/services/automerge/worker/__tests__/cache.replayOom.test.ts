@@ -23,7 +23,15 @@ import type { FamilyDocument } from '@/types/automerge';
 import { PayloadTooLargeError } from '@/types/sync';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
 
-const applyHook = vi.hoisted(() => ({ err: null as null | Error }));
+/**
+ * `err` is what `applyChanges` throws; `failOn` names WHICH calls throw (null =
+ * all of them). Call 0 is the fast path; 1..n are the single-increment replays.
+ */
+const applyHook = vi.hoisted(() => ({
+  err: null as null | Error,
+  failOn: null as null | number[],
+  calls: 0,
+}));
 
 // Only `applyChanges` is faked — `loadAndVerify`, `payloadFailure`, the framing
 // helpers and the mutation ops stay real, so the branch under test is the
@@ -33,7 +41,10 @@ vi.mock('../docOps', async (importOriginal) => {
   return {
     ...actual,
     applyChanges: vi.fn((doc: unknown, changes: Uint8Array[]) => {
-      if (applyHook.err) throw applyHook.err;
+      const n = applyHook.calls++;
+      if (applyHook.err && (!applyHook.failOn || applyHook.failOn.includes(n))) {
+        throw applyHook.err;
+      }
       return actual.applyChanges(doc as never, changes);
     }),
   };
@@ -59,6 +70,8 @@ describe('loadCachedDoc — increment replay classification', () => {
   beforeEach(async () => {
     __resetCacheForTesting();
     applyHook.err = null;
+    applyHook.failOn = null;
+    applyHook.calls = 0;
     key = await generateFamilyKey();
     await initPersistenceDB(FAMILY_ID);
 
@@ -99,14 +112,35 @@ describe('loadCachedDoc — increment replay classification', () => {
     expect((err as PayloadTooLargeError).payloadBytes).toBeGreaterThan(0);
   });
 
-  it('still recovers the prefix when an increment is genuinely corrupt', async () => {
-    // The behaviour the recovery path exists for — an over-broad OOM classifier
-    // would turn this into a hard failure and leave the user wedged.
+  it('recovers the PREFIX when a later increment is genuinely corrupt', async () => {
+    // The behaviour the recovery path exists for, and the direction an
+    // over-broad OOM classifier would break. An earlier version of this test
+    // failed EVERY apply, so the slow path broke at the first increment and
+    // recovered nothing — it asserted `recovered === true` and would have
+    // passed even if the prefix were dropped entirely. Fail the fast path
+    // (call 0) and the SECOND replay (call 2), letting the first replay ('a')
+    // through, then assert 'a' survived and 'b' did not.
     applyHook.err = new Error('invalid chunk type');
+    applyHook.failOn = [0, 2];
 
     const result = await loadCachedDoc(key, FAMILY_ID);
 
     expect(result).not.toBeNull();
     expect(result!.recovered).toBe(true);
+    expect(Object.keys((result!.doc as unknown as { accounts: object }).accounts)).toEqual(['a']);
+  });
+
+  it('classifies an increment DECRYPT allocation failure as decrypt, not materialize', async () => {
+    // The guarded blocks cover base64 + AES as well as the apply, so a
+    // hardcoded step would mislabel this — in the field a triager reads first.
+    const bad = await generateFamilyKey(); // wrong key => decrypt throws
+    vi.spyOn(globalThis.crypto.subtle, 'decrypt').mockRejectedValueOnce(
+      new RangeError('Array buffer allocation failed')
+    );
+
+    const err = await loadCachedDoc(bad, FAMILY_ID).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(PayloadTooLargeError);
+    expect((err as PayloadTooLargeError).step).toBe('decrypt');
   });
 });

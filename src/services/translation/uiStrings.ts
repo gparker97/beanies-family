@@ -4210,9 +4210,9 @@ const STRING_DEFS = {
   // is an invitation to wipe a perfectly good cache by hand, so the text has to
   // say outright that clearing will not help.
   'resumeSetup.podTooLarge': {
-    en: 'This device ran out of memory opening a pod this size. Your pod file is safe — nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. If it keeps happening, send support@beanies.family the details below.',
+    en: 'This device ran out of memory opening a pod this size. Your pod file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. If it keeps happening, send support@beanies.family the details below.',
     beanie:
-      'this device ran out of memory opening a pod this size. your pod file is safe — nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. if it keeps happening, send support@beanies.family the details below.',
+      'this device ran out of memory opening a pod this size. your pod file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. if it keeps happening, send support@beanies.family the details below.',
   },
   // The INLINE variant, for the compact error slots under a password field
   // (LoadPodView, SettingsPage, the join and login flows). The overlay copy
@@ -4220,9 +4220,27 @@ const STRING_DEFS = {
   // button that exist only on the fatal overlay — using it here would reference
   // UI the user cannot see.
   'podTooLarge.inline': {
-    en: 'This device ran out of memory opening your pod. Your file is safe — the problem is this device, not your data.',
+    en: 'This device ran out of memory opening your pod. Your file is safe; the problem is this device, not your data.',
     beanie:
-      'this device ran out of memory opening your pod. your file is safe — the problem is this device, not your data.',
+      'this device ran out of memory opening your pod. your file is safe; the problem is this device, not your data.',
+  },
+  // The corrupt-payload INLINE variant. `loginFlow.recoveryCorruptBody` cannot
+  // stand in for it: that string was written for OpenRecoveryPanel, which has a
+  // load-a-different-file escape, so it says "try again, or load a different
+  // copy" — advice that points at UI these compact slots do not have, and a
+  // retype loop for a failure no password can fix. A join INVITEE has no copy of
+  // the family file at all.
+  // The import-a-file decrypt fallback in Settings. Deliberately generic: the
+  // underlying `result.error` can be a raw exception message, which must not be
+  // rendered to a non-English user.
+  'settings.decryptFailed': {
+    en: "That file couldn't be opened. Check you picked the right .beanpod file, then try again.",
+    beanie: "that file couldn't be opened. check you picked the right .beanpod, then try again.",
+  },
+  'podCorrupted.inline': {
+    en: 'Your family data could not be read and may be damaged. Trying again will not help. Please contact support@beanies.family so we can look at it with you.',
+    beanie:
+      'your family data could not be read and may be damaged. trying again will not help. please contact support@beanies.family so we can look at it with you.',
   },
 
   // Generic "wrong password" prompt — used by ResumePodSetup auto-load too.

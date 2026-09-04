@@ -13,8 +13,8 @@ import * as Automerge from '@automerge/automerge';
 import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/types/automerge';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
-import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
-import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
+import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import {
   calculateAmortization,
@@ -248,11 +248,27 @@ export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc 
  * between them — and it is a decision with teeth, because the corruption branch
  * DELETES the local cache to self-heal and the out-of-memory branch must not.
  *
- * `payloadBytes` should be the DECRYPTED length wherever it is known: it is the
- * number that predicts the WASM inflation cost, and a better signal than the
- * base64 length. Before the decrypt has happened, the base64 length is the only
- * thing available and is fine — the `step` says which it is.
+ * `payloadBytes` is always DECRYPTED BYTES. It rides into `perf_doc_bytes`,
+ * where every other producer means real bytes, and into the diagnostic blob a
+ * user pastes into a support email — so a base64 CHARACTER count here would
+ * silently overstate by 4/3 on exactly the step that fires first on the
+ * smallest devices, skewing the "pods above N MB fail on 3GB devices"
+ * threshold. Before the decrypt has run the true length is not known, so
+ * callers pass `decodedSizeOf(base64)`, which is exact to within two bytes.
  */
+/**
+ * Decrypted byte count implied by a base64 string, without decoding it.
+ * Base64 is 4 characters per 3 bytes; padding removes 1 or 2. Tolerant of a
+ * missing/odd value because it is only ever used to LABEL a failure — a wrong
+ * number here must never become a second throw inside a catch.
+ */
+export function decodedSizeOf(base64: unknown): number | null {
+  if (typeof base64 !== 'string' || base64.length === 0) return null;
+  const rem = base64.length % 4;
+  const padding = rem === 0 ? (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0) : 0;
+  return Math.floor(base64.length / 4) * 3 - padding + (rem === 0 ? 0 : rem - 1);
+}
+
 export function payloadFailure(
   step: PayloadLoadStep,
   e: unknown,
@@ -261,7 +277,9 @@ export function payloadFailure(
 ): PayloadLoadError {
   // An already-classified error passes straight through: re-wrapping it at an
   // outer boundary would relabel a `materialize` OOM as a `decrypt` one.
-  if (e instanceof CorruptPayloadError || e instanceof PayloadTooLargeError) return e;
+  // `PayloadLoadError` (the base), never an enumeration of its subclasses — a
+  // third subclass would otherwise be silently re-wrapped and mislabelled.
+  if (e instanceof PayloadLoadError) return e;
   const what =
     step === 'load'
       ? 'Automerge.load'
@@ -286,7 +304,10 @@ export async function decryptToDoc(envelope: BeanpodFileV4, familyKey: CryptoKey
     const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
     binary = await decryptPayload(familyKey, encrypted);
   } catch (e) {
-    throw payloadFailure('decrypt', e, familyId, envelope.encryptedPayload.length);
+    // `?.length` on the value that may itself have caused the throw would make
+    // the CATCH throw an unclassified TypeError, which lands on the cache-clear
+    // branch — the one outcome this whole classification exists to avoid.
+    throw payloadFailure('decrypt', e, familyId, decodedSizeOf(envelope.encryptedPayload));
   }
   return loadAndVerify(binary, familyId);
 }
