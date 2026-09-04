@@ -108,17 +108,33 @@ export function noteRemoteUnreadable(err: PayloadLoadError): void {
   // family key is routine. Latching it would refuse every save for the session,
   // stop polling, and page Slack, while the re-prompt path that fixes it sits
   // unreachable behind the latch.
-  if (err.keyMayBeWrong) return;
+  if (err.keyMayBeWrong) {
+    // NOT a bare return. This class includes genuine corruption at the decrypt
+    // step (a wrong key and damaged bytes are the same observation), so going
+    // silent makes "the pod would not decrypt" unmeasurable fleet-wide — a real
+    // corruption incident becomes indistinguishable from a key-rotation wave.
+    // Only `critical` pages; `warning` still reaches CloudWatch, which is what
+    // the goal actually required.
+    reportError({
+      surface: 'pod-load-failure',
+      message: `Remote pod would not decrypt: Automerge ${err.step}`,
+      error: err,
+      severity: 'warning',
+      context: { action: 'remote-decrypt-failed', error_code: err.step },
+    });
+    return;
+  }
   // Reported ONCE PER CLASS, not once per latch. `setLocalChangeHandler` wires a
   // debounced save to every keystroke-level mutation, so a per-attempt critical
   // (which forces an immediate flush) paged roughly once a minute. But keying it
   // on "was the latch empty" let a too-large failure — which deliberately does
   // not report, `docClient` owns that class — consume the flag and silence the
   // corrupt report for the whole session, which is the one that matters.
-  const alreadyReported = reportedUnreadableSteps.has(err.name);
+  const throttleKey = `${err.name}:${err.step}`;
+  const alreadyReported = reportedUnreadableSteps.has(throttleKey);
   remoteUnreadable = err;
   if (!alreadyReported && !err.deviceCannotOpen) {
-    reportedUnreadableSteps.add(err.name);
+    reportedUnreadableSteps.add(throttleKey);
     reportError({
       surface: 'pod-load-failure',
       message: `Remote pod unreadable: Automerge ${err.step}`,
@@ -162,6 +178,24 @@ export function rollbackRemoteMarker(): void {
 
 /** Which error classes have already been reported for the current latch. */
 const reportedUnreadableSteps = new Set<string>();
+
+/**
+ * A USER asked again — clear the breaker so one attempt can run.
+ *
+ * Without this the latch is write-only: both automatic clear sites now sit
+ * BEHIND the head guards that consult it, so a `PayloadTooLargeError` — the
+ * class most likely to be transient, a WASM allocation that failed because
+ * another tab spiked memory and would succeed a minute later — permanently
+ * disabled reads, saves and polling for the session, with no exit but sign-out.
+ *
+ * Deliberately only reachable from an explicit user action (manual Refresh,
+ * Grant permission, a login retry, a file rebind), never from a timer: one
+ * attempt per tap is the half-open state a circuit breaker needs, and an
+ * automatic re-arm is the download storm the latch exists to stop.
+ */
+export function retryAfterRemoteBlock(): void {
+  clearRemoteUnreadable();
+}
 
 function clearRemoteUnreadable(): void {
   remoteUnreadable = null;
@@ -619,6 +653,7 @@ export function setProvider(provider: StorageProvider): void {
   // `rebindPodFile` — the supported repair for an unreadable pod — actually
   // repair it, without the store needing a clearing hook of its own.
   clearRemoteUnreadable();
+  pendingMarker = null; // see `reset()`
   currentProvider = provider;
   currentProviderFamilyId = getActiveFamilyId();
   // #61: a new provider means a DIFFERENT file (migrate to Drive, rebind pod
@@ -728,8 +763,12 @@ export function getSessionFileHandle(): FileSystemFileHandle | null {
  * Reset the sync service state.
  */
 export function reset(): void {
-  // A different pod entirely — a latch from the previous one must not follow.
+  // A different pod entirely — neither the latch nor an unearned marker may
+  // follow. A `pendingMarker` surviving a family switch would let a later
+  // rollback null a baseline that was legitimately earned minutes ago, after
+  // which every poll, save and open does a full multi-megabyte read forever.
   clearRemoteUnreadable();
+  pendingMarker = null;
   cancelPendingSave();
   stopPolling();
   currentProvider = null;

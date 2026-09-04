@@ -381,13 +381,19 @@ async function autoLoadFile() {
     // does not then offer a credential form for it.
     if (e instanceof PayloadLoadError) {
       // Latch only when a credential CANNOT be the cause. A stale key (a peer
-      // rotated it) is recoverable through the password form below, and
-      // latching would early-return `handlePendingPassword` for the rest of the
-      // session so neither that form nor the kit form ever opens again.
+      // rotated it) is recoverable, and latching would early-return
+      // `handlePendingPassword` for the rest of the session so neither the
+      // password form nor the kit form ever opens again.
       if (!e.keyMayBeWrong) podUnopenableHere.value = true;
       payloadExplanationShown.value = true;
       formError.value = t(payloadErrorMessageKey(e));
       isLoadingFile.value = false;
+      // ⚠️ For the recoverable class, OPEN THE FORM the message points at.
+      // Returning here left the user on the storage-picker screen reading "try
+      // your password" with no password field, no kit form and no retry.
+      if (e.keyMayBeWrong && syncStore.hasPendingEncryptedFile) {
+        await handlePendingPassword(syncStore.fileName, { tryAuto: false });
+      }
       return;
     }
     formError.value = syncStore.error ?? t('auth.fileLoadFailed');
