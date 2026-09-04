@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-03",
-    "translationCount": 4434
+    "lastUpdated": "2026-09-04",
+    "translationCount": 4437
   },
   "translations": {
     "app.name": {
@@ -22175,6 +22175,21 @@
       "translation": "邀请，预订，食谱— beanies就是这样。",
       "hash": "r4zwzg",
       "lastUpdated": "2026-09-03"
+    },
+    "wall.tooNarrow.title": {
+      "translation": "墙壁需要更宽的屏幕",
+      "hash": "kkrgqy",
+      "lastUpdated": "2026-09-04"
+    },
+    "wall.tooNarrow.body": {
+      "translation": "豆豆墙专为厨房墙壁上的平板电脑而建，因此全家人都可以从房间对面阅读。在平板电脑上（向上）或更大的窗口中打开它，它就会出现在这里。",
+      "hash": "tnu668",
+      "lastUpdated": "2026-09-04"
+    },
+    "wall.tooNarrow.back": {
+      "translation": "带我返回",
+      "hash": "8ed9me",
+      "lastUpdated": "2026-09-04"
     }
   }
 }
