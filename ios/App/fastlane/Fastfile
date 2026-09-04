@@ -281,6 +281,21 @@ platform :ios do
       # added, add its key here (and to promo_opts above) too.
       skip_screenshots: true,
       release_notes: { "en-US" => whats_new },
+      # Cancel a submission that is already in review so this build can replace it.
+      #
+      # An App Store version in "Waiting for Review" is NOT editable, so `select_build`
+      # cannot swap in the new binary: the 0.16 release uploaded and processed fine, then
+      # died on "The specified pre-release build could not be added" because build 65 was
+      # still pending. deliver cancels the submission and polls until it clears (runner.rb
+      # `reject_version_if_possible`), which is exactly the manual App Store Connect dance
+      # that unblocked it.
+      #
+      # OPT-IN, never the default: Apple does not distinguish "waiting for review" from
+      # "in review" here, and cancelling the latter pulls the build out from under a
+      # reviewer and returns it to the back of the queue. The preflight
+      # (assert-no-pending-submission.mjs) fails the run early and names this flag rather
+      # than letting a routine release silently torpedo a review in flight.
+      reject_if_possible: ENV["REPLACE_PENDING_SUBMISSION"].to_s.strip == "true",
       # Belt-and-braces to Info.plist's ITSAppUsesNonExemptEncryption=false so a
       # submission never stalls on the export-compliance prompt.
       submission_information: { export_compliance_uses_encryption: false },
