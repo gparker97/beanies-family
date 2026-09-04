@@ -12,6 +12,18 @@
  *   BEANPOD_FILE=/path/to/family.beanpod BEANPOD_PASSWORD='…' \
  *     npx vitest run src/services/automerge/__diagnostics__/beanpodProfile.spec.ts
  *
+ * Add `BEANPOD_COMPACT_OUT=/path/to/compacted.beanpod` to also WRITE a
+ * history-free copy: same family, same keys, same password, same envelope —
+ * only the payload is replaced with `Automerge.from(toJS(doc))`. Then run this
+ * same spec against THAT file to get the load time and peak RSS of a compacted
+ * pod in a clean process, which is the number Tier 2 is judged on. Measuring it
+ * in-process after the full load would be measuring a heap the full doc has
+ * already grown, and wasm linear memory never shrinks in place.
+ *
+ * ⚠️ The compacted copy DISCARDS ALL HISTORY and therefore cannot CRDT-merge
+ * with any device still holding the original. It is a measurement artefact and
+ * a migration prototype — not something to hand a family.
+ *
  * Run the file ALONE, as above: peak RSS is only attributable to this document
  * when nothing else shares the process. (`--pool=forks` is already the vitest
  * default and the config sets no `pool`, so passing it changes nothing.)
@@ -35,11 +47,11 @@
  * Neither the file nor the password is ever written anywhere by this spec.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import * as Automerge from '@automerge/automerge';
-import { parseBeanpodV4, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
-import { decryptPayload } from '@/services/crypto/familyKeyService';
-import { base64ToBuffer } from '@/utils/encoding';
+import { parseBeanpodV4, tryUnwrapFamilyKey, reEncryptEnvelope } from '@/services/sync/fileSync';
+import { decryptPayload, encryptPayload } from '@/services/crypto/familyKeyService';
+import { base64ToBuffer, bufferToBase64 } from '@/utils/encoding';
 import { loadAndVerify } from '@/services/automerge/worker/docOps';
 import { PayloadTooLargeError } from '@/types/sync';
 
@@ -115,7 +127,8 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
     // sampler over there sees this thread's allocations while this thread is
     // blocked. The max goes through a SharedArrayBuffer because the worker
     // cannot post a message to a blocked main thread either.
-    let peakRss = process.memoryUsage().rss;
+    const baselineRss = process.memoryUsage().rss;
+    let peakRss = baselineRss;
     const shared = new SharedArrayBuffer(8);
     const peakView = new Float64Array(shared);
     peakView[0] = peakRss;
@@ -192,11 +205,45 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
         `  history multiple    ${(fullBytes / Math.max(compactedBytes, 1)).toFixed(1)}x`,
         '',
         `  load time           ${loadMs}ms`,
+        `  RSS before load     ${mb(baselineRss)}`,
         `  peak RSS            ${mb(peakRss)}`,
+        // The process baseline (Node + vitest + the wasm module) is present in
+        // BOTH numbers, so the delta is the only part attributable to this
+        // document — and it is the part a 3GB tablet has to find room for.
+        `  ↳ this document     ${mb(peakRss - baselineRss)}`,
         '─'.repeat(60),
         '',
       ].join('\n')
     );
+
+    // ── Optional: write a compacted copy for a clean-process measurement ──
+    //
+    // Deliberately AFTER the report above, so a failure here costs nothing that
+    // has already been printed.
+    const compactOut = process.env.BEANPOD_COMPACT_OUT;
+    if (compactOut) {
+      try {
+        const compactedBinary = Automerge.save(Automerge.from(plain));
+        const payload = bufferToBase64(await encryptPayload(familyKey, compactedBinary));
+        // Same envelope, same wrapped keys — so the same password opens it and
+        // the profile run against it is comparing like with like.
+        writeFileSync(compactOut, reEncryptEnvelope(envelope, payload));
+        process.stdout.write(
+          [
+            '',
+            `  ✎ compacted copy written to ${compactOut}`,
+            `    ${mb(binary.byteLength)} → ${mb(compactedBinary.byteLength)} decrypted`,
+            '    ⚠️  history discarded — cannot merge with a device holding the original.',
+            '    Profile it in a clean process to get its true load time and peak RSS.',
+            '',
+          ].join('\n')
+        );
+      } catch (e) {
+        // Loud, never silent: the caller asked for a file and must not be left
+        // thinking one exists.
+        process.stdout.write(`\n  ⚠️  compacted write FAILED: ${String(e)}\n`);
+      }
+    }
 
     // ── Actor churn ──────────────────────────────────────────────────────
     //
