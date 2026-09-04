@@ -10,6 +10,7 @@
  * content-sized (never clip); px-pinned type (matches ExportSheet).
  */
 import type { MealExportRows } from '@/utils/mealExportModel';
+import { SLOT_EMOJI } from '@/constants/mealSlots';
 import type { MealSlot } from '@/types/models';
 
 const props = defineProps<{ rows: MealExportRows }>();
@@ -31,12 +32,8 @@ const SLOT_BAND: Record<MealSlot, string> = {
   snack: 'rgb(39 174 96 / 12%)',
 };
 
-const SLOT_ICON: Record<MealSlot, string> = {
-  breakfast: '🍳',
-  lunch: '🥪',
-  dinner: '🍽️',
-  snack: '🍎',
-};
+/** The print export's icons are the app's icons — only the BANDS above are print-specific. */
+const SLOT_ICON = SLOT_EMOJI;
 </script>
 
 <template>

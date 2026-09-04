@@ -7,6 +7,7 @@
  */
 import { computed } from 'vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
+import { MEAL_SLOTS, SLOT_EMOJI, SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
 import MealSlotCell from './MealSlotCell.vue';
 import type { WeekDay } from '@/composables/useCalendarNavigation';
@@ -22,7 +23,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
 
-const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const SLOTS = MEAL_SLOTS;
 
 /** Per-slot emoji + tinted chip classes, so each row is instantly distinguishable. */
 /**
@@ -39,22 +40,22 @@ const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
  */
 const SLOT_META: Record<MealSlot, { emoji: string; band: string; ink: string }> = {
   breakfast: {
-    emoji: '🍳',
+    emoji: SLOT_EMOJI.breakfast,
     band: 'bg-[rgba(230,166,74,0.07)] dark:bg-[rgba(230,166,74,0.10)]',
     ink: 'text-[#7d560f] dark:text-[#e3b063]',
   },
   lunch: {
-    emoji: '🥪',
+    emoji: SLOT_EMOJI.lunch,
     band: 'bg-[rgba(174,214,241,0.16)] dark:bg-[rgba(174,214,241,0.10)]',
     ink: 'text-[#2c3e50] dark:text-[#aed6f1]',
   },
   dinner: {
-    emoji: '🍽️',
+    emoji: SLOT_EMOJI.dinner,
     band: 'bg-[rgba(241,93,34,0.06)] dark:bg-[rgba(241,93,34,0.10)]',
     ink: 'text-[#b8420f] dark:text-[#f2865a]',
   },
   snack: {
-    emoji: '🍎',
+    emoji: SLOT_EMOJI.snack,
     band: 'bg-[rgba(39,174,96,0.06)] dark:bg-[rgba(39,174,96,0.11)]',
     ink: 'text-[#166534] dark:text-[#5fc98d]',
   },
@@ -152,7 +153,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
           <span class="font-outfit flex flex-col items-center gap-0.5" :class="SLOT_META[slot].ink">
             <span class="text-lg leading-none" aria-hidden="true">{{ SLOT_META[slot].emoji }}</span>
             <span class="text-xs font-bold tracking-[0.04em] uppercase">
-              {{ t(`mealPlanner.slot.${slot}`) }}
+              {{ t(SLOT_LABEL_KEYS[slot]) }}
             </span>
           </span>
         </div>
