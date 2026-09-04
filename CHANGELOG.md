@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-04
 
+### Added
+
+- **Your cookbook can now be sorted, filtered and grouped.** Once a family has more than a dozen recipes, one long alphabetical grid stops being useful. Recipes can now carry a course (starter, main, side, dessert, drink, baking, sauce or other), any number of your own lowercase tags, and the meals they suit — breakfast, lunch, dinner or snack. The cookbook gained a row of recipe-box divider tabs to group by meal or by course, course pills to filter, and a sort by A–Z, recently added or most cooked. Your sort and grouping choice is remembered on that device; the filter is not, so the cookbook always opens showing everything.
+- A recipe with no course or meal set never disappears from a grouped view — it gets its own quiet shelf at the bottom. Empty groups are skipped rather than shown empty.
+- When beanies captures a recipe from a web page, it now works out the course and which meals it suits at the same time, and fills them in for you to check. If it isn't sure, it leaves them blank rather than guessing.
+- Tags are saved in lowercase, so you only ever get one of each — and the recipe form says so, and tells you when a tag is a duplicate or you have reached the limit, instead of appearing to do nothing.
+
 ### Fixed
 
 - **Downloads work in the apps.** Saving or sharing a file from the iPhone or Android app did nothing at all: the recovery kit, meal-plan PDFs and images, data exports, and saved photos all reported success and produced no file. Every one of them now opens the share sheet, where "Save to Files" (or "Save to device" on Android) puts the file where you want it. A failure is now visible rather than silent, and cancelling the sheet is treated as cancelling, not as a failure.

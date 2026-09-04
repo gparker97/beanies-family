@@ -1,0 +1,151 @@
+/**
+ * 🚨 THE TEST THIS FEATURE EXISTS TO NOT NEED (#87).
+ *
+ * `RecipeFormModal` has FOUR seeding/save sites, not two: `useFormModal({ onEdit })` seeds the
+ * refs when opening an EXISTING recipe, `applyPrefill` seeds them on capture, `baselinePayload`
+ * says what the doc held, and `buildPayload` says what the form holds now.
+ *
+ * Miss `onEdit` and the failure is catastrophic and silent: opening a saved recipe leaves the
+ * new refs blank, `buildPayload` sends ''/[], `baselinePayload` reports the stored values,
+ * `diffPayload` sees a genuine change, and the clear is WRITTEN. Fixing a typo in the title
+ * would erase that recipe's tags, course and meals — on every edit, for every user, with no
+ * error anywhere.
+ *
+ * The first test below is the one that catches it.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mount } from '@vue/test-utils';
+import { setActivePinia, createPinia } from 'pinia';
+import { nextTick } from 'vue';
+import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import { useRecipesStore } from '@/stores/recipesStore';
+import type { Recipe } from '@/types/models';
+
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+vi.mock('@/composables/useConfirm', () => ({ confirm: vi.fn().mockResolvedValue(true) }));
+
+const FILED: Recipe = {
+  id: 'r1',
+  name: 'Pumpkin Pie',
+  ingredients: ['1 crust'],
+  steps: ['bake'],
+  course: 'dessert',
+  mealSlots: ['dinner', 'snack'],
+  tags: ['autumn', 'family favourite'],
+  createdAt: '2026-08-25',
+  updatedAt: '2026-08-25',
+} as Recipe;
+
+async function mountModal(recipe: Recipe = FILED) {
+  setActivePinia(createPinia());
+  const store = useRecipesStore();
+  store.recipes = [recipe];
+  store.updateRecipe = vi.fn().mockResolvedValue(recipe);
+  store.createRecipe = vi.fn().mockResolvedValue(recipe);
+
+  const wrapper = mount(RecipeFormModal, {
+    props: { open: false, recipe },
+    global: {
+      stubs: {
+        BeanieFormModal: {
+          props: ['saveDisabled', 'isSubmitting', 'showDelete', 'title'],
+          template: '<div><slot /></div>',
+        },
+        PhotoAttachments: true,
+        AiDocumentPicker: true,
+        RecipeSourceStrip: true,
+        DocumentExtractConsentModal: true,
+      },
+    },
+  });
+  await wrapper.setProps({ open: true });
+  await nextTick();
+  return { wrapper, store };
+}
+
+async function save(wrapper: Awaited<ReturnType<typeof mountModal>>['wrapper']) {
+  wrapper.findComponent(BeanieFormModal).vm.$emit('save');
+  await nextTick();
+  await nextTick();
+}
+
+describe('RecipeFormModal — course, meals and tags round-trip', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('writes NOTHING when a fully-filed recipe is opened and saved untouched', async () => {
+    const { wrapper, store } = await mountModal();
+    await save(wrapper);
+
+    const patch = (store.updateRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] ?? {};
+    // The assertion that would have failed had `onEdit` been missed: the patch would have
+    // carried course: undefined, mealSlots: [], tags: [] — the silent wipe.
+    expect(patch).not.toHaveProperty('course');
+    expect(patch).not.toHaveProperty('mealSlots');
+    expect(patch).not.toHaveProperty('tags');
+  });
+
+  it('seeds the course select from the stored recipe', async () => {
+    const { wrapper } = await mountModal();
+    const select = wrapper.find('select');
+    expect((select.element as HTMLSelectElement).value).toBe('dessert');
+  });
+
+  it('seeds the tag pills from the stored recipe', async () => {
+    const { wrapper } = await mountModal();
+    const text = wrapper.text();
+    expect(text).toContain('autumn');
+    expect(text).toContain('family favourite');
+  });
+
+  it('writes a changed course and leaves the untouched fields out of the patch', async () => {
+    const { wrapper, store } = await mountModal();
+    await wrapper.find('select').setValue('main');
+    await save(wrapper);
+
+    const patch = (store.updateRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] ?? {};
+    expect(patch.course).toBe('main');
+    expect(patch).not.toHaveProperty('tags');
+    expect(patch).not.toHaveProperty('mealSlots');
+  });
+
+  it('persists a CLEARED course as undefined so the repository deletes it', async () => {
+    const { wrapper, store } = await mountModal();
+    await wrapper.find('select').setValue('');
+    await save(wrapper);
+
+    const patch = (store.updateRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] ?? {};
+    expect(patch).toHaveProperty('course');
+    expect(patch.course).toBeUndefined();
+  });
+
+  it('writes nothing when the meal chips are toggled off and back on', async () => {
+    const { wrapper, store } = await mountModal();
+    // dinner is index 2 of breakfast/lunch/dinner/snack in the meal chip group.
+    const chips = wrapper
+      .findAll('button')
+      .filter((b) => b.text().includes('mealPlanner.slot.dinner'));
+    expect(chips.length).toBeGreaterThan(0);
+    await chips[0]!.trigger('click');
+    await chips[0]!.trigger('click');
+    await save(wrapper);
+
+    const patch = (store.updateRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] ?? {};
+    // Canonical ordering on both payload sides is what makes this true — diffPayload's array
+    // equality is BY INDEX, so a re-added slot landing at the end would read as a change.
+    expect(patch).not.toHaveProperty('mealSlots');
+  });
+
+  it('opens blank for a recipe with none of the new fields, and saves no phantom change', async () => {
+    const bare = { ...FILED, id: 'r2', course: undefined, mealSlots: undefined, tags: undefined };
+    const { wrapper, store } = await mountModal(bare as Recipe);
+    await save(wrapper);
+
+    const patch = (store.updateRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] ?? {};
+    expect(patch).not.toHaveProperty('course');
+    expect(patch).not.toHaveProperty('mealSlots');
+    expect(patch).not.toHaveProperty('tags');
+  });
+});

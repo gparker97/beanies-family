@@ -9,9 +9,11 @@
  * user inserts or reorders a line, and would then point the "check this" hint at the wrong
  * row. Texts stay meaningful under editing.
  */
-import type { Recipe } from '@/types/models';
+import type { MealSlot, Recipe, RecipeCourse } from '@/types/models';
 import type { RecipeExtractionResult, RecipeFieldConfidence } from '@/services/ai/types';
 import type { JsonLdRecipe } from '@/services/ai/recipeFetchService';
+import { isRecipeCourse } from '@/constants/recipeCourses';
+import { isMealSlot, sortSlots } from '@/constants/mealSlots';
 import type { DishImagePrefill } from '@/types/magicPayload';
 
 /** What the form is opened with. One object, because it always travels as a unit. */
@@ -22,6 +24,9 @@ export interface RecipePrefill {
     steps: string[];
     notes?: string;
     sourceUrl?: string;
+    /** Course and meal slots the model inferred (#87), already validated. */
+    course?: RecipeCourse;
+    mealSlots?: MealSlot[];
   };
   /** Ingredient texts the model filled in itself — shown for checking, never persisted. */
   inferredIngredients: string[];
@@ -38,6 +43,15 @@ export interface RecipePrefill {
    * meaningless. A bare array cannot tell those two apart.
    */
   dishImage: DishImagePrefill | null;
+  /**
+   * Which taxonomy axes the model answered with something we could not use (#87).
+   *
+   * REQUIRED, not optional, so both construction sites must state their answer rather than
+   * inherit `undefined`. It is the difference between "the model declined" and "the model
+   * drifted to 'Main Course' / 'brunch'" — two failure modes that look identical in the UI
+   * (the field is blank either way) and would otherwise be indistinguishable in CloudWatch.
+   */
+  taxonomyRejected: ('course' | 'meal')[];
   confidence: RecipeFieldConfidence;
 }
 
@@ -46,6 +60,52 @@ export interface RecipePrefill {
  * carried nothing worth showing. Returning null (rather than an empty prefill) keeps the
  * "nothing is created, nothing is invented" guarantee at the type level.
  */
+/**
+ * Validate the model's taxonomy answers, dropping anything unrecognised.
+ *
+ * Modelled directly on `extractionToActivity.validatedModelCategory`: validation belongs in the
+ * MAPPER, not in the pure prompt parser, which deliberately knows nothing about enums.
+ *
+ * ⚠️ Never COERCE a near-miss. A model can return "Main Course", "brunch", "pudding" or an
+ * object; mapping "Main Course" → `main` looks helpful right up to the day it maps "Main
+ * Course Salad" → `main` and files a starter under mains. Blank is honest; wrong is not.
+ */
+export function validatedTaxonomy(result: RecipeExtractionResult): {
+  course?: RecipeCourse;
+  mealSlots?: MealSlot[];
+  rejected: ('course' | 'meal')[];
+} {
+  const rejected: ('course' | 'meal')[] = [];
+
+  let course: RecipeCourse | undefined;
+  if (result.course) {
+    if (isRecipeCourse(result.course)) {
+      course = result.course;
+    } else {
+      rejected.push('course');
+      console.warn(
+        '[recipe-extract] model returned an unknown course; leaving it blank. ' +
+          'Add it to RECIPE_COURSES if it is a course we want, or ignore this.',
+        { got: result.course }
+      );
+    }
+  }
+
+  // De-duplicated and canonically ordered here, so the form's diffPayload sides agree.
+  const valid = result.mealSlots.filter(isMealSlot);
+  const mealSlots = valid.length > 0 ? sortSlots(valid) : undefined;
+  if (result.mealSlots.length > valid.length) {
+    rejected.push('meal');
+    console.warn(
+      '[recipe-extract] model returned unknown meal slot(s); dropping them. ' +
+        'The four slots are breakfast, lunch, dinner, snack — there is deliberately no brunch.',
+      { got: result.mealSlots }
+    );
+  }
+
+  return { ...(course ? { course } : {}), ...(mealSlots ? { mealSlots } : {}), rejected };
+}
+
 export function recipeExtractionToPrefill(result: RecipeExtractionResult): RecipePrefill | null {
   if (!result.isRecipe) return null;
 
@@ -65,6 +125,8 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
   // and the form requires a name before saving anyway, so the user simply types one.
   if (ingredients.length === 0 && steps.length === 0) return null;
 
+  const taxonomy = validatedTaxonomy(result);
+
   return {
     fields: {
       name: result.name,
@@ -75,7 +137,10 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
       ingredients,
       steps,
       ...(result.notes ? { notes: result.notes } : {}),
+      ...(taxonomy.course ? { course: taxonomy.course } : {}),
+      ...(taxonomy.mealSlots ? { mealSlots: taxonomy.mealSlots } : {}),
     },
+    taxonomyRejected: taxonomy.rejected,
     inferredIngredients: result.ingredients.filter((l) => l.inferred).map((l) => l.text),
     inferredSteps: result.steps.filter((l) => l.inferred).map((l) => l.text),
     // NO IMAGE CONCERN ON THIS PATH ANY MORE (#86). The model never had a real URL to give:
@@ -109,6 +174,11 @@ export function jsonLdToPrefill(recipe: JsonLdRecipe, sourceUrl: string): Recipe
       sourceUrl,
     },
     inferredIngredients: [],
+    // Course and meal are deliberately left blank on this rung. schema.org's `recipeCategory`
+    // is free text ("Dessert", "Main Course", "Weeknight"), and mapping it is a guessing
+    // exercise — on the one path whose whole point is that nothing is invented. Nothing was
+    // offered, so nothing was rejected.
+    taxonomyRejected: [],
     inferredSteps: [],
     // The JSON-LD `image` now arrives as candidate #1 from the server's ladder rather than
     // being re-derived here, so this mapper carries no image concern on either path.

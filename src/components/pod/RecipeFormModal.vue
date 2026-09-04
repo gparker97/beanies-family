@@ -34,7 +34,15 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { usePhotoStore } from '@/stores/photoStore';
-import type { Recipe, UUID } from '@/types/models';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
+import ChipToggleGroup from '@/components/ui/ChipToggleGroup.vue';
+import type { ChipOption } from '@/components/ui/FrequencyChips.vue';
+import RecipeTagInput from '@/components/pod/RecipeTagInput.vue';
+import { COURSE_DEFS } from '@/constants/recipeCourses';
+import { MEAL_SLOTS, SLOT_EMOJI, SLOT_LABEL_KEYS, sortSlots } from '@/constants/mealSlots';
+import { useRecipeCourseLabel } from '@/composables/useRecipeCourseLabel';
+import { suggestTags } from '@/utils/recipeTags';
+import type { MealSlot, Recipe, RecipeCourse, UUID } from '@/types/models';
 import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
 
 const props = withDefaults(
@@ -79,6 +87,18 @@ const stepsText = ref('');
 const notes = ref('');
 
 const sourceUrl = ref('');
+/**
+ * Course, meals and tags (#87).
+ *
+ * 🚨 THESE MUST BE SEEDED AND SAVED IN ALL FOUR PLACES — `onEdit`, `applyPrefill`,
+ * `baselinePayload` and `buildPayload`. Miss `onEdit` and the failure is catastrophic and
+ * silent: opening a saved recipe leaves these blank, `buildPayload` sends ''/[],
+ * `baselinePayload` reports the STORED values, `diffPayload` sees a real change and writes the
+ * clear — so fixing a typo in the title would erase that recipe's tags, course and meals.
+ */
+const course = ref<RecipeCourse | ''>('');
+const mealSlots = ref<MealSlot[]>([]);
+const tags = ref<string[]>([]);
 
 /**
  * Seed the form from an AI prefill, or clear it when there is none. Passing `null` is the
@@ -142,6 +162,10 @@ function applyPrefill(prefill: RecipePrefill | null): void {
   stepsText.value = (f?.steps ?? []).join('\n');
   notes.value = f?.notes ?? '';
   sourceUrl.value = f?.sourceUrl ?? '';
+  // Site 2 of 4. `applyPrefill(null)` IS the blank reset, so these must clear here too.
+  course.value = f?.course ?? '';
+  mealSlots.value = sortSlots(f?.mealSlots ?? []);
+  tags.value = [];
 }
 
 /**
@@ -167,6 +191,10 @@ const { isEditing, isSubmitting } = useFormModal(
       stepsText.value = (r.steps ?? []).join('\n');
       notes.value = r.notes ?? '';
       sourceUrl.value = r.sourceUrl ?? '';
+      // Site 1 of 4 — the ONLY path that seeds from an existing recipe. See the refs above.
+      course.value = r.course ?? '';
+      mealSlots.value = sortSlots(r.mealSlots ?? []);
+      tags.value = [...(r.tags ?? [])];
     },
     // ONE reset path. A separate `watch(() => props.prefill)` would RACE this callback
     // (useFormModal fires it when `open` flips), and the resulting "sometimes the form
@@ -177,6 +205,28 @@ const { isEditing, isSubmitting } = useFormModal(
 );
 
 const canSave = computed(() => name.value.trim().length > 0);
+
+const { courseLabel } = useRecipeCourseLabel();
+
+/** A leading "not set" option, because clearing a course must be possible. */
+const courseOptions = computed(() => [
+  { value: '', label: t('recipes.field.courseNone') },
+  ...COURSE_DEFS.map((c) => ({ value: c.id, label: `${c.emoji} ${courseLabel(c.id)}` })),
+]);
+
+const mealOptions = computed<ChipOption[]>(() =>
+  MEAL_SLOTS.map((slot) => ({
+    value: slot,
+    label: t(SLOT_LABEL_KEYS[slot]),
+    icon: SLOT_EMOJI[slot],
+  }))
+);
+
+/**
+ * Recomputed per (recipes, current tags) change — NOT per keystroke. `suggestTags` caps the
+ * list because a family with 200 distinct tags would otherwise render 200 pills.
+ */
+const tagSuggestions = computed(() => suggestTags(recipesStore.recipes, tags.value));
 
 /**
  * The shortcut band shows only on a genuinely blank ADD.
@@ -289,6 +339,12 @@ function baselinePayload(r: Recipe) {
     ingredients: r.ingredients ?? [],
     steps: r.steps ?? [],
     notes: r.notes,
+    // Site 3 of 4. `mealSlots` is canonicalised on BOTH sides because `diffPayload`'s array
+    // equality is by INDEX — ['dinner','lunch'] and ['lunch','dinner'] would otherwise read as
+    // a change and make a no-op save write.
+    course: r.course,
+    mealSlots: sortSlots(r.mealSlots ?? []),
+    tags: r.tags ?? [],
   };
 }
 
@@ -303,6 +359,12 @@ function buildPayload() {
     ingredients: splitLines(ingredientsText.value),
     steps: splitLines(stepsText.value),
     notes: orUndefined(notes.value),
+    // Site 4 of 4. `course` uses the existing orUndefined idiom (a cleared select is absent);
+    // meals and tags are ALWAYS-SENT arrays like `ingredients`, because an empty array is a
+    // meaningful value here — the user removed the last tag.
+    course: course.value === '' ? undefined : course.value,
+    mealSlots: sortSlots(mealSlots.value),
+    tags: [...tags.value],
     // photoIds stays conditional: an empty array is a MEANINGFUL value here (the user
     // removed every photo), not an absent one, and PhotoAttachments owns that state.
     ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
@@ -552,6 +614,18 @@ const LIST_TEXTAREA_CLASS =
           type="url"
           :placeholder="t('recipes.placeholder.sourceUrl')"
         />
+      </FormFieldGroup>
+
+      <FormFieldGroup :label="t('recipes.field.course')" optional>
+        <BaseSelect v-model="course" :options="courseOptions" />
+      </FormFieldGroup>
+
+      <FormFieldGroup :label="t('recipes.field.meals')" optional>
+        <ChipToggleGroup v-model="mealSlots" :options="mealOptions" />
+      </FormFieldGroup>
+
+      <FormFieldGroup :label="t('recipes.field.tags')" optional>
+        <RecipeTagInput v-model="tags" :suggestions="tagSuggestions" />
       </FormFieldGroup>
 
       <FormFieldGroup :label="t('recipes.field.notes')" optional>

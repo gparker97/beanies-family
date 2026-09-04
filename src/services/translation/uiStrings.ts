@@ -9942,6 +9942,67 @@ const STRING_DEFS = {
   'categoryGroup.subscriptions': { en: 'Subscriptions', beanie: 'subscriptions' },
   'categoryGroup.transportation': { en: 'Transportation', beanie: 'transportation' },
   'categoryGroup.travel': { en: 'Travel', beanie: 'travel' },
+
+  // ── Recipe course, tags and meal grouping (#87) ──────────────────────────
+  // Course labels. The stored value is the id; only the label is translated.
+  'recipes.course.starter': { en: 'Starter', beanie: 'starter' },
+  'recipes.course.main': { en: 'Main', beanie: 'main' },
+  'recipes.course.side': { en: 'Side', beanie: 'side' },
+  'recipes.course.dessert': { en: 'Dessert', beanie: 'dessert' },
+  'recipes.course.drink': { en: 'Drink', beanie: 'drink' },
+  'recipes.course.baking': { en: 'Baking', beanie: 'baking' },
+  'recipes.course.sauce': { en: 'Sauce', beanie: 'sauce' },
+  'recipes.course.other': { en: 'Other', beanie: 'other' },
+
+  // Recipe form — the new fields.
+  'recipes.field.course': { en: 'Course', beanie: 'course' },
+  'recipes.field.courseNone': { en: 'Not set', beanie: 'not set' },
+  'recipes.field.meals': { en: 'Good for', beanie: 'good for' },
+  'recipes.field.tags': { en: 'Tags', beanie: 'tags' },
+  'recipes.tags.placeholder': { en: 'Add a tag and press enter', beanie: 'add a tag, press enter' },
+  'recipes.tags.hint': {
+    en: 'Saved in lowercase, so you only ever get one of each.',
+    beanie: 'saved in lowercase, so you only ever get one of each.',
+  },
+  'recipes.tags.remove': { en: 'Remove tag', beanie: 'remove tag' },
+  'recipes.tags.suggestions': { en: 'Used before', beanie: 'used before' },
+  'recipes.tags.duplicate': {
+    en: 'You already have that tag.',
+    beanie: 'you already have that one.',
+  },
+  'recipes.tags.limit': {
+    en: 'That is as many tags as one recipe can hold ({max}).',
+    beanie: "that's as many tags as one recipe can hold ({max}).",
+  },
+  'recipes.tags.truncated': {
+    en: 'That tag was shortened to fit ({max} characters).',
+    beanie: 'that tag got shortened to fit ({max} characters).',
+  },
+
+  // Cookbook controls.
+  'cookbook.group.none': { en: 'Everything', beanie: 'everything' },
+  'cookbook.group.meal': { en: 'By meal', beanie: 'by meal' },
+  'cookbook.group.course': { en: 'By course', beanie: 'by course' },
+  'cookbook.groupLabel': { en: 'Show', beanie: 'show' },
+  'cookbook.filter.all': { en: 'All', beanie: 'all' },
+  'cookbook.filterLabel': { en: 'Course', beanie: 'course' },
+  'cookbook.sortLabel': { en: 'Sorted by', beanie: 'sorted by' },
+  'cookbook.sort.name': { en: 'A\u2013Z', beanie: 'a\u2013z' },
+  'cookbook.sort.recent': { en: 'Recently added', beanie: 'recently added' },
+  'cookbook.sort.cooked': { en: 'Most cooked', beanie: 'most cooked' },
+  'cookbook.shelf.unfiledMeal': {
+    en: 'Not filed to a meal yet',
+    beanie: 'not filed to a meal yet',
+  },
+  'cookbook.shelf.unfiledCourse': {
+    en: 'No course set yet',
+    beanie: 'no course set yet',
+  },
+  'cookbook.filteredEmpty': {
+    en: 'No {course} recipes in the cookbook yet.',
+    beanie: 'no {course} recipes in here yet.',
+  },
+  'cookbook.showAll': { en: 'Show all recipes', beanie: 'show all recipes' },
 } satisfies Record<string, StringEntry>;
 
 /**

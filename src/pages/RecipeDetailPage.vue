@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
+import RecipeTaxonomyBadges from '@/components/pod/RecipeTaxonomyBadges.vue';
 import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
@@ -270,6 +271,10 @@ watch(recipe, (now, before) => {
               </strong>
             </span>
           </div>
+
+          <!-- Same component as the cookbook card, so the two surfaces cannot drift.
+               `maxTags` is raised here: the detail page has the room the card does not. -->
+          <RecipeTaxonomyBadges :course="recipe.course" :tags="recipe.tags" :max-tags="12" />
 
           <!-- Provenance on its own line. It reads as a destination rather than a statistic,
                and among the times and servings it was easy to miss entirely. Quiet, but

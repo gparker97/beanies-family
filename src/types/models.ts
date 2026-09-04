@@ -1645,6 +1645,24 @@ export interface Milestone {
  * A family recipe — "secret family recipe" in the Family Cookbook.
  * Family-wide; any member can link a `FavoriteItem` to it.
  */
+/**
+ * The dish's role in a meal (#87) — one per recipe. Deliberately short and closed: `other` is
+ * the catch-all, and anything finer belongs in free-form `tags`, which is why there is no
+ * `pasta` or `soup` here.
+ */
+export const RECIPE_COURSES = [
+  'starter',
+  'main',
+  'side',
+  'dessert',
+  'drink',
+  'baking',
+  'sauce',
+  'other',
+] as const;
+
+export type RecipeCourse = (typeof RECIPE_COURSES)[number];
+
 export interface Recipe {
   id: UUID;
   name: string;
@@ -1667,6 +1685,25 @@ export interface Recipe {
   ingredients: string[];
   steps: string[];
   notes?: string;
+  /**
+   * Course, meal slots and tags (#87) — the cookbook's filter/sort/group axes.
+   *
+   * All three optional, so every recipe written before #87 stays valid and needs no migration.
+   *
+   * ⚠️ `[]` and `undefined` are BOTH "unset", and `[]` is the common case: the recipe form
+   * always sends arrays (an empty one is meaningful — the user removed the last tag), so a
+   * recipe with no tags stores `[]`, not `undefined`. Every consumer must test `?.length`,
+   * NEVER truthiness — `if (recipe.tags)` is true for `[]` and would render an empty pill row
+   * on every untagged recipe.
+   *
+   * `mealSlots` is stored in canonical `MEAL_SLOTS` order (see `sortSlots`), because
+   * `diffPayload` compares arrays BY INDEX and an unsorted array would make a no-op save write.
+   *
+   * `tags` are lowercase, user-entered, and NOT translated — they are user data, not UI copy.
+   */
+  course?: RecipeCourse;
+  mealSlots?: MealSlot[];
+  tags?: string[];
   photoIds?: UUID[];
   createdBy?: UUID;
   createdAt: ISODateString;
