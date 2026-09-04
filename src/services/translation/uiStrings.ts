@@ -4205,10 +4205,13 @@ const STRING_DEFS = {
     beanie:
       "your pod file appears damaged and can't be opened. please contact support@beanies.family with the diagnostic details below — we may be able to help.",
   },
-  // ⚠️ The fatal overlay renders a "Clear data" button directly beneath this
-  // message. Copy that merely says "nothing has been deleted" beside that button
-  // is an invitation to wipe a perfectly good cache by hand, so the text has to
-  // say outright that clearing will not help.
+  // The overlay now HIDES its Clear-data button for this message
+  // (`setFatal(..., { clearDataHelps: false })` in
+  // `utils/payloadFailureSurface.ts`), so the sentence about clearing is no
+  // longer load-bearing against an adjacent button. It stays because the
+  // instinct it heads off is the user's own — "the app is broken, wipe it and
+  // start again" — and because the app cannot hide the Clear-data control in
+  // Settings. Do not delete it on the grounds that the button is gone.
   'resumeSetup.podTooLarge': {
     en: 'This device ran out of memory opening a pod this size. Your pod file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. If it keeps happening, send support@beanies.family the details below.',
     beanie:
@@ -4236,6 +4239,20 @@ const STRING_DEFS = {
   'settings.decryptFailed': {
     en: "That file couldn't be opened. Check you picked the right .beanpod file, then try again.",
     beanie: "that file couldn't be opened. check you picked the right .beanpod, then try again.",
+  },
+  // The join flow's out-of-memory case. Distinct from `join.error.fileDecrypt`,
+  // which tells the joiner to ask for a new invite link: the invite is fine and
+  // a new one changes nothing.
+  // The post-init health check's "we finished but there is nothing here" case.
+  // Was a hardcoded English literal rendered straight into the overlay.
+  'app.initError.noData': {
+    en: 'beanies started up but could not find your family data.',
+    beanie: 'beanies woke up but could not find your beans.',
+  },
+  'join.error.fileTooLarge': {
+    en: "This device ran out of memory opening your family's data. Nothing is wrong with your invite; the pod is simply bigger than this device can open. Try again on a device with more memory.",
+    beanie:
+      "this device ran out of memory opening your family's beans. nothing is wrong with your invite; the pod is simply bigger than this device can open. try again on a device with more memory.",
   },
   'podCorrupted.inline': {
     en: 'Your family data could not be read and may be damaged. Trying again will not help. Please contact support@beanies.family so we can look at it with you.',

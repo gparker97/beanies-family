@@ -241,6 +241,34 @@ export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc 
 }
 
 /**
+ * Plaintext byte count implied by a base64 AES-GCM payload, without decoding
+ * it — for LABELLING a failure that happened before the decrypt could run.
+ *
+ * Base64 is 4 characters per 3 bytes; padding removes 1 or 2. The ciphertext
+ * then carries a 12-byte IV and a 16-byte GCM tag that the plaintext does not,
+ * so those come off: `payloadBytes` means DECRYPTED bytes at every other
+ * producer and it rides into `perf_doc_bytes`, where a units mismatch would
+ * skew the "pods above N MB fail on 3GB devices" threshold.
+ *
+ * Tolerant of a missing or malformed value on purpose: it is only ever used to
+ * label a failure, and a wrong number here must never become a second throw
+ * inside a catch. Returns `null` rather than 0 for anything it cannot size, so
+ * an unknown reaches CloudWatch as absent instead of "zero-byte payload".
+ */
+export function decodedSizeOf(base64: unknown): number | null {
+  if (typeof base64 !== 'string' || base64.length === 0) return null;
+  const rem = base64.length % 4;
+  if (rem === 1) return null; // not a valid base64 length
+  const padding = rem === 0 ? (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0) : 0;
+  const ciphertext = Math.floor(base64.length / 4) * 3 - padding + (rem === 0 ? 0 : rem - 1);
+  const plaintext = ciphertext - AES_GCM_OVERHEAD_BYTES;
+  return plaintext > 0 ? plaintext : null;
+}
+
+/** AES-GCM 12-byte IV prefix + 16-byte auth tag, per `familyKeyService`. */
+const AES_GCM_OVERHEAD_BYTES = 28;
+
+/**
  * THE classifier: is this throw bad data, or a device that ran out of memory?
  *
  * Exported and used by every step that touches payload bytes (`loadAndVerify`,
@@ -254,21 +282,9 @@ export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc 
  * silently overstate by 4/3 on exactly the step that fires first on the
  * smallest devices, skewing the "pods above N MB fail on 3GB devices"
  * threshold. Before the decrypt has run the true length is not known, so
- * callers pass `decodedSizeOf(base64)`, which is exact to within two bytes.
+ * callers pass `decodedSizeOf(base64)` (above), which subtracts the AES-GCM
+ * overhead and is exact to within two bytes.
  */
-/**
- * Decrypted byte count implied by a base64 string, without decoding it.
- * Base64 is 4 characters per 3 bytes; padding removes 1 or 2. Tolerant of a
- * missing/odd value because it is only ever used to LABEL a failure — a wrong
- * number here must never become a second throw inside a catch.
- */
-export function decodedSizeOf(base64: unknown): number | null {
-  if (typeof base64 !== 'string' || base64.length === 0) return null;
-  const rem = base64.length % 4;
-  const padding = rem === 0 ? (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0) : 0;
-  return Math.floor(base64.length / 4) * 3 - padding + (rem === 0 ? 0 : rem - 1);
-}
-
 export function payloadFailure(
   step: PayloadLoadStep,
   e: unknown,

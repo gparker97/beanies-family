@@ -62,6 +62,8 @@ const {
 } = await import('../cache');
 
 const FAMILY_ID = 'cache-replay-oom';
+/** The decoded base size — the value only the increment path reports. */
+let baseBinaryLength = 0;
 const base = () => migrateDoc(Automerge.init<FamilyDocument>());
 
 describe('loadCachedDoc — increment replay classification', () => {
@@ -77,7 +79,9 @@ describe('loadCachedDoc — increment replay classification', () => {
 
     // A base plus two increments, all genuinely valid on disk.
     const baseDoc = base();
-    await persistDocBinary(key, saveDoc(baseDoc));
+    const baseBinary = saveDoc(baseDoc);
+    baseBinaryLength = baseBinary.byteLength;
+    await persistDocBinary(key, baseBinary);
     let doc = baseDoc;
     for (const [id, balance] of [
       ['a', 1],
@@ -130,17 +134,34 @@ describe('loadCachedDoc — increment replay classification', () => {
     expect(Object.keys((result!.doc as unknown as { accounts: object }).accounts)).toEqual(['a']);
   });
 
-  it('classifies an increment DECRYPT allocation failure as decrypt, not materialize', async () => {
-    // The guarded blocks cover base64 + AES as well as the apply, so a
-    // hardcoded step would mislabel this — in the field a triager reads first.
-    const bad = await generateFamilyKey(); // wrong key => decrypt throws
-    vi.spyOn(globalThis.crypto.subtle, 'decrypt').mockRejectedValueOnce(
-      new RangeError('Array buffer allocation failed')
-    );
+  it('classifies an INCREMENT decrypt allocation failure, not just the base one', async () => {
+    // ⚠️ The obvious version of this test does not test anything. `loadCachedDoc`
+    // decrypts the BASE row first, so a plain `mockRejectedValueOnce` is consumed
+    // there — by a catch that hardcoded `'decrypt'` before `openIncrement`
+    // existed — and the assertions pass while `openIncrement` is never reached.
+    // Proven: deleting `openIncrement`'s whole classification block left that
+    // version green. So let the base decrypt through and fail the NEXT call.
+    const real = globalThis.crypto.subtle.decrypt.bind(globalThis.crypto.subtle);
+    let call = 0;
+    const spy = vi
+      .spyOn(globalThis.crypto.subtle, 'decrypt')
+      .mockImplementation((...args: Parameters<typeof real>) => {
+        if (call++ === 0) return real(...args); // the base row
+        return Promise.reject(new RangeError('Array buffer allocation failed'));
+      });
+    try {
+      const err = await loadCachedDoc(key, FAMILY_ID).catch((e: unknown) => e);
 
-    const err = await loadCachedDoc(bad, FAMILY_ID).catch((e: unknown) => e);
-
-    expect(err).toBeInstanceOf(PayloadTooLargeError);
-    expect((err as PayloadTooLargeError).step).toBe('decrypt');
+      expect(err).toBeInstanceOf(PayloadTooLargeError);
+      expect((err as PayloadTooLargeError).step).toBe('decrypt');
+      // The size only the INCREMENT path produces: `oomDuringReplay` reports the
+      // decoded BASE length, whereas the base-row catch reports
+      // `decodedSizeOf(baseEntry.payload)`. Asserting it is what pins that this
+      // came from `openIncrement` and not from the row above it.
+      expect((err as PayloadTooLargeError).payloadBytes).toBe(baseBinaryLength);
+      expect(call).toBeGreaterThan(1);
+    } finally {
+      spy.mockRestore(); // `vitest.config.ts` sets no `restoreMocks`
+    }
   });
 });
