@@ -122,7 +122,14 @@ export type CompleteAutoLoadResult =
       kind: 'corrupted';
       fileId: string;
       familyId: string;
-      error: CorruptPayloadError;
+      /**
+       * `PayloadLoadError`, not `CorruptPayloadError`, on purpose: this is the
+       * "everything that is not `too-large`" branch, and typing it to the
+       * narrower class forced the producer into an `as CorruptPayloadError`
+       * cast — which would silently mislabel any future third subclass instead
+       * of failing the build. Consumers read `.step`/`.message` only.
+       */
+      error: PayloadLoadError;
     }
   /**
    * The file is intact; THIS DEVICE ran out of memory inflating it. Distinct
@@ -146,18 +153,25 @@ export type CompleteAutoLoadResult =
  * a usable Automerge document. Catches silent V4-envelope-valid-but-payload-
  * corrupt cases (the Shaun-on-iOS failure mode).
  *
- * `step` distinguishes parse failure from materialize failure — `load` means
- * Automerge couldn't even consume the byte stream; `materialize` means it
- * loaded but reading a field threw "Out of bounds table access" or similar.
+ * `step` says WHERE it broke, which is the first thing a triager wants:
+ *   `decrypt`     — base64-decoding or AES-decrypting the payload, before
+ *                   Automerge ever saw it (an allocation failure here is a
+ *                   plain "this device has no room for a 3MB buffer");
+ *   `load`        — Automerge couldn't consume the byte stream at all;
+ *   `materialize` — it loaded, but reading a field threw "Out of bounds table
+ *                   access" or ran the WASM heap out inflating the ops.
  */
+/** Where in the open sequence the failure happened. See `PayloadLoadError`. */
+export type PayloadLoadStep = 'decrypt' | 'load' | 'materialize';
+
 export abstract class PayloadLoadError extends Error {
-  readonly step: 'load' | 'materialize';
+  readonly step: PayloadLoadStep;
   readonly familyId: string | null;
   /** Decrypted byte length — the number that predicts the WASM cost. */
   readonly payloadBytes: number | null;
   constructor(
     message: string,
-    step: 'load' | 'materialize',
+    step: PayloadLoadStep,
     familyId: string | null,
     payloadBytes: number | null = null
   ) {
@@ -171,7 +185,7 @@ export abstract class PayloadLoadError extends Error {
 export class CorruptPayloadError extends PayloadLoadError {
   constructor(
     message: string,
-    step: 'load' | 'materialize',
+    step: PayloadLoadStep,
     familyId: string | null,
     payloadBytes: number | null = null
   ) {
@@ -195,7 +209,7 @@ export class CorruptPayloadError extends PayloadLoadError {
 export class PayloadTooLargeError extends PayloadLoadError {
   constructor(
     message: string,
-    step: 'load' | 'materialize',
+    step: PayloadLoadStep,
     familyId: string | null,
     payloadBytes: number | null = null
   ) {
@@ -209,6 +223,24 @@ export class PayloadTooLargeError extends PayloadLoadError {
  * surface that shows one (the fatal overlay, the login flow) so the fields a
  * support request carries can never drift between them.
  */
+/**
+ * The INLINE message key for a payload failure — for compact error slots under
+ * a password field, where the fatal overlay's three-sentence copy would point
+ * at a diagnostic blob and a Clear-data button that are not on screen.
+ *
+ * Shared because there are four such surfaces (`LoadPodView`, `SettingsPage`,
+ * `useJoinFlow`, `useLoginFlow`) and the first cut wired only one of them,
+ * leaving the ORDINARY open path showing a raw Automerge/WASM string under the
+ * password field and inviting the user to retype forever.
+ */
+export function payloadErrorMessageKey(
+  err: PayloadLoadError
+): 'podTooLarge.inline' | 'loginFlow.recoveryCorruptBody' {
+  return err instanceof PayloadTooLargeError
+    ? 'podTooLarge.inline'
+    : 'loginFlow.recoveryCorruptBody';
+}
+
 export function payloadErrorDetail(
   err: PayloadLoadError,
   fileId: string | null,

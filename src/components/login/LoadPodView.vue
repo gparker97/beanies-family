@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle, FileSystemHandle */
 import { ref, computed, onMounted, watch } from 'vue';
+import { payloadErrorMessageKey } from '@/types/sync';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -523,6 +524,12 @@ async function handleDecrypt() {
 
       decryptPassword.value = '';
       await finishLoaded(result.viaRecoveryPassphrase ? 'recovery' : undefined);
+    } else if (result.payloadError) {
+      // NOT a credential failure: the payload could not be loaded however right
+      // the password is, so re-prompting loops forever. Before this branch the
+      // raw Automerge/WASM string ("error inflating document chunk ops: out of
+      // memory") was rendered untranslated under the password field.
+      formError.value = t(payloadErrorMessageKey(result.payloadError));
     } else {
       formError.value = result.error ?? t('password.decryptionError');
     }

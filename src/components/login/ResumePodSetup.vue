@@ -331,7 +331,16 @@ function surfacePayloadFailure(
       message: `Pod payload failed Automerge ${err.step} during resume`,
       error: err,
       severity: 'critical',
-      context: { file_id: fileId, family_id: familyId, corruption_step: err.step },
+      // `file_id` and `corruption_step` are NOT in `ALLOWED_CONTEXT_KEYS`, so the
+      // redactor would strip both (with a console warn) and this report would
+      // reach CloudWatch carrying neither — untriageable. Reuse the allowlisted
+      // keys the rest of the app already uses for exactly these two facts; the
+      // full file id still rides in the copyable diagnostic blob below.
+      context: {
+        file_id_tail: fileId.slice(-6),
+        family_id: familyId,
+        error_code: err.step,
+      },
     });
   }
   fatalErrorStore.setFatal(t(opts.copyKey), payloadErrorDetail(err, fileId, familyId));

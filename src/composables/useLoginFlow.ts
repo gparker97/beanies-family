@@ -14,7 +14,7 @@
  */
 
 import { ref, type Ref } from 'vue';
-import { PayloadTooLargeError } from '@/types/sync';
+import { PayloadTooLargeError, payloadErrorMessageKey } from '@/types/sync';
 import {
   transition,
   type LoginFlowEvent,
@@ -787,9 +787,10 @@ export function useLoginFlow(opts: {
                 // when it is merely too big for THIS device is the lie this change
                 // exists to remove.
                 const tooLarge = dec.payloadError instanceof PayloadTooLargeError;
-                proveError.value = t(
-                  tooLarge ? 'resumeSetup.podTooLarge' : 'loginFlow.recoveryCorruptBody'
-                );
+                // The INLINE key, not the overlay's: `proveError` renders in a
+                // compact slot with no diagnostic blob and no Clear-data button,
+                // so the overlay copy would point at UI that is not on screen.
+                proveError.value = t(payloadErrorMessageKey(dec.payloadError));
                 emitProveOutcome({
                   method: 'password',
                   ok: false,
