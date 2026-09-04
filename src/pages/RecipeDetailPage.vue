@@ -226,6 +226,7 @@ watch(recipe, (now, before) => {
         <PolaroidImage
           v-else
           :src="null"
+          :variant-seed="recipe.id"
           :loading="isPending(recipe.id)"
           :caption="
             isPending(recipe.id) ? t('recipeExtract.attaching') : t('cookbook.card.noPhoto')

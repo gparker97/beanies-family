@@ -275,6 +275,7 @@ async function handleSaved(id: string): Promise<void> {
       >
         <PolaroidImage
           :src="thumbFor(r)"
+          :variant-seed="r.id"
           :loading="!thumbFor(r) && isPending(r.id)"
           :caption="
             thumbFor(r)

@@ -156,6 +156,15 @@ describe('the youtube ladder', () => {
       title: 'Best Lemon Cake',
       sourceUrl: 'https://youtu.be/dQw4w9WgXcQ',
       path: 'youtube_description',
+      // The video thumbnail is the ONLY image this rung can ever have — there is no page to
+      // read — and it used to be hard-coded empty, so the one capture with no alternative
+      // was also the one guaranteed to end up pictureless (#86). Two rungs, because
+      // `maxresdefault` 404s below 720p while `hqdefault` always exists; the attach ladder
+      // falls through the first for free.
+      imageCandidates: [
+        { url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', source: 'youtube_thumb' },
+        { url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', source: 'youtube_thumb' },
+      ],
     });
   });
 

@@ -39,12 +39,37 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
 import type { ConsentGrant } from './useDocumentConsent';
-import type { RecipeShareSource, ResultEnvelope } from '@/types/magicPayload';
-import { boundedDishImage, toShareLink } from '@/utils/shareLink';
+import type {
+  DishImagePrefill,
+  ImageNoneReason,
+  RecipeShareSource,
+  ResultEnvelope,
+} from '@/types/magicPayload';
+import { toShareLink } from '@/utils/shareLink';
+import { attachDishImage } from '@/services/ai/attachDishImage';
 import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
 const SURFACE = 'recipe-extract';
+
+/**
+ * What a developer should DO about each `image_none` reason.
+ *
+ * An enum tells you which branch fired; it does not tell you whether that branch is a bug. A
+ * `cloud_required` is a family setting and entirely expected; an `all_failed` concentrated on
+ * one rung is a real regression. Console-only, so it never leaves the device.
+ */
+const HINTS: Record<ImageNoneReason, string> = {
+  no_candidates:
+    'the page declared no image at all — expected on some sites, and the number worth watching',
+  all_failed:
+    'candidates were found but none fetched — check error_code; site_refused means the CDN is rejecting our Referer',
+  cloud_required:
+    'this family has cloud photo storage disabled, so nothing can be stored — expected, not a bug',
+  at_cap: 'the recipe already holds the maximum number of photos',
+  store_rejected:
+    'fetched but not stored; cloud and cap were already ruled out, so this is a decode or upload failure — check sniffImageType against ACCEPTED_MIMES and the usePhotos error above',
+};
 
 export interface RecipeReady {
   prefill: RecipePrefill;
@@ -83,8 +108,6 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    * instead of showing a pictureless recipe for five silent seconds.
    */
   const { markPending, clearPending } = useRecipePhotoPending();
-  /** A screened dish-image URL held until the recipe is saved, then fetched and stored. */
-  const pendingDishImageUrl = ref<string | null>(null);
   /** Held between a successful extraction and the save that follows it. */
   const pendingSource = ref<File | null>(null);
   /**
@@ -137,9 +160,8 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   function deliverRecipeInner(source: RecipeShareSource, env: ResultEnvelope): void {
     // Drop anything held from a previous capture BEFORE claiming the new source, exactly as
     // `processFile` and `processUrl` do. Without it a shared recipe inherits the dish photo
-    // of whatever was captured before it — `pendingDishImageUrl` in particular is set by the
-    // URL path and read by `attachAfterSave`, so pasting a link and then receiving a share
-    // attached the link's hero image to the shared recipe.
+    // of whatever was captured before it. (The dish image no longer travels this way — it
+    // rides on the prefill — but the source FILE still does, and the hazard is the same.)
     discardPendingSource();
 
     // Loud-but-non-blocking FIRST — before the not-a-recipe return — so a >cap document whose
@@ -193,7 +215,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         prefill = jsonLdToPrefill(source.recipe, link.pageUrl);
         break;
       case 'extraction':
-        prefill = recipeExtractionToPrefill(source.data, link?.pageUrl);
+        prefill = recipeExtractionToPrefill(source.data);
         break;
       case 'titleOnly':
         // Deliberately the ONLY fabricated prefill in this file, and it fabricates nothing:
@@ -205,7 +227,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           fields: { name: source.title, ingredients: [], steps: [] },
           inferredIngredients: [],
           inferredSteps: [],
-          dishImageUrl: null,
+          dishImage: null,
           confidence: { name: 1, ingredients: 0, steps: 0 },
         };
         break;
@@ -233,9 +255,16 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       // shared, not the blog the ladder followed out of its description: they chose the
       // video, they recognise it, and its description links the blog anyway.
       prefill.fields.sourceUrl = link.provenanceUrl;
-      // USE the mapper's bounded value when it has one; otherwise screen the page's own
-      // image through the SAME bound rather than around it.
-      pendingDishImageUrl.value = boundedDishImage(link, prefill.dishImageUrl ?? null);
+      // THE ONE PLACE `dishImage` IS ASSIGNED (#86). Three write sites collapsed to this one,
+      // and it sits inside the `if (link)` that already knows both the link and its kind —
+      // which is exactly the code that knows whether a source page existed at all. That fact
+      // is what lets the caller tell "the page declared no images" from "there was no page";
+      // an empty `candidates` here is meaningful, a null `dishImage` is a different thing.
+      prefill.dishImage = {
+        kind: link.kind,
+        candidates: link.imageCandidates,
+        pageUrl: link.pageUrl,
+      };
     }
 
     pendingSource.value = env.sourceFile;
@@ -411,13 +440,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             { via: 'titleOnly', title: resolved.title },
             {
               sourceFile: null,
-              link: {
-                pageUrl: resolved.sourceUrl,
-                provenanceUrl: resolved.sourceUrl,
-                imageUrl: '',
-                path: resolved.path,
-                kind: 'youtube',
-              },
+              // Via `toShareLink`, not a hand-built literal — so this path picks up the
+              // video thumbnails (#86). It is the one capture with no page to read, and so
+              // the one that used to be guaranteed no picture at all.
+              link: toShareLink(resolved, { kind: 'youtube', url: resolved.sourceUrl }),
             }
           );
           return;
@@ -481,20 +507,36 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    *
    * Warn-not-rollback: a failed attach never undoes the saved recipe.
    */
-  async function attachAfterSave(recipeId: UUID): Promise<void> {
+  async function attachAfterSave(
+    recipeId: UUID,
+    /**
+     * ⚠️ USE THIS ARGUMENT. Never re-read it from a ref inside the async body.
+     *
+     * `RecipeFormModal.handleSave` calls this UNAWAITED and then immediately emits `close`,
+     * which fires the watcher that nulls its `dishImage` ref. The object is passed by
+     * reference and stays valid; the moment anyone "tidies" this into reading the ref, every
+     * dish image stops attaching and does so silently.
+     *
+     * OWNERSHIP (#86 §7): the dish image is owned by `RecipeFormModal` on every route, while
+     * the source FILE stays owned by whichever capture instance produced it. That asymmetry
+     * is forced by their lifetimes — the file never leaves its instance, the candidates are
+     * delivered INTO the form as a prefill by either instance — and it is what makes a double
+     * attach structurally impossible: exactly one expression in the codebase passes this.
+     */
+    dishImage: DishImagePrefill | null = null
+  ): Promise<void> {
     const file = pendingSource.value;
     const compressed = pendingCompressed.value;
-    const dishUrl = pendingDishImageUrl.value;
     pendingSource.value = null;
     pendingCompressed.value = null;
-    pendingDishImageUrl.value = null;
-    if (!file && !dishUrl) return; // manual save with no AI source — nothing to attach
+    if (!file && !dishImage) return; // manual save with no AI source — nothing to attach
     // Mark the RECIPE, not the page: the card and the detail hero both read this, so the
-    // waiting state reaches the user wherever they are looking. Only for a dish image —
-    // a source-file attach is invisible to the user and needs no hero placeholder.
-    if (dishUrl) markPending(recipeId);
+    // waiting state reaches the user wherever they are looking. Only when we will actually
+    // try for a photo — a source-file attach is invisible and needs no hero placeholder.
+    const marked = (dishImage?.candidates.length ?? 0) > 0;
+    if (marked) markPending(recipeId);
     try {
-      await runAttach(recipeId, file, compressed, dishUrl);
+      await runAttach(recipeId, file, compressed, dishImage);
     } finally {
       // ONE exit point, wrapping the WHOLE attach.
       //
@@ -502,7 +544,13 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       // path never reached: a pasted link produces an image and NO file, so `if (!file)
       // return` jumped clean over it and left the recipe marked pending forever. Pinned by
       // "CLEARS pending on the dish-image-only path" in the tests.
-      clearPending(recipeId);
+      //
+      // CONDITIONAL since #86 §7. Both capture instances run an attach for one save, so an
+      // instance handling only a source file must not clear a marker set by the other
+      // instance's still-running dish fetch — that would blink "photo on its way" off early.
+      // Latent rather than live today (no path produces both a file and a link), but it turns
+      // an invariant that is true by accident into one true by construction.
+      if (marked) clearPending(recipeId);
     }
   }
 
@@ -511,7 +559,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     recipeId: UUID,
     file: File | null,
     compressed: Blob | null,
-    dishUrl: string | null
+    dishImage: DishImagePrefill | null
   ): Promise<void> {
     const photos = usePhotos({
       collection: 'recipes',
@@ -529,35 +577,47 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     // from every family device on every render — the opposite of the local-first posture —
     // and would break when the site moves the file. The browser cannot do this itself
     // (CORS), which is why it goes through content-fetch.
-    if (dishUrl) {
-      try {
-        const img = await recipeFetchService.fetchImage(dishUrl);
-        if (img.success && img.data) {
-          // Named from the SNIFFED mime, never from the URL: a filename taken from an
-          // attacker-supplied path is how an svg ends up called .jpg, and usePhotos'
-          // accept test ORs the extension.
-          const ext =
-            img.data.mime === 'image/png' ? 'png' : img.data.mime === 'image/webp' ? 'webp' : 'jpg';
-          const blob = await (await fetch(img.data.dataUrl)).blob();
-          await photos.add([new File([blob], `dish-${recipeId}.${ext}`, { type: img.data.mime })]);
-        } else {
-          logEvent({
-            level: 'info',
-            surface: SURFACE,
-            message: 'dish image not attached',
-            context: { action: 'attach_failed', kind: 'dish_image', error_code: img.errorCode },
-          });
-        }
-      } catch (err) {
-        // Never fatal: the recipe is saved and a missing photo is cosmetic. The user can
-        // add one themselves, and the recipe text — the part that matters — is intact.
+    //
+    // The loop lives in `attachDishImage`; this owns the telemetry vocabulary so every event
+    // for this surface is emitted from one place. `dishImage != null` is exactly "a source
+    // page existed", which is what gates the events: a hand-typed or document-only save must
+    // emit NEITHER, or the hit-rate denominator counts recipes that never had a page.
+    if (dishImage) {
+      const outcome = await attachDishImage(recipeId, dishImage.candidates, {
+        photos,
+        fetchImage: (url, opts) => recipeFetchService.fetchImage(url, opts),
+        pageUrl: dishImage.pageUrl,
+      });
+      if (outcome.ok) {
         logEvent({
           level: 'info',
           surface: SURFACE,
-          message: 'dish image fetch threw',
-          context: { action: 'attach_failed', kind: 'dish_image' },
-          error: err,
+          message: 'dish image attached',
+          context: {
+            action: 'image_resolved',
+            kind: dishImage.kind,
+            detail: outcome.source,
+            count: dishImage.candidates.length,
+          },
         });
+      } else {
+        // THE EVENT THAT DID NOT EXIST (#86). Previously the commonest failure — the page
+        // offering no usable image — returned null in silence, which is why a shipped feature
+        // could under-deliver for weeks until a user happened to mention it.
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'no dish image attached',
+          context: {
+            action: 'image_none',
+            kind: dishImage.kind,
+            detail: outcome.reason,
+            count: dishImage.candidates.length,
+            ...(outcome.errorCode ? { error_code: outcome.errorCode } : {}),
+          },
+        });
+        // Developer-facing, never leaves the device: the enum alone does not say what to do.
+        console.warn(`[${SURFACE}] no dish image: ${outcome.reason}. ${HINTS[outcome.reason]}`);
       }
     }
 
@@ -632,7 +692,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   function discardPendingSource(): void {
     pendingSource.value = null;
     pendingCompressed.value = null;
-    pendingDishImageUrl.value = null;
+    // The dish image is NOT held here any more (#86). It rides on the prefill and is owned by
+    // `RecipeFormModal`, because the candidates are delivered INTO the form by either capture
+    // instance while the source file belongs to whichever instance produced it. See §7 of
+    // docs/plans/2026-09-04-recipe-dish-image-ladder.md.
   }
 
   return {

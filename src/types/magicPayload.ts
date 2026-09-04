@@ -31,11 +31,87 @@ export type ShareKind = 'event' | 'travel' | 'recipe';
  * For a plain page share they are the same string; for a video capture they are not, which
  * is exactly when getting them the wrong way round is silent.
  */
+/**
+ * Which rung of the dish-image ladder produced a candidate (#86).
+ *
+ * This is a TELEMETRY LABEL, not an authorisation. The client must never reject a candidate
+ * for carrying a value it does not recognise: the Lambda deploys ahead of the client, so a
+ * newly-added rung would have every one of its candidates silently dropped on-device for the
+ * whole deploy window — the exact silent-drop class this issue exists to remove. Unknown
+ * values are coerced to `other` and kept; see `screenCandidates`.
+ *
+ * `other` is a real member so the unknown case shows up in the CloudWatch rung distribution
+ * rather than being invisible.
+ */
+export const IMAGE_SOURCES = [
+  'jsonld',
+  'og_image',
+  'og_secure',
+  'twitter',
+  'twitter_src',
+  'link_rel',
+  'thumbnail',
+  'youtube_thumb',
+  'other',
+] as const;
+
+export type ImageSource = (typeof IMAGE_SOURCES)[number];
+
+/** One candidate dish photo, as extracted from the page by the content-fetch Lambda. */
+export interface ImageCandidate {
+  /** Already absolutised and syntactically screened. The BYTES are still unverified. */
+  url: string;
+  source: ImageSource;
+}
+
+/**
+ * Why a capture ended with no stored dish image, as a closed vocabulary (#86).
+ *
+ * Declared ONCE and imported by every log site rather than typed as bare string literals: the
+ * value space is shared across four `action`s, and a typo'd literal is a CloudWatch dimension
+ * that silently never matches.
+ *
+ * ⚠️ `compress_failed` is deliberately absent. `usePhotos.add` returns `[]` identically for a
+ * cloud-off refusal, an at-cap refusal, a rejected type and a thrown CompressionError, and the
+ * richer context it logs is not allowlisted. Since cloud and cap are checked BEFORE the call,
+ * a surviving `store_rejected` already means "decode or upload failed" by elimination.
+ * Declaring a value we can never emit would read in CloudWatch as evidence it never happens.
+ */
+export const IMAGE_NONE_REASONS = [
+  'no_candidates',
+  'all_failed',
+  'cloud_required',
+  'at_cap',
+  'store_rejected',
+] as const;
+
+export type ImageNoneReason = (typeof IMAGE_NONE_REASONS)[number];
+
+/**
+ * The dish-image half of a recipe prefill: the candidates, plus the FACT that a source page
+ * existed and which kind it was (#86).
+ *
+ * The `kind` earns its place twice over — it is the `kind` context key on the telemetry, and
+ * its mere presence is what distinguishes "a page declared no images" (candidates: []) from
+ * "there was no page" (the whole object is null). See the note on `RecipePrefill.dishImage`.
+ */
+export interface DishImagePrefill {
+  kind: 'page' | 'youtube';
+  candidates: ImageCandidate[];
+  /** The page the candidates came from, forwarded as a `Referer` when fetching them. */
+  pageUrl: string;
+}
+
 export interface ShareLink {
   pageUrl: string;
   provenanceUrl: string;
-  /** The page's own og:image / JSON-LD image. UNTRUSTED — screen with `boundedDishImage`. */
-  imageUrl: string;
+  /**
+   * The page's declared images, best first. UNTRUSTED — screen with `screenCandidates`.
+   *
+   * Replaced a single `imageUrl` in #86. May legitimately be empty: a page that declared no
+   * image at all is a distinct, and loggable, outcome from a capture that had no page.
+   */
+  imageCandidates: ImageCandidate[];
   path: ExtractionPath;
   kind: 'page' | 'youtube';
 }

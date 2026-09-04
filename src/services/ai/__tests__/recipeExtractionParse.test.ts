@@ -80,10 +80,13 @@ describe('parseRecipeExtractionResult', () => {
     expect(r.steps).toHaveLength(MODEL_LIST_MAX);
   });
 
-  it("carries imageUrl through UNSCREENED — screening is the caller's job", () => {
-    // Documented contract: the parser does not decide URL safety, the mapper does. Pinned
-    // so nobody "helpfully" adds a second, divergent screen here.
+  it('DROPS an imageUrl the model volunteers, rather than carrying it (#86)', () => {
+    // The field was removed from the prompt, but a model can still emit whatever it likes —
+    // so the parser is where "we do not accept model-supplied image URLs" has to be true.
+    // Previously this value was carried through unscreened for the caller to screen; now
+    // there is no caller for it, and a stray field must not become a fetched URL by
+    // accident. Dish photos come from the page's own markup via content-fetch.
     const r = parseRecipeExtractionResult({ ...VALID, imageUrl: 'javascript:' + 'alert(1)' });
-    expect(r.imageUrl).toBe('javascript:' + 'alert(1)');
+    expect(r).not.toHaveProperty('imageUrl');
   });
 });

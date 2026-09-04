@@ -380,8 +380,6 @@ export const RECIPE_JSON_SHAPE = {
     'array — one object per step, in order: { text: string (a single instruction), inferred: boolean }. Do not number them. Empty array if none.',
   notes:
     'string — every practical detail with no dedicated field above: substitutions, storage, equipment, make-ahead, allergen notes. One fact per line. "" if there is nothing.',
-  imageUrl:
-    'string — a URL to an existing, freely usable photograph of the finished dish, or "" if you do not have a real one. Never a Getty/Shutterstock/watermarked asset, never an AI-generated image, and never a URL you are unsure exists.',
   confidence: 'object — a 0..1 number for each of: name, ingredients, steps',
 };
 
@@ -501,8 +499,6 @@ export function parseRecipeExtractionResult(raw: unknown): RecipeExtractionResul
     ingredients: toLines(obj.ingredients),
     steps: toLines(obj.steps),
     notes: asString(obj.notes),
-    // NOT screened here — see RecipeExtractionResult.imageUrl. The caller screens it.
-    imageUrl: asString(obj.imageUrl, MODEL_URL_MAX),
     confidence,
   };
 }

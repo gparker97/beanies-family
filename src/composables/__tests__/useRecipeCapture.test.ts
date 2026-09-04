@@ -15,7 +15,7 @@ const photosAdd = vi.fn().mockResolvedValue([{ id: 'p1' }]);
 const fetchImage = vi.fn();
 
 vi.mock('../usePhotos', () => ({
-  usePhotos: () => ({ add: photosAdd, canAdd: ref(true) }),
+  usePhotos: () => ({ add: photosAdd, canAdd: ref(true), atCap: ref(false) }),
 }));
 vi.mock('@/services/ai/recipeFetchService', () => ({
   recipeFetchService: { fetchImage: (...a: unknown[]) => fetchImage(...a) },
@@ -53,23 +53,28 @@ describe('attachAfterSave', () => {
     return useRecipeCapture({ onRecipeReady: vi.fn() });
   }
 
-  /** Drive the real link path so the dish URL is held exactly as production holds it. */
+  /**
+   * Drive the real link path and hand back BOTH the capture and the dish image it produced.
+   *
+   * The dish image is returned rather than held inside the composable because #86 moved its
+   * ownership to `RecipeFormModal`: the candidates ride on the prefill, and `handleSave` is
+   * the one caller that passes them to `attachAfterSave`. Reading it off the prefill here is
+   * exactly what the component does, so these tests exercise the production wiring rather
+   * than a shape only the test knows about.
+   */
   async function captureFromLink() {
     resolveRecipeSource.mockResolvedValue({
       kind: 'jsonld',
       path: 'youtube_link_followed',
       sourceUrl: 'https://preppykitchen.com/pumpkin-pie-2/',
-      imageUrl: 'https://preppykitchen.com/img.jpg',
-      recipe: {
-        name: 'Pumpkin Pie',
-        ingredients: ['1 crust'],
-        steps: ['bake'],
-        imageUrl: 'https://preppykitchen.com/img.jpg',
-      },
+      imageCandidates: [{ url: 'https://preppykitchen.com/img.jpg', source: 'og_image' }],
+      recipe: { name: 'Pumpkin Pie', ingredients: ['1 crust'], steps: ['bake'] },
     });
-    const c = make();
+    const onRecipeReady = vi.fn();
+    const c = useRecipeCapture({ onRecipeReady });
     await c.processUrl('https://www.youtube.com/watch?v=PmuCEQTy-9E', __testConsentGrant);
-    return c;
+    const dishImage = onRecipeReady.mock.calls[0]?.[0]?.prefill?.dishImage ?? null;
+    return { c, dishImage };
   }
 
   it('is not pending before anything is captured', () => {
@@ -78,9 +83,27 @@ describe('attachAfterSave', () => {
   });
 
   it('fetches the dish image for a pasted link and attaches it', async () => {
-    const c = await captureFromLink();
-    await c.attachAfterSave('r1' as never);
-    expect(fetchImage).toHaveBeenCalledWith('https://preppykitchen.com/img.jpg');
+    const { c, dishImage } = await captureFromLink();
+    await c.attachAfterSave('r1' as never, dishImage);
+    // The page it came from rides along as a Referer, so hotlink-protected CDNs serve us.
+    expect(fetchImage).toHaveBeenCalledWith('https://preppykitchen.com/img.jpg', {
+      pageUrl: 'https://preppykitchen.com/pumpkin-pie-2/',
+    });
+    expect(photosAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it('ATTACHES EXACTLY ONCE even though both capture instances run an attach', async () => {
+    // THE BUG THIS PINS (#86 §7). A save fires two attaches: RecipeFormModal's own instance
+    // and FamilyCookbookPage's, off the `saved` emit. If both could see the dish candidates
+    // the photo would be fetched and stored TWICE — two photos on the recipe, two of the
+    // four-photo cap gone, and two `image_resolved` events silently inflating the hit-rate
+    // metric this work exists to create. Only the modal may pass them; the page passes none.
+    const { c, dishImage } = await captureFromLink();
+    const pageInstance = make(); // stands in for FamilyCookbookPage's own capture
+
+    await c.attachAfterSave('r1' as never, dishImage); // the modal — owns the dish image
+    await pageInstance.attachAfterSave('r1' as never); // the page — no second argument
+
     expect(photosAdd).toHaveBeenCalledTimes(1);
   });
 
@@ -88,7 +111,7 @@ describe('attachAfterSave', () => {
     // The user-visible half: the recipe saves instantly and the photo lands seconds later,
     // so the card and the hero must say the photo is still coming. Keyed by recipe id, so
     // it shows on the right card rather than as a page-wide banner.
-    const c = await captureFromLink();
+    const { c, dishImage } = await captureFromLink();
     let duringFetch: boolean | undefined;
     let otherRecipe: boolean | undefined;
     fetchImage.mockImplementation(async () => {
@@ -96,7 +119,7 @@ describe('attachAfterSave', () => {
       otherRecipe = useRecipePhotoPending().isPending('r2');
       return { success: true, data: { mime: 'image/jpeg', dataUrl: JPEG } };
     });
-    await c.attachAfterSave('r1' as never);
+    await c.attachAfterSave('r1' as never, dishImage);
     expect(duringFetch).toBe(true);
     expect(otherRecipe).toBe(false);
   });
@@ -106,22 +129,22 @@ describe('attachAfterSave', () => {
     // early `if (!file) return` sat ABOVE the try/finally that clears the marker — so the
     // recipe would have stayed marked forever. A permanent "adding the photo…" caption is
     // worse than the missing photo it describes.
-    const c = await captureFromLink();
-    await c.attachAfterSave('r1' as never);
+    const { c, dishImage } = await captureFromLink();
+    await c.attachAfterSave('r1' as never, dishImage);
     expect(useRecipePhotoPending().isPending('r1')).toBe(false);
   });
 
   it('CLEARS isAttaching even when the image fetch fails', async () => {
     fetchImage.mockResolvedValue({ success: false, errorCode: 'fetch_blocked' });
-    const c = await captureFromLink();
-    await c.attachAfterSave('r1' as never);
+    const { c, dishImage } = await captureFromLink();
+    await c.attachAfterSave('r1' as never, dishImage);
     expect(useRecipePhotoPending().isPending('r1')).toBe(false);
   });
 
   it('CLEARS isAttaching even when the image fetch throws', async () => {
     fetchImage.mockRejectedValue(new Error('boom'));
-    const c = await captureFromLink();
-    await c.attachAfterSave('r1' as never);
+    const { c, dishImage } = await captureFromLink();
+    await c.attachAfterSave('r1' as never, dishImage);
     expect(useRecipePhotoPending().isPending('r1')).toBe(false);
   });
 

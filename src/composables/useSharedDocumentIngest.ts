@@ -848,13 +848,11 @@ async function read(
           env: {
             sourceFile: null,
             origin: env.origin,
-            link: {
-              pageUrl: resolved.sourceUrl,
-              provenanceUrl: resolved.sourceUrl,
-              imageUrl: '',
-              path: resolved.path,
-              kind: 'youtube',
-            },
+            // Via `toShareLink` rather than a hand-built literal: it produces exactly this
+            // shape, and routing through it means the titleOnly path picks up the video
+            // thumbnails (#86) instead of being hard-coded to no image — the one case that
+            // has no other picture available.
+            link: toShareLink(resolved, { kind: 'youtube', url: resolved.sourceUrl }),
           },
         },
       };
