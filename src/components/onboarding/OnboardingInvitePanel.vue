@@ -185,7 +185,7 @@ function handleAddBeanFromWizard() {
 }
 
 .dark .invite-card {
-  background: #243342;
+  background: #26343f;
   border-color: rgb(174 214 241 / 12%);
 }
 
@@ -210,7 +210,7 @@ function handleAddBeanFromWizard() {
 }
 
 .dark .invite-pill {
-  color: #cbd5e1;
+  color: #c3ced6;
 }
 
 .invite-lede {
@@ -222,7 +222,7 @@ function handleAddBeanFromWizard() {
 }
 
 .dark .invite-lede {
-  color: #cbd5e1;
+  color: #c3ced6;
 }
 
 .invite-rows {
@@ -327,6 +327,6 @@ function handleAddBeanFromWizard() {
 }
 
 .dark .invite-reminder {
-  color: #cbd5e1;
+  color: #c3ced6;
 }
 </style>

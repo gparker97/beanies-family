@@ -115,12 +115,12 @@ function formatDate(dateStr: string): string {
 
 <template>
   <BaseCard :title="t('passkey.settingsTitle')">
-    <div v-if="!supported" class="py-2 text-sm text-gray-500 dark:text-gray-400">
+    <div v-if="!supported" class="dark:text-ink-soft py-2 text-sm text-gray-500">
       {{ t('passkey.webRetired') }}
     </div>
 
     <div v-else class="space-y-4">
-      <p v-if="native" class="text-sm text-gray-500 dark:text-gray-400">
+      <p v-if="native" class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('passkey.settingsDescription') }}
       </p>
 
@@ -128,9 +128,9 @@ function formatDate(dateStr: string): string {
            never an authenticator warning (the browser isn't broken — the mechanism
            moved to the installed app in Phase 4). -->
       <template v-if="!native">
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('passkey.webRetired') }}</p>
+        <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('passkey.webRetired') }}</p>
         <p
-          class="rounded-xl bg-[#AED6F1]/15 p-3 text-sm text-gray-600 dark:bg-[#AED6F1]/10 dark:text-gray-300"
+          class="dark:text-ink-soft rounded-xl bg-[#AED6F1]/15 p-3 text-sm text-gray-600 dark:bg-[#AED6F1]/10"
         >
           {{ t('passkey.webLeftoverNote') }}
         </p>
@@ -142,8 +142,8 @@ function formatDate(dateStr: string): string {
         class="flex items-center gap-2 text-sm"
         :class="
           platformAvailable
-            ? 'text-green-600 dark:text-green-400'
-            : 'text-amber-600 dark:text-amber-400'
+            ? 'dark:text-success-lift text-green-600'
+            : 'dark:text-terracotta-lift text-amber-600'
         "
       >
         <svg
@@ -173,13 +173,13 @@ function formatDate(dateStr: string): string {
 
       <!-- Registered passkeys -->
       <div v-if="passkeys.length > 0" class="space-y-2">
-        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">
+        <h4 class="dark:text-ink text-sm font-medium text-gray-900">
           {{ t('passkey.registeredPasskeys') }}
         </h4>
         <div
           v-for="passkey in passkeys"
           :key="passkey.credentialId"
-          class="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 dark:border-slate-700"
+          class="dark:border-line flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3"
         >
           <div class="min-w-0 flex-1">
             <!-- Inline edit mode -->
@@ -192,13 +192,13 @@ function formatDate(dateStr: string): string {
                   v-model="editLabel"
                   type="text"
                   :placeholder="t('passkey.renameLabel')"
-                  class="focus:border-primary-500 w-48 rounded border border-gray-300 bg-white px-2 py-0.5 text-base text-gray-900 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+                  class="focus:border-primary-500 dark:border-line-strong dark:bg-surface-raised dark:text-ink w-48 rounded border border-gray-300 bg-white px-2 py-0.5 text-base text-gray-900 focus:outline-none"
                   @keydown.escape="cancelEditing"
                 />
                 <button
                   type="submit"
                   :aria-label="t('action.save')"
-                  class="rounded p-0.5 text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                  class="dark:text-success-lift rounded p-0.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -212,7 +212,7 @@ function formatDate(dateStr: string): string {
                 <button
                   type="button"
                   :aria-label="t('action.cancel')"
-                  class="rounded p-0.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  class="dark:hover:bg-surface-hover rounded p-0.5 text-gray-400 hover:bg-gray-100"
                   @click="cancelEditing"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,13 +229,13 @@ function formatDate(dateStr: string): string {
             <!-- Display mode -->
             <template v-else>
               <div class="flex items-center gap-2">
-                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p class="dark:text-ink truncate text-sm font-medium text-gray-900">
                   {{ passkey.label }}
                 </p>
                 <button
                   :aria-label="t('passkey.rename')"
                   :title="t('passkey.rename')"
-                  class="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+                  class="dark:hover:bg-surface-hover dark:hover:text-ink-soft shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                   @click="startEditing(passkey)"
                 >
                   <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,7 +249,7 @@ function formatDate(dateStr: string): string {
                 </button>
               </div>
             </template>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft mt-0.5 text-xs text-gray-500">
               {{ formatDate(passkey.createdAt) }}
               <template v-if="passkey.lastUsedAt">
                 &middot; {{ t('passkey.lastUsed') }} {{ formatDate(passkey.lastUsedAt) }}
@@ -257,13 +257,13 @@ function formatDate(dateStr: string): string {
               <template v-else> &middot; {{ t('passkey.neverUsed') }} </template>
             </p>
             <span
-              class="mt-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              class="dark:text-success-lift mt-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30"
             >
               {{ passkey.prfSupported ? t('passkey.prfFull') : t('passkey.prfCached') }}
             </span>
           </div>
           <button
-            class="shrink-0 rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:border-red-700 dark:hover:bg-red-900/20"
+            class="dark:text-danger-lift shrink-0 rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 dark:border-red-800 dark:hover:border-red-700 dark:hover:bg-red-900/20"
             @click="handleRemove(passkey.credentialId)"
           >
             {{ t('action.delete') }}
@@ -271,7 +271,7 @@ function formatDate(dateStr: string): string {
         </div>
       </div>
 
-      <div v-else class="py-2 text-sm text-gray-400 dark:text-gray-500">
+      <div v-else class="dark:text-ink-faint py-2 text-sm text-gray-400">
         {{ t('passkey.noPasskeys') }}
       </div>
 
@@ -292,8 +292,8 @@ function formatDate(dateStr: string): string {
         class="rounded-lg p-3 text-sm"
         :class="
           statusMessage.type === 'success'
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
+            ? 'dark:text-success-lift bg-green-50 text-green-700 dark:bg-green-900/20'
+            : 'dark:text-terracotta-lift bg-amber-50 text-amber-700 dark:bg-amber-900/20'
         "
       >
         {{ statusMessage.text }}

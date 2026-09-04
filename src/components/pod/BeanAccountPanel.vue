@@ -83,7 +83,7 @@ const liveMember = computed<FamilyMember | null>(
 <template>
   <section
     v-if="canReset"
-    class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
     aria-labelledby="bean-account-title"
   >
     <div class="flex items-start gap-4">
@@ -99,11 +99,11 @@ const liveMember = computed<FamilyMember | null>(
       <div class="min-w-0 flex-1">
         <h2
           id="bean-account-title"
-          class="font-outfit text-secondary-500 text-lg font-bold dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold"
         >
           {{ t('bean.account.title') }}
         </h2>
-        <p class="font-inter text-secondary-500/70 mt-1 text-sm dark:text-gray-300">
+        <p class="font-inter text-secondary-500/70 dark:text-ink-soft mt-1 text-sm">
           {{ fmt('bean.account.description', { name: props.member.name }) }}
         </p>
         <div class="mt-4">

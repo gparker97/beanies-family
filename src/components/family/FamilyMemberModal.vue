@@ -395,13 +395,13 @@ function handleDelete() {
     <!-- 3. Name -->
     <FormFieldGroup :label="t('modal.memberName')" required>
       <div
-        class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+        class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
       >
         <input
           v-model="name"
           type="text"
           :disabled="readOnly"
-          class="font-outfit w-full border-none bg-transparent text-center text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-40 dark:text-gray-100"
+          class="font-outfit dark:text-ink w-full border-none bg-transparent text-center text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-40"
           :placeholder="t('modal.memberName')"
         />
       </div>
@@ -412,7 +412,7 @@ function handleDelete() {
       <FrequencyChips v-model="beanRole" :options="roleOptions" :disabled="readOnly" />
       <p
         v-if="isPet"
-        class="font-inter mt-2 text-xs text-[var(--color-text-muted)] dark:text-gray-400"
+        class="font-inter dark:text-ink-soft mt-2 text-xs text-[var(--color-text-muted)]"
       >
         {{ t('modal.petHint') }}
       </p>
@@ -454,31 +454,25 @@ function handleDelete() {
 
       <div v-if="showPermissions" class="mt-3 space-y-3">
         <div
-          class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5"
         >
-          <span
-            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200"
-          >
+          <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
             {{ t('modal.canViewFinances') }}
           </span>
           <ToggleSwitch v-model="canViewFinances" size="sm" :disabled="isOwnerMember" />
         </div>
         <div
-          class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5"
         >
-          <span
-            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200"
-          >
+          <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
             {{ t('modal.canEditActivities') }}
           </span>
           <ToggleSwitch v-model="canEditActivities" size="sm" :disabled="isOwnerMember" />
         </div>
         <div
-          class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5"
         >
-          <span
-            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200"
-          >
+          <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
             {{ t('modal.canManagePod') }}
           </span>
           <ToggleSwitch v-model="canManagePod" size="sm" :disabled="isOwnerMember" />

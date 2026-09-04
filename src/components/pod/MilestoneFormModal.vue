@@ -325,7 +325,7 @@ async function handleDelete(): Promise<void> {
           :class="
             isMemberSelected(m.id)
               ? 'bg-primary-500 border-transparent text-white'
-              : 'text-secondary-500 border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-4)] dark:bg-slate-700 dark:text-gray-200'
+              : 'text-secondary-500 dark:bg-surface-overlay dark:text-ink border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-4)]'
           "
           @click="selectMember(m.id)"
         >
@@ -342,7 +342,7 @@ async function handleDelete(): Promise<void> {
           :class="
             isMemberSelected(null)
               ? 'bg-primary-500 border-transparent text-white'
-              : 'text-secondary-500 border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-4)] dark:bg-slate-700 dark:text-gray-200'
+              : 'text-secondary-500 dark:bg-surface-overlay dark:text-ink border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-4)]'
           "
           @click="selectMember(null)"
         >
@@ -367,7 +367,7 @@ async function handleDelete(): Promise<void> {
       <BeanieDatePicker v-model="occurredOn" />
       <p
         v-if="dateError"
-        class="font-outfit mt-1 text-xs text-red-600 dark:text-red-400"
+        class="font-outfit dark:text-danger-lift mt-1 text-xs text-red-600"
         role="alert"
       >
         {{ dateError }}
@@ -379,7 +379,7 @@ async function handleDelete(): Promise<void> {
       <textarea
         v-model="description"
         rows="3"
-        class="focus:border-primary-500 focus:ring-primary-500 font-outfit w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-snug text-[var(--color-text)] outline-none focus:ring-1 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+        class="focus:border-primary-500 focus:ring-primary-500 font-outfit dark:border-line-strong dark:bg-surface-overlay dark:text-ink w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-base leading-snug text-[var(--color-text)] outline-none focus:ring-1"
         :placeholder="t('milestone.placeholder.description')"
       />
     </FormFieldGroup>
@@ -403,7 +403,7 @@ async function handleDelete(): Promise<void> {
         v-else
         type="button"
         :disabled="selectedMemberId === undefined || eager.isCreating.value"
-        class="font-outfit text-secondary-500 hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200"
+        class="font-outfit text-secondary-500 hover:border-primary-500 hover:text-primary-500 dark:text-ink flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
         @click="handleAddFirstPhoto"
       >
         <span class="text-2xl" aria-hidden="true">📷</span>
@@ -413,7 +413,7 @@ async function handleDelete(): Promise<void> {
       </button>
       <p
         v-if="selectedMemberId === undefined"
-        class="font-outfit mt-1 text-[0.6875rem] text-[var(--color-text-muted)] italic dark:text-gray-400"
+        class="font-outfit dark:text-ink-soft mt-1 text-[0.6875rem] text-[var(--color-text-muted)] italic"
       >
         {{ t('milestone.addPhotosHint') }}
       </p>

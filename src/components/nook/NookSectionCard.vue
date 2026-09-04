@@ -19,14 +19,14 @@ withDefaults(defineProps<Props>(), {
 
 <template>
   <div
-    class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)]"
     :class="borderColor ? 'border-l-4' : ''"
     :style="borderColor ? { borderLeftColor: borderColor } : {}"
   >
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <span
-        class="font-outfit text-xs font-bold tracking-[0.05em] text-gray-700 uppercase dark:text-gray-300"
+        class="font-outfit dark:text-ink-soft text-xs font-bold tracking-[0.05em] text-gray-700 uppercase"
       >
         {{ title }}
       </span>

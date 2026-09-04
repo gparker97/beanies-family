@@ -192,7 +192,7 @@ function toggle(listId: string, itemId: string): void {
         </button>
 
         <!-- Item rows — existing shared row (orange done-check). -->
-        <div class="bg-white px-3.5 dark:bg-slate-800">
+        <div class="dark:bg-surface-raised bg-white px-3.5">
           <ListItemRow
             v-for="item in card.visibleItems"
             :key="item.id"

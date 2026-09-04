@@ -66,16 +66,16 @@ const amountPrefix = computed(() => {
 
     <!-- Info -->
     <div class="min-w-0 flex-1">
-      <div class="text-secondary-500 text-sm font-semibold dark:text-gray-100">
+      <div class="text-secondary-500 dark:text-ink text-sm font-semibold">
         {{ name }}
       </div>
-      <div class="text-secondary-500/35 text-xs dark:text-gray-500">
+      <div class="text-secondary-500/35 dark:text-ink-faint text-xs">
         {{ subtitle }}
       </div>
     </div>
 
     <!-- Amount -->
-    <div class="font-outfit text-secondary-500 flex-shrink-0 text-sm font-bold dark:text-gray-200">
+    <div class="font-outfit text-secondary-500 dark:text-ink flex-shrink-0 text-sm font-bold">
       <template v-if="isUnlocked">{{ amountPrefix }}{{ converted.displayFormatted }}</template>
       <template v-else>{{ MASK }}</template>
     </div>

@@ -92,7 +92,7 @@ async function handleMint() {
 
 <template>
   <BaseCard :title="t('deviceLink.title')">
-    <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+    <p class="dark:text-ink-soft mb-3 text-sm text-gray-600">
       {{ t('deviceLink.description') }}
     </p>
 
@@ -104,7 +104,7 @@ async function handleMint() {
       <img v-if="qr" :src="qr" alt="" class="mx-auto h-44 w-44 rounded-xl bg-white p-2" />
       <div class="flex items-center gap-2">
         <p
-          class="flex-1 truncate rounded-xl bg-gray-50 p-2.5 text-xs text-gray-600 select-all dark:bg-slate-700 dark:text-gray-300"
+          class="dark:bg-surface-overlay dark:text-ink-soft flex-1 truncate rounded-xl bg-gray-50 p-2.5 text-xs text-gray-600 select-all"
         >
           {{ link }}
         </p>
@@ -112,12 +112,12 @@ async function handleMint() {
           {{ copied ? t('login.copied') : t('login.copyLink') }}
         </BaseButton>
       </div>
-      <p class="text-xs text-gray-500 dark:text-gray-400">
+      <p class="dark:text-ink-soft text-xs text-gray-500">
         {{ t('deviceLink.expiryNote') }}
       </p>
     </div>
 
-    <p v-if="formError" role="alert" class="mt-3 text-sm text-red-600 dark:text-red-400">
+    <p v-if="formError" role="alert" class="dark:text-danger-lift mt-3 text-sm text-red-600">
       {{ formError }}
     </p>
   </BaseCard>

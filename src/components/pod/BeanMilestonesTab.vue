@@ -78,7 +78,7 @@ function closeModal(): void {
         v-for="m in milestones"
         :key="m.id"
         type="button"
-        class="block rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-transform hover:scale-[1.02] dark:bg-slate-800"
+        class="dark:bg-surface-raised block rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-transform hover:scale-[1.02]"
         @click="openEdit(m)"
       >
         <div class="flex items-start gap-3">
@@ -88,21 +88,21 @@ function closeModal(): void {
           <MilestoneThumb :milestone="m" size="md" @open-lightbox="lightbox.openFor(m)" />
           <div class="min-w-0 flex-1">
             <p
-              class="font-outfit text-primary-600 text-[0.6875rem] font-semibold tracking-wide uppercase dark:text-orange-300"
+              class="font-outfit text-primary-600 dark:text-accent-lift text-[0.6875rem] font-semibold tracking-wide uppercase"
             >
               {{ formatDateShort(m.occurredOn) }}
             </p>
             <p
-              class="font-outfit mt-0.5 truncate text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              class="font-outfit dark:text-ink mt-0.5 truncate text-sm font-semibold text-[var(--color-text)]"
             >
               {{ m.title }}
             </p>
-            <p class="font-outfit text-secondary-500/60 mt-0.5 text-[0.6875rem] dark:text-gray-400">
+            <p class="font-outfit text-secondary-500/60 dark:text-ink-soft mt-0.5 text-[0.6875rem]">
               {{ categoryLabel(m) }}
             </p>
             <p
               v-if="m.description"
-              class="font-outfit text-secondary-500/80 mt-1.5 line-clamp-2 text-xs leading-snug dark:text-gray-300"
+              class="font-outfit text-secondary-500/80 dark:text-ink-soft mt-1.5 line-clamp-2 text-xs leading-snug"
             >
               {{ m.description }}
             </p>
@@ -118,7 +118,7 @@ function closeModal(): void {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="🌟"

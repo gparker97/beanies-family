@@ -39,13 +39,15 @@ function handleSubmit(): void {
 
 <template>
   <section
-    class="mb-5 rounded-[var(--sq)] border border-[rgb(230_126_34_/_18%)] bg-[#fbf3e3] p-3.5 sm:p-4"
+    class="dark:bg-surface-paper mb-5 rounded-[var(--sq)] border border-[rgb(230_126_34_/_18%)] bg-[#fbf3e3] p-3.5 sm:p-4 dark:border-[rgb(240_160_90_/_20%)]"
   >
-    <h3 class="font-outfit text-secondary-500 flex items-center gap-2 text-sm font-extrabold">
+    <h3
+      class="font-outfit text-secondary-500 dark:text-ink flex items-center gap-2 text-sm font-extrabold"
+    >
       <span aria-hidden="true">✨</span>
       <span>{{ t('recipeExtract.strip.title') }}</span>
     </h3>
-    <p class="font-outfit text-secondary-500/70 mt-0.5 text-xs">
+    <p class="font-outfit text-secondary-500/70 dark:text-ink-soft mt-0.5 text-xs">
       {{ t('recipeExtract.strip.subtitle') }}
     </p>
 
@@ -72,14 +74,14 @@ function handleSubmit(): void {
     <!-- Heritage Orange, never Alert Red: a mistyped link is routine, not a failure. -->
     <p
       class="font-outfit mt-1.5 text-xs"
-      :class="showError ? 'text-primary-500' : 'text-secondary-500/70'"
+      :class="showError ? 'text-primary-500' : 'text-secondary-500/70 dark:text-ink-soft'"
     >
       {{ t(hintKey) }}
     </p>
 
     <button
       type="button"
-      class="font-outfit text-secondary-500/70 hover:text-primary-500 mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold underline underline-offset-2 transition-colors"
+      class="font-outfit text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold underline underline-offset-2 transition-colors"
       @click="emit('document')"
     >
       <BeanieIcon name="image" size="sm" class="opacity-60" />

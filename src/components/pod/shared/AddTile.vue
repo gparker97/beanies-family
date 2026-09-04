@@ -19,18 +19,18 @@ defineEmits<{
 <template>
   <button
     type="button"
-    class="group flex flex-col items-center justify-center gap-1 rounded-[var(--sq)] border-2 border-dashed border-[var(--tint-slate-10)] bg-white/40 px-4 py-6 transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--tint-orange-4)] dark:bg-slate-800/40"
+    class="group dark:bg-surface-raised/40 flex flex-col items-center justify-center gap-1 rounded-[var(--sq)] border-2 border-dashed border-[var(--tint-slate-10)] bg-white/40 px-4 py-6 transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--tint-orange-4)]"
     :style="{ minHeight: minHeight ?? '7rem' }"
     @click="$emit('click')"
   >
     <span
-      class="text-secondary-500/40 group-hover:text-primary-500 text-3xl leading-none transition-colors"
+      class="text-secondary-500/40 group-hover:text-primary-500 dark:text-ink-faint text-3xl leading-none transition-colors"
       aria-hidden="true"
     >
       +
     </span>
     <span
-      class="font-outfit text-secondary-500/60 group-hover:text-primary-500 text-xs font-semibold transition-colors"
+      class="font-outfit text-secondary-500/60 group-hover:text-primary-500 dark:text-ink-soft text-xs font-semibold transition-colors"
     >
       {{ label }}
     </span>

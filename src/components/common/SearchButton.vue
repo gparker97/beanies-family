@@ -22,12 +22,12 @@ const showSearch = ref(false);
        flex box stays the tap target, only the visible magnifier grows. -->
   <button
     type="button"
-    class="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-[14px] text-gray-400 transition-colors hover:bg-black/5 dark:text-gray-500 dark:hover:bg-white/10"
+    class="dark:text-ink-faint flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-[14px] text-gray-400 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
     :aria-label="t('search.placeholder')"
     @click="showSearch = true"
   >
     <svg
-      class="text-gray-400 dark:text-gray-500"
+      class="dark:text-ink-faint text-gray-400"
       width="26"
       height="26"
       fill="none"

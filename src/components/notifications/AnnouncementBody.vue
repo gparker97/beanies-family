@@ -79,8 +79,8 @@ function handleCta() {
   text-align: center;
 }
 
-:global(.dark) .ann-title {
-  color: #e2e8f0;
+html.dark .ann-title {
+  color: #f2f5f7;
 }
 
 .ann-message {
@@ -91,7 +91,7 @@ function handleCta() {
   margin: 0;
 }
 
-:global(.dark) .ann-message {
+html.dark .ann-message {
   color: rgb(226 232 240 / 82%);
 }
 
@@ -106,7 +106,7 @@ function handleCta() {
   padding: 0.625rem 0.875rem;
 }
 
-:global(.dark) .ann-note {
+html.dark .ann-note {
   background: rgb(241 93 34 / 12%);
   color: rgb(245 158 110 / 95%);
 }
@@ -151,7 +151,7 @@ function handleCta() {
   letter-spacing: 0.06em;
 }
 
-:global(.dark) .ann-tagline {
+html.dark .ann-tagline {
   color: rgb(226 232 240 / 30%);
 }
 </style>

@@ -23,7 +23,7 @@ function shortLabel(labelKey: (typeof views)[number]['labelKey']): string {
 
 <template>
   <div
-    class="inline-flex items-center gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
+    class="dark:bg-surface-raised inline-flex items-center gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:shadow-none"
   >
     <button
       v-for="view in views"
@@ -34,7 +34,7 @@ function shortLabel(labelKey: (typeof views)[number]['labelKey']): string {
         compact ? 'w-9' : 'px-4',
         view.id === activeView
           ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
-          : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-400 dark:hover:text-gray-300',
+          : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-ink-soft dark:hover:text-ink',
       ]"
       :aria-label="compact ? t(view.labelKey) : undefined"
       @click="emit('update:activeView', view.id)"

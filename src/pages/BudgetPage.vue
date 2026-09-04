@@ -163,10 +163,10 @@ async function handleQuickAdd(data: CreateTransactionInput) {
     <!-- ── Empty State ─────────────────────────────────────────────────── -->
     <div v-if="!budgetStore.activeBudget" class="py-16 text-center">
       <EmptyStateIllustration variant="budget" class="mx-auto mb-6" />
-      <h2 class="font-outfit text-xl font-bold text-slate-700 dark:text-slate-200">
+      <h2 class="font-outfit dark:text-ink text-xl font-bold text-slate-700">
         {{ t('budget.empty.title') }}
       </h2>
-      <p class="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+      <p class="dark:text-ink-soft mx-auto mt-2 max-w-sm text-sm text-slate-500">
         {{ t('budget.empty.description') }}
       </p>
       <button
@@ -320,13 +320,13 @@ async function handleQuickAdd(data: CreateTransactionInput) {
         >
           <div v-if="isUnlocked" class="mt-1 flex flex-wrap gap-1.5">
             <span
-              class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+              class="dark:text-success-lift rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:bg-emerald-900/30"
             >
               {{ t('budget.summary.recurring') }}:
               {{ formatInDisplayCurrency(budgetStore.recurringIncome, settingsStore.baseCurrency) }}
             </span>
             <span
-              class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 opacity-60 dark:bg-slate-700/40 dark:text-slate-400"
+              class="dark:bg-surface-overlay/40 dark:text-ink-soft rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 opacity-60"
             >
               {{ t('budget.summary.oneTime') }}:
               {{ formatInDisplayCurrency(budgetStore.oneTimeIncome, settingsStore.baseCurrency) }}
@@ -342,7 +342,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
         >
           <div v-if="isUnlocked" class="mt-1 flex flex-wrap gap-1.5">
             <span
-              class="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+              class="dark:text-accent-lift rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 dark:bg-orange-900/30"
             >
               {{ t('budget.summary.recurring') }}:
               {{
@@ -350,7 +350,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               }}
             </span>
             <span
-              class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 opacity-60 dark:bg-slate-700/40 dark:text-slate-400"
+              class="dark:bg-surface-overlay/40 dark:text-ink-soft rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 opacity-60"
             >
               {{ t('budget.summary.oneTime') }}:
               {{ formatInDisplayCurrency(budgetStore.oneTimeExpenses, settingsStore.baseCurrency) }}
@@ -369,7 +369,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               class="text-xs font-semibold"
               :class="
                 budgetStore.savingsRate >= 0
-                  ? 'text-[#27AE60] dark:text-emerald-400'
+                  ? 'dark:text-success-lift text-[#27AE60]'
                   : 'text-[var(--heritage-orange)]'
               "
             >
@@ -380,17 +380,19 @@ async function handleQuickAdd(data: CreateTransactionInput) {
       </div>
 
       <!-- ── Spending by Category (full width) ────────────────────────── -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+      <div
+        class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+      >
         <div class="mb-4 flex items-center justify-between">
-          <span class="nook-section-label text-secondary-500 dark:text-gray-400">
+          <span class="nook-section-label text-secondary-500 dark:text-ink-soft">
             {{ t('budget.section.spendingByCategory') }}
           </span>
           <div class="flex items-center gap-3">
-            <span class="text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span class="dark:text-ink-faint text-xs font-medium text-slate-400">
               {{ currentMonthLabel }}
             </span>
             <button
-              class="flex items-center gap-1.5 rounded-[10px] bg-slate-50 px-3 py-1.5 transition-colors hover:bg-slate-100 dark:bg-slate-700/50 dark:hover:bg-slate-700"
+              class="dark:bg-surface-overlay/50 dark:hover:bg-surface-hover flex items-center gap-1.5 rounded-[10px] bg-slate-50 px-3 py-1.5 transition-colors hover:bg-slate-100"
               @click="showSettingsModal = true"
             >
               <BeanieIcon name="edit-2" size="xs" class="text-[var(--heritage-orange)]" />
@@ -402,7 +404,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
         </div>
         <div
           v-if="budgetStore.categoryBudgetStatus.length === 0"
-          class="py-6 text-center text-sm text-slate-400 dark:text-slate-500"
+          class="dark:text-ink-faint py-6 text-center text-sm text-slate-400"
         >
           {{ t('budget.category.noBudget') }}
         </div>
@@ -420,7 +422,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                     ? GROUP_EMOJI_MAP[getGroupName(cat.categoryId)] || '📦'
                     : CATEGORY_EMOJI_MAP[cat.categoryId] || ''
                 }}</span>
-                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                <span class="dark:text-ink text-sm font-medium text-slate-700">
                   {{ budgetCategoryLabel(cat.categoryId) }}
                 </span>
               </div>
@@ -428,9 +430,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 <span
                   v-if="isUnlocked"
                   class="font-outfit text-sm font-semibold"
-                  :class="
-                    cat.status === 'over' ? 'text-[#F15D22]' : 'text-slate-700 dark:text-slate-200'
-                  "
+                  :class="cat.status === 'over' ? 'text-[#F15D22]' : 'dark:text-ink text-slate-700'"
                 >
                   {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
                   <span
@@ -449,7 +449,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               :class="
                 cat.status === 'over'
                   ? 'h-2.5 bg-[#F15D22]/20'
-                  : 'h-1.5 bg-slate-100 dark:bg-slate-600/40'
+                  : 'dark:bg-surface-hover/40 h-1.5 bg-slate-100'
               "
             >
               <div
@@ -473,14 +473,16 @@ async function handleQuickAdd(data: CreateTransactionInput) {
       <!-- ── Bottom Section: Settings + Add Transactions ───────────────── -->
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <!-- Budget Settings -->
-        <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <div
+          class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+        >
           <!-- Header row: title + edit button -->
           <div class="mb-4 flex items-center justify-between">
-            <span class="nook-section-label text-secondary-500 dark:text-gray-400">
+            <span class="nook-section-label text-secondary-500 dark:text-ink-soft">
               {{ t('budget.section.budgetSettings') }}
             </span>
             <button
-              class="flex items-center gap-1.5 rounded-[10px] bg-slate-50 px-3.5 py-1.5 transition-colors hover:bg-slate-100 dark:bg-slate-700/50 dark:hover:bg-slate-700"
+              class="dark:bg-surface-overlay/50 dark:hover:bg-surface-hover flex items-center gap-1.5 rounded-[10px] bg-slate-50 px-3.5 py-1.5 transition-colors hover:bg-slate-100"
               @click="showSettingsModal = true"
             >
               <BeanieIcon name="edit-2" size="xs" class="text-[var(--heritage-orange)]" />
@@ -498,7 +500,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               :class="
                 budgetStore.activeBudget?.mode === 'percentage'
                   ? 'border-[var(--heritage-orange)] bg-gradient-to-br from-[#2C3E50] to-[#3D5368] text-white'
-                  : 'border-transparent bg-slate-50 dark:bg-slate-700/30'
+                  : 'dark:bg-surface-overlay/30 border-transparent bg-slate-50'
               "
             >
               <p
@@ -506,7 +508,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 :class="
                   budgetStore.activeBudget?.mode === 'percentage'
                     ? 'text-white'
-                    : 'text-slate-400 dark:text-slate-500'
+                    : 'dark:text-ink-faint text-slate-400'
                 "
               >
                 {{ t('budget.settings.percentageOfIncome') }}
@@ -516,7 +518,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 :class="
                   budgetStore.activeBudget?.mode === 'percentage'
                     ? 'text-white'
-                    : 'text-slate-300 dark:text-slate-600'
+                    : 'dark:text-ink-faint text-slate-300'
                 "
               >
                 {{ isUnlocked ? `${budgetStore.activeBudget?.percentage ?? 20}%` : MASK }}
@@ -526,7 +528,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 :class="
                   budgetStore.activeBudget?.mode === 'percentage'
                     ? 'text-white/40'
-                    : 'text-slate-300 dark:text-slate-600'
+                    : 'dark:text-ink-faint text-slate-300'
                 "
               >
                 {{
@@ -543,7 +545,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               :class="
                 budgetStore.activeBudget?.mode === 'fixed'
                   ? 'border-[var(--heritage-orange)] bg-gradient-to-br from-[#2C3E50] to-[#3D5368] text-white'
-                  : 'border-transparent bg-slate-50 dark:bg-slate-700/30'
+                  : 'dark:bg-surface-overlay/30 border-transparent bg-slate-50'
               "
             >
               <p
@@ -551,7 +553,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 :class="
                   budgetStore.activeBudget?.mode === 'fixed'
                     ? 'text-white'
-                    : 'text-slate-400 dark:text-slate-500'
+                    : 'dark:text-ink-faint text-slate-400'
                 "
               >
                 {{ t('budget.settings.fixedAmount') }}
@@ -561,7 +563,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 :class="
                   budgetStore.activeBudget?.mode === 'fixed'
                     ? 'text-white'
-                    : 'text-slate-300 dark:text-slate-600'
+                    : 'dark:text-ink-faint text-slate-300'
                 "
               >
                 {{ isUnlocked ? budgetAmount : MASK }}
@@ -571,7 +573,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 :class="
                   budgetStore.activeBudget?.mode === 'fixed'
                     ? 'text-white/40'
-                    : 'text-slate-300 dark:text-slate-600'
+                    : 'dark:text-ink-faint text-slate-300'
                 "
               >
                 {{ t('budget.settings.perMonth') }}
@@ -583,7 +585,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
           <div
             class="rounded-[14px] border-l-[3px] border-[var(--heritage-orange)] bg-[rgba(241,93,34,0.04)] p-3.5 dark:bg-[rgba(241,93,34,0.08)]"
           >
-            <p class="text-xs leading-relaxed text-slate-600/55 dark:text-slate-400/55">
+            <p class="dark:text-ink-faint text-xs leading-relaxed text-slate-600/55">
               <template v-if="budgetStore.activeBudget?.mode === 'percentage'">
                 {{
                   t('budget.settings.infoPercentage')
@@ -603,17 +605,19 @@ async function handleQuickAdd(data: CreateTransactionInput) {
         </div>
 
         <!-- Add Transactions -->
-        <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <span class="nook-section-label text-secondary-500 block dark:text-gray-400">
+        <div
+          class="dark:bg-surface-raised rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)]"
+        >
+          <span class="nook-section-label text-secondary-500 dark:text-ink-soft block">
             {{ t('budget.section.addTransactions') }}
           </span>
-          <p class="mt-1 mb-4 text-xs text-slate-400 dark:text-slate-500">
+          <p class="dark:text-ink-faint mt-1 mb-4 text-xs text-slate-400">
             {{ t('budget.addTransactions.subtitle') }}
           </p>
           <div class="space-y-3">
             <!-- Quick Add (functional) -->
             <button
-              class="flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 text-left transition-colors hover:bg-slate-100 dark:bg-slate-700/30 dark:hover:bg-slate-700/50"
+              class="dark:bg-surface-overlay/30 dark:hover:bg-surface-hover/50 flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 text-left transition-colors hover:bg-slate-100"
               @click="showQuickAddModal = true"
             >
               <div
@@ -622,23 +626,23 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 <BeanieIcon name="plus" size="sm" class="text-white" />
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                <p class="dark:text-ink text-sm font-semibold text-slate-700">
                   {{ t('budget.quickAdd.title') }}
                 </p>
-                <p class="text-xs text-slate-400 dark:text-slate-500">
+                <p class="dark:text-ink-faint text-xs text-slate-400">
                   {{ t('budget.quickAdd.subtitle') }}
                 </p>
               </div>
               <BeanieIcon
                 name="chevron-right"
                 size="sm"
-                class="flex-shrink-0 text-slate-300 dark:text-slate-600"
+                class="dark:text-ink-faint flex-shrink-0 text-slate-300"
               />
             </button>
 
             <!-- Batch Add (coming soon) -->
             <div
-              class="relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60 dark:bg-slate-700/30"
+              class="dark:bg-surface-overlay/30 relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60"
             >
               <div
                 class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--tint-silk-10)]"
@@ -646,10 +650,10 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 <span class="text-sm">📋</span>
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                <p class="dark:text-ink-soft text-sm font-semibold text-slate-600">
                   {{ t('budget.batchAdd.title') }}
                 </p>
-                <p class="text-xs text-slate-400 dark:text-slate-500">
+                <p class="dark:text-ink-faint text-xs text-slate-400">
                   {{ t('budget.batchAdd.subtitle') }}
                 </p>
               </div>
@@ -662,7 +666,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
 
             <!-- CSV Upload (coming soon) -->
             <div
-              class="relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60 dark:bg-slate-700/30"
+              class="dark:bg-surface-overlay/30 relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60"
             >
               <div
                 class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--tint-slate-5)]"
@@ -670,10 +674,10 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 <span class="text-sm">📄</span>
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                <p class="dark:text-ink-soft text-sm font-semibold text-slate-600">
                   {{ t('budget.csvUpload.title') }}
                 </p>
-                <p class="text-xs text-slate-400 dark:text-slate-500">
+                <p class="dark:text-ink-faint text-xs text-slate-400">
                   {{ t('budget.csvUpload.subtitle') }}
                 </p>
               </div>

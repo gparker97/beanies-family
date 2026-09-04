@@ -204,7 +204,7 @@ export const useSettingsStore = defineStore('settings', () => {
       // Keep browser chrome in sync
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) {
-        meta.setAttribute('content', isDark ? '#1a252f' : '#F8F9FA');
+        meta.setAttribute('content', isDark ? '#151E27' : '#F8F9FA');
       }
 
       // Mirror to localStorage for the FOUC-prevention bootstrap.

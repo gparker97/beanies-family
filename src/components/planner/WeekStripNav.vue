@@ -98,7 +98,7 @@ function onDayClick(dateStr: string) {
           :class="
             week.isFocused
               ? 'text-primary-500 relative pl-2'
-              : 'text-secondary-500/50 dark:text-gray-500'
+              : 'text-secondary-500/50 dark:text-ink-faint'
           "
         >
           <span
@@ -128,8 +128,8 @@ function onDayClick(dateStr: string) {
               : day.isToday
                 ? 'border-primary-500 bg-primary-500/10 text-primary-500'
                 : week.isFocused
-                  ? 'text-secondary-500 border-sky-200/60 bg-white hover:border-sky-300 dark:border-slate-600/60 dark:bg-slate-700/60 dark:text-gray-200'
-                  : 'text-secondary-500/70 border-gray-200/60 bg-white hover:border-gray-300 dark:border-slate-700/60 dark:bg-slate-800/40 dark:text-gray-400',
+                  ? 'text-secondary-500 dark:border-line-strong/60 dark:bg-surface-overlay/60 dark:text-ink border-sky-200/60 bg-white hover:border-sky-300'
+                  : 'text-secondary-500/70 dark:border-line/60 dark:bg-surface-raised/40 dark:text-ink-soft border-gray-200/60 bg-white hover:border-gray-300',
             day.isOutsideCurrentMonth ? 'opacity-60' : '',
           ]"
           :aria-label="`${day.dowLabel} ${day.dayNum}`"
@@ -159,7 +159,7 @@ function onDayClick(dateStr: string) {
               :class="
                 day.dateStr === selectedDate
                   ? 'text-white/85'
-                  : 'text-secondary-500/40 dark:text-gray-500'
+                  : 'text-secondary-500/40 dark:text-ink-faint'
               "
             >
               +{{ day.moreCount }}
@@ -175,7 +175,7 @@ function onDayClick(dateStr: string) {
     <button
       v-if="weeks.length > 1"
       type="button"
-      class="font-outfit text-secondary-500/55 hover:text-primary-500 mt-1 flex w-full items-center justify-center gap-1 rounded-lg py-1 text-[0.625rem] font-bold tracking-[0.1em] uppercase transition-colors dark:text-gray-500"
+      class="font-outfit text-secondary-500/55 hover:text-primary-500 dark:text-ink-faint mt-1 flex w-full items-center justify-center gap-1 rounded-lg py-1 text-[0.625rem] font-bold tracking-[0.1em] uppercase transition-colors"
       @click="emit('toggle-peek')"
     >
       <span>{{ collapsed ? t('planner.peekNextWeek') : t('action.showLess') }}</span>

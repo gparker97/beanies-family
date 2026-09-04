@@ -296,7 +296,7 @@ const resultCount = computed(() => results.value.length);
         @keydown="handleKeydown"
       >
         <div
-          class="search-card overflow-hidden rounded-[20px] bg-white shadow-[0_20px_60px_rgba(44,62,80,0.22),0_0_0_1px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.06)]"
+          class="search-card dark:bg-surface-raised overflow-hidden rounded-[20px] bg-white shadow-[0_20px_60px_rgba(44,62,80,0.22),0_0_0_1px_rgba(44,62,80,0.06)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.06)]"
         >
           <!-- Search input with gradient accent bar -->
           <div class="relative">
@@ -309,7 +309,7 @@ const resultCount = computed(() => results.value.length);
                 :class="
                   query.trim()
                     ? 'bg-gradient-to-br from-[var(--heritage-orange)] to-[var(--terracotta)] text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
-                    : 'bg-[var(--tint-slate-5)] text-gray-400 dark:bg-slate-700 dark:text-gray-500'
+                    : 'dark:bg-surface-overlay dark:text-ink-faint bg-[var(--tint-slate-5)] text-gray-400'
                 "
               >
                 <svg
@@ -329,12 +329,12 @@ const resultCount = computed(() => results.value.length);
                 v-model="query"
                 type="text"
                 :placeholder="t('search.placeholder')"
-                class="font-outfit w-full bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:font-medium placeholder:text-gray-300 dark:text-gray-100 dark:placeholder:text-gray-600"
+                class="font-outfit dark:text-ink dark:placeholder:text-ink-faint w-full bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:font-medium placeholder:text-gray-300"
               />
               <button
                 v-if="query"
                 type="button"
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tint-slate-5)] text-xs text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:bg-slate-700 dark:hover:bg-slate-600 dark:hover:text-gray-300"
+                class="dark:bg-surface-overlay dark:hover:bg-surface-hover dark:hover:text-ink-soft flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tint-slate-5)] text-xs text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600"
                 @click="query = ''"
               >
                 ✕
@@ -352,7 +352,7 @@ const resultCount = computed(() => results.value.length);
                 }}
               </span>
             </div>
-            <div class="mx-4 border-b border-[var(--tint-slate-5)] dark:border-slate-700" />
+            <div class="dark:border-line mx-4 border-b border-[var(--tint-slate-5)]" />
           </div>
 
           <!-- Results -->
@@ -363,16 +363,14 @@ const resultCount = computed(() => results.value.length);
                 v-for="(group, gi) in groupedResults"
                 :key="group.key"
                 class="py-2"
-                :class="
-                  gi > 0 ? 'border-t border-[var(--tint-slate-5)] dark:border-slate-700/50' : ''
-                "
+                :class="gi > 0 ? 'dark:border-line/50 border-t border-[var(--tint-slate-5)]' : ''"
               >
                 <div
-                  class="font-outfit flex items-center gap-2 px-5 py-1.5 text-[0.625rem] font-bold tracking-[0.12em] text-gray-400/70 uppercase dark:text-gray-500"
+                  class="font-outfit dark:text-ink-faint flex items-center gap-2 px-5 py-1.5 text-[0.625rem] font-bold tracking-[0.12em] text-gray-400/70 uppercase"
                 >
                   <span>{{ group.label }}</span>
                   <span
-                    class="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1 text-[0.5625rem] font-bold text-gray-400 dark:bg-slate-700"
+                    class="dark:bg-surface-overlay flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1 text-[0.5625rem] font-bold text-gray-400"
                   >
                     {{ group.items.length }}
                   </span>
@@ -395,25 +393,25 @@ const resultCount = computed(() => results.value.length);
                           }
                         : {}
                     "
-                    :class="!item.color ? 'bg-[var(--tint-slate-5)] dark:bg-slate-700' : ''"
+                    :class="!item.color ? 'dark:bg-surface-overlay bg-[var(--tint-slate-5)]' : ''"
                   >
                     {{ item.icon }}
                   </span>
                   <div class="min-w-0 flex-1">
                     <div
-                      class="font-outfit truncate text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                      class="font-outfit dark:text-ink truncate text-sm font-semibold text-[var(--color-text)]"
                     >
                       {{ item.title }}
                     </div>
                     <div
                       v-if="item.subtitle"
-                      class="truncate text-xs text-gray-400 dark:text-gray-500"
+                      class="dark:text-ink-faint truncate text-xs text-gray-400"
                     >
                       {{ item.subtitle }}
                     </div>
                   </div>
                   <span
-                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-transparent text-gray-300 transition-all duration-150 group-hover:bg-[var(--tint-orange-15)] group-hover:text-[var(--heritage-orange)] dark:text-gray-600 dark:group-hover:text-[var(--heritage-orange)]"
+                    class="dark:text-ink-faint flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-transparent text-gray-300 transition-all duration-150 group-hover:bg-[var(--tint-orange-15)] group-hover:text-[var(--heritage-orange)] dark:group-hover:text-[var(--heritage-orange)]"
                   >
                     <svg
                       class="h-3 w-3"
@@ -432,14 +430,14 @@ const resultCount = computed(() => results.value.length);
             <!-- No results -->
             <div v-else-if="query.trim()" class="px-5 py-12 text-center">
               <div
-                class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--tint-slate-5)] text-xl dark:bg-slate-700"
+                class="dark:bg-surface-overlay mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--tint-slate-5)] text-xl"
               >
                 🔍
               </div>
-              <p class="font-outfit text-sm font-semibold text-gray-400 dark:text-gray-500">
+              <p class="font-outfit dark:text-ink-faint text-sm font-semibold text-gray-400">
                 {{ t('search.noResults') }}
               </p>
-              <p class="mt-1 text-xs text-gray-300 dark:text-gray-600">
+              <p class="dark:text-ink-faint mt-1 text-xs text-gray-300">
                 {{ t('search.noResultsHint') }}
               </p>
             </div>
@@ -451,7 +449,7 @@ const resultCount = computed(() => results.value.length);
               >
                 🫘
               </div>
-              <p class="font-outfit text-xs font-medium text-gray-400 dark:text-gray-500">
+              <p class="font-outfit dark:text-ink-faint text-xs font-medium text-gray-400">
                 {{ t('search.emptyHint') }}
               </p>
             </div>

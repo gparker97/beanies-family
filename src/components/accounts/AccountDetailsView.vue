@@ -60,7 +60,7 @@ async function copyAddress(address: string) {
 <template>
   <div class="space-y-3">
     <h3
-      class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+      class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
     >
       {{ t('accountDetails.view.title') }}
     </h3>
@@ -202,14 +202,14 @@ async function copyAddress(address: string) {
     <!-- Wallets -->
     <div v-if="cryptoFieldsApply(account.type) && account.wallets?.length" class="space-y-2">
       <h4
-        class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+        class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
       >
         {{ t('accountDetails.crypto.title') }}
       </h4>
       <div
         v-for="wallet in account.wallets"
         :key="wallet.id"
-        class="rounded-[14px] bg-[var(--tint-slate-5)] p-3 dark:bg-slate-700"
+        class="dark:bg-surface-overlay rounded-[14px] bg-[var(--tint-slate-5)] p-3"
       >
         <div class="mb-1 flex items-center gap-2">
           <span class="font-outfit text-sm font-semibold">{{ wallet.label }}</span>
@@ -225,7 +225,7 @@ async function copyAddress(address: string) {
           }}</code>
           <button
             type="button"
-            class="hover:text-primary-500 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white text-[var(--color-text-muted)] shadow-sm transition-colors dark:bg-slate-600"
+            class="hover:text-primary-500 dark:bg-surface-hover grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white text-[var(--color-text-muted)] shadow-sm transition-colors"
             :aria-label="t('accountDetails.copyAddress')"
             :title="t('accountDetails.copyAddress')"
             @click="copyAddress(wallet.address)"
@@ -251,11 +251,11 @@ async function copyAddress(address: string) {
     <!-- Notes -->
     <div v-if="account.notes" class="space-y-1">
       <h4
-        class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+        class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
       >
         {{ t('accountDetails.field.notes') }}
       </h4>
-      <p class="text-sm whitespace-pre-line text-[var(--color-text)] dark:text-gray-300">
+      <p class="dark:text-ink-soft text-sm whitespace-pre-line text-[var(--color-text)]">
         {{ account.notes }}
       </p>
     </div>

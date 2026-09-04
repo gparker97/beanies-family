@@ -55,7 +55,7 @@ function handleBlur() {
   <div>
     <button
       type="button"
-      class="font-outfit flex w-full items-center gap-2 rounded-[14px] border-2 bg-[var(--tint-slate-5)] px-4 py-2.5 text-left text-sm transition-all duration-150 dark:bg-slate-700"
+      class="font-outfit dark:bg-surface-overlay flex w-full items-center gap-2 rounded-[14px] border-2 bg-[var(--tint-slate-5)] px-4 py-2.5 text-left text-sm transition-all duration-150"
       :class="
         isOpen
           ? 'border-primary-500 shadow-[0_0_0_3px_rgba(241,93,34,0.1)]'
@@ -66,7 +66,7 @@ function handleBlur() {
     >
       <template v-if="selectedItem">
         <span class="text-base">{{ selectedItem.icon || defaultIcon }}</span>
-        <span class="flex-1 truncate text-left text-[var(--color-text)] dark:text-gray-200">
+        <span class="dark:text-ink flex-1 truncate text-left text-[var(--color-text)]">
           {{ selectedItem.label }}
         </span>
       </template>
@@ -96,12 +96,12 @@ function handleBlur() {
     >
       <div
         v-if="isOpen"
-        class="mt-1 max-h-48 overflow-y-auto rounded-[14px] bg-white py-1 shadow-lg dark:bg-slate-800"
+        class="dark:bg-surface-raised mt-1 max-h-48 overflow-y-auto rounded-[14px] bg-white py-1 shadow-lg"
       >
         <!-- None option -->
         <button
           type="button"
-          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+          class="font-outfit dark:hover:bg-surface-hover flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-5)]"
           @mousedown.prevent="select(undefined)"
         >
           {{ t('common.none') }}
@@ -111,11 +111,11 @@ function handleBlur() {
           v-for="item in items"
           :key="item.id"
           type="button"
-          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-xs hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+          class="font-outfit dark:hover:bg-surface-hover flex w-full items-center gap-2 px-4 py-2 text-left text-xs hover:bg-[var(--tint-slate-5)]"
           @mousedown.prevent="select(item.id)"
         >
           <span class="text-sm">{{ item.icon || defaultIcon }}</span>
-          <span class="flex-1 truncate text-left text-[var(--color-text)] dark:text-gray-200">{{
+          <span class="dark:text-ink flex-1 truncate text-left text-[var(--color-text)]">{{
             item.label
           }}</span>
           <span v-if="item.secondary" class="text-xs text-[var(--color-text-muted)]">

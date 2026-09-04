@@ -91,7 +91,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       :class="
         isSelected(SHARED_ID)
           ? 'border-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-          : 'border-2 border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700'
+          : 'dark:bg-surface-overlay border-2 border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)]'
       "
       @click="toggle(SHARED_ID)"
     >
@@ -101,7 +101,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       >
         {{ t('common.all').charAt(0) }}
       </span>
-      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200">
+      <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
         {{ t('common.shared') }}
       </span>
     </button>
@@ -115,12 +115,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       :class="
         isSelected(member.id)
           ? 'border-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-          : 'border-2 border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700'
+          : 'dark:bg-surface-overlay border-2 border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)]'
       "
       @click="toggle(member.id)"
     >
       <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="xs" />
-      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200">
+      <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
         {{ member.name }}
       </span>
     </button>

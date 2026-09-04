@@ -271,7 +271,7 @@ async function handleSave() {
 
       <!-- Auto-generated title -->
       <div
-        class="font-outfit rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800 dark:bg-slate-700 dark:text-gray-200"
+        class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800"
       >
         {{ autoTitle }}
       </div>

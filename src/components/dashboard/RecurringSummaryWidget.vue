@@ -57,7 +57,7 @@ const upcomingItems = computed(() => {
       <!-- Empty state -->
       <div v-if="recurringStore.filteredRecurringItems.length === 0" class="py-4 text-center">
         <svg
-          class="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600"
+          class="dark:text-ink-faint mx-auto mb-3 h-10 w-10 text-gray-300"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -69,7 +69,7 @@ const upcomingItems = computed(() => {
             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
           />
         </svg>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
+        <p class="dark:text-ink-soft text-sm text-gray-500">
           {{ t('dashboard.noRecurringItems') }}
         </p>
       </div>
@@ -78,32 +78,32 @@ const upcomingItems = computed(() => {
       <div v-else>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('recurring.monthlyIncome') }}
             </p>
-            <p class="text-lg font-semibold text-green-600 dark:text-green-400">
+            <p class="dark:text-success-lift text-lg font-semibold text-green-600">
               {{ formatMasked('+' + monthlyIncome) }}
             </p>
           </div>
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('recurring.monthlyExpenses') }}
             </p>
-            <p class="text-lg font-semibold text-red-600 dark:text-red-400">
+            <p class="dark:text-danger-lift text-lg font-semibold text-red-600">
               {{ formatMasked('-' + monthlyExpenses) }}
             </p>
           </div>
         </div>
 
         <!-- Net -->
-        <div class="border-t border-gray-100 pt-3 dark:border-slate-700">
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.netRecurring') }}</p>
+        <div class="dark:border-line border-t border-gray-100 pt-3">
+          <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('dashboard.netRecurring') }}</p>
           <p
             class="text-xl font-bold"
             :class="
               netRecurring >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
+                ? 'dark:text-success-lift text-green-600'
+                : 'dark:text-danger-lift text-red-600'
             "
           >
             {{ formatMasked((netRecurring >= 0 ? '+' : '-') + netRecurringFormatted) }}
@@ -111,11 +111,8 @@ const upcomingItems = computed(() => {
         </div>
 
         <!-- Upcoming items -->
-        <div
-          v-if="upcomingItems.length > 0"
-          class="border-t border-gray-100 pt-3 dark:border-slate-700"
-        >
-          <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.upcoming') }}</p>
+        <div v-if="upcomingItems.length > 0" class="dark:border-line border-t border-gray-100 pt-3">
+          <p class="dark:text-ink-soft mb-2 text-sm text-gray-500">{{ t('dashboard.upcoming') }}</p>
           <div class="space-y-2">
             <div
               v-for="{ item, nextDate } in upcomingItems"
@@ -127,12 +124,12 @@ const upcomingItems = computed(() => {
                   class="h-2 w-2 flex-shrink-0 rounded-full"
                   :class="item.type === 'income' ? 'bg-green-500' : 'bg-red-500'"
                 />
-                <span class="truncate text-gray-700 dark:text-gray-300">
+                <span class="dark:text-ink-soft truncate text-gray-700">
                   {{ item.description }}
                 </span>
               </div>
               <div class="ml-2 flex flex-shrink-0 items-center gap-2">
-                <span class="text-xs text-gray-400 dark:text-gray-500">
+                <span class="dark:text-ink-faint text-xs text-gray-400">
                   {{ nextDate ? formatDateShort(nextDate.toISOString()) : '' }}
                 </span>
                 <CurrencyAmount

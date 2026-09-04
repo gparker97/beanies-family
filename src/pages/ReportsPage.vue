@@ -738,10 +738,10 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <template #header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 class="dark:text-ink text-lg font-semibold text-gray-900">
               {{ t('reports.netWorthOverTime') }}
             </h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('reports.netWorthDescription') }}
             </p>
           </div>
@@ -788,10 +788,10 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <template #header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 class="dark:text-ink text-lg font-semibold text-gray-900">
               {{ t('reports.incomeVsExpenses') }}
             </h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="dark:text-ink-soft text-sm text-gray-500">
               {{ t('reports.incomeVsExpensesDescription') }}
             </p>
           </div>

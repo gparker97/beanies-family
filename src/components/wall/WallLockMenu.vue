@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
   <div ref="root" class="relative shrink-0">
     <button
       type="button"
-      class="wall-lock-btn grid place-items-center rounded-[18px] bg-white shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="wall-lock-btn dark:bg-surface-raised grid place-items-center rounded-[18px] bg-white shadow-[var(--card-shadow)]"
       :aria-label="isLocked ? t('wall.lock.locked') : t('wall.lock.unlocked')"
       :aria-expanded="open"
       @click="open = !open"
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="open"
-      class="absolute top-16 right-0 z-50 w-64 rounded-[20px] bg-white p-2 text-left shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised absolute top-16 right-0 z-50 w-64 rounded-[20px] bg-white p-2 text-left shadow-[var(--card-hover-shadow)]"
     >
       <p
         class="font-outfit wall-lock-heading px-3 pt-2 pb-1 font-bold tracking-[0.1em] text-[var(--muted-text,#4d5d6c)] uppercase"
@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
       <button
         v-if="isLocked && canUnlock"
         type="button"
-        class="font-inter text-secondary-500 flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)] dark:text-gray-100"
+        class="font-inter text-secondary-500 dark:text-ink flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)]"
         @click="choose('unlock')"
       >
         <span aria-hidden="true">🔓</span>{{ t('wall.lock.unlock') }}
@@ -170,21 +170,21 @@ onBeforeUnmount(() => {
       <button
         v-if="!isLocked"
         type="button"
-        class="font-inter text-secondary-500 flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)] dark:text-gray-100"
+        class="font-inter text-secondary-500 dark:text-ink flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)]"
         @click="choose('relock')"
       >
         <span aria-hidden="true">🔒</span>{{ t('wall.lock.relock') }}
       </button>
       <button
         type="button"
-        class="font-inter text-secondary-500 flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)] dark:text-gray-100"
+        class="font-inter text-secondary-500 dark:text-ink flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)]"
         @click="choose('night')"
       >
         <span aria-hidden="true">🌙</span>{{ t('wall.lock.nightNow') }}
       </button>
       <button
         type="button"
-        class="font-inter text-secondary-500 flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)] dark:text-gray-100"
+        class="font-inter text-secondary-500 dark:text-ink flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left hover:bg-[var(--tint-slate-5)]"
         @click="choose('leave')"
       >
         <span aria-hidden="true">↩️</span>{{ t('wall.lock.leave') }}

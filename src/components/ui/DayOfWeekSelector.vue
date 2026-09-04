@@ -23,7 +23,7 @@ const { t } = useTranslation();
 const selectedClass = computed(() => {
   if (props.accent === 'orange') return 'bg-primary-500 text-white shadow-sm';
   if (props.accent === 'purple') return 'bg-purple-500 text-white shadow-sm';
-  return 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-slate-900';
+  return 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-surface-ground';
 });
 
 // Day labels: Mon-Sun (indices 1-6, 0)
@@ -59,7 +59,7 @@ function toggle(dayIndex: number, current: number[]) {
       :class="
         modelValue.includes(day.index)
           ? selectedClass
-          : 'bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+          : 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
       "
       @click="toggle(day.index, modelValue)"
     >

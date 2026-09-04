@@ -135,24 +135,24 @@ function handleChannel(channel: (typeof channels.value)[0]) {
   <div class="space-y-4">
     <!-- Copy link row -->
     <button
-      class="group flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition-all hover:border-[var(--color-sky-silk-300)] hover:bg-[var(--tint-silk-10)] dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-[var(--color-sky-silk-300)]/40 dark:hover:bg-slate-700"
+      class="group dark:border-line-strong dark:bg-surface-overlay/50 dark:hover:bg-surface-hover flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition-all hover:border-[var(--color-sky-silk-300)] hover:bg-[var(--tint-silk-10)] dark:hover:border-[var(--color-sky-silk-300)]/40"
       data-testid="invite-copy-link"
       @click="handleCopy"
     >
       <div
-        class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white shadow-sm transition-colors group-hover:bg-[var(--tint-silk-20)] dark:bg-slate-600 dark:group-hover:bg-slate-500"
+        class="dark:bg-surface-hover dark:group-hover:bg-surface-hover flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white shadow-sm transition-colors group-hover:bg-[var(--tint-silk-20)]"
       >
         <BeanieIcon
           :name="copied ? 'check' : 'copy'"
           size="md"
-          class="text-gray-500 dark:text-gray-300"
+          class="dark:text-ink-soft text-gray-500"
         />
       </div>
       <div class="min-w-0 flex-1">
-        <p class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+        <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
           {{ t('share.copyLink') }}
         </p>
-        <p class="truncate text-xs text-gray-400 dark:text-gray-500">
+        <p class="dark:text-ink-faint truncate text-xs text-gray-400">
           {{ link }}
         </p>
       </div>
@@ -167,7 +167,7 @@ function handleChannel(channel: (typeof channels.value)[0]) {
       >
         <span
           v-if="copied"
-          class="flex-shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+          class="dark:text-success-lift flex-shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30"
         >
           {{ t('login.copied') }}
         </span>
@@ -176,9 +176,9 @@ function handleChannel(channel: (typeof channels.value)[0]) {
 
     <!-- Divider -->
     <div class="flex items-center gap-3">
-      <div class="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
-      <span class="text-xs text-gray-400 dark:text-gray-500">{{ t('share.orShareVia') }}</span>
-      <div class="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
+      <div class="dark:bg-surface-overlay h-px flex-1 bg-gray-200" />
+      <span class="dark:text-ink-faint text-xs text-gray-400">{{ t('share.orShareVia') }}</span>
+      <div class="dark:bg-surface-overlay h-px flex-1 bg-gray-200" />
     </div>
 
     <!-- Social channels grid -->
@@ -186,7 +186,7 @@ function handleChannel(channel: (typeof channels.value)[0]) {
       <button
         v-for="ch in channels"
         :key="ch.id"
-        class="group flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all hover:bg-gray-50 active:scale-95 dark:hover:bg-slate-700/50"
+        class="group dark:hover:bg-surface-hover/50 flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all hover:bg-gray-50 active:scale-95"
         :data-testid="`invite-channel-${ch.id}`"
         @click="handleChannel(ch)"
       >
@@ -263,13 +263,13 @@ function handleChannel(channel: (typeof channels.value)[0]) {
           >
             <path
               d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
-              class="text-gray-400 dark:text-gray-500"
+              class="dark:text-ink-faint text-gray-400"
             />
-            <polyline points="22,6 12,13 2,6" class="text-gray-400 dark:text-gray-500" />
+            <polyline points="22,6 12,13 2,6" class="dark:text-ink-faint text-gray-400" />
           </svg>
         </div>
 
-        <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
+        <span class="dark:text-ink-soft text-xs font-medium text-gray-600">
           {{ ch.label }}
         </span>
       </button>
@@ -286,14 +286,14 @@ function handleChannel(channel: (typeof channels.value)[0]) {
         class="flex items-start gap-2.5 rounded-2xl bg-[#07C160]/8 px-4 py-3 dark:bg-[#07C160]/10"
       >
         <span class="mt-0.5 flex-shrink-0 text-sm">✅</span>
-        <p class="text-xs text-gray-600 dark:text-gray-300">
+        <p class="dark:text-ink-soft text-xs text-gray-600">
           {{ t('share.wechatHint') }}
         </p>
       </div>
     </Transition>
 
     <!-- Expiry note (consumer can hide via prop if it renders its own footer) -->
-    <p v-if="!hideExpiryNote" class="text-center text-xs text-gray-400 dark:text-gray-500">
+    <p v-if="!hideExpiryNote" class="dark:text-ink-faint text-center text-xs text-gray-400">
       🔒 {{ t('family.linkExpiry') }}
     </p>
   </div>

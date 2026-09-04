@@ -37,12 +37,92 @@ Use this skill whenever writing UI copy, designing components, choosing colors, 
 
 ### Dark mode
 
-- Background: Deep Slate `#2C3E50` and darker variants (`#1a252f`, `#243342`)
-- Surfaces: `#34495E` (lighter slate)
-- Accent: Heritage Orange `#F15D22` (slightly muted: `#E0551F` on dark surfaces)
-- Text: `#ECF0F1` (light), `#BDC3C7` (muted)
-- Borders: `#4A6274`
-- Keep existing Tailwind `dark:` prefix pattern, swap in brand colors
+**Dark-mode colour comes from the semantic scale, never from Tailwind's raw grey ramp.**
+A `dark:text-gray-*`, `dark:bg-slate-700`, or `dark:border-slate-600` in a component is a
+defect, and `vue/no-restricted-class` fails the build on it.
+
+The tokens live in `packages/brand/theme.css`. They are **dark values only** — always used
+behind the `dark:` variant, never bare — so light mode is untouched.
+
+**Elevation ladder.** Surfaces step upward: the page, then a card, then a modal above the
+card, then the hover state. Pick by what the element sits on, not by eye.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `surface-ground` | `#151E27` | Page background, recessed footers, the native window colour |
+| `surface-raised` | `#1E2A36` | Cards, inputs, modal and sheet panels |
+| `surface-overlay` | `#26343F` | Anything sitting ON a raised surface — tiles inside a sheet, pills and section cards inside a modal, popovers |
+| `surface-hover` | `#2F3E4B` | Hover and pressed states |
+| `surface-paper` | `#2A2119` | The scrapbook surfaces only — cookbook hero, recipe hero, recipe source strip, scrapbook page. A warm dark, because that cream paper is part of the character |
+
+`surface-ground` is mirrored natively: `useNativeShell.ts` `APP_BG_DARK`,
+`android/app/src/main/res/values-night/colors.xml`, and the PWA `theme-color`
+meta written by `settingsStore`. A mismatch shows as a seam behind the
+edge-to-edge status bar — change all four together.
+
+**Ink.** Three tiers. Every one clears WCAG AA (4.5:1) against **all four** surfaces, so a
+component can move up or down the ladder without a fresh contrast review.
+
+| Token | Value | Ground / Raised / Overlay / Hover | Use |
+| --- | --- | --- | --- |
+| `ink` | `#F2F5F7` | 15.38 / 13.32 / 11.66 / 10.03 | Headings, values, body |
+| `ink-soft` | `#C3CED6` | 10.52 / 9.11 / 7.97 / 6.86 | Subtitles, descriptions, labels |
+| `ink-faint` | `#9AA9B4` | 6.98 / 6.05 / 5.29 / 4.56 | Metadata, placeholders, table heads |
+
+**Lines.** `line` `#4A5B69` for dividers and card edges. `line-strong` `#7A8A97` for input
+borders and anything interactive — it clears the 3:1 WCAG floor for UI components (4.74 /
+4.10 / 3.59 / 3.09).
+
+**Accents get LIGHTER on dark, never darker.** Darkening moves an accent toward the
+background. (This guide previously said to mute Heritage Orange to `#E0551F` on dark; that
+scored 4.07 on the page ground and 2.43 on a card, worse than leaving it alone.) These are
+for accent **text and icons** on dark. Filled buttons keep true `primary-500` with white
+ink, unchanged.
+
+| Token | Value | On ground / raised |
+| --- | --- | --- |
+| `accent-lift` | `#FF8B5E` | 7.30 / 6.33 |
+| `terracotta-lift` | `#F0A05A` | 7.92 / 6.86 |
+| `success-lift` | `#5FD08A` | 8.72 / 7.55 |
+| `danger-lift` | `#FF8484` | 7.13 / 6.17 |
+| `purple-lift` | `#CB95DD` | 7.12 / 6.17 |
+
+**Two traps that produced invisible text before this scale existed:**
+
+1. **Never put an opacity modifier on text a person has to read.** `text-secondary-500/60`
+   is Deep Slate at 60% — soft grey on white in light mode, but in dark mode it composites
+   Deep Slate over a Deep Slate ground and lands at **1.18:1**. Opacity is for decoration
+   only. If a string needs to recede, use `ink-soft` or `ink-faint`.
+2. **A scoped style that paints a background MUST ship its dark partner — and the
+   selector has to be written a specific way.** Scoped styles carry a `[data-v]`
+   specificity boost that beats the `dark:bg-*` utility on the same element, so the card
+   stays white while its text switches to the dark colour. This is invisible to a search
+   for `bg-white`, and the lint rule cannot see it.
+
+   ```css
+   /* ✅ a PLAIN scoped rule. Vue appends the attribute to the last compound
+      selector, so this compiles to `html.dark .my-card[data-v-…]` — dark-aware,
+      still scoped to this component, and (0,3,1) so it beats the light rule. */
+   html.dark .my-card {
+     background: linear-gradient(135deg, #1e2a36 85%, …);
+   }
+
+   /* ❌ Vue DROPS everything after the :global() and emits `.dark { … }`,
+      silently painting the declarations onto <html> itself. */
+   :global(.dark) .my-card {
+   }
+
+   /* ⚠️ compiles correctly but throws away scoping, so a generic class name
+      then collides app-wide with any other component using it. Reach for this
+      ONLY to reach inside a child component, where the element does not carry
+      this component's data-v. */
+   :global(html.dark .my-card) {
+   }
+   ```
+
+   The broken middle form was live in 86 rules across 31 components — none of that dark
+   styling had ever applied. Only two rules in the codebase legitimately need the
+   `:global()` form; every other one is a plain scoped rule.
 
 ### Tinted Backgrounds
 
@@ -341,7 +421,7 @@ ring-2 ring-red-300 ring-offset-2
 ```
 BaseButton (primary):  bg-[#F15D22] hover:bg-[#D14D1A] text-white rounded-2xl
 BaseButton (secondary): bg-[#2C3E50] hover:bg-[#1a252f] text-white rounded-2xl
-BaseCard:              bg-white dark:bg-slate-800 rounded-3xl shadow-[var(--card-shadow)]
+BaseCard:              bg-white dark:bg-surface-raised rounded-3xl shadow-[var(--card-shadow)]
 BaseInput:             rounded-xl focus:ring-[#AED6F1]
 BaseSelect:            rounded-xl focus:ring-[#AED6F1]
 BaseModal:             rounded-3xl
@@ -417,7 +497,7 @@ Backdrop:  bg-black/50
 Shape:     rounded-3xl (desktop), rounded-none (fullscreen mobile)
 Header:    px-6 py-4, border-b
 Body:      p-6, overflow-y-auto
-Footer:    px-6 py-4, border-t, bg-gray-50 dark:bg-slate-900, rounded-b-3xl
+Footer:    px-6 py-4, border-t, bg-gray-50 dark:bg-surface-ground, rounded-b-3xl
 ```
 
 #### Tier 2: `BeanieFormModal.vue` — Branded Form Wrapper

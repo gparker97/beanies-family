@@ -47,7 +47,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     -->
     <span class="min-w-0" :class="inline ? 'text-left' : 'w-full'">
       <span
-        class="font-outfit text-secondary-500 wall-bean-name block truncate font-bold dark:text-gray-100"
+        class="font-outfit text-secondary-500 wall-bean-name dark:text-ink block truncate font-bold"
       >
         {{ member.name }}
       </span>

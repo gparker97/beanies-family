@@ -336,12 +336,12 @@ function handleDelete() {
     <!-- 3. Account Name (styled like TransactionModal description) -->
     <FormFieldGroup :label="t('modal.accountName')" required>
       <div
-        class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+        class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
       >
         <input
           v-model="name"
           type="text"
-          class="font-outfit w-full border-none bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+          class="font-outfit dark:text-ink w-full border-none bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
           :placeholder="t('modal.accountName')"
         />
       </div>
@@ -413,12 +413,10 @@ function handleDelete() {
 
         <!-- Include in Net Worth toggle -->
         <div
-          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
         >
           <div>
-            <div
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200"
-            >
+            <div class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
               {{ t('modal.includeInNetWorth') }}
             </div>
             <div class="text-xs text-[var(--color-text-muted)]">
@@ -430,11 +428,9 @@ function handleDelete() {
 
         <!-- Active toggle -->
         <div
-          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+          class="dark:bg-surface-overlay flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3"
         >
-          <span
-            class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200"
-          >
+          <span class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
             {{ t('form.isActive') }}
           </span>
           <ToggleSwitch v-model="isActive" />

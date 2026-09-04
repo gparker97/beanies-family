@@ -211,7 +211,7 @@ const severeAllergyCount = computed(
 
 <template>
   <article
-    class="group relative cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+    class="group dark:bg-surface-raised relative cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
     @click="openDetail"
   >
     <!-- Thin brand-gradient top stripe -->
@@ -244,16 +244,14 @@ const severeAllergyCount = computed(
         <div class="min-w-0 flex-1">
           <div class="flex items-start justify-between gap-2">
             <div class="flex min-w-0 items-center gap-2">
-              <h3
-                class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100"
-              >
+              <h3 class="font-outfit text-secondary-500 dark:text-ink truncate text-lg font-bold">
                 {{ member.name }}
               </h3>
             </div>
             <div class="flex flex-shrink-0 gap-1">
               <button
                 v-if="canManage"
-                class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
+                class="dark:hover:bg-surface-hover flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-orange-600"
                 :title="t('action.edit')"
                 @click.stop="emit('edit')"
               >
@@ -263,7 +261,7 @@ const severeAllergyCount = computed(
                 v-if="member.requiresPassword && !member.isPet && canManage"
                 :disabled="!inviteAvailable"
                 :class="[
-                  'flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 dark:hover:bg-slate-700',
+                  'dark:hover:bg-surface-hover flex h-9 w-9 items-center justify-center rounded-lg text-gray-400',
                   inviteAvailable
                     ? 'hover:bg-gray-100 hover:text-orange-600'
                     : 'cursor-not-allowed opacity-50',
@@ -279,7 +277,7 @@ const severeAllergyCount = computed(
               </button>
               <button
                 v-if="member.role !== 'owner' && canManage"
-                class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
+                class="dark:hover:bg-surface-hover flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-600"
                 @click.stop="emit('delete')"
               >
                 <BeanieIcon name="trash" size="sm" />
@@ -287,19 +285,19 @@ const severeAllergyCount = computed(
             </div>
           </div>
           <div
-            class="font-inter text-secondary-500/60 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs dark:text-gray-400"
+            class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
           >
             <!-- Owner gets a Heritage Orange chip with crown — unmistakable at a glance. -->
             <span
               v-if="member.role === 'owner'"
-              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[#F15D22] uppercase dark:bg-orange-900/30 dark:text-orange-200"
+              class="font-outfit dark:text-accent-lift inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[#F15D22] uppercase dark:bg-orange-900/30"
             >
               <span aria-hidden="true">👑</span>
               {{ t('family.role.ownerBadge') }}
             </span>
             <span
               v-else
-              class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[var(--color-secondary)] uppercase dark:bg-slate-700 dark:text-gray-300"
+              class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-[var(--color-secondary)] uppercase"
             >
               {{ roleLabel }}
             </span>
@@ -308,7 +306,7 @@ const severeAllergyCount = computed(
             }}</span>
             <span
               v-if="member.requiresPassword && !member.isPet"
-              class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              class="dark:text-terracotta-lift inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] font-medium text-amber-800 dark:bg-amber-900/30"
             >
               <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
               {{ t('family.status.waitingToJoin') }}
@@ -330,10 +328,10 @@ const severeAllergyCount = computed(
         >
           <span class="text-lg leading-none" aria-hidden="true">⭐</span>
           <div
-            class="font-inter text-secondary-500 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm leading-snug dark:text-gray-200"
+            class="font-inter text-secondary-500 dark:text-ink flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm leading-snug"
           >
             <span
-              class="font-outfit text-secondary-500/60 text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80 dark:text-gray-400"
+              class="font-outfit text-secondary-500/60 dark:text-ink-soft text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80"
             >
               {{ t('family.card.fave') }}
             </span>
@@ -356,12 +354,12 @@ const severeAllergyCount = computed(
           <span class="text-lg leading-none" aria-hidden="true">💬</span>
           <div>
             <div
-              class="font-outfit text-secondary-500/60 text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80 dark:text-gray-400"
+              class="font-outfit text-secondary-500/60 dark:text-ink-soft text-[0.625rem] font-semibold tracking-[0.08em] uppercase opacity-80"
             >
               {{ t('family.card.latestSaying') }}
             </div>
             <p
-              class="font-caveat text-secondary-500 mt-0.5 line-clamp-2 text-lg leading-tight dark:text-gray-200"
+              class="font-caveat text-secondary-500 dark:text-ink mt-0.5 line-clamp-2 text-lg leading-tight"
             >
               "{{ topSaying.words }}"
             </p>
@@ -379,10 +377,10 @@ const severeAllergyCount = computed(
             class="font-inter text-sm leading-snug"
             :class="
               headsUp.tone === 'danger'
-                ? 'text-[#c24a24] dark:text-orange-300'
+                ? 'dark:text-accent-lift text-[#c24a24]'
                 : headsUp.tone === 'success'
-                  ? 'text-secondary-500 dark:text-gray-200'
-                  : 'text-secondary-500/80 dark:text-gray-300'
+                  ? 'text-secondary-500 dark:text-ink'
+                  : 'text-secondary-500/80 dark:text-ink-soft'
             "
           >
             <span
@@ -402,13 +400,13 @@ const severeAllergyCount = computed(
         <div class="flex flex-wrap gap-1.5">
           <span
             v-if="favorites.length"
-            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)]"
           >
             {{ favorites.length }} {{ favorites.length === 1 ? 'fave' : 'faves' }}
           </span>
           <span
             v-if="sayings.length"
-            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)]"
           >
             {{ sayings.length }} {{ sayings.length === 1 ? 'saying' : 'sayings' }}
           </span>
@@ -417,8 +415,8 @@ const severeAllergyCount = computed(
             class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-semibold"
             :class="
               severeAllergyCount > 0
-                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                : 'text-secondary-500 bg-[var(--tint-slate-5)] dark:bg-slate-700 dark:text-gray-300'
+                ? 'dark:text-danger-lift bg-red-100 text-red-700 dark:bg-red-900/30'
+                : 'text-secondary-500 dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-5)]'
             "
           >
             {{ allergies.length }}
@@ -426,14 +424,14 @@ const severeAllergyCount = computed(
           </span>
           <span
             v-if="activeMedications.length"
-            class="font-outfit inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+            class="font-outfit dark:text-success-lift inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-semibold text-emerald-700 dark:bg-emerald-900/30"
           >
             {{ activeMedications.length }}
             {{ activeMedications.length === 1 ? t('family.card.med') : t('family.card.meds') }}
           </span>
           <span
             v-if="notes.length"
-            class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)] dark:bg-slate-700 dark:text-gray-300"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink-soft inline-flex items-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-secondary)]"
           >
             {{ notes.length }} {{ notes.length === 1 ? 'note' : 'notes' }}
           </span>

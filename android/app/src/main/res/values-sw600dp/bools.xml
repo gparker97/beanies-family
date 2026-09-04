@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tablets (smallest width >= 600dp) may rotate. On a tablet landscape is
+  arguably the better way to use the app — and it is the only sensible
+  orientation for a wall-mounted beanie wall.
+
+  sw600dp is Android's own tablet threshold and is measured on the SMALLEST
+  screen dimension, so a phone held in landscape never matches it.
+-->
+<resources>
+    <bool name="allow_rotation">true</bool>
+</resources>

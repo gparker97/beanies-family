@@ -19,7 +19,7 @@ const { t } = useTranslation();
       :class="
         dark
           ? 'bg-white/10 text-white/80 hover:bg-white/20'
-          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-slate-600 dark:text-gray-300 dark:hover:bg-slate-500'
+          : 'dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover bg-gray-100 text-gray-500 hover:bg-gray-200'
       "
       @click="unlock"
     >

@@ -51,13 +51,13 @@ const scheduleLabel = computed(() => {
 
 <template>
   <div
-    class="group relative overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+    class="group dark:bg-surface-raised relative overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
     :class="{ 'opacity-60': !isActive }"
   >
     <!-- Status spine — Sky Silk for active (calm, ongoing care), slate for ended -->
     <span
       class="absolute top-0 bottom-0 left-0 z-[1] w-1"
-      :class="isActive ? 'bg-[#AED6F1]' : 'bg-slate-300 dark:bg-slate-600'"
+      :class="isActive ? 'bg-[#AED6F1]' : 'dark:bg-surface-hover bg-slate-300'"
       aria-hidden="true"
     />
 
@@ -73,7 +73,7 @@ const scheduleLabel = computed(() => {
       <!-- Visual anchor: photo OR apothecary fallback -->
       <div
         class="relative aspect-square w-24 flex-shrink-0 overflow-hidden sm:w-28"
-        :class="photoUrl ? 'bg-slate-100 dark:bg-slate-900' : ''"
+        :class="photoUrl ? 'dark:bg-surface-ground bg-slate-100' : ''"
       >
         <img
           v-if="photoUrl"
@@ -160,31 +160,31 @@ const scheduleLabel = computed(() => {
       <div class="flex min-w-0 flex-1 flex-col gap-1.5 p-4" :class="{ 'pr-14': isActive }">
         <div class="flex items-start justify-between gap-2">
           <h4
-            class="font-outfit truncate text-base leading-tight font-bold text-[#2C3E50] dark:text-gray-100"
+            class="font-outfit dark:text-ink truncate text-base leading-tight font-bold text-[#2C3E50]"
           >
             {{ medication.name }}
           </h4>
           <span
             v-if="!isActive"
-            class="font-outfit flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[0.625rem] font-bold tracking-wider text-slate-600 uppercase dark:bg-slate-700 dark:text-slate-400"
+            class="font-outfit dark:bg-surface-overlay dark:text-ink-soft flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[0.625rem] font-bold tracking-wider text-slate-600 uppercase"
           >
             {{ t('medications.ended') }}
           </span>
         </div>
-        <p class="font-outfit text-sm font-medium text-[#2C3E50]/75 dark:text-gray-300">
+        <p class="font-outfit dark:text-ink-soft text-sm font-medium text-[#2C3E50]/75">
           <span class="font-semibold">{{ medication.dose }}</span>
-          <span class="mx-1.5 text-[#2C3E50]/30" aria-hidden="true">·</span>
+          <span class="dark:text-ink-soft mx-1.5 text-[#2C3E50]/30" aria-hidden="true">·</span>
           <span>{{ medication.frequency }}</span>
         </p>
         <p
           v-if="scheduleLabel"
-          class="font-outfit text-[0.625rem] font-semibold tracking-[0.1em] text-[#2C3E50]/50 uppercase"
+          class="font-outfit dark:text-ink-soft text-[0.625rem] font-semibold tracking-[0.1em] text-[#2C3E50]/50 uppercase"
         >
           {{ scheduleLabel }}
         </p>
         <p
           v-if="medication.notes"
-          class="font-inter line-clamp-2 text-xs leading-snug text-[#2C3E50]/60 italic dark:text-gray-400"
+          class="font-inter dark:text-ink-soft line-clamp-2 text-xs leading-snug text-[#2C3E50]/60 italic"
         >
           "{{ medication.notes }}"
         </p>

@@ -222,7 +222,7 @@ const showHalo = computed(() => props.halo ?? props.label);
   color: rgb(44 62 80 / 50%);
 }
 
-:global(.dark) .beanie-spinner:not(.bs-atmospheric) .bs-label-text {
+html.dark .beanie-spinner:not(.bs-atmospheric .bs-label-text) {
   color: rgb(189 195 199 / 50%);
 }
 

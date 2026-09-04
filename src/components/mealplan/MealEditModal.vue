@@ -176,7 +176,7 @@ async function onCookLogClosed(): Promise<void> {
       <div v-if="isRecipe">
         <div class="mp-label">{{ t('mealPlanner.editor.recipe') }}</div>
         <div
-          class="flex items-center gap-2 rounded-xl border border-[rgba(44,62,80,0.12)] bg-white px-3 py-2.5 text-sm dark:bg-slate-800"
+          class="dark:bg-surface-raised flex items-center gap-2 rounded-xl border border-[rgba(44,62,80,0.12)] bg-white px-3 py-2.5 text-sm"
         >
           <span class="min-w-0 flex-1 truncate">
             {{ recipe?.name ?? t('mealPlanner.card.recipeRemoved') }}
@@ -206,7 +206,9 @@ async function onCookLogClosed(): Promise<void> {
       <div>
         <div class="mp-label">
           {{ t('mealPlanner.editor.cook') }}
-          <span class="ml-1 font-normal tracking-normal text-[rgba(44,62,80,0.4)] normal-case">
+          <span
+            class="dark:text-ink-faint ml-1 font-normal tracking-normal text-[rgba(44,62,80,0.4)] normal-case"
+          >
             · {{ t('mealPlanner.editor.cookHint') }}
           </span>
         </div>
@@ -221,12 +223,12 @@ async function onCookLogClosed(): Promise<void> {
           <span
             v-for="(g, i) in guestNames"
             :key="`${g}-${i}`"
-            class="font-outfit text-secondary-500 inline-flex items-center gap-1 rounded-full bg-[var(--tint-silk-20)] px-2.5 py-1 text-xs font-semibold"
+            class="font-outfit text-secondary-500 dark:text-ink inline-flex items-center gap-1 rounded-full bg-[var(--tint-silk-20)] px-2.5 py-1 text-xs font-semibold"
           >
             {{ g }}
             <button
               type="button"
-              class="text-[rgba(44,62,80,0.5)]"
+              class="dark:text-ink-faint text-[rgba(44,62,80,0.5)]"
               :aria-label="t('common.remove')"
               @click="removeGuest(i)"
             >
@@ -244,7 +246,7 @@ async function onCookLogClosed(): Promise<void> {
           />
           <button
             type="button"
-            class="font-outfit text-secondary-500 flex-none rounded-xl bg-[var(--tint-slate-5)] px-3 text-sm font-semibold"
+            class="font-outfit text-secondary-500 dark:text-ink flex-none rounded-xl bg-[var(--tint-slate-5)] px-3 text-sm font-semibold"
             @click="addGuest"
           >
             {{ t('mealPlanner.editor.addGuest') }}

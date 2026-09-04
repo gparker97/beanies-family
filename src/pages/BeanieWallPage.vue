@@ -63,8 +63,40 @@ const orientation = useWallOrientation(SURFACE);
 const { bursts, burst } = useWallBurst();
 useWakeLock(SURFACE);
 
-// The wall may rotate; every other screen keeps the declarative default.
-orientation.release();
+/**
+ * The wall is a read-from-across-the-room display: bean lanes side by side, a
+ * full week of columns, a time axis. It works in BOTH orientations — see
+ * `wall-portrait` below — so this is deliberately not an orientation test. What
+ * it needs is room on BOTH axes, which is a different question to "is this
+ * portrait".
+ *
+ * A width-only threshold gets it wrong twice, in opposite directions: an iPad
+ * mini in portrait is 744px wide and would be refused a wall it renders
+ * perfectly well, while a phone held sideways is 844px wide and would be handed
+ * one it has only 390px of height to draw.
+ *
+ * So: a minimum on the smaller side, whichever side that currently is. 600px
+ * is Android's own `sw600dp` tablet threshold and the same number
+ * `isRotatableFormFactor()` uses, so "big enough to rotate" and "big enough for
+ * a wall" stay one idea.
+ *
+ * Reactive via matchMedia, so rotating a device or resizing a browser window
+ * moves between the wall and the gate rather than stranding anyone on either.
+ */
+const roomQuery =
+  typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(min-width: 600px) and (min-height: 600px)')
+    : null;
+const hasRoom = ref(roomQuery?.matches ?? true);
+function onRoomChange(e: MediaQueryListEvent) {
+  hasRoom.value = e.matches;
+}
+roomQuery?.addEventListener('change', onRoomChange);
+const tooNarrow = computed(() => !hasRoom.value);
+
+// The wall may rotate; every other screen keeps the declarative default. Not
+// worth doing for a screen that is only telling someone to come back wider.
+if (!tooNarrow.value) orientation.release();
 
 provide(WALL_LOCK, { isLocked: lock.isLocked, noteActivity: lock.noteActivity });
 provide(WALL_BURST, burst);
@@ -226,6 +258,7 @@ if (typeof window !== 'undefined') {
 
 onScopeDispose(() => {
   portraitQuery?.removeEventListener('change', onOrientationChange);
+  roomQuery?.removeEventListener('change', onRoomChange);
   clearInterval(clockTimer);
   resetCelebrationMode();
   logEvent({ level: 'info', surface: SURFACE, message: 'wall_exit', context: { action: 'exit' } });
@@ -252,8 +285,35 @@ watch(activeView, () => (sheet.value = null));
 </script>
 
 <template>
+  <!--
+    Too narrow for a wall. Not an error — the wall is simply somewhere else, so
+    this says where and offers the way back rather than apologising.
+  -->
   <div
-    class="wall-root relative flex h-[100dvh] flex-col overflow-hidden bg-[var(--cloud-white,#F8F9FA)] dark:bg-slate-900"
+    v-if="tooNarrow"
+    class="dark:bg-surface-ground flex h-[100dvh] flex-col items-center justify-center gap-5 bg-[var(--cloud-white,#F8F9FA)] px-8 text-center"
+  >
+    <span class="text-5xl" aria-hidden="true">🧱</span>
+    <h1 class="font-outfit text-secondary-500 dark:text-ink text-xl font-bold">
+      {{ t('wall.tooNarrow.title') }}
+    </h1>
+    <p
+      class="font-inter text-secondary-400 dark:text-ink-soft max-w-[46ch] text-sm leading-relaxed"
+    >
+      {{ t('wall.tooNarrow.body') }}
+    </p>
+    <button
+      type="button"
+      class="font-outfit bg-primary-500 hover:bg-primary-600 mt-1 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+      @click="leaveWall"
+    >
+      {{ t('wall.tooNarrow.back') }}
+    </button>
+  </div>
+
+  <div
+    v-else
+    class="wall-root dark:bg-surface-ground relative flex h-[100dvh] flex-col overflow-hidden bg-[var(--cloud-white,#F8F9FA)]"
     :class="{ 'wall-portrait': isPortrait }"
     @pointerdown="lock.noteActivity"
   >
@@ -265,7 +325,7 @@ watch(activeView, () => (sheet.value = null));
     -->
     <header class="relative z-40 flex shrink-0 items-center gap-4 px-7 pt-5 pb-3">
       <div class="min-w-0">
-        <h1 class="font-outfit text-secondary-500 wall-date font-extrabold dark:text-gray-100">
+        <h1 class="font-outfit text-secondary-500 wall-date dark:text-ink font-extrabold">
           {{
             new Date(`${today}T00:00:00`).toLocaleDateString(undefined, {
               weekday: 'long',
@@ -349,12 +409,12 @@ watch(activeView, () => (sheet.value = null));
     <!-- Leaving takes a moment (a route chunk); never let it look ignored. -->
     <div
       v-if="isExiting"
-      class="absolute inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-[var(--cloud-white,#F8F9FA)]/95 dark:bg-slate-900/95"
+      class="dark:bg-surface-ground/95 absolute inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-[var(--cloud-white,#F8F9FA)]/95"
       role="status"
       aria-live="polite"
     >
       <span class="wall-exit-spinner" aria-hidden="true" />
-      <p class="font-outfit text-secondary-500 wall-sheet-title font-bold dark:text-gray-100">
+      <p class="font-outfit text-secondary-500 wall-sheet-title dark:text-ink font-bold">
         {{ t('wall.exiting') }}
       </p>
     </div>

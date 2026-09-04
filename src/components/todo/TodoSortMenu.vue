@@ -140,7 +140,7 @@ onUnmounted(() => {
     <button
       ref="triggerRef"
       type="button"
-      class="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white py-1.5 pr-2.5 pl-1.5 shadow-[var(--card-shadow)] transition-colors hover:border-[#F15D22] dark:border-slate-600 dark:bg-slate-800"
+      class="dark:border-line-strong dark:bg-surface-raised flex items-center gap-2 rounded-2xl border border-gray-200 bg-white py-1.5 pr-2.5 pl-1.5 shadow-[var(--card-shadow)] transition-colors hover:border-[#F15D22]"
       aria-haspopup="menu"
       :aria-expanded="show ? 'true' : 'false'"
       @click.stop="toggle"
@@ -171,7 +171,7 @@ onUnmounted(() => {
         :style="popoverStyle"
         role="menu"
         :aria-label="t('todo.sortLabel')"
-        class="z-50 min-w-[12rem] rounded-2xl border border-gray-200 bg-white p-1.5 shadow-[var(--soft-shadow)] dark:border-slate-600 dark:bg-slate-800"
+        class="dark:border-line-strong dark:bg-surface-raised z-50 min-w-[12rem] rounded-2xl border border-gray-200 bg-white p-1.5 shadow-[var(--soft-shadow)]"
         @click.stop
         @keydown="onMenuKeydown"
       >

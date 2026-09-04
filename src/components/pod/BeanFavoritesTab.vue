@@ -80,21 +80,21 @@ function closeModal(): void {
         v-for="f in favorites"
         :key="f.id"
         type="button"
-        class="flex flex-col items-start gap-2 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+        class="dark:bg-surface-raised flex flex-col items-start gap-2 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
         @click="openEdit(f)"
       >
         <span class="text-2xl" aria-hidden="true">{{ CATEGORY_EMOJI[f.category] }}</span>
-        <h4 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
+        <h4 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
           {{ f.name }}
         </h4>
         <p
           v-if="f.description"
-          class="font-outfit text-secondary-500/70 line-clamp-3 text-sm dark:text-gray-400"
+          class="font-outfit text-secondary-500/70 dark:text-ink-soft line-clamp-3 text-sm"
         >
           {{ f.description }}
         </p>
         <span
-          class="font-outfit text-secondary-500/50 text-[0.6875rem] font-semibold tracking-wide uppercase"
+          class="font-outfit text-secondary-500/50 dark:text-ink-soft text-[0.6875rem] font-semibold tracking-wide uppercase"
         >
           {{ t(`favorites.category.${f.category}`) }}
         </span>
@@ -111,7 +111,7 @@ function closeModal(): void {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="💝"

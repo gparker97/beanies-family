@@ -108,10 +108,10 @@ async function copy(value: string): Promise<void> {
     <SegmentWhenBand v-if="item.timing?.band" :band="item.timing.band" />
 
     <!-- Expanded: always list who's travelling -->
-    <div class="divide-y divide-gray-100 dark:divide-slate-700/40">
+    <div class="dark:divide-surface-overlay/40 divide-y divide-gray-100">
       <div v-if="item.travellers.length" class="flex items-center gap-3 py-1 first:pt-0 last:pb-0">
         <span
-          class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
+          class="font-outfit dark:text-ink-faint w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase"
         >
           {{ t('vacation.field.travelling') }}
         </span>
@@ -126,7 +126,7 @@ async function copy(value: string): Promise<void> {
       >
         <!-- Label -->
         <span
-          class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
+          class="font-outfit dark:text-ink-faint w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase"
         >
           {{ row.label }}
         </span>
@@ -134,7 +134,7 @@ async function copy(value: string): Promise<void> {
         <!-- Copyable value (booking ref only) -->
         <button
           v-if="row.copyable"
-          class="font-outfit inline-flex items-center gap-1.5 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2.5 py-0.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
+          class="font-outfit dark:bg-surface-overlay inline-flex items-center gap-1.5 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2.5 py-0.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:text-white"
           @click="copy(row.value)"
         >
           {{ row.value }}
@@ -180,7 +180,7 @@ async function copy(value: string): Promise<void> {
         <ExpandableText
           v-else-if="row.field"
           :text="String(row.value ?? '')"
-          text-class="font-outfit text-sm font-medium text-gray-900 dark:text-gray-100"
+          text-class="font-outfit text-sm font-medium text-gray-900 dark:text-ink"
         />
 
         <!-- Map link (entire row clickable) -->
@@ -217,7 +217,7 @@ async function copy(value: string): Promise<void> {
         </div>
 
         <!-- Plain read-only value -->
-        <span v-else class="text-sm text-gray-900 dark:text-gray-100">
+        <span v-else class="dark:text-ink text-sm text-gray-900">
           {{ row.value }}
         </span>
       </div>

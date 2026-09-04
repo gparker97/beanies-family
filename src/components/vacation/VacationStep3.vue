@@ -166,7 +166,7 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
   <!-- Step header -->
   <div class="mb-5 text-center">
     <div class="text-3xl">🏨</div>
-    <h2 class="font-outfit text-lg font-bold text-[var(--color-text)] dark:text-gray-100">
+    <h2 class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
       {{ t('vacation.step3.title') }}
     </h2>
     <p class="text-xs text-[var(--color-text-muted)]">
@@ -200,7 +200,7 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
             :class="
               item.status === s.value
                 ? 'bg-[var(--vacation-teal)] text-white'
-                : 'bg-[var(--tint-slate-5)] text-gray-500 hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+                : 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-5)] text-gray-500 hover:bg-[var(--tint-slate-10)]'
             "
             @click="updateStatus(index, s.value)"
           >
@@ -304,11 +304,11 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
         v-for="at in accommodationTypes"
         :key="at.type"
         type="button"
-        class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-3 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+        class="dark:bg-surface-raised relative flex flex-col items-center rounded-xl border border-transparent bg-white p-3 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)]"
         @click="addItem(at.type)"
       >
         <span class="text-2xl">{{ at.emoji }}</span>
-        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+        <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
           {{ t(`vacation.accommodation.${at.key}` as any) }}
         </span>
       </button>
@@ -320,7 +320,7 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
         v-for="at in accommodationTypes"
         :key="at.type"
         type="button"
-        class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+        class="dark:border-line-strong rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:text-teal-400 dark:hover:border-teal-500"
         @click="addItem(at.type)"
       >
         + {{ at.emoji }} {{ t(`vacation.accommodation.${at.key}` as any) }}

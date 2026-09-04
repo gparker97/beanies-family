@@ -81,7 +81,7 @@ function footerText(s: SayingItem): string {
     </div>
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-10 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="💬"

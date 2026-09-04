@@ -15,10 +15,12 @@ interface WindowBackgroundPlugin {
 }
 const WindowBackground = registerPlugin<WindowBackgroundPlugin>('WindowBackground');
 
-// #53 keep-in-sync: these MUST equal the App.vue root `bg-gray-50` / `dark:bg-slate-900`
-// and the native android .../colors.xml `windowBackground` (Tailwind gray-50 / slate-900).
+// #53 keep-in-sync: these MUST equal the App.vue root `bg-gray-50` / `dark:bg-surface-ground`
+// and the native android .../colors.xml `windowBackground` (Tailwind gray-50 /
+// the dark scale's `surface-ground`). A mismatch shows as a seam behind the
+// edge-to-edge status bar and on overscroll.
 const APP_BG_LIGHT = '#F9FAFB';
-const APP_BG_DARK = '#0F172A';
+const APP_BG_DARK = '#151E27';
 
 /**
  * Native (Capacitor) shell wiring — ADR-029 A5. The single home for runtime

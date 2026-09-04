@@ -56,9 +56,9 @@ const body = computed(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="dark:bg-surface-raised mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl">
     <button
-      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="dark:text-ink-soft dark:hover:text-ink mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
       @click="emit('back')"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,15 +73,15 @@ const body = computed(() => {
         alt=""
         class="mx-auto mb-3 h-16 w-16"
       />
-      <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
         {{ proven ? t('loginFlow.recoveryTitle') : t('loginFlow.recoveryTitleUnproven') }}
       </h2>
-      <p v-if="familyName" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <p v-if="familyName" class="dark:text-ink-soft mt-1 text-sm text-gray-500">
         {{ familyName }}
       </p>
     </div>
 
-    <p class="mb-6 text-center text-sm text-gray-600 dark:text-gray-400">
+    <p class="dark:text-ink-soft mb-6 text-center text-sm text-gray-600">
       {{ body }}
     </p>
 
@@ -89,7 +89,7 @@ const body = computed(() => {
     <div
       v-if="error"
       role="alert"
-      class="mb-4 rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
+      class="dark:text-danger-lift mb-4 rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20"
     >
       {{ error }}
     </div>
@@ -119,7 +119,7 @@ const body = computed(() => {
       </BaseButton>
 
       <button
-        class="w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        class="dark:text-ink-soft dark:hover:text-ink w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700"
         @click="emit('use-bootstrap')"
       >
         {{ t('loginFlow.recoveryUseBootstrap') }}

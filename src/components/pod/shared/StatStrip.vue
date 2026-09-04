@@ -47,7 +47,7 @@ const ACCENT_CLASS: Record<NonNullable<Stat['accent']>, string> = {
     <div
       v-for="(stat, i) in stats"
       :key="i"
-      class="flex flex-col items-center gap-0.5 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-3 text-center sm:px-4 dark:bg-slate-700/40"
+      class="dark:bg-surface-overlay/40 flex flex-col items-center gap-0.5 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-3 text-center sm:px-4"
     >
       <span v-if="stat.emoji" class="text-lg leading-none" aria-hidden="true">{{
         stat.emoji
@@ -59,7 +59,7 @@ const ACCENT_CLASS: Record<NonNullable<Stat['accent']>, string> = {
         {{ stat.value }}
       </span>
       <span
-        class="font-outfit text-secondary-500/60 text-[0.6875rem] leading-tight font-medium dark:text-gray-400"
+        class="font-outfit text-secondary-500/60 dark:text-ink-soft text-[0.6875rem] leading-tight font-medium"
       >
         {{ stat.label }}
       </span>

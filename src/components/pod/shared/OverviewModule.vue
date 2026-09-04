@@ -47,7 +47,7 @@ defineEmits<{
     :class="[
       tone === 'safety'
         ? 'border border-[rgb(241_93_34_/_15%)] bg-[rgb(241_93_34_/_4%)]'
-        : 'bg-white dark:bg-slate-800',
+        : 'dark:bg-surface-raised bg-white',
       clickable
         ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] focus-visible:ring-2 focus-visible:ring-[#F15D22] focus-visible:ring-offset-2'
         : '',
@@ -63,7 +63,7 @@ defineEmits<{
         <span class="text-xl" aria-hidden="true">{{ emoji }}</span>
         <h3
           class="font-outfit truncate text-sm font-bold"
-          :class="tone === 'safety' ? 'text-primary-500' : 'text-secondary-500 dark:text-gray-100'"
+          :class="tone === 'safety' ? 'text-primary-500' : 'text-secondary-500 dark:text-ink'"
         >
           {{ title }}
         </h3>
@@ -72,15 +72,15 @@ defineEmits<{
           class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold tracking-wide uppercase"
           :class="
             headerChip.variant === 'success'
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+              ? 'dark:text-success-lift bg-green-100 text-green-700 dark:bg-green-900/30'
+              : 'dark:text-danger-lift bg-red-100 text-red-700 dark:bg-red-900/30'
           "
         >
           {{ headerChip.label }}
         </span>
         <span
           v-else-if="count !== null && count !== undefined"
-          class="font-outfit text-secondary-500/60 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold dark:bg-slate-700 dark:text-gray-400"
+          class="font-outfit text-secondary-500/60 dark:bg-surface-overlay dark:text-ink-soft inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold"
         >
           {{ count }}
         </span>

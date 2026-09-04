@@ -105,7 +105,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
   <div class="space-y-6">
     <!-- Hero -->
     <header
-      class="relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6 dark:bg-slate-800"
+      class="dark:bg-surface-raised relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6"
     >
       <div
         class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-[var(--card-shadow)] sm:h-14 sm:w-14 sm:text-3xl"
@@ -116,18 +116,18 @@ function emailFor(c: EmergencyContact, e: Event): void {
       <div class="min-w-0 flex-1">
         <button
           type="button"
-          class="font-outfit text-secondary-500/60 hover:text-primary-500 mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
+          class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
           @click="router.push('/pod')"
         >
           <BeanieIcon name="chevron-left" size="xs" />
           <span>{{ t('bean.backToPod') }}</span>
         </button>
         <h1
-          class="font-outfit text-secondary-500 text-xl leading-tight font-extrabold sm:text-2xl dark:text-gray-100"
+          class="font-outfit text-secondary-500 dark:text-ink text-xl leading-tight font-extrabold sm:text-2xl"
         >
           {{ t('contacts.title') }}
         </h1>
-        <p class="text-secondary-500/75 mt-1 text-sm">
+        <p class="text-secondary-500/75 dark:text-ink-soft mt-1 text-sm">
           <span class="font-caveat text-[#E67E22]">{{ t('contacts.subtitleLead') }}</span>
           <br />
           {{ t('contacts.subtitle') }}
@@ -145,13 +145,13 @@ function emailFor(c: EmergencyContact, e: Event): void {
     <!-- Search + filter toolbar -->
     <div v-if="store.contacts.length" class="mb-5 flex flex-wrap items-center gap-3">
       <label
-        class="flex min-w-[240px] flex-1 items-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-2.5 focus-within:border-[var(--color-primary)] dark:bg-slate-800"
+        class="dark:bg-surface-raised flex min-w-[240px] flex-1 items-center gap-2 rounded-2xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-2.5 focus-within:border-[var(--color-primary)]"
       >
-        <span aria-hidden="true" class="text-secondary-500/50">🔍</span>
+        <span aria-hidden="true" class="text-secondary-500/50 dark:text-ink-soft">🔍</span>
         <input
           v-model="search"
           type="search"
-          class="font-inter w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] dark:text-gray-100"
+          class="font-inter dark:text-ink w-full border-none bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
           :placeholder="t('contacts.searchPlaceholder')"
         />
       </label>
@@ -162,7 +162,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
           :class="
             filter === 'all'
               ? 'bg-[var(--color-primary)] text-white shadow-sm'
-              : 'text-secondary-500 bg-[var(--tint-slate-5)] hover:bg-[var(--tint-orange-4)] dark:bg-slate-700 dark:text-gray-200'
+              : 'text-secondary-500 dark:bg-surface-overlay dark:text-ink bg-[var(--tint-slate-5)] hover:bg-[var(--tint-orange-4)]'
           "
           @click="filter = 'all'"
         >
@@ -177,7 +177,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
           :class="
             filter === cat
               ? 'bg-[var(--color-primary)] text-white shadow-sm'
-              : 'text-secondary-500 bg-[var(--tint-slate-5)] hover:bg-[var(--tint-orange-4)] dark:bg-slate-700 dark:text-gray-200'
+              : 'text-secondary-500 dark:bg-surface-overlay dark:text-ink bg-[var(--tint-slate-5)] hover:bg-[var(--tint-orange-4)]'
           "
           :disabled="!countsByCategory[cat]"
           @click="filter = cat"
@@ -193,11 +193,11 @@ function emailFor(c: EmergencyContact, e: Event): void {
     <div v-if="grouped.length" class="space-y-6">
       <section v-for="group in grouped" :key="group.category">
         <h2
-          class="font-outfit text-secondary-500/70 mb-2 flex items-center gap-2 text-xs font-bold tracking-[0.08em] uppercase dark:text-gray-400"
+          class="font-outfit text-secondary-500/70 dark:text-ink-soft mb-2 flex items-center gap-2 text-xs font-bold tracking-[0.08em] uppercase"
         >
           <span aria-hidden="true" class="text-base">{{ CATEGORY_EMOJI[group.category] }}</span>
           <span>{{ t(`contacts.category.${group.category}`) }}</span>
-          <span class="text-secondary-500/40 text-[0.625rem] font-semibold">{{
+          <span class="text-secondary-500/40 dark:text-ink-faint text-[0.625rem] font-semibold">{{
             group.entries.length
           }}</span>
         </h2>
@@ -207,7 +207,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
             :key="c.id"
             role="button"
             tabindex="0"
-            class="flex cursor-pointer items-start gap-3 rounded-[var(--sq)] bg-white p-4 shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="dark:bg-surface-raised flex cursor-pointer items-start gap-3 rounded-[var(--sq)] bg-white p-4 shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
             @click="openEdit(c)"
             @keyup.enter="openEdit(c)"
           >
@@ -219,7 +219,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
             </div>
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <h3 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
+                <h3 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
                   {{ c.name }}
                 </h3>
                 <span
@@ -231,13 +231,13 @@ function emailFor(c: EmergencyContact, e: Event): void {
               </div>
               <p
                 v-if="c.role"
-                class="font-inter text-secondary-500/70 mt-0.5 text-sm dark:text-gray-400"
+                class="font-inter text-secondary-500/70 dark:text-ink-soft mt-0.5 text-sm"
               >
                 {{ c.role }}
               </p>
               <div
                 v-if="c.phone || c.email || c.address"
-                class="font-inter text-secondary-500/60 mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs dark:text-gray-400"
+                class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs"
               >
                 <span v-if="c.phone">📞 {{ c.phone }}</span>
                 <span v-if="c.email">✉️ {{ c.email }}</span>
@@ -245,7 +245,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
               </div>
               <p
                 v-if="c.notes"
-                class="font-inter text-secondary-500/60 mt-1.5 text-xs italic dark:text-gray-400"
+                class="font-inter text-secondary-500/60 dark:text-ink-soft mt-1.5 text-xs italic"
               >
                 {{ c.notes }}
               </p>
@@ -278,7 +278,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
     <!-- Empty / no-results state -->
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="🆘"

@@ -222,19 +222,19 @@ watch(
       <div class="space-y-2">
         <p
           v-if="account.institution"
-          class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300"
+          class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/70"
         >
           {{ account.institution }}
         </p>
-        <p v-if="coOwnerNames" class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300">
+        <p v-if="coOwnerNames" class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/70">
           {{ t('accounts.jointOwners') }}: {{ coOwnerNames }}
         </p>
-        <p v-if="forNames" class="font-outfit text-sm text-[#2C3E50]/70 dark:text-gray-300">
+        <p v-if="forNames" class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/70">
           {{ t('accounts.forWhom') }}: {{ forNames }}
         </p>
         <div>
           <p
-            class="font-outfit mb-1 text-xs tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+            class="font-outfit dark:text-ink-faint mb-1 text-xs tracking-[0.08em] text-[#2C3E50]/50 uppercase"
           >
             {{ t('accounts.currentBalance') }}
           </p>
@@ -255,7 +255,7 @@ watch(
       <!-- Activity section (shared renderer) -->
       <div class="space-y-3">
         <h3
-          class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
+          class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase"
         >
           {{ t('accountView.activity') }}
         </h3>
@@ -279,7 +279,7 @@ watch(
     <template #footer-start>
       <button
         type="button"
-        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50"
         @click="emit('close')"
       >
         {{ t('action.close') }}

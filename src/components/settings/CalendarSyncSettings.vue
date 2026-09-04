@@ -245,7 +245,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
     @save="emit('close')"
   >
     <div class="space-y-5">
-      <p class="text-[0.85rem] leading-snug text-[var(--deep-slate)]/70 dark:text-slate-300">
+      <p class="dark:text-ink-soft text-[0.85rem] leading-snug text-[var(--deep-slate)]/70">
         {{ t('calendarSync.intro') }}
       </p>
 
@@ -254,13 +254,13 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
         <div
           v-for="connection in store.connections"
           :key="connection.id"
-          class="space-y-2 rounded-2xl border border-[var(--tint-slate-05)] p-3 dark:border-slate-700"
+          class="dark:border-line space-y-2 rounded-2xl border border-[var(--tint-slate-05)] p-3"
         >
           <div class="flex items-center justify-between gap-2">
-            <span class="truncate font-medium text-[var(--deep-slate)] dark:text-slate-100">
+            <span class="dark:text-ink truncate font-medium text-[var(--deep-slate)]">
               {{ connection.accountEmail }}
             </span>
-            <span class="shrink-0 text-[0.75rem] text-[var(--deep-slate)]/60 dark:text-slate-400">
+            <span class="dark:text-ink-soft shrink-0 text-[0.75rem] text-[var(--deep-slate)]/60">
               {{ t(statusKey(connection.status)) }}
             </span>
           </div>
@@ -304,7 +304,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
       <!-- Clash nudge toggle (#34) — shown once a calendar is connected. -->
       <div
         v-if="clashNudgeFlagOn && store.connections.length > 0"
-        class="rounded-2xl border border-[var(--tint-slate-05)] px-3 dark:border-slate-700"
+        class="dark:border-line rounded-2xl border border-[var(--tint-slate-05)] px-3"
       >
         <SettingToggleRow
           :model-value="settingsStore.calendarClashNudgeEnabled"

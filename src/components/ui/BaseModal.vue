@@ -94,7 +94,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
             v-if="open"
             role="dialog"
             aria-modal="true"
-            class="relative flex w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-slate-800"
+            class="dark:bg-surface-raised relative flex w-full flex-col overflow-hidden bg-white shadow-xl"
             :class="
               isFullscreen
                 ? 'h-full max-h-full rounded-none'
@@ -109,11 +109,11 @@ useFullscreenOverlay(toRef(props, 'open'), close);
               :class="
                 customHeader
                   ? ''
-                  : 'flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700'
+                  : 'dark:border-line flex items-center justify-between border-b border-gray-200 px-6 py-4'
               "
             >
               <slot name="header">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h2 class="dark:text-ink text-lg font-semibold text-gray-900">
                   {{ title }}
                 </h2>
               </slot>
@@ -121,7 +121,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
               <button
                 v-if="closable && !customHeader"
                 type="button"
-                class="rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+                class="dark:hover:bg-surface-hover dark:hover:text-ink-soft rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
                 @click="close"
               >
                 <BeanieIcon name="close" size="md" />
@@ -136,7 +136,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
             <!-- Footer -->
             <div
               v-if="$slots.footer"
-              class="shrink-0 rounded-b-3xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
+              class="dark:border-line dark:bg-surface-ground shrink-0 rounded-b-3xl border-t border-gray-200 bg-gray-50 px-6 py-4"
             >
               <slot name="footer" />
             </div>

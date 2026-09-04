@@ -98,7 +98,7 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
         :class="
           isAutoSelected(cat)
             ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-            : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+            : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
         "
         @click="selectCategory(cat)"
       >
@@ -146,7 +146,7 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
           :class="
             modelValue === sub.type
               ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-              : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+              : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
           "
           @click="selectType(sub.type)"
         >
@@ -174,7 +174,7 @@ function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
               :class="
                 modelValue === sub.type
                   ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-                  : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+                  : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
               "
               @click="selectType(sub.type)"
             >

@@ -202,7 +202,7 @@ async function updateAskBeforePhotos(ask: boolean) {
           @update:model-value="onPickTier"
         />
         <p
-          class="rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-[0.8rem] leading-snug text-[var(--deep-slate)]/70 dark:bg-slate-800 dark:text-slate-300"
+          class="dark:bg-surface-raised dark:text-ink-soft rounded-2xl bg-[var(--tint-silk-20)] px-3 py-2.5 text-[0.8rem] leading-snug text-[var(--deep-slate)]/70"
         >
           {{ privacyText }}
         </p>
@@ -239,7 +239,7 @@ async function updateAskBeforePhotos(ask: boolean) {
       </div>
 
       <!-- Relocated "ask before photos" consent toggle (divider above separates it from BYOK) -->
-      <div class="border-t border-[var(--tint-slate-05)] dark:border-slate-700">
+      <div class="dark:border-line border-t border-[var(--tint-slate-05)]">
         <SettingToggleRow
           testid="ai-consent-toggle"
           :title="t('settings.ai.askBeforePhotos')"

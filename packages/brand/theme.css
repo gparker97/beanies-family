@@ -19,6 +19,12 @@
   --color-primary-600: #d14d1a;
   --color-primary-700: #b33e15;
 
+  /* `primary-900` is used at low alpha as the dark-mode tint behind a selected
+     pill (`dark:bg-primary-900/20`) in 12 places — but it was never defined, so
+     Tailwind emitted nothing and those pills kept their LIGHT `bg-primary-50`
+     in dark mode. Accent text on that read 2.12:1; on this tint it reads 6.21. */
+  --color-primary-900: #6b2409;
+
   /* Deep Slate scale.
      `secondary-400` was originally #5d7a8a — visually pleasing as a muted
      body slate but rendered ~4.3:1 on cloud-white backgrounds, just below
@@ -31,6 +37,15 @@
   --color-secondary-500: #2c3e50;
   --color-secondary-600: #243442;
   --color-secondary-700: #1a252f;
+
+  /* Same story as `primary-900`: referenced by `dark:bg-secondary-900`
+     (OpenFromDrivePage) but never defined, so that wrapper had no background
+     in either mode. `cloud-white` below is the brand's Cloud White, referenced
+     as `bg-cloud-white` on the same element. */
+  --color-secondary-900: #101820;
+
+  /* Cloud White — the brand's page ground, as a named utility. */
+  --color-cloud-white: #f8f9fa;
 
   /* Sky Silk */
   --color-sky-silk-50: #f0f7fd;
@@ -62,4 +77,61 @@
      the multiplier here is a one-line change that re-tunes the whole app.
      1.1875× = 16 px → 19 px root, the default Large mode bump. */
   --text-scale-large: 1.1875;
+
+  /* Dark-mode semantic scale
+     ──────────────────────────────────────────────────────────────────────
+     These are DARK-MODE VALUES ONLY. They are always used behind the
+     `dark:` variant (`dark:text-ink-soft`, `dark:bg-surface-raised`), never
+     bare — light mode keeps the palette it already had, so adopting these
+     changes nothing before sunset.
+
+     Why they exist: dark mode used to be written by hand, 1,420
+     `dark:text-*` utilities across 290 files, reaching for Tailwind's grey
+     ramp while the surfaces underneath used its slate ramp. Two hue
+     families, and 580 of those instances landed below the WCAG AA 4.5:1
+     floor for body text (`dark:text-gray-400` = 3.98 on the commonest card,
+     `dark:text-gray-500` = 2.14). An early adopter reported it as "text is
+     gray" and he was right.
+
+     The ladder below is measured, not estimated. Every ink clears AA
+     against ALL FOUR surfaces, so a component can move up or down the
+     elevation ladder without needing a fresh contrast review:
+
+                    ground  raised  overlay  hover
+       ink          15.38   13.32   11.66    10.03
+       ink-soft     10.52    9.11    7.97     6.86
+       ink-faint     6.98    6.05    5.29     4.56
+       line-strong   4.74    4.10    3.59     3.09   (3:1 UI floor)
+
+     Surfaces step upward in the order below; a modal sits above a card,
+     a card sits above the page. See `.claude/skills/beanies-theme/SKILL.md`
+     § Dark mode for the usage rules and the lint rule that enforces them. */
+  --color-surface-ground: #151e27;
+  --color-surface-raised: #1e2a36;
+  --color-surface-overlay: #26343f;
+  --color-surface-hover: #2f3e4b;
+
+  /* The scrapbook surfaces (cookbook hero, recipe hero, recipe source strip)
+     are cream `#fbf3e3` in light mode — that warm paper is part of the
+     character, so their dark twin is a warm dark rather than a flat slate
+     card. All three inks clear AA on it: 14.42 / 9.86 / 6.55, and the
+     Terracotta subtitle reads 5.54. */
+  --color-surface-paper: #2a2119;
+  --color-ink: #f2f5f7;
+  --color-ink-soft: #c3ced6;
+  --color-ink-faint: #9aa9b4;
+  --color-line: #4a5b69;
+  --color-line-strong: #7a8a97;
+
+  /* Accents, lifted for a dark ground. On dark you LIGHTEN an accent, never
+     darken it — darkening moves it toward the background. The old CIG rule
+     said to mute Heritage Orange to #E0551F on dark, which scored 4.07 on
+     the page ground and 2.43 on a card: worse than leaving it alone. These
+     are for accent TEXT and ICONS on dark. Filled buttons keep the true
+     brand colour (`primary-500`) with white ink, exactly as before. */
+  --color-accent-lift: #ff8b5e; /* Heritage Orange  7.30 / 6.33 */
+  --color-terracotta-lift: #f0a05a; /* Terracotta       7.92 / 6.86 */
+  --color-success-lift: #5fd08a; /* Growth green     8.72 / 7.55 */
+  --color-danger-lift: #ff8484; /* Destructive      7.13 / 6.17 */
+  --color-purple-lift: #cb95dd; /* To-do purple     7.12 / 6.17 */
 }

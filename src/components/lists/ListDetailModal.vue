@@ -372,7 +372,7 @@ async function handleDelete(): Promise<void> {
           ref="titleInputRef"
           v-model="draftTitle"
           type="text"
-          class="font-outfit min-w-0 flex-1 border-b border-[var(--color-primary-500)] bg-transparent text-lg font-bold text-[var(--color-text)] outline-none dark:text-gray-100"
+          class="font-outfit dark:text-ink min-w-0 flex-1 border-b border-[var(--color-primary-500)] bg-transparent text-lg font-bold text-[var(--color-text)] outline-none"
           :placeholder="t('lists.detail.titlePlaceholder')"
           :aria-label="t('lists.detail.editTitle')"
           @keyup.enter="inline.saveField('title')"
@@ -624,8 +624,10 @@ async function handleDelete(): Promise<void> {
   padding: 0.375rem 0.6875rem;
 }
 
-:global(.dark) .mb-pill {
-  background: var(--color-surface, #1e293b);
+html.dark .mb-pill {
+  /* surface-overlay: --color-surface now equals the modal panel's own
+     surface-raised, so these would vanish into it. */
+  background: #26343f;
 }
 
 .mb-due {
@@ -646,8 +648,10 @@ async function handleDelete(): Promise<void> {
   padding: 0.75rem 0.875rem;
 }
 
-:global(.dark) .setsec {
-  background: var(--color-surface, #1e293b);
+html.dark .setsec {
+  /* surface-overlay: --color-surface now equals the modal panel's own
+     surface-raised, so these would vanish into it. */
+  background: #26343f;
 }
 
 .lbl {

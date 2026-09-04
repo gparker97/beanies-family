@@ -11,7 +11,7 @@ const { t } = useTranslation();
 </script>
 
 <template>
-  <p class="flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+  <p class="dark:text-ink-soft flex items-start gap-1.5 text-xs text-gray-500">
     <span aria-hidden="true">🔒</span>
     <span>{{ t('settings.adminOnly') }}</span>
   </p>

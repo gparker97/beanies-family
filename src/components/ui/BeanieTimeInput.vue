@@ -273,7 +273,7 @@ onBeforeUnmount(() => {
   <div class="space-y-1">
     <label
       v-if="label"
-      class="font-outfit block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+      class="font-outfit dark:text-ink-soft block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
     >
       {{ label }}
       <span v-if="required" class="text-primary-500">*</span>
@@ -288,7 +288,7 @@ onBeforeUnmount(() => {
         :class="[
           modelValue
             ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-            : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400',
+            : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]',
           disabled && 'cursor-not-allowed opacity-50',
         ]"
         @click="toggle"
@@ -324,11 +324,11 @@ onBeforeUnmount(() => {
             v-if="isOpen"
             ref="popoverRef"
             :style="popoverStyle"
-            class="z-50 w-[248px] overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:border-slate-600 dark:bg-slate-800"
+            class="dark:border-line-strong dark:bg-surface-raised z-50 w-[248px] overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)]"
           >
             <!-- Column headers -->
             <div
-              class="grid grid-cols-[1fr_1fr_auto] gap-2 border-b border-[var(--tint-slate-10)] px-3 pt-2 pb-1.5 dark:border-slate-700"
+              class="dark:border-line grid grid-cols-[1fr_1fr_auto] gap-2 border-b border-[var(--tint-slate-10)] px-3 pt-2 pb-1.5"
             >
               <div
                 class="font-outfit text-center text-[0.625rem] font-bold tracking-wider text-[var(--color-text-muted)] uppercase opacity-60"
@@ -364,7 +364,7 @@ onBeforeUnmount(() => {
                   :class="[
                     draftHour === h && !!modelValue
                       ? 'bg-gradient-to-br from-[#F15D22] to-[#E67E22] text-white shadow-sm'
-                      : 'dark:hover:bg-primary-500/10 text-[var(--color-text)] hover:bg-[var(--tint-orange-8)] dark:text-gray-100',
+                      : 'dark:hover:bg-primary-500/10 dark:text-ink text-[var(--color-text)] hover:bg-[var(--tint-orange-8)]',
                     disabledHour(h) && 'cursor-not-allowed opacity-25',
                   ]"
                   @click="selectHour(h)"
@@ -389,8 +389,8 @@ onBeforeUnmount(() => {
                     draftMinute === m && !!modelValue
                       ? 'bg-gradient-to-br from-[#F15D22] to-[#E67E22] text-white shadow-sm'
                       : m % 5 === 0
-                        ? 'dark:hover:bg-primary-500/10 text-[var(--color-text)] hover:bg-[var(--tint-orange-8)] dark:text-gray-100'
-                        : 'text-[var(--color-text-muted)] opacity-60 hover:bg-[var(--tint-orange-8)] hover:opacity-100 dark:text-gray-400',
+                        ? 'dark:hover:bg-primary-500/10 dark:text-ink text-[var(--color-text)] hover:bg-[var(--tint-orange-8)]'
+                        : 'dark:text-ink-soft text-[var(--color-text-muted)] opacity-60 hover:bg-[var(--tint-orange-8)] hover:opacity-100',
                     disabledMinute(m) && 'cursor-not-allowed opacity-25',
                   ]"
                   @click="selectMinute(m)"
@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
                   :class="[
                     draftPeriod === p && !!modelValue
                       ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
-                      : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-200',
+                      : 'dark:bg-surface-overlay dark:text-ink border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-10)]',
                     disabledPeriod(p) && 'cursor-not-allowed opacity-40',
                   ]"
                   @click="selectPeriod(p)"
@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
                  close affordance — value is already saved on each tap, Done
                  just signals "I'm finished, dismiss." -->
             <div
-              class="flex items-center justify-between gap-2 border-t border-[var(--tint-slate-10)] px-3 py-1.5 dark:border-slate-700"
+              class="dark:border-line flex items-center justify-between gap-2 border-t border-[var(--tint-slate-10)] px-3 py-1.5"
             >
               <button
                 type="button"

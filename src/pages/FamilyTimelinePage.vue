@@ -136,14 +136,14 @@ function openMilestone(m: Milestone): void {
         <div class="min-w-0 flex-1">
           <button
             type="button"
-            class="font-outfit text-secondary-500/60 hover:text-primary-500 mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
+            class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
             @click="router.push('/pod')"
           >
             <BeanieIcon name="chevron-left" size="xs" />
             <span>{{ t('bean.backToPod') }}</span>
           </button>
           <h1
-            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
+            class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none"
           >
             {{ t('milestones.pageTitle') }}
           </h1>
@@ -183,7 +183,7 @@ function openMilestone(m: Milestone): void {
           <!-- Year tag — handwritten Caveat, slightly tilted, small
                shadow. "Hangs" on the rail with a small tape-edge feel. -->
           <div
-            class="timeline-year relative mb-4 inline-flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1 shadow-[0_2px_6px_rgba(241,93,34,0.12)] dark:bg-slate-700"
+            class="timeline-year dark:bg-surface-overlay relative mb-4 inline-flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1 shadow-[0_2px_6px_rgba(241,93,34,0.12)]"
           >
             <span class="font-caveat text-3xl leading-none text-[#E67E22]">{{ bucket.year }}</span>
           </div>
@@ -211,17 +211,17 @@ function openMilestone(m: Milestone): void {
               <button
                 type="button"
                 :disabled="m.memberId === null"
-                class="timeline-card relative block w-full rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-transform dark:bg-slate-800"
+                class="timeline-card dark:bg-surface-raised relative block w-full rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-transform"
                 :class="m.memberId === null ? 'cursor-default' : 'hover:scale-[1.01]'"
                 @click="openMilestone(m)"
               >
                 <p
-                  class="font-outfit text-primary-600 text-[0.625rem] font-semibold tracking-wide uppercase dark:text-orange-300"
+                  class="font-outfit text-primary-600 dark:text-accent-lift text-[0.625rem] font-semibold tracking-wide uppercase"
                 >
                   {{ formatDateShort(m.occurredOn) }}
                 </p>
                 <h3
-                  class="font-outfit text-secondary-500 mt-0.5 text-sm leading-tight font-bold sm:text-base dark:text-gray-100"
+                  class="font-outfit text-secondary-500 dark:text-ink mt-0.5 text-sm leading-tight font-bold sm:text-base"
                 >
                   {{ m.title }}
                 </h3>
@@ -229,7 +229,7 @@ function openMilestone(m: Milestone): void {
                   <template v-if="memberLabel(m).kind === 'family'">
                     <span class="text-base leading-none" aria-hidden="true">🏡</span>
                     <span
-                      class="font-outfit text-secondary-500/70 text-[0.6875rem] font-semibold dark:text-gray-400"
+                      class="font-outfit text-secondary-500/70 dark:text-ink-soft text-[0.6875rem] font-semibold"
                     >
                       {{ t('milestone.familyPill') }}
                     </span>
@@ -241,14 +241,14 @@ function openMilestone(m: Milestone): void {
                       aria-hidden="true"
                     />
                     <span
-                      class="font-outfit text-secondary-500/70 truncate text-[0.6875rem] font-semibold dark:text-gray-400"
+                      class="font-outfit text-secondary-500/70 dark:text-ink-soft truncate text-[0.6875rem] font-semibold"
                     >
                       {{ memberLabel(m).member!.name }}
                     </span>
                   </template>
                   <template v-else>
                     <span
-                      class="font-outfit text-secondary-500/60 text-[0.6875rem] font-semibold italic dark:text-gray-500"
+                      class="font-outfit text-secondary-500/60 dark:text-ink-faint text-[0.6875rem] font-semibold italic"
                     >
                       {{ t('milestone.unknownBean') }}
                     </span>
@@ -256,7 +256,7 @@ function openMilestone(m: Milestone): void {
                 </div>
                 <p
                   v-if="m.description"
-                  class="font-inter text-secondary-500/80 mt-2 line-clamp-2 text-xs leading-snug dark:text-gray-300"
+                  class="font-inter text-secondary-500/80 dark:text-ink-soft mt-2 line-clamp-2 text-xs leading-snug"
                 >
                   {{ m.description }}
                 </p>
@@ -270,7 +270,7 @@ function openMilestone(m: Milestone): void {
     <!-- Empty -->
     <div
       v-else
-      class="rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)] dark:bg-slate-800"
+      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-12 shadow-[var(--card-shadow)]"
     >
       <EmptyState
         emoji="🌟"
@@ -341,8 +341,8 @@ function openMilestone(m: Milestone): void {
   outline: 3px solid var(--color-background);
 }
 
-:global(.dark) .timeline-thumb {
-  outline-color: var(--color-background, #0f172a);
+html.dark .timeline-thumb {
+  outline-color: var(--color-background, #151e27);
 }
 
 /* Connecting nub between thumbnail and card — short horizontal line

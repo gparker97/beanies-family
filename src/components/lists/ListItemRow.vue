@@ -106,7 +106,7 @@ onBeforeUnmount(() => commitIfDirty());
       :class="
         item.completed
           ? 'border-transparent bg-gradient-to-br from-[var(--color-primary-500)] to-[#E67E22]'
-          : 'border-[var(--color-border)] bg-white dark:bg-slate-800'
+          : 'dark:bg-surface-raised border-[var(--color-border)] bg-white'
       "
       :aria-label="item.title"
       @click="$emit('toggle', item.id)"

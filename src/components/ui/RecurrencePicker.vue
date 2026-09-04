@@ -321,7 +321,7 @@ function stepN(delta: number) {
         class="font-outfit flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150"
         :class="
           s.uiMode === m
-            ? 'bg-white text-[var(--color-text)] shadow-sm dark:bg-slate-700'
+            ? 'dark:bg-surface-overlay bg-white text-[var(--color-text)] shadow-sm'
             : 'text-[var(--color-text-muted)]'
         "
         @click="setMode(m)"
@@ -415,7 +415,7 @@ function stepN(delta: number) {
             type="button"
             role="radio"
             :aria-checked="s.monthlyMode === opt.key"
-            class="flex items-center gap-3 rounded-xl border-2 bg-white px-4 py-3 text-left dark:bg-slate-700"
+            class="dark:bg-surface-overlay flex items-center gap-3 rounded-xl border-2 bg-white px-4 py-3 text-left"
             :class="
               s.monthlyMode === opt.key
                 ? accent === 'purple'

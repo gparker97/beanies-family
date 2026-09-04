@@ -267,7 +267,7 @@ function handleItemClick(item: QuickAddItem): void {
   margin: 0;
 }
 
-:global(.dark) .sheet-title {
+html.dark .sheet-title {
   color: rgb(241 242 244);
 }
 
@@ -311,11 +311,11 @@ function handleItemClick(item: QuickAddItem): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .sheet-close-x {
+html.dark .sheet-close-x {
   color: rgb(241 242 244 / 55%);
 }
 
-:global(.dark) .sheet-close-x:hover {
+html.dark .sheet-close-x:hover {
   background: rgb(241 242 244 / 10%);
   color: rgb(241 242 244);
 }
@@ -356,7 +356,7 @@ function handleItemClick(item: QuickAddItem): void {
   font-style: italic;
 }
 
-:global(.dark) .everyday-subhint {
+html.dark .everyday-subhint {
   color: rgb(241 242 244 / 65%);
 }
 
@@ -385,11 +385,6 @@ function handleItemClick(item: QuickAddItem): void {
     transform 0.15s ease-out,
     box-shadow 0.15s ease-out,
     border-color 0.15s ease-out;
-}
-
-:global(.dark) .everyday-item {
-  background: rgb(30 41 59);
-  border-color: rgb(241 93 34 / 25%);
 }
 
 .everyday-item:hover {
@@ -430,7 +425,7 @@ function handleItemClick(item: QuickAddItem): void {
   text-align: center;
 }
 
-:global(.dark) .everyday-label {
+html.dark .everyday-label {
   color: rgb(241 242 244);
 }
 
@@ -450,7 +445,7 @@ function handleItemClick(item: QuickAddItem): void {
   text-transform: uppercase;
 }
 
-:global(.dark) .secondary-title {
+html.dark .secondary-title {
   color: rgb(241 242 244 / 75%);
 }
 
@@ -465,7 +460,7 @@ function handleItemClick(item: QuickAddItem): void {
   text-transform: none;
 }
 
-:global(.dark) .secondary-suffix {
+html.dark .secondary-suffix {
   color: rgb(241 242 244 / 55%);
 }
 
@@ -516,12 +511,12 @@ function handleItemClick(item: QuickAddItem): void {
   transform: translateY(-1px);
 }
 
-:global(.dark) .secondary-item {
-  background: rgb(30 41 59);
+html.dark .secondary-item {
+  background: #1e2a36;
   border-color: rgb(241 242 244 / 10%);
 }
 
-:global(.dark) .secondary-item:hover {
+html.dark .secondary-item:hover {
   background: rgb(241 93 34 / 10%);
 }
 
@@ -546,7 +541,7 @@ function handleItemClick(item: QuickAddItem): void {
   line-height: 1.2;
 }
 
-:global(.dark) .secondary-label {
+html.dark .secondary-label {
   color: rgb(241 242 244);
 }
 
@@ -556,7 +551,7 @@ function handleItemClick(item: QuickAddItem): void {
   line-height: 1.3;
 }
 
-:global(.dark) .secondary-hint {
+html.dark .secondary-hint {
   color: rgb(241 242 244 / 60%);
 }
 
@@ -604,12 +599,12 @@ function handleItemClick(item: QuickAddItem): void {
   outline-offset: 2px;
 }
 
-:global(.dark) .sheet-close {
+html.dark .sheet-close {
   background: rgb(241 242 244 / 8%);
   color: rgb(241 242 244 / 80%);
 }
 
-:global(.dark) .sheet-close:hover {
+html.dark .sheet-close:hover {
   background: rgb(241 242 244 / 14%);
   color: rgb(241 242 244);
 }
@@ -653,6 +648,11 @@ function handleItemClick(item: QuickAddItem): void {
   .everyday-item:hover,
   .secondary-item:hover {
     transform: none;
+  }
+
+  html.dark .everyday-item {
+    background: #1e2a36;
+    border-color: rgb(241 93 34 / 25%);
   }
 }
 </style>

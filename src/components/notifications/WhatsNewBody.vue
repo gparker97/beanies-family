@@ -155,8 +155,8 @@ function handleSeeAll() {
   text-align: center;
 }
 
-:global(.dark) .wn-message {
-  color: #e2e8f0;
+html.dark .wn-message {
+  color: #f2f5f7;
 }
 
 /* headline + detail blocks — the "beanstalk list".
@@ -194,11 +194,11 @@ function handleSeeAll() {
   margin: 0;
 }
 
-:global(.dark) .wn-item-title {
-  color: #e2e8f0;
+html.dark .wn-item-title {
+  color: #f2f5f7;
 }
 
-:global(.dark) .wn-item-desc {
+html.dark .wn-item-desc {
   color: rgb(226 232 240 / 70%);
 }
 
@@ -261,9 +261,9 @@ function handleSeeAll() {
   width: 0.75rem;
 }
 
-:global(.dark) .wn-list:not(.single) .wn-item::before {
+html.dark .wn-list:not(.single .wn-item::before) {
   box-shadow:
-    0 0 0 4px #1e293b,
+    0 0 0 4px #1e2a36,
     0 3px 8px -3px rgb(241 93 34 / 70%);
 }
 
@@ -331,7 +331,7 @@ function handleSeeAll() {
   font-size: 0.75rem;
 }
 
-:global(.dark) .wn-fixes li {
+html.dark .wn-fixes li {
   color: rgb(226 232 240 / 55%);
 }
 
@@ -362,7 +362,7 @@ function handleSeeAll() {
   margin-top: 0.6875rem;
 }
 
-:global(.dark) .wn-tagline {
+html.dark .wn-tagline {
   color: rgb(226 232 240 / 30%);
 }
 </style>

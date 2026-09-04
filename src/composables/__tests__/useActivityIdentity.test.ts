@@ -136,7 +136,7 @@ describe('useActivityIdentity', () => {
 
   it('gives cards that own their surface an edge-only style', () => {
     // `background` is a shorthand and beats any class, so binding the full style on a
-    // card carrying `bg-white dark:bg-slate-800` silently replaced that surface.
+    // card carrying `bg-white dark:bg-surface-raised` silently replaced that surface.
     classify.mockReturnValue({ kind: 'solo', color: '#3b82f6', members: [member('a', '#3b82f6')] });
     const { identityFor } = useActivityIdentity();
     const id = identityFor(activity());

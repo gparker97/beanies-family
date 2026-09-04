@@ -173,7 +173,7 @@ watch(
 
 <template>
   <nav
-    class="fixed right-0 bottom-0 left-0 z-40 flex items-stretch border-t border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+    class="dark:border-line dark:bg-surface-ground fixed right-0 bottom-0 left-0 z-40 flex items-stretch border-t border-gray-200 bg-white"
     style="padding-bottom: env(safe-area-inset-bottom)"
     :aria-label="t('mobile.navigation')"
   >
@@ -235,7 +235,9 @@ watch(
         <span class="text-xl leading-none">{{ cat.emoji }}</span>
         <span
           class="font-outfit text-xs font-semibold"
-          :class="isCategoryActive(cat) ? 'text-primary-500' : 'text-secondary-500/40'"
+          :class="
+            isCategoryActive(cat) ? 'text-primary-500' : 'text-secondary-500/40 dark:text-ink-faint'
+          "
         >
           {{ t(cat.labelKey) }}
         </span>
@@ -288,10 +290,10 @@ watch(
   width: 46px;
 }
 
-:global(.dark) .calendar-hero {
-  /* slate-900 — matches the nav's dark surface (`dark:bg-slate-900`) so the
-     ring blends into the bar instead of showing a white halo. */
-  border-color: #0f172a;
+html.dark .calendar-hero {
+  /* surface-ground — matches the nav's dark surface (`dark:bg-surface-ground`) so
+     the ring blends into the bar instead of showing a halo. */
+  border-color: #151e27;
 }
 
 .calendar-label {

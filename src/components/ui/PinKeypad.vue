@@ -26,7 +26,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
       :key="key"
       type="button"
       :disabled="disabled"
-      class="font-outfit pin-key text-secondary-500 rounded-2xl bg-white font-bold shadow-[var(--card-shadow)] transition-transform active:scale-95 disabled:opacity-40 dark:bg-slate-800 dark:text-gray-100"
+      class="font-outfit pin-key text-secondary-500 dark:bg-surface-raised dark:text-ink rounded-2xl bg-white font-bold shadow-[var(--card-shadow)] transition-transform active:scale-95 disabled:opacity-40"
       @click="emit('digit', key)"
     >
       {{ key }}
@@ -35,7 +35,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
     <button
       type="button"
       :disabled="disabled"
-      class="font-outfit pin-key text-secondary-500 rounded-2xl bg-white font-bold shadow-[var(--card-shadow)] transition-transform active:scale-95 disabled:opacity-40 dark:bg-slate-800 dark:text-gray-100"
+      class="font-outfit pin-key text-secondary-500 dark:bg-surface-raised dark:text-ink rounded-2xl bg-white font-bold shadow-[var(--card-shadow)] transition-transform active:scale-95 disabled:opacity-40"
       @click="emit('digit', '0')"
     >
       0
@@ -43,7 +43,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
     <button
       type="button"
       :disabled="disabled"
-      class="pin-key text-secondary-500 rounded-2xl bg-white shadow-[var(--card-shadow)] transition-transform active:scale-95 disabled:opacity-40 dark:bg-slate-800 dark:text-gray-100"
+      class="pin-key text-secondary-500 dark:bg-surface-raised dark:text-ink rounded-2xl bg-white shadow-[var(--card-shadow)] transition-transform active:scale-95 disabled:opacity-40"
       :aria-label="t('pin.backspace')"
       @click="emit('backspace')"
     >

@@ -122,7 +122,7 @@ onMounted(() => {
  * so setting --fab-bg here swaps the gradient without shipping a
  * second asset. Light mode falls through to the SVG's own default.
  */
-:global(.dark) .fab-icon {
+html.dark .fab-icon {
   --fab-bg: url('#bfab-bg-dark');
 }
 
