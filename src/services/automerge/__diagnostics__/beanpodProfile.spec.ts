@@ -46,6 +46,29 @@ import { PayloadTooLargeError } from '@/types/sync';
 const FILE = process.env.BEANPOD_FILE;
 const PASSWORD = process.env.BEANPOD_PASSWORD;
 
+// SAY WHY IT SKIPPED. `describe.skipIf` alone reports "2 skipped" and nothing
+// else, so someone who runs this file expecting a report gets silence and no
+// idea what is missing — the exact silent-failure shape this whole change
+// exists to remove. Printed at collection time, before any test runs.
+if (!FILE || !PASSWORD) {
+  const missing = [!FILE && 'BEANPOD_FILE', !PASSWORD && 'BEANPOD_PASSWORD'].filter(Boolean);
+  process.stdout.write(
+    [
+      '',
+      `⚠ beanpod profile SKIPPED — ${missing.join(' and ')} not set.`,
+      '',
+      '  Export a pod from Settings → Export Encrypted Backup, then:',
+      '',
+      "    BEANPOD_FILE=/path/to/family.beanpod BEANPOD_PASSWORD='your-password' \\",
+      '      npx vitest run src/services/automerge/__diagnostics__/beanpodProfile.spec.ts',
+      '',
+      '  The password is read from the environment and never logged, stored or',
+      '  written anywhere by this spec.',
+      '',
+    ].join('\n')
+  );
+}
+
 /**
  * Run one step, and on failure re-throw with the step named and the likely
  * cause spelled out — so a failed diagnostic explains itself instead of
