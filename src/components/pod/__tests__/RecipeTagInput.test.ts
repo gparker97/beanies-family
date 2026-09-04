@@ -78,13 +78,43 @@ describe('RecipeTagInput autocomplete', () => {
     expect(options(wrapper)[0]!.attributes('aria-selected')).toBe('false');
   });
 
-  it('Escape clears the highlight without closing anything else', async () => {
+  // ⚠️ This test previously asserted the OPPOSITE — that Escape leaves the popup open — which
+  // pinned non-APG behaviour and would have made anyone fixing it think the old behaviour was
+  // deliberate and revert. APG combobox: Escape closes the popup.
+  it('Escape closes the popup rather than merely unhighlighting', async () => {
     const wrapper = factory();
     const input = wrapper.find('input');
     await input.setValue('we');
     await input.trigger('keydown', { key: 'ArrowDown' });
     await input.trigger('keydown', { key: 'Escape' });
-    expect(options(wrapper)[0]!.attributes('aria-selected')).toBe('false');
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(false);
+    expect(input.attributes('aria-expanded')).toBe('false');
+  });
+
+  it('stops the dismissing Escape from also discarding the form, but lets a second through', async () => {
+    const wrapper = factory();
+    const input = wrapper.find('input');
+    await input.setValue('we');
+
+    const first = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    const firstStopped = vi.spyOn(first, 'stopPropagation');
+    input.element.dispatchEvent(first);
+    expect(firstStopped).toHaveBeenCalled();
+
+    // Popup now closed: a second press must reach whatever owns the modal.
+    const second = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    const secondStopped = vi.spyOn(second, 'stopPropagation');
+    input.element.dispatchEvent(second);
+    expect(secondStopped).not.toHaveBeenCalled();
+  });
+
+  it('reopens the popup once the query changes again', async () => {
+    const wrapper = factory();
+    const input = wrapper.find('input');
+    await input.setValue('we');
+    await input.trigger('keydown', { key: 'Escape' });
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(false);
+    await input.setValue('wee');
     expect(wrapper.find('[role="listbox"]').exists()).toBe(true);
   });
 
@@ -119,5 +149,62 @@ describe('RecipeTagInput autocomplete', () => {
     const wrapper = factory(full, ['weeknight']);
     expect(wrapper.find('input').attributes('disabled')).toBeDefined();
     expect(wrapper.find('[role="listbox"]').exists()).toBe(false);
+  });
+});
+
+describe('RecipeTagInput rejections and pasting', () => {
+  it('does not let the popup cover the rejection message', async () => {
+    const wrapper = factory(['weeknight']);
+    const input = wrapper.find('input');
+    await input.setValue('weeknight');
+    await input.trigger('keydown', { key: 'Enter' });
+    // A duplicate does not clear the draft, so without this the open listbox would paint over
+    // the very message explaining why nothing happened.
+    expect(wrapper.text()).toContain('recipes.tags.duplicate');
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(false);
+  });
+
+  it('clears a stale rejection when the user arrows the list', async () => {
+    const wrapper = factory(['weeknight']);
+    const input = wrapper.find('input');
+    await input.setValue('weeknight');
+    await input.trigger('keydown', { key: 'Enter' });
+    expect(wrapper.text()).toContain('recipes.tags.duplicate');
+    await input.setValue('we');
+    await input.trigger('keydown', { key: 'ArrowDown' });
+    // Left up, it reads as a complaint about the option being highlighted.
+    expect(wrapper.text()).not.toContain('recipes.tags.duplicate');
+  });
+
+  it('reports truncation, which the DOM maxlength used to make unreachable', async () => {
+    const wrapper = factory();
+    const input = wrapper.find('input');
+    await input.setValue('x'.repeat(40));
+    await input.trigger('keydown', { key: 'Enter' });
+    expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual(['x'.repeat(24)]);
+    expect(wrapper.text()).toContain('recipes.tags.truncated');
+  });
+
+  it('splits a pasted list into one tag per entry', async () => {
+    const wrapper = factory();
+    const input = wrapper.find('input');
+    const ev = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: () => string };
+    };
+    ev.clipboardData = { getData: () => 'quick, easy\nvegan' };
+    input.element.dispatchEvent(ev);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual(['quick', 'easy', 'vegan']);
+  });
+
+  it('leaves a single pasted token to the browser', async () => {
+    const wrapper = factory();
+    const ev = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: () => string };
+    };
+    ev.clipboardData = { getData: () => 'weeknight' };
+    wrapper.find('input').element.dispatchEvent(ev);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
   });
 });
