@@ -6162,9 +6162,9 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.welcomeCta": {
-      "translation": "Let's Get This Pod Rolling 🥫",
-      "hash": "j82n32",
-      "lastUpdated": "2026-09-04"
+      "translation": "让我们开始吧 🫛",
+      "hash": "",
+      "lastUpdated": "2026-09-05"
     },
     "onboarding.welcomeSubtitle": {
       "translation": "几个简单的步骤·大约需要2分钟",
@@ -8807,9 +8807,9 @@
       "lastUpdated": "2026-03-23"
     },
     "share.messageBody": {
-      "translation": "Hi! {member} has invited you to join the {family} family!\nClick here to join your family's bean pod: {link}",
-      "hash": "6ccfp8",
-      "lastUpdated": "2026-09-04"
+      "translation": "您好！{member} 邀请您加入 {family} 家庭！\n点击此处加入您家庭的豆荚：{link}",
+      "hash": "",
+      "lastUpdated": "2026-09-05"
     },
     "share.wechatHint": {
       "translation": "链接已复制！打开微信并粘贴到聊天中，与您的联系人分享。",
@@ -10322,14 +10322,14 @@
       "lastUpdated": "2026-04-19"
     },
     "recipes.placeholder.ingredients": {
-      "translation": "One per line — 500g ground beef\\\n3 carrots\\\n…",
-      "hash": "usmk5p",
-      "lastUpdated": "2026-09-04"
+      "translation": "每行一项，例如 500 克牛肉末\n3 根胡萝卜\n……",
+      "hash": "",
+      "lastUpdated": "2026-09-05"
     },
     "recipes.placeholder.steps": {
-      "translation": "One step per line — brown the meat\\\nsweat the mirepoix\\\n…",
-      "hash": "dqlpyr",
-      "lastUpdated": "2026-09-04"
+      "translation": "每行一步，例如 把肉煎至上色\n炒香蔬菜丁\n……",
+      "hash": "",
+      "lastUpdated": "2026-09-05"
     },
     "recipes.placeholder.notes": {
       "translation": "例如， Neil每周日都会要求这样做。用大勺子吃。",

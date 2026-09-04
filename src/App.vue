@@ -107,6 +107,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { PayloadLoadError, PayloadTooLargeError } from '@/types/sync';
 import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
@@ -229,10 +230,14 @@ watch(
  * flag and refuses to clobber a more specific message.
  */
 function setGenericInitError(message: string, detail: string | null): void {
+  // The guard is what does the work: the ONLY writer of
+  // `initErrorClearHelps = false` is the store watcher, which requires
+  // `fatalErrorStore.message`, so reaching past this line means the flag is
+  // still true. Restoring it here would be dead code pretending to repair
+  // something.
   if (fatalErrorStore.message) return; // a payload failure already said something true
   initError.value = message;
   initErrorDetail.value = detail;
-  initErrorClearHelps.value = true;
 }
 // Mobile hamburger menu state is a shared singleton so the planner's reclaimed
 // command bar can toggle the same menu (see useMobileMenu). `headerReclaimed`
@@ -672,9 +677,23 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           return 'failed';
         }
         if (cacheResult.payloadError) {
-          initBreadcrumbs.push(
-            `path1a: cache ${cacheResult.payloadError.step} corrupt — cleared, re-seeding from Drive`
-          );
+          // The cache was corrupt, `initAndLoadCache` cleared it, and the Drive
+          // re-seed below will succeed — so the user notices nothing and the
+          // post-init health check never runs. Without an event here the
+          // fleet-wide rate of cache corruption (i.e. how often devices are
+          // forced into a full multi-megabyte re-download at boot) is
+          // unmeasurable. Non-paging: it self-heals.
+          initBreadcrumbs.push(`path1a: cache ${cacheResult.payloadError.step} corrupt — cleared`);
+          logEvent({
+            level: 'warn',
+            surface: 'pod-load-failure',
+            message: 'local cache was unreadable and has been cleared; re-seeding from Drive',
+            context: {
+              action: 'cache-corrupt-recovered',
+              error_code: cacheResult.payloadError.step,
+              perf_doc_bytes: cacheResult.payloadError.payloadBytes ?? undefined,
+            },
+          });
         }
         initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');
         console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
@@ -825,7 +844,23 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           return 'failed';
         }
         if (cacheResult.payloadError) {
+          // The cache was corrupt, `initAndLoadCache` cleared it, and the Drive
+          // re-seed below will succeed — so the user notices nothing and the
+          // post-init health check never runs. Without an event here the
+          // fleet-wide rate of cache corruption (i.e. how often devices are
+          // forced into a full multi-megabyte re-download at boot) is
+          // unmeasurable. Non-paging: it self-heals.
           initBreadcrumbs.push(`path2: cache ${cacheResult.payloadError.step} corrupt — cleared`);
+          logEvent({
+            level: 'warn',
+            surface: 'pod-load-failure',
+            message: 'local cache was unreadable and has been cleared; re-seeding from Drive',
+            context: {
+              action: 'cache-corrupt-recovered',
+              error_code: cacheResult.payloadError.step,
+              perf_doc_bytes: cacheResult.payloadError.payloadBytes ?? undefined,
+            },
+          });
         }
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');

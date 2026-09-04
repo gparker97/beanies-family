@@ -583,3 +583,44 @@ Why it survived so long:
 4. **When a fix does not show up in a screenshot, believe the screenshot.** Tests, type-check and lint were all green through every iteration of this bug.
 5. **Opacity is not a text colour.** `text-secondary-500/60` and `text-[rgba(44,62,80,0.4)]` composite Deep Slate over a Deep Slate ground in dark mode and land at 1.1–1.3:1. Worse, an `opacity-40` with no colour of its own inherits — which is why one summary tile's subtitle was legible and its neighbour's was invisible. If a string needs to recede, give it a real ink tier.
 6. **Changing a surface un-masks the text on it.** Giving the cookbook hero a dark background made the title unreadable, because it was `text-secondary-500` with no dark variant — correct on cream, invisible on dark. Sweep the text of any surface whose background changes.
+
+## 2026-09-04 — Classifying an error is the easy half; propagating it is the work
+
+**What happened.** A 3GB tablet could not open a ~4MB pod, and the app reported a
+DAMAGED FILE and deleted the local cache. Introducing `PayloadTooLargeError`
+beside `CorruptPayloadError` took one commit. Making every surface tell the truth
+took four review rounds and found eight separate `catch` blocks that flattened
+the class into a boolean or a `console.warn` on the way out — including the main
+cold-boot route, the PIN cold path, biometric unlock, the invite join, the
+background refresh and Grant-permission. Two of those flattenings were
+destructive (an empty doc written over a preserved cache; a valid family key
+deleted).
+
+**Rules.**
+
+1. **After adding a typed error, grep for every consumer of the function that now
+   throws it, and read each one.** `git grep -n '<fn>('` and check the catch. A
+   new error class is only as good as its narrowest caller. I claimed "every
+   entry path" in a CHANGELOG entry twice before it was true.
+2. **A `boolean` return is where classification goes to die.** Prefer a
+   discriminated result (`{ok:false, kind:'payload'|'password'|'transport'}`) so
+   the compiler forces the next caller to handle it. A `boolean | {…}` union is
+   worse than either — it is a truthy-object trap.
+3. **Narrowing an `instanceof` guard is a behaviour change for the OTHER class.**
+   Twice I narrowed a branch to `PayloadTooLargeError` and silently sent the
+   corrupt half down a destructive path. Ask explicitly: what happens now to
+   every class this no longer matches?
+4. **Check the discriminator is the right one.** `LoadPodView` should key on
+   `err.step === 'decrypt'`, not on the class: `loadAndVerify` runs outside the
+   decrypt's try, so `step: 'load'` proves the key was correct. The class was a
+   proxy for the question; the step was the question.
+5. **Do not raise a full-screen fatal overlay from a background path.** It runs
+   over a session that already painted real data.
+6. **A "stop retrying" latch belongs at the single site that creates the timer**,
+   not at each call site — three external callers re-armed the poller I had
+   stopped.
+7. **When two reviews disagree on a one-line judgment, settle it with the call
+   path, not with a rule of thumb.** `RangeError: Array buffer allocation failed`
+   is genuinely ambiguous in V8; what decides it is that nothing on the pod-open
+   path allocates from payload content. "A false positive is always worse" was a
+   plausible-sounding heuristic that cost the fix its main case.

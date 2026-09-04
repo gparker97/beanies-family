@@ -154,12 +154,14 @@ describe('loadCachedDoc — increment replay classification', () => {
 
       expect(err).toBeInstanceOf(PayloadTooLargeError);
       expect((err as PayloadTooLargeError).step).toBe('decrypt');
-      // The size only the INCREMENT path produces: `oomDuringReplay` reports the
-      // decoded BASE length, whereas the base-row catch reports
-      // `decodedSizeOf(baseEntry.payload)`. Asserting it is what pins that this
-      // came from `openIncrement` and not from the row above it.
+      // ⚠️ `payloadBytes` no longer discriminates the two paths: since
+      // `decodedSizeOf` started subtracting the AES-GCM IV + tag, the base-row
+      // catch reports the same figure `oomDuringReplay` does. Keep the
+      // assertion (it still pins the units) but do NOT rely on it as the
+      // discriminator — `call > 1` is what proves the base decrypt was let
+      // through and the failure came from `openIncrement`.
       expect((err as PayloadTooLargeError).payloadBytes).toBe(baseBinaryLength);
-      expect(call).toBeGreaterThan(1);
+      expect(call, 'the base decrypt must have been let through').toBeGreaterThan(1);
     } finally {
       spy.mockRestore(); // `vitest.config.ts` sets no `restoreMocks`
     }

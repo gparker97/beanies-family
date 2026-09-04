@@ -63,6 +63,7 @@ export type JoinErrorCode =
   | 'FILE_READ_FAILED'
   | 'FILE_DECRYPT_FAILED'
   | 'FILE_TOO_LARGE'
+  | 'FILE_CORRUPT'
   | 'FILE_FAMILY_MISMATCH'
   | 'INVITE_TOKEN_EXPIRED'
   | 'INVITE_TOKEN_INVALID'
@@ -71,20 +72,27 @@ export type JoinErrorCode =
 /**
  * A failed decrypt, as the error `tryStep` should record.
  *
- * Two jobs. It picks the right registry CODE, so a memory limit stops rendering
- * "ask the inviter for a new invite link" — advice the joiner will follow
- * forever, on an invite that is perfectly good. And it keeps the RAW engine
- * message: `recordError` builds a `severity: 'critical'` Slack page out of it
- * and the joiner never sees it (the view renders the registry's own copy), so
- * translating it would only strip the string `isAllocationFailure`'s feedback
- * loop depends on and split the dedup bucket per locale.
+ * Two jobs. It picks the right registry CODE, so neither payload class renders
+ * `join.error.fileDecrypt` — copy that tells the joiner to ask the inviter for
+ * a new link, with `recoveries: []` so there is no button at all, for a failure
+ * a new link cannot touch.
+ *
+ * And it FORWARDS the classified error rather than a synthetic one. `tryStep`
+ * hands whatever it catches to `reportError({ error })`, so rebuilding a plain
+ * `new Error(result.error)` here stripped `step` and `payloadBytes` from the
+ * one payload surface where they were unrecoverable — while both siblings
+ * forward the real thing.
  */
 function asJoinDecryptError(result: {
   error?: string;
   payloadError?: PayloadLoadError;
 }): Error & { joinCode?: JoinErrorCode } {
-  const err: Error & { joinCode?: JoinErrorCode } = new Error(result.error ?? 'Decryption failed');
-  if (result.payloadError instanceof PayloadTooLargeError) err.joinCode = 'FILE_TOO_LARGE';
+  const err: Error & { joinCode?: JoinErrorCode } =
+    result.payloadError ?? new Error(result.error ?? 'Decryption failed');
+  if (result.payloadError) {
+    err.joinCode =
+      result.payloadError instanceof PayloadTooLargeError ? 'FILE_TOO_LARGE' : 'FILE_CORRUPT';
+  }
   return err;
 }
 
@@ -164,6 +172,18 @@ export const JOIN_ERRORS = {
   FILE_TOO_LARGE: {
     messageKey: 'join.error.fileTooLarge',
     recoveries: ['tryAnotherDevice'],
+    severity: 'critical',
+  },
+  /**
+   * The family's pod itself is damaged. Also distinct from
+   * `FILE_DECRYPT_FAILED`: a new invite link points at the SAME file, so
+   * "ask the inviter for a new link" sends the joiner in a circle. Nothing the
+   * joiner can do fixes it, so no recovery action is offered either — but the
+   * copy says who to talk to.
+   */
+  FILE_CORRUPT: {
+    messageKey: 'join.error.fileCorrupt',
+    recoveries: [],
     severity: 'critical',
   },
   FILE_FAMILY_MISMATCH: {
@@ -323,7 +343,15 @@ export function useJoinFlow() {
       // A step may REFINE its code: `asJoinDecryptError` tags an out-of-memory
       // failure `FILE_TOO_LARGE` so the joiner is not told to ask for a new
       // invite link, which cannot help and which they would do forever.
-      const refined = (err as { joinCode?: JoinErrorCode }).joinCode ?? code;
+      // Guarded: `err` is `unknown`. A bare `Promise.reject()` or a `throw
+      // null` from a gapi/picker callback would make a raw property access
+      // throw INSIDE the catch, so `tryStep` would reject instead of returning
+      // null — no registry code, no Slack page, and the rejection escaping to
+      // the deliberately non-paging unhandledrejection handler.
+      const refined =
+        (err && typeof err === 'object' && 'joinCode' in err
+          ? (err as { joinCode?: JoinErrorCode }).joinCode
+          : undefined) ?? code;
       log(`step ${refined} failed`, { err: message });
       recordError(refined, { error: message, ...contextExtra }, err);
       return null;

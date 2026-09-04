@@ -60,7 +60,8 @@ import {
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
-import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
+import { surfacePayloadFatal, reportPayloadFailure } from '@/utils/payloadFailureSurface';
+import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { createSampler } from '@/services/telemetry/emitPolicy';
 import { isDemoSession } from '@/utils/reviewDemo';
@@ -556,6 +557,12 @@ export const useSyncStore = defineStore('sync', () => {
    *   Surface to user.
    */
   const backgroundSyncErrorKind = ref<BackgroundSyncErrorKind>(null);
+  /**
+   * This device cannot open the pod (out of memory, or the bytes are damaged).
+   * Latched, because every retry re-downloads megabytes and fails identically.
+   * Read by `startFilePolling`, the one place a poll timer is created.
+   */
+  const podUnopenable = ref(false);
 
   /**
    * Match the message shapes produced by `TokenExpiredError` (in
@@ -645,7 +652,11 @@ export const useSyncStore = defineStore('sync', () => {
             familyId: useFamilyContextStore().activeFamilyId,
             source: 'reload',
           });
-          return granted;
+          // FALSE, not `granted`. Permission was granted but nothing loaded,
+          // and both non-Settings callers read a `true` as "granted AND
+          // loaded": one drives the login flow into a signed-in state with no
+          // document, the other retries the identical allocation.
+          return false;
         }
         throw e;
       }
@@ -915,6 +926,12 @@ export const useSyncStore = defineStore('sync', () => {
    * create-recovery screen and `app.onboardingZombieState` false-fires.
    */
   async function runPostLoadDriveHousekeeping(): Promise<void> {
+    // A pod DID open, so whatever latched `podUnopenable` no longer holds —
+    // a reload freed memory, the file was replaced, a different device wrote a
+    // clean copy. Clearing it here (the single success terminus every load path
+    // funnels through) stops the latch outliving its reason and silently
+    // disabling cross-device sync for the rest of the session.
+    clearPodUnopenable();
     if (syncService.getProviderType() === 'google_drive') {
       setupTokenExpiryHandler();
       updateProviderEmailAfterLoad();
@@ -2589,8 +2606,17 @@ export const useSyncStore = defineStore('sync', () => {
       // two refresh callers additionally cleared `pendingEncryptedFile`.
       if (result.payloadError) return { success: false, payloadError: result.payloadError };
       return result.success;
-    } catch {
-      // Cached key invalid — caller handles fallback
+    } catch (e) {
+      // Cached key invalid — caller handles fallback. Logged rather than
+      // swallowed: this DELETES a credential, so "why did my trusted device
+      // stop working?" has to be answerable from the firehose alone.
+      logEvent({
+        level: 'warn',
+        surface: 'pod-load-failure',
+        message: 'cached family key discarded after a failed decrypt',
+        context: { action: 'cached-key-cleared' },
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
       if (famId) await settingsStore.clearCachedFamilyKey(famId);
       return false;
     }
@@ -2700,8 +2726,6 @@ export const useSyncStore = defineStore('sync', () => {
     // The per-call refresh result, returned to the caller + logged for manual
     // calls. Defaults to 'refreshed'; failure terminals reassign it.
     let refreshResult: RefreshOutcome = 'refreshed';
-    /** A payload failure: suppress the poller, which can only repeat it. */
-    let payloadFailed = false;
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
@@ -2776,16 +2800,10 @@ export const useSyncStore = defineStore('sync', () => {
         if (success !== false) {
           // A payload failure, not a credential one. "Password may have changed"
           // below would be a lie, and `pendingEncryptedFile.value = null` would
-          // throw away the envelope. Stop the poller too — every tick would
-          // re-download the same file and hit the same limit.
-          payloadFailed = true;
+          // throw away the envelope.
+          notePodUnopenable(success.payloadError);
           openOutcome = 'open-failed';
           refreshResult = 'decrypt-failed';
-          surfacePayloadFatal(success.payloadError, {
-            fileId: driveFileId.value,
-            familyId: useFamilyContextStore().activeFamilyId,
-            source: 'background-sync',
-          });
           return refreshResult;
         }
 
@@ -2827,14 +2845,8 @@ export const useSyncStore = defineStore('sync', () => {
       // and re-attempts the identical allocation every tick, swallowing each
       // failure in a console.warn. `payloadFailed` suppresses the poller.
       if (e instanceof PayloadLoadError) {
-        payloadFailed = true;
-        backgroundSyncErrorKind.value = 'network'; // no 'payload' kind on the bar
+        notePodUnopenable(e);
         refreshResult = 'network-failed';
-        surfacePayloadFatal(e, {
-          fileId: driveFileId.value,
-          familyId: useFamilyContextStore().activeFamilyId,
-          source: 'background-sync',
-        });
         return refreshResult;
       }
       const msg = e instanceof Error ? e.message : 'Could not refresh data from cloud';
@@ -2845,10 +2857,10 @@ export const useSyncStore = defineStore('sync', () => {
       if (isAuth) scheduleColdStartReconnectEscalation(msg);
     } finally {
       isBackgroundSyncing.value = false;
-      // Always start polling — even on error, next poll may succeed. The ONE
-      // exception is a payload failure: every poll would re-download the same
-      // file and hit the same limit, forever.
-      if (!filePollingTimer && !payloadFailed) {
+      // Always start polling — even on error, next poll may succeed. A payload
+      // failure is filtered inside `startFilePolling` by the `podUnopenable`
+      // latch, which is the only place that cannot be walked around.
+      if (!filePollingTimer) {
         startDeferredPolling();
       }
       // Path 1a handed us the open-cycle terminal (see App.vue's loadFamilyData
@@ -2924,7 +2936,15 @@ export const useSyncStore = defineStore('sync', () => {
             try {
               await hydrateFromEnvelope(pendingEncryptedFile.value.envelope);
               return true;
-            } catch {
+            } catch (e) {
+              // A payload failure is not a key problem: falling through reaches
+              // "password may have changed", discards the envelope and re-arms
+              // the poller — on a device with no cached key that is the whole
+              // bug this change removes, reached by another door.
+              if (e instanceof PayloadLoadError) {
+                notePodUnopenable(e);
+                return false;
+              }
               // Family key doesn't work — try cached key
             }
           }
@@ -2934,15 +2954,8 @@ export const useSyncStore = defineStore('sync', () => {
           if (success === true) return true;
           if (success !== false) {
             // A payload failure. Keep the envelope (nulling it breaks the
-            // decrypt modal's computeds) and STOP the poller: this fires every
-            // 10 seconds and each tick would re-download the same file and hit
-            // the same limit.
-            stopFilePolling();
-            surfacePayloadFatal(success.payloadError, {
-              fileId: driveFileId.value,
-              familyId: useFamilyContextStore().activeFamilyId,
-              source: 'background-sync',
-            });
+            // decrypt modal's computeds) and latch the poller off.
+            notePodUnopenable(success.payloadError);
             return false;
           }
 
@@ -2957,12 +2970,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (e instanceof PayloadLoadError) {
         // `loadFromFile({merge:true})` rethrows it. Same reasoning as above:
         // never silently re-poll a failure a poll cannot fix.
-        stopFilePolling();
-        surfacePayloadFatal(e, {
-          fileId: driveFileId.value,
-          familyId: useFamilyContextStore().activeFamilyId,
-          source: 'background-sync',
-        });
+        notePodUnopenable(e);
         return false;
       }
       if (e instanceof DriveApiError && e.status === 404) {
@@ -2988,8 +2996,58 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Start polling the sync file for external changes.
    */
+  /**
+   * A background refresh could not open the pod.
+   *
+   * Deliberately NOT the fatal overlay. These paths run over a session that
+   * already painted real data from the local cache, so a `fixed inset-0
+   * z-[300]` panel whose only button re-runs the same failing cycle would cover
+   * a working app seconds after it opened. The user keeps their data; the sync
+   * bar says the copy on Drive could not be read.
+   *
+   * Latches `podUnopenable` so the 10s poller stops re-downloading megabytes to
+   * fail identically, and reports once (the too-large half is already reported
+   * by `docClient.surface()`; `reportPayloadFailure` knows that).
+   */
+  function notePodUnopenable(err: PayloadLoadError): void {
+    podUnopenable.value = true;
+    stopFilePolling();
+    backgroundSyncError.value = useTranslationStore().t(
+      err instanceof PayloadTooLargeError ? 'podTooLarge.inline' : 'podCorrupted.inline'
+    );
+    backgroundSyncErrorKind.value = 'decrypt';
+    reportPayloadFailure(err, {
+      fileId: driveFileId.value,
+      familyId: useFamilyContextStore().activeFamilyId,
+      source: 'background-sync',
+    });
+  }
+
+  /**
+   * Something changed that could plausibly change the answer — a fresh file, a
+   * sign-out, a new family. Without this the latch would outlive its reason and
+   * silently disable cross-device sync for the rest of the session.
+   */
+  function clearPodUnopenable(): void {
+    podUnopenable.value = false;
+  }
+
   function startFilePolling(): void {
     if (filePollingTimer) return;
+    // ⚠️ THE circuit breaker, and it has to live HERE.
+    //
+    // A per-call `payloadFailed` flag only gates STARTING a poller, so it was a
+    // no-op whenever the timer was already running, and three external callers
+    // (`useStaleTabRefresh`'s tab-wake `resumeFilePolling`, App.vue's
+    // `startDeferredPolling`, the header Refresh) re-armed the one that
+    // `stopFilePolling()` had just cleared. Every restart re-downloads the
+    // multi-megabyte file, re-hits the same allocation and fires another
+    // critical report — the "forever" loop this was supposed to kill.
+    //
+    // This is the single site that creates the interval, so the latch cannot be
+    // walked around. It is cleared by `clearPodUnopenable()` on any path that
+    // could plausibly change the answer (a reload, a new file, a sign-out).
+    if (podUnopenable.value) return;
     filePollingTimer = setInterval(() => {
       reloadIfFileChanged().catch(console.warn);
     }, FILE_POLL_INTERVAL);
@@ -4592,6 +4650,8 @@ export const useSyncStore = defineStore('sync', () => {
     startDeferredPolling,
     backgroundSyncFromFile,
     tryDecryptWithCachedKey,
+    podUnopenable,
+    clearPodUnopenable,
     reloadIfFileChanged,
     handleGoogleReconnected,
     pauseFilePolling,
