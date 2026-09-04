@@ -138,6 +138,102 @@ describe('RecipeFormModal — course, meals and tags round-trip', () => {
     expect(patch).not.toHaveProperty('mealSlots');
   });
 
+  // ── The FIFTH seed site: applyPrefill as a MERGE into an already-open form ──
+  //
+  // `showSourceStrip` stays visible until `name` is non-empty, so ticking a meal and typing a
+  // tag BEFORE pasting a recipe URL is a normal order of operations — and `tags` can never be
+  // restored by a prefill, because RecipePrefill.fields has no `tags` member.
+  it('keeps user-typed tags when an AI capture lands in an already-open form', async () => {
+    const { wrapper } = await mountModal();
+    const vm = wrapper.vm as unknown as {
+      tags: string[];
+      mealSlots: string[];
+      course: string;
+      applyPrefill: (p: unknown) => void;
+    };
+    vm.tags = ['nana special'];
+    vm.mealSlots = ['dinner'];
+    await nextTick();
+
+    vm.applyPrefill({
+      fields: { name: 'Captured Pie', ingredients: ['a'], steps: ['b'] },
+      inferredIngredients: [],
+      inferredSteps: [],
+      taxonomyRejected: [],
+      dishImage: null,
+      confidence: { name: 1, ingredients: 1, steps: 1 },
+    });
+    await nextTick();
+
+    expect(vm.tags).toEqual(['nana special']);
+    // The model declined a course/meal, so the user's own tick survives rather than being
+    // overwritten with "nothing".
+    expect(vm.mealSlots).toEqual(['dinner']);
+  });
+
+  it('lets a confident capture replace the course and meals it does supply', async () => {
+    const { wrapper } = await mountModal();
+    const vm = wrapper.vm as unknown as {
+      tags: string[];
+      mealSlots: string[];
+      course: string;
+      applyPrefill: (p: unknown) => void;
+    };
+    vm.mealSlots = ['dinner'];
+    await nextTick();
+
+    vm.applyPrefill({
+      fields: {
+        name: 'Captured Pie',
+        ingredients: ['a'],
+        steps: ['b'],
+        course: 'dessert',
+        mealSlots: ['snack'],
+      },
+      inferredIngredients: [],
+      inferredSteps: [],
+      taxonomyRejected: [],
+      dishImage: null,
+      confidence: { name: 1, ingredients: 1, steps: 1 },
+    });
+    await nextTick();
+
+    expect(vm.course).toBe('dessert');
+    expect(vm.mealSlots).toEqual(['snack']);
+  });
+
+  it('still clears everything on the blank reset', async () => {
+    const { wrapper } = await mountModal();
+    const vm = wrapper.vm as unknown as {
+      tags: string[];
+      mealSlots: string[];
+      course: string;
+      applyPrefill: (p: unknown) => void;
+    };
+    vm.tags = ['x'];
+    vm.mealSlots = ['dinner'];
+    vm.course = 'main';
+    await nextTick();
+
+    vm.applyPrefill(null);
+    await nextTick();
+
+    expect(vm.tags).toEqual([]);
+    expect(vm.mealSlots).toEqual([]);
+    expect(vm.course).toBe('');
+  });
+
+  // `tags: 42` specifically: spreading a number THROWS, so without the Array.isArray guard in
+  // `onEdit` the modal cannot be opened at all — and a recipe you cannot open is a recipe you
+  // cannot repair.
+  it('opens a recipe whose stored tags are not an array, so it can be repaired', async () => {
+    const corrupt = { ...FILED, id: 'r3', tags: 42, mealSlots: 'dinner' };
+    const { wrapper } = await mountModal(corrupt as unknown as Recipe);
+    const vm = wrapper.vm as unknown as { tags: string[]; mealSlots: string[] };
+    expect(vm.tags).toEqual([]);
+    expect(wrapper.find('select').exists()).toBe(true);
+  });
+
   it('opens blank for a recipe with none of the new fields, and saves no phantom change', async () => {
     const bare = { ...FILED, id: 'r2', course: undefined, mealSlots: undefined, tags: undefined };
     const { wrapper, store } = await mountModal(bare as Recipe);
