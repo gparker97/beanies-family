@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>recipe form — sectioning study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Caveat:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ground:#F8F9FA; --panel:#FFFFFF; --card:#FBF9F6; --inset:#FFFFFF;
+  --ink:#2C3E50; --soft:#5B6B7A; --faint:#78889A;
+  --accent:#F15D22; --terra:#E67E22; --silk:#AED6F1;
+  --line:rgba(44,62,80,.10); --line-strong:rgba(44,62,80,.22);
+  --tint-orange:rgba(241,93,34,.08); --tint-slate:rgba(44,62,80,.05);
+  --shadow:0 4px 20px rgba(44,62,80,.08); --soft-shadow:0 8px 40px rgba(44,62,80,.12);
+  --sq:22px;
+}
+[data-theme="dark"]{
+  --ground:#151E27; --panel:#1E2A36; --card:#26343F; --inset:#1E2A36;
+  --ink:#F2F5F7; --soft:#C3CED6; --faint:#9AA9B4;
+  --accent:#FF8B5E; --terra:#F0A05A; --silk:#AED6F1;
+  --line:#4A5B69; --line-strong:#7A8A97;
+  --tint-orange:rgba(241,93,34,.12); --tint-slate:rgba(255,255,255,.05);
+  --shadow:0 4px 20px rgba(0,0,0,.2); --soft-shadow:0 8px 40px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:1rem;line-height:1.6;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:78rem;margin:0 auto;padding:2rem 1rem 6rem;}
+h1{font-family:Outfit,sans-serif;font-size:1.875rem;font-weight:700;margin:0 0 .25rem;letter-spacing:-.01em;}
+h1 .lc{color:var(--accent);}
+.lede{color:var(--soft);max-width:46rem;margin:0 0 1.5rem;font-size:.9375rem;}
+.bar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:2rem;}
+.btn{font-family:Outfit,sans-serif;font-size:.8125rem;font-weight:600;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);border-radius:999px;padding:.45rem 1rem;cursor:pointer;}
+.btn[aria-pressed="true"]{background:var(--tint-orange);border-color:var(--accent);color:var(--accent);}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* ── recommendation ── */
+.rec{background:var(--panel);border:1px solid var(--line);border-radius:var(--sq);padding:1.5rem;margin-bottom:2.5rem;box-shadow:var(--shadow);}
+.rec h2{font-family:Outfit,sans-serif;font-size:1.25rem;margin:0 0 .75rem;font-weight:700;}
+.grp{display:grid;grid-template-columns:auto 1fr;gap:.5rem 1rem;align-items:baseline;margin:1rem 0 0;}
+.gname{font-family:Outfit,sans-serif;font-weight:600;color:var(--accent);white-space:nowrap;}
+.gfields{color:var(--soft);font-size:.875rem;}
+.why{margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--line);font-size:.875rem;color:var(--soft);}
+.why b{color:var(--ink);}
+
+/* ── layout of the three treatments ── */
+.grid{display:grid;gap:2rem;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));align-items:start;}
+.col > h3{font-family:Outfit,sans-serif;font-size:1.0625rem;font-weight:700;margin:0 0 .25rem;}
+.col > p.tradeoff{font-size:.8125rem;color:var(--soft);margin:0 0 .875rem;min-height:5.5rem;}
+.col > p.tradeoff b{color:var(--ink);}
+.verdict{display:inline-block;font-family:Outfit,sans-serif;font-size:.6875rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:.15rem .55rem;margin-bottom:.5rem;}
+.v-yes{background:var(--tint-orange);color:var(--accent);}
+.v-no{background:var(--tint-slate);color:var(--faint);}
+
+/* ── the modal ── */
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--sq);box-shadow:var(--soft-shadow);overflow:hidden;display:flex;flex-direction:column;max-height:40rem;}
+.mhead{padding:1rem 1.25rem .75rem;border-bottom:1px solid var(--line);}
+.mtitle{font-family:Outfit,sans-serif;font-size:1.125rem;font-weight:700;margin:0;}
+.mbody{overflow-y:auto;padding:1.25rem;flex:1;}
+.mfoot{padding:.875rem 1.25rem;border-top:1px solid var(--line);background:var(--panel);display:flex;gap:.625rem;justify-content:flex-end;}
+.save{font-family:Outfit,sans-serif;font-weight:600;font-size:.875rem;background:#F15D22;color:#fff;border:none;border-radius:999px;padding:.55rem 1.4rem;cursor:pointer;}
+.cancel{font-family:Outfit,sans-serif;font-weight:600;font-size:.875rem;background:transparent;color:var(--soft);border:none;padding:.55rem 1rem;cursor:pointer;}
+
+/* magic beans strip — surface-paper character */
+.beans{background:var(--tint-orange);border:1px dashed var(--accent);border-radius:16px;padding:.875rem 1rem;margin-bottom:1.25rem;}
+.beans p{margin:0;font-size:.8125rem;color:var(--soft);}
+.beans .bt{font-family:Outfit,sans-serif;font-weight:600;color:var(--accent);font-size:.875rem;display:block;margin-bottom:.15rem;}
+body[data-state="edit"] .beans{display:none;}
+body[data-state="edit"] .t-add{display:none;}
+body[data-state="add"] .t-edit{display:none;}
+
+/* fields */
+.f{margin-bottom:1rem;}
+.f:last-child{margin-bottom:0;}
+.flabel{font-family:Outfit,sans-serif;font-size:.75rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);display:block;margin-bottom:.3rem;}
+.req{color:var(--accent);}
+.opt{color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none;font-size:.6875rem;}
+.ctl{width:100%;border:1px solid var(--line-strong);background:var(--inset);color:var(--ink);border-radius:14px;padding:.5rem .75rem;font-family:Inter,sans-serif;font-size:.875rem;}
+textarea.ctl{min-height:3.75rem;resize:vertical;}
+textarea.note{font-family:Caveat,cursive;font-size:1.125rem;line-height:1.4;}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;}
+@media(max-width:24rem){.row3{grid-template-columns:1fr;}}
+.hint{font-size:.75rem;color:var(--accent);margin:.3rem 0 0;}
+.sub{font-size:.75rem;color:var(--faint);margin:.3rem 0 0;}
+.chips{display:flex;flex-wrap:wrap;gap:.375rem;}
+.chip{font-family:Outfit,sans-serif;font-size:.75rem;font-weight:600;border-radius:999px;padding:.3rem .7rem;border:2px solid transparent;background:var(--tint-slate);color:var(--soft);cursor:pointer;}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--tint-orange);}
+.tags{border:1px solid var(--line-strong);background:var(--inset);border-radius:14px;padding:.4rem;display:flex;flex-wrap:wrap;gap:.375rem;align-items:center;}
+.tag{font-size:.75rem;background:var(--tint-slate);color:var(--ink);border-radius:999px;padding:.15rem .3rem .15rem .6rem;display:inline-flex;gap:.3rem;align-items:center;}
+.tag b{color:var(--faint);cursor:pointer;font-weight:400;}
+.tags input{border:none;background:transparent;outline:none;color:var(--ink);font-family:Inter,sans-serif;font-size:.8125rem;flex:1;min-width:6rem;padding:.2rem;}
+.ac{border:1px solid var(--line-strong);background:var(--panel);border-radius:14px;margin-top:.25rem;padding:.25rem;box-shadow:var(--shadow);}
+.ac div{font-size:.8125rem;padding:.3rem .6rem;border-radius:10px;cursor:pointer;}
+.ac div.on{background:var(--tint-orange);color:var(--accent);font-weight:600;}
+.photos{display:flex;gap:.5rem;}
+.ph{width:3.25rem;height:3.25rem;border-radius:12px;background:var(--tint-slate);border:1px solid var(--line);display:grid;place-items:center;font-size:1.1rem;}
+.ph.add{border-style:dashed;border-color:var(--accent);color:var(--accent);cursor:pointer;}
+
+/* ── TREATMENT A — labelled rules ── */
+.secA{margin:0 0 1.5rem;}
+.secA:last-child{margin-bottom:0;}
+.secA > .sh{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;}
+.secA > .sh .nm{font-family:Outfit,sans-serif;font-size:.9375rem;font-weight:700;color:var(--ink);white-space:nowrap;}
+.secA > .sh .rule{flex:1;height:1px;background:var(--line);}
+.secA > .sh .em{font-size:.9375rem;}
+
+/* ── TREATMENT B — inset cards ── */
+.secB{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem;margin-bottom:1rem;}
+.secB:last-child{margin-bottom:0;}
+.secB > .sh{display:flex;align-items:center;gap:.4rem;margin:0 0 .75rem;}
+.secB > .sh .nm{font-family:Outfit,sans-serif;font-size:.9375rem;font-weight:700;}
+.secB .ctl,.secB .tags{background:var(--inset);}
+
+/* ── TREATMENT C — collapsible ── */
+.secC{border-bottom:1px solid var(--line);}
+.secC:last-child{border-bottom:none;}
+.secC > .sh{display:flex;align-items:center;gap:.5rem;width:100%;background:none;border:none;padding:.875rem 0;cursor:pointer;font-family:Outfit,sans-serif;font-size:.9375rem;font-weight:700;color:var(--ink);text-align:left;}
+.secC > .sh .caret{margin-left:auto;color:var(--faint);font-size:.75rem;transition:transform .15s;}
+.secC[data-open="false"] > .sh .caret{transform:rotate(-90deg);}
+.secC[data-open="false"] > .body{display:none;}
+.secC > .body{padding-bottom:1rem;}
+.secC .count{font-family:Inter,sans-serif;font-weight:400;font-size:.75rem;color:var(--faint);}
+
+.foot{margin-top:2.5rem;padding-top:1.25rem;border-top:1px solid var(--line);font-size:.8125rem;color:var(--soft);}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body data-state="add">
+<div class="wrap">
+
+<h1>recipe form — <span class="lc">sectioning study</span></h1>
+<p class="lede">the add/edit recipe modal is eleven field groups in one flat scroll. course, “good for” and tags landed between the source link and notes, which reads as arbitrary. three ways to break it up, and the grouping i’d ship.</p>
+
+<div class="bar">
+  <button class="btn" id="theme" aria-pressed="false">dark mode</button>
+  <button class="btn" id="st-add" aria-pressed="true">adding a new recipe</button>
+  <button class="btn" id="st-edit" aria-pressed="false">editing an existing one</button>
+</div>
+
+<div class="rec">
+  <h2>the grouping i’d ship</h2>
+  <p class="lede" style="margin-bottom:0">ordered by what a person does first, not by the shape of the data. on the capture path the top two are already filled in and the job is to check them; on the hand-typed path they are what you came to write.</p>
+  <div class="grp">
+    <span class="gname">🍽️ the dish</span><span class="gfields">name (required) · subtitle · prep / cook / servings · link</span>
+    <span class="gname">🥄 how to make it</span><span class="gfields">ingredients · steps</span>
+    <span class="gname">🔖 finding it again</span><span class="gfields">course · good for · tags</span>
+    <span class="gname">✏️ your own touch</span><span class="gfields">notes · photos</span>
+  </div>
+  <p class="why"><b>why the break falls where it does.</b> the heading between “servings” and “ingredients” lands exactly where the form changes character — short inputs give way to two big textareas — so the eye gets a rest at the one place it needs one. <b>“finding it again” is the load-bearing name:</b> course, meals and tags are not obvious fields, and a heading that says what they are <i>for</i> does more for discoverability than any amount of layout. <b>the one judgement call</b> is the source link, which sits at the end of “the dish” as provenance — it is auto-filled on capture and glanced at while you check the name, not something you fill in later.</p>
+</div>
+
+<div class="grid">
+
+  <!-- ══ TREATMENT A ══ -->
+  <div class="col">
+    <span class="verdict v-yes">recommended</span>
+    <h3>A · labelled rules</h3>
+    <p class="tradeoff">one continuous scroll, each group named with a hairline running off to the right. <b>keeps the form feeling like one recipe card</b> rather than four settings panels, adds almost no vertical cost, and every field stays visible so nothing new can hide. <b>trade-off:</b> the lightest separation of the three — scroll fast on a phone and you can pass a heading without registering it.</p>
+    <div class="modal">
+      <div class="mhead"><p class="mtitle"><span class="t-add">add a recipe</span><span class="t-edit">edit recipe</span></p></div>
+      <div class="mbody">
+        <div class="beans"><span class="bt">✨ magic beans</span><p>paste a link or pick a document and i’ll fill this in for you.</p></div>
+
+        <div class="secA">
+          <div class="sh"><span class="em">🍽️</span><span class="nm">the dish</span><span class="rule"></span></div>
+          <div class="f"><span class="flabel">recipe name <span class="req">*</span></span><input class="ctl" value="nana’s pumpkin pie" /></div>
+          <div class="f"><span class="flabel">subtitle <span class="opt">optional</span></span><input class="ctl" value="the good one" /></div>
+          <div class="f"><div class="row3"><div><span class="flabel">prep</span><input class="ctl" value="35 mins" /></div><div><span class="flabel">cook</span><input class="ctl" value="55 mins" /></div><div><span class="flabel">serves</span><input class="ctl" value="8" /></div></div></div>
+          <div class="f"><span class="flabel">link <span class="opt">optional</span></span><input class="ctl" value="preppykitchen.com/pumpkin-pie" /></div>
+        </div>
+
+        <div class="secA">
+          <div class="sh"><span class="em">🥄</span><span class="nm">how to make it</span><span class="rule"></span></div>
+          <div class="f"><span class="flabel">ingredients</span><textarea class="ctl">1 pie crust
+425g pumpkin purée
+2 large eggs</textarea><p class="hint">🌟 some of these were filled in for you — worth a look</p></div>
+          <div class="f"><span class="flabel">steps</span><textarea class="ctl">heat the oven to 220°c.
+whisk the filling until smooth.</textarea></div>
+        </div>
+
+        <div class="secA">
+          <div class="sh"><span class="em">🔖</span><span class="nm">finding it again</span><span class="rule"></span></div>
+          <div class="f"><span class="flabel">course</span><select class="ctl"><option>🍰 dessert</option></select></div>
+          <div class="f"><span class="flabel">good for</span><div class="chips"><span class="chip">🍳 breakfast</span><span class="chip">🥪 lunch</span><span class="chip on">🍽️ dinner</span><span class="chip on">🍎 snack</span></div></div>
+          <div class="f"><span class="flabel">tags</span>
+            <div class="tags"><span class="tag">autumn <b>×</b></span><span class="tag">family favourite <b>×</b></span><input value="we" /></div>
+            <div class="ac"><div class="on">weeknight</div><div>sweet</div></div>
+            <p class="sub">saved in lowercase, so you only ever get one of each.</p>
+          </div>
+        </div>
+
+        <div class="secA">
+          <div class="sh"><span class="em">✏️</span><span class="nm">your own touch</span><span class="rule"></span></div>
+          <div class="f"><span class="flabel">notes <span class="opt">optional</span></span><textarea class="ctl note">chill the crust — nana swears by it</textarea></div>
+          <div class="f"><span class="flabel">photos <span class="opt">optional</span></span><div class="photos"><div class="ph">🥧</div><div class="ph add">＋</div></div></div>
+        </div>
+      </div>
+      <div class="mfoot"><button class="cancel">cancel</button><button class="save">save recipe</button></div>
+    </div>
+  </div>
+
+  <!-- ══ TREATMENT B ══ -->
+  <div class="col">
+    <span class="verdict v-no">viable</span>
+    <h3>B · inset cards</h3>
+    <p class="tradeoff">each group becomes its own card on the modal surface. <b>the strongest separation</b>, and the groups survive a fast scroll. <b>trade-off:</b> four lots of padding and border make the modal noticeably taller and start to read as a settings screen rather than a recipe card — the one thing the brief says not to lose. on dark it also needs a third surface tier, so inputs sit two steps down from the panel.</p>
+    <div class="modal">
+      <div class="mhead"><p class="mtitle"><span class="t-add">add a recipe</span><span class="t-edit">edit recipe</span></p></div>
+      <div class="mbody">
+        <div class="beans"><span class="bt">✨ magic beans</span><p>paste a link or pick a document and i’ll fill this in for you.</p></div>
+        <div class="secB">
+          <div class="sh"><span>🍽️</span><span class="nm">the dish</span></div>
+          <div class="f"><span class="flabel">recipe name <span class="req">*</span></span><input class="ctl" value="nana’s pumpkin pie" /></div>
+          <div class="f"><span class="flabel">subtitle <span class="opt">optional</span></span><input class="ctl" value="the good one" /></div>
+          <div class="f"><div class="row3"><div><span class="flabel">prep</span><input class="ctl" value="35 mins" /></div><div><span class="flabel">cook</span><input class="ctl" value="55 mins" /></div><div><span class="flabel">serves</span><input class="ctl" value="8" /></div></div></div>
+          <div class="f"><span class="flabel">link <span class="opt">optional</span></span><input class="ctl" value="preppykitchen.com/pumpkin-pie" /></div>
+        </div>
+        <div class="secB">
+          <div class="sh"><span>🥄</span><span class="nm">how to make it</span></div>
+          <div class="f"><span class="flabel">ingredients</span><textarea class="ctl">1 pie crust
+425g pumpkin purée</textarea><p class="hint">🌟 some of these were filled in for you — worth a look</p></div>
+          <div class="f"><span class="flabel">steps</span><textarea class="ctl">heat the oven to 220°c.</textarea></div>
+        </div>
+        <div class="secB">
+          <div class="sh"><span>🔖</span><span class="nm">finding it again</span></div>
+          <div class="f"><span class="flabel">course</span><select class="ctl"><option>🍰 dessert</option></select></div>
+          <div class="f"><span class="flabel">good for</span><div class="chips"><span class="chip">🍳 breakfast</span><span class="chip">🥪 lunch</span><span class="chip on">🍽️ dinner</span><span class="chip on">🍎 snack</span></div></div>
+          <div class="f"><span class="flabel">tags</span><div class="tags"><span class="tag">autumn <b>×</b></span><input value="" placeholder="add a tag" /></div><p class="sub">saved in lowercase, so you only ever get one of each.</p></div>
+        </div>
+        <div class="secB">
+          <div class="sh"><span>✏️</span><span class="nm">your own touch</span></div>
+          <div class="f"><span class="flabel">notes <span class="opt">optional</span></span><textarea class="ctl note">chill the crust</textarea></div>
+          <div class="f"><span class="flabel">photos <span class="opt">optional</span></span><div class="photos"><div class="ph">🥧</div><div class="ph add">＋</div></div></div>
+        </div>
+      </div>
+      <div class="mfoot"><button class="cancel">cancel</button><button class="save">save recipe</button></div>
+    </div>
+  </div>
+
+  <!-- ══ TREATMENT C ══ -->
+  <div class="col">
+    <span class="verdict v-no">not recommended</span>
+    <h3>C · collapsible</h3>
+    <p class="tradeoff">essentials open, the rest folded away with a summary of what is inside. <b>much the shortest scroll.</b> <b>trade-off, and it is the deciding one:</b> it hides precisely the fields nobody knows exist yet. course, meals and tags would ship folded shut on day one, and a field you have to open a drawer to find is a field that stays empty. it also hides the “filled in for you” hint, which is the one thing a captured recipe most needs you to read.</p>
+    <div class="modal">
+      <div class="mhead"><p class="mtitle"><span class="t-add">add a recipe</span><span class="t-edit">edit recipe</span></p></div>
+      <div class="mbody">
+        <div class="beans"><span class="bt">✨ magic beans</span><p>paste a link or pick a document and i’ll fill this in for you.</p></div>
+        <div class="secC" data-open="true">
+          <button class="sh"><span>🍽️</span><span>the dish</span><span class="caret">▾</span></button>
+          <div class="body">
+            <div class="f"><span class="flabel">recipe name <span class="req">*</span></span><input class="ctl" value="nana’s pumpkin pie" /></div>
+            <div class="f"><span class="flabel">subtitle <span class="opt">optional</span></span><input class="ctl" value="the good one" /></div>
+            <div class="f"><div class="row3"><div><span class="flabel">prep</span><input class="ctl" value="35 mins" /></div><div><span class="flabel">cook</span><input class="ctl" value="55 mins" /></div><div><span class="flabel">serves</span><input class="ctl" value="8" /></div></div></div>
+            <div class="f"><span class="flabel">link <span class="opt">optional</span></span><input class="ctl" value="preppykitchen.com/pumpkin-pie" /></div>
+          </div>
+        </div>
+        <div class="secC" data-open="true">
+          <button class="sh"><span>🥄</span><span>how to make it</span><span class="caret">▾</span></button>
+          <div class="body">
+            <div class="f"><span class="flabel">ingredients</span><textarea class="ctl">1 pie crust
+425g pumpkin purée</textarea><p class="hint">🌟 some of these were filled in for you — worth a look</p></div>
+            <div class="f"><span class="flabel">steps</span><textarea class="ctl">heat the oven to 220°c.</textarea></div>
+          </div>
+        </div>
+        <div class="secC" data-open="false">
+          <button class="sh"><span>🔖</span><span>finding it again</span> <span class="count">dessert · 2 meals · 2 tags</span><span class="caret">▾</span></button>
+          <div class="body">
+            <div class="f"><span class="flabel">course</span><select class="ctl"><option>🍰 dessert</option></select></div>
+            <div class="f"><span class="flabel">good for</span><div class="chips"><span class="chip on">🍽️ dinner</span><span class="chip on">🍎 snack</span></div></div>
+            <div class="f"><span class="flabel">tags</span><div class="tags"><span class="tag">autumn <b>×</b></span><input placeholder="add a tag" /></div></div>
+          </div>
+        </div>
+        <div class="secC" data-open="false">
+          <button class="sh"><span>✏️</span><span>your own touch</span> <span class="count">1 note · 1 photo</span><span class="caret">▾</span></button>
+          <div class="body">
+            <div class="f"><span class="flabel">notes <span class="opt">optional</span></span><textarea class="ctl note">chill the crust</textarea></div>
+            <div class="f"><span class="flabel">photos <span class="opt">optional</span></span><div class="photos"><div class="ph">🥧</div><div class="ph add">＋</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="mfoot"><button class="cancel">cancel</button><button class="save">save recipe</button></div>
+    </div>
+  </div>
+</div>
+
+<p class="foot"><b>considered and rejected:</b> reusing the cookbook’s recipe-box divider tabs inside the modal. tabs look right for this product, but they hide fields behind a click, break the tab order, and can hide a validation error on a field you cannot see — in a form with a required field that is a bad trade. the tabs stay on the cookbook page, where they switch a <i>view</i> rather than a <i>form</i>.</p>
+
+<script>
+const b=document.body,t=document.getElementById('theme');
+t.addEventListener('click',()=>{const d=b.parentElement.dataset.theme==='dark';b.parentElement.dataset.theme=d?'light':'dark';t.setAttribute('aria-pressed',String(!d));t.textContent=d?'dark mode':'light mode';});
+const a=document.getElementById('st-add'),e=document.getElementById('st-edit');
+function state(s){b.dataset.state=s;a.setAttribute('aria-pressed',String(s==='add'));e.setAttribute('aria-pressed',String(s==='edit'));}
+a.addEventListener('click',()=>state('add'));e.addEventListener('click',()=>state('edit'));
+document.querySelectorAll('.secC > .sh').forEach(h=>h.addEventListener('click',()=>{const s=h.parentElement;s.dataset.open=s.dataset.open==='true'?'false':'true';}));
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>c.classList.toggle('on')));
+</script>
+</div>
+</body>
+</html>
