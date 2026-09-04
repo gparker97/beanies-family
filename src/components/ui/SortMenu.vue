@@ -177,7 +177,7 @@ onUnmounted(() => {
       @click.stop="toggle"
     >
       <span
-        class="flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--tint-orange-8)] text-sm text-[#F15D22]"
+        class="dark:text-accent-lift flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--tint-orange-8)] text-sm text-[#F15D22]"
         aria-hidden="true"
         >⇅</span
       >
@@ -215,14 +215,17 @@ onUnmounted(() => {
           class="font-outfit flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold transition-colors"
           :class="
             option.value === modelValue
-              ? 'bg-[var(--tint-orange-8)] text-[#F15D22]'
+              ? 'dark:text-accent-lift bg-[var(--tint-orange-8)] text-[#F15D22]'
               : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)]'
           "
           @click="select(option.value)"
         >
           <span class="w-4 text-center text-sm" aria-hidden="true">{{ option.icon }}</span>
           <span class="flex-1">{{ t(option.labelKey) }}</span>
-          <span v-if="option.value === modelValue" class="text-[#F15D22]" aria-hidden="true"
+          <span
+            v-if="option.value === modelValue"
+            class="dark:text-accent-lift text-[#F15D22]"
+            aria-hidden="true"
             >✓</span
           >
         </button>
