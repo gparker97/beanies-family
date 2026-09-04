@@ -211,7 +211,6 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => {
   return {
     ...actual,
     reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
-    downloadAsFile: vi.fn(),
     tryUnwrapFamilyKey: vi.fn(),
   };
 });

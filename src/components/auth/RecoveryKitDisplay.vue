@@ -17,7 +17,7 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateInviteQR } from '@/utils/qrCode';
 import { useSheetExport, ExportError } from '@/composables/useSheetExport';
-import { shareOrDownloadFile } from '@/utils/shareOrDownloadFile';
+import { deliverFile } from '@/utils/deliverFile';
 import { kitDeepLink } from '@/services/auth/recoveryKit';
 import { reportError } from '@/utils/errorReporter';
 
@@ -89,13 +89,28 @@ async function exportKitPdf(preferDownload: boolean) {
     const pdf = await pngBlobToPdf(png);
     // preferDownload: "Save as PDF" means SAVE — on share-capable desktops the OS
     // sheet offered no plain save-to-disk (greg's local-test find).
-    await shareOrDownloadFile(
-      pdf,
-      `beanies-recovery-kit-${props.kitId}.pdf`,
-      'application/pdf',
-      t('recovery.kitModalTitle'),
-      preferDownload ? { preferDownload: true } : undefined
-    );
+    // The result MUST be inspected: `shareOrDownloadFile` RETURNS a failure
+    // rather than throwing, so discarding it (as this did) meant the error
+    // banner never rendered and the user was invited to press "I've stored it"
+    // for a kit that was never saved. `errorUi: 'caller'` because the banner
+    // below is this component's own visible error.
+    const result = await deliverFile({
+      blob: pdf,
+      filename: `beanies-recovery-kit-${props.kitId}.pdf`,
+      mimeType: 'application/pdf',
+      title: t('recovery.kitModalTitle'),
+      kind: 'recovery-kit-pdf',
+      preferDownload,
+      errorUi: 'caller',
+    });
+    // A cancel must LEAVE the banner as it is, not clear it. Assigning the
+    // comparison cleared a banner raised by a previous failed attempt, and on
+    // native `preferDownload` is ignored (the sheet is the only way out), so
+    // dismissing the sheet looked exactly like a fix: the user then pressed
+    // "I've stored my kit" and the host burned the one-time code for a kit that
+    // was never saved. Only a real outcome moves the flag.
+    if (result.delivered) kitPdfError.value = false;
+    else if (result.outcome === 'failed') kitPdfError.value = true;
   } catch (e) {
     kitPdfError.value = true;
     reportError({

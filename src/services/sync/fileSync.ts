@@ -215,7 +215,7 @@ export function reEncryptEnvelope(envelope: BeanpodFileV4, encryptedPayload: str
   return JSON.stringify(updated, null, 2);
 }
 
-// ── Utilities kept from V3 (file picker, download) ──────────────────
+// ── Utilities kept from V3 (file picker) ────────────────────────────
 
 /**
  * Opens a file picker for selecting a .beanpod file (fallback for mobile)
@@ -232,23 +232,4 @@ export function openFilePicker(): Promise<File | null> {
     input.oncancel = () => resolve(null);
     input.click();
   });
-}
-
-/**
- * Downloads a beanpod envelope as a .beanpod file
- */
-export function downloadAsFile(envelopeJson: string, filename?: string): void {
-  const blob = new Blob([envelopeJson], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-
-  const date = new Date().toISOString().split('T')[0];
-  const defaultFilename = `my-family-${date}.beanpod`;
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename ?? defaultFilename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }

@@ -213,7 +213,6 @@ vi.mock('@/services/sync/fileSync', () => ({
   reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
   parseBeanpodV4: vi.fn(() => ({})),
   detectFileVersion: vi.fn(() => 4),
-  downloadAsFile: vi.fn(),
 }));
 
 // Google Drive dependencies (imported by syncStore)

@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Downloads work in the apps.** Saving or sharing a file from the iPhone or Android app did nothing at all: the recovery kit, meal-plan PDFs and images, data exports, and saved photos all reported success and produced no file. Every one of them now opens the share sheet, where "Save to Files" (or "Save to device" on Android) puts the file where you want it. A failure is now visible rather than silent, and cancelling the sheet is treated as cancelling, not as a failure.
+
+- **Deleting your family no longer skips the backup.** Ticking "export my data first" was not checked before the deletion ran, so on the apps, where the export produced nothing, the data went anyway. The deletion now stops and tells you if the export did not produce a file. On the apps it also asks you to confirm the export really saved before anything is deleted, because Android reports a share as successful even when the receiving app throws it away.
+
+- **The backup taken before a deletion now contains everything.** It held ten of the twenty-nine kinds of thing beanies stores, so the cookbook, medications, allergies, milestones, photos, lists and emergency contacts were all missing from the copy taken immediately before they were deleted.
+
+- **"Export Encrypted Backup" and "Export as JSON" save again on desktop.** On Safari and on Chrome and Edge for Windows, both had started opening a share menu with no option to simply save the file. Saving a photo from the photo viewer behaves the same way.
+
 - **Dark mode is readable again.** An early adopter reported that text was grey and hard to read after dark, and he was right: six hundred and thirty pieces of text across the app sat below the contrast floor, and a few were the same colour as the card behind them. The whole palette after sunset has been rebuilt on measured values, so every shade of text now reads clearly on every surface it can land on. The worst of it was on the pages you use most: the cookbook title had vanished into its own header, the milestones and recent-activity cards on your nook were white slabs with unreadable text, and the recipe cards' descriptions were invisible. Bright colours stay bright, and warm surfaces like the cookbook and scrapbook keep their warmth rather than turning grey.
 
 - **The beanie wall says so when the screen is too small.** The wall is built to be read from across the kitchen, so it needs room on both sides of the screen, not just width. Opening it on a phone used to show a squashed, unusable wall; it now explains where the wall lives and offers a way back. A tablet works either way up, portrait or landscape, and a phone gets the message whichever way it is held.

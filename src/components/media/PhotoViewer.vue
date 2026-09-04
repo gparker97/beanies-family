@@ -15,6 +15,8 @@ import { confirm } from '@/composables/useConfirm';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { attachmentKind } from '@/utils/attachmentKind';
 import { pdfToPageImages } from '@/utils/pdfRender';
+import { deliverFile } from '@/utils/deliverFile';
+import { showToast } from '@/composables/useToast';
 import type { UUID } from '@/types/models';
 
 interface Props {
@@ -41,8 +43,11 @@ const store = usePhotoStore();
 const { t } = useTranslation();
 
 const currentIndex = ref(props.initialIndex);
+/** The `<img>` src ONLY. The PDF path renders rasterised pages instead, so this
+ *  is image-only — which is why the save button's `v-if` must not test it. */
 const fullUrl = ref<string | null>(null);
 const loading = ref(false);
+const isSaving = ref(false);
 
 // Inline PDF pages rendered via pdf.js (mobile/PWA webviews show a dead native
 // fallback for an <iframe> PDF, so we rasterize the pages ourselves). Object URLs,
@@ -101,7 +106,7 @@ function resolve(): void {
   }
   if (isPdfDoc.value) {
     // PDFs need real bytes — the lh3 image CDN (getPublicUrl) can't serve them.
-    // getBlobUrl does an authorized alt=media download → a same-origin object URL
+    // getFileBlob does an authorized alt=media download → bytes we can rasterize
     // (backs the download + open-in-new-tab links). We then read those bytes back
     // and rasterize every page with pdf.js so the document renders inline on every
     // platform — an <iframe> PDF dies in mobile/PWA webviews. The store caches the
@@ -111,16 +116,16 @@ function resolve(): void {
     loading.value = true;
     fullUrl.value = null;
     void store
-      .getBlobUrl(id)
-      .then(async (url) => {
+      .getFileBlob(id)
+      .then(async (blob) => {
         if (currentPhotoId.value !== id) return; // navigated away mid-fetch
-        fullUrl.value = url; // null → getBlobUrl marked it unresolved → missing state
-        if (!url) {
+        // null → getFileBlob marked it unresolved → missing state
+        if (!blob) {
           loading.value = false;
           return;
         }
         try {
-          const bytes = await (await fetch(url)).arrayBuffer();
+          const bytes = await blob.arrayBuffer();
           if (currentPhotoId.value !== id) return;
           const { urls, truncated } = await pdfToPageImages(bytes);
           if (currentPhotoId.value !== id) {
@@ -233,6 +238,54 @@ async function handleRemoveMissing(): Promise<void> {
   emit('remove', currentPhotoId.value);
   emit('close');
 }
+/**
+ * Save the document to the device.
+ *
+ * Goes through the store's AUTHORIZED bytes path rather than fetching
+ * `fullUrl`: for an image that is a cross-origin `lh3.googleusercontent.com`
+ * URL, where the `download` attribute is spec-ignored (which is why the old
+ * anchor never worked on ANY platform) and a CORS fetch would fail closed on an
+ * opaque response.
+ */
+async function handleSaveDocument(): Promise<void> {
+  const id = currentPhotoId.value;
+  if (!id || isSaving.value) return;
+  // Read the NAME on the same tick as the id. Both are reactive and the fetch
+  // below is slow, so reading the name afterwards took whichever photo the user
+  // had swiped to in the meantime: photo A's PDF bytes were delivered under
+  // photo B's name, and Android types a share by its extension. Nothing
+  // disables the chevrons while a save is in flight, so the swipe is ordinary.
+  const isPdf = isPdfDoc.value;
+  const name = docFileName.value || `beanies-photo-${id}.${isPdf ? 'pdf' : 'jpg'}`;
+  isSaving.value = true;
+  try {
+    const blob = await store.getFileBlob(id);
+    if (!blob) {
+      // The store has already classified and logged why (404 vs 403 vs
+      // network). Still tell the user, so the button is never a dead tap. See
+      // ADR-021: a member whose `drive.file` scope misses an other-owned file
+      // lands here. `source`, not `encode` — no bytes ever existed to encode.
+      showToast('error', t('photos.downloadFailed'), t('photos.downloadFailedHelp'), {
+        surface: 'file-delivery',
+        context: { action: 'delivery-failed', kind: 'photo', stage: 'source' },
+      });
+      return;
+    }
+    await deliverFile({
+      blob,
+      filename: name,
+      mimeType: blob.type || 'application/octet-stream',
+      title: t('photos.download'),
+      kind: 'photo',
+      // A photo the user asked to SAVE. On a share-capable desktop the sheet
+      // offers no plain save-to-disk; native ignores this and shares, which is
+      // where "Save to Files" lives.
+      preferDownload: true,
+    });
+  } finally {
+    isSaving.value = false;
+  }
+}
 </script>
 
 <template>
@@ -344,29 +397,11 @@ async function handleRemoveMissing(): Promise<void> {
           <p v-if="pdfTruncated" class="text-xs text-white/55">
             {{ t('photos.pdf.truncated') }}
           </p>
-          <a
-            v-if="fullUrl"
-            :href="fullUrl"
-            target="_blank"
-            rel="noopener"
-            class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 mt-1 inline-flex items-center gap-2 rounded-[16px] bg-gradient-to-r px-5 py-3 text-sm font-bold text-white no-underline shadow-sm transition-all duration-200 hover:shadow-md"
-          >
-            ↗ {{ t('photos.openInNewTab') }}
-          </a>
         </template>
         <!-- Render failed (or no bytes) → the open/download actions still work. -->
         <div v-else class="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <span class="text-5xl" aria-hidden="true">📄</span>
           <p class="max-w-xs text-sm text-white/70">{{ t('photos.pdf.previewFailed') }}</p>
-          <a
-            v-if="fullUrl"
-            :href="fullUrl"
-            target="_blank"
-            rel="noopener"
-            class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 inline-flex items-center gap-2 rounded-[16px] bg-gradient-to-r px-5 py-3 text-sm font-bold text-white no-underline shadow-sm transition-all duration-200 hover:shadow-md"
-          >
-            ↗ {{ t('photos.openInNewTab') }}
-          </a>
         </div>
       </div>
 
@@ -450,16 +485,17 @@ async function handleRemoveMissing(): Promise<void> {
         <!-- Utility: download. Hidden in the missing-photo state because
              there's no file to download. Slate-tinted bg differentiates
              "safe utility" from the destructive trash. -->
-        <a
-          v-if="!isMissing && fullUrl"
-          :href="fullUrl"
-          :download="docFileName || ''"
+        <button
+          v-if="!isMissing"
+          type="button"
+          :disabled="isSaving"
           :aria-label="t('photos.download')"
-          class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl no-underline transition-all duration-150 hover:scale-105"
+          class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl transition-all duration-150 hover:scale-105 disabled:opacity-50"
           style="background: rgb(44 62 80 / 6%)"
+          @click="handleSaveDocument"
         >
           📥
-        </a>
+        </button>
 
         <!-- Primary: Close (or Replace photo when the file is missing).
              Mirrors BeanieFormModal's flex-1 gradient-orange Save button. -->

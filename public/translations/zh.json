@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-04",
-    "translationCount": 4437
+    "translationCount": 4447
   },
   "translations": {
     "app.name": {
@@ -15116,11 +15116,6 @@
       "hash": "jr8bs0",
       "lastUpdated": "2026-06-04"
     },
-    "photos.openInNewTab": {
-      "translation": "在新标签页中打开",
-      "hash": "8cg67k",
-      "lastUpdated": "2026-06-04"
-    },
     "photos.document.tile": {
       "translation": "PDF 文档",
       "hash": "yh7gkp",
@@ -15387,9 +15382,9 @@
       "lastUpdated": "2026-06-07"
     },
     "photos.pdf.previewFailed": {
-      "translation": "此处无法显示此PDF。在新标签页中打开以查看。",
-      "hash": "uycqgy",
-      "lastUpdated": "2026-06-07"
+      "translation": "此处无法显示此PDF。保存后即可在其他应用中打开。",
+      "hash": "pswdgy",
+      "lastUpdated": "2026-09-04"
     },
     "nav.community": {
       "translation": "Beanies Discord",
@@ -22189,6 +22184,61 @@
     "wall.tooNarrow.back": {
       "translation": "带我返回",
       "hash": "8ed9me",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyExportFailed": {
+      "translation": "Nothing was deleted",
+      "hash": "piffgx",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyExportFailedHelp": {
+      "translation": "您的数据无法导出，因此您的家人仍然保持原样。请再次尝试导出，如果您希望在没有副本的情况下继续，请取消勾选。",
+      "hash": "ts6led",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyExportCheckTitle": {
+      "translation": "您的导出是否保存？",
+      "hash": "87ablu",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyExportCheckMsg": {
+      "translation": "检查您的文件，并确保导出确实存在。继续操作后，您的家人将被删除，您将仅拥有此副本。",
+      "hash": "5q7kyk",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyExportCheckConfirm": {
+      "translation": "是，已保存",
+      "hash": "pvkl1j",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyFailed": {
+      "translation": "无法完成删除",
+      "hash": "skel3j",
+      "lastUpdated": "2026-09-04"
+    },
+    "settings.deleteFamilyFailedHelp": {
+      "translation": "中途出错了。请检查“设置”以查看剩余内容，然后重试。",
+      "hash": "a8e13x",
+      "lastUpdated": "2026-09-04"
+    },
+    "fileDelivery.failed": {
+      "translation": "该文件未保存",
+      "hash": "ad1vg6",
+      "lastUpdated": "2026-09-04"
+    },
+    "fileDelivery.failedHelp": {
+      "translation": "没有任何内容保存到您的设备。请检查是否有可用空间，然后重试。",
+      "hash": "wywyi8",
+      "lastUpdated": "2026-09-04"
+    },
+    "photos.downloadFailed": {
+      "translation": "无法获取该照片",
+      "hash": "s82imz",
+      "lastUpdated": "2026-09-04"
+    },
+    "photos.downloadFailedHelp": {
+      "translation": "它可能已从您的家庭驱动器中删除，或者您可能无法访问它。",
+      "hash": "oejlkz",
       "lastUpdated": "2026-09-04"
     }
   }

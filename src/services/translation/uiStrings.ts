@@ -2350,6 +2350,37 @@ const STRING_DEFS = {
     beanie:
       'you need a pin or a password set up before you can do this. open settings → security to add one, then try again.',
   },
+  'settings.deleteFamilyExportFailed': {
+    en: 'Nothing was deleted',
+    beanie: 'nothing was deleted',
+  },
+  'settings.deleteFamilyExportFailedHelp': {
+    en: "Your data couldn't be exported, so your family has been left exactly as it was. Try the export again, or untick it if you'd rather continue without a copy.",
+    beanie:
+      "your data couldn't be exported, so your family has been left exactly as it was. try the export again, or untick it if you'd rather continue without a copy.",
+  },
+  'settings.deleteFamilyExportCheckTitle': {
+    en: 'Did your export save?',
+    beanie: 'did your export save?',
+  },
+  'settings.deleteFamilyExportCheckMsg': {
+    en: "Check your files and make sure the export is really there. Once you continue, your family is deleted and this copy is all you'll have.",
+    beanie:
+      "check your files and make sure the export is really there. once you continue, your beans are deleted and this copy is all you'll have.",
+  },
+  'settings.deleteFamilyExportCheckConfirm': {
+    en: "Yes, it's saved",
+    beanie: "yes, it's saved",
+  },
+  'settings.deleteFamilyFailed': {
+    en: "Couldn't finish deleting",
+    beanie: "couldn't finish deleting",
+  },
+  'settings.deleteFamilyFailedHelp': {
+    en: 'Something went wrong part-way through. Check Settings to see what is left, and try again.',
+    beanie:
+      'something went wrong part-way through. check settings to see what is left, and try again.',
+  },
   'settings.clearDataFailed': {
     en: 'Your data couldn’t be cleared. Nothing was removed — try again in a moment.',
     beanie: 'your data couldn’t be cleared. nothing was removed — try again in a moment.',
@@ -5538,6 +5569,15 @@ const STRING_DEFS = {
     en: 'Task complete! Well done!',
     beanie: 'task complete! the beanies are proud!',
   },
+  // ── file delivery ───────────────────────────────────────────────────────
+  // The shared failure copy for every export, share and download. One block, so
+  // it does not get scattered the way per-feature error copy has been before.
+  'fileDelivery.failed': { en: "That file didn't save", beanie: "that file didn't save" },
+  'fileDelivery.failedHelp': {
+    en: 'Nothing was saved to your device. Check you have space free, then try again.',
+    beanie: 'nothing was saved to your device. check you have space free, then try again.',
+  },
+
   // ── beanie wall ─────────────────────────────────────────────────────────
   // One contiguous block: uiStrings.ts is ~9.6k lines and a feature's copy
   // scattered through it is unfindable. Keep new wall copy HERE.
@@ -8621,14 +8661,21 @@ const STRING_DEFS = {
     en: 'Drop an image or PDF to add',
     beanie: 'drop an image or pdf to add',
   },
-  'photos.openInNewTab': { en: 'Open in new tab', beanie: 'open in new tab' },
   'photos.pdf.truncated': {
     en: 'Showing the first pages. Open it to see the whole document.',
     beanie: 'showing the first pages. open it to see the whole document.',
   },
   'photos.pdf.previewFailed': {
-    en: "This PDF can't be shown here. Open it in a new tab to view it.",
-    beanie: "this pdf can't be shown here. open it in a new tab to view it.",
+    en: "This PDF can't be shown here. Save it to open it in another app.",
+    beanie: "this pdf can't be shown here. save it to open it in another app.",
+  },
+  'photos.downloadFailed': {
+    en: "Couldn't fetch that photo",
+    beanie: "couldn't fetch that photo",
+  },
+  'photos.downloadFailedHelp': {
+    en: 'It may have been removed from your family drive, or you may not have access to it.',
+    beanie: 'it may have been removed from your family drive, or you may not have access to it.',
   },
   'photos.document.tile': { en: 'PDF document', beanie: 'pdf document' },
   'photos.document.tileNamed': { en: 'PDF: {name}', beanie: 'pdf: {name}' },

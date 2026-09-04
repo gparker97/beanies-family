@@ -50,8 +50,11 @@ import {
   list as projectionList,
   getSettings as getProjectionSettings,
 } from '@/services/automerge/projection';
+import { COLLECTION_NAMES } from '@/types/automerge';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
-import { downloadAsFile, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
+import { tryUnwrapFamilyKey } from '@/services/sync/fileSync';
+import { deliverFile } from '@/utils/deliverFile';
+import { isNative } from '@/services/sync/capabilities';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
 import {
@@ -534,8 +537,54 @@ function formatLastSync(timestamp: string | null): string {
 }
 
 // ── Data Management handlers ─────────────────────────────────────────────────
+/**
+ * In-flight guards for the two export buttons.
+ *
+ * Every other delivery call site already has one (`isExportingPdf`,
+ * `exportingFormat`, `isSaving`, `isDeleting`); these two did not, and on
+ * native the prepare phase is now multi-second. The seam serialises concurrent
+ * native deliveries so a double-tap can no longer corrupt one, but queuing two
+ * share sheets for one tap-tap is still wrong — so the button says busy.
+ */
+const isExportingBeanpod = ref(false);
+const isExportingJson = ref(false);
+
 async function handleManualExport() {
-  await syncStore.manualExport();
+  if (isExportingBeanpod.value) return;
+  isExportingBeanpod.value = true;
+  // Owns the whole sequence: build → deliver → stamp. Previously this awaited a
+  // store call that swallowed every throw and stamped `lastSync` even when the
+  // download was a no-op.
+  try {
+    const { json, filename } = await syncStore.buildExportEnvelope();
+    const result = await deliverFile({
+      blob: new Blob([json], { type: 'application/json' }),
+      filename,
+      mimeType: 'application/json',
+      title: t('settings.exportData'),
+      kind: 'beanpod',
+      // "Export Encrypted Backup" means SAVE. Without this, a share-capable
+      // desktop (Safari on macOS, Chrome/Edge on Windows and ChromeOS) opens a
+      // share menu with no save-to-disk option — the exact regression the
+      // recovery kit already passes `preferDownload` to avoid. Native ignores
+      // it, because there the share sheet IS where "Save to Files" lives.
+      preferDownload: true,
+    });
+    if (result.delivered) syncStore.markExported();
+  } catch (e) {
+    // `buildExportEnvelope` throws with no family key, and
+    // `docClient.exportEncryptedPayload` can reject. Both used to be silent.
+    showToast('error', t('fileDelivery.failed'), t('fileDelivery.failedHelp'), {
+      surface: 'file-delivery',
+      error: e,
+      // `source`, not `encode`: this fires when there was no family key or the
+      // worker could not produce a payload, so no bytes ever existed. Reporting
+      // `encode` sent the triager to a blob-size theory for a key problem.
+      context: { action: 'delivery-failed', kind: 'beanpod', stage: 'source' },
+    });
+  } finally {
+    isExportingBeanpod.value = false;
+  }
 }
 
 async function handleManualImport() {
@@ -552,29 +601,81 @@ async function handleManualImport() {
   }
 }
 
-function handleExportAsJson() {
-  const collections = [
-    'familyMembers',
-    'accounts',
-    'transactions',
-    'assets',
-    'goals',
-    'budgets',
-    'recurringItems',
-    'todos',
-    'activities',
-    'vacations',
-  ] as const;
-
+/**
+ * Build the readable-JSON export. Pure — no I/O, no delivery — so it is unit
+ * testable without a DOM and so the delivery policy lives in exactly one place.
+ */
+function buildReadableExportJson(): { json: string; filename: string } {
+  // Derived from `COLLECTION_NAMES`, never hand-listed — the same rule
+  // `dataBridge.ts` states for the same reason. The hand-written list this
+  // replaces held 10 of 29 collections, so the cookbook, medications,
+  // allergies, milestones, photos, lists and emergency contacts were all
+  // missing. That was survivable while this was merely "Export as JSON"; it is
+  // not survivable now the same function is the backup that authorises
+  // deleting the family. `COLLECTION_NAME_SEED` is `Record<CollectionName, 0>`,
+  // so a new collection is exported the moment it exists or the build fails.
   const data: Record<string, unknown> = {};
-  for (const key of collections) {
+  for (const key of COLLECTION_NAMES) {
     data[key] = projectionList(key);
   }
   data.settings = getProjectionSettings();
 
-  const json = JSON.stringify(data, null, 2);
   const date = new Date().toISOString().split('T')[0];
-  downloadAsFile(json, `beanies-export-${date}.json`);
+  return {
+    json: JSON.stringify(data, null, 2),
+    filename: `beanies-export-${date}.json`,
+  };
+}
+
+/**
+ * Deliver the readable-JSON export. Returns whether a file actually landed, so
+ * the delete-family gate can refuse to destroy anything when it did not.
+ */
+async function exportReadableJson(opts?: {
+  errorUi?: 'toast' | 'caller';
+  critical?: boolean;
+}): Promise<boolean> {
+  const { json, filename } = buildReadableExportJson();
+  const result = await deliverFile({
+    blob: new Blob([json], { type: 'application/json' }),
+    filename,
+    mimeType: 'application/json',
+    title: t('settings.exportAsJson'),
+    kind: 'readable-json',
+    // A save, not a share — see the note in `handleManualExport`. It also keeps
+    // the delete-family gate off `navigator.share`, which needs transient
+    // activation that a large `JSON.stringify` can outlive.
+    preferDownload: true,
+    errorUi: opts?.errorUi,
+    critical: opts?.critical,
+  });
+  return result.delivered;
+}
+
+/**
+ * Template handler. MUST take zero parameters — it is bound directly to
+ * `@click`, so any parameter would receive a `PointerEvent`.
+ */
+function handleExportAsJson(): void {
+  // `void` with no catch was an unhandled rejection waiting to happen:
+  // `JSON.stringify` throws `RangeError` on a very large family, and
+  // `deliverFile` touches the translation store on its failure branch. Either
+  // one left the button doing nothing, with no toast and nothing reported —
+  // which is precisely the class of silent failure this work exists to close.
+  // Its twin, `handleManualExport`, has always been wrapped.
+  if (isExportingJson.value) return;
+  isExportingJson.value = true;
+  exportReadableJson()
+    .catch((e: unknown) => {
+      showToast('error', t('fileDelivery.failed'), t('fileDelivery.failedHelp'), {
+        surface: 'file-delivery',
+        error: e,
+        context: { action: 'delivery-failed', kind: 'readable-json', stage: 'source' },
+      });
+    })
+    .finally(() => {
+      isExportingJson.value = false;
+    });
 }
 
 async function handleClearData() {
@@ -647,9 +748,59 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
   isDeleting.value = true;
 
   try {
-    // 1. Export if requested
+    // 1. Export if requested — and REFUSE to delete anything if it did not
+    //    actually produce a file. This step was previously fire-and-forget, so
+    //    on native (where delivery was a guaranteed no-op) a user could tick
+    //    "export my data first", receive nothing, and lose everything.
+    //    `delivered` is false for a CANCELLED share too, which is deliberate:
+    //    dismissing the sheet means no backup exists either.
     if (wantExport.value) {
-      handleExportAsJson();
+      const exported = await exportReadableJson({ errorUi: 'caller', critical: true });
+      if (!exported) {
+        showToast(
+          'error',
+          t('settings.deleteFamilyExportFailed'),
+          t('settings.deleteFamilyExportFailedHelp'),
+          // `exportReadableJson` already fired the single critical report;
+          // reporting again here would be two incidents for one failure.
+          { silent: true }
+        );
+        // Deliberately NOT `resetDeleteFamilyState()`: that unticks "export my
+        // data first", and the toast above tells the user to retry the export
+        // or untick it themselves. Someone following that advice would have
+        // found the box already cleared, confirmed again, and lost everything
+        // with no gate and no backup. Only the typed confirmation is cleared.
+        deleteConfirmText.value = '';
+        isDeleting.value = false;
+        showDeleteFamilyConfirm.value = true;
+        return;
+      }
+
+      // ⚠️ On native, `delivered` is NOT proof the file was saved, and it
+      // cannot be made into proof. `SharePlugin.java:59` resolves the call
+      // unless the chooser returned RESULT_CANCELED *and* `stopped` is false —
+      // and `handleOnStop()` sets `stopped` the moment the chosen app comes to
+      // the foreground. So picking Gmail and then discarding the draft resolves
+      // exactly like saving to Files does. The OS simply does not tell us.
+      //
+      // Since the very next lines are irreversible, the only honest gate is a
+      // human one: ask. On web the anchor download is deterministic
+      // (`preferDownload` above keeps it off `navigator.share`), so there is
+      // nothing to ask about and the flow is unchanged.
+      if (
+        isNative() &&
+        !(await confirm({
+          title: 'settings.deleteFamilyExportCheckTitle',
+          message: 'settings.deleteFamilyExportCheckMsg',
+          confirmLabel: 'settings.deleteFamilyExportCheckConfirm',
+          variant: 'danger',
+        }))
+      ) {
+        deleteConfirmText.value = '';
+        isDeleting.value = false;
+        showDeleteFamilyConfirm.value = true;
+        return;
+      }
     }
 
     // 2. Delete Drive file if requested
@@ -690,7 +841,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     // 7. Redirect
     router.replace('/welcome');
   } catch (e) {
+    // A deletion that dies half-way must not present as a button that simply
+    // stopped: the family may now be in a partial state and the user needs to
+    // know to go and look.
     console.error('[deleteFamily] Deletion failed:', e);
+    showToast('error', t('settings.deleteFamilyFailed'), t('settings.deleteFamilyFailedHelp'), {
+      surface: 'delete-family',
+      error: e,
+      context: { action: 'delete_family_failed' },
+      critical: true,
+    });
     isDeleting.value = false;
   }
 }
@@ -1674,7 +1834,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               {{ t('settings.downloadDataDescription') }}
             </p>
           </div>
-          <BaseButton variant="secondary" size="sm" @click="handleManualExport">
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            :disabled="isExportingBeanpod"
+            @click="handleManualExport"
+          >
             {{ t('action.download') }}
           </BaseButton>
         </div>
@@ -1786,7 +1951,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             {{ t('settings.exportDataDescription') }}
           </p>
         </div>
-        <BaseButton variant="ghost" size="sm" @click="handleManualExport">
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          :disabled="isExportingBeanpod"
+          @click="handleManualExport"
+        >
           {{ t('action.export') }}
         </BaseButton>
       </div>
@@ -1799,7 +1969,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             {{ t('settings.exportAsJsonDesc') }}
           </p>
         </div>
-        <BaseButton variant="ghost" size="sm" @click="handleExportAsJson">
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          :disabled="isExportingJson"
+          @click="handleExportAsJson"
+        >
           {{ t('action.export') }}
         </BaseButton>
       </div>
