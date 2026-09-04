@@ -38,7 +38,7 @@ const hasAnything = computed(() => Boolean(props.course) || (props.tags?.length 
   <div v-if="hasAnything" class="mt-1.5 flex flex-wrap items-center gap-1">
     <span
       v-if="course"
-      class="font-outfit dark:bg-primary-500/15 inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold text-[#F15D22]"
+      class="font-outfit dark:bg-primary-500/15 dark:text-accent-lift inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold text-[#F15D22]"
     >
       <span aria-hidden="true">{{ courseEmoji(course) }}</span>
       {{ courseLabel(course) }}

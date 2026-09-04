@@ -91,7 +91,7 @@ function onCourse(value: string) {
         class="font-outfit shrink-0 rounded-t-2xl border border-b-0 px-4 py-2 text-sm font-semibold transition-colors"
         :class="
           groupBy === tab.value
-            ? 'dark:bg-surface-raised dark:border-line-strong border-gray-200 bg-white text-[#F15D22]'
+            ? 'dark:bg-surface-raised dark:border-line-strong dark:text-accent-lift border-gray-200 bg-white text-[#F15D22]'
             : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
         "
         :aria-pressed="groupBy === tab.value"
