@@ -31,56 +31,17 @@
  * early-warning, never the enforcement. It exits non-zero for exactly one reason: the version
  * is confirmed used.
  *
- * Auth is an ES256 JWT built from the same App Store Connect API key the release already
- * uses, with `node:crypto` — no dependency, nothing new to keep in sync.
+ * Auth, the bundle-id lookup and the app-id lookup live in `ascClient.mjs`, shared with the
+ * pending-submission preflight so there is exactly one JWT builder to keep correct.
  */
 
-import fs from 'node:fs';
-import { createSign } from 'node:crypto';
-
-const ASC_HOST = 'https://api.appstoreconnect.apple.com';
-
-/** base64url without padding, as JWT requires. */
-function b64url(input) {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-/**
- * Build the ES256 JWT App Store Connect expects.
- *
- * Exported for the unit test: the signature cannot be asserted without the private key, but
- * the header/payload SHAPE can be, and getting `aud`, `alg` or the expiry wrong is the usual
- * way this silently 401s.
- *
- * @param {{ keyId: string, issuerId: string, privateKey: string, now?: number }} args
- */
-export function buildToken({ keyId, issuerId, privateKey, now = Math.floor(Date.now() / 1000) }) {
-  const header = { alg: 'ES256', kid: keyId, typ: 'JWT' };
-  // 20 minutes is Apple's maximum; anything longer is rejected outright.
-  const payload = { iss: issuerId, iat: now, exp: now + 20 * 60, aud: 'appstoreconnect-v1' };
-  const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
-  const signer = createSign('SHA256');
-  signer.update(signingInput);
-  const der = signer.sign({ key: privateKey, dsaEncoding: 'ieee-p1363' });
-  return `${signingInput}.${der.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
-}
-
-/**
- * The app's bundle id, read from the ONE place it is already declared.
- *
- * Hardcoding it here would be a second copy that silently rots: if `capacitor.config.ts`
- * ever changes, a stale literal makes the apps lookup return no app, which fails OPEN and
- * quietly protects nothing. `IOS_BUNDLE_ID` overrides for a test or a second app.
- */
-export function readBundleId(configSource) {
-  const match = /appId:\s*['"]([^'"]+)['"]/.exec(configSource);
-  if (!match) throw new Error('could not find appId in capacitor.config.ts');
-  return match[1];
-}
+import {
+  ascCredentials,
+  ascGet,
+  resolveAppId,
+  resolveBundleId,
+  tokenFromCredentials,
+} from './ascClient.mjs';
 
 /**
  * Decide the outcome from the versions App Store Connect reports.
@@ -117,30 +78,21 @@ export function judge(version, existing) {
  * without reaching Apple; it defaults to the global `fetch` at call time.
  */
 export async function fetchExistingVersions({ bundleId, token, fetchImpl = fetch }) {
-  const appsUrl = `${ASC_HOST}/v1/apps?filter[bundleId]=${encodeURIComponent(bundleId)}`;
-  const appsRes = await fetchImpl(appsUrl, { headers: { Authorization: `Bearer ${token}` } });
-  if (!appsRes.ok) throw new Error(`apps lookup returned HTTP ${appsRes.status}`);
-  const apps = await appsRes.json();
-  const appId = apps?.data?.[0]?.id;
-  if (!appId) throw new Error(`no app on App Store Connect for bundle id ${bundleId}`);
-
+  const appId = await resolveAppId({ bundleId, token, fetchImpl });
   // `limit=200` rather than paging: an app with more than 200 released versions is not a
   // situation this check needs to handle, and a partial list can only fail OPEN (it might
   // miss a used version, which the real upload then catches).
-  const versionsUrl = `${ASC_HOST}/v1/apps/${appId}/appStoreVersions?limit=200&fields[appStoreVersions]=versionString`;
-  const versionsRes = await fetchImpl(versionsUrl, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!versionsRes.ok) throw new Error(`versions lookup returned HTTP ${versionsRes.status}`);
-  const versions = await versionsRes.json();
+  const versions = await ascGet(
+    `/v1/apps/${appId}/appStoreVersions?limit=200&fields[appStoreVersions]=versionString`,
+    token,
+    fetchImpl
+  );
   return (versions?.data ?? []).map((v) => v?.attributes?.versionString).filter(Boolean);
 }
 
 async function main() {
   const version = process.env.MARKETING_VERSION?.trim();
-  const keyId = process.env.APP_STORE_CONNECT_API_KEY_ID?.trim();
-  const issuerId = process.env.APP_STORE_CONNECT_API_ISSUER_ID?.trim();
-  const keyPath = process.env.ASC_API_KEY_P8_PATH?.trim();
+  const credentials = ascCredentials();
 
   if (!version) {
     // A missing version is a workflow wiring fault, not an Apple outage — fail CLOSED, since
@@ -151,7 +103,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (!keyId || !issuerId || !keyPath) {
+  if (!credentials) {
     console.warn(
       '[preflight] App Store Connect credentials are not set ' +
         '(APP_STORE_CONNECT_API_KEY_ID / _ISSUER_ID / ASC_API_KEY_P8_PATH). ' +
@@ -164,12 +116,8 @@ async function main() {
   try {
     // Inside the try, with the network calls: an unreadable config or key is the same class
     // of environment fault as an unreachable Apple, and takes the same fail-open path.
-    const bundleId =
-      process.env.IOS_BUNDLE_ID?.trim() ||
-      readBundleId(fs.readFileSync(new URL('../../capacitor.config.ts', import.meta.url), 'utf8'));
-    const privateKey = fs.readFileSync(keyPath, 'utf8');
-    const token = buildToken({ keyId, issuerId, privateKey });
-    existing = await fetchExistingVersions({ bundleId, token });
+    const token = tokenFromCredentials(credentials);
+    existing = await fetchExistingVersions({ bundleId: resolveBundleId(), token });
   } catch (err) {
     // FAIL OPEN — see the header. Loud, so a persistently broken preflight is visible in the
     // log rather than quietly protecting nothing.
