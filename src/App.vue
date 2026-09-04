@@ -105,7 +105,7 @@ import { isFlagEnabled } from '@/config/flags';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
-import { PayloadLoadError, PayloadTooLargeError } from '@/types/sync';
+import { PayloadLoadError } from '@/types/sync';
 import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useNotificationsStore } from '@/stores/notificationsStore';
@@ -693,7 +693,7 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         // ending turns a self-healing hiccup into a permanent "your data may be
         // damaged" overlay plus a critical page on every boot, forever — while
         // the pod on Drive is fine.
-        if (cacheResult.payloadError instanceof PayloadTooLargeError) {
+        if (cacheResult.payloadError?.deviceCannotOpen) {
           initBreadcrumbs.push(`path1a: payload ${cacheResult.payloadError.step} too-large`);
           surfaceFatal(cacheResult.payloadError);
           return 'failed';
@@ -845,7 +845,7 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         // A CORRUPT cache is the opposite case: it has already been cleared, so
         // there is nothing left to overwrite and falling through to an empty doc
         // is the existing (and correct) degraded behaviour.
-        if (cacheResult.payloadError instanceof PayloadTooLargeError) {
+        if (cacheResult.payloadError?.deviceCannotOpen) {
           initBreadcrumbs.push(`path2: payload ${cacheResult.payloadError.step} too-large`);
           surfaceFatal(cacheResult.payloadError);
           return 'failed';

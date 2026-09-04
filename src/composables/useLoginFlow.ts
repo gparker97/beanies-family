@@ -14,7 +14,7 @@
  */
 
 import { ref, type Ref } from 'vue';
-import { PayloadTooLargeError, PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
+import { PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
 import { reportPayloadFailure, surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import {
   transition,
@@ -416,6 +416,10 @@ export function useLoginFlow(opts: {
    * on a transport problem — the caller just stops.
    */
   async function ensureStaged(): Promise<boolean> {
+    // Reset on ENTRY. Only one of the three callers reads and clears it, so a
+    // value left by an earlier biometric attempt mislabelled a later, unrelated
+    // funnel outcome — a network outage reported as 'corrupted'.
+    stagedPayloadFailure = null;
     if (podOpen() || syncStore.hasPendingEncryptedFile) return true;
     if (!syncStore.isConfigured) {
       // No provider and no open pod: this family cannot be opened from here.
@@ -438,18 +442,23 @@ export function useLoginFlow(opts: {
       // on the step that runs BEFORE the prove screen.
       if (e instanceof PayloadLoadError) {
         stagedPayloadFailure = e.deviceCannotOpen ? 'too-large' : 'corrupted';
-        // The FATAL overlay, not `OPEN_FAILED` — that lands in `open-recovery`,
-        // whose primary "Try again" clears `proveError`, re-downloads the pod
-        // and hits the identical allocation, unbounded, firing another critical
-        // report each press. Nothing is on screen at this point (this runs
-        // before the prove screen), so the overlay is the honest surface and its
-        // Reload really can help: a page reload reclaims the doc realm's wasm
-        // memory, which never shrinks in place.
-        surfacePayloadFatal(e, {
+        // INLINE, not the fatal overlay. All three callers run with a screen the
+        // user is looking at — `onBiometric` and `onPinSubmit` after they have
+        // acted, `runOpening` mid-open — so a `fixed inset-0 z-[300]` panel
+        // would land on top of it. And `OPEN_FAILED` must still dispatch or
+        // `runOpening` returns with the machine stuck in 'opening', which
+        // renders LoginPage's bare spinner with nothing left to dispatch.
+        //
+        // The retry loop that motivated the overlay is closed at the source
+        // instead: `syncService` latches the unreadable remote, so a
+        // `RECOVERY_RETRY` short-circuits rather than re-downloading.
+        proveError.value = t(payloadErrorMessageKey(e));
+        reportPayloadFailure(e, {
+          source: 'boot',
           fileId: syncStore.driveFileId ?? null,
           familyId: familyContextStore.activeFamilyId,
-          source: 'boot',
         });
+        dispatch({ type: 'OPEN_FAILED', reason: 'error' });
         return false;
       }
       reportError({
@@ -670,10 +679,7 @@ export function useLoginFlow(opts: {
           // Distinct outcome code — `decrypt-failed` is byte-identical to the
           // genuine credential failure below, so the two would be
           // indistinguishable in the funnel.
-          emitOutcome(
-            false,
-            dec.payloadError instanceof PayloadTooLargeError ? 'too-large' : 'corrupted'
-          );
+          emitOutcome(false, dec.payloadError.deviceCannotOpen ? 'too-large' : 'corrupted');
           // Report through the SHARED emitter. A hand-rolled copy here was
           // already divergent (no `file_id_tail`) and shared the (surface,
           // message) dedup bucket with the real one, so on the default sign-in
@@ -857,7 +863,7 @@ export function useLoginFlow(opts: {
                 // Two very different causes, and telling a user their file is damaged
                 // when it is merely too big for THIS device is the lie this change
                 // exists to remove.
-                const tooLarge = dec.payloadError instanceof PayloadTooLargeError;
+                const tooLarge = dec.payloadError.deviceCannotOpen;
                 // The INLINE key, not the overlay's: `proveError` renders in a
                 // compact slot with no diagnostic blob and no Clear-data button,
                 // so the overlay copy would point at UI that is not on screen.

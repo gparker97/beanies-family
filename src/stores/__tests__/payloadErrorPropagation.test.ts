@@ -82,8 +82,12 @@ vi.mock('@/services/sync/fileSync', () => ({
 // more of its surface than this suite cares about. Only the one call under
 // test is given a behaviour.
 vi.mock('@/services/automerge/worker/docClient');
+vi.mock('@/services/sync/syncService', async () => ({
+  ...(await import('../../services/sync/__mocks__/syncService')),
+}));
 
 import * as docClient from '@/services/automerge/worker/docClient';
+import * as syncService from '@/services/sync/syncService';
 import { useSyncStore } from '../syncStore';
 
 const tooLarge = () => new PayloadTooLargeError('oom', 'materialize', 'family-123', 3_000_000);
@@ -140,5 +144,46 @@ describe('payload failures propagate instead of flattening', () => {
 
     expect(r.success).toBe(false);
     expect(r.payloadError).toBeUndefined();
+  });
+});
+
+describe('the remote-unreadable latch gates the WORK, not just the timer', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    savedGlobalSettings = { ...mockGlobalSettings };
+    vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(null);
+  });
+
+  it('backgroundSyncFromFile short-circuits once the remote is known unreadable', async () => {
+    // `AppHeader`'s Refresh calls this DIRECTLY, so a latch checked only inside
+    // `startFilePolling` let every tap re-download the whole pod and re-hit the
+    // same allocation. There is no equivalent assertion anywhere else.
+    vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(tooLarge());
+
+    const outcome = await useSyncStore().backgroundSyncFromFile();
+
+    expect(outcome).toBe('skipped-unopenable');
+    expect(syncService.load).not.toHaveBeenCalled();
+  });
+
+  it('reloadIfFileChanged short-circuits too — that is the tab-wake door', async () => {
+    // `isConfigured` matters: without it the function returns false at its own
+    // first guard and the assertion passes whether or not the latch is checked
+    // (verified — removing the guard left the weaker version green).
+    const store = useSyncStore();
+    store.isConfigured = true;
+    store.needsPermission = false;
+    vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(tooLarge());
+
+    expect(await store.reloadIfFileChanged()).toBe(false);
+    expect(syncService.remoteChanged).not.toHaveBeenCalled();
+  });
+
+  it('does NOT short-circuit while the remote is readable', async () => {
+    // The direction that matters just as much: an over-eager latch would
+    // silently disable cross-device sync for a healthy pod.
+    const outcome = await useSyncStore().backgroundSyncFromFile();
+    expect(outcome).not.toBe('skipped-unopenable');
   });
 });

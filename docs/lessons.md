@@ -610,10 +610,14 @@ deleted).
    Twice I narrowed a branch to `PayloadTooLargeError` and silently sent the
    corrupt half down a destructive path. Ask explicitly: what happens now to
    every class this no longer matches?
-4. **Check the discriminator is the right one.** `LoadPodView` should key on
-   `err.step === 'decrypt'`, not on the class: `loadAndVerify` runs outside the
-   decrypt's try, so `step: 'load'` proves the key was correct. The class was a
-   proxy for the question; the step was the question.
+4. **Check the discriminator is the right one — and then check it again.**
+   Keying on the CLASS was wrong (`loadAndVerify` runs outside the decrypt's
+   try, so `step: 'load'` proves the key was correct). Keying on the STEP was
+   ALSO wrong, in the other direction: an allocation failure at the decrypt step
+   never reached the tag check either. Neither field was the question; the
+   question was "could the credential be at fault?", and it now lives on the
+   type as `keyMayBeWrong`. See addendum 8 — a question that needs two fields
+   combined is a policy, not a check.
 5. **Do not raise a full-screen fatal overlay from a background path.** It runs
    over a session that already painted real data.
 6. **A "stop retrying" latch belongs at the single site that creates the timer**,
@@ -642,3 +646,13 @@ broken again in the very next pass, twice, so two of them get sharper:
    written a full base over a remote it had just failed to read, destroying
    peer edits. When a change makes an app _more_ usable after a failure, ask
    what that failure was previously preventing.
+
+10. **Put a latch in the layer that owns the resource, not in the layer that
+    noticed.** The "stop re-downloading a pod this device cannot read" flag went
+    into `syncStore` first, where it could not see the local-file poll tick and
+    had to be cleared from five places (it was cleared wrongly in three). Then
+    the save path got its own `instanceof` special case, which defended exactly
+    one save, because the read had already learned the remote's revision marker
+    before the merge threw. Both doors run through `syncService.fetchAndMergeRemote`,
+    so one latch there closes every one of them — and "do not learn the marker
+    until the merge succeeds" is the fix that made the guard mean anything.

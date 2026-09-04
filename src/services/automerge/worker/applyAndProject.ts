@@ -18,7 +18,7 @@
  * single main-thread buffer. See ADR-032.
  */
 import * as Automerge from '@automerge/automerge';
-import { PayloadTooLargeError } from '@/types/sync';
+import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
@@ -522,7 +522,7 @@ export async function initAndLoadCache(
     // installs a real doc. All three callers are cold-open paths that hold no
     // doc worth keeping.
     dropDoc();
-    if (!(e instanceof PayloadTooLargeError)) {
+    if (!(e instanceof PayloadLoadError) || !e.deviceCannotOpen) {
       // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
       // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
       // `clearCache` deletes the whole DB — base AND snapshot rows — which is
