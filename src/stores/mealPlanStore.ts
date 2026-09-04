@@ -10,6 +10,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { trackFeature } from '@/services/analytics/plausible';
+import { SLOT_INDEX } from '@/constants/mealSlots';
 import type {
   MealPlanEntry,
   CreateMealPlanInput,
@@ -17,17 +18,14 @@ import type {
   MealSlot,
 } from '@/types/models';
 
-/** Canonical slot order for stable rendering (snacks last). */
-const SLOT_ORDER: Record<MealSlot, number> = { breakfast: 0, lunch: 1, dinner: 2, snack: 3 };
-
 const bySlotThenPosition = (a: MealPlanEntry, b: MealPlanEntry) =>
-  SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] || a.position - b.position;
+  SLOT_INDEX[a.slot] - SLOT_INDEX[b.slot] || a.position - b.position;
 
 // Week/multi-day ordering MUST lead with the date, else a share (which prints a
 // day heading only when the date changes) repeats headings and scrambles output.
 const byDateSlotPosition = (a: MealPlanEntry, b: MealPlanEntry) =>
   a.date.localeCompare(b.date) ||
-  SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] ||
+  SLOT_INDEX[a.slot] - SLOT_INDEX[b.slot] ||
   a.position - b.position;
 
 /**

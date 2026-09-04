@@ -1,3 +1,4 @@
+import { MEAL_SLOTS } from '@/constants/mealSlots';
 import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 /**
@@ -83,9 +84,6 @@ export interface MealExportRows {
   hasGuests: boolean;
 }
 
-/** Fixed slot order — the export always shows all four rows (empty cells dashed). */
-const SLOT_ORDER: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-
 /**
  * Fallback only — the caller should pass a collision-aware initial.
  *
@@ -153,7 +151,7 @@ export function buildMealExportRows(
 
   const dayColumns = weekDates.map((dateISO) => ({ dateISO, ...resolvers.dayHeading(dateISO) }));
 
-  const rows: ExportSlotRow[] = SLOT_ORDER.map((slot) => ({
+  const rows: ExportSlotRow[] = MEAL_SLOTS.map((slot) => ({
     slot,
     slotLabel: resolvers.slotLabel(slot),
     cells: weekDates.map((date) =>

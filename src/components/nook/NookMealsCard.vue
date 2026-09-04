@@ -13,9 +13,10 @@ import { MEAL_TYPE_STYLE, mealTypeEmoji } from '@/constants/mealTypes';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { SLOT_EMOJI, SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
 import { mealDisplayName } from '@/utils/mealDisplayName';
-import type { MealPlanEntry, MealSlot } from '@/types/models';
+import type { MealPlanEntry } from '@/types/models';
 
 const emit = defineEmits<{ openMeal: [meal: MealPlanEntry] }>();
 
@@ -26,13 +27,6 @@ const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
 
 const meals = computed(() => mealPlanStore.todaysMeals);
-
-const SLOT_EMOJI: Record<MealSlot, string> = {
-  breakfast: '🍳',
-  lunch: '🥪',
-  dinner: '🍽️',
-  snack: '🍎',
-};
 
 function recipeFor(m: MealPlanEntry) {
   return m.recipeId ? recipesStore.recipes.find((r) => r.id === m.recipeId) : undefined;
@@ -63,7 +57,7 @@ function cookFor(m: MealPlanEntry) {
           <span
             class="font-outfit dark:text-ink-faint w-14 flex-none text-xs font-semibold tracking-[0.05em] text-[rgba(44,62,80,0.45)] uppercase"
           >
-            {{ t(`mealPlanner.slot.${m.slot}`) }}
+            {{ t(SLOT_LABEL_KEYS[m.slot]) }}
           </span>
           <!--
             A medallion on EVERY meal, as on the board. It was `v-if="kind === 'recipe'"`,

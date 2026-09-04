@@ -12,12 +12,13 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { SLOT_EMOJI } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMealDrag } from '@/composables/useMealDrag';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import { MEAL_TYPE_STYLE, mealTypeEmoji } from '@/constants/mealTypes';
-import type { MealPlanEntry, MealSlot } from '@/types/models';
+import type { MealPlanEntry } from '@/types/models';
 
 const props = defineProps<{ meal: MealPlanEntry }>();
 const emit = defineEmits<{ open: [] }>();
@@ -27,13 +28,6 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
 const { startDrag, endDrag } = useMealDrag();
-
-const SLOT_EMOJI: Record<MealSlot, string> = {
-  breakfast: '🍳',
-  lunch: '🥪',
-  dinner: '🍽️',
-  snack: '🍎',
-};
 
 const recipe = computed(() =>
   props.meal.recipeId ? recipesStore.recipes.find((r) => r.id === props.meal.recipeId) : undefined

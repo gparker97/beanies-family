@@ -19,6 +19,7 @@ import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
+import { SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTranslationStore } from '@/stores/translationStore';
 import { confirm } from '@/composables/useConfirm';
@@ -243,7 +244,7 @@ function cook(id?: string): { name: string; color?: string; initial?: string } |
 // identically across the exported grid.
 const mealResolvers = computed<MealResolvers>(() => ({
   dayHeading,
-  slotLabel: (s: MealSlot) => t(`mealPlanner.slot.${s}`),
+  slotLabel: (s: MealSlot) => t(SLOT_LABEL_KEYS[s]),
   mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
   cook,
 }));

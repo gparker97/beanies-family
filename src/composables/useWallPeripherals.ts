@@ -24,15 +24,8 @@ import { isWallSafeList } from '@/utils/wallJobs';
 import { isFiled } from '@/utils/listLifecycle';
 import { buildWhenBand, tripDayProgress, tripPhase } from '@/utils/vacation';
 import type { WhenBand } from '@/utils/vacation';
+import { SLOT_EMOJI, SLOT_INDEX } from '@/constants/mealSlots';
 import type { FamilyList, FamilyMember, MealPlanEntry, MealSlot } from '@/types/models';
-
-/** Matches the nook card, so a meal reads identically on every surface. */
-const SLOT_EMOJI: Record<MealSlot, string> = {
-  breakfast: '🍳',
-  lunch: '🥪',
-  dinner: '🍽️',
-  snack: '🍎',
-};
 
 export interface WallMeal {
   id: string;
@@ -94,9 +87,8 @@ export function useWallPeripherals() {
 
   /** Every meal planned for today, in slot order — the card shows one, the sheet all. */
   const mealsToday = computed<WallMeal[]>(() => {
-    const order: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
     return [...mealPlanStore.todaysMeals]
-      .sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot) || a.position - b.position)
+      .sort((a, b) => SLOT_INDEX[a.slot] - SLOT_INDEX[b.slot] || a.position - b.position)
       .map(toWallMeal);
   });
 
