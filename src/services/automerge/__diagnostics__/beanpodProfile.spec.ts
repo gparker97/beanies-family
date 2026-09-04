@@ -167,6 +167,54 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
       ].join('\n')
     );
 
+    // ── Actor churn ──────────────────────────────────────────────────────
+    //
+    // `Automerge.load()` mints a FRESH RANDOM actorId on every call, so every
+    // cold start / cache load / poll-merge that then writes leaves a PERMANENT
+    // actor lane. That makes actor count grow with SESSIONS, not with data.
+    //
+    // Why it matters for Tier 2 and not for Tier 1: pinning a stable actor
+    // cannot shrink a pod that is already written, so it is a PREVENTIVE fix.
+    // What this distribution decides is how fast a compacted pod re-bloats —
+    // i.e. whether compaction alone is a durable fix or a repeating chore.
+    //
+    // Guarded: `getAllChanges` materialises every change's bytes, which on a
+    // history-heavy pod is a large allocation in its own right. A failure here
+    // must not cost us the main report above, which has already printed.
+    try {
+      const byActor = new Map<string, number>();
+      for (const change of Automerge.getAllChanges(doc)) {
+        const actor = Automerge.decodeChange(change).actor;
+        byActor.set(actor, (byActor.get(actor) ?? 0) + 1);
+      }
+      const counts = [...byActor.values()].sort((a, b) => b - a);
+      const total = counts.reduce((a, b) => a + b, 0);
+      const at = (q: number) => counts[Math.min(counts.length - 1, Math.floor(counts.length * q))];
+      // How concentrated is it? If the top 1% of actors hold most changes, the
+      // tail is session churn. If it is flat, every actor is a session.
+      const top1pct = counts.slice(0, Math.max(1, Math.floor(counts.length * 0.01)));
+      process.stdout.write(
+        [
+          '',
+          '─── actor churn ' + '─'.repeat(44),
+          `  distinct actors     ${counts.length.toLocaleString()}`,
+          `  changes             ${total.toLocaleString()}`,
+          `  changes per actor   mean ${(total / counts.length).toFixed(1)}  ` +
+            `median ${at(0.5)}  p90 ${at(0.1)}  max ${counts[0]}`,
+          `  actors with 1 change ${counts.filter((c) => c === 1).length.toLocaleString()}` +
+            ` (${((counts.filter((c) => c === 1).length / counts.length) * 100).toFixed(0)}%)`,
+          `  top 1% of actors    ${((top1pct.reduce((a, b) => a + b, 0) / total) * 100).toFixed(0)}% of changes`,
+          '─'.repeat(60),
+          '',
+        ].join('\n')
+      );
+    } catch (e) {
+      process.stdout.write(
+        `\n  (actor-churn breakdown skipped: ${e instanceof Error ? e.message : String(e)})\n` +
+          '  The main profile above is unaffected.\n\n'
+      );
+    }
+
     // Assertions are sanity checks, not thresholds: the OUTPUT is the artefact.
     expect(stats.numChanges).toBeGreaterThan(0);
     expect(fullBytes).toBeGreaterThan(0);
