@@ -14,6 +14,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import FormSection from '@/components/ui/FormSection.vue';
 import RecipeSourceStrip from './RecipeSourceStrip.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -581,132 +582,140 @@ const LIST_TEXTAREA_CLASS =
         @file="(f) => docGrant && void capture.processFile(f, docGrant)"
       />
 
-      <FormFieldGroup :label="t('recipes.field.name')" required>
-        <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.subtitle')" optional>
-        <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
-      </FormFieldGroup>
-
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
-          <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
+      <FormSection label-key="recipes.section.dish" emoji="🍽️" first>
+        <FormFieldGroup :label="t('recipes.field.name')" required>
+          <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />
         </FormFieldGroup>
-        <FormFieldGroup :label="t('recipes.field.cookTime')" optional>
-          <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
+
+        <FormFieldGroup :label="t('recipes.field.subtitle')" optional>
+          <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
         </FormFieldGroup>
-        <FormFieldGroup :label="t('recipes.field.servings')" optional>
-          <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
-        </FormFieldGroup>
-      </div>
 
-      <FormFieldGroup :label="t('recipes.field.ingredients')" optional>
-        <textarea
-          v-model="ingredientsText"
-          rows="6"
-          :class="LIST_TEXTAREA_CLASS"
-          :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
-        />
-        <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
-           error. Same idiom as ActivityModal's low-confidence hint. -->
-        <p v-if="inferredIngredients.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
-          {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
-        </p>
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.steps')" optional>
-        <textarea
-          v-model="stepsText"
-          rows="6"
-          :class="LIST_TEXTAREA_CLASS"
-          :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
-        />
-        <p v-if="inferredSteps.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
-          {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
-        </p>
-      </FormFieldGroup>
-
-      <!-- Where this came from, visible and editable — the same affordance activities have.
-           It is filled in automatically by the reader, but a hand-typed recipe can carry a
-           link too, and a captured one can be corrected. -->
-      <FormFieldGroup :label="t('recipes.field.sourceUrl')" optional>
-        <BaseInput
-          v-model="sourceUrl"
-          type="url"
-          :placeholder="t('recipes.placeholder.sourceUrl')"
-        />
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.course')" optional>
-        <BaseSelect v-model="course" :options="courseOptions" />
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.meals')" optional>
-        <ChipToggleGroup
-          v-model="mealSlots"
-          :options="mealOptions"
-          :aria-label="t('recipes.field.meals')"
-        />
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.tags')" optional>
-        <RecipeTagInput v-model="tags" :suggestions="tagSuggestions" />
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.notes')" optional>
-        <textarea
-          v-model="notes"
-          rows="3"
-          class="focus:border-primary-500 focus:ring-primary-500 font-caveat dark:border-line-strong dark:bg-surface-overlay dark:text-ink w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-lg leading-snug text-[var(--color-text)] outline-none focus:ring-1"
-          :placeholder="t('recipes.placeholder.notes')"
-        />
-      </FormFieldGroup>
-
-      <FormFieldGroup :label="t('recipes.field.photos')" optional>
-        <div v-if="eager.entityId.value">
-          <PhotoAttachments
-            ref="photoAttachmentsRef"
-            collection="recipes"
-            :entity-id="eager.entityId.value"
-            :photo-ids="binding.photoIds.value"
-            :current-member-id="currentMemberId"
-            :max="4"
-            @update:photo-ids="binding.updatePhotoIds"
-          />
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
+            <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('recipes.field.cookTime')" optional>
+            <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('recipes.field.servings')" optional>
+            <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
+          </FormFieldGroup>
         </div>
-        <template v-else>
-          <!-- Say a photo is coming, and STILL offer the add control.
-               The note removes the surprise, which was the actual problem — it is not a
-               reason to take the choice away. Adding your own plate alongside the original
-               is a normal thing to want, and the two cannot conflict: the captured photo is
-               appended after save, so whichever photo the user adds first stays the hero. -->
-          <p
-            v-if="willAttachPhoto"
-            class="font-outfit mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-[rgb(230_126_34_/_35%)] bg-[var(--tint-orange-4)] px-3 py-2.5 text-xs font-semibold text-[var(--color-text-muted)]"
-          >
-            <span aria-hidden="true">✨</span>
-            <span>{{ t('recipes.photos.willAttach') }}</span>
+
+        <!-- Where this came from, visible and editable — the same affordance activities have.
+             It is filled in automatically by the reader, but a hand-typed recipe can carry a
+             link too, and a captured one can be corrected. -->
+        <FormFieldGroup :label="t('recipes.field.sourceUrl')" optional>
+          <BaseInput
+            v-model="sourceUrl"
+            type="url"
+            :placeholder="t('recipes.placeholder.sourceUrl')"
+          />
+        </FormFieldGroup>
+      </FormSection>
+
+      <FormSection label-key="recipes.section.method" emoji="🥄">
+        <FormFieldGroup :label="t('recipes.field.ingredients')" optional>
+          <textarea
+            v-model="ingredientsText"
+            rows="6"
+            :class="LIST_TEXTAREA_CLASS"
+            :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
+          />
+          <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
+             error. Same idiom as ActivityModal's low-confidence hint. -->
+          <p v-if="inferredIngredients.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+            {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
           </p>
-          <button
-            type="button"
-            class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-            :disabled="!canSave || eager.isCreating.value"
-            @click="handleAddFirstPhoto"
-          >
-            <BeanieIcon name="camera" size="md" />
-            <span class="font-outfit text-xs font-semibold">
-              {{
-                canSave
-                  ? willAttachPhoto
-                    ? t('recipes.photos.addAnother')
-                    : t('photos.addPhoto')
-                  : t('recipes.photos.saveFirst')
-              }}
-            </span>
-          </button>
-        </template>
-      </FormFieldGroup>
+        </FormFieldGroup>
+
+        <FormFieldGroup :label="t('recipes.field.steps')" optional>
+          <textarea
+            v-model="stepsText"
+            rows="6"
+            :class="LIST_TEXTAREA_CLASS"
+            :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
+          />
+          <p v-if="inferredSteps.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+            {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
+          </p>
+        </FormFieldGroup>
+      </FormSection>
+
+      <FormSection label-key="recipes.section.filing" emoji="🔖">
+        <FormFieldGroup :label="t('recipes.field.course')" optional>
+          <BaseSelect v-model="course" :options="courseOptions" />
+        </FormFieldGroup>
+
+        <FormFieldGroup :label="t('recipes.field.meals')" optional>
+          <ChipToggleGroup
+            v-model="mealSlots"
+            :options="mealOptions"
+            :aria-label="t('recipes.field.meals')"
+          />
+        </FormFieldGroup>
+
+        <FormFieldGroup :label="t('recipes.field.tags')" optional>
+          <RecipeTagInput v-model="tags" :suggestions="tagSuggestions" />
+        </FormFieldGroup>
+      </FormSection>
+
+      <FormSection label-key="recipes.section.personal" emoji="✏️">
+        <FormFieldGroup :label="t('recipes.field.notes')" optional>
+          <textarea
+            v-model="notes"
+            rows="3"
+            class="focus:border-primary-500 focus:ring-primary-500 font-caveat dark:border-line-strong dark:bg-surface-overlay dark:text-ink w-full rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3 text-lg leading-snug text-[var(--color-text)] outline-none focus:ring-1"
+            :placeholder="t('recipes.placeholder.notes')"
+          />
+        </FormFieldGroup>
+
+        <FormFieldGroup :label="t('recipes.field.photos')" optional>
+          <div v-if="eager.entityId.value">
+            <PhotoAttachments
+              ref="photoAttachmentsRef"
+              collection="recipes"
+              :entity-id="eager.entityId.value"
+              :photo-ids="binding.photoIds.value"
+              :current-member-id="currentMemberId"
+              :max="4"
+              @update:photo-ids="binding.updatePhotoIds"
+            />
+          </div>
+          <template v-else>
+            <!-- Say a photo is coming, and STILL offer the add control.
+                 The note removes the surprise, which was the actual problem — it is not a
+                 reason to take the choice away. Adding your own plate alongside the original
+                 is a normal thing to want, and the two cannot conflict: the captured photo is
+                 appended after save, so whichever photo the user adds first stays the hero. -->
+            <p
+              v-if="willAttachPhoto"
+              class="font-outfit mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-[rgb(230_126_34_/_35%)] bg-[var(--tint-orange-4)] px-3 py-2.5 text-xs font-semibold text-[var(--color-text-muted)]"
+            >
+              <span aria-hidden="true">✨</span>
+              <span>{{ t('recipes.photos.willAttach') }}</span>
+            </p>
+            <button
+              type="button"
+              class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!canSave || eager.isCreating.value"
+              @click="handleAddFirstPhoto"
+            >
+              <BeanieIcon name="camera" size="md" />
+              <span class="font-outfit text-xs font-semibold">
+                {{
+                  canSave
+                    ? willAttachPhoto
+                      ? t('recipes.photos.addAnother')
+                      : t('photos.addPhoto')
+                    : t('recipes.photos.saveFirst')
+                }}
+              </span>
+            </button>
+          </template>
+        </FormFieldGroup>
+      </FormSection>
     </div>
   </BeanieFormModal>
 </template>
