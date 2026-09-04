@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-04",
-    "translationCount": 4488
+    "translationCount": 4490
   },
   "translations": {
     "app.name": {
@@ -2827,9 +2827,9 @@
       "lastUpdated": "2026-05-14"
     },
     "loginV6.growPodTitle": {
-      "translation": "启动pod\\ ud83c\\ udf31",
-      "hash": "mquzkw",
-      "lastUpdated": "2026-04-28"
+      "translation": "启动您的Pod 🌱",
+      "hash": "j0wdgh",
+      "lastUpdated": "2026-09-04"
     },
     "loginV6.signInPasswordLabel": {
       "translation": "您的登录密码",
@@ -6162,14 +6162,14 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.welcomeCta": {
-      "translation": "让我们开始吧 🫛",
-      "hash": "wa3hdy",
-      "lastUpdated": "2026-03-08"
+      "translation": "Let's Get This Pod Rolling 🥫",
+      "hash": "j82n32",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.welcomeSubtitle": {
-      "translation": "几个简单的步骤\\ u00B7大约需要2分钟",
-      "hash": "zcpkgb",
-      "lastUpdated": "2026-04-28"
+      "translation": "几个简单的步骤·大约需要2分钟",
+      "hash": "o4ifbm",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.bank": {
       "translation": "银行",
@@ -6212,9 +6212,9 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.savingsEncouragement": {
-      "translation": "您的豆罐每月收入为{amount}。\\ u {1F331}",
-      "hash": "swt60v",
-      "lastUpdated": "2026-03-08"
+      "translation": "您的豆罐每月收入为{amount}。 🌱",
+      "hash": "yykohj",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.summaryIncome": {
       "translation": "收入",
@@ -6292,9 +6292,9 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.completeDescription": {
-      "translation": "大功告成！\\ u2014大功告成！探索、添加更多信息，打造属于您的便帽。",
-      "hash": "ilg3an",
-      "lastUpdated": "2026-03-08"
+      "translation": "大功告成！大功告成！探索、添加更多信息，打造属于您的便帽。",
+      "hash": "v1eqqj",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.summaryAccount": {
       "translation": "账户",
@@ -6317,19 +6317,19 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.completeCta": {
-      "translation": "进入角落\\ u {1F3E1}",
-      "hash": "486yif",
-      "lastUpdated": "2026-03-08"
+      "translation": "进入角落 🏡",
+      "hash": "94yf01",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.completeSubtitle": {
-      "translation": "去照顾你的小豆子\\ u2014我们会处理剩下的。🫛",
-      "hash": "im0nwh",
-      "lastUpdated": "2026-03-08"
+      "translation": "去照顾你的小豆子，剩下的就交给我们吧。 🥫",
+      "hash": "fc8rt9",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.back": {
-      "translation": "\\ u2190返回",
-      "hash": "7agdeg",
-      "lastUpdated": "2026-03-08"
+      "translation": "← 返回",
+      "hash": "juj9nb",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.skip": {
       "translation": "暂时跳过",
@@ -7097,9 +7097,9 @@
       "lastUpdated": "2026-03-15"
     },
     "txLink.extraPaymentNote": {
-      "translation": "额外付款\\ u2014全额转入本金",
-      "hash": "b4usyo",
-      "lastUpdated": "2026-03-15"
+      "translation": "额外付款—全额存入本金",
+      "hash": "lvwh9i",
+      "lastUpdated": "2026-09-04"
     },
     "txLink.linkedLoan": {
       "translation": "关联贷款",
@@ -7217,14 +7217,14 @@
       "lastUpdated": "2026-03-16"
     },
     "txLink.hintAmortizationInterest": {
-      "translation": "利息=未清余额\\ u00d7 （年利率\\ u00f7 12 ）。这是当月的借款成本。",
-      "hash": "huf7ae",
-      "lastUpdated": "2026-03-16"
+      "translation": "利息=未清余额× （年利率÷ 12 ）。这是当月的借款成本。",
+      "hash": "u3k446",
+      "lastUpdated": "2026-09-04"
     },
     "txLink.hintAmortizationPrincipal": {
-      "translation": "本金=支付\\ u2212利息。此部分会减少您的未结余额。",
-      "hash": "bc25re",
-      "lastUpdated": "2026-03-16"
+      "translation": "本金=支付-利息。此部分会减少您的未结余额。",
+      "hash": "l216ds",
+      "lastUpdated": "2026-09-04"
     },
     "txLink.hintAmortizationOverTime": {
       "translation": "随着余额的减少，每笔付款的本金增加，利息减少。",
@@ -7492,9 +7492,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.step2.subtitle": {
-      "translation": "按日期排序\\ u2014展开任意卡片以查看完整详情",
-      "hash": "ew3908",
-      "lastUpdated": "2026-03-20"
+      "translation": "按日期排序—展开任意卡片以查看完整详细信息",
+      "hash": "1q84q2",
+      "lastUpdated": "2026-09-04"
     },
     "vacation.travel.addFlight": {
       "translation": "飞行",
@@ -7642,9 +7642,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.step3.subtitle": {
-      "translation": "选择您需要的内容\\ u2014为每个选项添加详细信息",
-      "hash": "mhzpo6",
-      "lastUpdated": "2026-03-20"
+      "translation": "选择您需要的内容—为每个选项添加详细信息",
+      "hash": "29drqq",
+      "lastUpdated": "2026-09-04"
     },
     "vacation.accommodation.hotel": {
       "translation": "酒店",
@@ -7732,9 +7732,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.step4.subtitle": {
-      "translation": "选择您需要的内容\\ u2014跳过其余部分！",
-      "hash": "nrgwxa",
-      "lastUpdated": "2026-03-20"
+      "translation": "选择您需要的内容—跳过其余部分！",
+      "hash": "8ugce2",
+      "lastUpdated": "2026-09-04"
     },
     "vacation.transport.airport_shuttle": {
       "translation": "机场班车",
@@ -8032,9 +8032,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.timelineSortedBy": {
-      "translation": "按日期排序\\ u2014轻点以复制\\ u2014单击字段以内联编辑",
-      "hash": "geghg0",
-      "lastUpdated": "2026-03-20"
+      "translation": "按日期排序—轻点以复制—单击字段以内联编辑",
+      "hash": "fumej2",
+      "lastUpdated": "2026-09-04"
     },
     "vacation.bucketList": {
       "translation": "旅程创意！",
@@ -8077,9 +8077,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.notBookedYet": {
-      "translation": "尚未预订\\ u2014我们\\ u2019会稍后提醒您！",
-      "hash": "w6el6p",
-      "lastUpdated": "2026-03-20"
+      "translation": "尚未预订，我们稍后会提醒您！",
+      "hash": "z8vfsj",
+      "lastUpdated": "2026-09-04"
     },
     "vacation.stillDeciding": {
       "translation": "还未决定",
@@ -8182,9 +8182,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.ideas.empty": {
-      "translation": "还没有创意\\ u2014在上面添加您的第一个创意！",
-      "hash": "1zsmc1",
-      "lastUpdated": "2026-03-20"
+      "translation": "还没有创意—在上面添加您的第一个！",
+      "hash": "f2hms5",
+      "lastUpdated": "2026-09-04"
     },
     "vacation.field.notesPlaceholder": {
       "translation": "添加注释",
@@ -8807,9 +8807,9 @@
       "lastUpdated": "2026-03-23"
     },
     "share.messageBody": {
-      "translation": "您好！ {member}邀请您加入{family}家庭！\\ n点击此处加入您家庭的豆豆荚： {link}",
-      "hash": "yyazky",
-      "lastUpdated": "2026-03-23"
+      "translation": "Hi! {member} has invited you to join the {family} family!\nClick here to join your family's bean pod: {link}",
+      "hash": "6ccfp8",
+      "lastUpdated": "2026-09-04"
     },
     "share.wechatHint": {
       "translation": "链接已复制！打开微信并粘贴到聊天中，与您的联系人分享。",
@@ -8867,9 +8867,9 @@
       "lastUpdated": "2026-03-26"
     },
     "vacation.ideas.collabHint": {
-      "translation": "更多创意可以随时添加\\ u2014所有家庭成员都可以一起推荐和投票！",
-      "hash": "j5z0tc",
-      "lastUpdated": "2026-03-27"
+      "translation": "您可以随时添加更多创意--所有家庭成员都可以一起提出建议并对创意进行投票！",
+      "hash": "br2xkg",
+      "lastUpdated": "2026-09-04"
     },
     "recurringPrompt.createOneTimePayment": {
       "translation": "创建一次性付款",
@@ -9187,9 +9187,9 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.context": {
-      "translation": "一次性后端更新意味着您安装的主屏幕图标指向我们的旧地址。要重新获得完整的应用体验\\ u2014离线支持、快速启动、原生体验\\ u2014您\\ u2019将希望从我们的新主页app.beanies.family重新安装。",
-      "hash": "swmd9l",
-      "lastUpdated": "2026-04-16"
+      "translation": "一次性后端更新意味着您安装的主屏幕图标指向我们的旧地址。要重新获得完整的应用体验（离线支持、快速启动、原生体验） ，您需要从我们的新主页app.beanies.family重新安装。",
+      "hash": "nbqvrf",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.stepsHeading": {
       "translation": "安装",
@@ -9197,9 +9197,9 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.iosStep1": {
-      "translation": "长按主屏<strong></strong>幕上的旧beanies.family图标，然后轻点<strong>删除应用</strong>→<strong>从主屏幕删除</strong>",
-      "hash": "vwvgaa",
-      "lastUpdated": "2026-04-16"
+      "translation": "长按主屏<strong>幕</strong>上的旧beanies.family图标，然后轻触→ <strong>从主屏幕</strong> <strong>删除应用</strong>删除",
+      "hash": "tqantd",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.iosStep2": {
       "translation": "打开<strong>Safari</strong>并访问<strong>app.beanies.family</strong>",
@@ -9207,14 +9207,14 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.iosStep3": {
-      "translation": "点击<strong>分享</strong>按钮→<strong>添加到主屏幕</strong>",
-      "hash": "oqykul",
-      "lastUpdated": "2026-04-16"
+      "translation": "轻点<strong>分享</strong>按钮→ <strong>添加到主屏幕</strong>",
+      "hash": "8awapy",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.iosStep4": {
-      "translation": "打开新图标并登录\\ u2014 ，您的家庭数据将从云端同步回来",
-      "hash": "c0h7ua",
-      "lastUpdated": "2026-04-16"
+      "translation": "打开新图标并登录—您的家庭数据将从云端同步回来",
+      "hash": "mzhkgq",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.androidStep1": {
       "translation": "长按旧的beanies.family图<strong>标</strong>，然后将其拖动到“<strong>卸载</strong>” （或轻点“<strong>删除</strong>” ）",
@@ -9227,19 +9227,19 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.androidStep3": {
-      "translation": "轻触三点菜单→<strong>安装应用</strong>（或<strong>添加到主屏幕</strong>）",
-      "hash": "b3kc61",
-      "lastUpdated": "2026-04-16"
+      "translation": "轻触三点菜单→ <strong>安装应用</strong>（或<strong>添加到主屏幕</strong>）",
+      "hash": "7iktrw",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.androidStep4": {
-      "translation": "打开新图标并登录\\ u2014 ，您的家庭数据将从云端同步回来",
-      "hash": "c0h7ua",
-      "lastUpdated": "2026-04-16"
+      "translation": "打开新图标并登录—您的家庭数据将从云端同步回来",
+      "hash": "mzhkgq",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.desktopStep1": {
-      "translation": "删除旧应用：在Chrome中，访问<strong>chrome://apps</strong> ，右键单<strong>击</strong>beanies.family→<strong>从Chrome中删除</strong>",
-      "hash": "m1smj7",
-      "lastUpdated": "2026-04-16"
+      "translation": "删除旧应用：在Chrome浏览器中，访问<strong>chrome://apps</strong> ，右键单击<strong>beanies.family</strong> → <strong>从Chrome浏览器中删除</strong>",
+      "hash": "ceov34",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.desktopStep2": {
       "translation": "在<strong>浏览器</strong>中访问app.beanies.family",
@@ -9247,14 +9247,14 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.desktopStep3": {
-      "translation": "点击地址栏中的安装图标（或三点菜单→<strong>安装</strong>）",
-      "hash": "i4oedw",
-      "lastUpdated": "2026-04-16"
+      "translation": "单击地址栏中的安装图标（或三点菜单→ <strong>安装</strong>）",
+      "hash": "7gqvnr",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.desktopStep4": {
-      "translation": "登录\\ u2014您的家庭数据将从云端同步回来",
-      "hash": "56iunb",
-      "lastUpdated": "2026-04-16"
+      "translation": "登录—您的家庭数据将从云端同步回来",
+      "hash": "hazagf",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.screenshotAlt": {
       "translation": "为您的平台安装说明屏幕截图",
@@ -9262,14 +9262,14 @@
       "lastUpdated": "2026-04-16"
     },
     "pwaReinstall.oneTimeNote": {
-      "translation": "这是一次性更改\\ u2014我们赢得了\\ u2019t定期进行此操作，承诺。",
-      "hash": "y7myzf",
-      "lastUpdated": "2026-04-16"
+      "translation": "这是一次性更改，我们不会定期更改，请放心。",
+      "hash": "yoo5ff",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.seeFullGuide": {
-      "translation": "查看完整的安装指南→",
-      "hash": "4q87zl",
-      "lastUpdated": "2026-04-16"
+      "translation": "查看完整的安装指南 →",
+      "hash": "3uv4c",
+      "lastUpdated": "2026-09-04"
     },
     "pwaReinstall.dismiss": {
       "translation": "明白了，谢谢！",
@@ -9447,9 +9447,9 @@
       "lastUpdated": "2026-04-19"
     },
     "photos.avatar.uploading": {
-      "translation": "正在上传照片\\ u2026",
-      "hash": "ohbham",
-      "lastUpdated": "2026-04-19"
+      "translation": "相片上传中",
+      "hash": "53uec3",
+      "lastUpdated": "2026-09-04"
     },
     "photos.avatar.uploadFailed": {
       "translation": "无法上传照片。请检查您的网络连接，然后重试。",
@@ -10322,14 +10322,14 @@
       "lastUpdated": "2026-04-19"
     },
     "recipes.placeholder.ingredients": {
-      "translation": "每行一个— 500克碎牛肉\\ n3根胡萝卜\\ n……",
-      "hash": "s95iib",
-      "lastUpdated": "2026-04-19"
+      "translation": "One per line — 500g ground beef\\\n3 carrots\\\n…",
+      "hash": "usmk5p",
+      "lastUpdated": "2026-09-04"
     },
     "recipes.placeholder.steps": {
-      "translation": "每行一步—将肉变成棕色\\ n品尝泥浆\\ n……",
-      "hash": "idpkid",
-      "lastUpdated": "2026-04-19"
+      "translation": "One step per line — brown the meat\\\nsweat the mirepoix\\\n…",
+      "hash": "dqlpyr",
+      "lastUpdated": "2026-09-04"
     },
     "recipes.placeholder.notes": {
       "translation": "例如， Neil每周日都会要求这样做。用大勺子吃。",
@@ -12547,9 +12547,9 @@
       "lastUpdated": "2026-04-28"
     },
     "loginV6.howThisWorks.lead": {
-      "translation": "beanies.family不运行任何服务器或数据库\\ u2014您的加密.beanpod文件位于您自己的存储中。",
-      "hash": "j0wcxb",
-      "lastUpdated": "2026-04-28"
+      "translation": "beanies.family不运行任何服务器或数据库—您的加密.beanpod文件位于您自己的存储中。",
+      "hash": "79oclz",
+      "lastUpdated": "2026-09-04"
     },
     "loginV6.howThisWorks.bullet1": {
       "translation": "AES-256加密。只有您的密码才能解锁。",
@@ -12607,44 +12607,44 @@
       "lastUpdated": "2026-05-14"
     },
     "onboarding.invite.send": {
-      "translation": "发送→",
-      "hash": "djcnc9",
-      "lastUpdated": "2026-04-28"
+      "translation": "傳送",
+      "hash": "u4tp7q",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.invite.noEmail": {
-      "translation": "还没有电子邮件\\ u2014在下一个屏幕上添加一个",
-      "hash": "tqr24z",
-      "lastUpdated": "2026-04-29"
+      "translation": "还没有电子邮件—在下一个屏幕上添加一个",
+      "hash": "92yv2v",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.invite.reminder": {
-      "translation": "\\ u2728您以后可以随时从My Pod邀请",
-      "hash": "640eg7",
-      "lastUpdated": "2026-04-28"
+      "translation": "✨ 您以后可以随时通过My Pod邀请",
+      "hash": "m5490d",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.errors.addAccountFailed": {
-      "translation": "无法添加该账号。请重试\\ u2014客服已收到通知。",
-      "hash": "z4l21v",
-      "lastUpdated": "2026-04-28"
+      "translation": "无法添加该账号。请重试—我们已通知客服。",
+      "hash": "vs43rx",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.errors.addRecurringFailed": {
-      "translation": "无法添加该定期交易。请重试\\ u2014客服已收到通知。",
-      "hash": "cgbxe3",
-      "lastUpdated": "2026-04-28"
+      "translation": "无法添加该定期交易。请重试—我们已通知客服。",
+      "hash": "oo735h",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.errors.addActivityFailed": {
-      "translation": "无法添加该活动。请重试\\ u2014客服已收到通知。",
-      "hash": "yu6zo9",
-      "lastUpdated": "2026-04-28"
+      "translation": "无法添加该活动。请重试—我们已通知客服。",
+      "hash": "7ixa8p",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.skipAddLater": {
-      "translation": "跳过\\ u2014稍后添加",
-      "hash": "f8w5xk",
-      "lastUpdated": "2026-04-28"
+      "translation": "跳过—稍后添加",
+      "hash": "409jr4",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.next": {
-      "translation": "下一步→",
-      "hash": "us1qqq",
-      "lastUpdated": "2026-04-28"
+      "translation": "下一页→",
+      "hash": "whv3gb",
+      "lastUpdated": "2026-09-04"
     },
     "onboarding.welcomeTagline": {
       "translation": "让我们设置您的豆荚",
@@ -22302,7 +22302,7 @@
       "lastUpdated": "2026-09-04"
     },
     "recipes.field.course": {
-      "translation": "航线制定",
+      "translation": "菜式",
       "hash": "xh6z3v",
       "lastUpdated": "2026-09-04"
     },
@@ -22387,7 +22387,7 @@
       "lastUpdated": "2026-09-04"
     },
     "cookbook.group.course": {
-      "translation": "按课程",
+      "translation": "按菜式",
       "hash": "qvrq58",
       "lastUpdated": "2026-09-04"
     },
@@ -22402,7 +22402,7 @@
       "lastUpdated": "2026-09-04"
     },
     "cookbook.filterLabel": {
-      "translation": "航线制定",
+      "translation": "菜式",
       "hash": "xh6z3v",
       "lastUpdated": "2026-09-04"
     },
@@ -22412,8 +22412,8 @@
       "lastUpdated": "2026-09-04"
     },
     "cookbook.sort.name": {
-      "translation": "A\\ u2013Z",
-      "hash": "cljleo",
+      "translation": "A → Z",
+      "hash": "6so8",
       "lastUpdated": "2026-09-04"
     },
     "cookbook.sort.recent": {
@@ -22432,7 +22432,7 @@
       "lastUpdated": "2026-09-04"
     },
     "cookbook.shelf.unfiledCourse": {
-      "translation": "还没有课程。",
+      "translation": "还没有菜式。",
       "hash": "8hm56k",
       "lastUpdated": "2026-09-04"
     },
@@ -22444,6 +22444,16 @@
     "cookbook.showAll": {
       "translation": "所有食谱",
       "hash": "nm8db1",
+      "lastUpdated": "2026-09-04"
+    },
+    "app.initError.noData": {
+      "translation": "beanies已启动，但找不到您的家庭数据。",
+      "hash": "lg47l2",
+      "lastUpdated": "2026-09-04"
+    },
+    "join.error.fileTooLarge": {
+      "translation": "打开您家人的数据时，此设备内存不足。您的邀请没有任何问题； Pod只是比此设备可以打开的大。请在具有更多内存的设备上重试。",
+      "hash": "dk90jd",
       "lastUpdated": "2026-09-04"
     }
   }

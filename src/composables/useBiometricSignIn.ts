@@ -21,6 +21,7 @@
  *   rather than there being a second `silent` flag.
  */
 import { ref, type Ref } from 'vue';
+import { payloadErrorMessageKey } from '@/types/sync';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -84,9 +85,15 @@ export function useBiometricSignIn(): {
           console.warn('[useBiometricSignIn] decryptPendingFileWithKey failed:', fkResult.error);
           return {
             ok: false,
-            message: fkResult.error?.includes('No pending')
-              ? t('passkey.fileLoadError')
-              : t('passkey.signInError'),
+            // A payload failure is NOT a bad fingerprint. The biometric unwrap
+            // already succeeded and returned a valid family key, so
+            // `passkey.signInError` reads as "your face/finger didn't work" and
+            // the user re-scans forever.
+            message: fkResult.payloadError
+              ? t(payloadErrorMessageKey(fkResult.payloadError))
+              : fkResult.error?.includes('No pending')
+                ? t('passkey.fileLoadError')
+                : t('passkey.signInError'),
           };
         }
       }

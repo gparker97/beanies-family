@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle, FileSystemHandle */
 import { ref, computed, onMounted, watch } from 'vue';
-import { payloadErrorMessageKey } from '@/types/sync';
+import { payloadErrorMessageKey, PayloadTooLargeError } from '@/types/sync';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -165,6 +165,25 @@ const pendingMemberCount = computed(() => {
  * Try to auto-decrypt using a cached family key from trusted device settings.
  * Returns true if decryption succeeded.
  */
+/**
+ * Set when the auto-decrypt failed because this device could not inflate the
+ * pod. `handlePendingPassword` reads it: opening a password (or recovery-kit)
+ * form for that failure is a retype loop, since no credential makes the
+ * document smaller.
+ */
+const podTooLargeForDevice = ref(false);
+
+/**
+ * Open the recovery-kit form. Clears a CREDENTIAL error (the user is switching
+ * method, so "wrong password" is stale) but keeps a payload one: that message
+ * explains why nothing is working, and wiping it left a kit form with no
+ * explanation — on the one escape hatch this whole path exists to preserve.
+ */
+function openKitEntry(): void {
+  showKitEntry.value = true;
+  if (!podTooLargeForDevice.value) formError.value = null;
+}
+
 async function tryAutoDecrypt(): Promise<boolean> {
   const pendingFamilyId = syncStore.pendingEncryptedFile?.envelope?.familyId;
   if (!pendingFamilyId) return false;
@@ -179,12 +198,18 @@ async function tryAutoDecrypt(): Promise<boolean> {
       const fk = await importFamilyKey(raw);
       const result = await syncStore.decryptPendingFileWithKey(fk);
       if (result.success) return true;
-      // The key was FINE — the device could not inflate the pod. Deleting it
-      // here would destroy a valid credential over a memory limit and force a
-      // full password re-entry on the next open. Surface the honest message and
-      // leave the key alone.
-      if (result.payloadError) {
+      // ⚠️ ONLY the too-large half skips the clear below. The key was FINE
+      // there — the device could not inflate the pod — so deleting it would
+      // destroy a valid credential over a memory limit.
+      //
+      // A CORRUPT payload must still fall through to the clear, and this is the
+      // distinction an earlier cut got wrong: a WRONG cached key (rotation,
+      // family switch, a partial IDB write) fails in `crypto.subtle.decrypt`
+      // and is classified `CorruptPayloadError`, so skipping the clear would
+      // retain the bad key permanently and dead-end every future open.
+      if (result.payloadError instanceof PayloadTooLargeError) {
         formError.value = t(payloadErrorMessageKey(result.payloadError));
+        podTooLargeForDevice.value = true;
         return false;
       }
     } catch {
@@ -273,6 +298,10 @@ async function handlePendingPassword(
   // open it. Open the decrypt surface straight in recovery-kit entry (the
   // passphrase stays available inside the modal's flow) instead of showing a
   // password form that is guaranteed to fail.
+  // No credential can make the pod fit in this device's memory, so a password
+  // form (or the kit form) here is a retype loop with the honest message
+  // wiped by the first submit. Leave the message on screen instead.
+  if (podTooLargeForDevice.value) return;
   const pendingEnv = syncStore.pendingEncryptedFile?.envelope;
   if (pendingEnv && envelopeNeedsRecovery(pendingEnv)) {
     showKitEntry.value = true;
@@ -1004,7 +1033,7 @@ async function handleDriveRefresh() {
         </BaseButton>
 
         <div v-if="hasRecoveryKits" class="mt-4">
-          <RecoveryKitLink @click="((showKitEntry = true), (formError = null))" />
+          <RecoveryKitLink @click="openKitEntry" />
         </div>
 
         <p

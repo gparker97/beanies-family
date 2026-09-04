@@ -105,7 +105,8 @@ import { isFlagEnabled } from '@/config/flags';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
-import { PayloadLoadError, PayloadTooLargeError, payloadErrorDetail } from '@/types/sync';
+import { PayloadLoadError, PayloadTooLargeError } from '@/types/sync';
+import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
@@ -212,9 +213,27 @@ watch(
       initError.value = msg;
       initErrorDetail.value = detail;
       initErrorClearHelps.value = clearHelps;
+      showClearConfirm.value = false; // never leave the destructive panel open
     }
   }
 );
+
+/**
+ * Raise the overlay for a NON-payload init failure.
+ *
+ * The two direct `initError.value = …` writers left below this (the init
+ * watchdog and the outer onMounted catch) used to overwrite a payload message
+ * — and its copyable diagnostic — while `initErrorClearHelps` stayed false,
+ * leaving an unrelated error with no Clear-data button on exactly the failures
+ * where clearing IS the recovery. Both go through here now, which restores the
+ * flag and refuses to clobber a more specific message.
+ */
+function setGenericInitError(message: string, detail: string | null): void {
+  if (fatalErrorStore.message) return; // a payload failure already said something true
+  initError.value = message;
+  initErrorDetail.value = detail;
+  initErrorClearHelps.value = true;
+}
 // Mobile hamburger menu state is a shared singleton so the planner's reclaimed
 // command bar can toggle the same menu (see useMobileMenu). `headerReclaimed`
 // hides the global AppHeader on the mobile/tablet Activities route.
@@ -424,8 +443,7 @@ async function safeRouterReplace(target: string, callerTag: string): Promise<voi
         // means we always have a message even if some race re-runs init
         // before the health check.
         if (!initError.value) {
-          initError.value = t('app.initError.description');
-          initErrorDetail.value = initBreadcrumbs.join('\n');
+          setGenericInitError(t('app.initError.description'), initBreadcrumbs.join('\n'));
         }
         return;
       }
@@ -533,41 +551,13 @@ watch(
   { flush: 'post' }
 );
 
-/**
- * THE one place a payload failure becomes the init overlay.
- *
- * Two things it does that a bare `setFatal` would not:
- *  - `clearDataHelps: false`, so the overlay drops the Clear-data advice and
- *    button. Without that the honest message sits directly under "you can
- *    clear your data and start fresh", which is wrong and destructive here.
- *  - reports the CORRUPT half. `docClient.surface()` is the single emitter for
- *    `PayloadTooLargeError` only, so without this a boot-path corruption
- *    reaches CloudWatch with no event at all: a user is told their pod is
- *    damaged and nobody is paged.
- */
-function surfacePayloadFatal(err: PayloadLoadError): void {
-  const fileId = syncStore.driveFileId ?? null;
-  const familyId = familyContextStore.activeFamilyId;
-  if (!(err instanceof PayloadTooLargeError)) {
-    reportError({
-      surface: 'app.podCorrupted',
-      message: `Pod payload failed Automerge ${err.step} during init`,
-      error: err,
-      severity: 'critical',
-      context: {
-        action: 'pod-load-corrupt',
-        error_code: err.step,
-        file_id_tail: fileId ? fileId.slice(-6) : undefined,
-        family_id: familyId ?? undefined,
-        perf_doc_bytes: err.payloadBytes ?? undefined,
-      },
-    });
-  }
-  fatalErrorStore.setFatal(
-    t(err instanceof PayloadTooLargeError ? 'resumeSetup.podTooLarge' : 'resumeSetup.podCorrupted'),
-    payloadErrorDetail(err, fileId, familyId),
-    { clearDataHelps: false }
-  );
+/** The boot path's context for the shared payload-failure surface. */
+function surfaceFatal(err: PayloadLoadError): void {
+  surfacePayloadFatal(err, {
+    fileId: syncStore.driveFileId ?? null,
+    familyId: familyContextStore.activeFamilyId,
+    source: 'boot',
+  });
 }
 
 async function loadFamilyData() {
@@ -665,14 +655,26 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           syncStore.backgroundSyncFromFile(openToken);
           return 'handed-off';
         }
-        if (cacheResult.payloadError) {
-          // Do not fall through to 1b. It would re-download the (usually LARGER)
-          // Drive copy and try to inflate it on the device that has just proved
-          // it has no room, so the second attempt fails identically after a long
-          // stall. Say so once, honestly.
-          initBreadcrumbs.push(`path1a: payload ${cacheResult.payloadError.step} failure`);
-          surfacePayloadFatal(cacheResult.payloadError);
+        // ⚠️ ONLY the too-large half dead-ends here. Falling through to 1b would
+        // re-download the (usually LARGER) Drive copy and try to inflate it on
+        // the device that has just proved it has no room: the same failure
+        // again, after a long stall.
+        //
+        // A CORRUPT cache must still fall through, and this is the distinction
+        // an earlier cut got wrong. `initAndLoadCache` CLEARS the cache before
+        // rethrowing precisely so a fresh Drive load can re-seed it, so dead-
+        // ending turns a self-healing hiccup into a permanent "your data may be
+        // damaged" overlay plus a critical page on every boot, forever — while
+        // the pod on Drive is fine.
+        if (cacheResult.payloadError instanceof PayloadTooLargeError) {
+          initBreadcrumbs.push(`path1a: payload ${cacheResult.payloadError.step} too-large`);
+          surfaceFatal(cacheResult.payloadError);
           return 'failed';
+        }
+        if (cacheResult.payloadError) {
+          initBreadcrumbs.push(
+            `path1a: cache ${cacheResult.payloadError.step} corrupt — cleared, re-seeding from Drive`
+          );
         }
         initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');
         console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
@@ -705,6 +707,16 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       if (loadResult.needsPassword) {
         console.log('[loadFamilyData] needsPassword — trying cached key');
         const success = await syncStore.tryDecryptWithCachedKey();
+        // A payload failure here is the MAIN cold-boot route on a memory-limited
+        // device: `familyKey` is null on a cold start, so `loadFromFile` never
+        // reaches its cached-key branch and returns `needsPassword`. A bare
+        // `false` sent the user to `/welcome?resume=setup` — a password screen
+        // for a failure no password can fix.
+        if (success !== true && success !== false) {
+          initBreadcrumbs.push(`path1b: cached-key payload ${success.payloadError.step} failure`);
+          surfaceFatal(success.payloadError);
+          return 'failed';
+        }
         if (success) {
           memberFilterStore.initialize();
           const result = await processRecurringItems();
@@ -773,7 +785,7 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       if (err instanceof PayloadLoadError) {
         initBreadcrumbs.push(`path1b: payload ${err.step} failure (${err.name})`);
         console.warn('[loadFamilyData] path1b: payload load failed', err);
-        surfacePayloadFatal(err);
+        surfaceFatal(err);
         return 'failed';
       }
       throw new Error(
@@ -798,15 +810,22 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       try {
         const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId);
         initBreadcrumbs.push(`path2: cacheResult=${cacheResult.success}`);
-        // ⚠️ MUST NOT fall through. Path 3 calls `initDoc()` — a fresh EMPTY doc
-        // — while the cache DB is still open on this family, because the
-        // too-large branch deliberately did not clear it. The user's next
+        // ⚠️ TOO-LARGE MUST NOT fall through. Path 3 calls `initDoc()` — a fresh
+        // EMPTY doc — while the cache DB is still open on this family, because
+        // the too-large branch deliberately did not clear it. The user's next
         // mutation would then persist that empty doc as the BASE, deleting every
         // increment the preserve branch just protected.
-        if (cacheResult.payloadError) {
-          initBreadcrumbs.push(`path2: payload ${cacheResult.payloadError.step} failure`);
-          surfacePayloadFatal(cacheResult.payloadError);
+        //
+        // A CORRUPT cache is the opposite case: it has already been cleared, so
+        // there is nothing left to overwrite and falling through to an empty doc
+        // is the existing (and correct) degraded behaviour.
+        if (cacheResult.payloadError instanceof PayloadTooLargeError) {
+          initBreadcrumbs.push(`path2: payload ${cacheResult.payloadError.step} too-large`);
+          surfaceFatal(cacheResult.payloadError);
           return 'failed';
+        }
+        if (cacheResult.payloadError) {
+          initBreadcrumbs.push(`path2: cache ${cacheResult.payloadError.step} corrupt — cleared`);
         }
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');
@@ -922,8 +941,7 @@ onMounted(async () => {
     if (chunkReloadInProgress) return; // a hardReload is already swapping the page
     if (!isInitializing.value && !isLoadingData.value) return; // already settled
     console.error('[App] init watchdog fired — setup stalled; surfacing recovery overlay');
-    initError.value = t('app.initError.stalled');
-    initErrorDetail.value = initBreadcrumbs.join('\n');
+    setGenericInitError(t('app.initError.stalled'), initBreadcrumbs.join('\n'));
     isInitializing.value = false;
     isLoadingData.value = false;
     reportError({
@@ -1363,8 +1381,7 @@ onMounted(async () => {
           },
         });
       } else {
-        initError.value = 'Initialization completed but no data was loaded';
-        initErrorDetail.value = breadcrumbLog;
+        setGenericInitError(t('app.initError.noData'), breadcrumbLog);
         console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
         // Surface it — a `podCreated` user reaching `/nook` with no decrypted
         // doc AND no snapshot data on screen is a real init failure (a half-finished
@@ -1483,13 +1500,14 @@ onMounted(async () => {
     // A blocked registry upgrade has ONE user-fixable cause: an old beanies tab/window
     // still open. Render the actionable instruction, not the raw error (2026-08-28
     // 0.13-deploy incident: users saw a 35s stall + mystery fatal screen).
-    initError.value =
-      err instanceof Error && err.name === 'RegistryBlockedError'
-        ? t('app.initError.registryBlocked')
-        : message;
     const stack = err instanceof Error ? (err.stack ?? '') : '';
     const breadcrumbLog = initBreadcrumbs.join('\n');
-    initErrorDetail.value = `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`;
+    setGenericInitError(
+      err instanceof Error && err.name === 'RegistryBlockedError'
+        ? t('app.initError.registryBlocked')
+        : message,
+      `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`
+    );
     console.error('[App] Initialization failed:', err, '\nBreadcrumbs:', breadcrumbLog);
   } finally {
     // Init resolved (success, early return, or error) — the watchdog is no
@@ -1837,7 +1855,7 @@ watch(
 
         <!-- Clear data confirmation -->
         <div
-          v-if="showClearConfirm"
+          v-if="showClearConfirm && initErrorClearHelps"
           class="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3 dark:border-orange-700 dark:bg-orange-900/20"
         >
           <p class="dark:text-accent-lift mb-2 text-sm text-orange-800">

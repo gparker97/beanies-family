@@ -90,12 +90,21 @@ export function base64ToBuffer(base64: string): ArrayBuffer {
         const binary = atob(src.slice(i, i + B64_DECODE_CHUNK_CHARS));
         for (let j = 0; j < binary.length; j++) bytes[written++] = binary.charCodeAt(j);
       }
-      // The arithmetic above is exact for well-formed input. Rather than trust
-      // it blindly on data that came off disk, fall back to the copying trim if
-      // it ever disagrees: correct-and-slower beats a buffer with stray zeros.
-      return written === bytes.byteLength
-        ? bytes.buffer
-        : (bytes.buffer.slice(0, written) as ArrayBuffer);
+      // The arithmetic above is EXACT for well-formed base64, so a mismatch
+      // means the input was not well-formed — whitespace (which `atob`
+      // tolerates and the size calculation counts) or a malformed group.
+      //
+      // Throwing is the point. Trimming to `written` instead would silently
+      // hand back a short buffer that decrypts to nothing and surfaces much
+      // later as an opaque AES-GCM failure — exactly the laundering the
+      // no-normalising-pass decision above is meant to avoid. A throw here is
+      // classified as a corrupt payload, which is what it is.
+      if (written !== bytes.byteLength) {
+        throw new Error(
+          `base64ToBuffer: decoded ${written} bytes, expected ${bytes.byteLength} — the input is not well-formed base64 (whitespace or a malformed group)`
+        );
+      }
+      return bytes.buffer;
     },
     // base64 decodes to ~3/4 its length in bytes. Reported as DECODED bytes so
     // it is directly comparable with `base64.encode`, which reports the same.

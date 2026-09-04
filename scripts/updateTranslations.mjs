@@ -56,6 +56,28 @@ function hashString(str) {
 }
 
 /**
+ * Resolve the JS string escapes a TEXT-level parse leaves behind.
+ *
+ * This script reads `uiStrings.ts` as text, not as a module, so a source
+ * literal like `'A\u2013Z'` arrives here as the six characters `\u2013` and
+ * was shipped to the translator verbatim — a zh user then saw the literal
+ * `A\ u2013Z` in the cookbook sort dropdown, and roughly fifty older entries
+ * carry the same corruption from `\u2014`. Unescape before hashing, so the
+ * hash tracks the RENDERED string and the fix re-translates the affected keys.
+ *
+ * `\\` is handled last so an escaped backslash cannot swallow the next escape.
+ */
+function unescapeLiteral(raw) {
+  return raw
+    .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\\/g, '\\');
+}
+
+/**
  * Parse STRING_DEFS from uiStrings.ts
  *
  * Extracts all { en: '...' } entries from the STRING_DEFS object.
@@ -101,7 +123,7 @@ function parseUIStrings() {
     if (currentKey) {
       const enSingle = line.match(/en\s*:\s*'((?:[^'\\]|\\.)*)'/);
       if (enSingle) {
-        const text = enSingle[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+        const text = unescapeLiteral(enSingle[1].replace(/\\'/g, "'"));
         strings[currentKey] = { text, hash: hashString(text) };
         currentKey = null;
         continue;
@@ -109,7 +131,7 @@ function parseUIStrings() {
       // Double-quoted en value
       const enDouble = line.match(/en\s*:\s*"((?:[^"\\]|\\.)*)"/);
       if (enDouble) {
-        const text = enDouble[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        const text = unescapeLiteral(enDouble[1].replace(/\\"/g, '"'));
         strings[currentKey] = { text, hash: hashString(text) };
         currentKey = null;
         continue;

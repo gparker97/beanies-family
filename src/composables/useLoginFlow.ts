@@ -622,11 +622,32 @@ export function useLoginFlow(opts: {
         if (dec.payloadError) {
           // NOT a credential failure: the PIN unwrapped the key correctly and
           // the pod would not open. `auth.signInFailed` reads as a wrong PIN,
-          // so the user retypes a correct PIN forever. Report on the pod-load
-          // surface too — `pin_decrypt_failed` at severity 'warning' would hide
-          // the incident from the CloudWatch filter built for exactly this.
+          // so the user retypes a correct PIN forever.
           proveError.value = t(payloadErrorMessageKey(dec.payloadError));
-          emitOutcome(false, 'decrypt-failed');
+          // Distinct outcome code — `decrypt-failed` is byte-identical to the
+          // genuine credential failure below, so the two would be
+          // indistinguishable in the funnel.
+          emitOutcome(
+            false,
+            dec.payloadError instanceof PayloadTooLargeError ? 'too-large' : 'corrupted'
+          );
+          // Report explicitly. Returning here skips the `pin_decrypt_failed`
+          // report below, and `docClient.surface()` emits only for
+          // `PayloadTooLargeError` — so without this a CORRUPT payload on the
+          // default sign-in path reached CloudWatch with zero events.
+          if (!(dec.payloadError instanceof PayloadTooLargeError)) {
+            reportError({
+              surface: 'pod-load-failure',
+              message: `Pod payload failed Automerge ${dec.payloadError.step}`,
+              error: dec.payloadError,
+              severity: 'critical',
+              context: {
+                action: 'pod-load-corrupt:pin-unlock',
+                error_code: dec.payloadError.step,
+                perf_doc_bytes: dec.payloadError.payloadBytes ?? undefined,
+              },
+            });
+          }
           return;
         }
         if (!dec.success) {
