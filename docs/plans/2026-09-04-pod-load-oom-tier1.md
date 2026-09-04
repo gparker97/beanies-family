@@ -485,13 +485,40 @@ restraint bounds. `mergeDocs` already fixed one instance of this (its comment
 records dropping a `fork()` that minted an actor per poll-merge); the remaining
 4,214 say the source is upstream of that, in `load` itself.
 
-An attempt to quantify the actor-lane cost separately from op count failed — the
-synthetic used to isolate it hit an unrelated Automerge load error and was
-abandoned rather than reported half-verified. **The mechanism is verified; its
-share of the 15.1× is not.** Worth measuring properly in Tier 2's planning,
-because it changes the design: if actor lanes are a large fraction, then pinning
-a stable per-device actor is a cheap, non-lineage-breaking mitigation that could
-slow growth WITHOUT the merge-safety risk compaction carries.
+**Measured 2026-09-04 on the real pod — it is session churn, not editing:**
+
+```
+  distinct actors     4,214
+  changes             14,570
+  changes per actor   mean 3.5  median 2  p90 6  max 102
+  actors with 1 change 1,912 (45%)
+  top 1% of actors    17% of changes
+```
+
+45% of actors made exactly ONE change, the median is 2, and the top 1% hold only
+17% — a flat tail of near-identical lanes, i.e. "opened the app, made one edit,
+closed", thousands of times. Not real editing behaviour.
+
+**Tier 2 therefore needs BOTH halves.** Compaction is remedial (nothing else
+touches the 3.7M ops already written) but has a shelf life: reset to one actor
+and the identical churn resumes, because the write path is unchanged. Pinning a
+stable per-device actor is preventive and cannot shrink the existing pod. Either
+alone leaves the problem.
+
+**A third driver, unlooked-for:** 3,725,253 ops across 14,570 changes is **256
+ops per change**. A change rewriting one entity should be tens of ops, not
+hundreds — something is writing whole objects or collections where a field-level
+update would do. Independent of both compaction and actor pinning; worth its own
+investigation in Tier 2's pre-plan.
+
+**Still unquantified:** an attempt to isolate the actor-lane cost from op count
+failed — the
+synthetic used to isolate it OOM-ed at high actor counts (itself a data point)
+and was abandoned rather than reported half-verified. So the DISTRIBUTION is
+measured and the behavioural conclusion is solid, but whether those 4,214 lanes
+are 5% or 40% of the 3.2MB is still unknown. It does not change the "both
+halves" conclusion above; it would change how urgently the actor fix is needed
+relative to compaction.
 
 ### CloudWatch rate query
 
