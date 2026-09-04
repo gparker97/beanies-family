@@ -69,6 +69,13 @@ describe('event extraction output caps', () => {
 });
 
 describe('travel extraction output caps', () => {
+  // Comfortably past the cap, DERIVED from it — a literal like 5000 proves nothing extra and
+  // is not safe against the cap being raised. It also matters for runtime: the travel
+  // fixtures are a segment count times a traveller count, so a literal 5000 in both built 25
+  // million array slots per test and pushed this file's 5s timeout over the edge under a
+  // loaded full run.
+  const OVER_CAP = MODEL_LIST_MAX * 2 + 1;
+
   const segment = (over: Record<string, unknown> = {}) => ({
     kind: 'accommodation',
     type: 'hotel',
@@ -76,7 +83,7 @@ describe('travel extraction output caps', () => {
     status: 'booked',
     bookingReference: HUGE,
     notes: HUGE,
-    travellers: Array.from({ length: 5000 }, () => HUGE),
+    travellers: Array.from({ length: OVER_CAP }, () => HUGE),
     confidence: { overall: 1 },
     ...over,
   });
@@ -86,7 +93,7 @@ describe('travel extraction output caps', () => {
       isTravel: true,
       tripName: HUGE,
       tripTypeHint: HUGE,
-      segments: Array.from({ length: 5000 }, () => segment()),
+      segments: Array.from({ length: OVER_CAP }, () => segment()),
     });
 
     expect(r.segments).toHaveLength(MODEL_LIST_MAX);
@@ -105,7 +112,7 @@ describe('travel extraction output caps', () => {
     // `fields` is keyed by whatever the model returned, so an unbounded loop would let a
     // hostile document choose how many keys we persist.
     const flood: Record<string, unknown> = {};
-    for (let i = 0; i < 5000; i++) flood[`f${i}`] = HUGE;
+    for (let i = 0; i < OVER_CAP; i++) flood[`f${i}`] = HUGE;
     const r = parseTravelExtractionResult({
       isTravel: true,
       tripName: 'x',
@@ -123,7 +130,7 @@ describe('travel extraction output caps', () => {
         isTravel: true,
         tripName: HUGE,
         tripTypeHint: HUGE,
-        segments: Array.from({ length: 5000 }, () => segment()),
+        segments: Array.from({ length: OVER_CAP }, () => segment()),
       })
     ).not.toThrow();
   });
