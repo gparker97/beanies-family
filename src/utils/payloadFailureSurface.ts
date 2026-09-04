@@ -106,15 +106,24 @@ export function surfacePayloadFatal(
   err: PayloadLoadError,
   ctx: { fileId: string | null; familyId: string | null; source: PayloadFailureSource }
 ): void {
-  const tooLarge = err.deviceCannotOpen;
   reportPayloadFailure(err, ctx);
 
   // `clearDataHelps: false` for BOTH classes. For too-large the file is intact
   // and clearing is the one action that destroys the local copy; for corrupt
   // the message says trying again will not help and points at support, so an
   // adjacent "clear your data and start fresh" button contradicts it.
+  // THREE-way, matching `payloadErrorMessageKey`. A two-way ternary here meant
+  // the same error object produced "try your password" inline and "your data may
+  // be damaged, contact support" full-screen — and the full-screen one is what a
+  // fresh install restoring from a .beanpod sees, which is precisely the
+  // population whose saved key is most likely to be stale.
+  const overlayKey = err.keyMayBeWrong
+    ? 'resumeSetup.podCredentialStale'
+    : err.deviceCannotOpen
+      ? 'resumeSetup.podTooLarge'
+      : 'resumeSetup.podCorrupted';
   useFatalErrorStore().setFatal(
-    useTranslationStore().t(tooLarge ? 'resumeSetup.podTooLarge' : 'resumeSetup.podCorrupted'),
+    useTranslationStore().t(overlayKey),
     // The envelope's family id reaches the user through this blob. It is
     // deliberately NOT in the report context above: `enrichAndRedact`
     // overwrites `family_id` with the ACTIVE family, so on a cross-family open

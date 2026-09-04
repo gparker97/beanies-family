@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia';
+import { isRemoteUnreadable } from '@/services/sync/syncService';
+import type { PayloadLoadError } from '@/types/sync';
 import { ref, computed } from 'vue';
 import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
 import {
@@ -2311,6 +2313,8 @@ export const useAuthStore = defineStore('auth', () => {
   function buildSignOutStepImpls(ctx: {
     departedEmail: string | null;
     familyId: string | undefined;
+    /** Snapshot taken before any step runs — see where it is set. */
+    remoteWasUnreadable: PayloadLoadError | null;
   }): SignOutStepImpls {
     const settingsStore = useSettingsStore();
     return {
@@ -2363,14 +2367,16 @@ export const useAuthStore = defineStore('auth', () => {
         // and `forceSaveWithTimeout` reads the resulting `false` as "no durable
         // state to save" and logs a console.warn. Deleting here would destroy a
         // whole session of edits that exist nowhere else.
-        const { isRemoteUnreadable } = await import('@/services/sync/syncService');
-        const unreadable = isRemoteUnreadable();
+        const unreadable = ctx.remoteWasUnreadable;
         if (unreadable) {
           reportError({
             surface: 'pod-load-failure',
             message: 'sign-out kept the local database: the remote pod is unreadable',
             error: unreadable,
-            severity: 'critical',
+            // NOT critical for the device-cannot-open class: that one is
+            // expected on a small tablet and would page on every sign-out. A
+            // CORRUPT remote is the one worth waking someone for.
+            severity: unreadable.deviceCannotOpen ? 'warning' : 'critical',
             context: { action: 'signout-kept-local-db', error_code: unreadable.step },
           });
           return;
@@ -2440,7 +2446,17 @@ export const useAuthStore = defineStore('auth', () => {
   async function signOut(): Promise<void> {
     const settingsStore = useSettingsStore();
     const trusted = settingsStore.isTrustedDevice;
-    const ctx = { departedEmail: null as string | null, familyId: undefined as string | undefined };
+    const ctx = {
+      departedEmail: null as string | null,
+      familyId: undefined as string | undefined,
+      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS. `resetSyncState` sits FOUR
+      // steps ahead of `deleteFamilyDb` in both deleting tiers, and it reaches
+      // `syncService.reset()` -> `clearRemoteUnreadable()`. So reading the latch
+      // inside `deleteFamilyDb` always saw `null` and the guard was dead code —
+      // exactly the "grep for the WRITERS as well as the readers" lesson from
+      // the round before, repeated.
+      remoteWasUnreadable: isRemoteUnreadable(),
+    };
     await runSignOutSteps(
       trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS,
       buildSignOutStepImpls(ctx)
@@ -2539,7 +2555,17 @@ export const useAuthStore = defineStore('auth', () => {
    * Step ORDER is data in `signOutSteps.ts`.
    */
   async function signOutAndClearData(): Promise<void> {
-    const ctx = { departedEmail: null as string | null, familyId: undefined as string | undefined };
+    const ctx = {
+      departedEmail: null as string | null,
+      familyId: undefined as string | undefined,
+      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS. `resetSyncState` sits FOUR
+      // steps ahead of `deleteFamilyDb` in both deleting tiers, and it reaches
+      // `syncService.reset()` -> `clearRemoteUnreadable()`. So reading the latch
+      // inside `deleteFamilyDb` always saw `null` and the guard was dead code —
+      // exactly the "grep for the WRITERS as well as the readers" lesson from
+      // the round before, repeated.
+      remoteWasUnreadable: isRemoteUnreadable(),
+    };
     await runSignOutSteps(SIGN_OUT_CLEAR_STEPS, buildSignOutStepImpls(ctx));
     emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });
     finalizeSession();

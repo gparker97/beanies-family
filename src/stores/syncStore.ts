@@ -661,6 +661,8 @@ export const useSyncStore = defineStore('sync', () => {
     const granted = await syncService.requestPermission();
     needsPermission.value = !granted;
     if (!granted) return { granted: false, loaded: false };
+    // An explicit user action — give the breaker its one half-open attempt.
+    syncService.retryAfterRemoteBlock();
 
     try {
       const loadResult = await loadFromFile();
@@ -964,7 +966,15 @@ export const useSyncStore = defineStore('sync', () => {
     // that button was an unbounded re-download loop with a critical report per
     // press. Reported as a plain failure; the honest message is already on
     // screen from the attempt that latched.
-    if (remoteUnreadable()) return { success: false, reason: 'error' };
+    // THROW, never a bare `{success:false}`. A plain failure strips the payload
+    // class from every consumer downstream: `requestPermission` returns
+    // `{granted:true, loaded:false}` with no `payloadError` (so Settings' Reload
+    // becomes a silent no-op), `LoadPodView` falls back to "check you picked the
+    // right file", and App.vue's path 1b never reaches its `PayloadLoadError`
+    // branch — landing instead on the generic overlay whose CTA is Clear Data,
+    // which deletes the one copy of the edits this latch exists to protect.
+    const blocked = remoteUnreadable();
+    if (blocked) throw blocked;
 
     // The single read chokepoint for the login flow (single-family auto-select +
     // FamilyPicker). On the post-consent redirect return the Google token may still
@@ -1202,6 +1212,16 @@ export const useSyncStore = defineStore('sync', () => {
       };
       return { success: false, needsPassword: true };
     } finally {
+      // ⚠️ TOTAL, not per-branch. `syncService.load()` stamps the remote's
+      // revision BEFORE the download, and only two of this function's exits
+      // called confirm or rollback. A transient read failure, an `auth` return,
+      // a `not-found` return or the `needsPassword` return all left a baseline
+      // claiming a revision nothing merged — after which the next change check
+      // answers 'unchanged', `fetchAndMergeRemote` returns without throwing, and
+      // the following save writes over it. Rolling back anything still pending
+      // at exit makes every path safe by construction; `confirmRemoteMerged`
+      // has already cleared it on the one path that earned it.
+      syncService.rollbackRemoteMarker();
       if (merging && isReloading) {
         isReloading = false;
       }
@@ -2750,6 +2770,12 @@ export const useSyncStore = defineStore('sync', () => {
     // wake and every Refresh tap re-download the whole pod, re-hit the same
     // allocation and fire another critical page — one per wake, indefinitely,
     // because wakes are far outside the 60s dedup window.
+    // A MANUAL refresh is the user asking again, which is the half-open state a
+    // circuit breaker needs: clear the latch so exactly one attempt runs. An
+    // automatic tick must never do this — that is the download storm the latch
+    // exists to stop — and without it the latch was write-only, since both of
+    // its automatic clear sites now sit behind the guards that read it.
+    if (opts?.manual) syncService.retryAfterRemoteBlock();
     if (remoteUnreadable()) {
       // Close the open cycle and log the outcome like every other terminal —
       // an early return above the try left the window open (so the cycle shipped
@@ -3016,8 +3042,20 @@ export const useSyncStore = defineStore('sync', () => {
               // REMOTE envelope with the in-memory family key, so it is the
               // canonical key-rotation site, and the recoverable fallback
               // (`tryDecryptWithCachedKey` → re-prompt) is eight lines below.
-              if (e instanceof PayloadLoadError && !e.keyMayBeWrong) {
-                notePodUnopenable(e);
+              if (e instanceof PayloadLoadError) {
+                if (!e.keyMayBeWrong) {
+                  notePodUnopenable(e);
+                  return false;
+                }
+                // Recoverable (a rotated key). Never a comment-only handler:
+                // falling through silently discarded the envelope below,
+                // surfaced nothing, and left the 10s timer that called this
+                // running — so the app re-downloaded and threw away the whole
+                // pod every tick with nothing on screen. Stop the poll, keep the
+                // envelope, and say it once.
+                stopFilePolling();
+                backgroundSyncError.value = useTranslationStore().t(payloadErrorMessageKey(e));
+                backgroundSyncErrorKind.value = 'decrypt';
                 return false;
               }
               // Family key doesn't work — try cached key
@@ -3095,7 +3133,14 @@ export const useSyncStore = defineStore('sync', () => {
     // to latch a `keyMayBeWrong` failure, which is why this is a call rather
     // than a second copy of that logic.
     syncService.noteRemoteUnreadable(err);
-    podUnopenable.value = true;
+    // MIRROR the service's actual answer — do not assert it. `noteRemoteUnreadable`
+    // declines to latch a `keyMayBeWrong` failure (a routine key rotation), so
+    // asserting `true` here set the UI mirror and stopped the poller while the
+    // authoritative latch stayed null — and `backgroundSyncFromFile`'s own
+    // `finally` then re-armed the 10s timer straight through a guard that saw
+    // null, which is the download loop this whole mechanism exists to stop.
+    podUnopenable.value = !!syncService.isRemoteUnreadable();
+    if (!podUnopenable.value) return; // recoverable: leave polling and the bar alone
     stopFilePolling();
     backgroundSyncError.value = useTranslationStore().t(payloadErrorMessageKey(err));
     backgroundSyncErrorKind.value = 'decrypt';
@@ -4092,9 +4137,8 @@ export const useSyncStore = defineStore('sync', () => {
     fileId: string,
     fileName_param: string
   ): Promise<{ ok: true } | { ok: false; code: PodAccessErrorCode }> {
-    // `setProvider` below clears the service latch; keep the UI mirror in step,
-    // or the supported repair leaves a stale 'cannot be opened' banner behind.
-    clearPodUnopenable();
+    // The supported repair for a latched pod — it must be allowed one attempt.
+    syncService.retryAfterRemoteBlock();
     try {
       if (!familyKey.value || !envelope.value) {
         return { ok: false, code: 'NO_HOME' };
@@ -4137,8 +4181,13 @@ export const useSyncStore = defineStore('sync', () => {
       fileName.value = fileName_param;
       driveFileId.value = fileId;
 
-      // ONE clearing site for every recovery banner's state, so the four banners
-      // can never disagree about whether recovery succeeded.
+      // ONE clearing site for every recovery banner's state, so the banners
+      // can never disagree about whether recovery succeeded. This sits AFTER
+      // `setProvider` on purpose: clearing at the top of the function erased the
+      // honest "this pod could not be opened" banner on the four failure exits
+      // above, which never reach `setProvider` and so leave the service latch
+      // armed — the app looked repaired while every read and save still refused.
+      clearPodUnopenable();
       driveFileNotFound.value = false;
       showSaveFailureBanner.value = false;
       podAccessError.value = null;

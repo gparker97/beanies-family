@@ -4272,6 +4272,14 @@ const STRING_DEFS = {
   },
   // The decrypt-step case, where a stale key and damaged bytes look identical.
   // Names the recoverable half, because that one has an action.
+  // The overlay variant of `podCredentialStale.inline`. Names the recovery kit,
+  // because at the point the OVERLAY is raised there is no password field on
+  // screen and the saved key is the thing that failed.
+  'resumeSetup.podCredentialStale': {
+    en: "Your family's data could not be unlocked on this device. The saved key may be out of date — a family member may have changed the password or removed a member. Reload and sign in with your password, or use your recovery kit. Your data is safe.",
+    beanie:
+      "your family's beans could not be unlocked on this device. the saved key may be out of date — a family bean may have changed the password or removed a member. reload and sign in with your password, or use your recovery kit. your beans are safe.",
+  },
   'podCredentialStale.inline': {
     en: "Your family's data could not be unlocked. Your saved key may be out of date, so try your password. If that does not work, contact support@beanies.family.",
     beanie:

@@ -648,7 +648,7 @@ broken again in the very next pass, twice, so two of them get sharper:
    what that failure was previously preventing.
 
 10. **Put a latch in the layer that owns the resource, not in the layer that
-    noticed.** The "stop re-downloading a pod this device cannot read" flag went
+    noticed** — but see 13: moving it is only half the job. The "stop re-downloading a pod this device cannot read" flag went
     into `syncStore` first, where it could not see the local-file poll tick and
     had to be cleared from five places (it was cleared wrongly in three). Then
     the save path got its own `instanceof` special case, which defended exactly
@@ -670,3 +670,20 @@ broken again in the very next pass, twice, so two of them get sharper:
     back to `return false` — so the half of the fix that was supposed to stop
     sign-out deleting the local database never landed. Trace where a throw
     actually surfaces before relying on it.
+
+13. **A guard that reads shared state must be checked against the ORDER things
+    run in.** The sign-out protection read the remote-unreadable latch inside
+    `deleteFamilyDb`, four steps after `resetSyncState` had already cleared it.
+    It was dead code, it looked right, and no test covered step ORDER, so CI was
+    green. This is lesson 11 repeated one commit later. When a guard depends on
+    state another step owns, snapshot it before the sequence starts, or prove the
+    order with a test.
+14. **"Stop paging" is not "stop reporting".** Silencing a class with a bare
+    `return` took the last emitter away from it, and that class included genuine
+    corruption — so the fleet-wide rate became unmeasurable and a real incident
+    could not be told from a routine key-rotation wave. Only `critical` pages;
+    every severity reaches the firehose. Drop the severity, keep the event.
+15. **A circuit breaker needs a half-open state.** Both of the latch's automatic
+    clear paths ended up behind the guards that consult it, so once armed there
+    was no in-session recovery — for a class (an allocation failure) that is
+    often transient. A user asking again is the re-arm signal; a timer is not.
