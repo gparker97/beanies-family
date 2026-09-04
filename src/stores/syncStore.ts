@@ -60,6 +60,7 @@ import {
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
+import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { createSampler } from '@/services/telemetry/emitPolicy';
 import { isDemoSession } from '@/utils/reviewDemo';
@@ -627,9 +628,26 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = !granted;
 
     if (granted) {
-      const loadResult = await loadFromFile();
-      if (loadResult.success) {
-        setupAutoSync();
+      try {
+        const loadResult = await loadFromFile();
+        if (loadResult.success) {
+          setupAutoSync();
+        }
+      } catch (e) {
+        // `loadFromFile` rethrows a payload failure so the boot path can
+        // classify it. Here there is no boot path: SettingsPage awaits this
+        // bare, so an escaping throw reached `main.ts`'s unhandledrejection
+        // handler — deliberately non-paging, no toast, no overlay — and the
+        // button appeared to succeed while nothing had loaded.
+        if (e instanceof PayloadLoadError) {
+          surfacePayloadFatal(e, {
+            fileId: driveFileId.value,
+            familyId: useFamilyContextStore().activeFamilyId,
+            source: 'reload',
+          });
+          return granted;
+        }
+        throw e;
       }
     }
 
@@ -2550,7 +2568,9 @@ export const useSyncStore = defineStore('sync', () => {
    * Shared helper for loadFamilyData, reloadIfFileChanged, and backgroundSyncFromFile.
    * Returns true if decryption succeeded.
    */
-  async function tryDecryptWithCachedKey(): Promise<boolean> {
+  async function tryDecryptWithCachedKey(): Promise<
+    boolean | { success: false; payloadError: PayloadLoadError }
+  > {
     const familyCtx = useFamilyContextStore();
     const settingsStore = useSettingsStore();
     const famId = familyCtx.activeFamilyId;
@@ -2562,6 +2582,12 @@ export const useSyncStore = defineStore('sync', () => {
       const { base64ToBuffer } = await import('@/utils/encoding');
       const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
       const result = await decryptPendingFileWithKey(fk);
+      // Carry the class out. This helper backs the MAIN cold-boot path (App.vue
+      // path 1b's `needsPassword` branch), the background refresh and the
+      // file-changed reload; returning a bare `false` sent all three to a
+      // credential-recovery screen for a failure no credential can fix, and the
+      // two refresh callers additionally cleared `pendingEncryptedFile`.
+      if (result.payloadError) return { success: false, payloadError: result.payloadError };
       return result.success;
     } catch {
       // Cached key invalid — caller handles fallback
@@ -2674,6 +2700,8 @@ export const useSyncStore = defineStore('sync', () => {
     // The per-call refresh result, returned to the caller + logged for manual
     // calls. Defaults to 'refreshed'; failure terminals reassign it.
     let refreshResult: RefreshOutcome = 'refreshed';
+    /** A payload failure: suppress the poller, which can only repeat it. */
+    let payloadFailed = false;
 
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
@@ -2741,8 +2769,23 @@ export const useSyncStore = defineStore('sync', () => {
         }
 
         const success = await tryDecryptWithCachedKey();
-        if (success) {
+        if (success === true) {
           await runPostLoadDriveHousekeeping();
+          return refreshResult;
+        }
+        if (success !== false) {
+          // A payload failure, not a credential one. "Password may have changed"
+          // below would be a lie, and `pendingEncryptedFile.value = null` would
+          // throw away the envelope. Stop the poller too — every tick would
+          // re-download the same file and hit the same limit.
+          payloadFailed = true;
+          openOutcome = 'open-failed';
+          refreshResult = 'decrypt-failed';
+          surfacePayloadFatal(success.payloadError, {
+            fileId: driveFileId.value,
+            familyId: useFamilyContextStore().activeFamilyId,
+            source: 'background-sync',
+          });
           return refreshResult;
         }
 
@@ -2778,6 +2821,22 @@ export const useSyncStore = defineStore('sync', () => {
       return refreshResult;
     } catch (e) {
       openOutcome = 'open-failed';
+      // A payload failure is NOT a network failure, and polling cannot fix it.
+      // Left to the branches below it was filed as `network`, and the `finally`
+      // then armed the 10s poller — which re-downloads the multi-megabyte file
+      // and re-attempts the identical allocation every tick, swallowing each
+      // failure in a console.warn. `payloadFailed` suppresses the poller.
+      if (e instanceof PayloadLoadError) {
+        payloadFailed = true;
+        backgroundSyncErrorKind.value = 'network'; // no 'payload' kind on the bar
+        refreshResult = 'network-failed';
+        surfacePayloadFatal(e, {
+          fileId: driveFileId.value,
+          familyId: useFamilyContextStore().activeFamilyId,
+          source: 'background-sync',
+        });
+        return refreshResult;
+      }
       const msg = e instanceof Error ? e.message : 'Could not refresh data from cloud';
       backgroundSyncError.value = msg;
       const isAuth = isAuthTransientSyncError(msg);
@@ -2786,8 +2845,10 @@ export const useSyncStore = defineStore('sync', () => {
       if (isAuth) scheduleColdStartReconnectEscalation(msg);
     } finally {
       isBackgroundSyncing.value = false;
-      // Always start polling — even on error, next poll may succeed
-      if (!filePollingTimer) {
+      // Always start polling — even on error, next poll may succeed. The ONE
+      // exception is a payload failure: every poll would re-download the same
+      // file and hit the same limit, forever.
+      if (!filePollingTimer && !payloadFailed) {
         startDeferredPolling();
       }
       // Path 1a handed us the open-cycle terminal (see App.vue's loadFamilyData
@@ -2870,7 +2931,20 @@ export const useSyncStore = defineStore('sync', () => {
 
           // Try cached family key
           const success = await tryDecryptWithCachedKey();
-          if (success) return true;
+          if (success === true) return true;
+          if (success !== false) {
+            // A payload failure. Keep the envelope (nulling it breaks the
+            // decrypt modal's computeds) and STOP the poller: this fires every
+            // 10 seconds and each tick would re-download the same file and hit
+            // the same limit.
+            stopFilePolling();
+            surfacePayloadFatal(success.payloadError, {
+              fileId: driveFileId.value,
+              familyId: useFamilyContextStore().activeFamilyId,
+              source: 'background-sync',
+            });
+            return false;
+          }
 
           pendingEncryptedFile.value = null;
         }
@@ -2880,6 +2954,17 @@ export const useSyncStore = defineStore('sync', () => {
         isCrossDeviceReload = false;
       }
     } catch (e) {
+      if (e instanceof PayloadLoadError) {
+        // `loadFromFile({merge:true})` rethrows it. Same reasoning as above:
+        // never silently re-poll a failure a poll cannot fix.
+        stopFilePolling();
+        surfacePayloadFatal(e, {
+          fileId: driveFileId.value,
+          familyId: useFamilyContextStore().activeFamilyId,
+          source: 'background-sync',
+        });
+        return false;
+      }
       if (e instanceof DriveApiError && e.status === 404) {
         // Auth-masked-as-404 on the background poll: an expired token yields the
         // same 404 as a missing file. Only flag `driveFileNotFound` when the

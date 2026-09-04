@@ -64,7 +64,8 @@
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
 import { ref, computed, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
-import { payloadErrorDetail, type PayloadLoadError } from '@/types/sync';
+import { type PayloadLoadError } from '@/types/sync';
+import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -79,7 +80,6 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
 import { getProvider } from '@/services/sync/syncService';
@@ -96,7 +96,6 @@ const { t } = useTranslation();
 const authStore = useAuthStore();
 const syncStore = useSyncStore();
 const familyContextStore = useFamilyContextStore();
-const fatalErrorStore = useFatalErrorStore();
 const settingsStore = useSettingsStore();
 
 const emit = defineEmits<{
@@ -308,48 +307,16 @@ async function handleStartNewPodFromRetry() {
 // ─── Non-destructive auto-load path ─────────────────────────────────────────
 
 /**
- * The ONE place a payload failure becomes a fatal overlay.
+ * Resume-flow adapter over the shared payload-failure surface.
  *
- * Both failure classes want the identical diagnostic blob and the identical
- * overlay; only the copy and whether to report differ. Cloning the ~25-line
- * body per class is what a third class would triple.
- *
- * `report` is load-bearing, not decoration: an out-of-memory failure has
- * ALREADY been reported once by `docClient.surface()`, and reporting again here
- * would use a different surface that the errorReporter's (surface, message)
- * dedup cannot collapse.
+ * The report + overlay body used to live here AND in `App.vue`, and the two had
+ * already drifted (different `surface` names; only one carried
+ * `perf_doc_bytes`). Both now go through `@/utils/payloadFailureSurface`, which
+ * also owns the "only the corrupt half is reported here, `docClient.surface()`
+ * already emitted the too-large one" rule.
  */
-function surfacePayloadFailure(
-  err: PayloadLoadError,
-  fileId: string,
-  familyId: string,
-  opts: { copyKey: 'resumeSetup.podCorrupted' | 'resumeSetup.podTooLarge'; report: boolean }
-): void {
-  if (opts.report) {
-    reportError({
-      surface: 'resumeSetup.podCorrupted',
-      message: `Pod payload failed Automerge ${err.step} during resume`,
-      error: err,
-      severity: 'critical',
-      // `file_id` and `corruption_step` are NOT in `ALLOWED_CONTEXT_KEYS`, so the
-      // redactor would strip both (with a console warn) and this report would
-      // reach CloudWatch carrying neither — untriageable. Reuse the allowlisted
-      // keys the rest of the app already uses for exactly these two facts; the
-      // full file id still rides in the copyable diagnostic blob below.
-      context: {
-        file_id_tail: fileId.slice(-6),
-        family_id: familyId,
-        error_code: err.step,
-      },
-    });
-  }
-  // `clearDataHelps: false` — the overlay's standing advice is "reload, or clear
-  // your data and start fresh", and for BOTH payload classes clearing is either
-  // useless (the file is intact and too big for this device) or destructive of
-  // the one local copy. The message says so; the button must not contradict it.
-  fatalErrorStore.setFatal(t(opts.copyKey), payloadErrorDetail(err, fileId, familyId), {
-    clearDataHelps: false,
-  });
+function surfacePayloadFailure(err: PayloadLoadError, fileId: string, familyId: string): void {
+  surfacePayloadFatal(err, { fileId, familyId, source: 'resume' });
 }
 
 async function handleAutoLoadSubmit() {
@@ -383,26 +350,15 @@ async function handleAutoLoadSubmit() {
         // createNewFile — that's the exact bug that produced the original
         // data-loss incident. Surface the canonical fatal-error modal with
         // diagnostics so the user can contact support with a fileId.
-        surfacePayloadFailure(result.error, result.fileId, result.familyId, {
-          copyKey: 'resumeSetup.podCorrupted',
-          report: true,
-        });
+        surfacePayloadFailure(result.error, result.fileId, result.familyId);
         return;
       case 'too-large':
         // The file is FINE — this device could not allocate enough memory to
         // inflate it. Same overlay, honest copy, and its existing Reload button
         // is the action: a reload reclaims the doc realm's wasm memory in both
         // worker and inline mode (a grown wasm heap never shrinks in place).
-        //
-        // `report: false` — `docClient.surface()` has ALREADY emitted the single
-        // `pod-load-memory` event by the time this result exists. A second
-        // report here would land on a DIFFERENT surface, which the
-        // (surface, message) dedup cannot collapse, so it would double-count
-        // every occurrence in the rate.
-        surfacePayloadFailure(result.error, result.fileId, result.familyId, {
-          copyKey: 'resumeSetup.podTooLarge',
-          report: false,
-        });
+        // The shared surface picks the copy and skips the duplicate report.
+        surfacePayloadFailure(result.error, result.fileId, result.familyId);
         return;
       case 'network-error':
         reportError({

@@ -18,6 +18,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { PayloadTooLargeError, type PayloadLoadError } from '@/types/sync';
 import { lookupFamily } from '@/services/registry/registryService';
 import { features } from '@/config/features';
 import {
@@ -61,10 +62,31 @@ export type JoinErrorCode =
   | 'PICKER_TIMEOUT'
   | 'FILE_READ_FAILED'
   | 'FILE_DECRYPT_FAILED'
+  | 'FILE_TOO_LARGE'
   | 'FILE_FAMILY_MISMATCH'
   | 'INVITE_TOKEN_EXPIRED'
   | 'INVITE_TOKEN_INVALID'
   | 'NO_UNCLAIMED_MEMBERS';
+
+/**
+ * A failed decrypt, as the error `tryStep` should record.
+ *
+ * Two jobs. It picks the right registry CODE, so a memory limit stops rendering
+ * "ask the inviter for a new invite link" — advice the joiner will follow
+ * forever, on an invite that is perfectly good. And it keeps the RAW engine
+ * message: `recordError` builds a `severity: 'critical'` Slack page out of it
+ * and the joiner never sees it (the view renders the registry's own copy), so
+ * translating it would only strip the string `isAllocationFailure`'s feedback
+ * loop depends on and split the dedup bucket per locale.
+ */
+function asJoinDecryptError(result: {
+  error?: string;
+  payloadError?: PayloadLoadError;
+}): Error & { joinCode?: JoinErrorCode } {
+  const err: Error & { joinCode?: JoinErrorCode } = new Error(result.error ?? 'Decryption failed');
+  if (result.payloadError instanceof PayloadTooLargeError) err.joinCode = 'FILE_TOO_LARGE';
+  return err;
+}
 
 export type RecoveryAction =
   'retry' | 'signInDifferentAccount' | 'tryAnotherDevice' | 'pickDifferentBean';
@@ -130,6 +152,18 @@ export const JOIN_ERRORS = {
   FILE_DECRYPT_FAILED: {
     messageKey: 'join.error.fileDecrypt',
     recoveries: [],
+    severity: 'critical',
+  },
+  /**
+   * The invite and the key are FINE — this device ran out of memory inflating
+   * the family's pod. Distinct from `FILE_DECRYPT_FAILED` because that entry's
+   * copy tells the joiner to ask the inviter for a new link, which cannot help
+   * and which they will do forever. `tryAnotherDevice` is the only recovery
+   * that can actually work.
+   */
+  FILE_TOO_LARGE: {
+    messageKey: 'join.error.fileTooLarge',
+    recoveries: ['tryAnotherDevice'],
     severity: 'critical',
   },
   FILE_FAMILY_MISMATCH: {
@@ -286,8 +320,12 @@ export function useJoinFlow() {
       return await fn();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      log(`step ${code} failed`, { err: message });
-      recordError(code, { error: message, ...contextExtra }, err);
+      // A step may REFINE its code: `asJoinDecryptError` tags an out-of-memory
+      // failure `FILE_TOO_LARGE` so the joiner is not told to ask for a new
+      // invite link, which cannot help and which they would do forever.
+      const refined = (err as { joinCode?: JoinErrorCode }).joinCode ?? code;
+      log(`step ${refined} failed`, { err: message });
+      recordError(refined, { error: message, ...contextExtra }, err);
       return null;
     }
   }
@@ -551,7 +589,7 @@ export function useJoinFlow() {
     const decrypted = await tryStep('FILE_DECRYPT_FAILED', async () => {
       const fk = await redeemInviteToken(pkg.wrapped, pkg.salt, inviteToken.value);
       const result = await syncStore.decryptPendingFileWithKey(fk);
-      if (!result.success) throw new Error(result.error ?? 'Decryption failed');
+      if (!result.success) throw asJoinDecryptError(result);
       return true;
     });
 
@@ -701,14 +739,7 @@ export function useJoinFlow() {
   async function handleSubmitDecryptPassword(password: string): Promise<boolean> {
     const ok = await tryStep('FILE_DECRYPT_FAILED', async () => {
       const result = await syncStore.decryptPendingFile(password);
-      // Deliberately the RAW message, not a translated one. `tryStep` feeds this
-      // into `recordError`, which builds a `severity: 'critical'` Slack page out
-      // of it, and the joiner never sees it: the view renders the message key
-      // registered for the file-decrypt code, which carries no placeholder for
-      // it. Translating it would strip the engine string that
-      // `isAllocationFailure`'s feedback loop depends on and split the
-      // (surface, message) dedup bucket per locale, for no user-visible gain.
-      if (!result.success) throw new Error(result.error ?? 'Decryption failed');
+      if (!result.success) throw asJoinDecryptError(result);
       return true;
     });
     if (!ok) return false;
