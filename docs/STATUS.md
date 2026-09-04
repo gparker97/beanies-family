@@ -1767,6 +1767,47 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 `web/src/`; travel decomposition has no new fingerprint; the #65/#61 open-guard validation
 is still an unrun CloudWatch query. This session was blog-only and shipped none of them.
 
+### ⭐ NEXT SESSION (2026-09-04) — early-adopter reports from Discord ⭐
+
+Raised by early adopters on Discord; greg wants these fixed asap. A **new context** starts here.
+
+1. **File downloads are dead in BOTH native apps** — the biggest of the set, and it is wider
+   than what was reported. Researched 2026-09-03; findings below so the next context does not
+   have to re-derive them.
+   - **Root cause:** `<a download>` + `blob:` saves nothing in either the Android System
+     WebView (no `DownloadListener` is registered — `grep -rn "DownloadListener" android/ ios/`
+     returns nothing) or iOS WKWebView. `navigator.share` is not exposed in the Android
+     WebView at all, so `shareOrDownloadFile.ts`'s share branch also falls through to the dead
+     anchor.
+   - **It reports success.** `downloadFile()` (`src/utils/shareOrDownloadFile.ts:30-51`)
+     returns `{outcome:'downloaded'}` unconditionally, because `anchor.click()` never throws.
+     So the app logs `export-downloaded` and shows the success path for a file that was never
+     written — which is why nothing about this appears in CloudWatch. **Fix this regardless of
+     which delivery fix is chosen.**
+   - **Reported broken:** recovery-kit PDF (both platforms — its `preferDownload:true`
+     bypasses the share sheet), meal-planner PDF (Android; iOS already has a special case).
+   - **Also broken, NOT reported:** `.beanpod` manual export and "Export Readable Data"
+     (`fileSync.ts:240` `downloadAsFile`, a second copy of the same dead idiom) on **both**
+     platforms — that is the data-portability escape hatch; the meal-planner PNG share on
+     Android; photo/PDF download in `PhotoViewer.vue:454`; and `PhotoViewer`'s bare
+     `target="_blank"` "open in new tab", which navigates the app's own WebView to the Drive
+     file with no way back.
+   - **Fix shape:** one native-aware branch inside `shareOrDownloadFile.ts` (the single
+     delivery seam) — `@capacitor/filesystem` (already installed AND compiled into the shipped
+     binaries) writes the blob to `Directory.Cache`, then the OS share sheet takes the `uri`.
+     Collapse `downloadAsFile` and the `isIosOrIpadOs()` meal-planner special case into it.
+   - **Two tiers.** `@capacitor/share` is the proper fix (real "Save to Files"/Drive on both)
+     but is NOT installed → new native dependency + **new signed store builds**; note two
+     traps: its `<provider>` declares the same `${applicationId}.fileprovider` authority
+     already in `AndroidManifest.xml:88-94` (manifest-merger conflict), and `file_paths.xml`
+     has `<cache-path>` but **no `<files-path>`**, so sharing a `Directory.Data` file throws
+     `Failed to find configured root`. A filesystem-only fallback (write + toast the path)
+     ships as a pure web deploy today but lands somewhere users struggle to find.
+   - Suggested sequence: ship the false-success fix + the JS-only fallback now, then
+     `@capacitor/share` in the next store build. This deserves a `/beanies-plan` pass.
+2. **Dark mode** — reported issues, not yet characterised. Get the specifics from Discord.
+3. **Recipe photos** — reported issues, not yet characterised. Get the specifics from Discord.
+
 ### ⭐ Session 2026-09-03 (3) — blog #57 staged, awaiting deploy ⭐
 
 1. **Deploy the post.** `gh workflow run deploy-web.yml --ref main`, then verify
