@@ -81,8 +81,7 @@ const ACCEPTED = Object.freeze([
     // An animated GIF is stored as its FIRST FRAME — the client re-encodes to JPEG. That is
     // correct for a dish photo and is not a bug.
     mime: 'image/gif',
-    matches: (b) =>
-      b.toString('ascii', 0, 6) === 'GIF87a' || b.toString('ascii', 0, 6) === 'GIF89a',
+    matches: (b) => tag(b, 0, 6) === 'GIF87a' || tag(b, 0, 6) === 'GIF89a',
   },
 ]);
 

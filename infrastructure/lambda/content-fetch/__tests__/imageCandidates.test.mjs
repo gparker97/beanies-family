@@ -248,6 +248,11 @@ describe('sniffImageType', () => {
       Buffer.from('avif'),
     ]);
     assert.equal(sniffImageType(ftypish), null);
+    // GIF gets its OWN assertion rather than letting RIFF stand for the whole table: this
+    // matcher was missed on the first pass and actually shipped to prod still masking the
+    // high bit, which is precisely what a per-entry assertion would have caught.
+    const gifish = Buffer.from([0xc7, 0xc9, 0xc6, 0xb8, 0xb9, 0xe1, 0, 0, 0, 0, 0, 0]);
+    assert.equal(sniffImageType(gifish), null);
   });
 
   test('accepts both GIF versions', () => {
