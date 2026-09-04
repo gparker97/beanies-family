@@ -385,6 +385,45 @@ const HEAVY_METHODS = new Set([
 // NOT here — its small entity payload needs full proxy-stripping.
 const ENVELOPE_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope', 'persistEnvelope']);
 
+/**
+ * The subset of `ENVELOPE_METHODS` that actually needs the encrypted bytes.
+ *
+ * NOT `persistEnvelope`: the IndexedDB envelope cache deliberately stores a
+ * STRIPPED envelope (it is a key-material carrier — the document comes from the
+ * doc cache), so guarding it would reject the very call that keeps cold starts
+ * fast. Getting this wrong once already meant no device that joined or resumed
+ * a pod ever wrote an envelope row again, silently, because
+ * `persistEnvelopeSafely` swallows the throw into a warning.
+ */
+const PAYLOAD_REQUIRED_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope']);
+
+/**
+ * Reject a stripped envelope before it can reach the doc realm.
+ *
+ * A long-lived in-memory envelope carries no payload (`withoutPayload`). Passing
+ * one to a method that decrypts would yield zero bytes, surface as a
+ * `CorruptPayloadError`, and CLEAR THE USER'S CACHE — a silent, data-destroying
+ * misuse. Fail loudly instead; this is a developer mistake, not a runtime state.
+ *
+ * Called from `requestCore`, NOT from `postRaw`: the inline executor never posts
+ * a message, so a check living in `postRaw` would protect worker devices and
+ * leave inline ones — disproportionately the low-memory devices this whole
+ * change is about — completely unguarded.
+ */
+function assertEnvelopeHasPayload(method: string, args: unknown): void {
+  if (!PAYLOAD_REQUIRED_METHODS.has(method)) return;
+  const envelope = (args as { envelope?: { encryptedPayload?: unknown } } | null)?.envelope;
+  if (!envelope || typeof envelope !== 'object') return;
+  const payload = envelope.encryptedPayload;
+  if (typeof payload !== 'string' || payload.length === 0) {
+    throw new DocWorkerError(
+      `'${method}' was given an envelope with no encryptedPayload — a long-lived ` +
+        `or cached envelope was passed where freshly-parsed bytes are required.`,
+      method
+    );
+  }
+}
+
 // Methods that are safe to transparently re-issue after a worker respawn: pure
 // reads, idempotent CRDT merges, idempotent re-persists/teardowns. This is an
 // ALLOWLIST, not a denylist, on purpose — a method must be affirmatively known-
@@ -442,17 +481,6 @@ function postRaw(req: RpcRequest): void {
     const envelope = (args as { envelope?: Record<string, unknown> }).envelope;
     if (ENVELOPE_METHODS.has(req.method) && envelope && typeof envelope === 'object') {
       const { encryptedPayload, ...rest } = envelope;
-      // A long-lived in-memory envelope carries NO payload (see `withoutPayload`).
-      // Passing one here would arrive as a zero-byte decrypt, surface as a
-      // CorruptPayloadError, and CLEAR THE USER'S CACHE. Fail loudly instead —
-      // this is a developer mistake, not a runtime condition.
-      if (typeof encryptedPayload !== 'string' || encryptedPayload.length === 0) {
-        throw new DocWorkerError(
-          `'${req.method}' was given an envelope with no encryptedPayload — a long-lived ` +
-            `or cached envelope was passed where freshly-parsed bytes are required.`,
-          req.method
-        );
-      }
       args = { ...(args as object), envelope: { ...(plainify(rest) as object), encryptedPayload } };
     } else {
       args = plainify(args);
@@ -490,6 +518,9 @@ async function requestCore(
   // those calls and post directly (at this point mode==='worker' and worker is
   // non-null — spawn() is past its handshake). Every OTHER caller still blocks on
   // ensureReady() until rehydrate lands (the read-after-respawn barrier).
+  // Before EITHER dispatch path, so worker and inline are guarded identically.
+  assertEnvelopeHasPayload(method, args);
+
   const via = rehydrating && mode === 'worker' && worker ? 'worker' : await ensureReady();
   if (via === 'inline') {
     if (!inlineExecutor) {
@@ -516,7 +547,18 @@ async function requestCore(
   const responsePromise = new Promise<RpcResponse>((resolve) => {
     pending.set(cid, { resolve, method });
   });
-  postRaw({ cid, method, args });
+  try {
+    postRaw({ cid, method, args });
+  } catch (e) {
+    // `postMessage` throws synchronously on a non-cloneable argument, and
+    // `plainify` can throw on a cyclic one. The pending entry is registered by
+    // then and nothing will ever resolve it: it would sit in the map for the
+    // life of the session and — for a HEAVY method — keep `extendWhile`
+    // extending every other op's deadline indefinitely. Drop it before
+    // rethrowing.
+    pending.delete(cid);
+    throw surface(e, method, opts.quiet);
+  }
 
   // Heavy whole-doc ops get the generous ceiling (HEAVY_METHODS); everything else
   // the tight mutation budget. An explicit opts.timeoutMs still overrides both.

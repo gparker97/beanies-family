@@ -54,9 +54,12 @@ describe('familyKeyService — view handling', () => {
     expect(await decryptPayload(key, viewAtOffset(encrypted))).toEqual(data);
   });
 
-  it('round-trips a payload large enough to cross the base64 chunk boundary', async () => {
-    // Guards the interaction between the chunked encoder and the view handling:
-    // a multi-chunk payload is where an off-by-one in either would show up.
+  it('round-trips a payload far larger than one AES block', async () => {
+    // NOT a base64 test: `encryptPayload`/`decryptPayload` deal in bytes and
+    // never touch the encoder, so claiming this covers the chunk boundary would
+    // be coverage theatre (`encoding.chunked.test.ts` owns that). What it does
+    // pin is that the subarray-past-the-IV handling still holds when the
+    // ciphertext is megabyte-scale rather than a single block.
     const key = await generateFamilyKey();
     const big = new Uint8Array(100_003);
     for (let i = 0; i < big.length; i++) big[i] = (i * 17) & 0xff;

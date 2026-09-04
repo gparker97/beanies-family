@@ -13,6 +13,8 @@
  */
 
 import { ref, computed } from 'vue';
+import { payloadErrorMessageKey } from '@/types/sync';
+import { useTranslationStore } from '@/stores/translationStore';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -701,7 +703,15 @@ export function useJoinFlow() {
   async function handleSubmitDecryptPassword(password: string): Promise<boolean> {
     const ok = await tryStep('FILE_DECRYPT_FAILED', async () => {
       const result = await syncStore.decryptPendingFile(password);
-      if (!result.success) throw new Error(result.error ?? 'Decryption failed');
+      if (!result.success) {
+        // Carry the honest reason: a raw Automerge/WASM string here reads as a
+        // password problem and invites an endless retype.
+        throw new Error(
+          result.payloadError
+            ? useTranslationStore().t(payloadErrorMessageKey(result.payloadError))
+            : (result.error ?? 'Decryption failed')
+        );
+      }
       return true;
     });
     if (!ok) return false;

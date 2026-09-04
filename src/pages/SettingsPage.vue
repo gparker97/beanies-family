@@ -51,6 +51,7 @@ import {
   getSettings as getProjectionSettings,
 } from '@/services/automerge/projection';
 import { COLLECTION_NAMES } from '@/types/automerge';
+import { payloadErrorMessageKey } from '@/types/sync';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { deliverFile } from '@/utils/deliverFile';
@@ -519,6 +520,10 @@ async function handleDecryptFile(password: string) {
     setTimeout(() => {
       importSuccess.value = false;
     }, 3000);
+  } else if (result.payloadError) {
+    // A memory limit or a damaged payload, not a wrong password — re-prompting
+    // would loop. Same classification the login and join flows use.
+    encryptionError.value = t(payloadErrorMessageKey(result.payloadError));
   } else {
     encryptionError.value = result.error ?? 'Failed to decrypt file';
   }

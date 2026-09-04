@@ -22,7 +22,13 @@ vi.mock('@automerge/automerge', async (importOriginal) => {
   };
 });
 
-const { loadAndVerify } = await import('../docOps');
+import * as Automerge from '@automerge/automerge';
+import type { FamilyDocument } from '@/types/automerge';
+import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import { generateFamilyKey, encryptPayload } from '@/services/crypto/familyKeyService';
+import { bufferToBase64 } from '@/utils/encoding';
+
+const { loadAndVerify, decryptToDoc, payloadFailure } = await import('../docOps');
 
 const BYTES = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
@@ -141,5 +147,46 @@ describe('the shared base class', () => {
     // DocWorkerError on the main thread.
     expect(new CorruptPayloadError('a', 'load', null).name).toBe('CorruptPayloadError');
     expect(new PayloadTooLargeError('b', 'load', null).name).toBe('PayloadTooLargeError');
+  });
+});
+
+describe('the decrypt step is classified too', () => {
+  it('a wrong key surfaces as a CORRUPT payload at step "decrypt", not a raw throw', async () => {
+    // Before this, a base64/AES failure escaped unclassified — and an
+    // unclassified throw reaching `initAndLoadCache` is treated as corruption,
+    // which DELETES the local cache. Getting the class right here is what makes
+    // that branch's decision meaningful.
+    const key = await generateFamilyKey();
+    const other = await generateFamilyKey();
+    const doc = Automerge.init<FamilyDocument>();
+    const envelope = {
+      familyId: 'fam-dec',
+      encryptedPayload: bufferToBase64(await encryptPayload(key, Automerge.save(doc))),
+    } as unknown as BeanpodFileV4;
+
+    const err = await decryptToDoc(envelope, other).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CorruptPayloadError);
+    expect((err as CorruptPayloadError).step).toBe('decrypt');
+    expect((err as CorruptPayloadError).familyId).toBe('fam-dec');
+  });
+});
+
+describe('payloadFailure', () => {
+  it('classifies an allocation failure as too-large and anything else as corrupt', () => {
+    expect(payloadFailure('load', new Error('out of memory'), 'f', 1)).toBeInstanceOf(
+      PayloadTooLargeError
+    );
+    expect(payloadFailure('load', new Error('invalid chunk type'), 'f', 1)).toBeInstanceOf(
+      CorruptPayloadError
+    );
+  });
+
+  it('passes an already-classified error straight through', () => {
+    // Re-wrapping at an outer boundary would relabel a `materialize` OOM as a
+    // `decrypt` one, and the step is what a triager reads first.
+    const original = new PayloadTooLargeError('oom', 'materialize', 'f', 99);
+    const again = payloadFailure('decrypt', original, 'f', 1);
+    expect(again).toBe(original);
+    expect(again.step).toBe('materialize');
   });
 });

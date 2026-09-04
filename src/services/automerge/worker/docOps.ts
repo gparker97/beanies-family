@@ -14,7 +14,7 @@ import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/ty
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
-import type { PayloadLoadError } from '@/types/sync';
+import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import {
   calculateAmortization,
@@ -225,42 +225,70 @@ export function projectionDeltasBetween(
  * `instanceof` recovery dispatch on main keeps working).
  */
 export function loadAndVerify(binary: Uint8Array, familyId: string | null): Doc {
-  /**
-   * ONE classifier for both steps, so the "is this bad data or a small device?"
-   * decision cannot drift between them.
-   *
-   * `payloadBytes` is the DECRYPTED length — the number that actually predicts
-   * the WASM inflation cost, and a better signal than the base64 length the
-   * perf sample carries.
-   */
-  const fail = (step: 'load' | 'materialize', e: unknown): PayloadLoadError => {
-    const what = step === 'load' ? 'Automerge.load' : 'Automerge materialize';
-    const message = `${what} failed on decrypted payload: ${e instanceof Error ? e.message : String(e)}`;
-    return isAllocationFailure(e)
-      ? new PayloadTooLargeError(message, step, familyId, binary.byteLength)
-      : new CorruptPayloadError(message, step, familyId, binary.byteLength);
-  };
-
   let doc: Doc;
   try {
     doc = Automerge.load<FamilyDocument>(binary);
   } catch (e) {
-    throw fail('load', e);
+    throw payloadFailure('load', e, familyId, binary.byteLength);
   }
   // Touching `familyMembers` (always a Record) forces the first materialize.
   try {
     Object.keys(doc.familyMembers ?? {});
   } catch (e) {
-    throw fail('materialize', e);
+    throw payloadFailure('materialize', e, familyId, binary.byteLength);
   }
   return doc;
 }
 
+/**
+ * THE classifier: is this throw bad data, or a device that ran out of memory?
+ *
+ * Exported and used by every step that touches payload bytes (`loadAndVerify`,
+ * `decryptToDoc`, the cache's increment replay) so the decision cannot drift
+ * between them — and it is a decision with teeth, because the corruption branch
+ * DELETES the local cache to self-heal and the out-of-memory branch must not.
+ *
+ * `payloadBytes` should be the DECRYPTED length wherever it is known: it is the
+ * number that predicts the WASM inflation cost, and a better signal than the
+ * base64 length. Before the decrypt has happened, the base64 length is the only
+ * thing available and is fine — the `step` says which it is.
+ */
+export function payloadFailure(
+  step: PayloadLoadStep,
+  e: unknown,
+  familyId: string | null,
+  payloadBytes: number | null
+): PayloadLoadError {
+  // An already-classified error passes straight through: re-wrapping it at an
+  // outer boundary would relabel a `materialize` OOM as a `decrypt` one.
+  if (e instanceof CorruptPayloadError || e instanceof PayloadTooLargeError) return e;
+  const what =
+    step === 'load'
+      ? 'Automerge.load'
+      : step === 'materialize'
+        ? 'Automerge materialize'
+        : 'Payload decrypt';
+  const message = `${what} failed on payload: ${e instanceof Error ? e.message : String(e)}`;
+  return isAllocationFailure(e)
+    ? new PayloadTooLargeError(message, step, familyId, payloadBytes)
+    : new CorruptPayloadError(message, step, familyId, payloadBytes);
+}
+
 /** Decrypt a fetched V4 envelope's payload → verified Automerge doc (unmigrated). */
 export async function decryptToDoc(envelope: BeanpodFileV4, familyKey: CryptoKey): Promise<Doc> {
-  const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
-  const binary = await decryptPayload(familyKey, encrypted);
-  return loadAndVerify(binary, envelope.familyId ?? null);
+  const familyId = envelope.familyId ?? null;
+  // The decode + decrypt allocate two more multi-megabyte buffers BEFORE
+  // Automerge is reached, so on a small device this is a place the open can run
+  // out of memory — and an unclassified throw here would reach
+  // `initAndLoadCache` looking like corruption and DELETE the local cache.
+  let binary: Uint8Array;
+  try {
+    const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
+    binary = await decryptPayload(familyKey, encrypted);
+  } catch (e) {
+    throw payloadFailure('decrypt', e, familyId, envelope.encryptedPayload.length);
+  }
+  return loadAndVerify(binary, familyId);
 }
 
 /**

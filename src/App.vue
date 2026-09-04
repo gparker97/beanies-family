@@ -105,6 +105,7 @@ import { isFlagEnabled } from '@/config/flags';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
+import { PayloadLoadError, PayloadTooLargeError, payloadErrorDetail } from '@/types/sync';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
@@ -703,6 +704,25 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       console.warn('[loadFamilyData] File load failed — falling through to recovery overlay');
       return;
     } catch (err) {
+      // A payload failure must keep its CLASS. Rewrapping it in a bare Error
+      // turns "this pod needs more memory than this device has" into a generic
+      // init failure, and the generic recovery overlay's advice is "reload, or
+      // clear your data and start fresh" — useless for an out-of-memory open,
+      // and the one action that destroys the local copy. This is the exact path
+      // the 3GB tablet takes, so it is the path that has to tell the truth.
+      if (err instanceof PayloadLoadError) {
+        initBreadcrumbs.push(`path1b: payload ${err.step} failure (${err.name})`);
+        console.warn('[loadFamilyData] path1b: payload load failed', err);
+        fatalErrorStore.setFatal(
+          t(
+            err instanceof PayloadTooLargeError
+              ? 'resumeSetup.podTooLarge'
+              : 'resumeSetup.podCorrupted'
+          ),
+          payloadErrorDetail(err, syncStore.driveFileId ?? null, familyContextStore.activeFamilyId)
+        );
+        return;
+      }
       throw new Error(
         `Failed to load data from sync file: ${err instanceof Error ? err.message : String(err)}`
       );

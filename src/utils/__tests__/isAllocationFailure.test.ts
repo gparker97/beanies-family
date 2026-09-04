@@ -18,7 +18,6 @@ describe('isAllocationFailure — positive cases', () => {
     'Out of memory',
     'memory allocation failed',
     'Allocation size overflow',
-    'Array buffer allocation failed',
     'WebAssembly.Memory(): could not allocate wasm memory',
     'cannot grow memory',
     'memory.grow failed',
@@ -37,11 +36,33 @@ describe('isAllocationFailure — positive cases', () => {
 });
 
 describe('isAllocationFailure — negative cases (the ones that matter)', () => {
-  it('does NOT match a bare RangeError', () => {
-    // `new Uint8Array(<absurd length>)` throws this, and a corrupt payload with
-    // a garbage length prefix produces exactly that. Matching it would classify
-    // real corruption as OOM and skip the cache clear it needs.
+  it('does NOT match the RangeError a garbage length prefix ACTUALLY produces', () => {
+    // The real signature, verified in node — not the one a naive test reaches
+    // for. `new Uint8Array(1099511627776)` throws "Array buffer allocation
+    // failed", NOT "Invalid array length". An earlier version of the matcher
+    // listed that exact phrase while its own header claimed to exclude it, so a
+    // corrupt payload was classified as OOM and the self-heal clear was skipped.
+    expect(isAllocationFailure(new RangeError('Array buffer allocation failed'))).toBe(false);
+    expect(isAllocationFailure(new RangeError('Invalid typed array length: -1'))).toBe(false);
     expect(isAllocationFailure(new RangeError('Invalid array length'))).toBe(false);
+  });
+
+  it('rejects the errors a bad length ACTUALLY throws, built for real', () => {
+    // Belt and braces: construct them rather than trusting a string literal that
+    // could drift from what the engine emits. (2.5 is deliberately absent — V8
+    // truncates a fractional length instead of throwing.)
+    for (const len of [1099511627776, 1e15, -1]) {
+      let thrown: unknown;
+      try {
+        new Uint8Array(len);
+      } catch (e) {
+        thrown = e;
+      }
+      expect(thrown, `expected new Uint8Array(${len}) to throw`).toBeInstanceOf(RangeError);
+      // Every one of these is a CORRUPTION shape. Classifying any as an
+      // allocation failure skips the cache clear that corruption needs.
+      expect(isAllocationFailure(thrown)).toBe(false);
+    }
   });
 
   it('does NOT match a bare `unreachable` wasm trap', () => {

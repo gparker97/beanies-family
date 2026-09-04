@@ -505,15 +505,22 @@ export async function initAndLoadCache(
     // CorruptPayloadError) clear()`: this catch also fires for IndexedDB and
     // key errors, and flipping to an allowlist would silently change their
     // behaviour too. Narrow change, one class. Do not "simplify" this.
+    //
+    // The cursor reset is UNCONDITIONAL and comes first. `initPersistenceDB(id)`
+    // above already re-pointed the DB at THIS family, so on every failure path
+    // the cursors still describe the PREVIOUS family's doc — including the
+    // too-large path, which skips the clear. Leaving them would let a later
+    // persist for this family write against a cursor from another one. Only the
+    // destructive clear below is conditional.
+    resetDocCursors();
     if (!(e instanceof PayloadTooLargeError)) {
       // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
       // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
+      // `clearCache` deletes the whole DB — base AND snapshot rows — which is
+      // why the cursors above had to go: only one of this function's three
+      // callers recovers with `dropDoc()`; the other two just log.
       await cache.clearCache(id).catch(() => {});
       await cache.initPersistenceDB(id);
-      // `clearCache` deleted the whole DB — base AND snapshot rows. Any cursor
-      // claiming those rows exist is now a lie, and only one of this function's three
-      // callers recovers with `dropDoc()`; the other two just log.
-      resetDocCursors();
     }
     throw e; // whole DB cleared → baseline row gone with it (C16 self-healing)
   }

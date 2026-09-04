@@ -54,23 +54,45 @@ export function bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
 
 /** Convert a standard base64 string back to an ArrayBuffer. */
 export function base64ToBuffer(base64: string): ArrayBuffer {
+  // `atob` silently tolerates whitespace; chunking does NOT. A newline inside a
+  // chunk shifts every following group boundary, so a wrapped or pretty-printed
+  // string would decode to garbage rather than throw. Normalise first — the
+  // test is a single O(n) scan and is false for everything we produce
+  // ourselves, so the common path pays nothing but the scan.
+  const src = /\s/.test(base64) ? base64.replace(/\s+/g, '') : base64;
   return measureSync(
     'base64.decode',
     () => {
-      // Decode in chunks so only one chunk-sized binary string is alive at a
-      // time, instead of the whole `atob` output coexisting with the Uint8Array.
-      const bytes = new Uint8Array(Math.floor((base64.length * 3) / 4) + 3);
+      // The EXACT output length, so the buffer can be handed back without a
+      // copy. An over-allocation plus `bytes.buffer.slice(0, written)` would
+      // duplicate the whole payload at peak — precisely what chunking the
+      // decode was meant to avoid, and it would leave the saving at nil.
+      //
+      // A base64 group of 4 chars is 3 bytes. A final group may be short:
+      // 2 chars → 1 byte, 3 chars → 2 bytes, whether that shortness is spelled
+      // with `=` padding or by simply stopping early (unpadded base64url).
+      const rem = src.length % 4;
+      const padding = rem === 0 ? (src.endsWith('==') ? 2 : src.endsWith('=') ? 1 : 0) : 0;
+      const size = Math.floor(src.length / 4) * 3 - padding + (rem === 0 ? 0 : rem - 1);
+
+      const bytes = new Uint8Array(size);
       let written = 0;
-      for (let i = 0; i < base64.length; i += B64_DECODE_CHUNK_CHARS) {
-        const binary = atob(base64.slice(i, i + B64_DECODE_CHUNK_CHARS));
+      // Decode in chunks so only one chunk-sized binary string is alive at a
+      // time, instead of the whole `atob` output coexisting with the array.
+      for (let i = 0; i < src.length; i += B64_DECODE_CHUNK_CHARS) {
+        const binary = atob(src.slice(i, i + B64_DECODE_CHUNK_CHARS));
         for (let j = 0; j < binary.length; j++) bytes[written++] = binary.charCodeAt(j);
       }
-      // Exact length: the estimate above over-allocates by up to 3 bytes when
-      // the input carries `=` padding.
-      return bytes.buffer.slice(0, written) as ArrayBuffer;
+      // The arithmetic above is exact for well-formed input. Rather than trust
+      // it blindly on data that came off disk, fall back to the copying trim if
+      // it ever disagrees: correct-and-slower beats a buffer with stray zeros.
+      return written === bytes.byteLength
+        ? bytes.buffer
+        : (bytes.buffer.slice(0, written) as ArrayBuffer);
     },
-    // base64 decodes to ~3/4 its length in bytes.
-    { perf_doc_bytes: Math.floor((base64.length * 3) / 4) }
+    // base64 decodes to ~3/4 its length in bytes. Reported as DECODED bytes so
+    // it is directly comparable with `base64.encode`, which reports the same.
+    { perf_doc_bytes: Math.floor((src.length * 3) / 4) }
   );
 }
 
