@@ -89,7 +89,7 @@ function onBlur() {
         <span class="truncate">{{ tag }}</span>
         <button
           type="button"
-          class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-10)] hover:text-[#F15D22]"
+          class="dark:hover:text-accent-lift flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-10)] hover:text-[#F15D22]"
           :aria-label="`${t('recipes.tags.remove')}: ${tag}`"
           :disabled="disabled"
           @click="drop(tag)"
@@ -116,7 +116,7 @@ function onBlur() {
     <!-- Rejections are SPOKEN, never swallowed. aria-live so it reaches a screen reader too. -->
     <p
       v-if="message"
-      class="font-inter mt-1 text-xs font-semibold text-[#F15D22]"
+      class="font-inter dark:text-accent-lift mt-1 text-xs font-semibold text-[#F15D22]"
       aria-live="polite"
     >
       {{ message }}
