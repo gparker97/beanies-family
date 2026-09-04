@@ -22,7 +22,7 @@
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
-import { PayloadLoadError, PayloadTooLargeError, payloadErrorDetail } from '@/types/sync';
+import { PayloadLoadError, payloadErrorDetail } from '@/types/sync';
 
 /** Where the failure was caught. Rides in `action`, so it stays queryable. */
 export type PayloadFailureSource =
@@ -30,6 +30,7 @@ export type PayloadFailureSource =
   | 'resume'
   | 'reload'
   | 'background-sync'
+  | 'trusted-auto-open'
   | 'pin-unlock'
   | 'password-unlock'
   | 'biometric-unlock';
@@ -47,22 +48,40 @@ export function reportPayloadFailure(
   err: PayloadLoadError,
   ctx: { fileId?: string | null; familyId?: string | null; source: PayloadFailureSource }
 ): void {
-  // Only the CORRUPT half. `docClient.surface()` is the single emitter for
-  // `PayloadTooLargeError` and has already fired by the time this runs; a
+  // Only the CORRUPT half. `docClient.surface()` is the single emitter for the
+  // device-cannot-open class and has already fired by the time this runs; a
   // second report would land on a different surface, which the
   // (surface, message) dedup cannot collapse, and would double-count the rate.
-  if (err instanceof PayloadTooLargeError) return;
+  //
+  // ⚠️ Callers that REPLACED an existing emit with this one must keep their own
+  // event for the too-large case, or that class goes dark on their path.
+  if (err.deviceCannotOpen) return;
   reportError({
     surface: 'pod-load-failure',
-    // CONSTANT per step — the size rides in `perf_doc_bytes`. A per-pod byte
-    // figure in the message would give every pod its own dedup bucket.
-    message: `Pod payload failed Automerge ${err.step}`,
+    // Constant per (step, source) — the byte count rides in `perf_doc_bytes`,
+    // because a per-pod figure in the message would give every pod its own
+    // dedup bucket and defeat the throttle entirely.
+    //
+    // ⚠️ The SOURCE is in the message on purpose. `errorReporter` buckets on
+    // (surface, normalizeMessage) for 60s, so with a message constant across
+    // all six call sites the automatic trusted-auto-open probe — which fires
+    // first in every login sequence — won the bucket and swallowed the
+    // user-facing PIN report seconds later. That is the exact defect that
+    // justified deleting the hand-rolled copy, at larger scale.
+    message: `Pod payload failed Automerge ${err.step} (${ctx.source})`,
     error: err,
     severity: 'critical',
     context: {
       action: `pod-load-corrupt:${ctx.source}`,
       error_code: err.step,
       file_id_tail: ctx.fileId ? ctx.fileId.slice(-6) : undefined,
+      // `enrichAndRedact` backfills `family_id` only `if (ctx.activeFamilyId)`,
+      // so on the resume path — a fresh install restoring from a .beanpod, the
+      // population most likely to hit an unopenable pod — there is no active
+      // family and the correlation key would simply be missing. Passing the
+      // envelope's value fills that gap; where a family IS active the redactor
+      // still wins, which is the behaviour every other report has.
+      family_id: ctx.familyId ?? undefined,
       perf_doc_bytes: err.payloadBytes ?? undefined,
     },
   });
@@ -82,7 +101,7 @@ export function surfacePayloadFatal(
   err: PayloadLoadError,
   ctx: { fileId: string | null; familyId: string | null; source: PayloadFailureSource }
 ): void {
-  const tooLarge = err instanceof PayloadTooLargeError;
+  const tooLarge = err.deviceCannotOpen;
   reportPayloadFailure(err, ctx);
 
   // `clearDataHelps: false` for BOTH classes. For too-large the file is intact

@@ -10,6 +10,7 @@
  */
 
 import { supportsFileSystemAccess, isNative } from './capabilities';
+import { PayloadLoadError } from '@/types/sync';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
@@ -1272,6 +1273,32 @@ async function doSave(): Promise<boolean> {
     try {
       await fetchAndMergeRemote();
     } catch (e) {
+      // ⚠️ ONE EXCEPTION, AND IT IS THE WHOLE REASON THIS BRANCH EXISTS.
+      //
+      // "Save local anyway" is right when the merge failed for a transport
+      // reason: the remote is still there, and the next save re-merges. It is
+      // catastrophic when the remote could not be READ INTO MEMORY, because
+      // the write below replaces the whole file with a base built from a doc
+      // that provably does not contain it — silently destroying every peer edit
+      // that lived only in the remote copy, and then certifying the result as
+      // the new baseline.
+      //
+      // This became reachable when the payload paths stopped raising the fatal
+      // overlay: before that the user could not generate mutations, so no
+      // debounced save could fire. Keeping the session usable means the save
+      // path has to refuse instead.
+      if (e instanceof PayloadLoadError) {
+        console.error('[syncService] doSave: remote unreadable — refusing to overwrite it', e);
+        reportError({
+          surface: 'pod-load-failure',
+          message: `Save refused: the remote pod failed Automerge ${e.step}`,
+          error: e,
+          severity: 'critical',
+          context: { action: 'save-refused-remote-unreadable', error_code: e.step },
+        });
+        updateState({ isSyncing: false, lastError: 'Remote file could not be read' });
+        return false;
+      }
       console.warn('[syncService] fetchAndMergeRemote failed (non-fatal):', e);
     }
 

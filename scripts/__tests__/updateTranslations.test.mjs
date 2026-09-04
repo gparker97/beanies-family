@@ -90,3 +90,20 @@ describe('suspiciousTranslationReason — control characters', () => {
     ).toBeNull();
   });
 });
+
+describe('suspiciousTranslationReason — control characters as a SET', () => {
+  const NL = String.fromCharCode(10);
+  const CR = String.fromCharCode(13);
+  const NUL = String.fromCharCode(0);
+
+  it('rejects a control char the source does not have, even when it has another', () => {
+    // Gating the whole test on "the source has at least one" disabled it
+    // entirely for the multi-line keys, so a NUL or a stray CR would persist.
+    expect(suspiciousTranslationReason(`a${NL}b`, `\u7532${CR}\u4e59`)).toBe('control characters');
+    expect(suspiciousTranslationReason(`a${NL}b`, `\u7532${NUL}\u4e59`)).toBe('control characters');
+  });
+
+  it('accepts the same control chars the source already has', () => {
+    expect(suspiciousTranslationReason(`a${NL}b${NL}c`, `\u7532${NL}\u4e59${NL}\u4e19`)).toBeNull();
+  });
+});

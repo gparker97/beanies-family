@@ -4246,6 +4246,17 @@ const STRING_DEFS = {
     en: 'beanies started up but could not find your family data.',
     beanie: 'beanies woke up but could not find your beans.',
   },
+  // The sync bar's toast title when the pod itself cannot be opened. The detail
+  // line carries the specific reason (`podTooLarge.inline` / `podCorrupted.inline`).
+  'sync.podUnopenable': {
+    en: "Your family file couldn't be opened on this device",
+    beanie: "your family file couldn't be opened on this device",
+  },
+  'header.refreshUnopenable': {
+    en: "Nothing to refresh — this device can't open your family file. Your data on screen is still yours.",
+    beanie:
+      "nothing to refresh — this device can't open your family file. your beans on screen are still yours.",
+  },
   'join.error.fileCorrupt': {
     en: "Your family's data could not be read and may be damaged. A new invite link points at the same file, so it will not help. Please ask whoever invited you to get in touch with support@beanies.family.",
     beanie:

@@ -37,9 +37,18 @@ watch(
 watch(
   () => syncStore.backgroundSyncError,
   (err) => {
-    if (err && syncStore.backgroundSyncErrorKind !== 'auth-transient') {
-      showToast('warning', t('sync.backgroundError'));
-    }
+    if (!err || syncStore.backgroundSyncErrorKind === 'auth-transient') return;
+    // The store resolves a specific, translated message for a pod that cannot
+    // be opened at all ("this device ran out of memory…"). Showing the generic
+    // "using cached data" line over it would be the same toast a flaky network
+    // produces, with no hint that sync has just latched off for the session —
+    // and the bar itself is a 3px strip with no text node, so this toast is the
+    // ONLY place any of it reaches the user.
+    showToast(
+      'warning',
+      syncStore.podUnopenable ? t('sync.podUnopenable') : t('sync.backgroundError'),
+      syncStore.podUnopenable ? (err ?? undefined) : undefined
+    );
   }
 );
 

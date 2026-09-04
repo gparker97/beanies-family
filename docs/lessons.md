@@ -624,3 +624,21 @@ deleted).
    is genuinely ambiguous in V8; what decides it is that nothing on the pod-open
    path allocates from payload content. "A false positive is always worse" was a
    plausible-sounding heuristic that cost the fix its main case.
+
+**Addendum, after two more rounds.** The rules above were written and then
+broken again in the very next pass, twice, so two of them get sharper:
+
+8. **When the same `instanceof`/field check appears at more than about three
+   sites, it is a policy and belongs on the type.** `PayloadLoadError` now
+   answers `keyMayBeWrong` and `deviceCannotOpen` itself. The ad-hoc versions
+   were wrong in both directions — once from the class alone (missing that
+   `loadAndVerify` runs outside `decryptToDoc`'s try, so a `load` failure proves
+   the AES-GCM tag verified) and once from the step alone (missing that an
+   allocation failure at the decrypt step never reached the tag check). Both
+   deleted a working credential.
+9. **Removing a blocking overlay makes previously-unreachable paths reachable.**
+   Round 4's overlay stopped the user generating mutations, so the save path
+   could not fire; round 5 removed the overlay and the save path would then have
+   written a full base over a remote it had just failed to read, destroying
+   peer edits. When a change makes an app _more_ usable after a failure, ask
+   what that failure was previously preventing.

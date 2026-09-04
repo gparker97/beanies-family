@@ -85,7 +85,11 @@ export function useBiometricSignIn(): {
         if (!fkResult.success) {
           // Same gap as the password branch: nothing reported the corrupt half.
           if (fkResult.payloadError) {
-            reportPayloadFailure(fkResult.payloadError, { source: 'biometric-unlock' });
+            reportPayloadFailure(fkResult.payloadError, {
+              source: 'biometric-unlock',
+              fileId: syncStore.pendingEncryptedFile?.driveFileId ?? null,
+              familyId: syncStore.pendingEncryptedFile?.envelope?.familyId ?? null,
+            });
           }
           console.warn('[useBiometricSignIn] decryptPendingFileWithKey failed:', fkResult.error);
           return {

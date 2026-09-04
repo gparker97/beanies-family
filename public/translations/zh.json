@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-04",
-    "translationCount": 4490
+    "translationCount": 4493
   },
   "translations": {
     "app.name": {
@@ -6163,7 +6163,7 @@
     },
     "onboarding.welcomeCta": {
       "translation": "让我们开始吧 🫛",
-      "hash": "",
+      "hash": "j82n32",
       "lastUpdated": "2026-09-05"
     },
     "onboarding.welcomeSubtitle": {
@@ -8808,7 +8808,7 @@
     },
     "share.messageBody": {
       "translation": "您好！{member} 邀请您加入 {family} 家庭！\n点击此处加入您家庭的豆荚：{link}",
-      "hash": "",
+      "hash": "6ccfp8",
       "lastUpdated": "2026-09-05"
     },
     "share.wechatHint": {
@@ -10322,13 +10322,13 @@
       "lastUpdated": "2026-04-19"
     },
     "recipes.placeholder.ingredients": {
-      "translation": "每行一项，例如 500 克牛肉末\n3 根胡萝卜\n……",
-      "hash": "",
+      "translation": "每行一项，例如 500 克牛肉末\\n3 根胡萝卜\\n……",
+      "hash": "s95iib",
       "lastUpdated": "2026-09-05"
     },
     "recipes.placeholder.steps": {
-      "translation": "每行一步，例如 把肉煎至上色\n炒香蔬菜丁\n……",
-      "hash": "",
+      "translation": "每行一步，例如 把肉煎至上色\\n炒香蔬菜丁\\n……",
+      "hash": "idpkid",
       "lastUpdated": "2026-09-05"
     },
     "recipes.placeholder.notes": {
@@ -22454,6 +22454,21 @@
     "join.error.fileTooLarge": {
       "translation": "打开您家人的数据时，此设备内存不足。您的邀请没有任何问题； Pod只是比此设备可以打开的大。请在具有更多内存的设备上重试。",
       "hash": "dk90jd",
+      "lastUpdated": "2026-09-04"
+    },
+    "sync.podUnopenable": {
+      "translation": "无法在此设备上打开您的家庭文件",
+      "hash": "c0gy66",
+      "lastUpdated": "2026-09-04"
+    },
+    "header.refreshUnopenable": {
+      "translation": "没有要刷新的内容—此设备无法打开您的家庭文件。您在屏幕上的数据仍然属于您。",
+      "hash": "ekj9s5",
+      "lastUpdated": "2026-09-04"
+    },
+    "join.error.fileCorrupt": {
+      "translation": "您家人的数据无法读取，可能已损坏。新的邀请链接指向同一个文件，因此无济于事。请让邀请您的人联系support@beanies.family。",
+      "hash": "dznn2q",
       "lastUpdated": "2026-09-04"
     }
   }

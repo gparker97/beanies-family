@@ -517,7 +517,11 @@ async function handleFamilySelected(payload: {
       // load-pod screen would then ask for a credential that cannot help. Let
       // `LoadPodView` classify it on the way in.
       if (e instanceof PayloadLoadError) {
-        reportPayloadFailure(e, { source: 'boot' });
+        reportPayloadFailure(e, {
+          source: 'boot',
+          fileId: syncStore.driveFileId ?? null,
+          familyId: payload.id,
+        });
         enterGenericLoadFallback(toProviderHint(payload.providerConfig), {
           message: t(payloadErrorMessageKey(e)),
         });
