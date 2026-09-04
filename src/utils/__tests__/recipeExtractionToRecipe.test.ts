@@ -19,7 +19,6 @@ function result(over: Partial<RecipeExtractionResult> = {}): RecipeExtractionRes
       { text: 'Bake for 45 minutes at 180C.', inferred: true },
     ],
     notes: 'Keeps 3 days in a tin.',
-    imageUrl: 'https://example.com/cake.jpg',
     confidence: { name: 0.9, ingredients: 0.8, steps: 0.7 },
     ...over,
   };
@@ -79,66 +78,44 @@ describe('recipeExtractionToPrefill', () => {
       expect(recipeExtractionToPrefill(result({ name: '', steps: [] }))).not.toBeNull();
     });
   });
-
-  describe('dish image URL is screened, never trusted', () => {
-    // The model reads untrusted sources, so imageUrl is attacker-influenceable. It is
-    // fetched server-side later, which makes an unscreened value a beacon/SSRF channel.
-    it.each([
-      'javascript:' + '//%0aalert(1)',
-      'data:text/html,<script>alert(1)</script>',
-      'http' + '://insecure.example.com/x.jpg',
-      'https://user:pass@evil.example.com/x.jpg',
-      '',
-    ])('drops %s', (bad) => {
-      expect(recipeExtractionToPrefill(result({ imageUrl: bad }))!.dishImageUrl).toBeNull();
+  describe('the mapper carries NO image concern at all (#86)', () => {
+    // ⚠️ THIS REPLACES THREE SUITES THAT TESTED A SAME-REGISTRABLE-DOMAIN BOUND.
+    //
+    // That bound was real security, not decoration: the model's imageUrl is
+    // attacker-influenceable and is fetched SERVER-SIDE, so an unscreened value was a
+    // beacon/SSRF channel and a way to write attacker-chosen bytes into a family's Drive.
+    // It has not been weakened — it has been made unnecessary, by removing the thing it
+    // guarded:
+    //
+    //   1. The model no longer returns an image URL at all. It never could return a real
+    //      one — `htmlToText` strips every tag before the model sees the page — so its only
+    //      possible contribution was an invention. That field is gone from the prompt.
+    //   2. Candidates now come from the CONTENT-FETCH LAMBDA's reading of the page's own
+    //      markup, pre-screened there, screened again by `screenCandidates`, and screened a
+    //      third time by `screenUrl` + `resolvePublicAddress` inside `guardedFetch` on every
+    //      hop of every fetch.
+    //
+    // The equivalent assertions now live in `shareLink.test.ts` (scheme/credentials/port
+    // rejection, malformed input) and the Lambda's `imageCandidates.test.mjs` (server-side
+    // pre-screening). What is asserted HERE is the invariant that makes those sufficient:
+    // this mapper must never emit an image, whatever the model says.
+    it('never surfaces an image, even from a model that smuggles one in', () => {
+      // `imageUrl` is no longer on RecipeExtractionResult at all, so this casts past the type
+      // deliberately: the runtime guarantee must hold regardless of what a model emits.
+      const smuggled = {
+        ...result(),
+        imageUrl: 'https://attacker.example/beacon.png',
+      } as RecipeExtractionResult;
+      expect(recipeExtractionToPrefill(smuggled)!.dishImage).toBeNull();
     });
 
-    it('keeps a plain https URL when it is on the SOURCE domain', () => {
-      // Behaviour change: scheme screening alone is no longer enough. Without a source page
-      // to bound it against, a model-supplied URL is dropped (see the same-domain suite
-      // below) — so this now asserts the bounded form.
-      expect(
-        recipeExtractionToPrefill(result(), 'https://example.com/recipes/cake')!.dishImageUrl
-      ).toBe('https://example.com/cake.jpg');
+    it('yields no image on the ordinary path either', () => {
+      expect(recipeExtractionToPrefill(result())!.dishImage).toBeNull();
     });
   });
 });
 
-describe('dish image is bounded to the SOURCE DOMAIN (found by /code-review max)', () => {
-  // The type comment and the saved plan both claimed this control existed. It did not.
-  // Without it a hostile recipe page names any host as its og:image and we fetch it
-  // server-side: a per-victim ping from our AWS egress, and up to 1.5MB of attacker-chosen
-  // bytes written into the family's Drive as their dish photo. No prompt injection needed —
-  // the page's own og:image is copied straight through.
-  const SRC = 'https://nanabakes.example/recipes/lemon';
-
-  it('keeps an image on the same registrable domain, including subdomains', () => {
-    for (const img of [
-      'https://nanabakes.example/img/cake.jpg',
-      'https://cdn.nanabakes.example/img/cake.jpg',
-      'https://images.nanabakes.example/cake.jpg',
-    ]) {
-      expect(recipeExtractionToPrefill(result({ imageUrl: img }), SRC)!.dishImageUrl).toBe(img);
-    }
-  });
-
-  it('DROPS an image on any other domain', () => {
-    for (const img of [
-      'https://attacker.example/beacon.png',
-      'https://nanabakes.example.evil.test/cake.jpg',
-      'https://evil.test/cake.jpg',
-    ]) {
-      expect(recipeExtractionToPrefill(result({ imageUrl: img }), SRC)!.dishImageUrl).toBeNull();
-    }
-  });
-
-  it('drops the image entirely when there is no source page to bound it against', () => {
-    // A photo/PDF capture has no page, so a model-suggested URL is unbounded by definition.
-    expect(recipeExtractionToPrefill(result())!.dishImageUrl).toBeNull();
-  });
-});
-
-describe('jsonLdToPrefill applies the same bound', () => {
+describe('jsonLdToPrefill also carries no image', () => {
   const RECIPE = {
     name: 'Lemon Drizzle',
     subtitle: '',
@@ -150,16 +127,21 @@ describe('jsonLdToPrefill applies the same bound', () => {
     imageUrl: 'https://attacker.example/beacon.png',
   };
 
-  it('drops a cross-domain image even from the page own JSON-LD', () => {
-    // A page's own markup is no more trustworthy than a model's suggestion — both are
-    // attacker-authored when the page is hostile.
-    const p = jsonLdToPrefill(RECIPE, 'https://nanabakes.example/r');
-    expect(p.dishImageUrl).toBeNull();
+  it('does not re-derive the image from the JSON-LD node', () => {
+    // The page's own JSON-LD `image` still reaches the user — but as candidate #1 of the
+    // server's ladder, screened on the way, rather than being read a second time here.
+    // Two paths to the same value is how one of them ends up missing a check.
+    expect(jsonLdToPrefill(RECIPE, 'https://nanabakes.example/r').dishImage).toBeNull();
+    expect(
+      jsonLdToPrefill(
+        { ...RECIPE, imageUrl: 'https://nanabakes.example/cake.jpg' },
+        'https://nanabakes.example/r'
+      ).dishImage
+    ).toBeNull();
   });
 
-  it('keeps a same-domain image', () => {
-    const img = 'https://cdn.nanabakes.example/cake.jpg';
-    const p = jsonLdToPrefill({ ...RECIPE, imageUrl: img }, 'https://nanabakes.example/r');
-    expect(p.dishImageUrl).toBe(img);
+  it('still records the source URL, which the form shows and stores', () => {
+    const p = jsonLdToPrefill(RECIPE, 'https://nanabakes.example/r');
+    expect(p.fields.sourceUrl).toBe('https://nanabakes.example/r');
   });
 });

@@ -119,4 +119,62 @@ describe('PolaroidImage', () => {
       }
     });
   });
+
+  describe('the no-photo placeholder varies by seed (#86)', () => {
+    const paths = (seed?: string) =>
+      mount(PolaroidImage, {
+        props: { src: null, ...(seed ? { variantSeed: seed } : {}) },
+        global: { stubs: { BeanieSpinner: true } },
+      })
+        .findAll('svg path')
+        .map((p) => p.attributes('d'))
+        .join('|');
+
+    const tint = (seed?: string) =>
+      mount(PolaroidImage, {
+        props: { src: null, ...(seed ? { variantSeed: seed } : {}) },
+        global: { stubs: { BeanieSpinner: true } },
+      })
+        .find('svg')
+        .attributes('style');
+
+    it('WITHOUT a seed, renders exactly what shipped before — the cloche in Terracotta', () => {
+      // Every other caller (cook logs, scrapbook) passes no seed, so this is the guarantee
+      // that they are untouched by the recipe-card change.
+      expect(paths()).toContain(
+        'M14 30h36a2 2 0 0 1 2 2v2a18 18 0 0 1-18 18h-4a18 18 0 0 1-18-18v-2a2 2 0 0 1 2-2z'
+      );
+      expect(tint()).toContain('#E67E22');
+    });
+
+    it('is STABLE for a given seed', () => {
+      // Random variation would flicker on every re-render; the whole point is that one
+      // recipe keeps one look across renders, reloads and devices.
+      expect(paths('recipe-abc')).toBe(paths('recipe-abc'));
+      expect(tint('recipe-abc')).toBe(tint('recipe-abc'));
+    });
+
+    it('DIFFERS across seeds, or a grid would repeat one drawing', () => {
+      const seen = new Set<string>();
+      for (let i = 0; i < 40; i += 1) seen.add(paths(`recipe-${i}`));
+      expect(seen.size).toBeGreaterThan(1);
+    });
+
+    it('applies the tint inline, because a computed Tailwind class generates no CSS', () => {
+      // The trap this pins: `text-[${tint}]` assembled at runtime is invisible to Tailwind's
+      // build-time scanner, so no class exists, `currentColor` inherits from the parent, and
+      // the glyph is a subtly wrong colour that nothing catches.
+      expect(tint('recipe-abc')).toMatch(/color:/);
+    });
+
+    it('keeps the dashed baseline stroke distinct from the outline strokes', () => {
+      const w = mount(PolaroidImage, {
+        props: { src: null, variantSeed: 'recipe-abc' },
+        global: { stubs: { BeanieSpinner: true } },
+      });
+      const dashed = w.findAll('svg path').filter((p) => p.attributes('stroke-dasharray'));
+      expect(dashed).toHaveLength(1);
+      expect(dashed[0].attributes('stroke-width')).toBe('1.5');
+    });
+  });
 });

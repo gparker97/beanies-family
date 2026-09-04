@@ -12,6 +12,7 @@
  * that has the client fetch a recipe site directly fails at runtime on nearly every site.
  */
 import type { DocumentExtractionResult, ExtractionErrorCode } from './types';
+import type { ImageCandidate } from '@/types/magicPayload';
 
 const FETCH_URL = import.meta.env.VITE_CONTENT_FETCH_URL;
 const FETCH_API_KEY = import.meta.env.VITE_CONTENT_FETCH_API_KEY;
@@ -76,8 +77,23 @@ export interface JsonLdRecipe {
 }
 
 export type PageFetchData =
-  | { kind: 'jsonld'; recipe: JsonLdRecipe; finalUrl: string }
-  | { kind: 'text'; text: string; title: string; imageUrl: string; finalUrl: string };
+  | {
+      kind: 'jsonld';
+      recipe: JsonLdRecipe;
+      /** The page's declared images, best first (#86). Normalise with `screenCandidates`. */
+      imageCandidates?: ImageCandidate[];
+      /** Compatibility shim from the Lambda, one release only. Superseded by the above. */
+      imageUrl?: string;
+      finalUrl: string;
+    }
+  | {
+      kind: 'text';
+      text: string;
+      title: string;
+      imageCandidates?: ImageCandidate[];
+      imageUrl?: string;
+      finalUrl: string;
+    };
 
 export interface YoutubeFetchData {
   videoId: string;
@@ -99,7 +115,12 @@ function buildSignal(signal?: AbortSignal): AbortSignal {
 async function post<T>(
   mode: 'page' | 'youtube' | 'image',
   url: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /**
+   * Extra body fields for this mode. Spread FIRST so a stray key can never shadow `mode` or
+   * `url` — those two are the dispatcher's contract and are set last, deliberately.
+   */
+  extra?: Record<string, string | undefined>
 ): Promise<DocumentExtractionResult<T>> {
   if (!FETCH_URL) {
     // An honest seam, exactly like managedProvider's: unconfigured degrades to a typed
@@ -119,7 +140,7 @@ async function post<T>(
         'Content-Type': 'application/json',
         ...(FETCH_API_KEY ? { 'x-api-key': FETCH_API_KEY } : {}),
       },
-      body: JSON.stringify({ mode, url }),
+      body: JSON.stringify({ ...extra, mode, url }),
       signal: buildSignal(signal),
     });
   } catch (err) {
@@ -160,7 +181,16 @@ export const recipeFetchService = {
   fetchPage: (url: string, signal?: AbortSignal) => post<PageFetchData>('page', url, signal),
   fetchYoutube: (url: string, signal?: AbortSignal) =>
     post<YoutubeFetchData>('youtube', url, signal),
-  fetchImage: (url: string, signal?: AbortSignal) => post<ImageFetchData>('image', url, signal),
+  /**
+   * Fetch one candidate's bytes.
+   *
+   * ⚠️ Options object, NOT a second positional: this function's second parameter has always
+   * been `signal`, so adding `pageUrl` there would be a bug waiting for the first caller that
+   * wants to abort. `pageUrl` is the page the candidate was found on and is forwarded as a
+   * `Referer` so hotlink-protected CDNs serve us (#86).
+   */
+  fetchImage: (url: string, opts: { pageUrl?: string; signal?: AbortSignal } = {}) =>
+    post<ImageFetchData>('image', url, opts.signal, { pageUrl: opts.pageUrl }),
 };
 
 export type RecipeFetchService = typeof recipeFetchService;
