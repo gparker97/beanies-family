@@ -24,13 +24,13 @@ defineEmits<{
     @click="$emit('click')"
   >
     <span
-      class="text-secondary-500/40 group-hover:text-primary-500 dark:text-ink-faint text-3xl leading-none transition-colors"
+      class="text-secondary-500/40 group-hover:text-primary-500 dark:text-ink-faint dark:group-hover:text-accent-lift text-3xl leading-none transition-colors"
       aria-hidden="true"
     >
       +
     </span>
     <span
-      class="font-outfit text-secondary-500/60 group-hover:text-primary-500 dark:text-ink-soft text-xs font-semibold transition-colors"
+      class="font-outfit text-secondary-500/60 group-hover:text-primary-500 dark:text-ink-soft dark:group-hover:text-accent-lift text-xs font-semibold transition-colors"
     >
       {{ label }}
     </span>

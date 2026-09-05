@@ -564,7 +564,7 @@ const saveLabel = computed(() => {
 }
 
 :is(.dark) .cele-lbl {
-  color: rgb(255 255 255 / 35%);
+  color: #9aa9b4;
 }
 
 .cele-val {

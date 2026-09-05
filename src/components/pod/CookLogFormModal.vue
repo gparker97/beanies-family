@@ -241,7 +241,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <button
         v-else
         type="button"
-        class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+        class="hover:border-primary-500 hover:text-primary-500 dark:hover:text-accent-lift flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!canSave"
         @click="handleAddFirstPhoto"
       >

@@ -170,14 +170,12 @@ function goHome() {
       </p>
 
       <!-- Heading -->
-      <h1
-        class="font-headline text-secondary-500 mt-[-1rem] text-2xl font-bold dark:text-[#ECF0F1]"
-      >
+      <h1 class="font-headline text-secondary-500 dark:text-ink mt-[-1rem] text-2xl font-bold">
         {{ t('notFound.heading') }}
       </h1>
 
       <!-- Description -->
-      <p class="text-secondary-500/60 mt-3 text-base dark:text-[#BDC3C7]">
+      <p class="text-secondary-500/60 dark:text-ink-soft mt-3 text-base">
         {{ t('notFound.description') }}
       </p>
 
@@ -189,7 +187,7 @@ function goHome() {
       </div>
 
       <!-- Subtle tagline -->
-      <p class="text-secondary-500/30 mt-6 text-sm italic dark:text-[#BDC3C7]/30">
+      <p class="text-secondary-500/50 dark:text-ink-faint mt-6 text-sm italic">
         {{ t('app.tagline') }}
       </p>
     </div>

@@ -170,7 +170,7 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
              as overdue. Fresh hints additionally get the "what's this?" explainer. -->
         <span
           v-if="isHintRow"
-          class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:px-2.5 md:text-xs"
+          class="font-outfit dark:text-accent-lift inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:px-2.5 md:text-xs"
         >
           {{ hintEmoji }} {{ t('todo.hint.badge')
           }}<template v-if="hintEventLabel">, {{ hintEventLabel }}</template>
@@ -199,7 +199,7 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
         <!-- Due today badge — tinted pill (the card's outlined glow does the heavy lifting) -->
         <span
           v-else-if="!isHintRow && formattedDate && isDueToday"
-          class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:gap-1.5 md:px-2.5 md:text-xs"
+          class="font-outfit dark:text-accent-lift inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:gap-1.5 md:px-2.5 md:text-xs"
         >
           📅 {{ t('date.today') }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
         </span>

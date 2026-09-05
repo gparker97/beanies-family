@@ -184,7 +184,7 @@ function closeDetail(): void {
         :title="t('lists.shelf.completed')"
         :lists="completed"
         :bands="completedBands"
-        label-class="text-green-600"
+        label-class="text-green-600 dark:text-success-lift"
         collapsible
         @open="openList"
       />

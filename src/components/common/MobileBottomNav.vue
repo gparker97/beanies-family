@@ -199,7 +199,9 @@ watch(
       >
         <span class="calendar-hero" aria-hidden="true">{{ cat.emoji }}</span>
         <span class="text-xl leading-none opacity-0" aria-hidden="true">{{ cat.emoji }}</span>
-        <span class="calendar-label font-outfit text-primary-500 text-xs font-semibold">
+        <span
+          class="calendar-label font-outfit text-primary-500 dark:text-accent-lift text-xs font-semibold"
+        >
           {{ t(cat.labelKey) }}
         </span>
       </div>

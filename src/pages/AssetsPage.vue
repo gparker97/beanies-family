@@ -122,43 +122,47 @@ function getAssetTypeConfig(type: AssetType): {
   const configs: Record<AssetType, { bgColor: string; iconColor: string; darkBgColor: string }> = {
     real_estate: {
       bgColor: 'bg-sky-silk-100',
-      iconColor: 'text-primary-600',
+      iconColor: 'text-primary-600 dark:text-accent-lift',
       darkBgColor: 'dark:bg-primary-900/30',
     },
     vehicle: {
       bgColor: 'bg-purple-100',
-      iconColor: 'text-purple-600',
+      iconColor: 'text-purple-600 dark:text-purple-lift',
       darkBgColor: 'dark:bg-purple-900/30',
     },
     boat: {
       bgColor: 'bg-cyan-100',
-      iconColor: 'text-cyan-600',
+      iconColor: 'text-cyan-600 dark:text-silk-lift',
       darkBgColor: 'dark:bg-cyan-900/30',
     },
     jewelry: {
       bgColor: 'bg-amber-100',
-      iconColor: 'text-amber-600',
+      iconColor: 'text-amber-600 dark:text-terracotta-lift',
       darkBgColor: 'dark:bg-amber-900/30',
     },
     electronics: {
       bgColor: 'bg-slate-100',
-      iconColor: 'text-slate-600',
+      iconColor: 'text-slate-600 dark:text-ink-soft',
       darkBgColor: 'dark:bg-surface-overlay',
     },
     equipment: {
       bgColor: 'bg-orange-100',
-      iconColor: 'text-orange-600',
+      iconColor: 'text-orange-600 dark:text-terracotta-lift',
       darkBgColor: 'dark:bg-orange-900/30',
     },
-    art: { bgColor: 'bg-pink-100', iconColor: 'text-pink-600', darkBgColor: 'dark:bg-pink-900/30' },
+    art: {
+      bgColor: 'bg-pink-100',
+      iconColor: 'text-pink-600 dark:text-purple-lift',
+      darkBgColor: 'dark:bg-pink-900/30',
+    },
     collectible: {
       bgColor: 'bg-sky-silk-100',
-      iconColor: 'text-secondary-400',
+      iconColor: 'text-secondary-400 dark:text-ink-soft',
       darkBgColor: 'dark:bg-secondary-400/30',
     },
     other: {
       bgColor: 'bg-gray-100',
-      iconColor: 'text-gray-600',
+      iconColor: 'text-gray-600 dark:text-ink-soft',
       darkBgColor: 'dark:bg-surface-overlay',
     },
   };
@@ -289,7 +293,7 @@ const appreciationSubtitle = computed(() => {
         tint="green"
       >
         <template #icon>
-          <BeanieIcon name="building" size="md" class="text-[#27AE60]" />
+          <BeanieIcon name="building" size="md" class="dark:text-success-lift text-[#27AE60]" />
         </template>
       </SummaryStatCard>
 
@@ -332,7 +336,11 @@ const appreciationSubtitle = computed(() => {
           <BeanieIcon
             :name="totalAppreciation >= 0 ? 'trending-up' : 'trending-down'"
             size="md"
-            :class="totalAppreciation >= 0 ? 'text-[#27AE60]' : 'text-primary-500'"
+            :class="
+              totalAppreciation >= 0
+                ? 'dark:text-success-lift text-[#27AE60]'
+                : 'text-primary-500 dark:text-accent-lift'
+            "
           />
         </template>
       </SummaryStatCard>
@@ -462,8 +470,8 @@ const appreciationSubtitle = computed(() => {
                 class="font-outfit inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
                 :class="
                   getAppreciation(asset) >= 0
-                    ? 'bg-[var(--tint-success-10)] text-[#27AE60]'
-                    : 'text-primary-500 bg-[var(--tint-orange-8)]'
+                    ? 'dark:text-success-lift bg-[var(--tint-success-10)] text-[#27AE60]'
+                    : 'text-primary-500 dark:text-accent-lift bg-[var(--tint-orange-8)]'
                 "
               >
                 <span>{{ getAppreciation(asset) >= 0 ? '↑' : '↓' }}</span>
@@ -483,7 +491,7 @@ const appreciationSubtitle = computed(() => {
                 <span class="font-outfit dark:text-ink-soft text-xs font-semibold text-gray-500">{{
                   t('assets.equity')
                 }}</span>
-                <span class="font-outfit text-xs font-bold text-[#27AE60]"
+                <span class="font-outfit dark:text-success-lift text-xs font-bold text-[#27AE60]"
                   >{{ getEquityPercent(asset).toFixed(0) }}%</span
                 >
               </div>
@@ -504,11 +512,13 @@ const appreciationSubtitle = computed(() => {
                 <div class="flex items-center gap-2">
                   <span>💰</span>
                   <span
-                    class="font-outfit text-primary-500 text-xs font-semibold tracking-wide uppercase"
+                    class="font-outfit text-primary-500 dark:text-accent-lift text-xs font-semibold tracking-wide uppercase"
                     >{{ t('common.loanOutstanding') }}</span
                   >
                 </div>
-                <div class="font-outfit text-primary-500 text-lg font-extrabold">
+                <div
+                  class="font-outfit text-primary-500 dark:text-accent-lift text-lg font-extrabold"
+                >
                   <CurrencyAmount
                     :amount="asset.loan.outstandingBalance"
                     :currency="asset.currency"
@@ -630,7 +640,7 @@ const appreciationSubtitle = computed(() => {
                           size="sm"
                         />
                       </span>
-                      <span class="text-primary-500 text-xs font-semibold">{{
+                      <span class="text-primary-500 dark:text-accent-lift text-xs font-semibold">{{
                         t('action.view')
                       }}</span>
                     </span>

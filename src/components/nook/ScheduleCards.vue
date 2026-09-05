@@ -183,7 +183,7 @@ function handleClick(item: ScheduleItem) {
     >
       <template #header-right>
         <span
-          class="rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[#3A7BAD]"
+          class="dark:text-ink-soft rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[#3A7BAD]"
         >
           {{ todayFormatted }}
         </span>
@@ -230,7 +230,7 @@ function handleClick(item: ScheduleItem) {
       <template #header-right>
         <router-link
           to="/activities"
-          class="text-primary-500 text-xs font-semibold hover:underline"
+          class="text-primary-500 dark:text-accent-lift text-xs font-semibold hover:underline"
         >
           {{ t('nook.fullCalendar') }} &rarr;
         </router-link>
@@ -277,7 +277,7 @@ function handleClick(item: ScheduleItem) {
         <router-link
           v-if="hasMoreWeekItems"
           to="/activities"
-          class="text-primary-500 font-outfit mt-1 block text-center text-xs font-semibold hover:underline"
+          class="text-primary-500 dark:text-accent-lift font-outfit mt-1 block text-center text-xs font-semibold hover:underline"
         >
           +{{ hiddenWeekCount }} {{ t('nook.moreItems') }} &rarr;
         </router-link>

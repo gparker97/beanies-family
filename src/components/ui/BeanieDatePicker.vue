@@ -285,7 +285,7 @@ const isTomorrowDisabled = computed(() => {
       class="font-outfit dark:text-ink-soft block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
     >
       {{ label }}
-      <span v-if="required" class="text-primary-500">*</span>
+      <span v-if="required" class="text-primary-500 dark:text-accent-lift">*</span>
     </label>
 
     <!-- Trigger: bean-pill, mirrors TimePresetPicker -->
@@ -428,7 +428,7 @@ const isTomorrowDisabled = computed(() => {
               class="font-outfit text-center text-[0.625rem] font-bold tracking-wider text-[var(--color-text-muted)] uppercase opacity-60"
               :class="
                 ((i + weekStart) % 7 === 0 || (i + weekStart) % 7 === 6) &&
-                'text-primary-500 opacity-70'
+                'text-primary-500 dark:text-accent-lift'
               "
             >
               {{ d }}
@@ -494,7 +494,7 @@ const isTomorrowDisabled = computed(() => {
             <button
               v-if="formatMonthYearShort(viewMonth) !== formatMonthYearShort(today)"
               type="button"
-              class="font-outfit text-primary-500 hover:text-primary-600 text-xs font-semibold transition-colors"
+              class="font-outfit text-primary-500 dark:text-accent-lift hover:text-primary-600 text-xs font-semibold transition-colors"
               @click="goToToday"
             >
               {{ t('date.jumpToToday') }}

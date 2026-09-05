@@ -382,12 +382,12 @@ function cancelEditFamilyName() {
             <input
               v-model="editFamilyName"
               type="text"
-              class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 dark:border-line-strong dark:bg-surface-raised w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none sm:w-48 sm:flex-initial"
+              class="font-outfit text-primary-500 dark:text-accent-lift focus:border-primary-500 focus:ring-primary-500 dark:border-line-strong dark:bg-surface-raised w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none sm:w-48 sm:flex-initial"
               @keyup.enter="saveFamilyName"
               @keyup.escape="cancelEditFamilyName"
             />
             <button
-              class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+              class="dark:text-success-lift rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
               @click="saveFamilyName"
             >
               <BeanieIcon name="check" size="md" />
@@ -476,7 +476,7 @@ function cancelEditFamilyName() {
             <router-link
               v-if="recentSayings.length > 0"
               to="/pod/scrapbook"
-              class="font-inter text-primary-500 text-xs font-semibold hover:underline"
+              class="font-inter text-primary-500 dark:text-accent-lift text-xs font-semibold hover:underline"
             >
               {{ t('family.hub.recentSayings.viewAll') }}
             </router-link>
@@ -513,26 +513,20 @@ function cancelEditFamilyName() {
 
         <!-- Cookbook strip — kraft-paper backdrop -->
         <section
-          class="rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)]"
-          style="
-            background-image:
-              linear-gradient(135deg, rgb(44 62 80 / 4%) 0%, transparent 60%),
-              linear-gradient(to bottom right, #f4e4c1, #e8d4a8);
-          "
+          class="kraft-band kraft-band-cookbook rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)]"
         >
           <div class="mb-4 flex items-baseline justify-between gap-2">
             <div>
-              <h2 class="font-outfit text-base font-bold" style="color: #5a4a2a">
+              <h2 class="font-outfit dark:text-ink text-base font-bold text-[#5a4a2a]">
                 {{ t('family.hub.cookbook.title') }}
               </h2>
-              <p class="font-caveat mt-0.5 text-sm" style="color: #8a6a3a">
+              <p class="font-caveat dark:text-ink-soft mt-0.5 text-sm text-[#8a6a3a]">
                 {{ t('family.hub.cookbook.sub') }}
               </p>
             </div>
             <router-link
               to="/pod/cookbook"
-              class="font-inter text-xs font-semibold hover:underline"
-              style="color: #5a4a2a"
+              class="font-inter dark:text-ink text-xs font-semibold text-[#5a4a2a] hover:underline"
             >
               {{ t('family.hub.cookbook.open') }}
             </router-link>
@@ -542,10 +536,10 @@ function cancelEditFamilyName() {
               v-for="recipe in railRecipes"
               :key="recipe.id"
               :to="`/pod/cookbook/${recipe.id}`"
-              class="group flex w-36 flex-shrink-0 snap-start flex-col overflow-hidden rounded-[14px] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              class="group dark:bg-surface-raised flex w-36 flex-shrink-0 snap-start flex-col overflow-hidden rounded-[14px] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
               <div
-                class="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-[#fff5e8] to-[#ffe4d6]"
+                class="dark:from-surface-overlay dark:to-surface-hover relative aspect-square w-full overflow-hidden bg-gradient-to-br from-[#fff5e8] to-[#ffe4d6]"
               >
                 <img
                   v-if="thumbForRecipe(recipe.id)"
@@ -555,14 +549,15 @@ function cancelEditFamilyName() {
                 />
                 <div
                   v-else
-                  class="font-caveat flex h-full w-full items-center justify-center text-center text-xs"
-                  style="color: #8a6a3a"
+                  class="font-caveat dark:text-ink-soft flex h-full w-full items-center justify-center text-center text-xs text-[#8a6a3a]"
                 >
                   {{ t('family.hub.cookbook.noPhoto') }}
                 </div>
               </div>
               <div class="px-2.5 py-2">
-                <h3 class="font-outfit truncate text-[0.8125rem] font-bold" style="color: #2c3e50">
+                <h3
+                  class="font-outfit dark:text-ink truncate text-[0.8125rem] font-bold text-[#2c3e50]"
+                >
                   {{ recipe.name }}
                 </h3>
               </div>
@@ -570,8 +565,7 @@ function cancelEditFamilyName() {
             <button
               v-if="canManagePod"
               type="button"
-              class="font-inter flex w-36 flex-shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed p-3 text-center text-xs font-semibold transition-colors hover:bg-white/40"
-              style="border-color: rgb(90 74 42 / 30%); color: #5a4a2a"
+              class="font-inter dark:border-line-strong dark:text-ink-soft flex w-36 flex-shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed border-[rgb(90_74_42_/_30%)] p-3 text-center text-xs font-semibold text-[#5a4a2a] transition-colors hover:bg-white/40"
               @click="router.push('/pod/cookbook?add=1')"
             >
               <span class="text-2xl leading-none" aria-hidden="true">+</span>
@@ -588,7 +582,9 @@ function cancelEditFamilyName() {
           class="rounded-[var(--sq)] p-4 shadow-[var(--card-shadow)]"
           style="background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(230 126 34 / 4%))"
         >
-          <div class="nook-section-label mb-3 flex items-center gap-1.5 text-[#F15D22]">
+          <div
+            class="nook-section-label dark:text-accent-lift mb-3 flex items-center gap-1.5 text-[#F15D22]"
+          >
             <span aria-hidden="true">⚠️</span>
             <span>{{ t('family.hub.sidebar.allergies') }}</span>
           </div>
@@ -600,8 +596,8 @@ function cancelEditFamilyName() {
                   a.severity === 'severe'
                     ? 'bg-[#F15D22] text-white'
                     : a.severity === 'moderate'
-                      ? 'bg-[#E67E22]/20 text-[#B5591A]'
-                      : 'bg-[#AED6F1]/30 text-[#1E5A85]'
+                      ? 'dark:text-terracotta-lift bg-[#E67E22]/20 text-[#B5591A]'
+                      : 'dark:text-silk-lift bg-[#AED6F1]/30 text-[#1E5A85]'
                 "
               >
                 {{ a.severity }}
@@ -624,7 +620,7 @@ function cancelEditFamilyName() {
           <router-link
             v-if="totalAllergies > sidebarAllergies.length"
             to="/pod/safety"
-            class="font-outfit mt-3 inline-flex text-xs font-semibold text-[#F15D22] hover:underline"
+            class="font-outfit dark:text-accent-lift mt-3 inline-flex text-xs font-semibold text-[#F15D22] hover:underline"
           >
             {{
               t('family.hub.sidebar.viewAllAllergies').replace('{count}', String(totalAllergies))
@@ -637,7 +633,9 @@ function cancelEditFamilyName() {
           class="rounded-[var(--sq)] p-4 shadow-[var(--card-shadow)]"
           style="background: linear-gradient(135deg, rgb(174 214 241 / 30%), rgb(174 214 241 / 8%))"
         >
-          <div class="nook-section-label mb-3 flex items-center gap-1.5 text-[#1E5A85]">
+          <div
+            class="nook-section-label dark:text-silk-lift mb-3 flex items-center gap-1.5 text-[#1E5A85]"
+          >
             <span aria-hidden="true">💊</span>
             <span>{{ t('family.hub.sidebar.todaysCare') }}</span>
           </div>
@@ -663,7 +661,7 @@ function cancelEditFamilyName() {
               sidebarMedications.length > 0 && totalActiveMedications > sidebarMedications.length
             "
             to="/pod/safety"
-            class="font-outfit mt-3 inline-flex text-xs font-semibold text-[#1E5A85] hover:underline"
+            class="font-outfit dark:text-silk-lift mt-3 inline-flex text-xs font-semibold text-[#1E5A85] hover:underline"
           >
             {{
               t('family.hub.sidebar.viewAllMeds').replace('{count}', String(totalActiveMedications))

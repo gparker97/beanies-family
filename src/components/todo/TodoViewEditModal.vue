@@ -304,7 +304,7 @@ async function handleDelete() {
               @keydown="handleTitleKeydown"
             />
             <button
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
+              class="dark:text-purple-lift flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
               @click.stop="saveField('title')"
             >
               <svg
@@ -376,7 +376,7 @@ async function handleDelete() {
             </span>
             <span
               v-else-if="viewFormattedDate && viewIsDueToday"
-              class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-orange-15)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-500)]"
+              class="font-outfit dark:text-accent-lift inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-orange-15)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-500)]"
             >
               {{ t('date.today') }}
               <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
@@ -398,7 +398,7 @@ async function handleDelete() {
                 <BeanieDatePicker v-model="draftDueDate" />
               </div>
               <button
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                class="dark:text-purple-lift flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
                 @click.stop="saveField('dueDate')"
               >
                 <svg
@@ -517,7 +517,7 @@ async function handleDelete() {
                   Ctrl+Enter {{ t('modal.toSave') }}
                 </span>
                 <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                  class="dark:text-purple-lift flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
                   @click.stop="saveField('description')"
                 >
                   <svg
@@ -600,7 +600,7 @@ async function handleDelete() {
       <button
         v-else
         type="button"
-        class="font-outfit flex flex-1 items-center justify-center gap-2 rounded-[16px] py-3.5 text-sm font-semibold text-purple-600 transition-colors hover:bg-purple-50 active:bg-purple-100 dark:hover:bg-purple-900/20"
+        class="font-outfit dark:text-purple-lift flex flex-1 items-center justify-center gap-2 rounded-[16px] py-3.5 text-sm font-semibold text-purple-600 transition-colors hover:bg-purple-50 active:bg-purple-100 dark:hover:bg-purple-900/20"
         @click="handleToggleComplete"
       >
         {{ t('todo.reopenTask') }}

@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-05
+
+### Fixed
+
+- **Text that had gone unreadable after dark is readable again.** The family scrapbook header and the family note on a recipe were showing white writing on a pale yellow banner, which is as unreadable as it sounds (it measured 1.01 to 1, where 4.5 is the readable floor). The cause was the previous dark mode pass: it changed the colour of the writing without changing the paper underneath, so anything sitting on a hand painted pastel kept its daytime background and lost its words. Every surface like that has been found and given a proper after dark partner. The sticky notes on a bean's page now dim like paper rather than glowing like stickers, and the milestones page header had the same fault and is fixed too.
+- **Around a hundred and twenty coloured labels, links, figures and icons were too faint to read after dark.** Orange, green, purple and blue text kept its daytime shade against a dark background. That reads as washed out rather than missing, so it survived every look at a screenshot while still failing anyone actually reading it. All of it now lifts to a lighter shade after sunset.
+- **Several controls were close to invisible after dark**, among them the Back and Skip buttons in the setup wizard, a number of onboarding labels and hints, the loading captions, and an unlink button. Each had been softened with transparency, which stacks against a dark background instead of gently fading.
+- Three pieces of dark mode styling had never once worked, because a fault in each rule made the browser throw the whole thing away.
+- Blue text after dark had been picked by hand a colour at a time, fourteen different ways, three of them too dark to read. Sky Silk, one of the five brand colours, now has a proper after dark shade of its own.
+
 ## 2026-09-04
 
 ### Added

@@ -152,10 +152,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
     <!-- Hero header — kept from previous design (multicolor kraft band
          with 📖 watermark). The "+ Add to scrapbook" button stays here. -->
     <header
-      class="relative mb-5 overflow-hidden rounded-[var(--sq)] px-5 py-5 sm:px-8 sm:py-7"
-      style="
-        background: linear-gradient(135deg, #fff7c8 0%, #ffe4d6 40%, #d4f1f4 80%, #e8f5e8 100%);
-      "
+      class="kraft-band kraft-band-scrapbook relative mb-5 overflow-hidden rounded-[var(--sq)] px-5 py-5 sm:px-8 sm:py-7"
     >
       <span
         class="pointer-events-none absolute top-3 right-7 text-[8.125rem] opacity-10"
@@ -179,7 +176,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
           >
             {{ t('scrapbook.title') }}
           </h1>
-          <p class="font-caveat mt-1 text-xl font-medium text-[#E67E22]">
+          <p class="font-caveat dark:text-terracotta-lift mt-1 text-xl font-medium text-[#E67E22]">
             {{ t('scrapbook.subtitle') }}
           </p>
         </div>

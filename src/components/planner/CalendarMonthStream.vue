@@ -361,7 +361,9 @@ defineExpose({ anchorTo });
           class="flex items-center gap-2.5 px-1 pt-5 pb-1.5"
           :class="monthIdx === 0 ? 'pt-1' : ''"
         >
-          <span class="font-outfit text-primary-500 text-base font-bold lowercase">
+          <span
+            class="font-outfit text-primary-500 dark:text-accent-lift text-base font-bold lowercase"
+          >
             {{ month.label }}
           </span>
           <span
@@ -376,7 +378,7 @@ defineExpose({ anchorTo });
             class="flex items-center gap-2 px-1 pt-1 pb-0.5"
             :class="
               weekMeta(month, cell)?.isCurrent
-                ? 'text-primary-500'
+                ? 'text-primary-500 dark:text-accent-lift'
                 : 'text-secondary-500/50 dark:text-ink-faint'
             "
           >

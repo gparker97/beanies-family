@@ -641,7 +641,7 @@ async function deleteCompletedGoal(id: string) {
           {{ t('goals.achievedGoals') }}
         </span>
         <span
-          class="font-outfit rounded-full bg-[var(--tint-success-10)] px-2.5 py-0.5 text-xs font-semibold text-[#27AE60]"
+          class="font-outfit dark:text-success-lift rounded-full bg-[var(--tint-success-10)] px-2.5 py-0.5 text-xs font-semibold text-[#27AE60]"
         >
           {{ goalsStore.filteredCompletedGoals.length }}
         </span>
@@ -843,6 +843,12 @@ async function deleteCompletedGoal(id: string) {
 .goal-encouragement-warm {
   color: var(--heritage-orange);
   font-weight: 600;
+}
+
+/* `--heritage-orange` is not redefined for dark, so the warm encouragement
+   line would stay #F15D22 (3.61:1) on the dark ground. Lift it. */
+html.dark .goal-encouragement-warm {
+  color: #ff8b5e;
 }
 
 /* ───── Milestone Dots ───── */

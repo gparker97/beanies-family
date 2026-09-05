@@ -163,7 +163,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
           <button
             v-if="!showCustomInput"
             type="button"
-            class="font-outfit text-primary-500 hover:bg-primary-500/5 w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition-colors"
+            class="font-outfit text-primary-500 dark:text-accent-lift hover:bg-primary-500/5 w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition-colors"
             :class="isCustomTime ? 'dark:bg-primary-500/15 bg-[var(--tint-orange-8)]' : ''"
             @click="openCustom"
           >

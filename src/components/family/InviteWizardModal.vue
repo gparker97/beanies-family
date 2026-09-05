@@ -271,7 +271,11 @@ function handleClose() {
             />
             <span
               class="font-outfit text-xs font-semibold tracking-[0.08em] uppercase transition-colors"
-              :class="currentStep === 1 ? 'text-[var(--color-primary)]' : 'text-[#E67E22]'"
+              :class="
+                currentStep === 1
+                  ? 'dark:text-accent-lift text-[var(--color-primary)]'
+                  : 'dark:text-terracotta-lift text-[#E67E22]'
+              "
             >
               {{ t('inviteWizard.step1.label') }}
             </span>
@@ -299,7 +303,11 @@ function handleClose() {
             />
             <span
               class="font-outfit text-xs font-semibold tracking-[0.08em] uppercase transition-colors"
-              :class="currentStep === 2 ? 'text-[var(--color-primary)]' : 'text-gray-400'"
+              :class="
+                currentStep === 2
+                  ? 'dark:text-accent-lift text-[var(--color-primary)]'
+                  : 'dark:text-ink-faint text-gray-400'
+              "
             >
               {{ t('inviteWizard.step2.label') }}
             </span>
@@ -346,7 +354,7 @@ function handleClose() {
         <button
           v-if="showChangeLink"
           type="button"
-          class="font-outfit dark:bg-surface-raised ml-auto rounded-full border border-[var(--color-primary)]/25 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--tint-orange-8)]"
+          class="font-outfit dark:bg-surface-raised dark:text-accent-lift ml-auto rounded-full border border-[var(--color-primary)]/25 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--tint-orange-8)]"
           data-testid="invite-wizard-change"
           @click="changeRecipient"
         >
@@ -371,8 +379,12 @@ function handleClose() {
           class="flex items-start gap-2.5 rounded-xl border border-[#AED6F1]/50 bg-[#AED6F1]/15 px-3.5 py-3"
           data-testid="invite-wizard-no-email-chip"
         >
-          <BeanieIcon name="alert-circle" size="sm" class="mt-0.5 flex-shrink-0 text-[#1E5A85]" />
-          <p class="text-sm leading-relaxed text-[#1E5A85]">
+          <BeanieIcon
+            name="alert-circle"
+            size="sm"
+            class="dark:text-ink mt-0.5 flex-shrink-0 text-[#1E5A85]"
+          />
+          <p class="dark:text-ink text-sm leading-relaxed text-[#1E5A85]">
             {{ noEmailChipMessage }}
           </p>
         </div>
@@ -387,7 +399,7 @@ function handleClose() {
             data-testid="invite-wizard-child-hint-toggle"
           >
             <span
-              class="text-[0.625rem] text-[var(--color-primary)] transition-transform group-open:rotate-90"
+              class="dark:text-accent-lift text-[0.625rem] text-[var(--color-primary)] transition-transform group-open:rotate-90"
               aria-hidden="true"
               >▸</span
             >
@@ -420,9 +432,9 @@ function handleClose() {
         <BeanieIcon
           name="alert-circle"
           size="sm"
-          class="mt-0.5 flex-shrink-0 text-[var(--color-primary)]"
+          class="dark:text-accent-lift mt-0.5 flex-shrink-0 text-[var(--color-primary)]"
         />
-        <div class="flex-1 text-sm text-[var(--color-primary)]">
+        <div class="dark:text-accent-lift flex-1 text-sm text-[var(--color-primary)]">
           {{ error.message }}
         </div>
         <button
@@ -461,7 +473,7 @@ function handleClose() {
         </span>
         <span class="dark:text-ink-soft text-sm leading-relaxed font-medium text-gray-700">
           <span
-            class="dark:bg-surface-raised rounded-md border border-[var(--color-primary)]/30 bg-white px-1.5 py-0.5 font-semibold text-[var(--color-primary)]"
+            class="dark:bg-surface-raised dark:text-accent-lift rounded-md border border-[var(--color-primary)]/30 bg-white px-1.5 py-0.5 font-semibold text-[var(--color-primary)]"
           >
             {{ trimmedEmail }}
           </span>
@@ -525,7 +537,7 @@ function handleClose() {
           @click="faqOpen = !faqOpen"
         >
           <span
-            class="text-[var(--color-primary)] transition-transform"
+            class="dark:text-accent-lift text-[var(--color-primary)] transition-transform"
             :class="faqOpen ? 'rotate-90' : ''"
             >›</span
           >
@@ -618,7 +630,9 @@ function handleClose() {
       >
         <p class="font-outfit text-secondary-500 dark:text-ink mb-3 text-sm font-semibold">
           {{ t('inviteWizard.step2.qr.title') }}
-          <span class="font-caveat ml-1 text-base text-[var(--color-primary)]">
+          <span
+            class="font-caveat dark:text-accent-lift ml-1 text-base text-[var(--color-primary)]"
+          >
             {{ t('inviteWizard.step2.qr.accent') }}
           </span>
         </p>

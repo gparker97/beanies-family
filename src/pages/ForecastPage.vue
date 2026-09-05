@@ -176,12 +176,12 @@ const features = [
         </div>
 
         <!-- Heading -->
-        <h2 class="font-headline text-secondary-500 text-xl font-bold dark:text-[#ECF0F1]">
+        <h2 class="font-headline text-secondary-500 dark:text-ink text-xl font-bold">
           {{ t('forecast.comingSoon') }}
         </h2>
 
         <!-- Description -->
-        <p class="text-secondary-500/60 mx-auto mt-2 max-w-sm text-sm dark:text-[#BDC3C7]">
+        <p class="text-secondary-500/60 dark:text-ink-faint mx-auto mt-2 max-w-sm text-sm">
           {{ t('forecast.comingSoonDescription') }}
         </p>
 
@@ -193,7 +193,7 @@ const features = [
               alt=""
               class="h-6 w-6 flex-shrink-0"
             />
-            <span class="text-secondary-500 text-sm dark:text-[#ECF0F1]">
+            <span class="text-secondary-500 dark:text-ink text-sm">
               {{ t(feature) }}
             </span>
           </li>

@@ -91,7 +91,7 @@ const { t } = useTranslation();
    wrap adds minor visual variance but never doubles up. Acceptable
    for a 2–4 stat ribbon. */
 
-html.dark .about-cell:not(:first-child::before) {
+html.dark .about-cell:not(:first-child)::before {
   background: rgb(255 255 255 / 8%);
 }
 </style>

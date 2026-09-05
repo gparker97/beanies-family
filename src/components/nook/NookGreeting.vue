@@ -35,14 +35,17 @@ const captionParts = computed(() => {
 <template>
   <div>
     <h1 class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-bold">
-      {{ greetingParts.before }}<span class="text-primary-500">{{ memberName }}</span
+      {{ greetingParts.before
+      }}<span class="text-primary-500 dark:text-accent-lift">{{ memberName }}</span
       >{{ greetingParts.after }}
     </h1>
     <!-- Compact (mobile/tablet): date inline as part of the section caption.
          The compact AppHeader skips the date; this is the single anchor. -->
     <p v-if="!isDesktop" class="text-secondary-500/55 dark:text-ink-soft mt-1 text-sm">
       {{ captionParts.before
-      }}<span class="font-outfit text-primary-500 font-semibold">{{ todayDate }}</span
+      }}<span class="font-outfit text-primary-500 dark:text-accent-lift font-semibold">{{
+        todayDate
+      }}</span
       >{{ captionParts.after }}
     </p>
     <!-- Desktop: header already carries the date — body caption is just the descriptor. -->

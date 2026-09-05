@@ -207,7 +207,11 @@ onUnmounted(() => {
             <span class="text-[var(--color-text-muted)]">{{ t('saveStatus.connection') }}</span>
             <span
               class="font-outfit font-medium"
-              :class="isDegraded ? 'text-[#F15D22]' : 'text-[#1F8F5F]'"
+              :class="
+                isDegraded
+                  ? 'dark:text-accent-lift text-[#F15D22]'
+                  : 'dark:text-success-lift text-[#1F8F5F]'
+              "
             >
               {{ isDegraded ? t('saveStatus.reconnecting') : t('saveStatus.connected') }}
             </span>
@@ -224,7 +228,7 @@ onUnmounted(() => {
           class="mt-2.5 rounded-xl px-2.5 py-2 text-xs"
           :class="
             isDegraded
-              ? 'bg-[var(--tint-orange-8)] text-[#A8461B]'
+              ? 'dark:text-accent-lift bg-[var(--tint-orange-8)] text-[#A8461B]'
               : 'bg-[var(--tint-silk-10)] text-[var(--color-text-muted)]'
           "
         >

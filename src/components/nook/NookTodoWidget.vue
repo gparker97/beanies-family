@@ -83,11 +83,14 @@ async function toggleComplete(todoId: string) {
     <template #header-right>
       <div class="flex items-center gap-2">
         <span
-          class="rounded-full bg-[rgba(155,89,182,0.12)] px-2 py-0.5 text-xs font-semibold text-[#9B59B6]"
+          class="dark:text-purple-lift rounded-full bg-[rgba(155,89,182,0.12)] px-2 py-0.5 text-xs font-semibold text-[#9B59B6]"
         >
           {{ t('nook.openCount').replace('{count}', String(openCount)) }}
         </span>
-        <router-link to="/todo" class="text-primary-500 text-xs font-medium hover:underline">
+        <router-link
+          to="/todo"
+          class="text-primary-500 dark:text-accent-lift text-xs font-medium hover:underline"
+        >
           {{ t('nook.viewAll') }} &rarr;
         </router-link>
       </div>

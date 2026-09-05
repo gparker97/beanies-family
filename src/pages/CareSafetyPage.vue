@@ -249,7 +249,7 @@ function openMedication(m: Medication): void {
         <div class="flex flex-shrink-0 items-center gap-3">
           <button
             type="button"
-            class="font-outfit text-primary-500 text-xs font-semibold hover:underline"
+            class="font-outfit text-primary-500 dark:text-accent-lift text-xs font-semibold hover:underline"
             @click="router.push('/pod/contacts')"
           >
             {{ t('careSafety.keyContacts.cta') }}

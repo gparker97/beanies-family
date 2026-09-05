@@ -118,7 +118,14 @@ async function handleSavePassphrase() {
       <p class="dark:text-ink-soft mb-3 text-sm text-gray-600">
         {{ t('recovery.kitDescription') }}
       </p>
-      <p class="mb-3 text-xs" :class="kitCount === 0 ? 'text-[#F15D22]' : 'text-gray-500'">
+      <p
+        class="mb-3 text-xs"
+        :class="
+          kitCount === 0
+            ? 'dark:text-accent-lift text-[#F15D22]'
+            : 'dark:text-ink-faint text-gray-500'
+        "
+      >
         {{
           kitCount === 0
             ? t('recovery.kitNone')

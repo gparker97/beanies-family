@@ -291,7 +291,7 @@ const transitionName = computed(() =>
 }
 
 .dark .ob-container {
-  background: #1a252f;
+  background: #151e27;
 }
 
 @media (width >= 640px) {
@@ -330,7 +330,7 @@ const transitionName = computed(() =>
 }
 
 .dark .ob-content {
-  background: linear-gradient(180deg, #1a252f 0%, #1e3040 100%);
+  background: linear-gradient(180deg, #151e27 0%, #1e2a36 100%);
 }
 
 @media (width >= 640px) {
@@ -351,7 +351,7 @@ const transitionName = computed(() =>
 }
 
 .dark .ob-nav {
-  background: #1a252f;
+  background: #151e27;
   border-top-color: rgb(255 255 255 / 6%);
 }
 
@@ -364,33 +364,31 @@ const transitionName = computed(() =>
 .ob-nav-back {
   background: none;
   border: none;
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 55%);
   cursor: pointer;
   font-family: Outfit, sans-serif;
   font-size: 0.78rem;
   font-weight: 500;
-  opacity: 0.35;
   padding: 12px 16px;
 }
 
-.dark .ob-nav-back {
+html.dark .ob-nav-back {
   color: #9aa9b4;
 }
 
 .ob-nav-skip {
   background: none;
   border: none;
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 55%);
   cursor: pointer;
   font-family: Outfit, sans-serif;
   font-size: 0.68rem;
   font-weight: 500;
-  opacity: 0.3;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.dark .ob-nav-skip {
+html.dark .ob-nav-skip {
   color: #9aa9b4;
 }
 

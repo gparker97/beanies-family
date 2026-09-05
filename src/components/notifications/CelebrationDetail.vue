@@ -251,6 +251,13 @@ html.dark .wn-content {
   background: #aed6f1;
 }
 
+/* The first bean is Deep Slate, which disappears against the dark card that
+   `html.dark .wn-content` paints. Kept after the light rules above so the
+   higher-specificity dark selector does not descend past them. */
+html.dark .wn-pod i:nth-child(1) {
+  background: #7a8a97;
+}
+
 .wn-sign {
   color: #5d6d7e;
   flex-shrink: 0;

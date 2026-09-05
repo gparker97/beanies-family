@@ -156,7 +156,7 @@ async function handleStart() {
 }
 
 .dark .ob-welcome {
-  background: linear-gradient(180deg, #1a252f 0%, #1e3040 100%);
+  background: linear-gradient(180deg, #151e27 0%, #1e2a36 100%);
 }
 
 .ob-welcome::before {
@@ -310,17 +310,16 @@ async function handleStart() {
 }
 
 .ob-subtitle {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 30%);
   font-family: Outfit, sans-serif;
   font-size: 0.62rem;
   font-style: italic;
   margin-top: 16px;
-  opacity: 0.3;
   position: relative;
   z-index: 1;
 }
 
-.dark .ob-subtitle {
+html.dark .ob-subtitle {
   color: #9aa9b4;
 }
 
@@ -344,15 +343,14 @@ async function handleStart() {
 }
 
 .ob-currency-label {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 50%);
   font-family: Outfit, sans-serif;
   font-size: 0.7rem;
   font-weight: 600;
   margin-bottom: 8px;
-  opacity: 0.5;
 }
 
-.dark .ob-currency-label {
+html.dark .ob-currency-label {
   color: #c3ced6;
 }
 
