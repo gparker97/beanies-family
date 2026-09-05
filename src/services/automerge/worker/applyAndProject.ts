@@ -20,10 +20,13 @@
 import * as Automerge from '@automerge/automerge';
 import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
+import { guardLineage, type LineageContext } from '@/services/sync/podLineage';
+import type { LineageBasis } from './protocol';
 import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
+  docLineage,
   migrateDoc,
   loadDoc,
   saveDoc,
@@ -658,38 +661,82 @@ export function noteRemoteBaseline(payload: string): void {
  * final chunk → post-merge readers (e.g. dedup) see the complete set. Persists the
  * merged doc to cache.
  */
+/**
+ * What this device can PROVE about its own document, from the basis main sent.
+ *
+ * Main owns the only fact the worker cannot see (what Drive HELD at the last
+ * durable baseline); the worker owns the only fact main cannot see at the
+ * instant it matters (what our document's heads are RIGHT NOW). Asking here
+ * closes a real window: answered on main before the RPC, a mutation landing in
+ * between yields a stale `clean` and therefore a wrong ADOPT that discards it.
+ */
+function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
+  if (basis.kind === 'user-file') return 'user-file';
+  // `no-local-document` never reaches here — the caller short-circuits on
+  // `!currentDoc` — but the arm is exhaustive so a future basis cannot slip
+  // through as an unconsidered default.
+  if (basis.kind === 'no-local-document') return 'clean';
+  // `null` heads means "we cannot prove what Drive held", which is `dirty` —
+  // the fail-safe direction, since it never adopts over unsynced work.
+  if (basis.heads === null) return 'dirty';
+  return headsEqual(basis.heads, headsOf(doc)) ? 'clean' : 'dirty';
+}
+
 export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   id: string | null,
-  adopt = false
-): Promise<{ heads: Heads; dirty: boolean; changed: boolean; remoteHeads: Heads }> {
+  basis: LineageBasis
+): Promise<{
+  action: 'merged' | 'adopted' | 'kept-local';
+  heads: Heads;
+  dirty: boolean;
+  changed: boolean;
+  remoteHeads: Heads;
+}> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
     perf_doc_bytes: envelope.encryptedPayload.length,
   });
-  // ⚠️ ADOPT DROPS *HERE*, INSIDE THE SAME RPC, AND ONLY AFTER THE DECRYPT.
+  // ⚠️ THE LINEAGE GUARD. THIS IS THE ONLY PLACE IT RUNS, AND IT RUNS HERE
+  // BECAUSE THIS IS THE ONLY PLACE BOTH DOCUMENTS EXIST.
   //
-  // It used to be a `dropDoc()` RPC on main followed by this one, which was
-  // documented as atomic and is not, in two directions:
-  //  • `mergeRemoteEnvelope` is RETRYABLE. A timeout respawns the worker, and
-  //    the rehydrator (`initAndLoadCache`) INSTALLS the cached OLD-lineage doc
-  //    before the retry lands — so the retry saw a `currentDoc` and took the
-  //    MERGE branch. A cross-lineage merge, persisted and pushed, which undoes
-  //    a compaction for the whole family.
-  //  • If the drop succeeded and this decrypt then threw (wrong key, OOM), the
-  //    worker held NO document for the rest of the session while the projection
-  //    still showed data: every edit threw `requireDoc`, every save failed.
-  // Dropping after the decrypt makes both impossible — a failure here leaves
-  // the old document installed, and a retry re-runs the drop from scratch.
-  // ⚠️ THE DROP ITSELF IS DEFERRED — see the `adopt ||` on the install below.
-  // Nulling `currentDoc` HERE was still before `headsOf(remote)` and before
-  // `migrateDoc(remote)`, which runs a real `Automerge.change` whenever the
-  // remote predates a collection. Either can throw on a low-memory device, and
-  // the worker was then left holding NO document for the session while main's
-  // projection still showed data: every mutate, save, getHeads and compactDoc
-  // failed. That is the second failure mode this fix exists to remove, and it
-  // breaks its own rule — the destructive half goes after the half that can
-  // fail, never before it.
+  // It used to run on MAIN, over the two ENVELOPES. That does not work: the
+  // envelope is maintained on three tracks independent of the document — the
+  // store's copy, the service's copy, and the worker's envelope cache, which
+  // `setEnvelope` writes on its own — so a device can hold the compacted file's
+  // stamp while its document is still the pre-compaction one. The guard then
+  // compared two envelopes that agreed, returned `same`, and permitted the merge
+  // it exists to prevent. Observed in the field, 2026-09-05.
+  //
+  // ⚠️ `!currentDoc` SHORT-CIRCUITS BEFORE THE BASIS IS READ. Deriving
+  // clean/dirty from a document that does not exist either throws or answers
+  // `dirty` (a null baseline is the common case on the path that gets here),
+  // and `adopt-remote` × `dirty` BLOCKS — so a device whose cache missed would
+  // be permanently unable to adopt a compacted pod. "There is no local document"
+  // is a fact this function can observe, and it outranks anything the caller
+  // asserted. The lineage question is moot when there is nothing to lose.
+  let installWholesale = !currentDoc;
+  if (currentDoc) {
+    const lineageCtx = lineageContextFor(basis, currentDoc);
+    // Throws `PodLineageError` on a block; every caller between here and the
+    // user dispatches on `isRemoteBlocker` FIRST, before any wrapping.
+    const act = guardLineage(docLineage(remote), docLineage(currentDoc), lineageCtx);
+    if (act === 'publish-local') {
+      // Our document is the newer lineage. Touch NOTHING — not the document,
+      // not the cursors, not the cache. The caller keeps its own document and
+      // publishes it; it must also NOT commit a Drive baseline for bytes we
+      // deliberately did not take.
+      return {
+        action: 'kept-local',
+        heads: headsOf(currentDoc),
+        dirty: true,
+        changed: false,
+        remoteHeads: headsOf(remote),
+      };
+    }
+    installWholesale = act === 'adopt';
+  }
+
   // #65: the heads of EXACTLY the bytes on Drive. Captured here, from the
   // UNMIGRATED decrypted doc (`decryptToDoc` does not migrate — see its doc
   // comment), before `migrateDoc`/`mergeDocs` can move anything. This is the
@@ -711,7 +758,7 @@ export async function mergeRemoteEnvelope(
   //    (guarded; falls back to full). Below the telemetry floor, not timed.
   // Do NOT convert other pushProjection callers (initAndLoadCache/loadSnapshot/
   // applyChanges) to deltas without the same diff+fallback guard.
-  if (adopt || !currentDoc) {
+  if (installWholesale) {
     // The adopt lands HERE, as a single assignment from an rvalue that is now
     // fully built: nothing between the decrypt and this line can leave the
     // worker document-less, and `resetDocCursors()` below is the drop's other
@@ -737,10 +784,21 @@ export async function mergeRemoteEnvelope(
     // the unmigrated remote's heads answers the real question: did adopting move
     // us past the file? When migrate is a no-op these are equal and the behaviour
     // is exactly as before.
-    return { heads, dirty: !headsEqual(remoteHeads, heads), changed: true, remoteHeads };
+    return {
+      action: 'adopted',
+      heads,
+      dirty: !headsEqual(remoteHeads, heads),
+      changed: true,
+      remoteHeads,
+    };
   }
 
+  // Non-null by construction: `installWholesale` is initialised to
+  // `!currentDoc`, and the branch above returns. Narrowed explicitly rather
+  // than asserted, so a future edit that breaks the invariant is a type error
+  // rather than a crash on a merge path.
   const local = currentDoc;
+  if (!local) throw new Error('mergeRemoteEnvelope: no document after the install branch');
   // Capture localHeads BEFORE the merge: `merged` contains local's full history,
   // so localHeads is a valid `diff` ancestor of merged.heads (getHeads returns a
   // value snapshot, so it survives the in-place merge that mutates `local`).
@@ -758,6 +816,7 @@ export async function mergeRemoteEnvelope(
   // Reuses the same `headsEqual` the persist path uses, against the localHeads
   // captured before the merge — so `changed` means precisely "our doc moved".
   return {
+    action: 'merged',
     heads: merged.heads,
     dirty: merged.dirty,
     changed: !headsEqual(localHeads, merged.heads),
@@ -941,8 +1000,26 @@ export function compactDoc(): {
   let compacted: Doc;
   try {
     const plain = Automerge.toJS(before) as unknown as Record<string, unknown>;
-    compacted = Automerge.from(plain, docInitOpts()) as Doc;
-    const differsAt = firstJsonDifference(plain, Automerge.toJS(compacted));
+    // The new identity, written INTO the document — see ADR-036. It travels
+    // with the history it describes and cannot drift from it, which is the whole
+    // reason this moved off the envelope. `docLineage` normalises the legacy
+    // absent case, so a first compaction reads `seq: 1`.
+    //
+    // ⚠️ STAMPED INTO THE SOURCE, not applied as a second `Automerge.change`
+    // afterwards. A separate change would leave the compacted document at TWO
+    // changes rather than one, in the tier whose entire point is that the
+    // rebuilt document is a single change; and it would force the verify below
+    // to run against an unstamped copy, so the check would no longer describe
+    // the bytes actually installed.
+    const source = {
+      ...plain,
+      podLineage: { id: crypto.randomUUID(), seq: (docLineage(before)?.seq ?? 0) + 1 },
+    };
+    compacted = Automerge.from(source, docInitOpts()) as Doc;
+    // Proves the rebuild round-tripped EXACTLY — including the stamp, which is
+    // the one field we deliberately changed and therefore the one worth
+    // confirming landed.
+    const differsAt = firstJsonDifference(source, Automerge.toJS(compacted));
     if (differsAt) {
       // The old doc is untouched — we never assigned `currentDoc`.
       throw new Error(`compaction changed the document at ${differsAt}`);
@@ -1055,7 +1132,7 @@ export async function dispatch(
         result: await mergeRemoteEnvelope(
           a.envelope as BeanpodFileV4,
           (a.familyId as string | null) ?? null,
-          a.adopt === true
+          a.basis as LineageBasis
         ),
       };
     case 'exportEncryptedPayload':

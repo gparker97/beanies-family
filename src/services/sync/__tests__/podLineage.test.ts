@@ -23,7 +23,7 @@ const L = (id: string, seq: number) => ({ id, seq });
 
 describe('compareLineage', () => {
   it('calls two absent lineages the same — that is the whole fleet today', () => {
-    expect(compareLineage(undefined, undefined)).toBe('same');
+    expect(compareLineage(null, null)).toBe('same');
   });
 
   it('calls equal ids the same regardless of seq', () => {
@@ -33,12 +33,12 @@ describe('compareLineage', () => {
   });
 
   it('adopts when the remote has been compacted and we have not', () => {
-    expect(compareLineage(L('a', 1), undefined)).toBe('adopt-remote');
+    expect(compareLineage(L('a', 1), null)).toBe('adopt-remote');
     expect(compareLineage(L('a', 2), L('b', 1))).toBe('adopt-remote');
   });
 
   it('is ours-newer when we hold a compaction the remote has not got', () => {
-    expect(compareLineage(undefined, L('a', 1))).toBe('ours-newer');
+    expect(compareLineage(null, L('a', 1))).toBe('ours-newer');
     expect(compareLineage(L('b', 1), L('a', 2))).toBe('ours-newer');
   });
 
@@ -90,9 +90,9 @@ describe('lineageAction — the policy table', () => {
 
 describe('guardLineage', () => {
   it('returns the action for every non-blocking case', () => {
-    expect(guardLineage(undefined, undefined, 'clean')).toBe('merge');
-    expect(guardLineage(L('a', 1), undefined, 'clean')).toBe('adopt');
-    expect(guardLineage(undefined, L('a', 1), 'clean')).toBe('publish-local');
+    expect(guardLineage(null, null, 'clean')).toBe('merge');
+    expect(guardLineage(L('a', 1), null, 'clean')).toBe('adopt');
+    expect(guardLineage(null, L('a', 1), 'clean')).toBe('publish-local');
   });
 
   it('THROWS a typed error carrying the verdict', () => {
@@ -113,7 +113,7 @@ describe('guardLineage', () => {
 
   it('never throws for a pod that has never been compacted', () => {
     for (const ctx of ['clean', 'dirty', 'user-file'] as LineageContext[]) {
-      expect(() => guardLineage(undefined, undefined, ctx)).not.toThrow();
+      expect(() => guardLineage(null, null, ctx)).not.toThrow();
     }
   });
 });

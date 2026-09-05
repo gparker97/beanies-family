@@ -38,6 +38,28 @@ export type ProjectionDelta =
   /** Several deltas applied together (one batch op, or a multi-collection merge). */
   | { kind: 'multi'; deltas: ProjectionDelta[] };
 
+/**
+ * What the caller can tell the worker about ITS OWN document's standing.
+ *
+ * ⚠️ REQUIRED, and exhaustive, so a merge cannot be reached without stating one.
+ * The old `adopt = false` boolean was a second entry point with a default, and a
+ * default is a decision nobody made.
+ *
+ * ⚠️ `no-local-document` is NOT a lineage verdict. Three store paths force a
+ * wholesale install because the worker may be holding a DIFFERENT family's
+ * document. If they said `user-file`, a `same` verdict would return `merge` and
+ * the remote would be CRDT-merged into a foreign family's document — durable
+ * cross-family corruption. Two orthogonal questions, two arms.
+ *
+ * ⚠️ `heads`, never a fingerprint string: `remoteBaseline.ts` is type-imported
+ * by worker code and must stay value-free so those imports are erased. Main
+ * decodes; the worker compares heads.
+ */
+export type LineageBasis =
+  | { kind: 'no-local-document' }
+  | { kind: 'user-file' }
+  | { kind: 'baseline'; heads: string[] | null };
+
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─
 
 export type MutationOp =

@@ -151,23 +151,28 @@ describe('every refusal leaves the pod untouched', () => {
 });
 
 describe('the happy path', () => {
-  it('caches the document BEFORE stamping the lineage', async () => {
-    // ⚠️ The ordering rule. `setEnvelope` persists the envelope cache eagerly,
-    // so stamping first would leave the cached envelope claiming a lineage the
-    // cached document is not on — and every subsequent open would read
-    // `ours-newer`, latch, and reproduce it forever.
+  it('does NOT stamp the envelope — the lineage lives in the DOCUMENT', async () => {
+    // ⚠️ THE DEFECT THIS REPLACES. `setEnvelope` persists the envelope cache
+    // eagerly and independently of the document cache, so a stamp here left the
+    // cached envelope claiming a lineage the cached document was not on. The
+    // guard then compared two envelopes that agreed while the documents did
+    // not, returned `same`, and permitted the cross-lineage merge it exists to
+    // prevent — observed in the field on 2026-09-05. `compactDoc` now writes
+    // the identity into the document itself, where it cannot drift.
     await usePodCompaction().compact();
-    const flushOrder = vi.mocked(docClient.flush).mock.invocationCallOrder[0]!;
-    const stampOrder = replaceEnvelope.mock.invocationCallOrder[0]!;
-    expect(flushOrder).toBeLessThan(stampOrder);
+    expect(docClient.compactDoc).toHaveBeenCalled();
+    for (const call of replaceEnvelope.mock.calls) {
+      expect(call[0]).not.toHaveProperty('podLineage');
+    }
   });
 
-  it('stamps a NEW lineage identity, and advances the sequence', async () => {
+  it('still flushes the rebuilt document before publishing it', async () => {
+    // The flush stays: a flushed but unpublished compaction is now
+    // self-describing in the cache, which is what makes the `ours-newer`
+    // recovery work by construction rather than by the ordering of two writes.
     await usePodCompaction().compact();
-    const stamped = replaceEnvelope.mock.calls[0]![0] as {
-      podLineage: { id: string; seq: number };
-    };
-    expect(stamped.podLineage.seq).toBe(1);
-    expect(stamped.podLineage.id).toMatch(/[0-9a-f-]{8,}/);
+    const flushOrder = vi.mocked(docClient.flush).mock.invocationCallOrder[0]!;
+    const publishOrder = syncNow.mock.invocationCallOrder.at(-1)!;
+    expect(flushOrder).toBeLessThan(publishOrder);
   });
 });

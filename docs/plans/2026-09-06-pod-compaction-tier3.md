@@ -650,6 +650,46 @@ be done."
 5. Acceptance: a test drives (a) all members current and (b) one stale member,
    and asserts the two different messages.
 
+### R7 — offer the fix at the moment the family needs it (the OOM surface)
+
+greg, 2026-09-06: "when any system hits an OOM error … one of the recovery
+options they are presented with is to compact their data file. it's still a
+manual trigger, but it's presented at exactly the time the family needs it."
+
+Right, and it needs one correction to be honest:
+
+⚠️ **THE DEVICE THAT HIT THE OOM IS THE ONE DEVICE THAT CANNOT COMPACT.**
+`compactDoc` calls `requireDoc`, and holds THREE copies at peak (`before`, the
+`toJS` plain object, the rebuilt `compacted`) — strictly MORE memory than an
+open. On the tablet that just failed to open, a compact button would fail too.
+Offering it there is a dead end dressed as a fix, which is the exact class of
+defect the wall PIN dialog was.
+
+So the recovery is two-sided, and both sides are new copy rather than new
+machinery:
+
+1. **On the device that FAILED** (`podTooLarge.inline`, and the fatal payload
+   overlay): name the fix and say WHERE it can happen — "your family file has
+   grown too large for this device. On a computer or another device that can
+   still open it, tidy the file in Settings; this device will then open it
+   normally." That converts today's dead end into an instruction. No button,
+   because no button can work here.
+2. **On a device that CAN open it**: the R3 due note already puts the button in
+   front of the person who can press it. The OOM path is the other end of the
+   same story, so the two must use the SAME wording for the action, and the due
+   threshold should treat "another device reported an OOM" as due regardless of
+   the byte threshold — a real failure outranks a heuristic.
+
+   ⚠️ That signal must come from the DOCUMENT, not from telemetry: a
+   `podTooLargeSeenAt` on the member's own row, written where R3.5 already
+   writes `lineageEpoch` on login, and read by `usePodHealth`. Telemetry cannot
+   reach another device, and a fleet-wide CloudWatch query is not something a
+   family's Settings page can ask.
+
+3. Acceptance: the OOM surface offers NO button on the failing device, names the
+   action, and a family with a device that reported an OOM reads as due on the
+   device that can act — asserted both ways.
+
 ## Order of work
 
 The demonstrated failure mode of this subsystem is the big batch: nine review
@@ -663,8 +703,8 @@ the previous round. So these stages ship and are verified independently.
 - **Stage 2 — R5 + R2.** UI weight and the safety copy. Neither touches the
   merge path, so neither can regress Stage 1. Flag still OFF.
 - **Stage 3 — R1.** The rebase. Flag still OFF.
-- **Stage 4 — R3 + R6.** Due note, gates, completion message. Only then is
-  enabling the flag on the table.
+- **Stage 4 — R3 + R6 + R7.** Due note, gates, completion message, and the OOM
+  surface's recovery copy. Only then is enabling the flag on the table.
 
 ## Important notes
 

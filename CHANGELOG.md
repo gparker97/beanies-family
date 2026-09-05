@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-06
+
+### Fixed
+
+- **beanies is much better at telling when two devices' copies of a family file cannot safely be combined.** The check that protects this had been looking at the wrong thing: a label kept alongside the file rather than the file's own history, and the two could drift apart. It now reads the history itself, in the one place both copies are open together, so it cannot be fooled.
+- **A device that cannot combine its changes now says so, and keeps saying so.** That warning used to be a message that faded after a few seconds, so it was easy to miss entirely. It is now a banner that stays until you dismiss it, and it appears on the beanie wall too.
+
 ## 2026-09-05
 
 ### Fixed

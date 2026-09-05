@@ -17,7 +17,8 @@ import {
   isRemoteBlocker,
   type RemoteBlocker,
 } from '@/types/sync';
-import { PodLineageError, guardLineage } from '@/services/sync/podLineage';
+import { PodLineageError } from '@/services/sync/podLineage';
+import type { LineageBasis } from '@/services/automerge/worker/protocol';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
@@ -40,6 +41,7 @@ import {
   encodeBaselinePayload,
   hasUnpushedChanges,
   headsFingerprint,
+  decodeHeadsFingerprint,
 } from './remoteBaseline';
 import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
@@ -1551,45 +1553,25 @@ async function fetchAndMergeRemote(): Promise<void> {
   // if this only ever merged-or-threw, every peer in the fleet would latch and
   // none would ever adopt.
   //
-  // The context is the #65 comparison that already exists, over the baseline
-  // this module already holds — no extra probe.
-  const lineageCtx = await docPushedAgainst(remoteBaseline?.headsFp ?? null);
-  // ⚠️ LATCH AT THE THROW. `guardLineage` throws OUTSIDE the try below, so a
-  // block armed nothing: the local-file poll watcher's `if (remoteBlocked)`
-  // gate stayed open and it re-downloaded, re-parsed and re-threw the whole
-  // multi-megabyte pod every tick, reporting a `local-file-polling` warning
-  // each time and telling the user nothing.
-  let lineageAct;
-  try {
-    lineageAct = guardLineage(remoteEnvelope.podLineage, currentEnvelope?.podLineage, lineageCtx);
-  } catch (e) {
-    if (e instanceof PodLineageError) noteLineageBlocked(e);
-    throw e;
-  }
-  if (lineageAct === 'publish-local') {
-    // We hold an unpublished compaction and the remote is on the older lineage.
-    // Do NOT merge and do NOT learn the marker: `doSave` should proceed to write
-    // our compacted document over it. (If the remote had actually moved, the
-    // guard would have returned `block` — see the policy table.)
-    return;
-  }
+  // The basis is the #65 baseline this module already holds — no extra probe.
+  // ⚠️ HEADS, not the fingerprint: `remoteBaseline.ts` is type-imported by the
+  // worker and must stay value-free, so main decodes and the worker compares.
+  const basis: LineageBasis = {
+    kind: 'baseline',
+    heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null),
+  };
 
-  // The worker decrypts + CRDT-merges the remote into its doc and returns
-  // heads-derived `dirty` (did local carry unsynced changes the converged doc
-  // must push back?). No suppressAutoSave bracket is needed — the worker doesn't
-  // fire a main persist callback; main decides when to save via `dirty`.
-  //
-  // `adopt` returns the SAME shape, so the baseline commit, `setEnvelope`, the
-  // latch clear and the `if (dirty)` tail below are all unchanged. Adopting
-  // after a genuine `changed` probe is sound for the reason the full-adopt
-  // branch already documents: the document installed IS the remote, so
-  // `remoteHeads` describes it exactly.
-  let merged: { dirty: boolean; remoteHeads: string[] | null };
+  // The worker decrypts, runs the LINEAGE GUARD (the only place both documents
+  // exist), then merges or adopts, and returns which it did. `adopted` returns
+  // the SAME shape as `merged`, so the baseline commit, `setEnvelope`, the latch
+  // clear and the `if (dirty)` tail below are all unchanged.
+  let merged: {
+    action: 'merged' | 'adopted' | 'kept-local';
+    dirty: boolean;
+    remoteHeads: string[] | null;
+  };
   try {
-    merged =
-      lineageAct === 'adopt'
-        ? await docClient.adoptRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId)
-        : await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
+    merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId, basis);
   } catch (e) {
     // ⚠️ THE MARKER MUST NOT BE LEARNED FOR A REMOTE WE COULD NOT READ.
     //
@@ -1599,8 +1581,16 @@ async function fetchAndMergeRemote(): Promise<void> {
     // early WITHOUT throwing — and the save that followed sailed past its own
     // refusal and overwrote the remote anyway. The refusal defended exactly one
     // save. Learning it only on success is what makes that guard mean anything.
-    if (e instanceof PayloadLoadError) {
-      noteRemoteUnreadable(e);
+    // ⚠️ BLOCKER FIRST, BEFORE ANY WRAPPING. The lineage guard now throws in
+    // the WORKER, so its `PodLineageError` arrives HERE rather than at a call
+    // site this function wraps itself. Without this arm it would fall into the
+    // `RemoteMergeError` wrap below, `backgroundSyncErrorKind` would read
+    // `'decrypt'` instead of `'lineage'`, and the banner that is the entire
+    // reason this guard is visible would never fire. Moving a throw moves its
+    // classification; every catch between the worker and the user is part of
+    // that change.
+    if (isRemoteBlocker(e)) {
+      noteRemoteBlocked(e);
       throw e;
     }
     // Anything else here fired AFTER the bytes were read: the download, the
@@ -1611,6 +1601,15 @@ async function fetchAndMergeRemote(): Promise<void> {
     const blocked = e instanceof RemoteMergeError ? e : new RemoteMergeError(e);
     noteMergeFailed(blocked);
     throw blocked;
+  }
+  if (merged.action === 'kept-local') {
+    // Our document is the NEWER lineage. Take the remote's KEY DICTS — declining
+    // its payload is a different decision from declining its keys, and this is
+    // the only path by which a remote-only wrapped key reaches us — then return
+    // WITHOUT learning the marker or committing a baseline. Recording Drive's
+    // heads for bytes we deliberately did not take is a false skip.
+    setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
+    return;
   }
   const { dirty, remoteHeads } = merged;
 

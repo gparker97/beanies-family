@@ -774,3 +774,28 @@ broken again in the very next pass, twice, so two of them get sharper:
     and merged across lineages. A retryable operation must be idempotent as a
     WHOLE, which means one RPC — and the destructive half (the drop) goes after
     the half that can fail (the decrypt), never before it.
+20. **A guard that compares METADATA is not a guard on the DATA.** The pod
+    lineage guard compared two envelopes, and the envelope is maintained on
+    three tracks independent of the document it describes — so a device held the
+    compacted file's stamp over a pre-compaction document, the guard read
+    "same", and it permitted the cross-lineage merge it exists to prevent.
+    Worse, the divergence was guaranteed rather than accidental:
+    `preserveLocalKeyDicts` spreads `...incoming`, so every envelope replacement
+    overwrote the local stamp with the remote's — including on the branch that
+    exists BECAUSE ours is newer. If a fact is a property of X, store it in X.
+    Storing it beside X, in a structure with its own lifecycle, means the two can
+    disagree, and the guard will believe the copy.
+21. **A rule enforced by a comment is not enforced.** Three separate "⚠️ if you
+    miss this it fails silently" notes in the Tier 3 draft became, on review, one
+    `NON_COLLECTION_KEYS` declaration that makes two of them COMPILE ERRORS, and
+    a `no-restricted-imports` rule that makes the third a lint error. The test
+    that had been guarding the same invariant sliced source on a delimiter
+    occurring zero times in the target file and asserted nothing while reporting
+    green. Prefer the compiler, then the linter, then a test — and if it must be
+    a test, verify the mutation fails for the RIGHT reason.
+22. **Moving a throw moves its classification.** Relocating `guardLineage` into
+    the worker routed its error through a catch that wraps every non-payload
+    throw in `RemoteMergeError`, which would have silently refiled every lineage
+    block as a merge failure and disabled the banner that made it visible at all.
+    When you move where something is raised, enumerate every catch between the
+    new site and the user; they are part of the change.

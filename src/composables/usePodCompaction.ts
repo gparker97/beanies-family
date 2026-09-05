@@ -34,7 +34,6 @@ import * as syncService from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { generateUUID } from '@/utils/id';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
 type RefusalCode = 'not-synced' | 'backup-not-delivered' | 'no-envelope' | 'no-permission';
@@ -133,11 +132,13 @@ export function usePodCompaction() {
 
       // 5-6. The only window where state has moved. See the ordering note above.
       try {
+        // ⚠️ NO ENVELOPE STAMP. `compactDoc` already wrote the new lineage
+        // INTO the document, so a flushed but unpublished compaction is
+        // self-describing in the cache and the `ours-newer → publish-local`
+        // recovery works by construction rather than by the ordering of two
+        // writes. That ordering — flush BEFORE the stamp — was the hazard, and
+        // it disappears with the step it was protecting.
         await docClient.flush();
-        syncStore.replaceEnvelope({
-          ...envelope,
-          podLineage: { id: generateUUID(), seq: (envelope.podLineage?.seq ?? 0) + 1 },
-        });
         if (!(await syncStore.syncNow(false))) throw new Error('publish failed');
       } catch (e) {
         // The one place a human should look. The recoverable state is a cached,

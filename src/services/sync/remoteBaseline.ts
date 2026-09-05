@@ -104,7 +104,36 @@ export interface DecodedBaseline {
  * module keeps its single type-only import (see the header note).
  */
 export function headsFingerprint(heads: readonly string[]): string {
+  // ⚠️ THIS MUST REMAIN A LOSSLESS ENCODING. `decodeHeadsFingerprint` below is
+  // its inverse, and the lineage guard depends on recovering the heads from a
+  // stored baseline row. Hashing this — which looks like an obvious tidy-up for
+  // a value only ever compared for equality — would silently disable the rebase
+  // fleet-wide with no failing test. The round-trip is pinned by a property
+  // test for exactly that reason.
   return heads.join(' ');
+}
+
+/**
+ * The inverse of `headsFingerprint`. `null` means "unusable — do not guess".
+ *
+ * Change hashes are 64-char lowercase hex and contain no spaces, so the join is
+ * reversible by construction. Anything else in the string means the row was
+ * written by a format this build does not understand, and the honest answer is
+ * "I cannot tell you what Drive held" rather than a plausible-looking guess:
+ * the guard reads `null` as `dirty`, which never adopts over unsynced work.
+ */
+export function decodeHeadsFingerprint(fp: string | null): string[] | null {
+  if (fp === null) return null;
+  if (fp === '') return []; // a document with no heads is a real, empty answer
+  const parts = fp.split(' ');
+  if (!parts.every((h) => /^[0-9a-f]{64}$/.test(h))) {
+    console.error(
+      '[remoteBaseline] baseline fingerprint is not a head list — ignoring it. ' +
+        'If `headsFingerprint` was changed to hash or truncate, this is why: it must stay lossless.'
+    );
+    return null;
+  }
+  return parts;
 }
 
 /**

@@ -20,14 +20,14 @@
  * The earlier "200/200" and "~50% coin flip" figures both came from
  * single-collection probes, which can only ever exhibit the tie case.
  */
-import type { PodLineage } from '@/types/syncFileV4';
+import type { PodLineage } from '@/types/models';
 import type { PodBlockMessageKey, RemoteBlocker } from '@/types/sync';
 
 /** How the two lineages relate. A fact, with no policy in it. */
 export type LineageVerdict = 'same' | 'adopt-remote' | 'ours-newer' | 'conflict';
 
 /** What the caller should DO. The four things a caller can actually perform. */
-export type LineageAction = 'merge' | 'adopt' | 'publish-local' | 'block';
+export type LineageAction = 'merge' | 'adopt' | 'rebase' | 'publish-local' | 'block';
 
 /**
  * What this device can PROVE about its own document.
@@ -82,8 +82,8 @@ export class PodLineageError extends Error implements RemoteBlocker {
 }
 
 export function compareLineage(
-  remote: PodLineage | undefined,
-  local: PodLineage | undefined
+  remote: PodLineage | null,
+  local: PodLineage | null
 ): LineageVerdict {
   if (!remote && !local) return 'same'; // the whole fleet, today
   if (remote && local && remote.id === local.id) return 'same';
@@ -116,6 +116,8 @@ export function compareLineage(
  */
 const POLICY: Record<LineageVerdict, Record<LineageContext, LineageAction>> = {
   same: { clean: 'merge', dirty: 'merge', 'user-file': 'merge' },
+  // ⚠️ `dirty` becomes `'rebase'` in Stage 3 (R1), NOT a special case around
+  // `block`. Until then it blocks, which is the safe half of the same decision.
   'adopt-remote': { clean: 'adopt', dirty: 'block', 'user-file': 'adopt' },
   'ours-newer': { clean: 'publish-local', dirty: 'publish-local', 'user-file': 'adopt' },
   conflict: { clean: 'block', dirty: 'block', 'user-file': 'adopt' },
@@ -144,13 +146,24 @@ const WHY: Record<LineageVerdict, string> = {
  *   3. syncService.fetchAndMergeRemote         (poll + pre-save)
  */
 export function guardLineage(
-  remote: PodLineage | undefined,
-  local: PodLineage | undefined,
+  remote: PodLineage | null,
+  local: PodLineage | null,
   ctx: LineageContext
 ): Exclude<LineageAction, 'block'> {
   const verdict = compareLineage(remote, local);
   const action = lineageAction(verdict, ctx);
-  if (action === 'block')
-    throw new PodLineageError(verdict, `Pod lineage blocked: ${WHY[verdict]}`);
+  if (action === 'block') throw lineageBlockError(verdict);
   return action;
+}
+
+/**
+ * The block, as a factory — so the copy has ONE source.
+ *
+ * The worker raises the same error when a REBASE turns out to be unavailable
+ * (no baseline heads, or heads this document's history does not contain), and
+ * the user must not be able to tell the two apart: both mean "these two
+ * documents cannot be combined here, and your work is still yours".
+ */
+export function lineageBlockError(verdict: LineageVerdict): PodLineageError {
+  return new PodLineageError(verdict, `Pod lineage blocked: ${WHY[verdict]}`);
 }

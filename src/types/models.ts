@@ -2024,3 +2024,29 @@ export interface RegistryEntry {
   signupPlatform?: 'web' | 'ios' | 'android' | null;
   updatedAt: ISODateString;
 }
+
+/**
+ * Which HISTORY a family document descends from.
+ *
+ * ⚠️ THIS LIVES ON THE DOCUMENT, NEVER ON THE FILE ENVELOPE — see ADR-036.
+ * `Automerge.from(Automerge.toJS(doc))` is the only way to drop history in
+ * Automerge 3.x, and it mints brand-new object ids, so a compacted document
+ * shares NO ancestry with the original and a merge between the two is a
+ * map-level conflict rather than a reconciliation. Automerge breaks such a tie
+ * by opId COUNTER before it falls back to the actor id, so for every collection
+ * added by a later migration the OLD lineage wins DETERMINISTICALLY: measured
+ * 60/60 in `recipes` against 29/60 in `accounts`, where the counters tie.
+ *
+ * It lived on the envelope until 2026-09-06, and that is exactly why the guard
+ * did not work: the envelope is maintained on three tracks independent of the
+ * document (`syncStore.envelope`, `syncService.currentEnvelope`, the worker's
+ * envelope cache), so a device could hold the compacted file's stamp over a
+ * pre-compaction document. The guard then compared two envelopes that agreed
+ * and permitted the merge it exists to prevent. Observed in the field.
+ */
+export interface PodLineage {
+  /** Minted per compaction. The identity — two lineages are the same iff equal. */
+  id: string;
+  /** Monotonic, and ONLY for direction. Never an identity on its own. */
+  seq: number;
+}

@@ -226,7 +226,10 @@ describe('docClient', () => {
     await expect(
       // A realistic envelope: `postRaw` now rejects a payload-less one outright,
       // because that shape means a long-lived/stripped envelope leaked to the worker.
-      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1')
+      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+        kind: 'baseline',
+        heads: null,
+      })
     ).rejects.toBeInstanceOf(CorruptPayloadError);
     expect(showToast).not.toHaveBeenCalled();
   });
@@ -239,7 +242,10 @@ describe('docClient', () => {
     }));
 
     await expect(
-      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1')
+      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+        kind: 'baseline',
+        heads: null,
+      })
     ).rejects.toBeInstanceOf(PayloadTooLargeError);
 
     // Expected degradation: the fatal overlay is the user surface, not a toast.
@@ -302,7 +308,10 @@ describe('docClient', () => {
     // to zero bytes, surface as CorruptPayloadError, and CLEAR THE USER'S CACHE.
     useWorker(() => null);
     await expect(
-      mergeRemoteEnvelope({ encryptedPayload: '', familyId: 'f' } as never, 'f')
+      mergeRemoteEnvelope({ encryptedPayload: '', familyId: 'f' } as never, 'f', {
+        kind: 'baseline',
+        heads: null,
+      })
     ).rejects.toThrow(/no encryptedPayload/);
   });
 
@@ -378,7 +387,8 @@ describe('docClient — postRaw envelope-payload narrowing', () => {
     );
     await mergeRemoteEnvelope(
       { encryptedPayload: bigPayload, wrappedKeys: reactiveWrapped, familyId: 'f' } as never,
-      'f'
+      'f',
+      { kind: 'baseline', heads: null }
     );
 
     const posted = fw.posted.find((p) => p.method === 'mergeRemoteEnvelope')!;
@@ -412,7 +422,8 @@ describe('docClient — Set-driven two-tier RPC timeout', () => {
         // Non-empty: an empty payload is now rejected at the RPC boundary before
         // any timeout logic runs, which is a different test.
         { encryptedPayload: 'ZmFrZQ==', familyId: 'f' } as never,
-        'f'
+        'f',
+        { kind: 'baseline', heads: null }
       ).then(
         () => 'resolved',
         (e: Error) => e.message

@@ -79,9 +79,12 @@ describe('applyAndProject — merge-throw recoverability (clone removal side-eff
     vi.mocked(mergeDocs).mockImplementationOnce(() => {
       throw new Error('boom-merge');
     });
-    await expect(mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID)).rejects.toThrow(
-      'boom-merge'
-    );
+    await expect(
+      mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      })
+    ).rejects.toThrow('boom-merge');
 
     // A later mutate still succeeds against a coherent doc; l1 preserved, r1 never merged.
     const after = mutate({

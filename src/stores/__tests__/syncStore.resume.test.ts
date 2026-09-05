@@ -72,7 +72,10 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   setFamilyKey: vi.fn(async () => {}),
   persistEnvelope: vi.fn(async () => {}),
   initAndLoadCache: vi.fn(async () => ({ loaded: false, remoteBaseline: null })),
-  mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
+  mergeRemoteEnvelope: vi.fn(async () => ({
+    action: 'merged' as const,
+    dirty: false,
+  })),
   // The adopt half of the lineage guard. Absent here, a test that exercises
   // an adopt or a publish-local throws 'No export is defined' instead of
   // asserting anything — the same blind spot as the syncService mock.
@@ -422,7 +425,7 @@ describe('syncStore.completeAutoLoad', () => {
   // Cross-family data-integrity regression (2026-07-06): a cache MISS must adopt
   // the remote FRESH, never CRDT-merge it into whatever (possibly foreign) doc the
   // worker still holds — else A∪B gets persisted + uploaded to B's file.
-  it('cross-family safety: a cache MISS drops the resident doc BEFORE merging (adopts remote fresh)', async () => {
+  it('cross-family safety: a cache MISS installs the remote WHOLESALE, never merging', async () => {
     vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
@@ -431,9 +434,9 @@ describe('syncStore.completeAutoLoad', () => {
       loaded: false,
       remoteBaseline: null,
     }); // B never cached here
-    // `changed: true` — the cache miss drops the doc, so the merge takes the
-    // fresh-adopt branch, which always installs a brand-new projection.
+    // `changed: true` — a wholesale install always brings a brand-new projection.
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'adopted' as const,
       heads: [],
       dirty: false,
       changed: true,
@@ -444,12 +447,20 @@ describe('syncStore.completeAutoLoad', () => {
     preloadPendingFile(syncStore);
     await syncStore.completeAutoLoad('right-pw');
 
-    expect(docClient.dropDoc).toHaveBeenCalledTimes(1);
+    // ⚠️ The guarantee is unchanged; the mechanism is. It used to be a separate
+    // `dropDoc()` RPC before the merge, which is not atomic: a respawn between
+    // the two rehydrates a document and the merge then finds one. The basis
+    // says it inside the SAME call, so a retry re-decides from scratch.
+    //
+    // And it must be `no-local-document`, NOT `user-file`: `user-file` would let
+    // a `same` verdict return `merge`, CRDT-merging the remote into whatever
+    // (possibly FOREIGN) family's document the worker still holds — the exact
+    // A∪B corruption this test was written for.
     expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
-    // dropDoc must run BEFORE the merge (so the merge takes the fresh-adopt branch).
-    expect(vi.mocked(docClient.dropDoc).mock.invocationCallOrder[0]!).toBeLessThan(
-      vi.mocked(docClient.mergeRemoteEnvelope).mock.invocationCallOrder[0]!
-    );
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]![2]).toEqual({
+      kind: 'no-local-document',
+    });
+    expect(docClient.dropDoc).not.toHaveBeenCalled();
   });
 
   it('cross-family safety: a cache HIT merges into THIS family cached doc WITHOUT dropping it', async () => {
@@ -463,6 +474,7 @@ describe('syncStore.completeAutoLoad', () => {
     }); // this family's cache present
     // `changed: false` — cache and remote already agree, so this is a no-op merge.
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'merged' as const,
       heads: [],
       dirty: false,
       changed: false,
@@ -520,6 +532,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       remoteBaseline: null,
     });
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'merged' as const,
       heads: [],
       dirty: false,
       changed: false,
@@ -546,6 +559,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
     vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'merged' as const,
       heads: [],
       remoteHeads: [],
       ...outcome,
@@ -576,6 +590,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       remoteBaseline: null,
     });
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'merged' as const,
       heads: [],
       dirty: false,
       changed: false,
@@ -661,6 +676,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
       remoteBaseline: null,
     });
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'merged' as const,
       heads: [],
       dirty: false,
       changed: false,
@@ -681,13 +697,9 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     // An older/partial worker or test double that omits the fields: "unknown"
     // must resolve to the safe direction (upload), never to silently dropping it.
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'merged' as const,
       heads: [],
-    } as unknown as {
-      heads: never[];
-      dirty: boolean;
-      changed: boolean;
-      remoteHeads: never[];
-    });
+    } as unknown as Awaited<ReturnType<typeof docClient.mergeRemoteEnvelope>>);
 
     await syncStore.backgroundSyncFromFile();
     expect(docClient.mergeRemoteEnvelope).toHaveBeenCalled();
