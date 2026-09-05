@@ -162,7 +162,15 @@ export type CompleteAutoLoadResult =
  *                   access" or ran the WASM heap out inflating the ops.
  */
 /** Where in the open sequence the failure happened. See `PayloadLoadError`. */
-export type PayloadLoadStep = 'decrypt' | 'load' | 'materialize';
+/**
+ * `parse` is the ENVELOPE step — `parseBeanpodV4` rejecting the JSON or the
+ * version — and it sits before `decrypt`. It is here so that a remote we
+ * downloaded but cannot understand is a `RemoteBlocker` like every other
+ * unreadable remote: without it the throw was a plain `Error`, `doSave` took
+ * its "merge failed, save local anyway" branch, and this device overwrote a
+ * torn upload (or a pod written by a NEWER app version) with its own base.
+ */
+export type PayloadLoadStep = 'parse' | 'decrypt' | 'load' | 'materialize';
 
 /** The inline message keys a blocked remote can resolve to. */
 export type PodBlockMessageKey =
@@ -193,6 +201,30 @@ export interface RemoteBlocker extends Error {
   readonly blockCode: string;
   /** Inline message key for the sync bar. */
   readonly inlineMessageKey: PodBlockMessageKey;
+}
+
+/**
+ * Is this throw one the remote-blocked breaker owns?
+ *
+ * ⚠️ THE REASON THIS EXISTS. Every latch site and every save refusal used to
+ * ask `e instanceof PayloadLoadError`, so the two blockers added later —
+ * `PodLineageError` and `RemoteMergeError` — silently fell out of all of them.
+ * `noteLineageBlocked` had NO reachable production caller: a lineage block was
+ * flattened into "your password may have changed", and `doSave` took its
+ * "merge failed, save local anyway" branch and wrote a pre-compaction document
+ * over a compacted remote.
+ *
+ * Structural on purpose (lessons 11, 13, 17): a new blocker answers the two
+ * members of the interface and is picked up by every site at once, instead of
+ * needing a fourth class added to N `instanceof` chains that nobody can grep
+ * for. Prefer this to `instanceof` ANYWHERE the question is "should this latch
+ * / should the save refuse". Keep `instanceof PayloadLoadError` only where a
+ * payload-specific member (`step`, `keyMayBeWrong`, `payloadBytes`) is read.
+ */
+export function isRemoteBlocker(e: unknown): e is RemoteBlocker {
+  if (!(e instanceof Error)) return false;
+  const c = e as Partial<RemoteBlocker>;
+  return typeof c.blockCode === 'string' && typeof c.inlineMessageKey === 'string';
 }
 
 export abstract class PayloadLoadError extends Error implements RemoteBlocker {

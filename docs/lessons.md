@@ -757,3 +757,20 @@ broken again in the very next pass, twice, so two of them get sharper:
     that can throw on a path with a permissive catch, enumerate what that catch
     will now do with it, and refuse by default after a point of no return (here:
     the remote bytes were already read).
+18. **A probe on a one-collection document cannot see how Automerge resolves a
+    conflict.** Two rounds measured cross-lineage merge loss as "200/200" and
+    then "~50%, a coin flip", both on a single map. Automerge breaks a map-write
+    tie by opId COUNTER first and only falls back to the actor id when the
+    counters are equal — which is the only case a one-collection fixture can
+    produce. On a real document, a collection added by a later migration has a
+    high counter in the old lineage and a low one in the compacted copy, so the
+    OLD lineage wins DETERMINISTICALLY (60/60 measured). The regression test
+    encoded the wrong model too, and passed. When a measurement drives a design,
+    check the fixture is capable of exhibiting the failure you are looking for.
+19. **"Atomic" written in a comment is not atomicity.** `adoptRemoteEnvelope`
+    was `dropDoc()` + `mergeRemoteEnvelope()` with a paragraph explaining why a
+    respawn between them was safe. It was not: the respawn's rehydrator
+    reinstalls the cached document first, so the retried merge found a document
+    and merged across lineages. A retryable operation must be idempotent as a
+    WHOLE, which means one RPC — and the destructive half (the drop) goes after
+    the half that can fail (the decrypt), never before it.

@@ -2323,6 +2323,16 @@ export const useAuthStore = defineStore('auth', () => {
         // the expected consequence of leaving — keep them off the toast layer.
         docClient.beginQuietTeardown();
         await forceSaveWithTimeout(3000);
+        // ⚠️ RE-READ THE LATCH. The snapshot below is taken before any step so
+        // it survives `resetSyncState`, but THIS step can arm the breaker
+        // itself: the final save merges first, and a refused merge (an
+        // unreadable remote, a lineage block, a duplicate-seq collision) makes
+        // `doSave` refuse — which is exactly the case where the local database
+        // holds the only copy. Snapshotting only before the steps meant that
+        // latch was invisible to `deleteFamilyDb` four steps later, and the
+        // guard passed straight through. `??` so a latch that already existed
+        // is never overwritten.
+        ctx.remoteWasUnreadable = ctx.remoteWasUnreadable ?? isRemoteBlocked();
       },
       cancelReminders: () => cancelRemindersForSignOut(),
       captureDepartingAccount: () => {
@@ -2454,12 +2464,13 @@ export const useAuthStore = defineStore('auth', () => {
     const ctx = {
       departedEmail: null as string | null,
       familyId: undefined as string | undefined,
-      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS. `resetSyncState` sits FOUR
-      // steps ahead of `deleteFamilyDb` in both deleting tiers, and it reaches
-      // `syncService.reset()` -> `clearRemoteUnreadable()`. So reading the latch
-      // inside `deleteFamilyDb` always saw `null` and the guard was dead code —
-      // exactly the "grep for the WRITERS as well as the readers" lesson from
-      // the round before, repeated.
+      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS, AND REFRESHED BY STEP ONE.
+      // `resetSyncState` sits FOUR steps ahead of `deleteFamilyDb` in both
+      // deleting tiers and reaches `syncService.reset()` ->
+      // `clearRemoteUnreadable()`, so reading the latch inside `deleteFamilyDb`
+      // always saw `null` and the guard was dead code. Taking it here alone was
+      // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
+      // the breaker itself, so it re-reads into this field (see that step).
       remoteWasUnreadable: isRemoteBlocked(),
     };
     await runSignOutSteps(
@@ -2563,12 +2574,13 @@ export const useAuthStore = defineStore('auth', () => {
     const ctx = {
       departedEmail: null as string | null,
       familyId: undefined as string | undefined,
-      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS. `resetSyncState` sits FOUR
-      // steps ahead of `deleteFamilyDb` in both deleting tiers, and it reaches
-      // `syncService.reset()` -> `clearRemoteUnreadable()`. So reading the latch
-      // inside `deleteFamilyDb` always saw `null` and the guard was dead code —
-      // exactly the "grep for the WRITERS as well as the readers" lesson from
-      // the round before, repeated.
+      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS, AND REFRESHED BY STEP ONE.
+      // `resetSyncState` sits FOUR steps ahead of `deleteFamilyDb` in both
+      // deleting tiers and reaches `syncService.reset()` ->
+      // `clearRemoteUnreadable()`, so reading the latch inside `deleteFamilyDb`
+      // always saw `null` and the guard was dead code. Taking it here alone was
+      // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
+      // the breaker itself, so it re-reads into this field (see that step).
       remoteWasUnreadable: isRemoteBlocked(),
     };
     await runSignOutSteps(SIGN_OUT_CLEAR_STEPS, buildSignOutStepImpls(ctx));

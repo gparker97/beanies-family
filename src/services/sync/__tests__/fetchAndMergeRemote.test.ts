@@ -623,3 +623,43 @@ describe('a merge that refuses AFTER the remote was read', () => {
     expect(syncService.isRemoteBlocked()).toBeNull();
   });
 });
+
+describe('a LINEAGE block must refuse the save, not fall through to it', () => {
+  const fakeKey = {} as CryptoKey;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+    parseMock.mockImplementation((text) => JSON.parse(text) as BeanpodFileV4);
+  });
+
+  it('never writes a pre-compaction document over a compacted remote', async () => {
+    // The terminus-3 guard throws OUTSIDE `fetchAndMergeRemote`'s own try, so a
+    // `PodLineageError` reached `doSave`'s catch, which listed only
+    // PayloadLoadError|RemoteMergeError — and the "save local anyway" branch
+    // then wrote this device's OLD-lineage doc, plus an envelope with no
+    // `podLineage` at all, over the compacted file. Every peer would then adopt
+    // the un-compaction.
+    //
+    // Remote carries a lineage, local does not => `adopt-remote`; no baseline
+    // fingerprint => `docPushedAgainst` answers `dirty` => `block`.
+    const remoteEnv = buildEnvelope({ podLineage: { id: 'L1', seq: 1 } });
+    let written = '';
+    const provider = makeProvider({
+      remoteText: JSON.stringify(remoteEnv),
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: (c) => {
+        written = c;
+      },
+    });
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope()); // local: no lineage
+
+    await expect(syncService.save()).resolves.toBe(false);
+
+    expect(provider.write).not.toHaveBeenCalled();
+    expect(written).toBe('');
+    // And it latches, so the 10s poller stops re-downloading to fail the same way.
+    expect(syncService.isRemoteBlocked()?.blockCode).toBe('adopt-remote');
+  });
+});

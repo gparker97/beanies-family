@@ -121,7 +121,7 @@ import {
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
   PayloadLoadError,
-  RemoteMergeError,
+  isRemoteBlocker,
   PayloadTooLargeError,
   payloadErrorMessageKey,
   type RemoteBlocker,
@@ -981,6 +981,16 @@ export const useSyncStore = defineStore('sync', () => {
     // the adopt happens at the next open (terminus 1) instead. One adopt
     // implementation, one instruction to the user.
     const act = guardLineage(env.podLineage, envelope.value?.podLineage, 'dirty');
+    // ⚠️ EXHAUSTIVE, not `adopt ? … : merge`. The ternary sent `publish-local`
+    // — "we hold an unpublished compaction, the remote is on the old lineage" —
+    // into a CROSS-LINEAGE merge, which is the exact operation the guard exists
+    // to prevent. `publish-local` means leave the local document alone and let
+    // the next save carry it up.
+    if (act === 'publish-local') {
+      pendingEncryptedFile.value = null;
+      syncService.triggerDebouncedSave();
+      return;
+    }
     const { dirty } =
       act === 'adopt'
         ? await docClient.adoptRemoteEnvelope(env, env.familyId)
@@ -1141,11 +1151,27 @@ export const useSyncStore = defineStore('sync', () => {
           // the open path at all. Measured in prod on R10: zero skips in 44h.
           let driveHeads: readonly string[] | null = null;
           if (merging) {
-            // CRDT merge remote into the worker's doc.
-            const mergeResult = await docClient.mergeRemoteEnvelope(
-              remoteEnvelope,
-              remoteEnvelope.familyId
-            );
+            // ⚠️ LINEAGE GUARD (terminus 4). This branch merged foreign bytes
+            // into the live document with NO guard at all — the poll paths
+            // (`backgroundSyncFromFile`, `reloadIfFileChanged`) reach it, so a
+            // compacted pod arriving here was CRDT-merged across lineages. That
+            // is not a coin flip: `Automerge.from` renumbers opIds, so for every
+            // collection added by a later `migrateDoc` the OLD lineage wins
+            // DETERMINISTICALLY (measured 60/60), silently reverting every
+            // post-compaction edit and republishing the hybrid fleet-wide.
+            const ctx = await syncService.docPushedAgainst(syncService.getRemoteBaselineHeadsFp());
+            const act = guardLineage(remoteEnvelope.podLineage, envelope.value?.podLineage, ctx);
+            if (act === 'publish-local') {
+              // Our unpublished compaction stands; the next save carries it up.
+              syncService.triggerDebouncedSave();
+              return { success: true };
+            }
+            // CRDT merge remote into the worker's doc (or adopt it wholesale
+            // when the remote has been compacted and we are provably clean).
+            const mergeResult =
+              act === 'adopt'
+                ? await docClient.adoptRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId)
+                : await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
             // `?? true` is deliberate, not defensive noise: an absent field means
             // we do not KNOW the outcome, and both unknowns must resolve to the
             // safe direction — re-project rather than show stale data, re-upload
@@ -1250,7 +1276,7 @@ export const useSyncStore = defineStore('sync', () => {
           // failure no password can fix, and pinned the multi-megabyte envelope
           // in `pendingEncryptedFile` on the way. Let it out; App.vue and the
           // resume flow both classify it.
-          if (e instanceof PayloadLoadError) {
+          if (isRemoteBlocker(e)) {
             // ⚠️ THE OTHER HALF, and it is the one that loses other people's
             // data. `syncService.load()` already stamped this revision as the
             // baseline; leaving it there makes the next change check answer
@@ -1260,7 +1286,7 @@ export const useSyncStore = defineStore('sync', () => {
             // Drive cohort's read path, which never goes through
             // `fetchAndMergeRemote` and so never armed the breaker.
             syncService.rollbackRemoteMarker();
-            syncService.noteRemoteUnreadable(e);
+            syncService.noteRemoteBlocked(e);
             throw e;
           }
           console.warn('[syncStore] Failed to decrypt with current FK, may need re-auth:', e);
@@ -2940,7 +2966,10 @@ export const useSyncStore = defineStore('sync', () => {
             // and tell the user their data is damaged, when falling through to
             // the cached key and "password may have changed" is the recoverable
             // path the code below already provides.
-            if (e instanceof PayloadLoadError && !e.keyMayBeWrong) {
+            // ANY blocker (payload, lineage, merge) — see `isRemoteBlocker`.
+            // The `keyMayBeWrong` exemption below is payload-specific and stays
+            // an `instanceof`; a lineage or merge block has no such recovery.
+            if (isRemoteBlocker(e) && !(e instanceof PayloadLoadError && e.keyMayBeWrong)) {
               notePodUnopenable(e);
               // Classify the terminal too. Returning the initial 'refreshed'
               // with `openOutcome` still 'open-complete' reported a pod that
@@ -3108,8 +3137,8 @@ export const useSyncStore = defineStore('sync', () => {
               // REMOTE envelope with the in-memory family key, so it is the
               // canonical key-rotation site, and the recoverable fallback
               // (`tryDecryptWithCachedKey` → re-prompt) is eight lines below.
-              if (e instanceof PayloadLoadError) {
-                if (!e.keyMayBeWrong) {
+              if (isRemoteBlocker(e)) {
+                if (!(e instanceof PayloadLoadError && e.keyMayBeWrong)) {
                   notePodUnopenable(e);
                   return false;
                 }
@@ -3198,9 +3227,7 @@ export const useSyncStore = defineStore('sync', () => {
     // `noteRemoteUnreadable` also owns the report (once per class) and refuses
     // to latch a `keyMayBeWrong` failure, which is why this is a call rather
     // than a second copy of that logic.
-    if (err instanceof PodLineageError) syncService.noteLineageBlocked(err);
-    else if (err instanceof RemoteMergeError) syncService.noteMergeFailed(err);
-    else if (err instanceof PayloadLoadError) syncService.noteRemoteUnreadable(err);
+    syncService.noteRemoteBlocked(err);
     // MIRROR the service's actual answer — do not assert it. `noteRemoteUnreadable`
     // declines to latch a `keyMayBeWrong` failure (a routine key rotation), so
     // asserting `true` here set the UI mirror and stopped the poller while the

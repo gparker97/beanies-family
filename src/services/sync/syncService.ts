@@ -10,7 +10,13 @@
  */
 
 import { supportsFileSystemAccess, isNative } from './capabilities';
-import { PayloadLoadError, RemoteMergeError, type RemoteBlocker } from '@/types/sync';
+import {
+  PayloadLoadError,
+  RemoteMergeError,
+  CorruptPayloadError,
+  isRemoteBlocker,
+  type RemoteBlocker,
+} from '@/types/sync';
 import { PodLineageError, guardLineage } from '@/services/sync/podLineage';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
@@ -256,6 +262,20 @@ export function noteMergeFailed(err: RemoteMergeError): void {
   });
 }
 
+/**
+ * Arm the breaker for ANY blocker, dispatching to the class that owns the
+ * policy (only `noteRemoteUnreadable` knows `keyMayBeWrong` must not latch;
+ * only `noteMergeFailed` knows an actor collision pages).
+ *
+ * ONE dispatcher, because the three-way `instanceof` chain was already written
+ * twice and a fourth blocker would have to find both copies.
+ */
+export function noteRemoteBlocked(err: RemoteBlocker): void {
+  if (err instanceof PodLineageError) noteLineageBlocked(err);
+  else if (err instanceof RemoteMergeError) noteMergeFailed(err);
+  else if (err instanceof PayloadLoadError) noteRemoteUnreadable(err);
+}
+
 function clearRemoteUnreadable(): void {
   remoteBlocked = null;
   reportedBlockClasses.clear();
@@ -418,7 +438,11 @@ function startPollingIfApplicable(provider: StorageProvider | null): void {
           // A payload failure is already latched + reported once by
           // `noteRemoteUnreadable`; a second `warning` here would file it as a
           // poll hiccup on a surface no pod-load filter reads.
-          if (e instanceof PayloadLoadError) return;
+          // Already latched + reported once by the note* functions; a second
+          // `warning` here files it as a poll hiccup on a surface no pod-load
+          // filter reads. `isRemoteBlocker`, not `instanceof PayloadLoadError`:
+          // a lineage or merge block is just as much "already handled".
+          if (isRemoteBlocker(e)) return;
           reportError({
             surface: 'local-file-polling',
             message: 'poll-tick merge threw',
@@ -992,6 +1016,16 @@ export async function isFullySynced(): Promise<boolean> {
   return (await docPushedAgainst(remoteBaseline?.headsFp ?? null)) === 'clean';
 }
 
+/**
+ * The Drive-baseline fingerprint this module holds, for a caller that needs the
+ * lineage CONTEXT but does not own the baseline (terminus 4 in `syncStore`).
+ * Exposed rather than duplicated: the baseline is module state here and a
+ * second copy in the store would drift the first time either side changed.
+ */
+export function getRemoteBaselineHeadsFp(): string | null {
+  return remoteBaseline?.headsFp ?? null;
+}
+
 export async function docPushedAgainst(baselineFp: string | null): Promise<'clean' | 'dirty'> {
   return (await unpushedLocalChangesCheck(baselineFp)) === null ? 'clean' : 'dirty';
 }
@@ -1124,7 +1158,31 @@ export function seedRemoteBaseline(row: { payload: string; checkedAt: string } |
  */
 export function commitRemoteBaseline(driveHeads: readonly string[] | null): void {
   const revision = remoteBaseline?.revision ?? null;
-  if (revision === null) return;
+  if (revision === null) {
+    // ⚠️ NO REVISION IS NOT NO BASELINE. Only `GoogleDriveProvider` implements
+    // `getRemoteMarker`, so every local-file family reached this early return
+    // and never recorded a heads fingerprint. `docPushedAgainst(null)` then
+    // answered `dirty` forever, which meant `isFullySynced()` could never be
+    // true — compaction refused with "not synced" on a pod that was perfectly
+    // synced — and the lineage context was permanently `dirty`, so those
+    // families would BLOCK where they should adopt.
+    //
+    // The revision is only needed for the change PROBE (and for the encoded
+    // payload the worker persists). The fingerprint is provable without it, and
+    // it is the half these two callers actually read.
+    const fpOnly = driveHeads === null ? null : headsFingerprint(driveHeads);
+    if (fpOnly !== null) {
+      remoteBaseline = remoteBaseline
+        ? { ...remoteBaseline, headsFp: fpOnly }
+        : {
+            revision: null,
+            modifiedTime: null,
+            checkedAt: new Date().toISOString(),
+            headsFp: fpOnly,
+          };
+    }
+    return;
+  }
   // #65: `driveHeads` MUST be the heads of the content DRIVE HOLDS at `revision`
   // — the unmigrated decrypted remote doc at a merge terminus, or the serialized
   // bytes at the write terminus. NEVER `currentDoc`'s heads, which can be ahead
@@ -1435,7 +1493,22 @@ async function fetchAndMergeRemote(): Promise<void> {
   const text = await currentProvider.read();
   if (!text) return;
 
-  const remoteEnvelope = parseBeanpodV4(text);
+  // ⚠️ CLASSIFIED, not bare. A torn upload or a pod written by a newer app
+  // version throws here — AFTER the bytes were read — and a plain `Error`
+  // reaches `doSave`'s "save local anyway" branch, which then replaces that
+  // remote with this device's base and certifies the result as the baseline.
+  let remoteEnvelope: BeanpodFileV4;
+  try {
+    remoteEnvelope = parseBeanpodV4(text);
+  } catch (e) {
+    const err = new CorruptPayloadError(
+      e instanceof Error ? e.message : String(e),
+      'parse',
+      currentEnvelope?.familyId ?? null
+    );
+    noteRemoteUnreadable(err);
+    throw err;
+  }
 
   // ⚠️ LINEAGE GUARD (terminus 3), and this is the one that makes a compaction
   // able to SPREAD. A peer's first post-compaction sync arrives right here, so
@@ -1445,11 +1518,18 @@ async function fetchAndMergeRemote(): Promise<void> {
   // The context is the #65 comparison that already exists, over the baseline
   // this module already holds — no extra probe.
   const lineageCtx = await docPushedAgainst(remoteBaseline?.headsFp ?? null);
-  const lineageAct = guardLineage(
-    remoteEnvelope.podLineage,
-    currentEnvelope?.podLineage,
-    lineageCtx
-  );
+  // ⚠️ LATCH AT THE THROW. `guardLineage` throws OUTSIDE the try below, so a
+  // block armed nothing: the local-file poll watcher's `if (remoteBlocked)`
+  // gate stayed open and it re-downloaded, re-parsed and re-threw the whole
+  // multi-megabyte pod every tick, reporting a `local-file-polling` warning
+  // each time and telling the user nothing.
+  let lineageAct;
+  try {
+    lineageAct = guardLineage(remoteEnvelope.podLineage, currentEnvelope?.podLineage, lineageCtx);
+  } catch (e) {
+    if (e instanceof PodLineageError) noteLineageBlocked(e);
+    throw e;
+  }
   if (lineageAct === 'publish-local') {
     // We hold an unpublished compaction and the remote is on the older lineage.
     // Do NOT merge and do NOT learn the marker: `doSave` should proceed to write
@@ -1591,7 +1671,12 @@ async function doSave(): Promise<boolean> {
       // overlay: before that the user could not generate mutations, so no
       // debounced save could fire. Keeping the session usable means the save
       // path has to refuse instead.
-      if (e instanceof PayloadLoadError || e instanceof RemoteMergeError) {
+      if (isRemoteBlocker(e)) {
+        // ⚠️ ANY blocker, not a list of classes. A `PodLineageError` reaching
+        // here (the terminus-3 guard throws OUTSIDE the try below it) used to
+        // fall through to "save local anyway", which writes this device's
+        // PRE-COMPACTION document — and an envelope with no `podLineage` — over
+        // the compacted remote, undoing the compaction for the whole family.
         console.error(
           '[syncService] doSave: remote unreadable or unmergeable — refusing to overwrite it',
           e
@@ -1602,7 +1687,11 @@ async function doSave(): Promise<boolean> {
         // drives the sidebar indicator. Without it a whole session of edits
         // went unsaved with nothing on screen, and `forceSaveWithTimeout` read
         // the false as "nothing to save" and let sign-out delete the local DB.
-        // `noteRemoteUnreadable` has already reported it once per latch.
+        // Arm the breaker for a blocker that reached us unlatched. The
+        // terminus-3 lineage guard throws before `fetchAndMergeRemote`'s own
+        // try, so nothing had latched it; without this the next tick repeats
+        // the whole download.
+        if (e instanceof PodLineageError && !isRemoteBlocked()) noteLineageBlocked(e);
         throw e;
       }
       console.warn('[syncService] fetchAndMergeRemote failed (non-fatal):', e);

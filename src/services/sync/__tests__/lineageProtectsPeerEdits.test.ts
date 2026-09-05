@@ -16,7 +16,11 @@ import { describe, it, expect } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import { guardLineage, PodLineageError } from '@/services/sync/podLineage';
 
-type Doc = { accounts: Record<string, { id: string; balance: number }> };
+type Doc = {
+  accounts: Record<string, { id: string; balance: number }>;
+  /** Optional, and added by a LATER change on purpose — see the probe below. */
+  recipes?: Record<string, { id: string; title: string }>;
+};
 
 /** A pod, and the compacted copy of it a peer would publish. */
 function pod() {
@@ -51,28 +55,46 @@ describe('a naive merge across lineages', () => {
     // families.
     const N = 200;
     let survived = 0;
+    let survivedLate = 0;
     for (let i = 0; i < N; i++) {
-      const original = Automerge.save(
-        Automerge.from<Doc>({
-          accounts: { a1: { id: 'a1', balance: 100 }, a2: { id: 'a2', balance: 50 } },
-        })
-      );
+      // ⚠️ TWO collections, and the second added by a LATER change — because a
+      // SINGLE-collection document can only ever exhibit the TIE case, which is
+      // what made both earlier probes ("200/200", then "~50%") measure the
+      // wrong thing. Automerge breaks a map-write tie by opId COUNTER first and
+      // only falls back to the actor id when the counters are equal. A
+      // collection added by a later change (here `recipes`, standing in for
+      // every collection a later `migrateDoc` introduced) carries a HIGH
+      // counter in the old lineage and a LOW one in the compacted pod, so the
+      // old lineage wins DETERMINISTICALLY.
+      let base = Automerge.from<Doc>({
+        accounts: { a1: { id: 'a1', balance: 100 }, a2: { id: 'a2', balance: 50 } },
+      });
+      base = Automerge.change(base, (d) => {
+        d.recipes = { r1: { id: 'r1', title: 'soup' } };
+      });
+      const original = Automerge.save(base);
       const compacted = Automerge.save(
         Automerge.from<Doc>(Automerge.toJS(Automerge.load<Doc>(original)))
       );
       let peer = Automerge.load<Doc>(original); // still on the OLD history
       peer = Automerge.change(peer, (d) => {
-        d.accounts.a1!.balance = 999; // an edit to an existing entity
-        d.accounts.a3 = { id: 'a3', balance: 7 }; // and a brand-new one
+        d.accounts.a1!.balance = 999; // an edit in the FIRST-change collection
+        d.recipes!.r1!.title = 'stew'; // and one in the later-added collection
       });
       const merged = Automerge.toJS(Automerge.merge(peer, Automerge.load<Doc>(compacted)));
       if (merged.accounts.a1?.balance === 999) survived++;
+      if (merged.recipes?.r1?.title === 'stew') survivedLate++;
     }
-    // Bounded loosely on both sides: the point is that it is neither reliably
-    // safe nor reliably broken. A build where it became either would mean
-    // Automerge's conflict resolution changed and this analysis needs redoing.
-    expect(survived, `${survived}/${N} peers kept their work`).toBeGreaterThan(N * 0.2);
+    // The first-change collection is the TIE case: the actor id decides, so it
+    // lands somewhere in the middle and neither bound may be tight.
+    expect(survived, `${survived}/${N} peers kept a first-change edit`).toBeGreaterThan(N * 0.2);
     expect(survived).toBeLessThan(N * 0.8);
+    // The later-added collection is the DETERMINISTIC case, and it is the one
+    // that matters: every collection the app added after the first release
+    // behaves like this. `survivedLate === N` (the old lineage always wins) is
+    // what makes an unguarded merge silently revert a whole compaction rather
+    // than corrupt it visibly half the time.
+    expect(survivedLate, `${survivedLate}/${N} kept a later-collection edit`).toBe(N);
   });
 });
 

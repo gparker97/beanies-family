@@ -77,8 +77,25 @@ after the read reaches "save local anyway"), A2-1/A2-3/C-2 (the unfenced window
 between `compactDoc` and the lineage stamp), R-1 (two Slack pages per corrupt
 pod), Eff-1/Eff-3.
 
+## FIXED (2026-09-05, all mutation-checked)
+
+Each fix was removed again after it landed and the suite re-run; every one has a
+test that fails without it. Two of them had NO coverage at all beforehand.
+
+| #         | Fix                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S4 + A3-1 | `isRemoteBlocker()` type guard replaces the `instanceof PayloadLoadError` chain at every latch site and at `doSave`'s refusal; one `noteRemoteBlocked()` dispatcher replaces the three-way `instanceof` that was written twice. `noteLineageBlocked` now has a reachable caller.                                                                                                                              |
+| S1        | `loadFromFile`'s merging branch — a FOURTH terminus, reached by both Drive poll paths — now consults the guard and can adopt, via a new `getRemoteBaselineHeadsFp()` accessor rather than a second copy of the baseline.                                                                                                                                                                                      |
+| S3        | Termini 1 and 2 tested `=== 'adopt'` only, so `publish-local` fell into a cross-lineage merge. All three termini now name every non-blocking action.                                                                                                                                                                                                                                                          |
+| C-7       | The `syncService` mock gained the five missing exports; the resume suite's `docClient` mock gained `adoptRemoteEnvelope`.                                                                                                                                                                                                                                                                                     |
+| P1-2/P1-3 | Stale "200/200" and "coin flip" comments replaced with the measured result. `lineageProtectsPeerEdits.test.ts` used a ONE-collection document, which can only exhibit the tie case; it now adds a collection in a later change and asserts the deterministic 60/60 outcome.                                                                                                                                   |
+| L-1       | The sign-out latch snapshot is taken before any step so it survives `resetSyncState` — but step ONE is the force-save, which can arm the breaker itself. That step now refreshes the snapshot (`??`, so a pre-existing latch is never overwritten), which is what stops `deleteFamilyDb` destroying the only copy of refused edits.                                                                           |
+| L-4       | `parseBeanpodV4` throwing AFTER the read produced a plain `Error` that reached "save local anyway", overwriting a torn upload or a newer-format pod. A new `'parse'` step makes it a `CorruptPayloadError`, i.e. a `RemoteBlocker`.                                                                                                                                                                           |
+| A2-1      | `compactDoc` installed the compacted document BEFORE serialising it, with the tail outside the try. An OOM there reported "nothing moved" while the worker held the compacted doc, unstamped, which the next save published under the OLD lineage. Everything that can throw now runs before the install.                                                                                                     |
+| C-3 + C-5 | `adoptRemoteEnvelope` was `dropDoc()` then `mergeRemoteEnvelope()` on main, documented as atomic and not: the merge is RETRYABLE, and a respawn's rehydrator reinstalls the cached old-lineage doc before the retry, so the retry MERGED across lineages. It is now one RPC, and the worker drops only after the decrypt resolves — so a decrypt failure no longer leaves the worker with no document at all. |
+
 ## Next
 
-1. Fix the CONFIRMED set; re-derive the Tier 3 rebase design against P1-2.
-2. Verify the HIGH set (the ledger has file:line for each).
-3. Re-run the review over the fixes.
+1. Verify the remaining ledger items (E-3, E-4, E-6, A1-1, A1-5, A1-6, B-5, C-4, C-6, R-1).
+2. Re-derive the Tier 3 rebase design against P1-2's deterministic model.
+3. Re-review the fixes with a different model.

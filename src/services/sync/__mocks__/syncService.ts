@@ -113,3 +113,22 @@ export const noteRemoteUnreadable = vi.fn();
 
 /** User-initiated half-open retry of the remote-blocked breaker. */
 export const retryAfterRemoteBlock = vi.fn();
+
+/**
+ * The lineage/merge surface (see the real module).
+ *
+ * ⚠️ THESE MUST EXIST. Without them `syncService.docPushedAgainst` was
+ * `undefined` in every store test, the call threw inside the surrounding `try`,
+ * the lineage context silently stayed `clean`, and the `adopt-remote` × `dirty`
+ * → block cell — the one that protects a peer's unsynced work — was untestable
+ * through the store while every suite stayed green.
+ *
+ * `clean` is the default so existing suites keep today's merge behaviour; a
+ * suite that wants the block overrides it with `mockResolvedValue('dirty')`.
+ */
+export const docPushedAgainst = vi.fn(async () => 'clean' as const);
+export const isFullySynced = vi.fn(async () => true);
+export const getRemoteBaselineHeadsFp = vi.fn<() => string | null>(() => null);
+export const noteLineageBlocked = vi.fn();
+export const noteMergeFailed = vi.fn();
+export const noteRemoteBlocked = vi.fn();

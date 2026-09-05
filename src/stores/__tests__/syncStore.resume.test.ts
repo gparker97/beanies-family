@@ -73,6 +73,15 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   persistEnvelope: vi.fn(async () => {}),
   initAndLoadCache: vi.fn(async () => ({ loaded: false, remoteBaseline: null })),
   mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false })),
+  // The adopt half of the lineage guard. Absent here, a test that exercises
+  // an adopt or a publish-local throws 'No export is defined' instead of
+  // asserting anything — the same blind spot as the syncService mock.
+  adoptRemoteEnvelope: vi.fn(async () => ({
+    heads: [],
+    dirty: false,
+    changed: true,
+    remoteHeads: [],
+  })),
   verifyEnvelope: vi.fn(async () => {}),
   exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64==' })),
   dropDoc: vi.fn(async () => {}),
@@ -592,7 +601,11 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     await expect(syncStore.loadFromFile()).rejects.toBeInstanceOf(PayloadTooLargeError);
 
     expect(syncService.rollbackRemoteMarker).toHaveBeenCalled();
-    expect(syncService.noteRemoteUnreadable).toHaveBeenCalled();
+    // `noteRemoteBlocked` is the one dispatcher for all three blocker classes;
+    // it routes a PayloadLoadError to `noteRemoteUnreadable` (pinned by
+    // `blockerDispatch.test.ts`). Asserting the dispatcher here is what keeps
+    // this test honest for a lineage or merge block too.
+    expect(syncService.noteRemoteBlocked).toHaveBeenCalled();
     expect(syncService.confirmRemoteMerged).not.toHaveBeenCalled();
   });
 
