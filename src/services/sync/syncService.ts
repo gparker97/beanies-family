@@ -951,6 +951,21 @@ export async function remoteChanged(): Promise<ChangeResult> {
  * `unpushedLocalChangesCheck` already documents: the cost of a wrong `dirty` is
  * a refusal the user can clear; the cost of a wrong `clean` is a peer's work.
  */
+/**
+ * Is this device provably current AND clean against the remote?
+ *
+ * The precondition a compaction needs: it publishes a document no peer can
+ * merge with, so publishing one that is missing a peer's edits would strand
+ * them permanently. Both halves are checks that already exist — the #61 change
+ * probe and the #65 unpushed-changes comparison — so there is no third notion
+ * of "in sync" to keep in step.
+ */
+export async function isFullySynced(): Promise<boolean> {
+  const change = await remoteChanged();
+  if (change.status !== 'unchanged') return false; // moved, or we cannot tell
+  return (await docPushedAgainst(remoteBaseline?.headsFp ?? null)) === 'clean';
+}
+
 export async function docPushedAgainst(baselineFp: string | null): Promise<'clean' | 'dirty'> {
   return (await unpushedLocalChangesCheck(baselineFp)) === null ? 'clean' : 'dirty';
 }

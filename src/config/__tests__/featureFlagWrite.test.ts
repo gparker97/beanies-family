@@ -31,17 +31,10 @@ describe('config/featureFlagWrite', () => {
     const result = applyFlagWrite(allFalse(), 'aiPhotoExtract', true);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.nextState).toEqual({
-      aiPhotoExtract: true,
-      aiTravelExtract: false,
-      beanieWall: false,
-      calendarClashNudge: false,
-      docWorker: false,
-      familyLists: false,
-      googleCalendarSync: false,
-      helpfulHints: false,
-      mealPlanner: false,
-    });
+    // Derived from the registry, not enumerated: a hard-coded list makes
+    // ADDING a flag break a test about writing one, which is a maintenance trap
+    // the file's own header warns about for toggling.
+    expect(result.nextState).toEqual({ ...allFalse(), aiPhotoExtract: true });
     expect(result.source).toContain('aiPhotoExtract: true,');
   });
 
@@ -67,17 +60,7 @@ describe('config/featureFlagWrite', () => {
     const result = applyFlagWrite(stale, 'aiTravelExtract', true);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.nextState).toEqual({
-      aiPhotoExtract: false,
-      aiTravelExtract: true,
-      beanieWall: false,
-      calendarClashNudge: false,
-      docWorker: false,
-      familyLists: false,
-      googleCalendarSync: false,
-      helpfulHints: false,
-      mealPlanner: false,
-    });
+    expect(result.nextState).toEqual({ ...allFalse(), aiTravelExtract: true });
     expect(Object.keys(result.nextState)).not.toContain('bogusOld');
     expect(result.source).not.toContain('bogusOld');
   });

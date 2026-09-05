@@ -35,6 +35,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
+import { usePodExport } from '@/composables/usePodExport';
+import { usePodCompaction } from '@/composables/usePodCompaction';
 import { showToast } from '@/composables/useToast';
 import { requireReauth, canStepUp } from '@/composables/useReauth';
 import { reportError } from '@/utils/errorReporter';
@@ -56,7 +58,6 @@ import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { deliverFile } from '@/utils/deliverFile';
-import { isNative } from '@/services/sync/capabilities';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
 import {
@@ -579,45 +580,16 @@ function formatLastSync(timestamp: string | null): string {
  * native deliveries so a double-tap can no longer corrupt one, but queuing two
  * share sheets for one tap-tap is still wrong — so the button says busy.
  */
-const isExportingBeanpod = ref(false);
+// The busy flag now lives with the export logic; aliased so the two template
+// bindings keep reading the same name.
+const { isExporting: isExportingBeanpod, exportEncryptedPod, confirmBackupLanded } = usePodExport();
+const { busy: isCompacting, compact: compactPod } = usePodCompaction();
 const isExportingJson = ref(false);
 
 async function handleManualExport() {
-  if (isExportingBeanpod.value) return;
-  isExportingBeanpod.value = true;
-  // Owns the whole sequence: build → deliver → stamp. Previously this awaited a
-  // store call that swallowed every throw and stamped `lastSync` even when the
-  // download was a no-op.
-  try {
-    const { json, filename } = await syncStore.buildExportEnvelope();
-    const result = await deliverFile({
-      blob: new Blob([json], { type: 'application/json' }),
-      filename,
-      mimeType: 'application/json',
-      title: t('settings.exportData'),
-      kind: 'beanpod',
-      // "Export Encrypted Backup" means SAVE. Without this, a share-capable
-      // desktop (Safari on macOS, Chrome/Edge on Windows and ChromeOS) opens a
-      // share menu with no save-to-disk option — the exact regression the
-      // recovery kit already passes `preferDownload` to avoid. Native ignores
-      // it, because there the share sheet IS where "Save to Files" lives.
-      preferDownload: true,
-    });
-    if (result.delivered) syncStore.markExported();
-  } catch (e) {
-    // `buildExportEnvelope` throws with no family key, and
-    // `docClient.exportEncryptedPayload` can reject. Both used to be silent.
-    showToast('error', t('fileDelivery.failed'), t('fileDelivery.failedHelp'), {
-      surface: 'file-delivery',
-      error: e,
-      // `source`, not `encode`: this fires when there was no family key or the
-      // worker could not produce a payload, so no bytes ever existed. Reporting
-      // `encode` sent the triager to a blob-size theory for a key problem.
-      context: { action: 'delivery-failed', kind: 'beanpod', stage: 'source' },
-    });
-  } finally {
-    isExportingBeanpod.value = false;
-  }
+  // The body moved to `usePodExport` so the compaction flow shares this exact
+  // gate rather than a second copy of it.
+  await exportEncryptedPod();
 }
 
 async function handleManualImport() {
@@ -820,15 +792,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       // human one: ask. On web the anchor download is deterministic
       // (`preferDownload` above keeps it off `navigator.share`), so there is
       // nothing to ask about and the flow is unchanged.
-      if (
-        isNative() &&
-        !(await confirm({
-          title: 'settings.deleteFamilyExportCheckTitle',
-          message: 'settings.deleteFamilyExportCheckMsg',
-          confirmLabel: 'settings.deleteFamilyExportCheckConfirm',
-          variant: 'danger',
-        }))
-      ) {
+      if (!(await confirmBackupLanded())) {
         deleteConfirmText.value = '';
         isDeleting.value = false;
         showDeleteFamilyConfirm.value = true;
@@ -1927,6 +1891,35 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             @click="showTransferOwnership = true"
           >
             {{ t('settings.transferOwnershipAction') }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <!-- ── Slim down the family file (pod compaction) ──────────────────
+           Owner-only, dev-flagged. Beside Pod Ownership because this is the
+           same class of action: rare, owner-only, once in a pod's lifetime. -->
+      <div
+        v-if="isFlagEnabled('podCompaction') && isOwner"
+        class="dark:border-line mt-6 border-t border-gray-200 pt-4"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="dark:text-ink font-medium text-gray-900">
+              {{ t('settings.compactPod') }}
+            </p>
+            <p class="dark:text-ink-soft text-xs text-gray-500">
+              {{ t('settings.compactPodDesc') }}
+            </p>
+          </div>
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            class="flex-shrink-0"
+            :disabled="isCompacting"
+            data-testid="compact-pod"
+            @click="compactPod"
+          >
+            {{ t('settings.compactPod') }}
           </BaseButton>
         </div>
       </div>

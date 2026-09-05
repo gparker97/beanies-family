@@ -12,6 +12,12 @@
 
 export const FLAG_REGISTRY = [
   {
+    id: 'podCompaction',
+    label: 'Pod compaction',
+    description:
+      'Owner-only: rewrite the family file without its edit history, so it opens on a low-memory tablet. Publishes a new pod lineage.',
+  },
+  {
     id: 'beanieWall',
     label: 'Beanie wall',
     description: 'Tablet wall/table display mode: the family plan and the jobs board, chrome-free.',

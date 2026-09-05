@@ -22,6 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Owners can now slim down a large family file (behind a developer flag while it is tested).** Years of edits make a family file slow and memory-hungry to open, which is why it can fail on an older tablet. This rewrites the file without its edit history: the same data, a fraction of the size. beanies saves a backup to your device first and refuses to continue unless that file actually landed, checks the rebuilt file matches the original before replacing anything, and other devices pick up the slimmer file the next time they are online. Off in production for now.
+
 - **beanies now refuses to combine two versions of your family file that cannot safely be combined.** Groundwork for the next release, which will let a large family file be reorganised so it opens on older tablets. Reorganising changes the file's identity, and merging a reorganised copy with one that has not caught up yet can quietly drop whichever side loses a coin toss. beanies now recognises the two versions, takes the newer one whole when this device has nothing unsaved, and stops and says so when it does. Families that never reorganise see no change at all.
 
 - **beanies now keeps one identity per device instead of inventing a new one every time it opens.** Every open used to add a permanent new signature to your family file, so a file could accumulate thousands of them for a family of five, making it slower and heavier to open on every device. New opens no longer add one. This does not shrink a file that has already grown; that is the next piece of work.

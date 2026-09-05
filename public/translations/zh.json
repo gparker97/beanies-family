@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-05",
-    "translationCount": 4498
+    "translationCount": 4512
   },
   "translations": {
     "app.name": {
@@ -22494,6 +22494,76 @@
     "resumeSetup.podLineageBlocked": {
       "translation": "您的家庭文件已在另一台设备上重组，此设备无法安全地将两者结合起来。没有任何东西丢失。如果此设备具有从未保存的更改，请先从“设置”中导出它们；否则，重新加载和beanies将拾取重组后的副本。",
       "hash": "xlvoe3",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.confirmTitle": {
+      "translation": "精简您的家庭文件？",
+      "hash": "w8axl3",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.confirmMessage": {
+      "translation": "beanies将在没有编辑历史记录的情况下重写您的家庭文件，因此它打开速度更快，适用于较旧的平板电脑。您的数据未更改。Beanies会先将副本保存到您的设备。下次在线时，其他所有设备都会拿起更薄的文件—在此之前，他们会说他们需要赶上。",
+      "hash": "48lmsb",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.confirmCta": {
+      "translation": "减肥",
+      "hash": "6vssl0",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.refused": {
+      "translation": "beanies没有精简您的文件",
+      "hash": "a2s25r",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.refused.not-synced": {
+      "translation": "某些更改尚未到达云端。请等待同步完成，然后重试。",
+      "hash": "9hijws",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.refused.backup-not-delivered": {
+      "translation": "备份未保存，因此Beanies已停止。什么都没有改变。请重试，并在询问时保存文件。",
+      "hash": "spjvc7",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.refused.no-envelope": {
+      "translation": "beanies无法找到您的家庭文件详细信息。请重新加载并重试。",
+      "hash": "f0chr6",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.done": {
+      "translation": "您的家庭文件更薄",
+      "hash": "hclh0c",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.failed": {
+      "translation": "beanies无法精简您的文件",
+      "hash": "ba490x",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.failedHelp": {
+      "translation": "没有任何变化，您的数据是安全的。如果这种情况持续发生，请向support@beanies.family发送详细信息。",
+      "hash": "s6c287",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.publishFailed": {
+      "translation": "较薄的文件未保存到云端",
+      "hash": "w7vde8",
+      "lastUpdated": "2026-09-05"
+    },
+    "compaction.publishFailedHelp": {
+      "translation": "您的备份位于此设备上，您的数据是安全的。重新加载豆子，它将完成工作。",
+      "hash": "igqa52",
+      "lastUpdated": "2026-09-05"
+    },
+    "settings.compactPod": {
+      "translation": "精简家庭文件",
+      "hash": "enkmn1",
+      "lastUpdated": "2026-09-05"
+    },
+    "settings.compactPodDesc": {
+      "translation": "在没有编辑历史记录的情况下重写家庭文件，使其更快地打开并在旧版平板电脑上运行。仅限所有者。",
+      "hash": "1zopem",
       "lastUpdated": "2026-09-05"
     }
   }
