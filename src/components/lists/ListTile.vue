@@ -95,10 +95,12 @@ const statusPill = computed<Pill | null>(() => {
           class="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full px-2 py-0.5 text-xs font-semibold"
           :title="statusPill.text"
           :class="{
-            'bg-[var(--tint-orange-15)] text-[var(--color-primary-500)]':
+            'dark:text-accent-lift bg-[var(--tint-orange-15)] text-[var(--color-primary-500)]':
               statusPill.kind === 'due' || statusPill.kind === 'overdue',
-            'bg-[var(--tint-purple-12)] text-purple-600': statusPill.kind === 'recurring',
-            'bg-[rgba(42,157,143,0.12)] text-[#2a9d8f]': statusPill.kind === 'linked',
+            'dark:text-purple-lift bg-[var(--tint-purple-12)] text-purple-600':
+              statusPill.kind === 'recurring',
+            'dark:text-teal-lift bg-[rgba(42,157,143,0.12)] text-[#2a9d8f]':
+              statusPill.kind === 'linked',
           }"
         >
           <span aria-hidden="true">{{ statusPill.glyph }}</span> {{ statusPill.text }}

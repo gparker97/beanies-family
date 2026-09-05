@@ -207,7 +207,10 @@ function onOpenAdd(): void {
             {{ isBeanieMode ? member.name.toLowerCase() : member.name }}
           </h2>
         </div>
-        <p v-if="subtitle" class="font-caveat mt-1 text-xl text-[#E67E22]">
+        <p
+          v-if="subtitle"
+          class="font-caveat dark:text-terracotta-lift mt-1 text-xl text-[#E67E22]"
+        >
           {{ subtitle }}
         </p>
       </div>

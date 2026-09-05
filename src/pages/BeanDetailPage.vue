@@ -172,7 +172,7 @@ function selectTab(tab: BeanTabId): void {
       <p class="text-secondary-500/60 dark:text-ink-soft text-sm">{{ t('bean.notFound.body') }}</p>
       <button
         type="button"
-        class="font-outfit text-primary-500 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+        class="font-outfit text-primary-500 dark:text-accent-lift inline-flex items-center gap-1 text-sm font-semibold hover:underline"
         @click="router.push('/pod')"
       >
         <BeanieIcon name="chevron-left" size="xs" />

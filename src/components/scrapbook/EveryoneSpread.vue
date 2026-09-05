@@ -202,7 +202,7 @@ function onOpenAdd(): void {
       <span class="title-flourish" aria-hidden="true" />
       <p
         v-if="familyNameDisplay"
-        class="font-caveat mt-2 text-xl font-medium text-[#E67E22] italic sm:text-2xl"
+        class="font-caveat dark:text-terracotta-lift mt-2 text-xl font-medium text-[#E67E22] italic sm:text-2xl"
       >
         {{ familyNameDisplay }}
       </p>

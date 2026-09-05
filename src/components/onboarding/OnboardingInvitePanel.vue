@@ -214,14 +214,13 @@ function handleAddBeanFromWizard() {
 }
 
 .invite-lede {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 60%);
   font-size: 0.75rem;
   line-height: 1.5;
   margin-bottom: 12px;
-  opacity: 0.6;
 }
 
-.dark .invite-lede {
+html.dark .invite-lede {
   color: #c3ced6;
 }
 
@@ -261,22 +260,30 @@ function handleAddBeanFromWizard() {
 }
 
 .invite-email {
+  color: rgb(44 62 80 / 50%);
   flex: 1;
   font-family: Inter, sans-serif;
   font-size: 0.7rem;
   min-width: 0;
-  opacity: 0.5;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+html.dark .invite-email {
+  color: #9aa9b4;
+}
+
 .invite-noemail-hint {
+  color: rgb(44 62 80 / 50%);
   flex: 1;
   font-family: Outfit, sans-serif;
   font-size: 0.7rem;
   font-style: italic;
-  opacity: 0.5;
+}
+
+html.dark .invite-noemail-hint {
+  color: #9aa9b4;
 }
 
 .invite-send-btn {
@@ -317,16 +324,15 @@ function handleAddBeanFromWizard() {
 }
 
 .invite-reminder {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 55%);
   font-family: Caveat, cursive;
   font-size: 0.95rem;
   font-style: italic;
   font-weight: 500;
-  opacity: 0.55;
   text-align: center;
 }
 
-.dark .invite-reminder {
+html.dark .invite-reminder {
   color: #c3ced6;
 }
 </style>

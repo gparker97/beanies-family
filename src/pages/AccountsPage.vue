@@ -226,78 +226,82 @@ function getAccountTypeConfig(type: AccountType): {
     {
       checking: {
         bgColor: 'bg-sky-silk-100',
-        iconColor: 'text-primary-600',
+        iconColor: 'text-primary-600 dark:text-accent-lift',
         darkBgColor: 'dark:bg-primary-900/30',
       },
       savings: {
         bgColor: 'bg-green-100',
-        iconColor: 'text-green-600',
+        iconColor: 'text-green-600 dark:text-success-lift',
         darkBgColor: 'dark:bg-green-900/30',
       },
       credit_card: {
         bgColor: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        iconColor: 'text-orange-600 dark:text-terracotta-lift',
         darkBgColor: 'dark:bg-orange-900/30',
       },
       investment: {
         bgColor: 'bg-purple-100',
-        iconColor: 'text-purple-600',
+        iconColor: 'text-purple-600 dark:text-purple-lift',
         darkBgColor: 'dark:bg-purple-900/30',
       },
       crypto: {
         bgColor: 'bg-amber-100',
-        iconColor: 'text-amber-600',
+        iconColor: 'text-amber-600 dark:text-terracotta-lift',
         darkBgColor: 'dark:bg-amber-900/30',
       },
       retirement_401k: {
         bgColor: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
+        iconColor: 'text-indigo-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-indigo-900/30',
       },
       retirement_ira: {
         bgColor: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
+        iconColor: 'text-indigo-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-indigo-900/30',
       },
       retirement_roth_ira: {
         bgColor: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
+        iconColor: 'text-indigo-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-indigo-900/30',
       },
       retirement_bene_ira: {
         bgColor: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
+        iconColor: 'text-indigo-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-indigo-900/30',
       },
       retirement_kids_ira: {
         bgColor: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
+        iconColor: 'text-indigo-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-indigo-900/30',
       },
       retirement: {
         bgColor: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
+        iconColor: 'text-indigo-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-indigo-900/30',
       },
       education_529: {
         bgColor: 'bg-teal-100',
-        iconColor: 'text-teal-600',
+        iconColor: 'text-teal-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-teal-900/30',
       },
       education_savings: {
         bgColor: 'bg-teal-100',
-        iconColor: 'text-teal-600',
+        iconColor: 'text-teal-600 dark:text-silk-lift',
         darkBgColor: 'dark:bg-teal-900/30',
       },
       cash: {
         bgColor: 'bg-emerald-100',
-        iconColor: 'text-emerald-600',
+        iconColor: 'text-emerald-600 dark:text-success-lift',
         darkBgColor: 'dark:bg-emerald-900/30',
       },
-      loan: { bgColor: 'bg-red-100', iconColor: 'text-red-600', darkBgColor: 'dark:bg-red-900/30' },
+      loan: {
+        bgColor: 'bg-red-100',
+        iconColor: 'text-red-600 dark:text-danger-lift',
+        darkBgColor: 'dark:bg-red-900/30',
+      },
       other: {
         bgColor: 'bg-gray-100',
-        iconColor: 'text-gray-600',
+        iconColor: 'text-gray-600 dark:text-ink-soft',
         darkBgColor: 'dark:bg-surface-overlay',
       },
     };
@@ -610,7 +614,10 @@ async function deleteAccount(id: string) {
                       &middot; {{ account.institutionCountry }}</span
                     >
                   </p>
-                  <p v-if="account.linkedAssetId" class="text-primary-500 text-xs">
+                  <p
+                    v-if="account.linkedAssetId"
+                    class="text-primary-500 dark:text-accent-lift text-xs"
+                  >
                     {{
                       t('accounts.linkedTo').replace(
                         '{asset}',

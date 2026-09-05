@@ -48,7 +48,7 @@ const overNote = computed(() =>
         class="font-outfit inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold"
         :class="
           status.isOver
-            ? 'bg-[var(--tint-orange-15)] text-[#F15D22]'
+            ? 'dark:text-accent-lift bg-[var(--tint-orange-15)] text-[#F15D22]'
             : 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-8)] text-[#2C3E50]/70'
         "
       >
@@ -58,7 +58,7 @@ const overNote = computed(() =>
     </div>
     <div
       v-if="status.isOver"
-      class="font-inter mt-1.5 flex items-center gap-1.5 rounded-xl bg-[var(--tint-orange-8)] px-3 py-1.5 text-xs font-medium text-[#F15D22]"
+      class="font-inter dark:text-accent-lift mt-1.5 flex items-center gap-1.5 rounded-xl bg-[var(--tint-orange-8)] px-3 py-1.5 text-xs font-medium text-[#F15D22]"
     >
       <span aria-hidden="true">⚠️</span>
       <span>{{ overNote }}</span>

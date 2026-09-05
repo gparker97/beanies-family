@@ -768,6 +768,42 @@
   opacity: 0.4;
 }
 
+/* Kraft band — the pastel hero band on the scrapbook and timeline pages.
+   The light stops differ per page, so each caller passes its own via the
+   `--kraft-band` custom property rather than an inline `background`. That
+   matters: an inline `background` outranks every stylesheet rule, so the
+   band would stay pastel in dark mode while the heading inside it switched
+   to `ink` — white text on yellow. Routing the light value through a custom
+   property lets the dark partner below actually win. */
+.kraft-band {
+  background: var(--kraft-band);
+}
+
+/* The light variants. Each caller picks one instead of carrying an inline
+   gradient, so all four kraft surfaces are visible in one place and none of
+   them can drift apart again. */
+.kraft-band-scrapbook {
+  --kraft-band: linear-gradient(135deg, #fff7c8 0%, #ffe4d6 40%, #d4f1f4 80%, #e8f5e8 100%);
+}
+
+.kraft-band-timeline {
+  --kraft-band: linear-gradient(135deg, #fff7c8 0%, #ffe4d6 50%, #d4f1f4 100%);
+}
+
+.kraft-band-cookbook {
+  --kraft-band:
+    linear-gradient(135deg, rgb(44 62 80 / 4%) 0%, transparent 60%),
+    linear-gradient(to bottom right, #f4e4c1, #e8d4a8);
+}
+
+:root.dark .kraft-band {
+  /* Warm dark, opening on surface-paper so the band reads as the same
+     material as the scrapbook page beneath it, then settling onto
+     surface-raised. `ink` measures 14.42 on the first stop and 13.32 on
+     the last; `ink-soft` 9.86 / 9.11. */
+  background: linear-gradient(135deg, #2a2119 0%, #26343f 60%, #1e2a36 100%);
+}
+
 /* Taped paper card — kraft card with a small "tape strip" pseudo at
    the top-right corner. Self-positions (relative) so callers can add
    their own classes without colliding. */

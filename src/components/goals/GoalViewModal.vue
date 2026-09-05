@@ -242,7 +242,7 @@ watch(
           <button
             type="button"
             :aria-label="t('action.edit')"
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[var(--tint-orange-8)] text-[#F15D22] transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"
+            class="dark:text-accent-lift flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[var(--tint-orange-8)] text-[#F15D22] transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"
             @click="onEdit"
           >
             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

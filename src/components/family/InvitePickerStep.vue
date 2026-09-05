@@ -140,13 +140,13 @@ function handleSelect(tile: Tile): void {
           </div>
           <span
             v-if="tile.state === 'owner'"
-            class="font-outfit flex-shrink-0 rounded-full bg-[#E67E22]/15 px-2.5 py-1 text-[10.5px] font-semibold tracking-wide whitespace-nowrap text-[#B5591A]"
+            class="font-outfit dark:text-terracotta-lift flex-shrink-0 rounded-full bg-[#E67E22]/15 px-2.5 py-1 text-[10.5px] font-semibold tracking-wide whitespace-nowrap text-[#B5591A]"
           >
             {{ t('inviteWizard.picker.statusOwner') }}
           </span>
           <span
             v-else-if="tile.state === 'joined'"
-            class="font-outfit flex-shrink-0 rounded-full bg-[#AED6F1]/30 px-2.5 py-1 text-[10.5px] font-semibold tracking-wide whitespace-nowrap text-[#1E5A85]"
+            class="font-outfit dark:text-ink flex-shrink-0 rounded-full bg-[#AED6F1]/30 px-2.5 py-1 text-[10.5px] font-semibold tracking-wide whitespace-nowrap text-[#1E5A85]"
           >
             {{ t('inviteWizard.picker.statusJoined') }}
           </span>
@@ -164,7 +164,7 @@ function handleSelect(tile: Tile): void {
     <button
       type="button"
       data-testid="invite-picker-add-bean"
-      class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--color-primary)]/40 bg-transparent px-4 py-3.5 text-sm font-semibold text-[var(--color-primary)] transition-all hover:-translate-y-0.5 hover:border-solid hover:bg-[var(--tint-orange-8)] hover:shadow-[var(--color-primary)]/15 hover:shadow-md"
+      class="font-outfit dark:text-accent-lift flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--color-primary)]/40 bg-transparent px-4 py-3.5 text-sm font-semibold text-[var(--color-primary)] transition-all hover:-translate-y-0.5 hover:border-solid hover:bg-[var(--tint-orange-8)] hover:shadow-[var(--color-primary)]/15 hover:shadow-md"
       @click="emit('add-bean')"
     >
       <span class="text-lg leading-none font-normal" aria-hidden="true">+</span>

@@ -132,7 +132,7 @@ onBeforeUnmount(() => commitIfDirty());
       />
       <button
         type="button"
-        class="flex-shrink-0 text-sm text-[var(--color-primary-500)] transition-opacity hover:opacity-80"
+        class="dark:text-accent-lift flex-shrink-0 text-sm text-[var(--color-primary-500)] transition-opacity hover:opacity-80"
         :aria-label="t('action.save')"
         @pointerdown.prevent
         @click="onEnter"

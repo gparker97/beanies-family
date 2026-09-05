@@ -85,12 +85,21 @@ onMounted(() => {
   text-align: center;
 }
 
+html.dark .exclude-page {
+  background: #151e27;
+  color: #f2f5f7;
+}
+
 .card {
   background: white;
   border-radius: 24px;
   box-shadow: 0 4px 20px rgb(44 62 80 / 5%);
   max-width: 400px;
   padding: 40px 32px;
+}
+
+html.dark .card {
+  background: #1e2a36;
 }
 
 .emoji {

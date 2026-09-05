@@ -74,14 +74,18 @@ function handleSubmit(): void {
     <!-- Heritage Orange, never Alert Red: a mistyped link is routine, not a failure. -->
     <p
       class="font-outfit mt-1.5 text-xs"
-      :class="showError ? 'text-primary-500' : 'text-secondary-500/70 dark:text-ink-soft'"
+      :class="
+        showError
+          ? 'text-primary-500 dark:text-accent-lift'
+          : 'text-secondary-500/70 dark:text-ink-soft'
+      "
     >
       {{ t(hintKey) }}
     </p>
 
     <button
       type="button"
-      class="font-outfit text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold underline underline-offset-2 transition-colors"
+      class="font-outfit text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft dark:hover:text-accent-lift mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold underline underline-offset-2 transition-colors"
       @click="emit('document')"
     >
       <BeanieIcon name="image" size="sm" class="opacity-60" />

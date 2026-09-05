@@ -54,12 +54,12 @@ const quoteSize = computed(() => {
 
 <template>
   <article
-    class="relative rounded-lg shadow-[0_1px_2px_rgba(44,62,80,0.06),0_6px_20px_rgba(44,62,80,0.08)]"
-    :style="{ background, transform: `rotate(${rotation}deg)` }"
+    class="sticky-note relative rounded-lg shadow-[0_1px_2px_rgba(44,62,80,0.06),0_6px_20px_rgba(44,62,80,0.08)]"
+    :style="{ '--sticky-paper': background, transform: `rotate(${rotation}deg)` }"
   >
     <div class="px-4 pt-3.5 pb-4">
       <blockquote
-        class="text-secondary-500 font-caveat leading-tight font-medium"
+        class="text-secondary-500 dark:text-ink font-caveat leading-tight font-medium"
         :class="quoteSize"
       >
         <slot>{{ text }}</slot>
@@ -73,3 +73,24 @@ const quoteSize = computed(() => {
     </div>
   </article>
 </template>
+
+<style scoped>
+/* The pastel paper is passed in as a custom property rather than set as an
+   inline `background`, because an inline background outranks every
+   stylesheet rule — the note would stay pastel in dark mode while the
+   quote and footer switched to light ink, which is the "white text on a
+   yellow slab" defect. Routing it through a property lets the dark
+   partner below win.
+
+   Dark treatment matches `.scrap-taped` / `.bean-polaroid` in style.css:
+   the paper dims to a translucent warm wash and the ink goes light, so a
+   sticky note reads as paper in both themes rather than as a bright
+   sticker on a dark board. */
+.sticky-note {
+  background: var(--sticky-paper);
+}
+
+html.dark .sticky-note {
+  background: rgb(255 250 240 / 6%);
+}
+</style>

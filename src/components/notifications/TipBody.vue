@@ -71,7 +71,9 @@ function handleMute() {
         <div class="beanie-tip-header">
           <div class="beanie-tip-label">
             <span class="beanie-tip-bulb">💡</span>
-            <span class="font-outfit text-primary-500 text-xs font-bold tracking-[0.04em]">
+            <span
+              class="font-outfit text-primary-500 dark:text-accent-lift text-xs font-bold tracking-[0.04em]"
+            >
               {{ t('tips.label') }}
             </span>
           </div>
@@ -299,7 +301,7 @@ html.dark .beanie-tip::after {
 }
 
 html.dark .beanie-tip-mute {
-  color: rgb(107 114 128 / 70%);
+  color: #9aa9b4;
 }
 
 .beanie-tip-tryit {

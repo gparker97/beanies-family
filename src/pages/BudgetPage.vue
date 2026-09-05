@@ -430,12 +430,20 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 <span
                   v-if="isUnlocked"
                   class="font-outfit text-sm font-semibold"
-                  :class="cat.status === 'over' ? 'text-[#F15D22]' : 'dark:text-ink text-slate-700'"
+                  :class="
+                    cat.status === 'over'
+                      ? 'dark:text-accent-lift text-[#F15D22]'
+                      : 'dark:text-ink text-slate-700'
+                  "
                 >
                   {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
                   <span
                     class="text-xs font-normal"
-                    :class="cat.status === 'over' ? 'text-[#F15D22]/60' : 'text-slate-400'"
+                    :class="
+                      cat.status === 'over'
+                        ? 'dark:text-accent-lift text-[#F15D22]'
+                        : 'dark:text-ink-faint text-slate-400'
+                    "
                   >
                     / {{ formatInDisplayCurrency(cat.budgeted, settingsStore.baseCurrency) }}
                   </span>

@@ -42,22 +42,22 @@ const SLOT_META: Record<MealSlot, { emoji: string; band: string; ink: string }> 
   breakfast: {
     emoji: SLOT_EMOJI.breakfast,
     band: 'bg-[rgba(230,166,74,0.07)] dark:bg-[rgba(230,166,74,0.10)]',
-    ink: 'text-[#7d560f] dark:text-[#e3b063]',
+    ink: 'text-[#7d560f] dark:text-terracotta-lift',
   },
   lunch: {
     emoji: SLOT_EMOJI.lunch,
     band: 'bg-[rgba(174,214,241,0.16)] dark:bg-[rgba(174,214,241,0.10)]',
-    ink: 'text-[#2c3e50] dark:text-[#aed6f1]',
+    ink: 'text-[#2c3e50] dark:text-silk-lift',
   },
   dinner: {
     emoji: SLOT_EMOJI.dinner,
     band: 'bg-[rgba(241,93,34,0.06)] dark:bg-[rgba(241,93,34,0.10)]',
-    ink: 'text-[#b8420f] dark:text-[#f2865a]',
+    ink: 'text-[#b8420f] dark:text-accent-lift',
   },
   snack: {
     emoji: SLOT_EMOJI.snack,
     band: 'bg-[rgba(39,174,96,0.06)] dark:bg-[rgba(39,174,96,0.11)]',
-    ink: 'text-[#166534] dark:text-[#5fc98d]',
+    ink: 'text-[#166534] dark:text-success-lift',
   },
 };
 

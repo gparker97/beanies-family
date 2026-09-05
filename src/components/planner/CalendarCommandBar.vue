@@ -156,7 +156,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="font-outfit text-primary-500 hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
+            class="font-outfit text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
             @click="emit('today')"
           >
             {{ t('planner.today') }}

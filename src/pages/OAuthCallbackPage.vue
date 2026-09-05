@@ -120,7 +120,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-screen items-center justify-center bg-[#F8F9FA]">
-    <p class="font-outfit text-lg text-[#2C3E50]">{{ t('auth.loadingFile') }}</p>
+  <div class="dark:bg-surface-ground flex h-screen items-center justify-center bg-[#F8F9FA]">
+    <p class="font-outfit dark:text-ink text-lg text-[#2C3E50]">{{ t('auth.loadingFile') }}</p>
   </div>
 </template>

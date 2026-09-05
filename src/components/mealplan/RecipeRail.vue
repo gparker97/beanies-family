@@ -90,7 +90,9 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
     <div class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold">
       📖 {{ t('mealPlanner.cookbook') }}
     </div>
-    <p class="welcome-hint mt-0.5 text-[#F15D22]">{{ t('mealPlanner.railHint') }}</p>
+    <p class="welcome-hint dark:text-accent-lift mt-0.5 text-[#F15D22]">
+      {{ t('mealPlanner.railHint') }}
+    </p>
 
     <input
       v-model="query"
@@ -101,7 +103,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
 
     <button
       type="button"
-      class="font-outfit mt-2.5 w-full rounded-[14px] border-[1.5px] border-dashed border-[rgba(241,93,34,0.5)] bg-[var(--tint-orange-8)] py-2.5 text-sm font-bold text-[#F15D22]"
+      class="font-outfit dark:text-accent-lift mt-2.5 w-full rounded-[14px] border-[1.5px] border-dashed border-[rgba(241,93,34,0.5)] bg-[var(--tint-orange-8)] py-2.5 text-sm font-bold text-[#F15D22]"
       @click="addOpen = true"
     >
       ＋ {{ t('mealPlanner.newRecipe') }}
@@ -178,7 +180,7 @@ const ALT_TYPES: { kind: Exclude<MealKind, 'recipe'>; emoji: string; tile: strin
       "
     >
       <span class="text-2xl" aria-hidden="true">🗑️</span>
-      <span class="font-outfit text-sm font-bold text-[#F15D22]">
+      <span class="font-outfit dark:text-accent-lift text-sm font-bold text-[#F15D22]">
         {{ t('mealPlanner.removeHint') }}
       </span>
     </div>

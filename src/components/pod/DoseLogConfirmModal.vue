@@ -148,7 +148,9 @@ function onSave(): void {
           >💡</span
         >
         <div class="min-w-0 flex-1 pr-5">
-          <p class="font-outfit text-sm font-bold text-[#F15D22]">{{ overWarningTitle }}</p>
+          <p class="font-outfit dark:text-accent-lift text-sm font-bold text-[#F15D22]">
+            {{ overWarningTitle }}
+          </p>
           <p class="font-inter dark:text-ink-soft mt-1 text-xs leading-relaxed text-[#2C3E50]/75">
             {{ overWarningBody }}
           </p>
@@ -199,13 +201,17 @@ function onSave(): void {
           <BeanieTimeInput v-model="timeValue" :placeholder="t('medicationLog.timeFieldLabel')" />
           <button
             type="button"
-            class="font-outfit rounded-xl bg-[var(--tint-orange-8)] px-3 py-2 text-xs font-bold tracking-wider text-[#F15D22] uppercase transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"
+            class="font-outfit dark:text-accent-lift rounded-xl bg-[var(--tint-orange-8)] px-3 py-2 text-xs font-bold tracking-wider text-[#F15D22] uppercase transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"
             @click="resetToNow"
           >
             {{ t('medicationLog.now') }}
           </button>
         </div>
-        <p v-if="isFuture" class="font-inter mt-2 text-xs text-[#F15D22]" role="alert">
+        <p
+          v-if="isFuture"
+          class="font-inter dark:text-accent-lift mt-2 text-xs text-[#F15D22]"
+          role="alert"
+        >
           {{ t('medicationLog.errors.futureNotAllowed') }}
         </p>
       </section>

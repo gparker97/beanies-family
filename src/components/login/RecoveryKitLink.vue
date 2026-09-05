@@ -21,13 +21,13 @@ const { t } = useTranslation();
 <template>
   <button
     type="button"
-    class="mx-auto flex items-center gap-2 rounded-full bg-[#AED6F1]/20 px-4 py-2 text-xs font-semibold text-[#2C3E50] transition-all hover:-translate-y-px hover:bg-[#AED6F1]/35 disabled:opacity-40 dark:bg-[#AED6F1]/10 dark:text-[#AED6F1] dark:hover:bg-[#AED6F1]/20"
+    class="dark:text-silk-lift mx-auto flex items-center gap-2 rounded-full bg-[#AED6F1]/20 px-4 py-2 text-xs font-semibold text-[#2C3E50] transition-all hover:-translate-y-px hover:bg-[#AED6F1]/35 disabled:opacity-40 dark:bg-[#AED6F1]/10 dark:hover:bg-[#AED6F1]/20"
     :disabled="disabled"
     @click="emit('click')"
   >
     <!-- Life buoy: the universal "rescue" mark -->
     <svg
-      class="h-4 w-4 text-[#5B8DB8] dark:text-[#AED6F1]"
+      class="dark:text-silk-lift h-4 w-4 text-[#5B8DB8]"
       fill="none"
       stroke="currentColor"
       stroke-width="2"

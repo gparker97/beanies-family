@@ -237,11 +237,15 @@ async function handleSaved(id: string): Promise<void> {
       >
         {{ t('cookbook.title') }}
       </h1>
-      <p class="font-caveat mt-1 text-xl text-[#E67E22]">{{ t('cookbook.subtitle') }}</p>
+      <p class="font-caveat dark:text-terracotta-lift mt-1 text-xl text-[#E67E22]">
+        {{ t('cookbook.subtitle') }}
+      </p>
 
       <div class="relative mt-4 flex flex-wrap items-end gap-4 sm:gap-6">
         <div class="flex flex-col">
-          <span class="text-primary-500 font-outfit text-2xl leading-none font-extrabold">
+          <span
+            class="text-primary-500 dark:text-accent-lift font-outfit text-2xl leading-none font-extrabold"
+          >
             {{ recipes.length }}
           </span>
           <span
@@ -251,7 +255,9 @@ async function handleSaved(id: string): Promise<void> {
           </span>
         </div>
         <div class="flex flex-col">
-          <span class="text-primary-500 font-outfit text-2xl leading-none font-extrabold">
+          <span
+            class="text-primary-500 dark:text-accent-lift font-outfit text-2xl leading-none font-extrabold"
+          >
             {{ totalCookCount }}
           </span>
           <span
@@ -261,7 +267,9 @@ async function handleSaved(id: string): Promise<void> {
           </span>
         </div>
         <div v-if="avgRating > 0" class="flex flex-col">
-          <span class="text-primary-500 font-outfit text-2xl leading-none font-extrabold">
+          <span
+            class="text-primary-500 dark:text-accent-lift font-outfit text-2xl leading-none font-extrabold"
+          >
             ⭐ {{ avgRating }}
           </span>
           <span

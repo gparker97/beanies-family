@@ -344,7 +344,7 @@ function clearSelection() {
       class="font-outfit dark:text-ink-soft block text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
     >
       {{ label }}
-      <span v-if="required" class="text-primary-500">*</span>
+      <span v-if="required" class="text-primary-500 dark:text-accent-lift">*</span>
     </label>
 
     <!-- Trigger button -->

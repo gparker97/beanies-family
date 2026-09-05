@@ -640,7 +640,10 @@ const LIST_TEXTAREA_CLASS =
           />
           <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
              error. Same idiom as ActivityModal's low-confidence hint. -->
-          <p v-if="inferredIngredients.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+          <p
+            v-if="inferredIngredients.length"
+            class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs"
+          >
             {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
           </p>
         </FormFieldGroup>
@@ -652,7 +655,10 @@ const LIST_TEXTAREA_CLASS =
             :class="LIST_TEXTAREA_CLASS"
             :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
           />
-          <p v-if="inferredSteps.length" class="font-outfit text-primary-500 mt-1.5 text-xs">
+          <p
+            v-if="inferredSteps.length"
+            class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs"
+          >
             {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
           </p>
         </FormFieldGroup>
@@ -713,7 +719,7 @@ const LIST_TEXTAREA_CLASS =
             </p>
             <button
               type="button"
-              class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+              class="hover:border-primary-500 hover:text-primary-500 dark:hover:text-accent-lift flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!canSave || eager.isCreating.value"
               @click="handleAddFirstPhoto"
             >

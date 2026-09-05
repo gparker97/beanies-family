@@ -126,7 +126,7 @@ function onJoinDiscord(): void {
 }
 
 .dark .ob-complete {
-  background: linear-gradient(180deg, #1e3040 0%, #1a252f 50%, #261e18 100%);
+  background: linear-gradient(180deg, #1e2a36 0%, #151e27 50%, #2a2119 100%);
 }
 
 .ob-complete::before {
@@ -240,15 +240,14 @@ function onJoinDiscord(): void {
 }
 
 .ob-description {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 50%);
   font-size: 0.78rem;
   line-height: 1.6;
   margin: 0 auto 20px;
   max-width: 400px;
-  opacity: 0.5;
 }
 
-.dark .ob-description {
+html.dark .ob-description {
   color: #c3ced6;
 }
 
@@ -309,10 +308,14 @@ function onJoinDiscord(): void {
 }
 
 .ob-summary-label {
+  color: rgb(44 62 80 / 40%);
   font-family: Outfit, sans-serif;
   font-size: 0.5rem;
   font-weight: 600;
-  opacity: 0.4;
+}
+
+html.dark .ob-summary-label {
+  color: #9aa9b4;
 }
 
 @media (width >= 640px) {
@@ -406,14 +409,13 @@ function onJoinDiscord(): void {
 }
 
 .ob-discord-body {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 65%);
   font-size: 0.78rem;
   line-height: 1.5;
   margin: 0;
-  opacity: 0.65;
 }
 
-.dark .ob-discord-body {
+html.dark .ob-discord-body {
   color: #c3ced6;
 }
 
@@ -421,23 +423,26 @@ function onJoinDiscord(): void {
 .ob-skip {
   background: none;
   border: none;
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 45%);
   cursor: pointer;
   display: block;
   font-family: Outfit, sans-serif;
   font-size: 0.78rem;
   font-weight: 600;
   margin: 14px auto 0;
-  opacity: 0.45;
-  transition: opacity 0.15s;
+  transition: color 0.15s;
 }
 
 .ob-skip:hover {
-  opacity: 0.7;
+  color: rgb(44 62 80 / 70%);
 }
 
-.dark .ob-skip {
+html.dark .ob-skip {
   color: #9aa9b4;
+}
+
+html.dark .ob-skip:hover {
+  color: #f2f5f7;
 }
 
 .ob-cta:hover {
@@ -452,15 +457,14 @@ function onJoinDiscord(): void {
 }
 
 .ob-subtitle {
-  color: var(--deep-slate, #2c3e50);
+  color: rgb(44 62 80 / 30%);
   font-family: Outfit, sans-serif;
   font-size: 0.62rem;
   font-style: italic;
   margin-top: 16px;
-  opacity: 0.3;
 }
 
-.dark .ob-subtitle {
+html.dark .ob-subtitle {
   color: #9aa9b4;
 }
 

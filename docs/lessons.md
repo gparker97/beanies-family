@@ -4,6 +4,58 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A dark-mode sweep that only changes text colour creates the bug it is meant to fix
+
+**Date:** 2026-09-05
+**Context:** greg reported white text on a yellow banner in the scrapbook header and an
+unreadable family-note card on the recipe page. Both were _introduced_ by the previous
+dark-mode remediation, not missed by it.
+
+The remediation added `dark:text-ink` to headings and `dark:text-ink-soft` to captions
+across the app. On a `bg-white` card that is correct — the card had a `dark:bg-*` partner.
+But on `bg-[#fff7c8]`, or on an inline `style="background: linear-gradient(…pastel…)"`,
+the surface has no dark partner and never switches. The sweep flipped the ink to near-white
+and left the background yellow. Searching for `bg-white` finds none of these, and the lint
+rule cannot see an arbitrary hex or an inline style.
+
+A full audit then found the same shape in `StickyNote.vue` (three pastel papers), and two
+more hero bands built from the identical inline gradient.
+
+**Rules:**
+
+1. **When you add a dark ink to an element, audit the surface underneath in the same
+   edit.** The pair is the unit of work. A `dark:text-*` added alone is a half-change, and
+   the half that is missing is the one that makes text disappear.
+2. **An inline `style` background outranks every stylesheet rule** — no `dark:bg-*`
+   utility and no `html.dark` rule can override it. Pass the light value in as a custom
+   property and let the dark rule win. `.kraft-band` (`src/style.css`) and `.sticky-note`
+   are the reference pattern. A `<style scoped>` rule has the same problem for a different
+   reason: its `[data-v]` boost also beats the utility.
+3. **An invalid selector fails silently, and the symptom looks like specificity.** Three
+   dark rules shipped dead because a descendant combinator had been swallowed into a
+   `:not()` — `html.dark .about-cell:not(:first-child::before)` instead of
+   `…:not(:first-child)::before`, plus the same shape in `WhatsNewBody.vue` and
+   `BeanieSpinner.vue`. All three are the fingerprint of an earlier automated rewrite.
+   Before debugging a dead dark rule, check that its selector parses.
+4. **Reviving a dead rule means auditing what it contains.** `BeanieSpinner`'s revived rule
+   carried `rgb(189 195 199 / 50%)` — the old grey ramp at half alpha. Enabling it verbatim
+   would have introduced the low-contrast bug it looked like it was fixing.
+5. **Measure a contrast ratio; never assert one from memory.** I wrote "Heritage Orange on
+   the dark ground is 3.61:1" into the CIG, CLAUDE.md and the theme skill. It is 5.08. The
+   real finding was more useful than the invented one: Heritage Orange _passes_ on the page
+   ground and fails on every surface above it (4.40 on a card, 3.85 on an overlay), which is
+   exactly why it survived review for so long.
+6. **A missing token gets hand-rolled, every time.** Sky Silk is one of the five brand
+   colours and had no `-lift`, so blue accents on dark were written as one-off hexes — 14
+   distinct values, three of them under the floor. The fix is to add the token, not to keep
+   picking hexes. `silk-lift` and `teal-lift` now exist.
+7. **Define the token before you migrate call sites onto it.** I replaced 27 call sites with
+   `dark:text-silk-lift` while my `theme.css` edit had been reverted on disk, leaving 18
+   sites pointing at a token that did not exist — those utilities emit nothing, so the text
+   would have fallen back to its light colour. Verify the definition landed, then migrate.
+
+---
+
 ## A create-payload reused as an update-payload writes fields the user never touched — and a test that can't distinguish two values proves nothing
 
 **Date:** 2026-08-15

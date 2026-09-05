@@ -134,4 +134,17 @@
   --color-success-lift: #5fd08a; /* Growth green     8.72 / 7.55 */
   --color-danger-lift: #ff8484; /* Destructive      7.13 / 6.17 */
   --color-purple-lift: #cb95dd; /* To-do purple     7.12 / 6.17 */
+
+  /* Sky Silk is one of the five brand colours but had no lift, so every blue
+     accent on dark was being hand-rolled as an arbitrary hex — #1E5A85 (2.29
+     on ground), #3A7BAD (3.70) and #0077B6 (3.46) all shipped under the floor.
+     One token closes that gap.
+     Deliberately a shade deeper than Sky Silk itself (#AED6F1, 10.98): at that
+     lightness a blue accent reads as ink rather than as an accent. */
+  --color-silk-lift: #8fc7e8; /* Sky Silk         9.22 / 7.99 */
+
+  /* The travel/vacation teal family. The vacation teal itself (#00B4D8, 6.83 /
+     5.92) already clears AA and is left alone; this is for the darker members
+     of that family used as text (#0077B6, #2a9d8f). */
+  --color-teal-lift: #4fd1be; /* Travel teal      8.98 / 7.78 */
 }

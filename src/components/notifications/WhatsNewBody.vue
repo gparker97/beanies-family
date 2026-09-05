@@ -261,7 +261,7 @@ html.dark .wn-item-desc {
   width: 0.75rem;
 }
 
-html.dark .wn-list:not(.single .wn-item::before) {
+html.dark .wn-list:not(.single) .wn-item::before {
   box-shadow:
     0 0 0 4px #1e2a36,
     0 3px 8px -3px rgb(241 93 34 / 70%);

@@ -184,7 +184,7 @@ async function onCookLogClosed(): Promise<void> {
           <button
             v-if="recipe"
             type="button"
-            class="font-outfit flex-none text-xs font-semibold text-[#F15D22]"
+            class="font-outfit dark:text-accent-lift flex-none text-xs font-semibold text-[#F15D22]"
             @click="recipeEditOpen = true"
           >
             {{ t('mealPlanner.editor.editRecipe') }}
@@ -274,7 +274,7 @@ async function onCookLogClosed(): Promise<void> {
       <button
         v-if="isRecipe && meal?.recipeId && !meal.cooked"
         type="button"
-        class="font-outfit w-full rounded-xl border border-[rgba(241,93,34,0.35)] bg-[var(--tint-orange-8)] py-2.5 text-sm font-semibold text-[#F15D22]"
+        class="font-outfit dark:text-accent-lift w-full rounded-xl border border-[rgba(241,93,34,0.35)] bg-[var(--tint-orange-8)] py-2.5 text-sm font-semibold text-[#F15D22]"
         @click="openCookLog"
       >
         ✓ {{ t('mealPlanner.editor.markCooked') }}
@@ -282,7 +282,7 @@ async function onCookLogClosed(): Promise<void> {
       <button
         v-else-if="isRecipe && meal?.recipeId && meal.cooked"
         type="button"
-        class="font-outfit w-full rounded-xl border border-[rgba(39,174,96,0.35)] bg-[rgba(39,174,96,0.1)] py-2.5 text-sm font-semibold text-[#1e7a45]"
+        class="font-outfit dark:text-success-lift w-full rounded-xl border border-[rgba(39,174,96,0.35)] bg-[rgba(39,174,96,0.1)] py-2.5 text-sm font-semibold text-[#1e7a45]"
         @click="openCookLog"
       >
         📖 {{ t('mealPlanner.editor.viewCookLog') }}

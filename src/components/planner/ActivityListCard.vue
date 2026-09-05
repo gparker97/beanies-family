@@ -101,11 +101,17 @@ const identity = computed(() => identityFor(props.activity));
 
       <!-- Line 2: Time + recurrence + reminder + assignees -->
       <div class="mt-0.5 flex items-center gap-2">
-        <span v-if="activity.startTime" class="text-primary-500 text-xs font-medium">
+        <span
+          v-if="activity.startTime"
+          class="text-primary-500 dark:text-accent-lift text-xs font-medium"
+        >
           {{ formatTime12(activity.startTime)
           }}{{ activity.endTime ? ` - ${formatTime12(activity.endTime)}` : '' }}
         </span>
-        <span v-else-if="activity.isAllDay" class="text-primary-500 text-xs font-medium">
+        <span
+          v-else-if="activity.isAllDay"
+          class="text-primary-500 dark:text-accent-lift text-xs font-medium"
+        >
           {{ t('planner.allDay') }}
         </span>
         <!--

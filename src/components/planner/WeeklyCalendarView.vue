@@ -867,7 +867,9 @@ function onStripDayClick(dateStr: string) {
                   <ClashIndicator :clash="clashFor(activity.id, day.dateStr)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
-                  <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">
+                  <span
+                    class="text-primary-500 dark:text-accent-lift truncate text-[0.6875rem] leading-tight"
+                  >
                     {{ formatTime12(activity.startTime!)
                     }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
                   </span>

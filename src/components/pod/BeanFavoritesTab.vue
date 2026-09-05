@@ -100,7 +100,7 @@ function closeModal(): void {
         </span>
         <span
           v-if="f.recipeId && recipeExists(f.recipeId)"
-          class="font-outfit text-primary-500 mt-auto text-[0.6875rem] font-semibold hover:underline"
+          class="font-outfit text-primary-500 dark:text-accent-lift mt-auto text-[0.6875rem] font-semibold hover:underline"
           role="link"
           @click="(e: Event) => openRecipe(f.recipeId!, e)"
         >

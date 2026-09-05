@@ -70,7 +70,9 @@ const { presentation, tintClass, title, summary, when, roleLabel } = useNotifica
         <span
           class="font-outfit mt-1 block text-[0.6875rem] font-semibold"
           :class="
-            notification.overdue ? 'text-primary-600' : 'text-secondary-500/45 dark:text-ink-faint'
+            notification.overdue
+              ? 'text-primary-600 dark:text-accent-lift'
+              : 'text-secondary-500/45 dark:text-ink-faint'
           "
         >
           {{ when }}

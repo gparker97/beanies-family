@@ -86,7 +86,7 @@ function labelFor(id: BeanTabId): string {
       class="font-outfit flex flex-shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-semibold transition-colors sm:gap-2 sm:px-4"
       :class="
         tab.id === active
-          ? 'text-primary-500 border-primary-500 border-b-2'
+          ? 'text-primary-500 border-primary-500 dark:text-accent-lift dark:border-accent-lift border-b-2'
           : 'text-secondary-500/60 dark:text-ink-soft hover:text-secondary-500 dark:hover:text-ink border-b-2 border-transparent'
       "
       :aria-current="tab.id === active ? 'page' : undefined"
@@ -97,7 +97,11 @@ function labelFor(id: BeanTabId): string {
       <span
         v-if="tab.badge > 0"
         class="font-outfit inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1.5 py-0.5 text-[0.625rem] font-semibold"
-        :class="tab.id === active ? 'text-primary-500' : 'text-secondary-500/60 dark:text-ink-soft'"
+        :class="
+          tab.id === active
+            ? 'text-primary-500 dark:text-accent-lift'
+            : 'text-secondary-500/60 dark:text-ink-soft'
+        "
       >
         {{ tab.badge }}
       </span>

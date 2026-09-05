@@ -87,7 +87,11 @@ function handleSave(): void {
       <!-- Heritage Orange, never Alert Red: a mistyped link is routine, not a failure. -->
       <p
         class="font-outfit mt-1.5 text-xs"
-        :class="showError ? 'text-primary-500' : 'text-secondary-500/70 dark:text-ink-soft'"
+        :class="
+          showError
+            ? 'text-primary-500 dark:text-accent-lift'
+            : 'text-secondary-500/70 dark:text-ink-soft'
+        "
       >
         {{ t(hintKey) }}
       </p>

@@ -94,7 +94,7 @@ const liveMember = computed<FamilyMember | null>(
         style="background: var(--tint-orange-8)"
         aria-hidden="true"
       >
-        <BeanieIcon name="lock" size="md" class="text-primary-500" />
+        <BeanieIcon name="lock" size="md" class="text-primary-500 dark:text-accent-lift" />
       </div>
       <div class="min-w-0 flex-1">
         <h2

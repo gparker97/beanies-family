@@ -122,8 +122,7 @@ function openMilestone(m: Milestone): void {
 <template>
   <div class="space-y-6">
     <header
-      class="relative mb-5 overflow-hidden rounded-[var(--sq)] px-5 py-5 sm:px-8 sm:py-7"
-      style="background: linear-gradient(135deg, #fff7c8 0%, #ffe4d6 50%, #d4f1f4 100%)"
+      class="kraft-band kraft-band-timeline relative mb-5 overflow-hidden rounded-[var(--sq)] px-5 py-5 sm:px-8 sm:py-7"
     >
       <span
         class="pointer-events-none absolute top-3 right-7 text-[8.125rem] opacity-10"
@@ -147,7 +146,7 @@ function openMilestone(m: Milestone): void {
           >
             {{ t('milestones.pageTitle') }}
           </h1>
-          <p class="font-caveat mt-1 text-xl text-[#E67E22]">
+          <p class="font-caveat dark:text-terracotta-lift mt-1 text-xl text-[#E67E22]">
             {{ t('milestones.pageSubtitle') }}
           </p>
         </div>

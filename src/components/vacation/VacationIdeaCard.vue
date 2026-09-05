@@ -139,7 +139,7 @@ function patch(fields: Partial<VacationIdea>) {
             class="rounded-full px-2 py-0.5 text-[0.5625rem] font-semibold"
             :class="
               idea.costType === 'free'
-                ? 'bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                ? 'dark:text-success-lift bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                 : 'bg-[var(--tint-orange-8)] text-[var(--heritage-orange)]'
             "
           >
@@ -147,7 +147,7 @@ function patch(fields: Partial<VacationIdea>) {
           </span>
           <span
             v-if="idea.isPlanned"
-            class="rounded-full bg-[rgba(39,174,96,0.08)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[#27AE60]"
+            class="dark:text-success-lift rounded-full bg-[rgba(39,174,96,0.08)] px-2 py-0.5 text-[0.5625rem] font-semibold text-[#27AE60]"
           >
             {{ t('vacation.ideas.plannedPill') }}
           </span>
@@ -265,7 +265,7 @@ function patch(fields: Partial<VacationIdea>) {
             :class="
               idea.costType === ct
                 ? ct === 'free'
-                  ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                  ? 'dark:text-success-lift border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                   : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
                 : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
@@ -312,7 +312,7 @@ function patch(fields: Partial<VacationIdea>) {
             class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
             :class="
               idea.needsBooking === false
-                ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                ? 'dark:text-success-lift border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                 : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
             "
             :disabled="readOnly"

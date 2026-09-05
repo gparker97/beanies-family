@@ -137,7 +137,7 @@ function openViewer(): void {
     <div v-if="!disabled && photosEnabled" class="flex items-center gap-2 text-xs">
       <button
         type="button"
-        class="font-outfit text-primary-500 inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold transition-colors hover:bg-[var(--tint-orange-8)] disabled:opacity-50"
+        class="font-outfit text-primary-500 dark:text-accent-lift inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold transition-colors hover:bg-[var(--tint-orange-8)] disabled:opacity-50"
         :disabled="uploading"
         @click="picker.open()"
       >

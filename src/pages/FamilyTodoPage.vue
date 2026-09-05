@@ -238,7 +238,7 @@ async function handleAcknowledge(id: string) {
       <!-- Open Tasks -->
       <TodoSection
         :label="t('todo.section.open')"
-        label-class="text-purple-500"
+        label-class="text-purple-500 dark:text-purple-lift"
         :todos="displayedOpenTodos"
         :empty-text="t('todo.noTodos')"
         @toggle="handleToggle"

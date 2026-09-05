@@ -276,7 +276,7 @@ onBeforeUnmount(() => {
       class="font-outfit dark:text-ink-soft block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
     >
       {{ label }}
-      <span v-if="required" class="text-primary-500">*</span>
+      <span v-if="required" class="text-primary-500 dark:text-accent-lift">*</span>
     </label>
 
     <div ref="dropdownRef" class="relative inline-block w-full">
@@ -430,7 +430,7 @@ onBeforeUnmount(() => {
             >
               <button
                 type="button"
-                class="font-outfit text-primary-500 hover:text-primary-600 text-xs font-semibold transition-colors"
+                class="font-outfit text-primary-500 dark:text-accent-lift hover:text-primary-600 text-xs font-semibold transition-colors"
                 @click="selectNow"
               >
                 {{ t('time.now') }}

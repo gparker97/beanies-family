@@ -211,11 +211,11 @@ const showRecipePicker = computed(() => category.value === 'food');
       class="flex flex-col gap-2.5 rounded-[14px] border border-[var(--tint-orange-15)] bg-[var(--tint-orange-8)] p-3.5"
     >
       <div
-        class="font-outfit text-[0.6875rem] font-semibold tracking-[0.06em] text-[#E67E22] uppercase"
+        class="font-outfit dark:text-terracotta-lift text-[0.6875rem] font-semibold tracking-[0.06em] text-[#E67E22] uppercase"
       >
         {{ t('favorites.food.detailsLabel') }}
       </div>
-      <p class="font-caveat -mt-1 text-base text-[#E67E22]">
+      <p class="font-caveat dark:text-terracotta-lift -mt-1 text-base text-[#E67E22]">
         {{ t('favorites.food.hint') }}
       </p>
 

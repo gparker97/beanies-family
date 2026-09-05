@@ -26,7 +26,7 @@ defineProps<{
       </div>
     </div>
     <span
-      class="font-outfit flex-shrink-0 rounded-full bg-[rgba(0,180,216,0.1)] px-2.5 py-0.5 text-[0.625rem] font-semibold text-[#0077B6]"
+      class="font-outfit dark:text-silk-lift flex-shrink-0 rounded-full bg-[rgba(0,180,216,0.1)] px-2.5 py-0.5 text-[0.625rem] font-semibold text-[#0077B6]"
     >
       {{ typeLabel }}
     </span>

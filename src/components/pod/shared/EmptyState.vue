@@ -25,7 +25,7 @@ defineEmits<{
     <button
       v-if="actionLabel"
       type="button"
-      class="font-outfit text-primary-500 mt-1 text-xs font-semibold hover:underline"
+      class="font-outfit text-primary-500 dark:text-accent-lift mt-1 text-xs font-semibold hover:underline"
       @click="$emit('action')"
     >
       {{ actionLabel }}

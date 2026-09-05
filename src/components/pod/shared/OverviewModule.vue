@@ -63,7 +63,11 @@ defineEmits<{
         <span class="text-xl" aria-hidden="true">{{ emoji }}</span>
         <h3
           class="font-outfit truncate text-sm font-bold"
-          :class="tone === 'safety' ? 'text-primary-500' : 'text-secondary-500 dark:text-ink'"
+          :class="
+            tone === 'safety'
+              ? 'text-primary-500 dark:text-accent-lift'
+              : 'text-secondary-500 dark:text-ink'
+          "
         >
           {{ title }}
         </h3>
@@ -88,7 +92,7 @@ defineEmits<{
       <button
         v-if="viewAllLabel"
         type="button"
-        class="font-outfit text-primary-500 text-xs font-semibold transition-opacity hover:opacity-80"
+        class="font-outfit text-primary-500 dark:text-accent-lift text-xs font-semibold transition-opacity hover:opacity-80"
         @click.stop="$emit('view-all')"
       >
         {{ viewAllLabel }}

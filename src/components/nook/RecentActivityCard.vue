@@ -76,7 +76,10 @@ const activityItems = computed<ActivityItem[]>(() => {
     border-color="#27AE60"
   >
     <template #header-right>
-      <router-link to="/transactions" class="text-primary-500 text-xs font-medium">
+      <router-link
+        to="/transactions"
+        class="text-primary-500 dark:text-accent-lift text-xs font-medium"
+      >
         {{ t('nook.seeAll') }} &rarr;
       </router-link>
     </template>

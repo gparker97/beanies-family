@@ -6,7 +6,9 @@ defineProps<{ text: string }>();
 </script>
 
 <template>
-  <p class="welcome-subtitle text-xl text-[var(--color-primary-500)]">{{ text }}</p>
+  <p class="welcome-subtitle dark:text-accent-lift text-xl text-[var(--color-primary-500)]">
+    {{ text }}
+  </p>
 </template>
 
 <style scoped>

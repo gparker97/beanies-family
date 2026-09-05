@@ -379,7 +379,7 @@ function handleSave() {
               :class="
                 costType === ct
                   ? ct === 'free'
-                    ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                    ? 'dark:text-success-lift border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                     : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
                   : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
@@ -426,7 +426,7 @@ function handleSave() {
               class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
               :class="
                 needsBooking === false
-                  ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                  ? 'dark:text-success-lift border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                   : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="needsBooking = false"
@@ -454,7 +454,7 @@ function handleSave() {
               class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
               :class="
                 isPlanned
-                  ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                  ? 'dark:text-success-lift border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                   : 'dark:border-line-strong dark:text-ink-soft border-gray-200 text-gray-500'
               "
               @click="togglePlanned"

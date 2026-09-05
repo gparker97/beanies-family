@@ -337,7 +337,7 @@ const severeAllergyCount = computed(
             </span>
             <span class="truncate">{{ topFavorite.name }}</span>
             <span
-              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[rgb(230_126_34_/_12%)] px-2 py-0.5 text-[0.625rem] font-semibold text-[#E67E22]"
+              class="font-outfit dark:text-terracotta-lift inline-flex items-center gap-1 rounded-full bg-[rgb(230_126_34_/_12%)] px-2 py-0.5 text-[0.625rem] font-semibold text-[#E67E22]"
             >
               {{ FAV_EMOJI[topFavorite.category] }}
               {{ t(`favorites.category.${topFavorite.category}`) }}
