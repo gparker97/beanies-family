@@ -17,6 +17,7 @@
 import type { CollectionName } from '@/types/automerge';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
+import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
@@ -216,6 +217,17 @@ const payloadCodec = (Ctor: PayloadErrorCtor): ErrorCodec => ({
     ),
 });
 
+/**
+ * `PodLineageError`'s own codec — its constructor shape is (verdict, message),
+ * not the payload family's (message, step, familyId, bytes), so it cannot reuse
+ * `payloadCodec`.
+ */
+const lineageCodec: ErrorCodec = {
+  serialize: (err) => (err instanceof PodLineageError ? { verdict: err.verdict } : undefined),
+  reconstruct: (message, data) =>
+    new PodLineageError((data?.verdict as LineageVerdict) ?? 'conflict', message),
+};
+
 const ERROR_REGISTRY: Record<string, ErrorCodec> = {
   // ⚠️ Keys are LITERAL strings, never `Ctor.name`: the prod build minifies and
   // a mangled key would never match `serializeError`'s `err.name`, silently
@@ -228,6 +240,7 @@ const ERROR_REGISTRY: Record<string, ErrorCodec> = {
     serialize: () => undefined,
     reconstruct: (message) => new WorkerCrashError(message),
   },
+  PodLineageError: lineageCodec,
 };
 
 /** Convert any thrown value into a wire-safe `SerializedError`. Never throws. */
