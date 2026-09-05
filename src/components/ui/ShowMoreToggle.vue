@@ -33,8 +33,8 @@ defineEmits<{ 'show-more': []; 'show-less': [] }>();
 const { t } = useTranslation();
 
 const TONE_CLASSES: Record<NonNullable<Props['tone']>, string> = {
-  'on-light': 'py-2 text-primary-500 hover:bg-primary-500/5',
-  'on-light-purple': 'py-2 text-[#9B59B6] hover:bg-[#9B59B6]/5',
+  'on-light': 'py-2 text-primary-500 dark:text-accent-lift hover:bg-primary-500/5',
+  'on-light-purple': 'py-2 text-[#9B59B6] dark:text-purple-lift hover:bg-[#9B59B6]/5',
   'on-accent':
     'border border-white/[0.12] bg-white/[0.07] py-1.5 text-white/[0.78] hover:bg-white/[0.13] hover:text-white',
 };

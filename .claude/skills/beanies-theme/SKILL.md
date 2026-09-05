@@ -86,8 +86,18 @@ ink, unchanged.
 | `success-lift` | `#5FD08A` | 8.72 / 7.55 |
 | `danger-lift` | `#FF8484` | 7.13 / 6.17 |
 | `purple-lift` | `#CB95DD` | 7.12 / 6.17 |
+| `silk-lift` | `#8FC7E8` | 9.22 / 7.99 |
+| `teal-lift` | `#4FD1BE` | 8.98 / 7.78 |
 
-**Two traps that produced invisible text before this scale existed:**
+`silk-lift` was added because Sky Silk — one of the five brand colours — had no lift, so
+every blue accent on dark was hand-rolled as an arbitrary hex and three shipped under the
+floor (`#1E5A85` 2.29, `#0077B6` 3.46, `#3A7BAD` 3.70). It is deliberately a shade deeper
+than Sky Silk itself (`#AED6F1`, 10.98), which at that lightness reads as ink rather than
+as an accent. **If a brand colour has no lift, add the token — do not invent a one-off
+hex.**
+
+**Four traps that produce unreadable text. All four have shipped to production at least
+once; the CIG (`docs/brand/beanies-cig-v2.html`, slide 9) carries the same list.**
 
 1. **Never put an opacity modifier on text a person has to read.** `text-secondary-500/60`
    is Deep Slate at 60% — soft grey on white in light mode, but in dark mode it composites
@@ -123,6 +133,48 @@ ink, unchanged.
    The broken middle form was live in 86 rules across 31 components — none of that dark
    styling had ever applied. Only two rules in the codebase legitimately need the
    `:global()` form; every other one is a plain scoped rule.
+
+   A related failure has the same symptom: a dark rule whose selector is **invalid** is
+   dropped silently, so the light rule stays. Three shipped that way —
+   `html.dark .about-cell:not(:first-child::before)` and two siblings, where a descendant
+   combinator had been swallowed *into* the `:not()`. If a dark rule appears to do nothing,
+   check that its selector actually parses before assuming a specificity problem.
+
+3. **A hard-coded light background never switches, but the ink on top of it does.** This
+   is the one that reaches users as "white text on a yellow banner". `bg-[#fff7c8]` — or
+   an inline `style="background: linear-gradient(…)"` — has no dark partner, so it stays
+   pastel; meanwhile the `dark:text-ink` on the heading inside it resolves to `#F2F5F7`.
+   A sweep that adds `dark:text-*` without auditing the surface underneath *creates* this
+   defect.
+
+   Note the ordering hazard: **an inline `style` background outranks every stylesheet
+   rule**, so no `dark:bg-*` utility and no `html.dark` rule can override it. Pass the
+   light value in as a custom property instead and let the dark rule win — the pattern
+   used by `.kraft-band` (`src/style.css`) and `.sticky-note`:
+
+   ```html
+   <header class="kraft-band" style="--kraft-band: linear-gradient(…pastel…)">
+   ```
+
+   ```css
+   .kraft-band { background: var(--kraft-band); }
+   :root.dark .kraft-band { background: linear-gradient(…warm dark…); }
+   ```
+
+   For paper surfaces the house treatment is to **dim the paper and let the ink go light**
+   (`.scrap-taped`, `.scrap-ripped`, `.bean-polaroid`, `.sticky-note` all use
+   `rgb(255 250 240 / 6%)`), so a sticky note reads as paper in both themes rather than as
+   a bright sticker on a dark board.
+
+4. **An accent with no lift is under the AA floor without ever looking broken.** Heritage
+   Orange clears AA on the page ground (5.08) and then fails on every surface above it:
+   4.40 on `surface-raised`, 3.85 on `surface-overlay`, 3.31 on `surface-hover`. That is
+   what makes it a trap — it measures fine where you check it and fails where it actually
+   lives, on a card. It never vanishes, so it survives a screenshot review and fails a
+   real one, which is why ~120 sites accumulated it before this sweep.
+   Every accent used as readable text or a meaningful icon needs its `-lift` partner:
+   `class="text-primary-500 dark:text-accent-lift"`. Filled buttons are the exception and
+   keep true `primary-500` with white ink.
 
 ### Tinted Backgrounds
 

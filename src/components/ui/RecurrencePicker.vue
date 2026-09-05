@@ -349,7 +349,7 @@ function stepN(delta: number) {
       >
         <button
           type="button"
-          class="font-outfit h-10 w-9 text-lg font-semibold text-[var(--color-primary)]"
+          class="font-outfit dark:text-accent-lift h-10 w-9 text-lg font-semibold text-[var(--color-primary)]"
           :aria-label="t('recurrence.a11y.decrease')"
           @click="stepN(-1)"
         >
@@ -360,7 +360,7 @@ function stepN(delta: number) {
         }}</span>
         <button
           type="button"
-          class="font-outfit h-10 w-9 text-lg font-semibold text-[var(--color-primary)]"
+          class="font-outfit dark:text-accent-lift h-10 w-9 text-lg font-semibold text-[var(--color-primary)]"
           :aria-label="t('recurrence.a11y.increase')"
           @click="stepN(1)"
         >
@@ -482,7 +482,7 @@ function stepN(delta: number) {
         >
           <button
             type="button"
-            class="font-outfit h-9 w-8 font-semibold text-[var(--color-primary)]"
+            class="font-outfit dark:text-accent-lift h-9 w-8 font-semibold text-[var(--color-primary)]"
             :aria-label="t('recurrence.a11y.decrease')"
             @click="stepCount(-1)"
           >
@@ -493,7 +493,7 @@ function stepN(delta: number) {
           }}</span>
           <button
             type="button"
-            class="font-outfit h-9 w-8 font-semibold text-[var(--color-primary)]"
+            class="font-outfit dark:text-accent-lift h-9 w-8 font-semibold text-[var(--color-primary)]"
             :aria-label="t('recurrence.a11y.increase')"
             @click="stepCount(1)"
           >

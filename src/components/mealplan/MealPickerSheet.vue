@@ -136,7 +136,9 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
       <div
         class="dark:bg-surface-raised rounded-[14px] border border-[rgba(241,93,34,0.3)] bg-white p-3 shadow-[var(--card-shadow)]"
       >
-        <p class="quick-hint text-[#F15D22]">{{ t('mealPlanner.picker.quickAddHint') }}</p>
+        <p class="quick-hint dark:text-accent-lift text-[#F15D22]">
+          {{ t('mealPlanner.picker.quickAddHint') }}
+        </p>
         <div class="mt-2 flex gap-2">
           <input
             v-model="quickName"

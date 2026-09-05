@@ -384,7 +384,7 @@ async function handleDelete(): Promise<void> {
              tap away, which saves, consistent with the item rows). -->
         <button
           type="button"
-          class="flex-shrink-0 text-base text-[var(--color-primary-500)] transition-opacity hover:opacity-80"
+          class="dark:text-accent-lift flex-shrink-0 text-base text-[var(--color-primary-500)] transition-opacity hover:opacity-80"
           :aria-label="t('action.save')"
           @pointerdown.prevent
           @click="inline.saveField('title')"
@@ -682,8 +682,12 @@ html.dark .setsec {
 }
 
 .unlink {
+  color: rgb(44 62 80 / 70%);
   margin-left: 0.25rem;
-  opacity: 0.7;
+}
+
+html.dark .unlink {
+  color: #9aa9b4;
 }
 
 .picker-row {

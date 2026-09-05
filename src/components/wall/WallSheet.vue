@@ -738,7 +738,7 @@ const { identityFor } = useActivityIdentity();
               </span>
               <span
                 v-else-if="tripDetail.booking.total"
-                class="font-outfit wall-card-sub rounded-lg bg-[rgba(39,174,96,0.12)] px-2 py-0.5 font-semibold text-[#1e8449] dark:text-[#6fcf97]"
+                class="font-outfit wall-card-sub dark:text-success-lift rounded-lg bg-[rgba(39,174,96,0.12)] px-2 py-0.5 font-semibold text-[#1e8449]"
               >
                 <span aria-hidden="true">✓</span> {{ t('wall.trip.allBooked') }}
               </span>

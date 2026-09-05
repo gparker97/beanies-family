@@ -28,11 +28,11 @@ withDefaults(
 );
 
 const ACCENT_CLASS: Record<NonNullable<Stat['accent']>, string> = {
-  primary: 'text-primary-500',
-  secondary: 'text-secondary-500',
-  success: 'text-[#27AE60]',
-  silk: 'text-[#3498DB]',
-  terracotta: 'text-[#E67E22]',
+  primary: 'text-primary-500 dark:text-accent-lift',
+  secondary: 'text-secondary-500 dark:text-ink',
+  success: 'text-[#27AE60] dark:text-success-lift',
+  silk: 'text-[#3498DB] dark:text-silk-lift',
+  terracotta: 'text-[#E67E22] dark:text-terracotta-lift',
 };
 </script>
 

@@ -240,7 +240,10 @@ watch(recipe, (now, before) => {
           >
             {{ recipe.name }}
           </h1>
-          <p v-if="recipe.subtitle" class="font-caveat mt-1 text-xl text-[#E67E22]">
+          <p
+            v-if="recipe.subtitle"
+            class="font-caveat dark:text-terracotta-lift mt-1 text-xl text-[#E67E22]"
+          >
             {{ recipe.subtitle }}
           </p>
           <div
@@ -290,7 +293,9 @@ watch(recipe, (now, before) => {
           >
             <span aria-hidden="true">🔗</span>
             <span>{{ t('recipes.detail.source') }}</span>
-            <strong class="font-outfit text-primary-500 font-semibold underline underline-offset-2">
+            <strong
+              class="font-outfit text-primary-500 dark:text-accent-lift font-semibold underline underline-offset-2"
+            >
               {{ getUrlDomain(recipe.sourceUrl ?? '') }}
             </strong>
           </a>
@@ -345,7 +350,8 @@ watch(recipe, (now, before) => {
               :key="i"
               class="font-inter text-secondary-500/80 dark:text-ink-soft flex gap-3 text-sm leading-relaxed"
             >
-              <span class="font-outfit text-primary-500 flex-shrink-0 text-xs leading-5 font-bold"
+              <span
+                class="font-outfit text-primary-500 dark:text-accent-lift flex-shrink-0 text-xs leading-5 font-bold"
                 >{{ i + 1 }}.</span
               >
               <span>{{ step }}</span>
@@ -360,7 +366,7 @@ watch(recipe, (now, before) => {
       <!-- Notes -->
       <section
         v-if="recipe.notes"
-        class="font-caveat text-secondary-500 dark:text-ink mb-6 rounded-[20px] bg-[#fff7c8] p-6 text-lg leading-snug"
+        class="font-caveat text-secondary-500 dark:text-ink dark:bg-surface-paper mb-6 rounded-[20px] bg-[#fff7c8] p-6 text-lg leading-snug"
         style="box-shadow: var(--card-shadow); transform: rotate(-0.4deg)"
       >
         📝 {{ recipe.notes }}
@@ -465,7 +471,7 @@ watch(recipe, (now, before) => {
       </p>
       <button
         type="button"
-        class="font-outfit text-primary-500 text-sm font-semibold hover:underline"
+        class="font-outfit text-primary-500 dark:text-accent-lift text-sm font-semibold hover:underline"
         @click="router.push('/pod/cookbook')"
       >
         {{ t('recipes.detail.backToCookbook') }}

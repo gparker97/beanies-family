@@ -167,13 +167,17 @@ function onMoreClick(event: MouseEvent) {
     <div class="flex w-10 flex-shrink-0 flex-col items-center gap-0.5 pt-0.5 md:hidden">
       <span
         class="text-[0.625rem] font-bold tracking-[0.14em] uppercase"
-        :class="cell.isToday ? 'text-primary-500' : 'text-secondary-500/50 dark:text-ink-faint'"
+        :class="
+          cell.isToday
+            ? 'text-primary-500 dark:text-accent-lift'
+            : 'text-secondary-500/50 dark:text-ink-faint'
+        "
       >
         {{ dowLabel }}
       </span>
       <span
         class="text-lg leading-none font-semibold"
-        :class="cell.isToday ? 'text-primary-500' : ''"
+        :class="cell.isToday ? 'text-primary-500 dark:text-accent-lift' : ''"
       >
         {{ cell.day }}
       </span>
@@ -187,7 +191,7 @@ function onMoreClick(event: MouseEvent) {
           cell.allDayItems.length === 0 &&
           cell.holidays.length === 0
         "
-        class="text-primary-500 mt-0.5 text-[0.5625rem] font-bold tracking-[0.12em] uppercase"
+        class="text-primary-500 dark:text-accent-lift mt-0.5 text-[0.5625rem] font-bold tracking-[0.12em] uppercase"
       >
         {{ t('planner.today') }}
       </span>

@@ -178,7 +178,7 @@ defineExpose({
         :class="
           tone === 'dark'
             ? 'border-white/20 text-white/70 hover:bg-white/5'
-            : 'hover:text-primary-500 border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
+            : 'hover:text-primary-500 dark:hover:text-accent-lift border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
         "
         @click="cameraPicker.open"
       >
@@ -192,7 +192,7 @@ defineExpose({
         :class="
           tone === 'dark'
             ? 'border-white/20 text-white/70 hover:bg-white/5'
-            : 'hover:text-primary-500 border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
+            : 'hover:text-primary-500 dark:hover:text-accent-lift border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
         "
         @click="galleryPicker.open"
       >

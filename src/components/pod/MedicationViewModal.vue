@@ -265,7 +265,9 @@ const scheduleMeta = computed(() => {
           {{ medication.name }}
         </h2>
         <p class="font-outfit dark:text-ink-soft text-sm text-[#2C3E50]/70">
-          <span class="font-semibold text-[#F15D22]">{{ medication.dose }}</span>
+          <span class="dark:text-accent-lift font-semibold text-[#F15D22]">{{
+            medication.dose
+          }}</span>
           <span class="dark:text-ink-soft mx-1.5 text-[#2C3E50]/30" aria-hidden="true">·</span>
           <span>{{ medication.frequency }}</span>
         </p>

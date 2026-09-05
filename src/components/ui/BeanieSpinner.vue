@@ -222,8 +222,12 @@ const showHalo = computed(() => props.halo ?? props.label);
   color: rgb(44 62 80 / 50%);
 }
 
-html.dark .beanie-spinner:not(.bs-atmospheric .bs-label-text) {
-  color: rgb(189 195 199 / 50%);
+html.dark .beanie-spinner:not(.bs-atmospheric) .bs-label-text {
+  /* ink-faint at full alpha. The previous value was the old grey ramp at
+     50%, which composites toward the ground — and the rule was dead, so
+     enabling it at that value would have introduced the bug it looked
+     like it was fixing. */
+  color: #9aa9b4;
 }
 
 /* ── Keyframes ────────────────────────────────────────────────────────── */

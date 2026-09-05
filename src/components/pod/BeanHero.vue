@@ -177,7 +177,7 @@ function onAddButtonClick(): void {
     <!-- Top-left back link (breadcrumb-style; sits above the avatar + name row) -->
     <button
       type="button"
-      class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft -ml-1 inline-flex w-fit items-center gap-1 text-xs font-semibold transition-colors"
+      class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft dark:hover:text-accent-lift -ml-1 inline-flex w-fit items-center gap-1 text-xs font-semibold transition-colors"
       @click="router.push('/pod')"
     >
       <BeanieIcon name="chevron-left" size="xs" />

@@ -526,7 +526,7 @@ async function confirmSignOutAndClearData() {
         <h1 class="font-outfit text-secondary-500 dark:text-ink truncate text-lg font-bold">
           {{ isNookOrDashboard ? greeting : pageTitle }}
         </h1>
-        <p class="font-outfit text-primary-500 text-xs font-medium">
+        <p class="font-outfit text-primary-500 dark:text-accent-lift text-xs font-medium">
           {{ todayFormatted }}
         </p>
       </div>
@@ -551,7 +551,7 @@ async function confirmSignOutAndClearData() {
             "
             @click="selectCurrencyChip(chip.code)"
           >
-            <span class="text-[#27AE60]">{{ chip.symbol }}</span>
+            <span class="dark:text-success-lift text-[#27AE60]">{{ chip.symbol }}</span>
             {{ chip.code }}
           </button>
         </div>
@@ -564,7 +564,7 @@ async function confirmSignOutAndClearData() {
             @click="showCurrencyDropdown = !showCurrencyDropdown"
             @blur="closeCurrencyDropdown"
           >
-            <span class="text-[#27AE60]">{{
+            <span class="dark:text-success-lift text-[#27AE60]">{{
               currentCurrencyInfo?.symbol || settingsStore.displayCurrency
             }}</span>
             {{ settingsStore.displayCurrency }}

@@ -216,7 +216,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
           </div>
           <router-link
             to="/transactions"
-            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+            class="text-primary-500 hover:text-primary-600 dark:text-accent-lift text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>
@@ -268,7 +268,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
           </div>
           <router-link
             to="/transactions"
-            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+            class="text-primary-500 hover:text-primary-600 dark:text-accent-lift text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>
@@ -311,7 +311,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
           </div>
           <router-link
             to="/assets"
-            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+            class="text-primary-500 hover:text-primary-600 dark:text-accent-lift text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>
@@ -369,7 +369,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
           </div>
           <router-link
             to="/accounts"
-            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+            class="text-primary-500 hover:text-primary-600 dark:text-accent-lift text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>

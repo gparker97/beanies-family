@@ -1006,7 +1006,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         @click="toggleDirection('income')"
       >
         <template #icon>
-          <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
+          <BeanieIcon name="arrow-up" size="md" class="dark:text-success-lift text-[#27AE60]" />
         </template>
       </SummaryStatCard>
 
@@ -1119,8 +1119,8 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         class="font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors"
         :class="
           directionFilter === 'income'
-            ? 'bg-[rgba(39,174,96,0.12)] text-[#27AE60] dark:bg-[rgba(39,174,96,0.2)]'
-            : 'text-primary-500 dark:bg-primary-900/20 bg-[var(--tint-orange-8)]'
+            ? 'dark:text-success-lift bg-[rgba(39,174,96,0.12)] text-[#27AE60] dark:bg-[rgba(39,174,96,0.2)]'
+            : 'text-primary-500 dark:text-accent-lift dark:bg-primary-900/20 bg-[var(--tint-orange-8)]'
         "
         @click="directionFilter = 'all'"
       >
@@ -1243,7 +1243,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                   />
                   <span
                     v-if="tx.recurringItemId"
-                    class="text-primary-500 dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
+                    class="text-primary-500 dark:text-accent-lift dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
                   >
                     {{ t('transactions.typeRecurring') }}
                   </span>
@@ -1322,7 +1322,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
             <div class="hidden md:block">
               <span
                 v-if="tx.recurringItemId"
-                class="text-primary-500 dark:bg-primary-900/20 inline-block rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
+                class="text-primary-500 dark:text-accent-lift dark:bg-primary-900/20 inline-block rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
               >
                 {{ getRecurringFrequencyLabel(tx) }}
               </span>

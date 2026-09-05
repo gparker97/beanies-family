@@ -108,7 +108,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
       class="dark:bg-surface-raised relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6"
     >
       <div
-        class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-[var(--card-shadow)] sm:h-14 sm:w-14 sm:text-3xl"
+        class="dark:bg-surface-overlay flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-[var(--card-shadow)] sm:h-14 sm:w-14 sm:text-3xl"
         aria-hidden="true"
       >
         🏥
@@ -128,7 +128,9 @@ function emailFor(c: EmergencyContact, e: Event): void {
           {{ t('contacts.title') }}
         </h1>
         <p class="text-secondary-500/75 dark:text-ink-soft mt-1 text-sm">
-          <span class="font-caveat text-[#E67E22]">{{ t('contacts.subtitleLead') }}</span>
+          <span class="font-caveat dark:text-terracotta-lift text-[#E67E22]">{{
+            t('contacts.subtitleLead')
+          }}</span>
           <br />
           {{ t('contacts.subtitle') }}
         </p>
@@ -224,7 +226,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
                 </h3>
                 <span
                   v-if="c.category === 'other' && c.customCategory"
-                  class="font-outfit inline-flex items-center rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-bold tracking-wide text-[var(--color-primary)] uppercase"
+                  class="font-outfit dark:text-accent-lift inline-flex items-center rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.625rem] font-bold tracking-wide text-[var(--color-primary)] uppercase"
                 >
                   {{ c.customCategory }}
                 </span>
@@ -254,7 +256,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
               <a
                 v-if="c.phone"
                 :href="`tel:${c.phone.replace(/[^\d+]/g, '')}`"
-                class="text-primary-500 hover:bg-primary-500/10 flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+                class="text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
                 :title="t('contacts.action.call')"
                 @click="(e: Event) => callFor(c, e)"
               >
@@ -263,7 +265,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
               <a
                 v-if="c.email"
                 :href="`mailto:${c.email}`"
-                class="text-primary-500 hover:bg-primary-500/10 flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+                class="text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
                 :title="t('contacts.action.email')"
                 @click="(e: Event) => emailFor(c, e)"
               >

@@ -416,7 +416,7 @@ async function runExport(format: ExportFormat): Promise<void> {
       <button
         v-if="!isCurrentWeek"
         type="button"
-        class="font-outfit text-sm font-semibold text-[#F15D22]"
+        class="font-outfit dark:text-accent-lift text-sm font-semibold text-[#F15D22]"
         @click="goToToday"
       >
         {{ t('mealPlanner.thisWeek') }}

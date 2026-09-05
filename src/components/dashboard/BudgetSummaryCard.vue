@@ -88,7 +88,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
       </div>
       <router-link
         to="/budgets"
-        class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+        class="text-primary-500 hover:text-primary-600 dark:text-accent-lift text-xs font-medium"
       >
         {{ t('dashboard.seeAll') }}
       </router-link>
@@ -101,7 +101,7 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
         {{ t('dashboard.noBudget') }}
       </p>
       <button
-        class="text-primary-500 hover:text-primary-600 mt-2 text-xs font-medium"
+        class="text-primary-500 hover:text-primary-600 dark:text-accent-lift mt-2 text-xs font-medium"
         @click="router.push('/budgets')"
       >
         {{ t('dashboard.createBudget') }}
@@ -187,12 +187,20 @@ function categoryBarColor(cat: CategoryBudgetInfo): string {
               <span
                 v-if="isUnlocked"
                 class="font-outfit text-xs font-semibold"
-                :class="cat.status === 'over' ? 'text-[#F15D22]' : 'dark:text-ink text-slate-700'"
+                :class="
+                  cat.status === 'over'
+                    ? 'dark:text-accent-lift text-[#F15D22]'
+                    : 'dark:text-ink text-slate-700'
+                "
               >
                 {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
                 <span
                   class="font-normal"
-                  :class="cat.status === 'over' ? 'text-[#F15D22]/60' : 'text-slate-400'"
+                  :class="
+                    cat.status === 'over'
+                      ? 'dark:text-accent-lift text-[#F15D22]'
+                      : 'dark:text-ink-faint text-slate-400'
+                  "
                 >
                   / {{ formatInDisplayCurrency(cat.budgeted, settingsStore.baseCurrency) }}
                 </span>

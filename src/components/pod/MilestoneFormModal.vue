@@ -403,7 +403,7 @@ async function handleDelete(): Promise<void> {
         v-else
         type="button"
         :disabled="selectedMemberId === undefined || eager.isCreating.value"
-        class="font-outfit text-secondary-500 hover:border-primary-500 hover:text-primary-500 dark:text-ink flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
+        class="font-outfit text-secondary-500 hover:border-primary-500 hover:text-primary-500 dark:text-ink dark:hover:text-accent-lift flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
         @click="handleAddFirstPhoto"
       >
         <span class="text-2xl" aria-hidden="true">📷</span>
