@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-04",
-    "translationCount": 4493
+    "lastUpdated": "2026-09-05",
+    "translationCount": 4495
   },
   "translations": {
     "app.name": {
@@ -137,9 +137,9 @@
       "lastUpdated": "2026-03-03"
     },
     "nav.forecast": {
-      "translation": "天氣預報",
+      "translation": "预测",
       "hash": "8sd9nf",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "nav.family": {
       "translation": "家庭中心",
@@ -182,7 +182,7 @@
       "lastUpdated": "2026-03-03"
     },
     "action.confirm": {
-      "translation": "確認",
+      "translation": "确认",
       "hash": "rrr0bk",
       "lastUpdated": "2026-03-03"
     },
@@ -197,9 +197,9 @@
       "lastUpdated": "2026-03-03"
     },
     "action.next": {
-      "translation": "下一頁",
+      "translation": "下一步",
       "hash": "1fytv",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "action.submit": {
       "translation": "提交",
@@ -212,9 +212,9 @@
       "lastUpdated": "2026-03-03"
     },
     "action.filter": {
-      "translation": "籂選",
+      "translation": "筛选",
       "hash": "ysvd08",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "action.clear": {
       "translation": "清楚",
@@ -227,9 +227,9 @@
       "lastUpdated": "2026-03-03"
     },
     "action.loading": {
-      "translation": "正在載入...",
+      "translation": "加载中...",
       "hash": "vb9ooe",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "action.pause": {
       "translation": "暂停",
@@ -377,9 +377,9 @@
       "lastUpdated": "2026-02-10"
     },
     "recurring.next": {
-      "translation": "下一頁",
+      "translation": "下一步",
       "hash": "1fytv",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "accounts.title": {
       "translation": "账户",
@@ -437,9 +437,9 @@
       "lastUpdated": "2026-03-03"
     },
     "accounts.type.checking": {
-      "translation": "往來戶口",
+      "translation": "支票账户",
       "hash": "7jgly1",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "accounts.type.savings": {
       "translation": "储蓄账户",
@@ -667,7 +667,7 @@
       "lastUpdated": "2026-03-03"
     },
     "assets.type.vehicle": {
-      "translation": "車輛",
+      "translation": "车辆",
       "hash": "x6r0uk",
       "lastUpdated": "2026-03-03"
     },
@@ -962,9 +962,9 @@
       "lastUpdated": "2026-03-03"
     },
     "forecast.title": {
-      "translation": "天氣預報",
+      "translation": "预测",
       "hash": "8sd9nf",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "forecast.noData": {
       "translation": "尚无可用于预测的数据。",
@@ -1242,7 +1242,7 @@
       "lastUpdated": "2026-03-03"
     },
     "form.frequency.weekly": {
-      "translation": "每週",
+      "translation": "每周",
       "hash": "s8sy1r",
       "lastUpdated": "2026-03-03"
     },
@@ -1302,12 +1302,12 @@
       "lastUpdated": "2026-03-03"
     },
     "validation.required": {
-      "translation": "必須填寫這一欄位",
+      "translation": "此项为必填",
       "hash": "16025",
-      "lastUpdated": "2026-02-10"
+      "lastUpdated": "2026-09-05"
     },
     "validation.invalidEmail": {
-      "translation": "請輸入有效的電子郵件地址",
+      "translation": "请输入有效的电子邮件地址",
       "hash": "jw84of",
       "lastUpdated": "2026-02-10"
     },
@@ -1317,9 +1317,9 @@
       "lastUpdated": "2026-02-10"
     },
     "validation.minLength": {
-      "translation": "必须至少为 [missing] 个字符",
+      "translation": "至少需要 {min} 个字符",
       "hash": "fvrjy",
-      "lastUpdated": "2026-02-10"
+      "lastUpdated": "2026-09-05"
     },
     "confirm.delete": {
       "translation": "是否确定要删除此项目？",
@@ -1657,7 +1657,7 @@
       "lastUpdated": "2026-03-03"
     },
     "date.allTime": {
-      "translation": "所有時間",
+      "translation": "所有时间",
       "hash": "ttx99o",
       "lastUpdated": "2026-03-03"
     },
@@ -1767,9 +1767,9 @@
       "lastUpdated": "2026-03-03"
     },
     "dashboard.upcoming": {
-      "translation": "近期賽事",
+      "translation": "即将到来",
       "hash": "moghmk",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "dashboard.noRecurringItems": {
       "translation": "尚无定期项目",
@@ -1882,9 +1882,9 @@
       "lastUpdated": "2026-03-03"
     },
     "transactions.net": {
-      "translation": "對銷金額",
+      "translation": "净额",
       "hash": "1ocd",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "transactions.noTransactionsForPeriod": {
       "translation": "未找到此期间的交易",
@@ -2692,9 +2692,9 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.pickBeanSubtitle": {
-      "translation": "你的個人資料",
+      "translation": "选择你的个人资料",
       "hash": "xrr7zv",
-      "lastUpdated": "2026-05-14"
+      "lastUpdated": "2026-09-05"
     },
     "loginV6.parentBean": {
       "translation": "成人",
@@ -2732,9 +2732,9 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.createNext": {
-      "translation": "下一頁",
+      "translation": "下一步",
       "hash": "1fytv",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "loginV6.createButton": {
       "translation": "创建Pod",
@@ -3492,9 +3492,9 @@
       "lastUpdated": "2026-02-26"
     },
     "nook.viewAll": {
-      "translation": "檢視全部",
+      "translation": "查看全部",
       "hash": "ktimxy",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "nook.moretasks": {
       "translation": "更多任务",
@@ -3512,9 +3512,9 @@
       "lastUpdated": "2026-03-03"
     },
     "nook.upcoming": {
-      "translation": "近期賽事",
+      "translation": "即将到来",
       "hash": "moghmk",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "nook.daysAway": {
       "translation": "还有{days}天",
@@ -3562,7 +3562,7 @@
       "lastUpdated": "2026-03-03"
     },
     "nook.noEvents": {
-      "translation": "沒有安排的活動。",
+      "translation": "没有安排的活动。",
       "hash": "a2dqgr",
       "lastUpdated": "2026-03-03"
     },
@@ -3602,9 +3602,9 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.recommended": {
-      "translation": "建議使用",
+      "translation": "推荐",
       "hash": "jo0amd",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "loginV6.googleDriveCardDesc": {
       "translation": "从云存储加载",
@@ -3907,7 +3907,7 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.recurrence.weekly": {
-      "translation": "每週",
+      "translation": "每周",
       "hash": "s8sy1r",
       "lastUpdated": "2026-03-03"
     },
@@ -3942,7 +3942,7 @@
       "lastUpdated": "2026-03-27"
     },
     "planner.fee.weekly": {
-      "translation": "每週",
+      "translation": "每周",
       "hash": "s8sy1r",
       "lastUpdated": "2026-03-03"
     },
@@ -4077,9 +4077,9 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.upcomingAfterDay": {
-      "translation": "即將播出",
+      "translation": "即将到来",
       "hash": "6nm2ca",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "planner.legend": {
       "translation": "图例",
@@ -4097,7 +4097,7 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.day.tue": {
-      "translation": "週二",
+      "translation": "周二",
       "hash": "1t5w",
       "lastUpdated": "2026-03-03"
     },
@@ -4107,12 +4107,12 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.day.thu": {
-      "translation": "週四",
+      "translation": "周四",
       "hash": "1sv5",
       "lastUpdated": "2026-03-03"
     },
     "planner.day.fri": {
-      "translation": "週五",
+      "translation": "周五",
       "hash": "1ipp",
       "lastUpdated": "2026-03-03"
     },
@@ -4307,9 +4307,9 @@
       "lastUpdated": "2026-03-03"
     },
     "modal.addToCalendar": {
-      "translation": "增加至記事簿",
+      "translation": "添加到日历",
       "hash": "4znex0",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "modal.saveTask": {
       "translation": "保存任务",
@@ -4697,9 +4697,9 @@
       "lastUpdated": "2026-03-03"
     },
     "budget.section.viewAll": {
-      "translation": "檢視全部",
+      "translation": "查看全部",
       "hash": "ktimxy",
-      "lastUpdated": "2026-03-03"
+      "lastUpdated": "2026-09-05"
     },
     "budget.quickAdd.title": {
       "translation": "快捷添加",
@@ -4982,7 +4982,7 @@
       "lastUpdated": "2026-05-15"
     },
     "budget.category.overAmount": {
-      "translation": "超過",
+      "translation": "超过",
       "hash": "21djo",
       "lastUpdated": "2026-03-01"
     },
@@ -5727,9 +5727,9 @@
       "lastUpdated": "2026-03-07"
     },
     "inviteGate.tokenPlaceholder": {
-      "translation": "輸入您的Yelp授權碼",
+      "translation": "输入你的邀请码",
       "hash": "5yrqoc",
-      "lastUpdated": "2026-03-07"
+      "lastUpdated": "2026-09-05"
     },
     "inviteGate.tokenRequired": {
       "translation": "请输入个人Token",
@@ -5792,9 +5792,9 @@
       "lastUpdated": "2026-03-07"
     },
     "inviteGate.messagePlaceholder": {
-      "translation": "你感興趣嗎？",
+      "translation": "你为什么感兴趣？",
       "hash": "6efhap",
-      "lastUpdated": "2026-03-07"
+      "lastUpdated": "2026-09-05"
     },
     "inviteGate.fieldsRequired": {
       "translation": "电话号码是必填项！",
@@ -5952,9 +5952,9 @@
       "lastUpdated": "2026-03-08"
     },
     "dashboard.comingUp": {
-      "translation": "即將播出",
+      "translation": "即将到来",
       "hash": "6nm2ca",
-      "lastUpdated": "2026-03-08"
+      "lastUpdated": "2026-09-05"
     },
     "dashboard.yourAssets": {
       "translation": "一站式管理",
@@ -6137,9 +6137,9 @@
       "lastUpdated": "2026-03-08"
     },
     "storage.recommended": {
-      "translation": "建議使用",
+      "translation": "推荐",
       "hash": "jo0amd",
-      "lastUpdated": "2026-03-08"
+      "lastUpdated": "2026-09-05"
     },
     "planner.openInMaps": {
       "translation": "在地图中打开",
@@ -6207,9 +6207,9 @@
       "lastUpdated": "2026-03-08"
     },
     "onboarding.savingsNice": {
-      "translation": "好極！你已將你的分數傳送至 Facebook！",
+      "translation": "太好了！",
       "hash": "18t3r8",
-      "lastUpdated": "2026-03-08"
+      "lastUpdated": "2026-09-05"
     },
     "onboarding.savingsEncouragement": {
       "translation": "您的豆罐每月收入为{amount}。 🌱",
@@ -6377,7 +6377,7 @@
       "lastUpdated": "2026-03-08"
     },
     "dashboard.budgetOver": {
-      "translation": "超過",
+      "translation": "超过",
       "hash": "21djo",
       "lastUpdated": "2026-03-08"
     },
@@ -6442,9 +6442,9 @@
       "lastUpdated": "2026-03-08"
     },
     "family.hub.stat.events": {
-      "translation": "比賽項目",
+      "translation": "活动",
       "hash": "yiuhbt",
-      "lastUpdated": "2026-03-08"
+      "lastUpdated": "2026-09-05"
     },
     "todo.links": {
       "translation": "链接",
@@ -6582,7 +6582,7 @@
       "lastUpdated": "2026-03-13"
     },
     "common.whatsThis": {
-      "translation": "這是什麼？",
+      "translation": "这是什么？",
       "hash": "n0sf5b",
       "lastUpdated": "2026-03-11"
     },
@@ -6607,9 +6607,9 @@
       "lastUpdated": "2026-03-13"
     },
     "assets.equity": {
-      "translation": "股東權益",
+      "translation": "净值",
       "hash": "ygdmg5",
-      "lastUpdated": "2026-03-13"
+      "lastUpdated": "2026-09-05"
     },
     "assets.activeLoans": {
       "translation": "活跃贷款",
@@ -6632,7 +6632,7 @@
       "lastUpdated": "2026-03-13"
     },
     "goals.type.vehicle": {
-      "translation": "車輛",
+      "translation": "车辆",
       "hash": "x6r0uk",
       "lastUpdated": "2026-03-13"
     },
@@ -6677,9 +6677,9 @@
       "lastUpdated": "2026-03-13"
     },
     "goals.almostThere": {
-      "translation": "馬上就好！{0} 好像沒有被串連至你的 Yahoo 賬戶。是否可讓我們幫你串連？",
+      "translation": "就快到了！",
       "hash": "hmahd",
-      "lastUpdated": "2026-03-13"
+      "lastUpdated": "2026-09-05"
     },
     "goals.letsCatchUp": {
       "translation": "让我们一起迎头赶上",
@@ -6877,7 +6877,7 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.group.sports": {
-      "translation": "運動",
+      "translation": "运动",
       "hash": "tyr5up",
       "lastUpdated": "2026-03-15"
     },
@@ -6887,7 +6887,7 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.group.lessons": {
-      "translation": "課程",
+      "translation": "课程",
       "hash": "sn8nx7",
       "lastUpdated": "2026-03-15"
     },
@@ -6932,7 +6932,7 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.category.tennis": {
-      "translation": "網球",
+      "translation": "网球",
       "hash": "tns079",
       "lastUpdated": "2026-03-15"
     },
@@ -6942,9 +6942,9 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.category.golf_activity": {
-      "translation": "哥爾夫球",
+      "translation": "高尔夫球",
       "hash": "1bp1e",
-      "lastUpdated": "2026-03-15"
+      "lastUpdated": "2026-09-05"
     },
     "planner.category.baseball": {
       "translation": "棒球",
@@ -6967,7 +6967,7 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.category.spelling_bee": {
-      "translation": "拼字比賽",
+      "translation": "拼字比赛",
       "hash": "b9x9es",
       "lastUpdated": "2026-03-15"
     },
@@ -7147,7 +7147,7 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.category.gymnastics": {
-      "translation": "體操",
+      "translation": "体操",
       "hash": "wwhw3u",
       "lastUpdated": "2026-03-15"
     },
@@ -7477,7 +7477,7 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.type.adventure": {
-      "translation": "冒險",
+      "translation": "冒险",
       "hash": "lnv568",
       "lastUpdated": "2026-03-20"
     },
@@ -7832,7 +7832,7 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.ideas.category.shopping": {
-      "translation": "購物",
+      "translation": "购物",
       "hash": "4mlg1k",
       "lastUpdated": "2026-03-20"
     },
@@ -7932,9 +7932,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.next": {
-      "translation": "下一頁",
+      "translation": "下一步",
       "hash": "1fytv",
-      "lastUpdated": "2026-03-20"
+      "lastUpdated": "2026-09-05"
     },
     "vacation.back": {
       "translation": "后退",
@@ -8572,7 +8572,7 @@
       "lastUpdated": "2026-03-23"
     },
     "blog.featured": {
-      "translation": "編輯推薦",
+      "translation": "编辑推荐",
       "hash": "3qkaeq",
       "lastUpdated": "2026-03-23"
     },
@@ -8582,14 +8582,14 @@
       "lastUpdated": "2026-03-23"
     },
     "blog.newer": {
-      "translation": "從不",
+      "translation": "更新的",
       "hash": "18qyp9",
-      "lastUpdated": "2026-03-23"
+      "lastUpdated": "2026-09-05"
     },
     "blog.older": {
-      "translation": "較舊",
+      "translation": "更早的",
       "hash": "19eu44",
-      "lastUpdated": "2026-03-23"
+      "lastUpdated": "2026-09-05"
     },
     "blog.empty": {
       "translation": "还没有帖子—豆茎仍在增长！",
@@ -9137,7 +9137,7 @@
       "lastUpdated": "2026-05-13"
     },
     "setupProgress.error.retry": {
-      "translation": "再試一次",
+      "translation": "再试一次",
       "hash": "9ysxvf",
       "lastUpdated": "2026-04-09"
     },
@@ -9152,7 +9152,7 @@
       "lastUpdated": "2026-04-09"
     },
     "setupProgress.success.title": {
-      "translation": "歡迎回家！",
+      "translation": "欢迎回家！",
       "hash": "d3jorg",
       "lastUpdated": "2026-04-09"
     },
@@ -9377,12 +9377,12 @@
       "lastUpdated": "2026-04-19"
     },
     "photos.next": {
-      "translation": "下一張圖片",
+      "translation": "下一张图片",
       "hash": "c5dmor",
       "lastUpdated": "2026-04-19"
     },
     "photos.previous": {
-      "translation": "上一張圖片",
+      "translation": "上一张图片",
       "hash": "u1arqh",
       "lastUpdated": "2026-04-19"
     },
@@ -9437,7 +9437,7 @@
       "lastUpdated": "2026-04-19"
     },
     "photos.avatar.replace": {
-      "translation": "更換相片",
+      "translation": "更换相片",
       "hash": "nidl4u",
       "lastUpdated": "2026-04-19"
     },
@@ -9742,9 +9742,9 @@
       "lastUpdated": "2026-04-19"
     },
     "memberNotes.addTitle": {
-      "translation": "加入筆記",
+      "translation": "添加备注",
       "hash": "f3wro0",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "memberNotes.editTitle": {
       "translation": "编辑信息",
@@ -9762,9 +9762,9 @@
       "lastUpdated": "2026-04-19"
     },
     "memberNotes.field.body": {
-      "translation": "附註",
+      "translation": "备注",
       "hash": "1g64y",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "memberNotes.placeholder.title": {
       "translation": "例如：就寝常规",
@@ -9882,9 +9882,9 @@
       "lastUpdated": "2026-04-19"
     },
     "allergies.type.medication": {
-      "translation": "藥品",
+      "translation": "药物",
       "hash": "504f0x",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "allergies.type.environmental": {
       "translation": "环境",
@@ -10592,9 +10592,9 @@
       "lastUpdated": "2026-04-19"
     },
     "contacts.addContact": {
-      "translation": "加入通訊錄",
+      "translation": "添加联系人",
       "hash": "p2hfnl",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "contacts.searchPlaceholder": {
       "translation": "按姓名、角色或电话搜索……",
@@ -10622,9 +10622,9 @@
       "lastUpdated": "2026-04-19"
     },
     "contacts.addTitle": {
-      "translation": "新增連絡人...",
+      "translation": "添加联系人",
       "hash": "2jsmzm",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "contacts.editTitle": {
       "translation": "编辑联系人",
@@ -10802,7 +10802,7 @@
       "lastUpdated": "2026-05-14"
     },
     "scrapbook.filter.types": {
-      "translation": "顯示",
+      "translation": "显示",
       "hash": "1j7rx",
       "lastUpdated": "2026-04-19"
     },
@@ -10842,9 +10842,9 @@
       "lastUpdated": "2026-04-19"
     },
     "scrapbook.type.note": {
-      "translation": "附註",
+      "translation": "备注",
       "hash": "1g64y",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "scrapbook.empty": {
       "translation": "剪贴簿中没有任何内容—添加一些收藏夹、谚语或备注，以便在此处查看。",
@@ -11022,14 +11022,14 @@
       "lastUpdated": "2026-04-19"
     },
     "family.hub.sidebar.viewAllAllergies": {
-      "translation": "查看所有计数",
+      "translation": "查看全部 {count} 项 →",
       "hash": "gwdotd",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "family.hub.sidebar.viewAllMeds": {
-      "translation": "查看所有计数",
+      "translation": "查看全部 {count} 项 →",
       "hash": "gwdotd",
-      "lastUpdated": "2026-04-19"
+      "lastUpdated": "2026-09-05"
     },
     "photos.takePhoto": {
       "translation": "拍照",
@@ -11152,7 +11152,7 @@
       "lastUpdated": "2026-04-20"
     },
     "action.showMore": {
-      "translation": "顯示更多",
+      "translation": "显示更多",
       "hash": "p5oxk",
       "lastUpdated": "2026-04-20"
     },
@@ -11427,14 +11427,14 @@
       "lastUpdated": "2026-04-21"
     },
     "accountView.transferTo": {
-      "translation": "转账帐户",
+      "translation": "转账 → {account}",
       "hash": "cnjbjs",
-      "lastUpdated": "2026-04-21"
+      "lastUpdated": "2026-09-05"
     },
     "accountView.transferFrom": {
-      "translation": "转账帐户",
+      "translation": "转账 ← {account}",
       "hash": "o8xkfu",
-      "lastUpdated": "2026-04-21"
+      "lastUpdated": "2026-09-05"
     },
     "txn.balanceAdjusted": {
       "translation": "调整后的余额。",
@@ -11457,9 +11457,9 @@
       "lastUpdated": "2026-04-21"
     },
     "txn.filteredByGoal": {
-      "translation": "目标名称",
+      "translation": "目标：{name}",
       "hash": "eex8xc",
-      "lastUpdated": "2026-04-21"
+      "lastUpdated": "2026-09-05"
     },
     "txn.clearFilter": {
       "translation": "清除过滤器",
@@ -11732,9 +11732,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.note.label": {
-      "translation": "附註",
+      "translation": "备注",
       "hash": "1g64y",
-      "lastUpdated": "2026-04-23"
+      "lastUpdated": "2026-09-05"
     },
     "quickAdd.note.hint": {
       "translation": "每会员日记账",
@@ -11817,9 +11817,9 @@
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.medication.label": {
-      "translation": "藥品",
+      "translation": "药物",
       "hash": "504f0x",
-      "lastUpdated": "2026-04-23"
+      "lastUpdated": "2026-09-05"
     },
     "quickAdd.medication.hint": {
       "translation": "剂量·时间表",
@@ -11947,7 +11947,7 @@
       "lastUpdated": "2026-04-23"
     },
     "time.hour": {
-      "translation": "小時",
+      "translation": "小时",
       "hash": "1cc90",
       "lastUpdated": "2026-04-24"
     },
@@ -12117,7 +12117,7 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.step1.label": {
-      "translation": "確認電子郵件",
+      "translation": "确认电子邮件",
       "hash": "7jh05g",
       "lastUpdated": "2026-04-26"
     },
@@ -12167,9 +12167,9 @@
       "lastUpdated": "2026-06-14"
     },
     "inviteWizard.step1.cta.confirm": {
-      "translation": "确认电子邮件",
+      "translation": "确认 {email}",
       "hash": "5zuqzg",
-      "lastUpdated": "2026-04-26"
+      "lastUpdated": "2026-09-05"
     },
     "inviteWizard.step1.faq.toggle": {
       "translation": "您有疑问吗？我们为您解答",
@@ -12272,7 +12272,7 @@
       "lastUpdated": "2026-04-26"
     },
     "inviteWizard.error.tryAgain": {
-      "translation": "再試一次",
+      "translation": "再试一次",
       "hash": "9ysxvf",
       "lastUpdated": "2026-04-26"
     },
@@ -12607,9 +12607,9 @@
       "lastUpdated": "2026-05-14"
     },
     "onboarding.invite.send": {
-      "translation": "傳送",
+      "translation": "发送",
       "hash": "u4tp7q",
-      "lastUpdated": "2026-09-04"
+      "lastUpdated": "2026-09-05"
     },
     "onboarding.invite.noEmail": {
       "translation": "还没有电子邮件—在下一个屏幕上添加一个",
@@ -13137,7 +13137,7 @@
       "lastUpdated": "2026-05-04"
     },
     "changePassword.confirmNewPasswordPlaceholder": {
-      "translation": "重新輸入新密码",
+      "translation": "重新输入新密码",
       "hash": "598prg",
       "lastUpdated": "2026-05-04"
     },
@@ -13647,9 +13647,9 @@
       "lastUpdated": "2026-05-07"
     },
     "scrapbook.seeAll": {
-      "translation": "閱讀所有",
+      "translation": "查看全部 →",
       "hash": "lrjeii",
-      "lastUpdated": "2026-05-07"
+      "lastUpdated": "2026-09-05"
     },
     "scrapbook.everyone.familyMoments": {
       "translation": "家庭时光",
@@ -14162,7 +14162,7 @@
       "lastUpdated": "2026-05-15"
     },
     "planner.weekday.short.tue": {
-      "translation": "週二",
+      "translation": "周二",
       "hash": "1t5w",
       "lastUpdated": "2026-05-15"
     },
@@ -14172,12 +14172,12 @@
       "lastUpdated": "2026-05-15"
     },
     "planner.weekday.short.thu": {
-      "translation": "週四",
+      "translation": "周四",
       "hash": "1sv5",
       "lastUpdated": "2026-05-15"
     },
     "planner.weekday.short.fri": {
-      "translation": "週五",
+      "translation": "周五",
       "hash": "1ipp",
       "lastUpdated": "2026-05-15"
     },
@@ -14297,9 +14297,9 @@
       "lastUpdated": "2026-05-16"
     },
     "settings.resumeSetup": {
-      "translation": "繼續安裝?",
+      "translation": "继续设置",
       "hash": "2wkclm",
-      "lastUpdated": "2026-05-16"
+      "lastUpdated": "2026-09-05"
     },
     "family.resetPassword.modalTitle": {
       "translation": "重置{name}的密码",
@@ -14522,9 +14522,9 @@
       "lastUpdated": "2026-05-19"
     },
     "planner.weekUpcoming": {
-      "translation": "近期賽事",
+      "translation": "即将到来",
       "hash": "moghmk",
-      "lastUpdated": "2026-05-19"
+      "lastUpdated": "2026-09-05"
     },
     "planner.weekLast": {
       "translation": "上周",
@@ -15677,7 +15677,7 @@
       "lastUpdated": "2026-06-11"
     },
     "calendarSync.clash.whatsThis": {
-      "translation": "這是什麼？",
+      "translation": "这是什么？",
       "hash": "n0sf5b",
       "lastUpdated": "2026-06-11"
     },
@@ -15812,7 +15812,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.therapy": {
-      "translation": "治療",
+      "translation": "治疗",
       "hash": "57lnbd",
       "lastUpdated": "2026-06-14"
     },
@@ -15832,9 +15832,9 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.track_field": {
-      "translation": "徑賽 & 田賽",
+      "translation": "田径",
       "hash": "rjjkid",
-      "lastUpdated": "2026-06-14"
+      "lastUpdated": "2026-09-05"
     },
     "planner.category.brunch": {
       "translation": "早午餐",
@@ -15857,7 +15857,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.picnic": {
-      "translation": "郊遊",
+      "translation": "郊游",
       "hash": "vhyc9u",
       "lastUpdated": "2026-06-14"
     },
@@ -15987,7 +15987,7 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.basketball": {
-      "translation": "籃球",
+      "translation": "篮球",
       "hash": "q1buaj",
       "lastUpdated": "2026-06-14"
     },
@@ -16022,9 +16022,9 @@
       "lastUpdated": "2026-06-14"
     },
     "planner.category.conference": {
-      "translation": "多人會議",
+      "translation": "会议",
       "hash": "q10tl0",
-      "lastUpdated": "2026-06-14"
+      "lastUpdated": "2026-09-05"
     },
     "planner.category.networking": {
       "translation": "网络",
@@ -16297,9 +16297,9 @@
       "lastUpdated": "2026-06-15"
     },
     "assets.fromAccount": {
-      "translation": "從電子郵件",
+      "translation": "来自 {name}",
       "hash": "5wjffx",
-      "lastUpdated": "2026-06-15"
+      "lastUpdated": "2026-09-05"
     },
     "settings.exchangeRates.title": {
       "translation": "汇率",
@@ -16442,9 +16442,9 @@
       "lastUpdated": "2026-06-15"
     },
     "planner.fromAccount": {
-      "translation": "從電子郵件",
+      "translation": "来自 {name}",
       "hash": "5wjffx",
-      "lastUpdated": "2026-06-15"
+      "lastUpdated": "2026-09-05"
     },
     "planner.vacationDayOf": {
       "translation": "第{day}天，共{total}天",
@@ -16497,9 +16497,9 @@
       "lastUpdated": "2026-06-15"
     },
     "header.profileAvatar": {
-      "translation": "個人檔案",
+      "translation": "个人资料",
       "hash": "mev895",
-      "lastUpdated": "2026-06-15"
+      "lastUpdated": "2026-09-05"
     },
     "header.profileFallbackName": {
       "translation": "用户",
@@ -16612,7 +16612,7 @@
       "lastUpdated": "2026-06-15"
     },
     "dashboard.period.allTime": {
-      "translation": "所有時間",
+      "translation": "所有时间",
       "hash": "ss054c",
       "lastUpdated": "2026-06-15"
     },
@@ -17742,9 +17742,9 @@
       "lastUpdated": "2026-06-17"
     },
     "lists.detail.titlePlaceholder": {
-      "translation": "名單名稱",
+      "translation": "清单名称",
       "hash": "bxkpt9",
-      "lastUpdated": "2026-06-17"
+      "lastUpdated": "2026-09-05"
     },
     "lists.detail.delete": {
       "translation": "删除列表",
@@ -17832,9 +17832,9 @@
       "lastUpdated": "2026-06-17"
     },
     "lists.template.beforeSchool.name": {
-      "translation": "課前輔導",
+      "translation": "上学前",
       "hash": "9annvi",
-      "lastUpdated": "2026-06-17"
+      "lastUpdated": "2026-09-05"
     },
     "lists.template.beforeSchool.desc": {
       "translation": "日常检点表",
@@ -18862,7 +18862,7 @@
       "lastUpdated": "2026-07-23"
     },
     "reminders.cruises": {
-      "translation": "郵輪",
+      "translation": "邮轮",
       "hash": "q8pgwy",
       "lastUpdated": "2026-07-23"
     },
@@ -18952,9 +18952,9 @@
       "lastUpdated": "2026-07-23"
     },
     "reminders.activityBody": {
-      "translation": "即將播出",
+      "translation": "即将开始",
       "hash": "tdbi3l",
-      "lastUpdated": "2026-07-23"
+      "lastUpdated": "2026-09-05"
     },
     "reminders.todoBody": {
       "translation": "截止于{time}",
@@ -19692,9 +19692,9 @@
       "lastUpdated": "2026-08-18"
     },
     "common.next": {
-      "translation": "下一頁",
+      "translation": "下一步",
       "hash": "1fytv",
-      "lastUpdated": "2026-08-18"
+      "lastUpdated": "2026-09-05"
     },
     "common.remove": {
       "translation": "移除",
@@ -19797,9 +19797,9 @@
       "lastUpdated": "2026-08-18"
     },
     "mealPlanner.kind.leftovers": {
-      "translation": "剩飯",
+      "translation": "剩菜",
       "hash": "8u1pk8",
-      "lastUpdated": "2026-08-18"
+      "lastUpdated": "2026-09-05"
     },
     "mealPlanner.kind.skip": {
       "translation": "跳过",
@@ -20357,9 +20357,9 @@
       "lastUpdated": "2026-08-23"
     },
     "recurrence.unit.months": {
-      "translation": "百萬港元",
+      "translation": "个月",
       "hash": "ho5dzh",
-      "lastUpdated": "2026-08-23"
+      "lastUpdated": "2026-09-05"
     },
     "recurrence.unit.years": {
       "translation": "年",
@@ -21507,7 +21507,7 @@
       "lastUpdated": "2026-09-01"
     },
     "wall.chores.heading": {
-      "translation": "家務",
+      "translation": "家务",
       "hash": "xd8kpi",
       "lastUpdated": "2026-09-01"
     },
@@ -21647,7 +21647,7 @@
       "lastUpdated": "2026-09-01"
     },
     "wall.card.chores": {
-      "translation": "家務",
+      "translation": "家务",
       "hash": "xd8kpi",
       "lastUpdated": "2026-09-01"
     },
@@ -21792,9 +21792,9 @@
       "lastUpdated": "2026-09-01"
     },
     "wall.jobFailed.title": {
-      "translation": "不儲存",
+      "translation": "没有保存成功",
       "hash": "7w6k1k",
-      "lastUpdated": "2026-09-01"
+      "lastUpdated": "2026-09-05"
     },
     "wall.jobFailed.message": {
       "translation": "它可能已在其他设备上更改。下次同步时，墙壁将迎头赶上。",
@@ -22272,9 +22272,9 @@
       "lastUpdated": "2026-09-04"
     },
     "recipes.course.side": {
-      "translation": "側面",
+      "translation": "配菜",
       "hash": "1j88n",
-      "lastUpdated": "2026-09-04"
+      "lastUpdated": "2026-09-05"
     },
     "recipes.course.dessert": {
       "translation": "甜点",
@@ -22317,7 +22317,7 @@
       "lastUpdated": "2026-09-04"
     },
     "recipes.field.tags": {
-      "translation": "標籤",
+      "translation": "标签",
       "hash": "1jpdl",
       "lastUpdated": "2026-09-04"
     },
@@ -22392,7 +22392,7 @@
       "lastUpdated": "2026-09-04"
     },
     "cookbook.groupLabel": {
-      "translation": "顯示",
+      "translation": "显示",
       "hash": "1j7rx",
       "lastUpdated": "2026-09-04"
     },
@@ -22470,6 +22470,16 @@
       "translation": "您家人的数据无法读取，可能已损坏。新的邀请链接指向同一个文件，因此无济于事。请让邀请您的人联系support@beanies.family。",
       "hash": "dznn2q",
       "lastUpdated": "2026-09-04"
+    },
+    "resumeSetup.podCredentialStale": {
+      "translation": "无法在此设备上解锁您家人的数据。保存的密钥可能已过期—家庭成员可能更改了密码或删除了成员。重新加载并使用您的密码登录，或使用您的恢复工具包。您的数据是安全的。",
+      "hash": "3bzs3c",
+      "lastUpdated": "2026-09-05"
+    },
+    "podCredentialStale.inline": {
+      "translation": "您家人的数据无法解锁。您保存的密钥可能已过期，请尝试使用密码。如果这不起作用，请联系support@beanies.family。",
+      "hash": "phnl3f",
+      "lastUpdated": "2026-09-05"
     }
   }
 }
