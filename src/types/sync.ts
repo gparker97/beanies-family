@@ -164,7 +164,37 @@ export type CompleteAutoLoadResult =
 /** Where in the open sequence the failure happened. See `PayloadLoadError`. */
 export type PayloadLoadStep = 'decrypt' | 'load' | 'materialize';
 
-export abstract class PayloadLoadError extends Error {
+/** The inline message keys a blocked remote can resolve to. */
+export type PodBlockMessageKey =
+  | 'podTooLarge.inline'
+  | 'podCorrupted.inline'
+  | 'podCredentialStale.inline'
+  | 'podLineage.unsyncedInline'
+  | 'podLineage.conflictInline';
+
+/**
+ * Anything that may latch `syncService`'s remote-blocked breaker.
+ *
+ * An INTERFACE rather than a union (`PayloadLoadError | PodLineageError`),
+ * deliberately. A union forces narrowing at every reader, and the readers are
+ * already written: `authStore` reads `.step`, `notePodUnopenable` calls
+ * `payloadErrorMessageKey`, and `noteRemoteUnreadable` reads five
+ * PayloadLoadError members. The union would push an `instanceof` into all of
+ * them and into every future one. Two members answer the only two questions a
+ * consumer actually asks, and the payload-specific reads stay behind the ONE
+ * `instanceof` inside the latch itself.
+ *
+ * Same idiom as `deviceCannotOpen`: prefer a member that a new subclass must
+ * ANSWER to an `instanceof` it can silently inherit the wrong side of.
+ */
+export interface RemoteBlocker extends Error {
+  /** Short, stable code for `error_code` (payload: the step; lineage: the verdict). */
+  readonly blockCode: string;
+  /** Inline message key for the sync bar. */
+  readonly inlineMessageKey: PodBlockMessageKey;
+}
+
+export abstract class PayloadLoadError extends Error implements RemoteBlocker {
   readonly step: PayloadLoadStep;
   readonly familyId: string | null;
   /** Decrypted byte length — the number that predicts the WASM cost. */
@@ -211,6 +241,16 @@ export abstract class PayloadLoadError extends Error {
    * `instanceof` wherever the QUESTION is about the device, so a future third
    * subclass has to state its own answer.
    */
+  /** `RemoteBlocker`: the step is the code a triager reads first. */
+  get blockCode(): string {
+    return this.step;
+  }
+
+  /** `RemoteBlocker`: delegates, so the three-way copy rule lives in one place. */
+  get inlineMessageKey(): PodBlockMessageKey {
+    return payloadErrorMessageKey(this);
+  }
+
   get deviceCannotOpen(): boolean {
     return false;
   }
@@ -266,9 +306,7 @@ export class PayloadTooLargeError extends PayloadLoadError {
  * leaving the ORDINARY open path showing a raw Automerge/WASM string under the
  * password field and inviting the user to retype forever.
  */
-export function payloadErrorMessageKey(
-  err: PayloadLoadError
-): 'podTooLarge.inline' | 'podCorrupted.inline' | 'podCredentialStale.inline' {
+export function payloadErrorMessageKey(err: PayloadLoadError): PodBlockMessageKey {
   // THREE answers, because there are three situations and the middle one was
   // being told its data is damaged.
   //

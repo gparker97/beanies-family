@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-05",
-    "translationCount": 4495
+    "translationCount": 4498
   },
   "translations": {
     "app.name": {
@@ -22479,6 +22479,21 @@
     "podCredentialStale.inline": {
       "translation": "您家人的数据无法解锁。您保存的密钥可能已过期，请尝试使用密码。如果这不起作用，请联系support@beanies.family。",
       "hash": "phnl3f",
+      "lastUpdated": "2026-09-05"
+    },
+    "podLineage.unsyncedInline": {
+      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有尚未保存的更改。先保存或导出，然后重新加载。",
+      "hash": "xbp8zs",
+      "lastUpdated": "2026-09-05"
+    },
+    "podLineage.conflictInline": {
+      "translation": "两台设备同时重组了您的家庭文件。beanies无法安全地在它们之间进行选择。在进行更多更改之前，请联系support@beanies.family。",
+      "hash": "cnv0j7",
+      "lastUpdated": "2026-09-05"
+    },
+    "resumeSetup.podLineageBlocked": {
+      "translation": "您的家庭文件已在另一台设备上重组，此设备无法安全地将两者结合起来。没有任何东西丢失。如果此设备具有从未保存的更改，请先从“设置”中导出它们；否则，重新加载和beanies将拾取重组后的副本。",
+      "hash": "xlvoe3",
       "lastUpdated": "2026-09-05"
     }
   }

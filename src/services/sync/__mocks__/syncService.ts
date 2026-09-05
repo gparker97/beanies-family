@@ -98,9 +98,9 @@ export const setPasskeySecrets = vi.fn();
 /**
  * The remote-unreadable latch (see the real module). Null = readable, which is
  * what every existing suite assumes; a suite that wants the latched behaviour
- * overrides it with `vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(err)`.
+ * overrides it with `vi.mocked(syncService.isRemoteBlocked).mockReturnValue(err)`.
  */
-export const isRemoteUnreadable = vi.fn<() => Error | null>(() => null);
+export const isRemoteBlocked = vi.fn<() => Error | null>(() => null);
 
 /**
  * The provisional-marker handshake (see the real module). `load()` stamps the

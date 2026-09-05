@@ -106,7 +106,8 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { PayloadLoadError } from '@/types/sync';
-import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
+import { surfacePayloadFatal, surfaceLineageFatal } from '@/utils/payloadFailureSurface';
+import { PodLineageError } from '@/services/sync/podLineage';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
@@ -808,6 +809,14 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       // clear your data and start fresh" — useless for an out-of-memory open,
       // and the one action that destroys the local copy. This is the exact path
       // the 3GB tablet takes, so it is the path that has to tell the truth.
+      if (err instanceof PodLineageError) {
+        // The remote must not be MERGED with this device's document. Same shape
+        // as a payload failure from the user's point of view — the app cannot
+        // open — so it lands on the same overlay, with its own honest copy.
+        initBreadcrumbs.push(`path1b: pod lineage blocked (${err.verdict})`);
+        surfaceLineageFatal(err, { familyId: familyContextStore.activeFamilyId });
+        return 'failed';
+      }
       if (err instanceof PayloadLoadError) {
         initBreadcrumbs.push(`path1b: payload ${err.step} failure (${err.name})`);
         console.warn('[loadFamilyData] path1b: payload load failed', err);

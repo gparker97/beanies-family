@@ -1,4 +1,7 @@
 import { defineStore } from 'pinia';
+import { PodLineageError } from '@/services/sync/podLineage';
+import { guardLineage, type LineageContext } from '@/services/sync/podLineage';
+import { decodeBaselinePayload } from '@/services/sync/remoteBaseline';
 import { ref, computed, shallowRef, nextTick, watch } from 'vue';
 
 // Import stores for auto-sync and reload
@@ -120,6 +123,7 @@ import {
   PayloadLoadError,
   PayloadTooLargeError,
   payloadErrorMessageKey,
+  type RemoteBlocker,
 } from '@/types/sync';
 
 /**
@@ -141,7 +145,13 @@ export type MigrateStorageResult =
 export type SaveStatus = 'saving' | 'critical' | 'degraded' | 'saved' | 'hidden';
 
 /** Classified cause of a failed background/manual Drive read. */
-export type BackgroundSyncErrorKind = 'auth-transient' | 'decrypt' | 'network' | null;
+export type BackgroundSyncErrorKind =
+  | 'auth-transient'
+  | 'decrypt'
+  /** The remote must not be MERGED with this device's document. See `podLineage`. */
+  | 'lineage'
+  | 'network'
+  | null;
 
 /**
  * The result of a `backgroundSyncFromFile` call — returned so a caller (the
@@ -564,7 +574,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   const backgroundSyncErrorKind = ref<BackgroundSyncErrorKind>(null);
   /**
-   * Reactive MIRROR of `syncService.isRemoteUnreadable()`, for the UI only.
+   * Reactive MIRROR of `syncService.isRemoteBlocked()`, for the UI only.
    *
    * The authoritative latch lives in `syncService`, the layer that owns the
    * download: the store cannot see the local-file poll tick, and a second
@@ -575,7 +585,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   const podUnopenable = ref(false);
   /** The guards' authoritative read. Never the mirror. */
-  const remoteUnreadable = () => syncService.isRemoteUnreadable();
+  const remoteUnreadable = () => syncService.isRemoteBlocked();
 
   /**
    * Match the message shapes produced by `TokenExpiredError` (in
@@ -882,9 +892,23 @@ export const useSyncStore = defineStore('sync', () => {
     // its `!currentDoc` full-adopt branch and installs a clean B. See the
     // cross-family teardown in `authStore.signOut` (defence-in-depth).
     let loadedFromCache = false;
+    /**
+     * What we can PROVE about our own document, for the lineage guard below.
+     * Starts `clean` because with no local doc there is, by definition, nothing
+     * to lose.
+     */
+    let lineageCtx: LineageContext = 'clean';
     try {
       const cacheResult = await docClient.initAndLoadCache(familyId);
       loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
+      // Zero extra I/O: the baseline row came back in the SAME round-trip.
+      if (loadedFromCache) {
+        lineageCtx = await syncService.docPushedAgainst(
+          cacheResult?.remoteBaseline
+            ? (decodeBaselinePayload(cacheResult.remoteBaseline.payload)?.headsFp ?? null)
+            : null
+        );
+      }
     } catch (e) {
       // An out-of-memory failure must NOT fall through to the adopt-remote path
       // below. `initAndLoadCache` deliberately KEPT the cache in that case; the
@@ -899,6 +923,37 @@ export const useSyncStore = defineStore('sync', () => {
       if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
+
+    // ⚠️ LINEAGE GUARD (terminus 1). A document may only be CRDT-merged with a
+    // document of the same lineage; a compacted pod shares no ancestry with the
+    // original, so merging one into a peer still on the old history destroys
+    // that peer's unsynced work about half the time, decided by actor ordering.
+    //
+    // `block` throws, and the throw lands in the latch the same way a
+    // `PayloadLoadError` already does, so the surrounding error path is unchanged.
+    const lineageAct = guardLineage(
+      remoteEnvelope.podLineage,
+      envelope.value?.podLineage,
+      lineageCtx
+    );
+    if (lineageAct === 'adopt') {
+      // Wholesale, never a merge — and deliberately NOT `clearCache()` first:
+      // the adopt's own `resetDocCursors()` makes the next persist write a fresh
+      // BASE, which already supersedes every stale-lineage row, and deleting the
+      // DB would open a window in which the device holds no copy of the pod at
+      // all.
+      const adopted = await docClient.adoptRemoteEnvelope(remoteEnvelope, familyId);
+      logEvent({
+        level: 'info',
+        surface: 'pod-lineage',
+        message: 'adopted a newer pod lineage',
+        context: { action: 'adopted', family_id: familyId },
+      });
+      await deduplicateRecurringTransactions();
+      if (adopted.dirty) syncService.triggerDebouncedSave();
+      return adopted.remoteHeads ?? null;
+    }
+
     if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
     const { dirty, remoteHeads } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
     // Clean up duplicate recurring transactions from the CRDT merge.
@@ -919,7 +974,16 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function hydrateFromEnvelope(env: BeanpodFileV4): Promise<void> {
     await docClient.setFamilyKey(familyKey.value!, env.familyId);
-    const { dirty } = await docClient.mergeRemoteEnvelope(env, env.familyId);
+    // ⚠️ LINEAGE GUARD (terminus 2). This runs on the background paths with a
+    // live document, so it cannot prove anything about unsynced work: `dirty`
+    // is the honest answer, which means a newer remote lineage BLOCKS here and
+    // the adopt happens at the next open (terminus 1) instead. One adopt
+    // implementation, one instruction to the user.
+    const act = guardLineage(env.podLineage, envelope.value?.podLineage, 'dirty');
+    const { dirty } =
+      act === 'adopt'
+        ? await docClient.adoptRemoteEnvelope(env, env.familyId)
+        : await docClient.mergeRemoteEnvelope(env, env.familyId);
     const merged = replaceEnvelope(env);
     syncService.setFamilyKey(familyKey.value!, merged);
     pendingEncryptedFile.value = null;
@@ -1100,12 +1164,12 @@ export const useSyncStore = defineStore('sync', () => {
             if (famId) {
               driveHeads = await replaceDocWithCacheRecovery(remoteEnvelope, famId);
             } else {
-              await docClient.dropDoc(); // no cache to recover — adopt remote fresh
+              // No cache to recover — adopt the remote wholesale.
               // This branch adopts Drive's document verbatim (nothing local survived
               // the drop), so `remoteHeads` is exactly as sound here as on the merging
               // branch. Discarding it would forfeit the next skip and log a WARN-level
               // fail-open on an open that converged perfectly.
-              const adopted = await docClient.mergeRemoteEnvelope(
+              const adopted = await docClient.adoptRemoteEnvelope(
                 remoteEnvelope,
                 remoteEnvelope.familyId
               );
@@ -1348,8 +1412,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (famId) {
         await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
-        await docClient.dropDoc();
-        await docClient.mergeRemoteEnvelope(pending.envelope, pending.envelope.familyId);
+        await docClient.adoptRemoteEnvelope(pending.envelope, pending.envelope.familyId);
       }
 
       // Set the family key and envelope. `replaceEnvelope` is the safe path
@@ -2162,8 +2225,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (famId) {
         await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
-        await docClient.dropDoc();
-        await docClient.mergeRemoteEnvelope(pending.envelope, pending.envelope.familyId);
+        await docClient.adoptRemoteEnvelope(pending.envelope, pending.envelope.familyId);
       }
 
       familyKey.value = fk;
@@ -3125,7 +3187,7 @@ export const useSyncStore = defineStore('sync', () => {
    * fail identically, and reports once (the too-large half is already reported
    * by `docClient.surface()`; `reportPayloadFailure` knows that).
    */
-  function notePodUnopenable(err: PayloadLoadError): void {
+  function notePodUnopenable(err: RemoteBlocker): void {
     // ⚠️ ARM THE SERVICE LATCH. Every guard reads `syncService`, and none of
     // these callers reach `fetchAndMergeRemote` — they call
     // `docClient.mergeRemoteEnvelope` directly — so without this the breaker was
@@ -3135,18 +3197,21 @@ export const useSyncStore = defineStore('sync', () => {
     // `noteRemoteUnreadable` also owns the report (once per class) and refuses
     // to latch a `keyMayBeWrong` failure, which is why this is a call rather
     // than a second copy of that logic.
-    syncService.noteRemoteUnreadable(err);
+    if (err instanceof PodLineageError) syncService.noteLineageBlocked(err);
+    else if (err instanceof PayloadLoadError) syncService.noteRemoteUnreadable(err);
     // MIRROR the service's actual answer — do not assert it. `noteRemoteUnreadable`
     // declines to latch a `keyMayBeWrong` failure (a routine key rotation), so
     // asserting `true` here set the UI mirror and stopped the poller while the
     // authoritative latch stayed null — and the background refresh's own
     // `finally` then re-armed the 10s timer straight through a guard that saw
     // null, which is the download loop this whole mechanism exists to stop.
-    podUnopenable.value = !!syncService.isRemoteUnreadable();
+    podUnopenable.value = !!syncService.isRemoteBlocked();
     if (!podUnopenable.value) return; // recoverable: leave polling and the bar alone
     stopFilePolling();
-    backgroundSyncError.value = useTranslationStore().t(payloadErrorMessageKey(err));
-    backgroundSyncErrorKind.value = 'decrypt';
+    // `.inlineMessageKey` is the `RemoteBlocker` member, so a new blocker class
+    // has to answer this rather than inherit someone else's copy.
+    backgroundSyncError.value = useTranslationStore().t(err.inlineMessageKey);
+    backgroundSyncErrorKind.value = err instanceof PodLineageError ? 'lineage' : 'decrypt';
     // NOTE on repeats: the message is constant per class, so a second failure
     // assigns an identical string and `BackgroundSyncBar`'s watcher does not
     // re-fire. That is acceptable ONLY because a repeat cannot happen while the
@@ -3165,7 +3230,13 @@ export const useSyncStore = defineStore('sync', () => {
     podUnopenable.value = false;
     // Null the message too, so the NEXT failure re-fires the bar's watcher
     // instead of assigning an identical string to itself.
-    if (backgroundSyncErrorKind.value === 'decrypt') {
+    // 'lineage' as well as 'decrypt': without it the bar's message never clears
+    // after a lineage block resolves, and the next genuine failure assigns an
+    // identical string so the watcher does not re-fire.
+    if (
+      backgroundSyncErrorKind.value === 'decrypt' ||
+      backgroundSyncErrorKind.value === 'lineage'
+    ) {
       backgroundSyncError.value = null;
       backgroundSyncErrorKind.value = null;
     }

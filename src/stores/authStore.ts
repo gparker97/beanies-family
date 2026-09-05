@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
-import { isRemoteUnreadable } from '@/services/sync/syncService';
-import type { PayloadLoadError } from '@/types/sync';
+import { isRemoteBlocked } from '@/services/sync/syncService';
+import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { ref, computed } from 'vue';
 import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
 import {
@@ -2314,7 +2314,7 @@ export const useAuthStore = defineStore('auth', () => {
     departedEmail: string | null;
     familyId: string | undefined;
     /** Snapshot taken before any step runs — see where it is set. */
-    remoteWasUnreadable: PayloadLoadError | null;
+    remoteWasUnreadable: RemoteBlocker | null;
   }): SignOutStepImpls {
     const settingsStore = useSettingsStore();
     return {
@@ -2376,8 +2376,13 @@ export const useAuthStore = defineStore('auth', () => {
             // NOT critical for the device-cannot-open class: that one is
             // expected on a small tablet and would page on every sign-out. A
             // CORRUPT remote is the one worth waking someone for.
-            severity: unreadable.deviceCannotOpen ? 'warning' : 'critical',
-            context: { action: 'signout-kept-local-db', error_code: unreadable.step },
+            // `deviceCannotOpen` is payload-specific; the interface does not carry
+            // it, and a lineage block is never the paging case here either.
+            severity:
+              unreadable instanceof PayloadLoadError && !unreadable.deviceCannotOpen
+                ? 'critical'
+                : 'warning',
+            context: { action: 'signout-kept-local-db', error_code: unreadable.blockCode },
           });
           return;
         }
@@ -2455,7 +2460,7 @@ export const useAuthStore = defineStore('auth', () => {
       // inside `deleteFamilyDb` always saw `null` and the guard was dead code —
       // exactly the "grep for the WRITERS as well as the readers" lesson from
       // the round before, repeated.
-      remoteWasUnreadable: isRemoteUnreadable(),
+      remoteWasUnreadable: isRemoteBlocked(),
     };
     await runSignOutSteps(
       trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS,
@@ -2564,7 +2569,7 @@ export const useAuthStore = defineStore('auth', () => {
       // inside `deleteFamilyDb` always saw `null` and the guard was dead code —
       // exactly the "grep for the WRITERS as well as the readers" lesson from
       // the round before, repeated.
-      remoteWasUnreadable: isRemoteUnreadable(),
+      remoteWasUnreadable: isRemoteBlocked(),
     };
     await runSignOutSteps(SIGN_OUT_CLEAR_STEPS, buildSignOutStepImpls(ctx));
     emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });

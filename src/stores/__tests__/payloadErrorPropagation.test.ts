@@ -156,14 +156,14 @@ describe('the remote-unreadable latch gates the WORK, not just the timer', () =>
     setActivePinia(createPinia());
     vi.clearAllMocks();
     savedGlobalSettings = { ...mockGlobalSettings };
-    vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(null);
+    vi.mocked(syncService.isRemoteBlocked).mockReturnValue(null);
   });
 
   it('backgroundSyncFromFile short-circuits once the remote is known unreadable', async () => {
     // `AppHeader`'s Refresh calls this DIRECTLY, so a latch checked only inside
     // `startFilePolling` let every tap re-download the whole pod and re-hit the
     // same allocation. There is no equivalent assertion anywhere else.
-    vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(tooLarge());
+    vi.mocked(syncService.isRemoteBlocked).mockReturnValue(tooLarge());
 
     const outcome = await useSyncStore().backgroundSyncFromFile();
 
@@ -178,7 +178,7 @@ describe('the remote-unreadable latch gates the WORK, not just the timer', () =>
     const store = useSyncStore();
     store.isConfigured = true;
     store.needsPermission = false;
-    vi.mocked(syncService.isRemoteUnreadable).mockReturnValue(tooLarge());
+    vi.mocked(syncService.isRemoteBlocked).mockReturnValue(tooLarge());
 
     expect(await store.reloadIfFileChanged()).toBe(false);
     expect(syncService.remoteChanged).not.toHaveBeenCalled();

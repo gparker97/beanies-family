@@ -4280,6 +4280,26 @@ const STRING_DEFS = {
     beanie:
       "your family's beans could not be unlocked on this device. the saved key may be out of date — a family bean may have changed the password or removed a member. reload and sign in with your password, or use your recovery kit. your beans are safe.",
   },
+  // The two ways a lineage check can BLOCK. Both are recoverable, and both name
+  // the action, because the alternative — a merge — would silently discard one
+  // side's work about half the time.
+  'podLineage.unsyncedInline': {
+    en: 'Your family file was reorganised on another device, and this one still has changes that have not been saved. Save or export them first, then reload.',
+    beanie:
+      'your family file was reorganised on another device, and this one still has beans that have not been saved. save or export them first, then reload.',
+  },
+  'podLineage.conflictInline': {
+    en: 'Two devices reorganised your family file at the same time. beanies cannot safely pick between them. Please contact support@beanies.family before making more changes.',
+    beanie:
+      'two beans reorganised your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
+  },
+  // The overlay variant, for a lineage block raised at OPEN where there is no
+  // sync bar on screen.
+  'resumeSetup.podLineageBlocked': {
+    en: 'Your family file was reorganised on another device and this one cannot safely combine the two. Nothing has been lost. If this device has changes that were never saved, export them from Settings first; otherwise reload and beanies will pick up the reorganised copy.',
+    beanie:
+      'your family file was reorganised on another device and this one cannot safely combine the two. nothing has been lost. if this device has beans that were never saved, export them from settings first; otherwise reload and beanies will pick up the reorganised copy.',
+  },
   'podCredentialStale.inline': {
     en: "Your family's data could not be unlocked. Your saved key may be out of date, so try your password. If that does not work, contact support@beanies.family.",
     beanie:

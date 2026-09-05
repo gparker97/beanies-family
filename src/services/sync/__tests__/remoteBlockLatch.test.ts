@@ -11,7 +11,7 @@ import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
-const { isRemoteUnreadable, noteRemoteUnreadable, retryAfterRemoteBlock, reset } =
+const { isRemoteBlocked, noteRemoteUnreadable, retryAfterRemoteBlock, reset } =
   await import('@/services/sync/syncService');
 const { reportError } = await import('@/utils/errorReporter');
 
@@ -26,7 +26,7 @@ beforeEach(() => {
 describe('noteRemoteUnreadable', () => {
   it('latches a genuinely unreadable remote', () => {
     noteRemoteUnreadable(corrupt('load'));
-    expect(isRemoteUnreadable()).toBeInstanceOf(CorruptPayloadError);
+    expect(isRemoteBlocked()).toBeInstanceOf(CorruptPayloadError);
   });
 
   it('does NOT latch a failure a credential could fix', () => {
@@ -34,7 +34,7 @@ describe('noteRemoteUnreadable', () => {
     // save for the session and stop polling, while the re-prompt that fixes it
     // sits unreachable behind the latch.
     noteRemoteUnreadable(corrupt('decrypt'));
-    expect(isRemoteUnreadable()).toBeNull();
+    expect(isRemoteBlocked()).toBeNull();
   });
 
   it('still REPORTS the credential case — quietly, not silently', () => {
@@ -61,7 +61,7 @@ describe('noteRemoteUnreadable', () => {
 
   it('stays quiet for the device class, which docClient already owns', () => {
     noteRemoteUnreadable(new PayloadTooLargeError('oom', 'materialize', 'fam-1', 1000));
-    expect(isRemoteUnreadable()).toBeInstanceOf(PayloadTooLargeError);
+    expect(isRemoteBlocked()).toBeInstanceOf(PayloadTooLargeError);
     expect(reportError).not.toHaveBeenCalled();
   });
 });
@@ -73,11 +73,11 @@ describe('retryAfterRemoteBlock', () => {
     // disabled reads, saves and polling for the whole session with no exit but
     // sign-out.
     noteRemoteUnreadable(new PayloadTooLargeError('oom', 'materialize', 'fam-1', 1000));
-    expect(isRemoteUnreadable()).not.toBeNull();
+    expect(isRemoteBlocked()).not.toBeNull();
 
     retryAfterRemoteBlock();
 
-    expect(isRemoteUnreadable()).toBeNull();
+    expect(isRemoteBlocked()).toBeNull();
   });
 
   it('clears the report throttle too, so a repeat failure is visible again', () => {

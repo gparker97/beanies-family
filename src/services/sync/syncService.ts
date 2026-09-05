@@ -10,7 +10,8 @@
  */
 
 import { supportsFileSystemAccess, isNative } from './capabilities';
-import { PayloadLoadError } from '@/types/sync';
+import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
+import { PodLineageError, guardLineage } from '@/services/sync/podLineage';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
@@ -94,11 +95,18 @@ let saveInProgress: Promise<boolean> | null = null;
  *
  * Cleared by a read that actually merges, and by `resetState`.
  */
-let remoteUnreadable: PayloadLoadError | null = null;
+let remoteBlocked: RemoteBlocker | null = null;
 
-/** Has this device failed to read the remote pod? See `remoteUnreadable`. */
-export function isRemoteUnreadable(): PayloadLoadError | null {
-  return remoteUnreadable;
+/**
+ * Is the remote pod off limits to this device? See `remoteBlocked`.
+ *
+ * Two reasons, one latch: the bytes could not be READ (a payload failure), or
+ * they must not be MERGED (a lineage mismatch). Both want the same three
+ * behaviours — refuse saves, stop the poll, report once — so they share the
+ * mechanism rather than each having their own.
+ */
+export function isRemoteBlocked(): RemoteBlocker | null {
+  return remoteBlocked;
 }
 
 export function noteRemoteUnreadable(err: PayloadLoadError): void {
@@ -131,10 +139,10 @@ export function noteRemoteUnreadable(err: PayloadLoadError): void {
   // not report, `docClient` owns that class — consume the flag and silence the
   // corrupt report for the whole session, which is the one that matters.
   const throttleKey = `${err.name}:${err.step}`;
-  const alreadyReported = reportedUnreadableSteps.has(throttleKey);
-  remoteUnreadable = err;
+  const alreadyReported = reportedBlockClasses.has(throttleKey);
+  remoteBlocked = err;
   if (!alreadyReported && !err.deviceCannotOpen) {
-    reportedUnreadableSteps.add(throttleKey);
+    reportedBlockClasses.add(throttleKey);
     reportError({
       surface: 'pod-load-failure',
       message: `Remote pod unreadable: Automerge ${err.step}`,
@@ -176,8 +184,8 @@ export function rollbackRemoteMarker(): void {
   remoteBaseline = null;
 }
 
-/** Which error classes have already been reported for the current latch. */
-const reportedUnreadableSteps = new Set<string>();
+/** Which (class, step) pairs have already been reported for the current latch. */
+const reportedBlockClasses = new Set<string>();
 
 /**
  * A USER asked again — clear the breaker so one attempt can run.
@@ -197,9 +205,34 @@ export function retryAfterRemoteBlock(): void {
   clearRemoteUnreadable();
 }
 
+/**
+ * A LINEAGE mismatch latches the same breaker, for the same three reasons: the
+ * remote must not be merged, retrying cannot change that, and the user needs to
+ * be told once rather than every ten seconds.
+ *
+ * Reported at `warning`, not `critical`, for every verdict except `conflict`:
+ * an `adopt-remote` block is the expected, recoverable outcome of a compaction
+ * reaching a device with unsaved work, and paging a human for it would train
+ * the alert to be ignored. A `conflict` genuinely needs someone to look.
+ */
+export function noteLineageBlocked(err: PodLineageError): void {
+  const throttleKey = `PodLineageError:${err.verdict}`;
+  const alreadyReported = reportedBlockClasses.has(throttleKey);
+  remoteBlocked = err;
+  if (alreadyReported) return;
+  reportedBlockClasses.add(throttleKey);
+  reportError({
+    surface: 'pod-lineage',
+    message: `Pod lineage blocked: ${err.verdict}`,
+    error: err,
+    severity: err.verdict === 'conflict' ? 'critical' : 'warning',
+    context: { action: 'blocked', error_code: err.verdict },
+  });
+}
+
 function clearRemoteUnreadable(): void {
-  remoteUnreadable = null;
-  reportedUnreadableSteps.clear();
+  remoteBlocked = null;
+  reportedBlockClasses.clear();
 }
 
 let currentProvider: StorageProvider | null = null;
@@ -347,7 +380,7 @@ function startPollingIfApplicable(provider: StorageProvider | null): void {
         // identically. This is the LOCAL-FILE cohort's door into that loop —
         // `syncStore`'s latch cannot see it, because this layer owns the
         // download and the store never runs.
-        if (remoteUnreadable) return;
+        if (remoteBlocked) return;
         try {
           await fetchAndMergeRemote();
         } catch (e) {
@@ -909,6 +942,19 @@ export async function remoteChanged(): Promise<ChangeResult> {
  * and the exact bug class #65 exists to close. Ask at the moment the answer is
  * used.
  */
+/**
+ * Can this device PROVE its document holds nothing the remote has not seen?
+ *
+ * The context the lineage guard needs, answered by the #65 comparison that
+ * already exists rather than a second heads probe. Unknown counts as `dirty` —
+ * a null baseline, or a failed probe — which is the same fail-safe direction
+ * `unpushedLocalChangesCheck` already documents: the cost of a wrong `dirty` is
+ * a refusal the user can clear; the cost of a wrong `clean` is a peer's work.
+ */
+export async function docPushedAgainst(baselineFp: string | null): Promise<'clean' | 'dirty'> {
+  return (await unpushedLocalChangesCheck(baselineFp)) === null ? 'clean' : 'dirty';
+}
+
 async function unpushedLocalChangesCheck(
   baselineFp: string | null
 ): Promise<{ skip: false; reason: string } | null> {
@@ -1312,7 +1358,7 @@ async function fetchAndMergeRemote(): Promise<void> {
   // + parse + decrypt + failed WASM allocation roughly every two seconds,
   // indefinitely. Throwing (rather than returning) keeps `doSave`'s refusal
   // intact — a silent return would let the save through.
-  if (remoteUnreadable) throw remoteUnreadable;
+  if (remoteBlocked) throw remoteBlocked;
   if (!currentProvider) return;
   // Drive's save path always calls this (legacy direct call); the polling
   // watcher only activates for providers that opt in. Both paths converge
@@ -1350,13 +1396,43 @@ async function fetchAndMergeRemote(): Promise<void> {
 
   const remoteEnvelope = parseBeanpodV4(text);
 
+  // ⚠️ LINEAGE GUARD (terminus 3), and this is the one that makes a compaction
+  // able to SPREAD. A peer's first post-compaction sync arrives right here, so
+  // if this only ever merged-or-threw, every peer in the fleet would latch and
+  // none would ever adopt.
+  //
+  // The context is the #65 comparison that already exists, over the baseline
+  // this module already holds — no extra probe.
+  const lineageCtx = await docPushedAgainst(remoteBaseline?.headsFp ?? null);
+  const lineageAct = guardLineage(
+    remoteEnvelope.podLineage,
+    currentEnvelope?.podLineage,
+    lineageCtx
+  );
+  if (lineageAct === 'publish-local') {
+    // We hold an unpublished compaction and the remote is on the older lineage.
+    // Do NOT merge and do NOT learn the marker: `doSave` should proceed to write
+    // our compacted document over it. (If the remote had actually moved, the
+    // guard would have returned `block` — see the policy table.)
+    return;
+  }
+
   // The worker decrypts + CRDT-merges the remote into its doc and returns
   // heads-derived `dirty` (did local carry unsynced changes the converged doc
   // must push back?). No suppressAutoSave bracket is needed — the worker doesn't
   // fire a main persist callback; main decides when to save via `dirty`.
+  //
+  // `adopt` returns the SAME shape, so the baseline commit, `setEnvelope`, the
+  // latch clear and the `if (dirty)` tail below are all unchanged. Adopting
+  // after a genuine `changed` probe is sound for the reason the full-adopt
+  // branch already documents: the document installed IS the remote, so
+  // `remoteHeads` describes it exactly.
   let merged: { dirty: boolean; remoteHeads: string[] | null };
   try {
-    merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
+    merged =
+      lineageAct === 'adopt'
+        ? await docClient.adoptRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId)
+        : await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
   } catch (e) {
     // ⚠️ THE MARKER MUST NOT BE LEARNED FOR A REMOTE WE COULD NOT READ.
     //

@@ -17,6 +17,7 @@
  * looks like it works.
  */
 import type { PodLineage } from '@/types/syncFileV4';
+import type { PodBlockMessageKey, RemoteBlocker } from '@/types/sync';
 
 /** How the two lineages relate. A fact, with no policy in it. */
 export type LineageVerdict = 'same' | 'adopt-remote' | 'ours-newer' | 'conflict';
@@ -42,7 +43,7 @@ export type LineageAction = 'merge' | 'adopt' | 'publish-local' | 'block';
 export type LineageContext = 'clean' | 'dirty' | 'user-file';
 
 /** Thrown by `guardLineage` when the two documents must not be combined. */
-export class PodLineageError extends Error {
+export class PodLineageError extends Error implements RemoteBlocker {
   readonly verdict: LineageVerdict;
   constructor(verdict: LineageVerdict, message: string) {
     super(message);
@@ -56,6 +57,18 @@ export class PodLineageError extends Error {
   /** `RemoteBlocker`: the short, stable code for `error_code`. */
   get blockCode(): string {
     return this.verdict;
+  }
+
+  /**
+   * `RemoteBlocker`: which inline message the sync bar shows.
+   *
+   * Two, because the two blocking verdicts have different actions. An
+   * `adopt-remote` block is recoverable by the user (save or export the local
+   * changes, then reload); a `conflict` is not something they can resolve, and
+   * the honest copy says so rather than sending them round a loop.
+   */
+  get inlineMessageKey(): PodBlockMessageKey {
+    return this.verdict === 'conflict' ? 'podLineage.conflictInline' : 'podLineage.unsyncedInline';
   }
 }
 
