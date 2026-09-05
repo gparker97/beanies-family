@@ -37,7 +37,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { generateUUID } from '@/utils/id';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
-type RefusalCode = 'not-synced' | 'backup-not-delivered' | 'no-envelope';
+type RefusalCode = 'not-synced' | 'backup-not-delivered' | 'no-envelope' | 'no-permission';
 
 export function usePodCompaction() {
   const syncStore = useSyncStore();
@@ -78,11 +78,31 @@ export function usePodCompaction() {
       //    that no peer can merge with, so publishing one that is missing a
       //    peer's edits would strand them permanently.
       await syncService.flushPendingSave();
-      // ⚠️ CHEAPEST PROOF FIRST. `syncNow` unconditionally exports, encrypts,
-      // base64s and UPLOADS the whole multi-megabyte pod, and `doSave` has no
-      // clean short-circuit — so an already-synced device paid a full round trip
-      // for nothing, on exactly the low-memory device this feature exists for.
-      // Ask the question first; only push when the answer is no.
+
+      // 2a. ⚠️ PROVE WE CAN WRITE, BEFORE ANYTHING MOVES. Reordering the gates
+      //     to skip a pointless upload also removed the only thing that had
+      //     ever exercised the provider, so a revoked file permission or an
+      //     expired token surfaced at step 6 — AFTER the lineage was stamped.
+      //     `doSave` returns false there without arming a blocker or recording
+      //     a save failure, leaving a cached, unpublished compaction on a
+      //     device whose documented self-repair is the very write it cannot do.
+      if (!(await syncService.hasPermission())) return refuse('no-permission');
+
+      // 2b. ⚠️ PULL UNCONDITIONALLY. `isFullySynced` trusts the change probe,
+      //     and on a provider with no revision that probe compares MTIMES —
+      //     which a filesystem granule (FAT/exFAT rounds to 2s) or a cloud
+      //     client that rewrites a file preserving its timestamp can defeat.
+      //     A missed peer write is one this compaction then publishes over,
+      //     stranding them permanently, which is the exact outcome this gate
+      //     exists to prevent. `loadFromFile` downloads and merges without
+      //     consulting the probe, so it closes the hole for every provider; one
+      //     download on a rare, user-initiated, one-way operation is the
+      //     cheapest possible insurance.
+      if (!(await syncStore.loadFromFile({ merge: true })).success) return refuse('not-synced');
+
+      // 2c. Now push whatever the merge revealed, and prove we are level.
+      //     Still cheapest-proof-first: `syncNow` exports, encrypts, base64s and
+      //     uploads the whole pod, so an already-level device skips it.
       if (!(await syncService.isFullySynced())) {
         if (!(await syncStore.syncNow(false))) return refuse('not-synced');
         if (!(await syncService.isFullySynced())) return refuse('not-synced');

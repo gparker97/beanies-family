@@ -515,6 +515,39 @@ describe('Sensitive Data Clearing Security', () => {
       removeItemSpy.mockRestore();
     });
 
+    it('KEEPS the local database when the final save did not push everything', async () => {
+      // ⚠️ THE DATA-LOSS CASE, and it had no test at all. Sign-out deletes the
+      // family database on the assumption the final force-save pushed
+      // everything. Two independent things broke that assumption:
+      //   • the guard read a LATCH after a 3s race, while the merge it waits on
+      //     is budgeted at 120s — so on a large pod the blocker armed tens of
+      //     seconds too late and the guard saw null;
+      //   • `doSave` refuses on ANY blocker, while the recoverable classes
+      //     (a rotated family key, a torn read) deliberately do NOT latch — so
+      //     the save was refused and the guard was blind at the same time.
+      // Measuring the DOCUMENT closes both: it does not care why the save did
+      // not land, and it cannot be raced.
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
+      const { auth } = populateAllStores();
+
+      await auth.signOutAndClearData();
+
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+    });
+
+    it('still deletes when the document is provably level with the remote', async () => {
+      // The other direction: an over-cautious guard that never deletes would
+      // quietly defeat the whole point of the destructive tier.
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+      const { auth } = populateAllStores();
+
+      await auth.signOutAndClearData();
+
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123');
+    });
+
     it('force-saves the latest doc before clearing (ADR-032: durable save then delete)', async () => {
       const { auth } = populateAllStores();
 

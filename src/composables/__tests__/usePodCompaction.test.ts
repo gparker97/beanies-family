@@ -13,6 +13,8 @@ const hooks = vi.hoisted(() => ({
   synced: true,
   exported: true,
   backupLanded: true,
+  canWrite: true,
+  pulled: true,
 }));
 
 vi.mock('@/composables/useConfirm', () => ({
@@ -38,6 +40,9 @@ vi.mock('@/stores/familyContextStore', () => ({
 vi.mock('@/services/sync/syncService', () => ({
   flushPendingSave: vi.fn(async () => {}),
   isFullySynced: vi.fn(async () => hooks.synced),
+  // The write proof: a revoked file permission or an expired token must be
+  // caught BEFORE the lineage is stamped, not at the publish.
+  hasPermission: vi.fn(async () => hooks.canWrite),
 }));
 vi.mock('@/services/automerge/worker/docClient', () => ({
   compactDoc: vi.fn(async () => ({
@@ -52,10 +57,14 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 
 const syncNow = vi.fn(async () => true);
 const replaceEnvelope = vi.fn();
+// The unconditional pull. `isFullySynced` trusts a change probe that, with no
+// revision, compares mtimes — so compaction pulls without consulting it.
+const loadFromFile = vi.fn(async () => ({ success: hooks.pulled }));
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({
     syncNow,
     replaceEnvelope,
+    loadFromFile,
     envelope: { version: '4.0', familyId: 'fam-1', podLineage: undefined },
   }),
 }));
@@ -67,7 +76,14 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   syncNow.mockResolvedValue(true);
-  Object.assign(hooks, { confirmed: true, synced: true, exported: true, backupLanded: true });
+  Object.assign(hooks, {
+    confirmed: true,
+    synced: true,
+    exported: true,
+    backupLanded: true,
+    canWrite: true,
+    pulled: true,
+  });
 });
 
 describe('every refusal leaves the pod untouched', () => {
@@ -84,6 +100,37 @@ describe('every refusal leaves the pod untouched', () => {
     hooks.synced = false;
     await usePodCompaction().compact();
     expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('refuses when this device cannot WRITE, before anything moves', async () => {
+    // Reordering the gates to skip a pointless upload also removed the only
+    // thing that had ever exercised the provider, so a revoked file permission
+    // or an expired token surfaced at the PUBLISH — after the lineage was
+    // stamped. `doSave` returns false there without arming a blocker or
+    // recording a save failure, leaving a cached, unpublished compaction on a
+    // device whose documented self-repair is the very write it cannot perform.
+    hooks.canWrite = false;
+    await usePodCompaction().compact();
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    expect(replaceEnvelope).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the unconditional pull fails', async () => {
+    // Compaction does not trust the change probe: with no revision it compares
+    // MTIMES, which a filesystem granule or a timestamp-preserving cloud client
+    // can defeat, and a peer write missed that way is one this compaction then
+    // publishes over.
+    hooks.pulled = false;
+    await usePodCompaction().compact();
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('pulls even when it already believes it is level', async () => {
+    // The pull is UNCONDITIONAL — that is the point. Gating it on
+    // `isFullySynced` would reintroduce the probe it exists to distrust.
+    hooks.synced = true;
+    await usePodCompaction().compact();
+    expect(loadFromFile).toHaveBeenCalledWith({ merge: true });
   });
 
   it('refuses when the backup did not actually land', async () => {

@@ -155,3 +155,58 @@ describe('the guard must be CONSULTED everywhere, and its answer acted on in ful
     }
   );
 });
+
+describe('the guard must be able to say ADOPT, not only block', () => {
+  it('terminus 4 reads the baseline BEFORE load() destroys it', () => {
+    // `load()` nulls `remoteBaseline`, then `learnRemoteMarker` re-seeds it with
+    // `headsFp: null`. Asking for the fingerprint AFTER the download therefore
+    // always answered null → `docPushedAgainst(null)` → 'dirty' →
+    // POLICY['adopt-remote']['dirty'] = block. So the moment any device
+    // published a compaction, every peer's poll threw, latched and stopped
+    // polling, and a manual Refresh looped forever — "no peer ever adopts, so a
+    // compaction can never propagate", which is what podLineage.ts warns about.
+    // `code()` first: the comment above names the very identifiers this
+    // asserts on, so an uncommented slice would match itself.
+    const body = code(
+      bodyOf(read('src/stores/syncStore.ts'), 'async function loadFromFile', '\n  }\n')
+    );
+    const captureAt = body.indexOf('getRemoteBaselineHeadsFp()');
+    const loadAt = body.indexOf('await syncService.load()');
+    const guardAt = body.indexOf('docPushedAgainst(');
+    expect(captureAt).toBeGreaterThan(-1);
+    expect(loadAt).toBeGreaterThan(-1);
+    expect(captureAt, 'the capture must precede load()').toBeLessThan(loadAt);
+    expect(guardAt, 'the guard consumes it after').toBeGreaterThan(loadAt);
+    // And it must consume the captured value, not re-read the destroyed one.
+    expect(body).toContain('docPushedAgainst(baselineFpBeforeLoad)');
+  });
+});
+
+describe('compaction proves what it needs before anything moves', () => {
+  const body = () =>
+    code(bodyOf(read('src/composables/usePodCompaction.ts'), 'async function compact', '\n  }\n'));
+
+  it('proves it can WRITE before the lineage is stamped', () => {
+    // Reordering the gates to skip a pointless upload removed the only thing
+    // that had ever exercised the provider, so a revoked permission surfaced
+    // AFTER the stamp — leaving a cached, unpublished compaction on a device
+    // whose documented self-repair is the very write it cannot perform.
+    const b = body();
+    const permAt = b.indexOf('hasPermission()');
+    const stampAt = b.indexOf('podLineage:');
+    expect(permAt).toBeGreaterThan(-1);
+    expect(stampAt).toBeGreaterThan(-1);
+    expect(permAt, 'the write proof must precede the stamp').toBeLessThan(stampAt);
+  });
+
+  it('pulls UNCONDITIONALLY rather than trusting the change probe', () => {
+    // `isFullySynced` trusts a probe that, with no revision, compares mtimes —
+    // defeated by a filesystem granule or a timestamp-preserving cloud client.
+    // A missed peer write is one this compaction then publishes over.
+    const b = body();
+    const pullAt = b.indexOf('loadFromFile({ merge: true })');
+    const syncAt = b.indexOf('isFullySynced()');
+    expect(pullAt, 'a forced pull must exist').toBeGreaterThan(-1);
+    expect(pullAt, 'and must precede the level check').toBeLessThan(syncAt);
+  });
+});

@@ -1095,6 +1095,18 @@ export const useSyncStore = defineStore('sync', () => {
       syncService.cancelPendingSave();
     }
 
+    // ⚠️ CAPTURE BEFORE `load()`, WHICH DESTROYS IT. `load()` nulls
+    // `remoteBaseline` and then `learnRemoteMarker` re-seeds it with
+    // `headsFp: null`, so asking for the fingerprint AFTER the download always
+    // answered null → `docPushedAgainst(null)` → 'dirty' → the terminus-4 guard
+    // could only ever BLOCK. The moment any device published a compaction,
+    // every peer's poll threw, latched and stopped, and a manual Refresh looped
+    // (the retry clears the latch, the next poll re-blocks) — the "no peer ever
+    // adopts, so a compaction can never propagate" outcome `podLineage.ts`
+    // warns about. The honest question is "as of the last thing we KNEW Drive
+    // held, is our document ahead?", and that is this value, read here.
+    const baselineFpBeforeLoad = syncService.getRemoteBaselineHeadsFp();
+
     try {
       console.log('[syncStore.loadFromFile] calling syncService.load()...');
       const text = await syncService.load();
@@ -1191,7 +1203,7 @@ export const useSyncStore = defineStore('sync', () => {
             // collection added by a later `migrateDoc` the OLD lineage wins
             // DETERMINISTICALLY (measured 60/60), silently reverting every
             // post-compaction edit and republishing the hybrid fleet-wide.
-            const ctx = await syncService.docPushedAgainst(syncService.getRemoteBaselineHeadsFp());
+            const ctx = await syncService.docPushedAgainst(baselineFpBeforeLoad);
             const act = guardLineage(remoteEnvelope.podLineage, envelope.value?.podLineage, ctx);
             if (act === 'publish-local') {
               // Our unpublished compaction stands; the next save carries it up.

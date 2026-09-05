@@ -127,16 +127,38 @@ four of `notePodUnopenable`'s five tail lines.
 - **#14** — both outer catches accept any blocker.
 - **#15** — CHANGELOG entries added.
 
+## FIXED (2026-09-05, second pass — all mutation-checked)
+
+- **#5** `loadFromFile` captures the baseline fingerprint BEFORE `load()`
+  destroys it, so terminus 4 can answer `clean` and therefore ADOPT. Reading it
+  after the download could only ever say "unknown" → dirty → block.
+- **#13** The sign-out guard no longer asks "is the remote unreadable" (a latch
+  read after a 3s race against a 120s merge, which the recoverable classes never
+  arm anyway). It asks whether the DOCUMENT still holds work Drive has not got,
+  measured after the final save: provider-agnostic, unraceable, and indifferent
+  to why the save did not land. Unmeasurable reads as dirty. Both directions
+  tested — an over-cautious guard that never deletes would defeat the tier.
+- **#10** Compaction PULLS UNCONDITIONALLY rather than trusting the change
+  probe. Requiring a revision basis would have locked local-file families out
+  entirely (A1-6 in reverse); removing the trust closes the hole for every
+  provider at the cost of one download on a rare, user-initiated, one-way
+  operation. The expensive half of Eff-1 (skipping a pointless upload) survives.
+- **#9** An explicit `hasPermission()` gate before anything moves, replacing the
+  accidental write proof the removed upload used to provide.
+
+### Judgement call worth revisiting
+
+Sign-out now keeps the encrypted local database whenever the final save does not
+demonstrably complete, including when it is merely slow. Keeping it costs
+nothing; deleting it can cost a session of edits. The trade-off is that a slow
+sign-out on a shared device leaves cached data behind. Product decision.
+
 ## STILL OPEN — needs design, not patching (all dormant behind the flag)
 
-- **#5** terminus 4's context is always `dirty`, so it can never adopt. The
-  honest fix needs a baseline `loadFromFile` does not currently hold.
-- **#10** `isFullySynced` accepts an mtime-basis "unchanged" that
-  `shouldSkipOpenRead` explicitly refuses.
-- **#13** the sign-out latch refresh reads after a 3s race against a 120s merge.
-- **#9** Eff-1 removed the only proof the device can WRITE before the stamp.
-
-Do these as ONE batch, with a review, before `podCompaction` is ever enabled.
+None. All four are fixed above. What remains before `podCompaction` is enabled
+is not code but EVIDENCE: nobody has yet opened a compacted pod on the tablet,
+or watched two devices go through a compaction. 6261 green tests and two audits
+are not that evidence.
 
 ## Order of work
 
