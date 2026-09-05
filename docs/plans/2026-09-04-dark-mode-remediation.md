@@ -100,3 +100,30 @@ locked OS setting. `useWallOrientation` now owns the policy and restores to the 
 
 Still needs an on-device check on a real Android tablet and an iPad; the native half cannot
 be verified from here and needs new store builds to reach users.
+
+---
+
+## Follow-up — 2026-09-05: this pass created two bugs it could not see
+
+Recorded here so this plan's Outcome is not read as "dark mode is finished".
+
+greg reported white text on a yellow banner (scrapbook header) and an unreadable family
+note on a recipe. Both were **produced by this remediation**, not missed by it. It added
+`dark:text-ink` / `dark:text-ink-soft` to headings and captions app-wide, which is correct
+on a `bg-white` card because the card has a `dark:bg-*` partner — but on a hand-painted
+pastel (`bg-[#fff7c8]`, or an inline `style="background: linear-gradient(…)"`) the surface
+has no dark partner and never switches. The ink went near-white and the paper stayed
+yellow: **1.01:1**.
+
+The blind spot was structural, not careless. A search for `bg-white` finds none of these
+surfaces, and `vue/no-restricted-class` cannot see an arbitrary hex or an inline style. The
+rule learned: **the ink and the surface under it are one unit of work**; a `dark:text-*`
+added on its own is a half-change, and the missing half is the one that makes text vanish.
+
+The follow-up sweep (`02f49910`) also found three `html.dark` rules that had never once
+applied, an `opacity`-in-dark cluster across onboarding, ~120 accent sites with no `-lift`
+partner, and a missing `silk-lift` token. It corrected a contrast figure this plan's
+lineage had asserted from memory: Heritage Orange on `surface-ground` is 5.08, not 3.61.
+
+See `docs/STATUS.md` (2026-09-05 block), `docs/lessons.md` (top entry), and CIG slides
+08–09.
