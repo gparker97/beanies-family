@@ -10,7 +10,13 @@
  * replacement for the `changeDoc(fn)` closures that can't cross `postMessage`.
  */
 import * as Automerge from '@automerge/automerge';
-import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/types/automerge';
+import {
+  COLLECTION_NAMES,
+  NON_COLLECTION_KEYS,
+  type FamilyDocument,
+  type CollectionName,
+} from '@/types/automerge';
+import type { PodLineage } from '@/types/models';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
@@ -38,6 +44,23 @@ function toPlain<T>(value: T): T {
 // ─── Doc lifecycle ───────────────────────────────────────────────────────────
 
 /** Initialize any collections missing from an older document. */
+/**
+ * This document's lineage, normalised — the ONE place absent-or-null is decided.
+ *
+ * `podLineage` is typed `PodLineage | null` but is ABSENT on every pod created
+ * before it shipped, exactly as `settings` is: `migrateDoc` seeds only
+ * `COLLECTION_NAMES`, and it must stay that way — seeding this field would emit
+ * a real `Automerge.change` into every legacy pod on open, churn in the document
+ * the whole tier exists to shrink.
+ *
+ * Reading it directly would push that three-state distinction (absent / null /
+ * present) onto every caller, and `compareLineage` deliberately accepts only
+ * two. So: read it HERE, or not at all.
+ */
+export function docLineage(doc: Doc): PodLineage | null {
+  return (doc as { podLineage?: PodLineage | null }).podLineage ?? null;
+}
+
 export function migrateDoc(doc: Doc): Doc {
   const missing = COLLECTION_NAMES.filter((name) => doc[name] === undefined || doc[name] === null);
   if (missing.length === 0) return doc;
@@ -166,6 +189,15 @@ export function projectionDeltasBetween(
       const top = patch.path[0];
       if (top === 'settings') {
         settingsChanged = true;
+        continue;
+      }
+      // ⚠️ EVERY OTHER SINGLETON IS IGNORED, and `podLineage` must NEVER be
+      // folded into `settingsChanged`. Doing so would push a spurious settings
+      // delta on every compaction and — far worse — make a lineage write look
+      // like a settings change to the Stage 3 rebase, which would then carry the
+      // peer's settings over the compactor's. It is also not an entity, so it
+      // cannot fall through to the collection branch below.
+      if (typeof top === 'string' && (NON_COLLECTION_KEYS as readonly string[]).includes(top)) {
         continue;
       }
       if (patch.path.length < 2) continue; // top-level/migrate create — no entity

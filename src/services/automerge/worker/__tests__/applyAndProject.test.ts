@@ -292,7 +292,10 @@ describe('worker/applyAndProject', () => {
       id: 'r1',
       entity: { id: 'r1', title: 'remote' },
     }).doc;
-    const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+    const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+      kind: 'baseline',
+      heads: null,
+    });
 
     expect(res.dirty).toBe(false);
     expect(res.heads.length).toBeGreaterThan(0);
@@ -320,7 +323,10 @@ describe('worker/applyAndProject', () => {
       entity: { id: 'r1', title: 'remote' },
     }).doc;
     chunks = [];
-    const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+    const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+      kind: 'baseline',
+      heads: null,
+    });
 
     expect(res.dirty).toBe(true); // local l1 is not in remote → must push back
     // A poll-merge now streams a DELTA (only the entity the merge brought in),
@@ -356,7 +362,10 @@ describe('worker/applyAndProject', () => {
       (d as unknown as Record<string, Record<string, unknown>>).bogus = { x: { id: 'x' } };
     });
     chunks = [];
-    await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+    await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+      kind: 'baseline',
+      heads: null,
+    });
 
     // Half-update safety: the sink sees a COMPLETE full rebuild — every todos delta
     // is a bulk reset, NO partial upsert/remove leaked, a settings delta is present,
@@ -573,7 +582,10 @@ describe('worker/applyAndProject', () => {
         entity: { id: 'r1', title: 'remote' },
       }).doc;
 
-      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       // Nothing to push BACK (we had no local changes), but every consumer's
       // projection is stale by definition — the two booleans are not the same
@@ -592,9 +604,15 @@ describe('worker/applyAndProject', () => {
       }).doc;
       // Adopt it first, then merge the SAME bytes again — the classic "open the app
       // twice with nothing having happened" case.
-      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
-      const res = await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+      const res = await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       expect(res.changed).toBe(false);
       expect(res.dirty).toBe(false);
@@ -608,7 +626,10 @@ describe('worker/applyAndProject', () => {
         id: 'l1',
         entity: { id: 'l1', title: 'local' },
       }).doc;
-      await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       const remote = applyMutation(local, {
         op: 'set',
@@ -616,7 +637,10 @@ describe('worker/applyAndProject', () => {
         id: 'r2',
         entity: { id: 'r2', title: 'remote' },
       }).doc;
-      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       expect(res.changed).toBe(true);
     });
@@ -635,7 +659,10 @@ describe('worker/applyAndProject', () => {
       const remote = Automerge.init<FamilyDocument>();
       const rawHeads = getHeads(remote);
 
-      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       expect(res.remoteHeads).toEqual(rawHeads);
       expect(res.heads).not.toEqual(rawHeads); // migrate genuinely moved the doc
@@ -656,7 +683,10 @@ describe('worker/applyAndProject', () => {
         entity: { id: 'r1', title: 'remote' },
       }).doc;
 
-      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       expect(res.dirty).toBe(false);
       expect(res.remoteHeads).toEqual(res.heads);
@@ -670,7 +700,10 @@ describe('worker/applyAndProject', () => {
         id: 'l1',
         entity: { id: 'l1', title: 'local' },
       }).doc;
-      await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       const remote = applyMutation(base(), {
         op: 'set',
@@ -678,7 +711,10 @@ describe('worker/applyAndProject', () => {
         id: 'r2',
         entity: { id: 'r2', title: 'remote' },
       }).doc;
-      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID);
+      const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       // Our merged doc holds BOTH edits, so its heads are strictly ahead of Drive.
       // remoteHeads must still describe Drive alone.
@@ -695,7 +731,10 @@ describe('worker/applyAndProject', () => {
         id: 'e1',
         entity: { id: 'e1', title: 'exported' },
       }).doc;
-      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
 
       const res = await exportEncryptedPayload();
       expect(res.heads).toEqual(getHeads(doc));
@@ -710,7 +749,10 @@ describe('worker/applyAndProject', () => {
         id: 'e1',
         entity: { id: 'e1', title: 'exported' },
       }).doc;
-      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
       const headsAtExport = getHeads(doc);
 
       // Land a mutation while the encrypt is in flight. Heads captured BEFORE the
@@ -779,12 +821,18 @@ describe('worker/applyAndProject', () => {
         id: 's1',
         entity: { id: 's1', title: 'seed' },
       }).doc;
-      await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
       await flush();
       const warm = perf.filter((l) => l === 'snapshot.persist').length;
 
       await openCache(FAMILY_ID); // re-open (stands in for a family switch)
-      await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID);
+      await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID, {
+        kind: 'baseline',
+        heads: null,
+      });
       await flush();
 
       expect(perf.filter((l) => l === 'snapshot.persist').length).toBeGreaterThan(warm);

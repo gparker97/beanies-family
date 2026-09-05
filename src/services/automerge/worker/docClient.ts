@@ -32,7 +32,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
-import { PayloadLoadError } from '@/types/sync';
+import { PayloadLoadError, isRemoteBlocker } from '@/types/sync';
 import { deviceMemoryScalar } from '@/utils/diagnostics';
 import { getPlatform } from '@/services/sync/capabilities';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
@@ -49,6 +49,7 @@ import {
   type MutationOp,
   type Heads,
   type CachePersistFailureDetail,
+  type LineageBasis,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
@@ -963,7 +964,12 @@ function surface(
   const error = err instanceof Error ? err : new DocWorkerError(String(err), method);
   // Expected-degradation classes stay quiet: PayloadLoadError (recovery
   // dispatches on it) + WorkerCrashError (already surfaced once at the crash site).
-  const expected = error instanceof PayloadLoadError || error instanceof WorkerCrashError;
+  // ⚠️ `isRemoteBlocker`, not a class list. A `PodLineageError` is now RAISED IN
+  // THE WORKER (the guard moved there), so it arrives here too — and without
+  // this it would fire a generic report AND toast on top of the one
+  // `noteLineageBlocked` already owns. A strict SUPERSET of the old set
+  // (`PayloadLoadError implements RemoteBlocker`), so nothing goes quiet.
+  const expected = isRemoteBlocker(error) || error instanceof WorkerCrashError;
   if (!quiet && !expected) {
     notifyFailure(error, implicatedMethods ?? [method]);
   }
@@ -1018,36 +1024,6 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });
   await request('setKey', { key });
-}
-
-/**
- * Adopt a remote envelope WHOLESALE — never a CRDT merge.
- *
- * `dropDoc()` is already this codebase's way of saying "adopt": with no
- * `currentDoc`, `mergeRemoteEnvelope` takes its full-adopt branch, installs the
- * remote verbatim, resets the cursors and pushes a full projection. Four call
- * sites already used the pair; naming it means a cross-lineage merge is a
- * different FUNCTION rather than a convention someone has to remember.
- *
- * Preferred over a `mode: 'merge' | 'adopt'` parameter on `mergeRemoteEnvelope`:
- * that API has seven call sites, so a required mode would be seven edits and
- * seven chances to answer `'merge'` reflexively to get the build green.
- *
- * ⚠️ ONE RPC, and it must stay one. This was `dropDoc()` then
- * `mergeRemoteEnvelope()`, documented as atomic on the reasoning that a respawn
- * between them leaves no document so the retry adopts anyway. That is false:
- * the respawn's rehydrator (`initAndLoadCache`) reinstalls the cached
- * OLD-LINEAGE document first, so the retried merge found a `currentDoc` and
- * took the CROSS-LINEAGE merge branch — persisted and pushed, undoing a
- * compaction for the whole family. The drop now happens inside the worker,
- * after the decrypt has succeeded, so a retry re-runs the whole operation and a
- * decrypt failure leaves the old document installed.
- */
-export function adoptRemoteEnvelope(
-  envelope: BeanpodFileV4,
-  familyId: string | null
-): Promise<{ dirty: boolean; remoteHeads: string[] | null; changed?: boolean }> {
-  return mergeRemoteEnvelope(envelope, familyId, { adopt: true });
 }
 
 /**
@@ -1200,16 +1176,28 @@ export function noteRemoteBaseline(payload: string): void {
 export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   familyId: string | null,
-  /** `adopt` replaces the document instead of merging — see `adoptRemoteEnvelope`. */
-  opts?: RequestOpts & { adopt?: boolean }
-): Promise<{ heads: Heads; dirty: boolean; changed: boolean; remoteHeads: Heads }> {
-  const { adopt, ...requestOpts } = opts ?? {};
+  /**
+   * ⚠️ REQUIRED. What this caller can prove about its OWN document — the worker
+   * owns the lineage decision and cannot make it without this. There is no
+   * default, because a default is a decision nobody made, and the boolean it
+   * replaced (`adopt`) was a second entry point that could be forgotten.
+   */
+  basis: LineageBasis,
+  opts?: RequestOpts
+): Promise<{
+  action: 'merged' | 'adopted' | 'kept-local';
+  heads: Heads;
+  dirty: boolean;
+  changed: boolean;
+  remoteHeads: Heads;
+}> {
   const res = await request<{
+    action: 'merged' | 'adopted' | 'kept-local';
     heads: Heads;
     dirty: boolean;
     changed: boolean;
     remoteHeads: Heads;
-  }>('mergeRemoteEnvelope', { envelope, familyId, adopt: adopt === true }, requestOpts);
+  }>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
   // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');

@@ -4341,6 +4341,16 @@ const STRING_DEFS = {
     beanie:
       'rewrite your pod without its edit history so it opens faster and works on older tablets. owner only.',
   },
+  'podLineage.bannerTitle': {
+    en: 'Some changes on this device are waiting',
+    beanie: 'some beans on this device are waiting',
+  },
+  'podLineage.bannerMessage': {
+    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved. Nothing has been lost. Export those changes from Settings, then reload, and beanies will pick up the reorganised file.',
+    beanie:
+      'your family file was reorganised on another bean, and this one still has beans that were never saved. nothing has been lost. export them from settings, then reload, and beanies will pick up the reorganised file.',
+  },
+  'podLineage.bannerCta': { en: 'Export my changes', beanie: 'export my beans' },
   'podLineage.unsyncedInline': {
     en: 'Your family file was reorganised on another device, and this one still has changes that have not been saved. Save or export them first, then reload.',
     beanie:

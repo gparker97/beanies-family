@@ -38,6 +38,7 @@ import { claimInterruption } from '@/composables/useSessionInterruption';
 import UnifiedReconnectToast from '@/components/common/UnifiedReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
+import LineageBanner from '@/components/common/LineageBanner.vue';
 // REVIEW-DEMO: sample-data banner for store-review demo sessions.
 import ReviewDemoBanner from '@/components/common/ReviewDemoBanner.vue';
 import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
@@ -2246,6 +2247,7 @@ watch(
         <!-- Local-durability-cache failure — inline (pushes the header down), bound to
              syncStore.cachePersistFailed. See #50. -->
         <DurabilityBanner />
+        <LineageBanner />
         <!-- REVIEW-DEMO: marks a seeded demo session. Both banners are in-flow, so
              they stack predictably rather than overlapping. -->
         <ReviewDemoBanner />

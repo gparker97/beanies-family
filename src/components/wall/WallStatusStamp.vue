@@ -32,9 +32,20 @@ const { t } = useTranslation();
 
 const presentation = computed(() => SAVE_STATUS_PRESENTATION[syncStore.saveStatus]);
 
-/** Failures that have a banner elsewhere but no representation in `saveStatus`. */
+/**
+ * Failures that have a banner elsewhere but no representation in `saveStatus`.
+ *
+ * ⚠️ A LINEAGE BLOCK BELONGS HERE. The wall is a `noChrome` route a family may
+ * leave up all day, and it renders NONE of App.vue's banners — so without this
+ * the one state that needs a human is the one state the wall stays silent
+ * about.
+ */
 const blocked = computed(
-  () => syncStore.driveFileNotFound || !!syncStore.podAccessError || syncStore.cachePersistFailed
+  () =>
+    syncStore.driveFileNotFound ||
+    !!syncStore.podAccessError ||
+    syncStore.cachePersistFailed ||
+    syncStore.backgroundSyncErrorKind === 'lineage'
 );
 
 /**

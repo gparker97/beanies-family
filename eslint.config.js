@@ -346,6 +346,41 @@ export default [
       '@microsoft/sdl/no-postmessage-star-origin': 'error',
     },
   },
+  // ── The lineage guard has exactly ONE call site, and it is in the worker ──
+  //
+  // It used to be called from four termini on the main thread, over the two
+  // ENVELOPES — which is why it did not work: the envelope is maintained on
+  // three tracks independent of the document, so it read `same` while the
+  // documents differed and permitted the merge it exists to prevent.
+  //
+  // A LINT RULE rather than a test, deliberately. The test this replaces sliced
+  // `syncStore.ts` source on a delimiter that occurs ZERO times in that file,
+  // fell back to "the rest of the file", and asserted nothing while reporting
+  // green — which is how a broken guard shipped. A lint rule runs on every file
+  // and cannot silently match the wrong slice.
+  //
+  // ⚠️ `importNames`, never the module: both files legitimately import
+  // `PodLineageError` from it to classify a block that the WORKER raised.
+  {
+    files: ['src/stores/**/*.ts', 'src/services/sync/syncService.ts'],
+    ignores: ['**/__tests__/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/services/sync/podLineage',
+              importNames: ['guardLineage', 'compareLineage', 'lineageAction'],
+              message:
+                'The lineage guard runs in the worker (applyAndProject.mergeRemoteEnvelope) — the only place BOTH documents exist. Pass a LineageBasis instead of comparing envelopes here; see ADR-036.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   {
     // FINANCE EXCLUSION for the beanie wall.
     //
