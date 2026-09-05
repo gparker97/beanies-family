@@ -988,16 +988,21 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
  * that API has seven call sites, so a required mode would be seven edits and
  * seven chances to answer `'merge'` reflexively to get the build green.
  *
- * Atomicity: a worker respawn between the two calls leaves it with no document
- * at all, so the retried merge adopts — the same outcome, never a cross-lineage
- * merge. Both RPCs are already `RETRYABLE`.
+ * ⚠️ ONE RPC, and it must stay one. This was `dropDoc()` then
+ * `mergeRemoteEnvelope()`, documented as atomic on the reasoning that a respawn
+ * between them leaves no document so the retry adopts anyway. That is false:
+ * the respawn's rehydrator (`initAndLoadCache`) reinstalls the cached
+ * OLD-LINEAGE document first, so the retried merge found a `currentDoc` and
+ * took the CROSS-LINEAGE merge branch — persisted and pushed, undoing a
+ * compaction for the whole family. The drop now happens inside the worker,
+ * after the decrypt has succeeded, so a retry re-runs the whole operation and a
+ * decrypt failure leaves the old document installed.
  */
-export async function adoptRemoteEnvelope(
+export function adoptRemoteEnvelope(
   envelope: BeanpodFileV4,
   familyId: string | null
 ): Promise<{ dirty: boolean; remoteHeads: string[] | null; changed?: boolean }> {
-  await dropDoc();
-  return mergeRemoteEnvelope(envelope, familyId);
+  return mergeRemoteEnvelope(envelope, familyId, { adopt: true });
 }
 
 /**
@@ -1150,14 +1155,16 @@ export function noteRemoteBaseline(payload: string): void {
 export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   familyId: string | null,
-  opts?: RequestOpts
+  /** `adopt` replaces the document instead of merging — see `adoptRemoteEnvelope`. */
+  opts?: RequestOpts & { adopt?: boolean }
 ): Promise<{ heads: Heads; dirty: boolean; changed: boolean; remoteHeads: Heads }> {
+  const { adopt, ...requestOpts } = opts ?? {};
   const res = await request<{
     heads: Heads;
     dirty: boolean;
     changed: boolean;
     remoteHeads: Heads;
-  }>('mergeRemoteEnvelope', { envelope, familyId }, opts);
+  }>('mergeRemoteEnvelope', { envelope, familyId, adopt: adopt === true }, requestOpts);
   // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');

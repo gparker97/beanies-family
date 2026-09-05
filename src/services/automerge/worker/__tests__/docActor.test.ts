@@ -9,6 +9,8 @@
  * is the thing the profiler measures on greg's real pod.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import { setDocActor, resetDocActor, docInitOpts } from '../docActor';
@@ -98,5 +100,33 @@ describe('why the actor needs a lease (actorLease.ts)', () => {
       d.items.b = 'from-B';
     });
     expect(() => Automerge.merge(Automerge.clone(tabA), tabB)).toThrow(/duplicate seq/i);
+  });
+});
+
+describe('adopt is atomic, and the drop happens after the decrypt', () => {
+  // Structural, like `lineageWiring.test.ts`: driving a real worker respawn
+  // mid-RPC is not reachable from a unit test, and the failure mode here is
+  // silent — a cross-lineage merge that persists and publishes.
+  const src = fs.readFileSync(path.resolve(__dirname, '../docClient.ts'), 'utf8');
+  const worker = fs.readFileSync(path.resolve(__dirname, '../applyAndProject.ts'), 'utf8');
+
+  it('adoptRemoteEnvelope is ONE rpc, never dropDoc-then-merge on main', () => {
+    // The pair was documented as atomic and was not: `mergeRemoteEnvelope` is
+    // RETRYABLE, and a respawn's rehydrator reinstalls the cached OLD-lineage
+    // doc before the retry, so the retry took the MERGE branch.
+    const body = src.slice(src.indexOf('export function adoptRemoteEnvelope'));
+    const fn = body.slice(0, body.indexOf('\n}\n'));
+    expect(fn).toContain('adopt: true');
+    expect(fn).not.toContain('dropDoc(');
+  });
+
+  it('the worker drops only AFTER the decrypt has resolved', () => {
+    // A drop before the decrypt leaves the worker holding NO document when the
+    // decrypt throws — every later edit and every save fails for the session.
+    const fn = worker.slice(worker.indexOf('export async function mergeRemoteEnvelope'));
+    const decryptAt = fn.indexOf('decryptToDoc');
+    const dropAt = fn.indexOf('if (adopt) {');
+    expect(decryptAt).toBeGreaterThan(-1);
+    expect(dropAt).toBeGreaterThan(decryptAt);
   });
 });

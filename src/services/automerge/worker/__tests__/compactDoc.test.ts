@@ -17,6 +17,7 @@ const diffHook = vi.hoisted(() => ({ path: null as string | null }));
 // An ESM namespace property is not configurable, so `vi.spyOn(Automerge, 'from')`
 // throws. Mock the module and drive `from` through a hook the tests set.
 const fromHook = vi.hoisted(() => ({ throws: null as Error | null }));
+const statsHook = vi.hoisted(() => ({ throwsOnCompacted: null as Error | null, seen: 0 }));
 vi.mock('@automerge/automerge', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@automerge/automerge')>();
   return {
@@ -24,6 +25,14 @@ vi.mock('@automerge/automerge', async (importOriginal) => {
     from: (...args: unknown[]) => {
       if (fromHook.throws) throw fromHook.throws;
       return (actual.from as (...a: unknown[]) => unknown)(...args);
+    },
+    // `stats` runs in compactDoc's TAIL, after the rebuild succeeded. That tail
+    // is where an OOM is most likely (the compacted doc is being serialised
+    // while both copies are resident), and it used to sit outside the try AND
+    // after the install.
+    stats: (...args: unknown[]) => {
+      if (statsHook.throwsOnCompacted && statsHook.seen++ > 0) throw statsHook.throwsOnCompacted;
+      return (actual.stats as (...a: unknown[]) => unknown)(...args);
     },
   };
 });
@@ -60,6 +69,8 @@ function seedHistory(n: number) {
 beforeEach(() => {
   diffHook.path = null;
   fromHook.throws = null;
+  statsHook.throwsOnCompacted = null;
+  statsHook.seen = 0;
   resetDocActor();
   __resetApplyAndProjectForTesting();
   configure({ pushChunk: () => {}, perf: () => {}, cachePersistFailed: () => {} });
@@ -102,6 +113,29 @@ describe('compactDoc', () => {
     seedHistory(3);
     fromHook.throws = new Error('error inflating document chunk ops: out of memory');
     expect(() => compactDoc()).toThrow(PayloadTooLargeError);
+  });
+
+  it('does NOT install a document it could not finish measuring', () => {
+    // ⚠️ THE WORST OUTCOME IN THE WHOLE FEATURE, and it was reachable.
+    // `saveDoc(compacted)` and `Automerge.stats(compacted)` ran AFTER
+    // `currentDoc = compacted` and outside the try. An OOM there rejected the
+    // RPC, so `usePodCompaction` reported "rebuild-failed" and told the user
+    // nothing had moved — while the worker held the COMPACTED document with
+    // its cursors reset and its lineage never stamped. The next persist wrote
+    // that compacted base to cache and the next save uploaded it under the OLD
+    // lineage, where every peer reads `same` and merges across lineages.
+    seedHistory(3);
+    const before = exportSnapshot().binary;
+    statsHook.throwsOnCompacted = new Error('out of memory');
+
+    expect(() => compactDoc()).toThrow(PayloadTooLargeError);
+
+    // The OLD document is still the current one, history and all.
+    const after = exportSnapshot().binary;
+    expect(Automerge.getAllChanges(Automerge.load(after)).length).toBe(
+      Automerge.getAllChanges(Automerge.load(before)).length
+    );
+    expect(Automerge.getAllChanges(Automerge.load(after)).length).toBeGreaterThan(1);
   });
 
   it('uses the pinned actor, so it does not re-introduce the churn', () => {

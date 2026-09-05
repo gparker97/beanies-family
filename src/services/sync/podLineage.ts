@@ -9,12 +9,16 @@
  * `Automerge.from(Automerge.toJS(doc))` is the only way to drop history in
  * Automerge 3.x, and it mints brand-new object ids. The compacted document
  * therefore shares no ancestry with the original, so a merge is a map-level
- * conflict rather than a reconciliation. Measured on a two-account document:
- * merging a compacted pod into a peer still holding the original history
- * destroyed that peer's unsynced changes 200 runs out of 200 — both an edit to
- * an existing entity and a newly created one. On a single-key document the
- * outcome flips run to run on random actor ordering, which is worse, because it
- * looks like it works.
+ * conflict rather than a reconciliation. And merging one into a peer still on the original history is NOT a coin flip.
+ * `Automerge.from` renumbers every opId, and Automerge breaks a map-write tie
+ * by opId COUNTER before it falls back to the actor id. A collection added by a
+ * later `migrateDoc` therefore carries a HIGH counter in the old lineage and a
+ * LOW one in the compacted pod, so the OLD lineage wins DETERMINISTICALLY.
+ * Measured over 60 trials: the compactor's post-compaction edits were destroyed
+ * 60/60 in `recipes` (added by a later migration) and 29/60 in `accounts`
+ * (created in the first change, where the counters tie and the actor id decides).
+ * The earlier "200/200" and "~50% coin flip" figures both came from
+ * single-collection probes, which can only ever exhibit the tie case.
  */
 import type { PodLineage } from '@/types/syncFileV4';
 import type { PodBlockMessageKey, RemoteBlocker } from '@/types/sync';
