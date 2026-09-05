@@ -12,6 +12,27 @@ import path from 'node:path';
 
 const root = path.resolve(__dirname, '../../../..');
 const read = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
+/**
+ * Slice one function's body, and FAIL LOUDLY if the delimiter is not there.
+ *
+ * ⚠️ THIS IS WHY. The previous helper sliced on `'\n}\n'` — which occurs ZERO
+ * times in `syncStore.ts`, because every function closes at `  }` inside the
+ * `defineStore` setup — and fell back to "the rest of the file" on -1. Two of
+ * three cases therefore searched 178KB of unrelated source and asserted nothing
+ * at all, while reporting green and being described as mutation-checked. A test
+ * that cannot fail is worse than no test.
+ */
+function bodyOf(src: string, marker: string, endMarker: string): string {
+  const start = src.indexOf(marker);
+  if (start === -1) throw new Error(`bodyOf: marker not found: ${marker}`);
+  const rest = src.slice(start);
+  const end = rest.indexOf(endMarker, marker.length);
+  if (end === -1) {
+    throw new Error(`bodyOf: end marker ${JSON.stringify(endMarker)} not found after ${marker}`);
+  }
+  return rest.slice(0, end);
+}
+
 /** Comments explain what the code does NOT do, so strip them before asserting. */
 const code = (src: string) =>
   src
@@ -98,28 +119,39 @@ describe('the guard must be CONSULTED everywhere, and its answer acted on in ful
   });
 
   it.each([
-    ['hydrateFromEnvelope', 'src/stores/syncStore.ts', 'async function hydrateFromEnvelope'],
-    ['loadFromFile', 'src/stores/syncStore.ts', 'async function loadFromFile'],
+    // `replaceDocWithCacheRecovery` is terminus 1 and was MISSING from this
+    // list, which is why it shipped still testing `=== 'adopt'` only while the
+    // findings doc claimed all three termini had been converted.
+    [
+      'replaceDocWithCacheRecovery',
+      'src/stores/syncStore.ts',
+      'async function replaceDocWithCacheRecovery',
+      '\n  }\n',
+    ],
+    [
+      'hydrateFromEnvelope',
+      'src/stores/syncStore.ts',
+      'async function hydrateFromEnvelope',
+      '\n  }\n',
+    ],
+    ['loadFromFile', 'src/stores/syncStore.ts', 'async function loadFromFile', '\n  }\n'],
     [
       'fetchAndMergeRemote',
       'src/services/sync/syncService.ts',
       'async function fetchAndMergeRemote',
+      '\n}\n',
     ],
-  ])('%s acts on publish-local instead of falling through to a merge', (_name, file, marker) => {
-    // `act === 'adopt' ? adopt : merge` is the shape that sent `publish-local`
-    // — "we hold an unpublished compaction, the remote is on the old lineage" —
-    // into a CROSS-LINEAGE merge, which is precisely what the guard exists to
-    // prevent. Every consumer must name all three non-blocking actions.
-    // Slice to the function's own closing brace at COLUMN ZERO. An earlier
-    // helper cut at the first `\n  }\n`, which is the close of the first
-    // two-space block inside the body — so it truncated before the branch it
-    // was asserting on and failed on code that was actually correct.
-    const src = read(file);
-    const start = src.indexOf(marker);
-    expect(start, `${marker} not found in ${file}`).toBeGreaterThan(-1);
-    const rest = src.slice(start);
-    const end = rest.indexOf('\n}\n');
-    const body = code(end === -1 ? rest : rest.slice(0, end));
-    expect(body).toContain("'publish-local'");
-  });
+  ])(
+    '%s acts on publish-local instead of falling through to a merge',
+    (_name, file, marker, endMarker) => {
+      // `act === 'adopt' ? adopt : merge` is the shape that sent `publish-local`
+      // — "we hold an unpublished compaction, the remote is on the old lineage"
+      // — into a CROSS-LINEAGE merge, precisely what the guard exists to
+      // prevent. Every consumer must name all three non-blocking actions.
+      const body = code(bodyOf(read(file), marker, endMarker));
+      // The slice must be a FUNCTION, not the rest of the file — see `bodyOf`.
+      expect(body.length, `${marker} body looks unsliced`).toBeLessThan(40_000);
+      expect(body).toContain("'publish-local'");
+    }
+  );
 });

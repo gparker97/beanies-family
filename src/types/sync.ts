@@ -179,7 +179,8 @@ export type PodBlockMessageKey =
   | 'podCredentialStale.inline'
   | 'podLineage.unsyncedInline'
   | 'podLineage.conflictInline'
-  | 'podMerge.failedInline';
+  | 'podMerge.failedInline'
+  | 'podUnreadable.inline';
 
 /**
  * Anything that may latch `syncService`'s remote-blocked breaker.
@@ -201,6 +202,21 @@ export interface RemoteBlocker extends Error {
   readonly blockCode: string;
   /** Inline message key for the sync bar. */
   readonly inlineMessageKey: PodBlockMessageKey;
+  /**
+   * May this class ARM the session breaker?
+   *
+   * ⚠️ REFUSING A SAVE AND LATCHING ARE DIFFERENT QUESTIONS, and conflating
+   * them was a regression. "The remote was read but not merged, so do not
+   * overwrite it" is true of every blocker. "Retrying cannot help, so stop
+   * polling for the session and tell the user to contact support" is true of
+   * almost none of them:
+   *   • a torn read (a `.beanpod` mid-write inside a Dropbox/OneDrive folder)
+   *     and a pod written by a NEWER app version both self-heal;
+   *   • a worker RPC timeout on a busy device is the definition of transient.
+   * Latching those stopped background sync for the whole session behind
+   * "contact support", with nothing to re-arm it.
+   */
+  readonly latches: boolean;
 }
 
 /**
@@ -287,6 +303,16 @@ export abstract class PayloadLoadError extends Error implements RemoteBlocker {
   get deviceCannotOpen(): boolean {
     return false;
   }
+
+  /**
+   * `parse` and `keyMayBeWrong` are recoverable, so they must not latch.
+   * `parse` means the JSON or the version was rejected — a torn read, or a pod
+   * written by a newer build during a staged rollout. Both fix themselves on
+   * the next peer write or the next app update.
+   */
+  get latches(): boolean {
+    return this.step !== 'parse' && !this.keyMayBeWrong;
+  }
 }
 
 export class CorruptPayloadError extends PayloadLoadError {
@@ -350,6 +376,12 @@ export function payloadErrorMessageKey(err: PayloadLoadError): PodBlockMessageKe
   // contact support, when a peer simply rotated the family key, is the same
   // class of lie this whole change exists to remove.
   if (err.keyMayBeWrong) return 'podCredentialStale.inline';
+  // `parse` is NOT damage. The file was downloaded but its JSON or its version
+  // was rejected — a torn read, or a pod written by a newer app version. Saying
+  // "your data may be damaged, trying again will not help, contact support" for
+  // either of those is a lie that also stops the user retrying, which is the
+  // one thing that DOES work.
+  if (err.step === 'parse') return 'podUnreadable.inline';
   return err.deviceCannotOpen ? 'podTooLarge.inline' : 'podCorrupted.inline';
 }
 
@@ -471,6 +503,16 @@ export class RemoteMergeError extends Error implements RemoteBlocker {
    * A duplicate-seq refusal is an Automerge invariant violation — a BUG in the
    * actor plumbing, not weather — and is the one class that should page.
    */
+  /**
+   * Only a genuine merge REFUSAL latches. This class wraps everything that
+   * throws after the remote was read, which includes a 120s worker RPC timeout
+   * and a worker crash — transient by definition. Latching those ended
+   * background sync for the session behind "contact support".
+   */
+  get latches(): boolean {
+    return this.isActorCollision;
+  }
+
   get isActorCollision(): boolean {
     const m = this.cause instanceof Error ? this.cause.message : String(this.cause);
     return /duplicate seq/i.test(m);

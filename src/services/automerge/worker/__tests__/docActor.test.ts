@@ -120,13 +120,16 @@ describe('adopt is atomic, and the drop happens after the decrypt', () => {
     expect(fn).not.toContain('dropDoc(');
   });
 
-  it('the worker drops only AFTER the decrypt has resolved', () => {
-    // A drop before the decrypt leaves the worker holding NO document when the
-    // decrypt throws — every later edit and every save fails for the session.
+  it('the adopt REPLACES in one assignment — it never nulls the doc first', () => {
+    // Nulling `currentDoc` up front was still before `headsOf(remote)` and
+    // before `migrateDoc(remote)` (a real `Automerge.change`). Either can throw
+    // on a low-memory device, and the worker was then left holding NO document
+    // for the session while main's projection still showed data: every mutate,
+    // save, getHeads and compactDoc failed.
     const fn = worker.slice(worker.indexOf('export async function mergeRemoteEnvelope'));
-    const decryptAt = fn.indexOf('decryptToDoc');
-    const dropAt = fn.indexOf('if (adopt) {');
-    expect(decryptAt).toBeGreaterThan(-1);
-    expect(dropAt).toBeGreaterThan(decryptAt);
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    expect(body).not.toContain('currentDoc = null');
+    // The adopt lands on the install branch instead, as one assignment.
+    expect(body).toContain('if (adopt || !currentDoc)');
   });
 });

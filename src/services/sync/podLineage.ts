@@ -63,6 +63,11 @@ export class PodLineageError extends Error implements RemoteBlocker {
     return this.verdict;
   }
 
+  /** A lineage mismatch is a fact about the two documents; a retry cannot change it. */
+  get latches(): boolean {
+    return true;
+  }
+
   /**
    * `RemoteBlocker`: which inline message the sync bar shows.
    *
