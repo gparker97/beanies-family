@@ -4351,6 +4351,11 @@ const STRING_DEFS = {
     beanie:
       'beanies could not combine the beans in your family file with the ones on this device, so nothing has been written over. your beans are kept here. close any other beanies tabs and reload; if this keeps happening, export your beans from settings and contact support@beanies.family.',
   },
+  'podUnreadable.inline': {
+    en: 'beanies could not read your family file this time. It may have been part-way through saving on another device, or it may have been written by a newer version of beanies. Nothing has been changed. Try again in a moment, and update beanies on this device if the message keeps coming back.',
+    beanie:
+      'beanies could not read your family file this time. it may have been part-way through saving on another bean, or written by a newer version of beanies. nothing has been changed. try again in a moment, and update beanies on this device if it keeps happening.',
+  },
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.
   'resumeSetup.podLineageBlocked': {

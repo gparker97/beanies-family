@@ -71,3 +71,48 @@ describe('a latch must not outlive the file it describes', () => {
     }
   });
 });
+
+describe('refusing a save and ARMING the breaker are different questions', () => {
+  // Conflating them was the regression: a torn read, a pod from a newer build,
+  // and a worker RPC timeout all stopped background sync for the whole session
+  // behind "contact support", with nothing to re-arm it.
+  it('a parse failure does NOT latch — a torn read and version skew self-heal', () => {
+    const err = new CorruptPayloadError('Unsupported beanpod version: 5.0', 'parse', 'fam');
+    expect(err.latches).toBe(false);
+    // ...and it must not tell the user their data is damaged.
+    expect(err.inlineMessageKey).toBe('podUnreadable.inline');
+  });
+
+  it('a wrong-key decrypt does NOT latch — a peer rotating the key is routine', () => {
+    const err = new CorruptPayloadError('tag mismatch', 'decrypt', 'fam');
+    expect(err.keyMayBeWrong).toBe(true);
+    expect(err.latches).toBe(false);
+  });
+
+  it('genuine corruption and an out-of-memory load DO latch', () => {
+    expect(new CorruptPayloadError('invalid chunk', 'load', 'fam').latches).toBe(true);
+    expect(new PayloadTooLargeError('oom', 'load', 'fam', 1).latches).toBe(true);
+  });
+
+  it('a merge refusal latches ONLY when it is a real refusal, not a worker timeout', () => {
+    // `RemoteMergeError` wraps everything that throws after the bytes were read,
+    // including a 120s HEAVY-RPC timeout on a busy worker.
+    expect(new RemoteMergeError(new Error('duplicate seq 2 found for actor a')).latches).toBe(true);
+    expect(new RemoteMergeError(new Error('doc worker timed out')).latches).toBe(false);
+  });
+
+  it('a lineage block latches — retrying cannot change a fact about two documents', () => {
+    expect(new PodLineageError('adopt-remote', 'm').latches).toBe(true);
+  });
+
+  it('every blocker answers `latches`, so a new one cannot inherit silence', () => {
+    for (const e of [
+      new CorruptPayloadError('m', 'load', 'f'),
+      new PayloadTooLargeError('m', 'load', 'f', 1),
+      new RemoteMergeError(new Error('x')),
+      new PodLineageError('conflict', 'm'),
+    ]) {
+      expect(typeof e.latches, e.name).toBe('boolean');
+    }
+  });
+});
