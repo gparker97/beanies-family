@@ -4346,6 +4346,11 @@ const STRING_DEFS = {
     beanie:
       'two beans reorganised your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
   },
+  'podMerge.failedInline': {
+    en: 'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. Your changes are kept here. Close any other beanies tabs and reload; if this keeps happening, export your changes from Settings and contact support@beanies.family.',
+    beanie:
+      'beanies could not combine the beans in your family file with the ones on this device, so nothing has been written over. your beans are kept here. close any other beanies tabs and reload; if this keeps happening, export your beans from settings and contact support@beanies.family.',
+  },
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.
   'resumeSetup.podLineageBlocked': {

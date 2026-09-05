@@ -79,3 +79,24 @@ describe('docInitOpts', () => {
     expect(docInitOpts()).toBeUndefined();
   });
 });
+
+describe('why the actor needs a lease (actorLease.ts)', () => {
+  it('two realms writing under ONE actor cannot be merged — Automerge refuses', () => {
+    // Pinned so the reason for the lease is executable, not folklore. If a
+    // future Automerge starts tolerating this, the lease becomes optional and
+    // this test says so.
+    const ACTOR = 'abcdef0123456789abcdef0123456789';
+    const bytes = Automerge.save(
+      Automerge.from<{ items: Record<string, string> }>({ items: {} }, { actor: ACTOR })
+    );
+    let tabA = Automerge.load<{ items: Record<string, string> }>(bytes, { actor: ACTOR });
+    let tabB = Automerge.load<{ items: Record<string, string> }>(bytes, { actor: ACTOR });
+    tabA = Automerge.change(tabA, (d) => {
+      d.items.a = 'from-A';
+    });
+    tabB = Automerge.change(tabB, (d) => {
+      d.items.b = 'from-B';
+    });
+    expect(() => Automerge.merge(Automerge.clone(tabA), tabB)).toThrow(/duplicate seq/i);
+  });
+});

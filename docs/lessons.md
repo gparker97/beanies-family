@@ -739,3 +739,21 @@ broken again in the very next pass, twice, so two of them get sharper:
     clear paths ended up behind the guards that consult it, so once armed there
     was no in-session recovery — for a class (an allocation failure) that is
     often transient. A user asking again is the re-arm signal; a timer is not.
+16. **A shared identifier needs a shared-scope fence.** Pinning the Automerge
+    actor to `hash(deviceId, familyId)` was correct per DEVICE and wrong per
+    REALM: `deviceId` lives in `localStorage`, which every tab of a profile
+    shares, and the doc worker is per tab, so two tabs wrote under one actor
+    and Automerge refused to merge them (`duplicate seq`). Nine same-model
+    review rounds never asked "what else shares this key's scope?" because
+    every reviewer inherited the "per device" framing. When you derive an
+    identity from storage, fence it with something of the SAME scope (here a
+    Web Lock, origin × profile, exactly like `localStorage`), and pin the
+    library's refusal in a test so the reason for the fence is executable.
+17. **A "non-fatal, carry on" branch is a classification, and every new throw
+    class lands in it by default.** `doSave`'s "merge failed, save local
+    anyway" was right for transport failures and catastrophic for a merge
+    refusal, and nothing new was needed to reach it: the new failure simply
+    was not the one class the branch excluded. When you introduce a mechanism
+    that can throw on a path with a permissive catch, enumerate what that catch
+    will now do with it, and refuse by default after a point of no return (here:
+    the remote bytes were already read).

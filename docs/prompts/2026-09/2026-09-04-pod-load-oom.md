@@ -73,3 +73,15 @@ Also established, and it reshapes Tier 2: a compacted pod merged into a peer tha
 still holds the original history destroys that peer's unsynced changes 200/200
 times. Compaction must be a coordinated migration with an epoch marker, not a
 background optimisation.
+
+### 2026-09-05 (Fable 5.1 premise audit + fix)
+
+**~11:30** — "i've updated the model to fable - please review the full context and run a /code-review max against all code implemented, pay particular attention to the code review angle and parameters proposed earlier by the opus model … In addition, given the serious and risky nature of this change, perform a general review of the plan, test results, and overall implementation to ensure it works as designed and as expected, and does not introduce any issues with existing users or backwards compatibility, and achieves the ultimate goal of being able to open on an older tablet (i.e. galaxy a7+) without hitting memory or other issues, and does not introduce any new bugs or side effects or security issues."
+
+**~12:20** — "go ahead and implement the fix once the review lands"
+
+Outcome: premise audit reproduced compaction (2.06→0.17MB, 329→51MB) and the
+merge-loss coin flip (50.3%); found Phase A's shared-actor collision across
+tabs (Automerge `duplicate seq` → `doSave` overwrote the remote). Fixed with
+the device-actor lease + `RemoteMergeError`; see
+`docs/plans/2026-09-05-device-actor-lease.md`.

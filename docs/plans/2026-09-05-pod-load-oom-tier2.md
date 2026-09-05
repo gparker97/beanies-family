@@ -1039,3 +1039,23 @@ message: "once that is compelte, move directly into /beanies-plan for the tier 2
 changes as per the results of the script."
 
 </details>
+
+## Outcome (2026-09-05)
+
+Phases A, B and C shipped to `main` as `7a31386c`, `0aaab624`, `067938b2`,
+`2bb7e64e` (compaction behind `podCompaction`, off). Not deployed. Compaction
+measured on greg's test pod: 2.06MB → 0.17MB, 2768ms → 374ms, 329MB → 51MB
+document RSS. Merge-loss without the lineage guard re-measured with a
+per-trial rebuild: 50.3% (151/300).
+
+**Phase A amendment.** The pinned actor is shared by every tab of a browser
+profile, and two tabs writing under it made Automerge refuse the merge
+(`duplicate seq`), after which `doSave`'s transport-failure branch overwrote
+the remote. Fixed by a per-family Web Lock lease (only the holding realm pins
+the actor) and a `RemoteMergeError` blocker that makes the save path refuse
+after the remote was read. See `docs/plans/2026-09-05-device-actor-lease.md`.
+
+**Correction.** The "4,214 actors, 45% single-change" figures came from an
+earlier export; the pod in `/tmp` measures 2,607 actors, 24% single-change,
+mean 4.1 / median 2 / p90 9 / max 151 changes per actor. Same shape, same
+conclusion (a flat tail of session churn), different numbers.

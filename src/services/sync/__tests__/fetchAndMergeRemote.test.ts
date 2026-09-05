@@ -549,3 +549,77 @@ describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', 
     expect((await syncService.shouldSkipOpenRead()).reason).toBe('trust-expired');
   });
 });
+
+describe('a merge that refuses AFTER the remote was read', () => {
+  const fakeKey = {} as CryptoKey;
+  const reportErrorMock = async () =>
+    vi.mocked((await import('@/utils/errorReporter')).reportError);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+    parseMock.mockImplementation((text) => JSON.parse(text) as BeanpodFileV4);
+  });
+
+  it('refuses the save, never writes, and latches the breaker with blockCode "merge"', async () => {
+    // Two realms sharing one actor is what Automerge says this about.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(
+      new Error('error applying changes: duplicate seq 2 found for actor abc')
+    );
+    const provider = makeProvider({
+      remoteText: JSON.stringify(buildEnvelope()),
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {},
+    });
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.save()).resolves.toBe(false);
+
+    // The whole point: the base that lacks the remote's changes is NOT written.
+    expect(provider.write).not.toHaveBeenCalled();
+    expect(syncService.isRemoteBlocked()?.blockCode).toBe('merge');
+    const reportError = await reportErrorMock();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'pod-merge', severity: 'critical' })
+    );
+  });
+
+  it('reports a non-collision refusal at "error", not "critical"', async () => {
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(new Error('worker gone'));
+    const provider = makeProvider({
+      remoteText: JSON.stringify(buildEnvelope()),
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {},
+    });
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.save()).resolves.toBe(false);
+    expect(provider.write).not.toHaveBeenCalled();
+    const reportError = await reportErrorMock();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'pod-merge', severity: 'error' })
+    );
+  });
+
+  it('a TRANSPORT failure before the bytes were read still saves (pinned)', async () => {
+    // The branch this fix narrows must keep its original job: the remote is
+    // still there, nothing was read, the next save re-merges.
+    let written = '';
+    const provider = makeProvider({
+      remoteText: '',
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: (c) => {
+        written = c;
+      },
+    });
+    provider.read.mockRejectedValueOnce(new Error('network down'));
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(written).not.toBe('');
+    expect(syncService.isRemoteBlocked()).toBeNull();
+  });
+});
