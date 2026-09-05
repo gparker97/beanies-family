@@ -515,32 +515,15 @@ describe('Sensitive Data Clearing Security', () => {
       removeItemSpy.mockRestore();
     });
 
-    it('KEEPS the local database when the final save did not push everything', async () => {
-      // ⚠️ THE DATA-LOSS CASE, and it had no test at all. Sign-out deletes the
-      // family database on the assumption the final force-save pushed
-      // everything. Two independent things broke that assumption:
-      //   • the guard read a LATCH after a 3s race, while the merge it waits on
-      //     is budgeted at 120s — so on a large pod the blocker armed tens of
-      //     seconds too late and the guard saw null;
-      //   • `doSave` refuses on ANY blocker, while the recoverable classes
-      //     (a rotated family key, a torn read) deliberately do NOT latch — so
-      //     the save was refused and the guard was blind at the same time.
-      // Measuring the DOCUMENT closes both: it does not care why the save did
-      // not land, and it cannot be raced.
+    it('ALWAYS deletes when the human explicitly asked to clear, even with unpushed work', async () => {
+      // ⚠️ THE GUARD MUST NOT OVERRIDE CONSENT. This tier is reached only
+      // through the clear-data flow, behind a screen the user typed into.
+      // Keeping their data anyway is wrong twice: it retains what they asked to
+      // be rid of, and — seen in the field within minutes of the guard shipping
+      // — it makes the one in-app escape from a wedged cache silently do
+      // nothing, leaving the user stuck with no exit but DevTools.
       const { docPushedAgainst } = await import('@/services/sync/syncService');
       vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
-      const { auth } = populateAllStores();
-
-      await auth.signOutAndClearData();
-
-      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
-    });
-
-    it('still deletes when the document is provably level with the remote', async () => {
-      // The other direction: an over-cautious guard that never deletes would
-      // quietly defeat the whole point of the destructive tier.
-      const { docPushedAgainst } = await import('@/services/sync/syncService');
-      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
       const { auth } = populateAllStores();
 
       await auth.signOutAndClearData();
@@ -566,6 +549,40 @@ describe('Sensitive Data Clearing Security', () => {
   // 2. signOut() on untrusted device
   // =========================================================================
   describe('signOut() on untrusted device', () => {
+    it('KEEPS the local database when the final save did not push everything', async () => {
+      // ⚠️ THE DATA-LOSS CASE, and it had no test at all. An ORDINARY sign-out
+      // (never the clear-data tier, where consent wins) deletes the
+      // family database on the assumption the final force-save pushed
+      // everything. Two independent things broke that assumption:
+      //   • the guard read a LATCH after a 3s race, while the merge it waits on
+      //     is budgeted at 120s — so on a large pod the blocker armed tens of
+      //     seconds too late and the guard saw null;
+      //   • `doSave` refuses on ANY blocker, while the recoverable classes
+      //     (a rotated family key, a torn read) deliberately do NOT latch — so
+      //     the save was refused and the guard was blind at the same time.
+      // Measuring the DOCUMENT closes both: it does not care why the save did
+      // not land, and it cannot be raced.
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
+      const { auth } = populateAllStores();
+
+      await auth.signOut();
+
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+    });
+
+    it('still deletes when the document is provably level with the remote', async () => {
+      // The other direction: an over-cautious guard that never deletes would
+      // quietly defeat the untrusted tier's whole purpose.
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+      const { auth } = populateAllStores();
+
+      await auth.signOut();
+
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
+    });
+
     it('calls deleteFamilyDatabase when device is NOT trusted', async () => {
       const { auth, settings } = populateAllStores();
       // Ensure untrusted (default)

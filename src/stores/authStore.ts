@@ -2317,6 +2317,18 @@ export const useAuthStore = defineStore('auth', () => {
   function buildSignOutStepImpls(ctx: {
     departedEmail: string | null;
     familyId: string | undefined;
+    /**
+     * Did the human explicitly ask for their data to be DELETED?
+     *
+     * ⚠️ THE KEEP-THE-DATABASE GUARD BELOW MUST NOT APPLY TO THIS TIER. It is
+     * reached only through the clear-data flow, behind a consent screen the
+     * user typed into. Overriding that is wrong twice over: it retains data
+     * they asked to be rid of, and — seen in the field within minutes of the
+     * guard shipping — it makes the flow the only in-app escape from a wedged
+     * cache silently do nothing, leaving the user stuck with no way out but
+     * DevTools.
+     */
+    userAskedToClear: boolean;
     /** Snapshot taken before any step runs, refreshed by step one — see both. */
     remoteWasUnreadable: RemoteBlocker | null;
     /**
@@ -2407,8 +2419,9 @@ export const useAuthStore = defineStore('auth', () => {
         // state to save" and logs a console.warn. Deleting here would destroy a
         // whole session of edits that exist nowhere else.
         // Keep the database when the final save provably did NOT land — for
-        // any reason, including one nothing latched.
-        if (ctx.unpushedAtSignOut === 'dirty') {
+        // any reason, including one nothing latched. NEVER on the clear-data
+        // tier: see `userAskedToClear`.
+        if (!ctx.userAskedToClear && ctx.unpushedAtSignOut === 'dirty') {
           reportError({
             surface: 'pod-load-failure',
             message: 'sign-out kept the local database: the final save did not push everything',
@@ -2420,7 +2433,7 @@ export const useAuthStore = defineStore('auth', () => {
           });
           return;
         }
-        const unreadable = ctx.remoteWasUnreadable;
+        const unreadable = ctx.userAskedToClear ? null : ctx.remoteWasUnreadable;
         if (unreadable) {
           reportError({
             surface: 'pod-load-failure',
@@ -2514,6 +2527,7 @@ export const useAuthStore = defineStore('auth', () => {
       // always saw `null` and the guard was dead code. Taking it here alone was
       // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
       // the breaker itself, so it re-reads into this field (see that step).
+      userAskedToClear: false,
       remoteWasUnreadable: isRemoteBlocked(),
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
     };
@@ -2625,6 +2639,7 @@ export const useAuthStore = defineStore('auth', () => {
       // always saw `null` and the guard was dead code. Taking it here alone was
       // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
       // the breaker itself, so it re-reads into this field (see that step).
+      userAskedToClear: true, // the human typed the consent — honour it
       remoteWasUnreadable: isRemoteBlocked(),
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
     };
