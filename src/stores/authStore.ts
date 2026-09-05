@@ -1,5 +1,9 @@
 import { defineStore } from 'pinia';
-import { isRemoteBlocked } from '@/services/sync/syncService';
+import {
+  isRemoteBlocked,
+  docPushedAgainst,
+  getRemoteBaselineHeadsFp,
+} from '@/services/sync/syncService';
 import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { ref, computed } from 'vue';
 import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
@@ -2313,8 +2317,23 @@ export const useAuthStore = defineStore('auth', () => {
   function buildSignOutStepImpls(ctx: {
     departedEmail: string | null;
     familyId: string | undefined;
-    /** Snapshot taken before any step runs — see where it is set. */
+    /** Snapshot taken before any step runs, refreshed by step one — see both. */
     remoteWasUnreadable: RemoteBlocker | null;
+    /**
+     * Does the document still hold work Drive has not got, AFTER the final
+     * save? `null` = not measured.
+     *
+     * ⚠️ THIS, NOT THE LATCH, IS THE QUESTION `deleteFamilyDb` MUST ASK.
+     * The latch answer was wrong in two independent ways. It is read after a 3s
+     * race while the merge it waits on is budgeted at 120s, so for the dominant
+     * case (a large pod) the blocker arms tens of seconds too late. And
+     * `doSave` refuses on ANY blocker while `noteRemoteUnreadable` deliberately
+     * does not latch the recoverable ones — so the routine "a peer rotated the
+     * family key" case refused the save and left the guard blind. Measuring the
+     * document instead is provider-agnostic, immune to both timings, and does
+     * not care WHY the save did not land. An unknown answer reads as dirty.
+     */
+    unpushedAtSignOut: 'clean' | 'dirty' | null;
   }): SignOutStepImpls {
     const settingsStore = useSettingsStore();
     return {
@@ -2333,6 +2352,16 @@ export const useAuthStore = defineStore('auth', () => {
         // guard passed straight through. `??` so a latch that already existed
         // is never overwritten.
         ctx.remoteWasUnreadable = ctx.remoteWasUnreadable ?? isRemoteBlocked();
+        // And the authoritative one: did the save actually push everything?
+        // `docPushedAgainst` probes the worker with `probe: true`, so it fails
+        // fast rather than dragging a teardown, and its failure answer is
+        // `dirty` — the safe direction.
+        try {
+          ctx.unpushedAtSignOut = await docPushedAgainst(getRemoteBaselineHeadsFp());
+        } catch (e) {
+          console.warn('[authStore] could not measure unpushed work at sign-out', e);
+          ctx.unpushedAtSignOut = 'dirty';
+        }
       },
       cancelReminders: () => cancelRemindersForSignOut(),
       captureDepartingAccount: () => {
@@ -2377,6 +2406,20 @@ export const useAuthStore = defineStore('auth', () => {
         // and `forceSaveWithTimeout` reads the resulting `false` as "no durable
         // state to save" and logs a console.warn. Deleting here would destroy a
         // whole session of edits that exist nowhere else.
+        // Keep the database when the final save provably did NOT land — for
+        // any reason, including one nothing latched.
+        if (ctx.unpushedAtSignOut === 'dirty') {
+          reportError({
+            surface: 'pod-load-failure',
+            message: 'sign-out kept the local database: the final save did not push everything',
+            severity: 'warning',
+            context: {
+              action: 'signout-kept-local-db',
+              error_code: ctx.remoteWasUnreadable?.blockCode ?? 'unpushed',
+            },
+          });
+          return;
+        }
         const unreadable = ctx.remoteWasUnreadable;
         if (unreadable) {
           reportError({
@@ -2472,6 +2515,7 @@ export const useAuthStore = defineStore('auth', () => {
       // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
       // the breaker itself, so it re-reads into this field (see that step).
       remoteWasUnreadable: isRemoteBlocked(),
+      unpushedAtSignOut: null as 'clean' | 'dirty' | null,
     };
     await runSignOutSteps(
       trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS,
@@ -2582,6 +2626,7 @@ export const useAuthStore = defineStore('auth', () => {
       // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
       // the breaker itself, so it re-reads into this field (see that step).
       remoteWasUnreadable: isRemoteBlocked(),
+      unpushedAtSignOut: null as 'clean' | 'dirty' | null,
     };
     await runSignOutSteps(SIGN_OUT_CLEAR_STEPS, buildSignOutStepImpls(ctx));
     emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });

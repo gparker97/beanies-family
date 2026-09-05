@@ -4311,6 +4311,11 @@ const STRING_DEFS = {
     en: 'beanies could not find your family file details. Reload and try again.',
     beanie: 'beanies could not find your pod details. reload and try again.',
   },
+  'compaction.refused.no-permission': {
+    en: 'beanies cannot write to your family file at the moment, so it has not changed anything. Reconnect your storage, or grant access to the file again, then try tidying it once more.',
+    beanie:
+      'beanies cannot write to your family file at the moment, so nothing has changed. reconnect your storage, or grant access to the file again, then try tidying it once more.',
+  },
   'compaction.done': { en: 'Your family file is slimmer', beanie: 'your pod is slimmer' },
   'compaction.failed': {
     en: "beanies couldn't slim your file down",
