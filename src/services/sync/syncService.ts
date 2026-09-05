@@ -10,7 +10,7 @@
  */
 
 import { supportsFileSystemAccess, isNative } from './capabilities';
-import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
+import { PayloadLoadError, RemoteMergeError, type RemoteBlocker } from '@/types/sync';
 import { PodLineageError, guardLineage } from '@/services/sync/podLineage';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
@@ -227,6 +227,32 @@ export function noteLineageBlocked(err: PodLineageError): void {
     error: err,
     severity: err.verdict === 'conflict' ? 'critical' : 'warning',
     context: { action: 'blocked', error_code: err.verdict },
+  });
+}
+
+/**
+ * A MERGE refusal latches the same breaker: the remote was read but could not
+ * be combined, retrying will not change that, and the save path must refuse.
+ *
+ * Pages only for an actor collision (`duplicate seq`), which is an invariant
+ * violation in the actor plumbing and needs a human; any other refusal is
+ * reported at `error` so its RATE is measurable without training the alert to
+ * be ignored by a wedged worker on a low-memory tablet.
+ */
+export function noteMergeFailed(err: RemoteMergeError): void {
+  const throttleKey = `RemoteMergeError:${err.isActorCollision ? 'actor' : 'other'}`;
+  const alreadyReported = reportedBlockClasses.has(throttleKey);
+  remoteBlocked = err;
+  if (alreadyReported) return;
+  reportedBlockClasses.add(throttleKey);
+  reportError({
+    surface: 'pod-merge',
+    message: err.isActorCollision
+      ? 'Remote pod merge refused: two realms share one actor'
+      : 'Remote pod merge refused',
+    error: err.cause instanceof Error ? err.cause : err,
+    severity: err.isActorCollision ? 'critical' : 'error',
+    context: { action: 'blocked', error_code: err.blockCode },
   });
 }
 
@@ -1457,8 +1483,18 @@ async function fetchAndMergeRemote(): Promise<void> {
     // early WITHOUT throwing — and the save that followed sailed past its own
     // refusal and overwrote the remote anyway. The refusal defended exactly one
     // save. Learning it only on success is what makes that guard mean anything.
-    if (e instanceof PayloadLoadError) noteRemoteUnreadable(e);
-    throw e;
+    if (e instanceof PayloadLoadError) {
+      noteRemoteUnreadable(e);
+      throw e;
+    }
+    // Anything else here fired AFTER the bytes were read: the download, the
+    // decrypt and the load all succeeded and the MERGE refused. That is not a
+    // transport failure, so it must not reach `doSave`'s "save local anyway"
+    // branch — which would write a base that provably lacks the remote's
+    // changes over it. Wrap it into the blocker the save path refuses on.
+    const blocked = e instanceof RemoteMergeError ? e : new RemoteMergeError(e);
+    noteMergeFailed(blocked);
+    throw blocked;
   }
   const { dirty, remoteHeads } = merged;
 
@@ -1555,8 +1591,11 @@ async function doSave(): Promise<boolean> {
       // overlay: before that the user could not generate mutations, so no
       // debounced save could fire. Keeping the session usable means the save
       // path has to refuse instead.
-      if (e instanceof PayloadLoadError) {
-        console.error('[syncService] doSave: remote unreadable — refusing to overwrite it', e);
+      if (e instanceof PayloadLoadError || e instanceof RemoteMergeError) {
+        console.error(
+          '[syncService] doSave: remote unreadable or unmergeable — refusing to overwrite it',
+          e
+        );
         // THROW, do not `return false`. A bare false skips the catch below,
         // which is the only caller of `recordSaveFailure` — the mechanism that
         // increments the failure count, raises the save-failure banner and
