@@ -1362,6 +1362,9 @@ export async function selectSyncFile(): Promise<boolean> {
     if (familyId) {
       await provider.persist(familyId);
     }
+    // A breaker armed against the PREVIOUS file must not survive a rebind to a
+    // different one (`setProvider` clears it for the same reason).
+    clearRemoteUnreadable();
     currentProvider = provider;
     currentProviderFamilyId = familyId;
     startPollingIfApplicable(provider);
@@ -1403,6 +1406,9 @@ export async function selectNativeLocalFile(baseName = 'my-family'): Promise<boo
     if (familyId) {
       await provider.persist(familyId);
     }
+    // A breaker armed against the PREVIOUS file must not survive a rebind to a
+    // different one (`setProvider` clears it for the same reason).
+    clearRemoteUnreadable();
     currentProvider = provider;
     currentProviderFamilyId = familyId;
     startPollingIfApplicable(provider);
@@ -2198,6 +2204,13 @@ export async function disconnect(): Promise<void> {
   // skip against a file this service is no longer bound to. #65 widens the leak —
   // the surviving object also carries `headsFp` and a live `checkedAt`.
   remoteBaseline = null;
+  // ⚠️ AND THE BREAKER. It describes a file this service is no longer bound to,
+  // and nothing else cleared it: `selectSyncFile`/`selectNativeLocalFile` assign
+  // `currentProvider` directly, so a latch armed on the OLD pod survived a
+  // disconnect and a rebind to a DIFFERENT one — after which `createNewFile` ->
+  // `syncNow(true)` -> `doSave` threw the stale blocker, `loadFromFile` threw it
+  // at entry, and only a page reload cleared it.
+  clearRemoteUnreadable();
   updateState({
     isConfigured: false,
     fileName: null,
