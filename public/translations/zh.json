@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-05",
-    "translationCount": 4512
+    "translationCount": 4513
   },
   "translations": {
     "app.name": {
@@ -22564,6 +22564,11 @@
     "settings.compactPodDesc": {
       "translation": "在没有编辑历史记录的情况下重写家庭文件，使其更快地打开并在旧版平板电脑上运行。仅限所有者。",
       "hash": "1zopem",
+      "lastUpdated": "2026-09-05"
+    },
+    "podMerge.failedInline": {
+      "translation": "beanies无法将家庭文件中的更改与此设备上的更改合并，因此未写入任何内容。您的更改将保留在此处。关闭任何其他beanies选项卡并重新加载；如果继续发生这种情况，请从“设置”中导出更改并联系support@beanies.family。",
+      "hash": "g39z74",
       "lastUpdated": "2026-09-05"
     }
   }
