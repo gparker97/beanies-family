@@ -1055,7 +1055,9 @@ the remote. Fixed by a per-family Web Lock lease (only the holding realm pins
 the actor) and a `RemoteMergeError` blocker that makes the save path refuse
 after the remote was read. See `docs/plans/2026-09-05-device-actor-lease.md`.
 
-**Correction.** The "4,214 actors, 45% single-change" figures came from an
-earlier export; the pod in `/tmp` measures 2,607 actors, 24% single-change,
-mean 4.1 / median 2 / p90 9 / max 151 changes per actor. Same shape, same
-conclusion (a flat tail of session churn), different numbers.
+**Which pod the figures belong to.** "4,214 actors, 45% single-change" is
+greg's REAL pod (3.20MB, profiled 2026-09-04). The TEST pod in `/tmp` (2.06MB)
+measures 2,607 actors, 24% single-change, mean 4.1 / median 2 / p90 9 / max
+151 changes per actor. Same shape, same conclusion (a flat tail of session
+churn); the two sets of numbers were quoted against each other in places, so
+this names which is which.
