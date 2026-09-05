@@ -122,16 +122,17 @@ export function noteRemoteUnreadable(err: PayloadLoadError): void {
   // family key is routine. Latching it would refuse every save for the session,
   // stop polling, and page Slack, while the re-prompt path that fixes it sits
   // unreachable behind the latch.
-  if (err.keyMayBeWrong) {
+  if (!err.latches) {
     // NOT a bare return. This class includes genuine corruption at the decrypt
     // step (a wrong key and damaged bytes are the same observation), so going
     // silent makes "the pod would not decrypt" unmeasurable fleet-wide — a real
     // corruption incident becomes indistinguishable from a key-rotation wave.
     // Only `critical` pages; `warning` still reaches CloudWatch, which is what
-    // the goal actually required.
+    // the goal actually required. Covers `parse` too — a torn read or a pod
+    // from a newer build is worth COUNTING, never worth waking someone for.
     reportError({
       surface: 'pod-load-failure',
-      message: `Remote pod would not decrypt: Automerge ${err.step}`,
+      message: `Remote pod not readable: Automerge ${err.step}`,
       error: err,
       severity: 'warning',
       context: { action: 'remote-decrypt-failed', error_code: err.step },
@@ -248,7 +249,13 @@ export function noteLineageBlocked(err: PodLineageError): void {
 export function noteMergeFailed(err: RemoteMergeError): void {
   const throttleKey = `RemoteMergeError:${err.isActorCollision ? 'actor' : 'other'}`;
   const alreadyReported = reportedBlockClasses.has(throttleKey);
-  remoteBlocked = err;
+  // ⚠️ ONLY A GENUINE REFUSAL LATCHES. This class wraps everything that throws
+  // after the remote was read — including a 120s worker RPC timeout and a
+  // worker crash. Latching those stopped background sync for the whole session
+  // behind "close your other tabs and contact support", with nothing to re-arm
+  // it. The save still refuses either way; that is `doSave`'s job, not the
+  // breaker's.
+  if (err.latches) remoteBlocked = err;
   if (alreadyReported) return;
   reportedBlockClasses.add(throttleKey);
   reportError({
@@ -274,6 +281,25 @@ export function noteRemoteBlocked(err: RemoteBlocker): void {
   if (err instanceof PodLineageError) noteLineageBlocked(err);
   else if (err instanceof RemoteMergeError) noteMergeFailed(err);
   else if (err instanceof PayloadLoadError) noteRemoteUnreadable(err);
+  else {
+    // ⚠️ NO SILENT NO-OP. `isRemoteBlocker` admits anything that answers the
+    // interface — that is the whole promise of using a member instead of an
+    // `instanceof`, and `blockerDispatch.test.ts` asserts a duck-typed class
+    // passes it. Without this arm, such an error refused every save (the gates
+    // admit it) while arming NOTHING: no latch, no bar, no report, and the
+    // 10s poller kept re-downloading. The generic path is the honest default.
+    if (err.latches) remoteBlocked = err;
+    const throttleKey = `${err.name}:${err.blockCode}`;
+    if (reportedBlockClasses.has(throttleKey)) return;
+    reportedBlockClasses.add(throttleKey);
+    reportError({
+      surface: 'pod-load-failure',
+      message: `Remote pod blocked: ${err.name}`,
+      error: err,
+      severity: 'error',
+      context: { action: 'blocked', error_code: err.blockCode },
+    });
+  }
 }
 
 function clearRemoteUnreadable(): void {
@@ -1170,16 +1196,20 @@ export function commitRemoteBaseline(driveHeads: readonly string[] | null): void
     // The revision is only needed for the change PROBE (and for the encoded
     // payload the worker persists). The fingerprint is provable without it, and
     // it is the half these two callers actually read.
+    // ⚠️ SYMMETRIC WITH THE REVISION BRANCH BELOW, including the null case.
+    // That branch assigns `headsFp` unconditionally so a null `driveHeads`
+    // CLEARS it — "cannot prove what Drive holds ⇒ never skip". Skipping the
+    // assignment here instead left a fingerprint proven against an OLDER remote
+    // standing, which is the false-skip this whole mechanism exists to prevent.
     const fpOnly = driveHeads === null ? null : headsFingerprint(driveHeads);
-    if (fpOnly !== null) {
-      remoteBaseline = remoteBaseline
-        ? { ...remoteBaseline, headsFp: fpOnly }
-        : {
-            revision: null,
-            modifiedTime: null,
-            checkedAt: new Date().toISOString(),
-            headsFp: fpOnly,
-          };
+    if (remoteBaseline) {
+      remoteBaseline.headsFp = fpOnly;
+    } else if (fpOnly !== null) {
+      // No `checkedAt` of our own invention: a trust window nothing probed
+      // would be a claim we cannot support. `shouldSkipOpenRead` gates on
+      // `revision !== null` first, so this row can only ever feed the lineage
+      // context and `isFullySynced`, which is exactly what it is for.
+      remoteBaseline = { revision: null, modifiedTime: null, checkedAt: null, headsFp: fpOnly };
     }
     return;
   }

@@ -681,10 +681,15 @@ export async function mergeRemoteEnvelope(
   //    still showed data: every edit threw `requireDoc`, every save failed.
   // Dropping after the decrypt makes both impossible — a failure here leaves
   // the old document installed, and a retry re-runs the drop from scratch.
-  if (adopt) {
-    currentDoc = null;
-    resetDocCursors();
-  }
+  // ⚠️ THE DROP ITSELF IS DEFERRED — see the `adopt ||` on the install below.
+  // Nulling `currentDoc` HERE was still before `headsOf(remote)` and before
+  // `migrateDoc(remote)`, which runs a real `Automerge.change` whenever the
+  // remote predates a collection. Either can throw on a low-memory device, and
+  // the worker was then left holding NO document for the session while main's
+  // projection still showed data: every mutate, save, getHeads and compactDoc
+  // failed. That is the second failure mode this fix exists to remove, and it
+  // breaks its own rule — the destructive half goes after the half that can
+  // fail, never before it.
   // #65: the heads of EXACTLY the bytes on Drive. Captured here, from the
   // UNMIGRATED decrypted doc (`decryptToDoc` does not migrate — see its doc
   // comment), before `migrateDoc`/`mergeDocs` can move anything. This is the
@@ -706,7 +711,11 @@ export async function mergeRemoteEnvelope(
   //    (guarded; falls back to full). Below the telemetry floor, not timed.
   // Do NOT convert other pushProjection callers (initAndLoadCache/loadSnapshot/
   // applyChanges) to deltas without the same diff+fallback guard.
-  if (!currentDoc) {
+  if (adopt || !currentDoc) {
+    // The adopt lands HERE, as a single assignment from an rvalue that is now
+    // fully built: nothing between the decrypt and this line can leave the
+    // worker document-less, and `resetDocCursors()` below is the drop's other
+    // half. A retry re-runs the whole operation from the decrypt.
     currentDoc = migrateDoc(remote);
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
@@ -977,9 +986,27 @@ export function compactDoc(): {
     throw payloadFailure('materialize', e, null, beforeBytes);
   }
 
+  // ⚠️ THE PROJECTION PUSH IS PART OF "CAN THROW", and it was left outside.
+  // `pushProjection` builds every collection and structure-clones each chunk
+  // across the worker boundary — strictly MORE allocation than the `saveDoc`
+  // that was moved into the try, on the same low-memory device. An OOM (or a
+  // DataCloneError) there rejected the RPC, so the composable reported
+  // "rebuild-failed" and toasted "nothing has changed and your data is safe",
+  // while the worker held the COMPACTED document with cursors reset and no
+  // lineage stamp — for the next save to publish under the OLD lineage.
+  const previous = before; // non-null: `requireDoc('compactDoc')` produced it
   currentDoc = compacted;
   resetDocCursors(); // see (2) above — the next persist MUST write a base
-  pushProjection(compacted);
+  try {
+    pushProjection(compacted);
+  } catch (e) {
+    // Put the old document back, cursors and all, so the caller's "nothing
+    // moved" really is true.
+    currentDoc = previous;
+    resetDocCursors();
+    pushProjection(previous);
+    throw payloadFailure('materialize', e, null, beforeBytes);
+  }
   return stats;
 }
 

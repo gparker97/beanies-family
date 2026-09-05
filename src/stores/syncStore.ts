@@ -955,6 +955,27 @@ export const useSyncStore = defineStore('sync', () => {
       return adopted.remoteHeads ?? null;
     }
 
+    if (lineageAct === 'publish-local') {
+      // ⚠️ NOT A MERGE. We hold an unpublished compaction and the remote is on
+      // the old lineage; merging it in is the cross-lineage merge the guard
+      // exists to prevent, and per the measured model the OLD lineage wins
+      // deterministically in every later-added collection — silently reverting
+      // the compaction and republishing the hybrid. This is the documented
+      // failed-publish recovery path, so it is reached exactly when it matters.
+      // ⚠️ MERGE THE ENVELOPE EVEN THOUGH WE REFUSE THE DOCUMENT. The two are
+      // separate: we decline the remote's PAYLOAD (wrong lineage) but its KEY
+      // DICTS are still the newest truth, and `replaceEnvelope` ->
+      // `preserveLocalKeyDicts` is the ONLY path by which a remote-only
+      // `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches
+      // `currentEnvelope`. Returning without it meant the save we just armed
+      // wrote the LOCAL envelope over the remote and ERASED a member, passkey
+      // or invite another device had added — locking that person out. Terminus
+      // 4 makes it systematic: it is only reached when a peer HAS written.
+      const keptEnv = replaceEnvelope(remoteEnvelope);
+      syncService.setFamilyKey(familyKey.value!, keptEnv);
+      syncService.triggerDebouncedSave();
+      return null;
+    }
     if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
     const { dirty, remoteHeads } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
     // Clean up duplicate recurring transactions from the CRDT merge.
@@ -987,6 +1008,17 @@ export const useSyncStore = defineStore('sync', () => {
     // to prevent. `publish-local` means leave the local document alone and let
     // the next save carry it up.
     if (act === 'publish-local') {
+      // ⚠️ MERGE THE ENVELOPE EVEN THOUGH WE REFUSE THE DOCUMENT. The two are
+      // separate: we decline the remote's PAYLOAD (wrong lineage) but its KEY
+      // DICTS are still the newest truth, and `replaceEnvelope` ->
+      // `preserveLocalKeyDicts` is the ONLY path by which a remote-only
+      // `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches
+      // `currentEnvelope`. Returning without it meant the save we just armed
+      // wrote the LOCAL envelope over the remote and ERASED a member, passkey
+      // or invite another device had added — locking that person out. Terminus
+      // 4 makes it systematic: it is only reached when a peer HAS written.
+      const keptEnv = replaceEnvelope(env);
+      syncService.setFamilyKey(familyKey.value!, keptEnv);
       pendingEncryptedFile.value = null;
       syncService.triggerDebouncedSave();
       return;
@@ -1163,6 +1195,17 @@ export const useSyncStore = defineStore('sync', () => {
             const act = guardLineage(remoteEnvelope.podLineage, envelope.value?.podLineage, ctx);
             if (act === 'publish-local') {
               // Our unpublished compaction stands; the next save carries it up.
+              // ⚠️ MERGE THE ENVELOPE EVEN THOUGH WE REFUSE THE DOCUMENT. The two are
+              // separate: we decline the remote's PAYLOAD (wrong lineage) but its KEY
+              // DICTS are still the newest truth, and `replaceEnvelope` ->
+              // `preserveLocalKeyDicts` is the ONLY path by which a remote-only
+              // `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches
+              // `currentEnvelope`. Returning without it meant the save we just armed
+              // wrote the LOCAL envelope over the remote and ERASED a member, passkey
+              // or invite another device had added — locking that person out. Terminus
+              // 4 makes it systematic: it is only reached when a peer HAS written.
+              const keptEnv = replaceEnvelope(remoteEnvelope);
+              syncService.setFamilyKey(familyKey.value!, keptEnv);
               syncService.triggerDebouncedSave();
               return { success: true };
             }
@@ -3035,7 +3078,12 @@ export const useSyncStore = defineStore('sync', () => {
       // then armed the 10s poller — which re-downloads the multi-megabyte file
       // and re-attempts the identical allocation every tick, swallowing each
       // failure in a console.warn. `payloadFailed` suppresses the poller.
-      if (e instanceof PayloadLoadError) {
+      // ANY blocker, not just a payload one. A `PodLineageError` (terminus 4
+      // now throws one) missed `notePodUnopenable` entirely, so `podUnopenable`
+      // stayed false, the failure was filed as `network`, and the RAW English
+      // "Pod lineage blocked: …" landed in the UI — untranslated, against the
+      // CI-enforced i18n rule — while the honest recovery copy was unreachable.
+      if (isRemoteBlocker(e)) {
         notePodUnopenable(e);
         refreshResult = 'network-failed';
         return refreshResult;
@@ -3175,9 +3223,12 @@ export const useSyncStore = defineStore('sync', () => {
         isCrossDeviceReload = false;
       }
     } catch (e) {
-      if (e instanceof PayloadLoadError) {
+      if (isRemoteBlocker(e)) {
         // `loadFromFile({merge:true})` rethrows it. Same reasoning as above:
-        // never silently re-poll a failure a poll cannot fix.
+        // never silently re-poll a failure a poll cannot fix. `isRemoteBlocker`
+        // rather than `instanceof PayloadLoadError`: a lineage block reduced to
+        // a `console.warn` here left the user with a stopped poller and no
+        // message at all.
         notePodUnopenable(e);
         return false;
       }
@@ -3307,14 +3358,24 @@ export const useSyncStore = defineStore('sync', () => {
     if (remoteUnreadable()) return;
     filePollingTimer = setInterval(() => {
       reloadIfFileChanged()
-        .catch(console.warn)
         // ⚠️ MIRROR WHAT THE SERVICE DECIDED. `syncService` arms the breaker on
         // paths this store never sees — its own local-file poll and the pre-save
         // merge — and `podUnopenable` (the only thing `BackgroundSyncBar` reads)
         // was written in exactly ONE place, inside `notePodUnopenable`. So a
         // latch armed down there stopped polling SILENTLY: no bar, no message,
         // and a read-only session never learned the pod could not be read.
-        .finally(() => mirrorServiceLatch());
+        .finally(() => {
+          // ⚠️ INSIDE the try, and AFTER the catch. Chained as
+          // `.catch(console.warn).finally(...)` a throw out of the mirror (an
+          // unavailable Pinia, say) escaped as an unhandled rejection every
+          // 10 seconds, past the handler meant to contain it.
+          try {
+            mirrorServiceLatch();
+          } catch (e) {
+            console.warn('[syncStore] mirrorServiceLatch threw', e);
+          }
+        })
+        .catch(console.warn);
     }, FILE_POLL_INTERVAL);
   }
 
