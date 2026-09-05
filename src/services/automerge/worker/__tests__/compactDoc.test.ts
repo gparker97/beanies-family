@@ -1,0 +1,156 @@
+// @vitest-environment node
+/**
+ * The compaction, against the real worker ops.
+ *
+ * Two properties matter more than the size saving, and both are silent when
+ * broken: the rebuilt document must be VERIFIED before it replaces anything,
+ * and installing it must reset the persist cursors — the compacted document
+ * shares no ancestry with the cached one, so a persist that wrote an INCREMENT
+ * against it would produce an unreadable cache.
+ */
+import 'fake-indexeddb/auto';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as Automerge from '@automerge/automerge';
+import { PayloadTooLargeError } from '@/types/sync';
+
+const diffHook = vi.hoisted(() => ({ path: null as string | null }));
+// An ESM namespace property is not configurable, so `vi.spyOn(Automerge, 'from')`
+// throws. Mock the module and drive `from` through a hook the tests set.
+const fromHook = vi.hoisted(() => ({ throws: null as Error | null }));
+vi.mock('@automerge/automerge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@automerge/automerge')>();
+  return {
+    ...actual,
+    from: (...args: unknown[]) => {
+      if (fromHook.throws) throw fromHook.throws;
+      return (actual.from as (...a: unknown[]) => unknown)(...args);
+    },
+  };
+});
+vi.mock('@/utils/firstJsonDifference', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/firstJsonDifference')>();
+  return {
+    firstJsonDifference: (a: unknown, b: unknown) =>
+      diffHook.path ?? actual.firstJsonDifference(a, b),
+  };
+});
+
+const cache = await import('../cache');
+const { setDocActor, resetDocActor } = await import('../docActor');
+const {
+  configure,
+  compactDoc,
+  setKey,
+  flush,
+  __resetApplyAndProjectForTesting,
+  initDoc,
+  mutate,
+  getHeads,
+  exportSnapshot,
+} = await import('../applyAndProject');
+
+/** A document with real history: many changes, one entity per change. */
+function seedHistory(n: number) {
+  initDoc();
+  for (let i = 0; i < n; i++) {
+    mutate({ op: 'set', collection: 'accounts', id: `a${i}`, entity: { id: `a${i}`, bal: i } });
+  }
+}
+
+beforeEach(() => {
+  diffHook.path = null;
+  fromHook.throws = null;
+  resetDocActor();
+  __resetApplyAndProjectForTesting();
+  configure({ pushChunk: () => {}, perf: () => {}, cachePersistFailed: () => {} });
+});
+
+describe('compactDoc', () => {
+  it('drops the history and keeps the data', () => {
+    seedHistory(30);
+    const before = compactDoc();
+
+    expect(before.changesBefore).toBeGreaterThan(30);
+    expect(before.changesAfter).toBe(1);
+    expect(before.afterBytes).toBeLessThan(before.beforeBytes);
+  });
+
+  it('REFUSES and keeps the old document when the rebuild differs', () => {
+    // The gate. `toJS -> from` is type-safe by construction for a pure-JSON
+    // document, but "by construction" is not good enough when the output
+    // replaces a family's pod.
+    seedHistory(5);
+    const headsBefore = getHeads().heads;
+    diffHook.path = 'accounts.a3.bal';
+
+    expect(() => compactDoc()).toThrow(/accounts\.a3\.bal/);
+    // The old document is still installed and unchanged.
+    expect(getHeads().heads).toEqual(headsBefore);
+  });
+
+  it('names the PATH of the difference, never the value', () => {
+    // The message reaches the firehose, and the firehose is PII-free.
+    seedHistory(3);
+    diffHook.path = 'accounts.a1.bal';
+    expect(() => compactDoc()).toThrow(/compaction changed the document at accounts\.a1\.bal/);
+  });
+
+  it('classifies an out-of-memory rebuild as a device problem, not damaged data', () => {
+    // A compaction holds three copies at once, so it costs MORE than an open —
+    // a real possibility on the devices that most want it. The honest copy for
+    // that already exists; it just has to be reachable.
+    seedHistory(3);
+    fromHook.throws = new Error('error inflating document chunk ops: out of memory');
+    expect(() => compactDoc()).toThrow(PayloadTooLargeError);
+  });
+
+  it('uses the pinned actor, so it does not re-introduce the churn', () => {
+    // The compacted document is ONE change. If it were minted with a random
+    // actor, Phase C would add a fresh lane to the very document it just
+    // stripped of its history.
+    const ACTOR = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+    setDocActor(ACTOR);
+    seedHistory(4);
+    compactDoc();
+    // `exportSnapshot` is the only doc accessor the worker exposes; loading its
+    // bytes back gives the change log, and a compacted doc has exactly one.
+    const doc = Automerge.load(exportSnapshot().binary);
+    const actors = new Set(
+      Automerge.getAllChanges(doc).map((c) => Automerge.decodeChange(c).actor)
+    );
+    expect([...actors]).toEqual([ACTOR]);
+  });
+});
+
+describe('installing the compacted document resets the persist cursors', () => {
+  it('makes the NEXT persist write a base, never an increment', async () => {
+    // ⚠️ The silent one. The compacted document shares NO ancestry with the
+    // cached one, so an increment written against it would produce a cache that
+    // cannot be reconstructed — and nothing about that is visible until a
+    // device tries to open it. Removing the `resetDocCursors()` line leaves
+    // every other assertion in this file green, which is why this asserts on
+    // the REAL cache rows rather than on a mock.
+    const { generateFamilyKey } = await import('@/services/crypto/familyKeyService');
+    cache.__resetCacheForTesting();
+    await cache.initPersistenceDB('compact-cursor-test');
+    setKey(await generateFamilyKey());
+
+    seedHistory(4);
+    await flush(); // the first persist after initDoc writes the BASE
+    expect(cache.incrementCount()).toBe(0);
+
+    // Control: an ordinary edit persists as an INCREMENT, so the assertion
+    // below is a comparison rather than a claim.
+    mutate({ op: 'set', collection: 'accounts', id: 'zz', entity: { id: 'zz', bal: 1 } });
+    await flush();
+    expect(cache.incrementCount(), 'control: an ordinary edit is an increment').toBeGreaterThan(0);
+
+    compactDoc();
+    await flush();
+    // A base write clears every increment in the same transaction, so a count
+    // of zero IS the proof that this persisted as a base.
+    expect(cache.incrementCount(), 'a compaction must persist as a BASE').toBe(0);
+
+    await cache.clearCache('compact-cursor-test');
+  });
+});

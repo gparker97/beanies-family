@@ -4872,6 +4872,11 @@ export const useSyncStore = defineStore('sync', () => {
     startDeferredPolling,
     backgroundSyncFromFile,
     tryDecryptWithCachedKey,
+    // Exported for `usePodCompaction`, which stamps the new lineage. Deliberately
+    // the SAME mandated write path every other envelope change uses, so the
+    // payload strip and the cache re-seed cannot be applied on one and missed
+    // on the other.
+    replaceEnvelope,
     podUnopenable,
     clearPodUnopenable,
     reloadIfFileChanged,

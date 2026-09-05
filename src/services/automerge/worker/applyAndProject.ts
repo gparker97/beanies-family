@@ -19,6 +19,7 @@
  */
 import * as Automerge from '@automerge/automerge';
 import { docInitOpts, setDocActor, resetDocActor } from './docActor';
+import { firstJsonDifference } from '@/utils/firstJsonDifference';
 import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -37,6 +38,7 @@ import {
   projectionDeltasBetween,
   frameChanges,
   registerNamedOp,
+  payloadFailure,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
@@ -871,6 +873,72 @@ export function loadSnapshot(binary: Uint8Array): { loaded: true } {
   return { loaded: true };
 }
 
+/**
+ * Rebuild the document WITHOUT its history, verify it, and install it.
+ *
+ * `Automerge.from(Automerge.toJS(doc))` is the only way to drop history in
+ * Automerge 3.x. It mints brand-new object ids, so the result is a different
+ * LINEAGE — see `services/sync/podLineage.ts`. The caller is responsible for
+ * stamping and publishing that; this function only produces it.
+ *
+ * ⚠️ THREE things here are load-bearing:
+ *
+ *  1. **Verify before installing.** The document is pure JSON, so `toJS -> from`
+ *     is type-safe by construction — but "by construction" is not good enough
+ *     when the output replaces a family's pod. On any difference the OLD doc is
+ *     kept and the path of the first difference is thrown (a path, never a
+ *     value: this reaches the firehose).
+ *  2. **`resetDocCursors()` on install.** The compacted doc shares no ancestry
+ *     with the cached one, so a persist that wrote an INCREMENT against it would
+ *     produce an unreadable cache. Every other install site does this for the
+ *     same reason.
+ *  3. **`docInitOpts()` for the actor**, never a locally minted one, or the
+ *     compaction would re-introduce the churn the stable actor removed — in the
+ *     one document that has just been stripped of its history.
+ *
+ * Schedules NO persist: the caller flushes explicitly, after it has decided the
+ * compaction is going ahead.
+ */
+export function compactDoc(): {
+  beforeBytes: number;
+  afterBytes: number;
+  changesBefore: number;
+  changesAfter: number;
+  actorsBefore: number;
+} {
+  const before = requireDoc('compactDoc');
+  const beforeStats = Automerge.stats(before);
+  const beforeBytes = saveDoc(before).byteLength;
+
+  let compacted: Doc;
+  try {
+    const plain = Automerge.toJS(before) as unknown as Record<string, unknown>;
+    compacted = Automerge.from(plain, docInitOpts()) as Doc;
+    const differsAt = firstJsonDifference(plain, Automerge.toJS(compacted));
+    if (differsAt) {
+      // The old doc is untouched — we never assigned `currentDoc`.
+      throw new Error(`compaction changed the document at ${differsAt}`);
+    }
+  } catch (e) {
+    // Classified, so an OOM here reads as "this device ran out of memory" with
+    // the copy that is already written, rather than "your data is damaged". A
+    // compaction costs MORE memory than an open (three copies resident at once),
+    // so this is a real possibility on the devices that most want it.
+    throw payloadFailure('materialize', e, null, beforeBytes);
+  }
+
+  currentDoc = compacted;
+  resetDocCursors(); // see (2) above — the next persist MUST write a base
+  pushProjection(compacted);
+  return {
+    beforeBytes,
+    afterBytes: saveDoc(compacted).byteLength,
+    changesBefore: beforeStats.numChanges,
+    changesAfter: Automerge.stats(compacted).numChanges,
+    actorsBefore: (beforeStats as { numActors?: number }).numActors ?? 0,
+  };
+}
+
 /** Serialize the doc to a raw (unencrypted) binary. DEV/E2E-only snapshot path. */
 export function exportSnapshot(): { binary: Uint8Array } {
   if (!import.meta.env.DEV) throw new Error('exportSnapshot is DEV-only');
@@ -891,6 +959,8 @@ export async function dispatch(
     case 'setKey':
       setKey(a.key as CryptoKey);
       return {};
+    case 'compactDoc':
+      return { result: compactDoc() };
     case 'setActor':
       setActor((a.actor as string | null) ?? null);
       return {};

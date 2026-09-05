@@ -393,6 +393,8 @@ const JSON_SAFE_METHODS = new Set([
 // new whole-doc op is a single line here — it can't silently fall back to the
 // tight 45 s budget and re-introduce the iOS large-doc lockout.
 const HEAVY_METHODS = new Set([
+  // A whole-doc rebuild + a whole-doc verify: heavier than a merge, not lighter.
+  'compactDoc',
   'mergeRemoteEnvelope',
   'initAndLoadCache',
   'verifyEnvelope',
@@ -476,6 +478,11 @@ const RETRYABLE_METHODS = new Set([
   // deliberately NOT in JSON_SAFE — its arg is a plain string, and that set
   // means "args that could carry a Vue proxy".
   'setActor',
+  // ⚠️ `compactDoc` is deliberately ABSENT. A transparent re-issue after a
+  // respawn would re-compact a document that has already been replaced, so the
+  // second run would verify a compaction against itself and install a doc whose
+  // lineage the caller never stamped. Not JSON_SAFE or ENVELOPE either: it
+  // takes no arguments.
   'collectReferencedPhotoIds',
   'ping',
 ]);
@@ -487,7 +494,9 @@ const RETRYABLE_METHODS = new Set([
 // firehose-only (invisible to the user but recoverable + observable) — safe.
 // Orthogonal to RETRYABLE (retry-safety) and HEAVY (timeout tier); membership
 // changes independently.
-const USER_ACTION_METHODS = new Set(['mutate', 'initDoc']);
+// `compactDoc` is here because the user pressed a button and their data is in
+// doubt if it fails — a silent firehose-only report would be the wrong shape.
+const USER_ACTION_METHODS = new Set(['mutate', 'initDoc', 'compactDoc']);
 
 // A liveness ping does no compute, so a live worker answers near-instantly — a
 // short ceiling turns a reaped/wedged worker into a fast recovery on resume.
@@ -985,6 +994,29 @@ export async function adoptRemoteEnvelope(
 ): Promise<{ dirty: boolean; remoteHeads: string[] | null; changed?: boolean }> {
   await dropDoc();
   return mergeRemoteEnvelope(envelope, familyId);
+}
+
+/**
+ * Rebuild the document without its history. See `applyAndProject.compactDoc`.
+ *
+ * Installs the rebuilt document in the worker but persists NOTHING: the caller
+ * decides whether the compaction goes ahead and flushes explicitly, so a failed
+ * publish is recoverable rather than half-applied.
+ */
+export function compactDoc(): Promise<{
+  beforeBytes: number;
+  afterBytes: number;
+  changesBefore: number;
+  changesAfter: number;
+  actorsBefore: number;
+}> {
+  return request('compactDoc') as Promise<{
+    beforeBytes: number;
+    afterBytes: number;
+    changesBefore: number;
+    changesAfter: number;
+    actorsBefore: number;
+  }>;
 }
 
 /** Create a fresh empty document (create-family). Pushes the full projection. */
