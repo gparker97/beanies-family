@@ -78,8 +78,15 @@ export function usePodCompaction() {
       //    that no peer can merge with, so publishing one that is missing a
       //    peer's edits would strand them permanently.
       await syncService.flushPendingSave();
-      if (!(await syncStore.syncNow(false))) return refuse('not-synced');
-      if (!(await syncService.isFullySynced())) return refuse('not-synced');
+      // ⚠️ CHEAPEST PROOF FIRST. `syncNow` unconditionally exports, encrypts,
+      // base64s and UPLOADS the whole multi-megabyte pod, and `doSave` has no
+      // clean short-circuit — so an already-synced device paid a full round trip
+      // for nothing, on exactly the low-memory device this feature exists for.
+      // Ask the question first; only push when the answer is no.
+      if (!(await syncService.isFullySynced())) {
+        if (!(await syncStore.syncNow(false))) return refuse('not-synced');
+        if (!(await syncService.isFullySynced())) return refuse('not-synced');
+      }
 
       // 3. Backup, gated on DELIVERY. The only rollback route.
       if (!(await exportEncryptedPod({ errorUi: 'caller' }))) {

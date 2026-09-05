@@ -9,6 +9,11 @@
  * pre-compaction document over a compacted remote.
  */
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(__dirname, '../../../..');
+const read = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
 import {
   isRemoteBlocker,
   PayloadTooLargeError,
@@ -41,5 +46,28 @@ describe('isRemoteBlocker', () => {
       readonly inlineMessageKey = 'podCorrupted.inline' as const;
     }
     expect(isRemoteBlocker(new FutureBlocker('m'))).toBe(true);
+  });
+});
+
+describe('a latch must not outlive the file it describes', () => {
+  it('disconnect and a file rebind both clear the breaker', () => {
+    // Nothing cleared `remoteBlocked` on either path: `selectSyncFile` and
+    // `selectNativeLocalFile` assign `currentProvider` directly rather than
+    // through `setProvider`. So a latch armed against the OLD pod survived a
+    // disconnect and a rebind to a DIFFERENT one, after which `createNewFile`
+    // -> `syncNow(true)` -> `doSave` threw the stale blocker and `loadFromFile`
+    // threw it at entry. Only a page reload cleared it.
+    const src = read('src/services/sync/syncService.ts');
+    for (const marker of [
+      'export async function disconnect',
+      'export async function selectSyncFile',
+      'export async function selectNativeLocalFile',
+    ]) {
+      const start = src.indexOf(marker);
+      expect(start, `${marker} not found`).toBeGreaterThan(-1);
+      const rest = src.slice(start);
+      const body = rest.slice(0, rest.indexOf('\n}\n'));
+      expect(body, `${marker} must clear the breaker`).toContain('clearRemoteUnreadable()');
+    }
   });
 });

@@ -3255,6 +3255,22 @@ export const useSyncStore = defineStore('sync', () => {
    * authoritative latch itself (on a successful merge, on a provider swap —
    * which is what makes `rebindPodFile` a genuine repair — and on reset).
    */
+  /**
+   * Reconcile the UI mirror with `syncService`'s authoritative latch.
+   *
+   * Deliberately one-way and additive: it only ever turns the mirror ON.
+   * Clearing stays with `clearPodUnopenable`, which also nulls the message so
+   * the bar's watcher re-fires — reconciling a clear here would skip that.
+   */
+  function mirrorServiceLatch(): void {
+    const blocker = syncService.isRemoteBlocked();
+    if (!blocker || podUnopenable.value) return;
+    podUnopenable.value = true;
+    backgroundSyncError.value = useTranslationStore().t(blocker.inlineMessageKey);
+    backgroundSyncErrorKind.value = blocker instanceof PodLineageError ? 'lineage' : 'decrypt';
+    stopFilePolling();
+  }
+
   function clearPodUnopenable(): void {
     podUnopenable.value = false;
     // Null the message too, so the NEXT failure re-fires the bar's watcher
@@ -3290,7 +3306,15 @@ export const useSyncStore = defineStore('sync', () => {
     // The latch itself is `syncService`'s; see `remoteUnreadable()`.
     if (remoteUnreadable()) return;
     filePollingTimer = setInterval(() => {
-      reloadIfFileChanged().catch(console.warn);
+      reloadIfFileChanged()
+        .catch(console.warn)
+        // ⚠️ MIRROR WHAT THE SERVICE DECIDED. `syncService` arms the breaker on
+        // paths this store never sees — its own local-file poll and the pre-save
+        // merge — and `podUnopenable` (the only thing `BackgroundSyncBar` reads)
+        // was written in exactly ONE place, inside `notePodUnopenable`. So a
+        // latch armed down there stopped polling SILENTLY: no bar, no message,
+        // and a read-only session never learned the pod could not be read.
+        .finally(() => mirrorServiceLatch());
     }, FILE_POLL_INTERVAL);
   }
 

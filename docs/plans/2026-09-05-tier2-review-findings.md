@@ -96,8 +96,41 @@ test that fails without it. Two of them had NO coverage at all beforehand.
 | A1-6      | Only the Drive provider has a revision, so every local-file family hit `commitRemoteBaseline`'s early return and never recorded a heads fingerprint. `isFullySynced()` could then never be true (compaction refused "not synced" on a synced pod) and the lineage context was permanently `dirty`, so those families would BLOCK where they should adopt. The fingerprint is now recorded without a revision. |
 | C-3 + C-5 | `adoptRemoteEnvelope` was `dropDoc()` then `mergeRemoteEnvelope()` on main, documented as atomic and not: the merge is RETRYABLE, and a respawn's rehydrator reinstalls the cached old-lineage doc before the retry, so the retry MERGED across lineages. It is now one RPC, and the worker drops only after the decrypt resolves — so a decrypt failure no longer leaves the worker with no document at all. |
 
+## ALSO FIXED — the lower-severity set
+
+| #     | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1-5  | Nothing cleared the breaker on `disconnect`, `selectSyncFile` or `selectNativeLocalFile` (the last two assign `currentProvider` directly, bypassing `setProvider`). A latch armed against the OLD pod survived a rebind to a DIFFERENT one; only a page reload cleared it.                                                                                                                                                                               |
+| E-3   | `syncService` arms the breaker on paths the store never sees (its own local-file poll, the pre-save merge), but `podUnopenable` — the only thing `BackgroundSyncBar` reads — was written in exactly one place. A latch armed down there stopped polling SILENTLY. The poll tick now mirrors the service's answer (one-way: it only turns the mirror on; clearing stays with `clearPodUnopenable`, which also nulls the message so the watcher re-fires). |
+| Eff-1 | Compaction called `syncNow(false)` BEFORE `isFullySynced()`, and `doSave` has no clean short-circuit — so an already-synced device paid a full export + encrypt + upload of a multi-megabyte pod for nothing, on exactly the low-memory device the feature exists for. Cheapest proof first.                                                                                                                                                             |
+
+## DELIBERATELY NOT FIXED (with reasons)
+
+- **B-5** — the unconditional `rollbackRemoteMarker()` in `loadFromFile`'s
+  `finally` costs a redundant re-download on each PIN/password open. It is also
+  the guard that makes every exit path safe by construction. Trading a
+  data-loss guard for a performance win is the wrong direction; if the cost
+  matters, the fix is to have the password/PIN paths CONFIRM the marker after a
+  successful merge, which is its own change with its own tests.
+- **Sim-5** — `lineageCodec` looks dead (`PodLineageError` is only thrown on
+  main today). Removing it is the hazard, not keeping it: without a codec a
+  future worker-side throw degrades to `DocWorkerError`, which `isRemoteBlocker`
+  does NOT recognise, so it would reach "save local anyway". Its `?? 'conflict'`
+  default is the safe direction (conflict blocks everywhere but `user-file`).
+- **E-4** — `keyMayBeWrong` deliberately does not latch (a peer rotating the key
+  is routine and recoverable), so the service's local-file poll re-downloads
+  each tick. Fixing it needs a bounded backoff for that class, i.e. new
+  machinery, and the failure is noise rather than loss.
+- **E-6** — family creation calls `initDoc()` before any `setFamilyKey`, so the
+  owner's first session writes under a random actor and `docActor` warns. The
+  cost is exactly one extra lane, once per family, and the create path is the
+  highest-risk path in the app. Not worth touching for that.
+- **R-1** — a corrupt pod files two `critical` reports (`noteRemoteUnreadable`
+  plus `surfacePayloadFatal`). Real noise, but every candidate fix risks going
+  dark on the Drive read path, which reaches no surface. Needs its own pass.
+
 ## Next
 
-1. Verify the remaining ledger items (E-3, E-4, E-6, A1-1, A1-5, B-5, C-6, R-1, Sim-5).
+1. Verify the remaining ledger items (A1-1, A1-7, C-6, and the R/Sim/Eff cleanup set).
 2. Re-derive the Tier 3 rebase design against P1-2's deterministic model.
 3. Re-review the fixes with a different model.
