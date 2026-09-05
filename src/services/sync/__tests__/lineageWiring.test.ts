@@ -80,6 +80,23 @@ describe('the guard must be CONSULTED everywhere, and its answer acted on in ful
     expect(body).toContain('adoptRemoteEnvelope(');
   });
 
+  it('terminus 3 LATCHES the block, so the poller stops re-downloading', () => {
+    // `guardLineage` throws OUTSIDE `fetchAndMergeRemote`'s try, so a block
+    // armed nothing. The local-file poll watcher's `if (remoteBlocked) return`
+    // gate therefore stayed open and it re-downloaded, re-parsed and re-threw
+    // the whole multi-megabyte pod every tick, filing a `local-file-polling`
+    // warning each time and telling the user nothing. `doSave` arming it later
+    // is not enough: a read-only session never reaches `doSave`.
+    const src = read('src/services/sync/syncService.ts');
+    const start = src.indexOf('async function fetchAndMergeRemote');
+    const rest = src.slice(start);
+    const body = code(rest.slice(0, rest.indexOf('\n}\n')));
+    const guardAt = body.indexOf('guardLineage(');
+    const latchAt = body.indexOf('noteLineageBlocked(');
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(latchAt, 'the guard throw must arm the breaker').toBeGreaterThan(guardAt);
+  });
+
   it.each([
     ['hydrateFromEnvelope', 'src/stores/syncStore.ts', 'async function hydrateFromEnvelope'],
     ['loadFromFile', 'src/stores/syncStore.ts', 'async function loadFromFile'],
