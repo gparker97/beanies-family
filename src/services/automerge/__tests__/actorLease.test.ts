@@ -161,3 +161,53 @@ describe('the lease is wired where the actor is minted and dropped', () => {
     expect(body('export function __resetDocClientForTesting')).toContain('releaseActorLease()');
   });
 });
+
+describe('actor pinning is OFF, and the reason is executable', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '../worker/docClient.ts'), 'utf8');
+
+  it('setFamilyKey posts NO actor while the invariant cannot be met', () => {
+    // A pinned actor needs the local document never to regress below what it
+    // published. Cache-first loading + a debounced persist + a prefix-keeping
+    // recovery make it regress routinely, and the next edit then reuses a seq
+    // Drive already holds — `duplicate seq`, which refuses the merge AND the
+    // save. Seen in the field on the first real two-session test.
+    expect(src).toContain('const ACTOR_PINNING_ENABLED = false;');
+    const start = src.indexOf('export async function setFamilyKey');
+    const body = src.slice(start, src.indexOf('\n}\n', start));
+    expect(body).toContain('ACTOR_PINNING_ENABLED');
+  });
+
+  it('and the machinery survives, so re-enabling is one line', () => {
+    // The lease, the derivation and their tests are all intact — deleting them
+    // would mean rebuilding this from scratch once the invariant holds.
+    const body = src.slice(src.indexOf('export async function setFamilyKey'));
+    expect(body).toContain('acquireActorLease(familyId)');
+    expect(body).toContain('deviceActorId(familyId)');
+  });
+});
+
+describe('the collision a pinned actor causes, pinned as a fact', () => {
+  it('one device that fell behind its own published history cannot merge it back', async () => {
+    // THE mechanism, end to end. Not two tabs, not two people: ONE device whose
+    // cached document lagged what it had already pushed.
+    const Automerge = await import('@automerge/automerge');
+    const ACTOR = 'd316ecd2309724e0267661c418f39f0a';
+    type Doc = { items: Record<string, string> };
+    let doc = Automerge.from<Doc>({ items: {} }, { actor: ACTOR });
+    for (const k of ['a', 'b', 'c']) {
+      doc = Automerge.change(doc, (d) => {
+        d.items[k] = k;
+      });
+    }
+    const drive = Automerge.save(doc); // all three reached Drive
+    // The cache, however, kept only a prefix.
+    const changes = Automerge.getAllChanges(doc);
+    let cached = Automerge.init<Doc>({ actor: ACTOR });
+    [cached] = Automerge.applyChanges(cached, changes.slice(0, 2));
+    // Cache-first open, then the user edits BEFORE the background merge lands.
+    cached = Automerge.change(cached, (d) => {
+      d.items.userEdit = 'made right after opening';
+    });
+    expect(() => Automerge.merge(cached, Automerge.load<Doc>(drive))).toThrow(/duplicate seq/i);
+  });
+});

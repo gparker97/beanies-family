@@ -105,6 +105,47 @@ let familyKey: CryptoKey | null = null;
  * silently — the failure is invisible for weeks and only shows up as a slowly
  * growing actor count in the pod.
  */
+/**
+ * Pin this device's Automerge actor? **NO — and this is deliberate.**
+ *
+ * ⚠️ THE INVARIANT A PINNED ACTOR NEEDS, WHICH THIS APP CANNOT PROVIDE:
+ * a device's local document must NEVER regress below what it has already
+ * published under that actor. Three shipped decisions make it regress as a
+ * matter of course:
+ *
+ *   1. the app loads CACHE-FIRST, so a session starts from IndexedDB before
+ *      Drive is consulted;
+ *   2. the cache persist is DEBOUNCED, and its recovery path deliberately keeps
+ *      only a PREFIX when an increment will not replay (`cache.ts`,
+ *      `recovered: true`) — so the cached document can sit behind Drive;
+ *   3. a worker respawn rehydrates from that same cache.
+ *
+ * So: open the app, the cached doc is a change or two behind Drive, the user
+ * edits before the background merge lands, and that edit reuses a seq Drive
+ * already holds under the same actor. Automerge then refuses the merge:
+ *
+ *   RangeError: error applying changes: duplicate seq 101 found for actor …
+ *
+ * and the save refuses with it. Reproduced in the field on the first real
+ * two-session test, and by probe. It is not an edge case — it is the ordinary
+ * path for anyone who edits shortly after opening.
+ *
+ * Before pinning, every `load()` minted a fresh random actor, so a collision
+ * was impossible. That is the behaviour this constant restores.
+ *
+ * ⚠️ WHAT IS LOST, AND WHY THAT IS THE RIGHT TRADE: only the PREVENTIVE half of
+ * #90 Tier 2 — actor-list growth, which is a slow burn measured in months.
+ * COMPACTION (the remedial half, and the one that actually gets a large pod
+ * onto a low-memory tablet) does not depend on this and is unaffected. A
+ * blocked save is immediate; actor growth is not, and compaction resets it.
+ *
+ * ⚠️ BEFORE TURNING THIS BACK ON, one of these must be true: the cache can
+ * never lag Drive, or a collision self-heals by replaying the divergent changes
+ * onto a fresh actor (the same rebase machinery Tier 3 needs). Flipping it
+ * without one of those reintroduces a save-blocking defect.
+ */
+const ACTOR_PINNING_ENABLED = false;
+
 let docActor: string | null = null;
 let currentFamilyId: string | null = null;
 let rehydrator: ((familyId: string) => Promise<void>) | null = null;
@@ -962,13 +1003,17 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // forget, and five places to remember forever; one required parameter is
   // compiler-enforced and a future sixth caller cannot omit it.
   familyKey = key;
-  // ⚠️ ONE WRITER PER ACTOR. The device actor is shared by every tab of this
-  // browser profile, and two realms writing under one actor make Automerge
-  // refuse to merge them (`duplicate seq`) — see `actorLease.ts`. Only the realm
-  // holding the lease pins it; every other realm passes no actor and Automerge
-  // mints a random one, which is exactly today's behaviour. Neither call throws:
-  // an actor-derivation or lease failure must not be able to stop a pod opening.
-  docActor = (await acquireActorLease(familyId)) ? await deviceActorId(familyId) : null;
+  // ⚠️ ACTOR PINNING IS OFF. See `ACTOR_PINNING_ENABLED` below — it is one
+  // constant, and everything it gates (the lease, the derivation, their tests)
+  // is intact and ready for the day the invariant it needs actually holds.
+  //
+  // When on: only the realm holding the lease pins the device actor; every
+  // other realm passes no actor and Automerge mints a random one. Neither call
+  // throws — an actor-derivation or lease failure must never stop a pod opening.
+  docActor =
+    ACTOR_PINNING_ENABLED && (await acquireActorLease(familyId))
+      ? await deviceActorId(familyId)
+      : null;
   // ⚠️ ACTOR BEFORE KEY: every doc-creating op is downstream of the key, so the
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });

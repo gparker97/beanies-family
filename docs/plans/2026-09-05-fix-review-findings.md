@@ -160,6 +160,37 @@ is not code but EVIDENCE: nobody has yet opened a compacted pod on the tablet,
 or watched two devices go through a compaction. 6261 green tests and two audits
 are not that evidence.
 
+## ⚠️ FOUND IN THE FIELD, 2026-09-05 — actor pinning turned OFF
+
+greg's first real two-session test blocked a save with
+`RangeError: error applying changes: duplicate seq 101 found for actor d316…`.
+NOT a two-tab problem: ONE device colliding with its OWN published history.
+This is the audit's P1-1, which was CONFIRMED by probe and then not fixed — an
+error of judgement, since it is the ordinary path rather than an edge case.
+
+**Mechanism (reproduced by probe, now a test).** A pinned actor needs the local
+document never to regress below what it has published. Three shipped decisions
+make it regress routinely: the app loads CACHE-FIRST; the cache persist is
+DEBOUNCED and its recovery keeps only a PREFIX when an increment will not
+replay; a worker respawn rehydrates from that same cache. So: open the app,
+the cached doc is behind Drive, the user edits before the background merge
+lands, and the edit reuses a seq Drive already holds under the same actor.
+
+**Resolution.** `ACTOR_PINNING_ENABLED = false` in `docClient.ts`, with the
+argument written beside it. Every piece of machinery survives — the derivation,
+the Web Lock lease, their tests — so re-enabling is one line. The collision
+itself is now a test, so the reason is executable.
+
+**What it costs:** only the PREVENTIVE half of Tier 2 (actor-list growth, a slow
+burn over months). Compaction — the remedial half, and the one that gets a large
+pod onto a low-memory tablet — is unaffected, and now mints a random actor for
+the rebuilt document, which also removes the A2-4 hazard where a compacted
+lineage collided with the old one under a shared actor.
+
+**Before re-enabling**, one of these must hold: the cache can never lag Drive,
+or a collision self-heals by replaying the divergent changes onto a fresh actor
+(the same rebase machinery Tier 3 needs).
+
 ## Order of work
 
 1. The four LIVE items, immediately.

@@ -36,9 +36,16 @@ export function docInitOpts(): { actor: string } | undefined {
     // The worker cannot telemeter (`perfTiming` flushes on `window`/`pagehide`),
     // so this is a console warning by necessity. Names the plumbing, because the
     // symptom — a slowly growing actor count — is invisible for weeks.
+    // ⚠️ EXPECTED WHILE `ACTOR_PINNING_ENABLED` IS FALSE (docClient.ts), which
+    // is the current, deliberate state — a pinned actor collides with this
+    // device's own published history whenever the cache lags Drive. Kept at
+    // `warn` only because the lint allows nothing quieter; the wording carries
+    // the real severity. It still names the plumbing, because once pinning is
+    // re-enabled a silent miss here is invisible for weeks.
     console.warn(
       '[docActor] no actor set for this realm; Automerge will mint a random one. ' +
-        'Check that docClient.setFamilyKey(key, familyId) ran, and that spawn()/enterInlineMode() re-post it.'
+        'Expected while actor pinning is disabled. If it is enabled, check that ' +
+        'docClient.setFamilyKey(key, familyId) ran and that spawn()/enterInlineMode() re-post it.'
     );
   }
   return undefined;
