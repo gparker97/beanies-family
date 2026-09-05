@@ -23,6 +23,7 @@ import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
 import { PayloadLoadError, payloadErrorDetail } from '@/types/sync';
+import type { PodLineageError } from '@/services/sync/podLineage';
 
 /** Where the failure was caught. Rides in `action`, so it stays queryable. */
 export type PayloadFailureSource =
@@ -129,6 +130,40 @@ export function surfacePayloadFatal(
     // overwrites `family_id` with the ACTIVE family, so on a cross-family open
     // the argument would be silently discarded and the two would disagree.
     payloadErrorDetail(err, ctx.fileId, ctx.familyId),
+    { clearDataHelps: false }
+  );
+}
+
+/**
+ * The lineage sibling of `surfacePayloadFatal`.
+ *
+ * A SEPARATE function, not a generalisation of the pair above: making those
+ * generic over two unrelated error shapes would push
+ * `deviceCannotOpen`/`keyMayBeWrong`/`payloadBytes` narrowing into code whose
+ * entire value is that it has none. This file stays "THE one place a payload
+ * failure becomes the fatal overlay" and gains a second, equally small entry.
+ */
+export function surfaceLineageFatal(err: PodLineageError, ctx: { familyId: string | null }): void {
+  reportError({
+    surface: 'pod-lineage',
+    // Constant per verdict — no per-pod detail, so the dedup bucket works.
+    message: `Pod lineage blocked at open: ${err.verdict}`,
+    error: err,
+    // Only a genuine `conflict` needs a human. An `adopt-remote` block is the
+    // expected, recoverable outcome of a compaction meeting unsaved work.
+    severity: err.verdict === 'conflict' ? 'critical' : 'warning',
+    context: {
+      action: 'blocked-at-open',
+      error_code: err.verdict,
+      family_id: ctx.familyId ?? undefined,
+    },
+  });
+  useFatalErrorStore().setFatal(
+    useTranslationStore().t('resumeSetup.podLineageBlocked'),
+    JSON.stringify({ familyId: ctx.familyId, verdict: err.verdict, message: err.message }, null, 2),
+    // Clearing local data is exactly the wrong move here: the local document may
+    // hold the only copy of work that has not been saved, which is the whole
+    // reason the guard refused rather than merging.
     { clearDataHelps: false }
   );
 }

@@ -962,6 +962,31 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   await request('setKey', { key });
 }
 
+/**
+ * Adopt a remote envelope WHOLESALE — never a CRDT merge.
+ *
+ * `dropDoc()` is already this codebase's way of saying "adopt": with no
+ * `currentDoc`, `mergeRemoteEnvelope` takes its full-adopt branch, installs the
+ * remote verbatim, resets the cursors and pushes a full projection. Four call
+ * sites already used the pair; naming it means a cross-lineage merge is a
+ * different FUNCTION rather than a convention someone has to remember.
+ *
+ * Preferred over a `mode: 'merge' | 'adopt'` parameter on `mergeRemoteEnvelope`:
+ * that API has seven call sites, so a required mode would be seven edits and
+ * seven chances to answer `'merge'` reflexively to get the build green.
+ *
+ * Atomicity: a worker respawn between the two calls leaves it with no document
+ * at all, so the retried merge adopts — the same outcome, never a cross-lineage
+ * merge. Both RPCs are already `RETRYABLE`.
+ */
+export async function adoptRemoteEnvelope(
+  envelope: BeanpodFileV4,
+  familyId: string | null
+): Promise<{ dirty: boolean; remoteHeads: string[] | null; changed?: boolean }> {
+  await dropDoc();
+  return mergeRemoteEnvelope(envelope, familyId);
+}
+
 /** Create a fresh empty document (create-family). Pushes the full projection. */
 export function initDoc(): Promise<{ loaded: true }> {
   // A fresh doc means a fresh session — restore normal toast policy immediately.
