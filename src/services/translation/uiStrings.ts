@@ -4601,6 +4601,11 @@ const STRING_DEFS = {
     en: 'Your PIN must be exactly 6 digits.',
     beanie: 'your pin must be exactly 6 digits.',
   },
+  'pin.noSignedInMember': {
+    en: 'beanies does not know who you are on this device yet, so it cannot set your PIN. Sign in as yourself from the welcome screen first, then set a PIN here.',
+    beanie:
+      'beanies does not know which bean you are on this device yet, so it cannot set your pin. sign in as yourself from the welcome screen first, then set a pin here.',
+  },
   'pin.currentRequired': {
     en: 'Enter your current PIN to change it.',
     beanie: 'enter your current pin to change it.',

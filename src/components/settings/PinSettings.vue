@@ -12,6 +12,7 @@ import PinInput from '@/components/ui/PinInput.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { PIN_LENGTH, isValidPin } from '@/services/auth/deviceUnlock';
 
 const { t } = useTranslation();
@@ -49,7 +50,23 @@ function cancelEditing() {
 
 async function handleSave() {
   statusMessage.value = null;
-  if (!me.value) return;
+  if (!me.value) {
+    // ⚠️ NEVER A BARE RETURN. This fired whenever the session has a pod open
+    // but no signed-in MEMBER — opening a `.beanpod` from the welcome gate on a
+    // fresh device is exactly that — and the Save button then did literally
+    // nothing: no message, no log, no toast. Reported from the field as "the
+    // save button did not respond". Worse, `WallSetupCard` asks a DIFFERENT
+    // question (`familyStore.currentMember`, which falls back to the owner), so
+    // it kept insisting a PIN was needed while this form could never set one.
+    statusMessage.value = { text: t('pin.noSignedInMember'), type: 'error' };
+    logEvent({
+      level: 'warn',
+      surface: 'pin-settings',
+      message: 'PIN save attempted with no signed-in member',
+      context: { action: 'no-member' },
+    });
+    return;
+  }
   if (!isValidPin(newPin.value)) {
     statusMessage.value = { text: t('pin.invalidFormat'), type: 'error' };
     return;
