@@ -121,6 +121,7 @@ import {
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
   PayloadLoadError,
+  RemoteMergeError,
   PayloadTooLargeError,
   payloadErrorMessageKey,
   type RemoteBlocker,
@@ -3198,6 +3199,7 @@ export const useSyncStore = defineStore('sync', () => {
     // to latch a `keyMayBeWrong` failure, which is why this is a call rather
     // than a second copy of that logic.
     if (err instanceof PodLineageError) syncService.noteLineageBlocked(err);
+    else if (err instanceof RemoteMergeError) syncService.noteMergeFailed(err);
     else if (err instanceof PayloadLoadError) syncService.noteRemoteUnreadable(err);
     // MIRROR the service's actual answer — do not assert it. `noteRemoteUnreadable`
     // declines to latch a `keyMayBeWrong` failure (a routine key rotation), so

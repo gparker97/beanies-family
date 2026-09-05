@@ -170,7 +170,8 @@ export type PodBlockMessageKey =
   | 'podCorrupted.inline'
   | 'podCredentialStale.inline'
   | 'podLineage.unsyncedInline'
-  | 'podLineage.conflictInline';
+  | 'podLineage.conflictInline'
+  | 'podMerge.failedInline';
 
 /**
  * Anything that may latch `syncService`'s remote-blocked breaker.
@@ -399,5 +400,47 @@ export class DriveConsentDeniedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'DriveConsentDeniedError';
+  }
+}
+
+/**
+ * The remote pod was READ — downloaded, decrypted, loaded — but the MERGE into
+ * the local document refused.
+ *
+ * This is the third `RemoteBlocker`, and it exists for one reason: `doSave`'s
+ * "merge failed, save local anyway" branch is right for a transport failure
+ * (the remote is still there; the next save re-merges) and catastrophic for a
+ * merge refusal, because the write that follows replaces the whole file with a
+ * base built from a document that provably does not contain the remote's
+ * changes. The first refusal seen in practice was Automerge's
+ * `duplicate seq N found for actor …` — two realms sharing one pinned actor —
+ * and its symptom was two tabs overwriting each other in turn.
+ */
+export class RemoteMergeError extends Error implements RemoteBlocker {
+  readonly cause: unknown;
+  constructor(cause: unknown) {
+    super(
+      `Remote pod could not be merged: ${cause instanceof Error ? cause.message : String(cause)}`
+    );
+    // Literal, never `new.target.name`: the prod build minifies class names.
+    this.name = 'RemoteMergeError';
+    this.cause = cause;
+  }
+
+  get blockCode(): string {
+    return 'merge';
+  }
+
+  get inlineMessageKey(): PodBlockMessageKey {
+    return 'podMerge.failedInline';
+  }
+
+  /**
+   * A duplicate-seq refusal is an Automerge invariant violation — a BUG in the
+   * actor plumbing, not weather — and is the one class that should page.
+   */
+  get isActorCollision(): boolean {
+    const m = this.cause instanceof Error ? this.cause.message : String(this.cause);
+    return /duplicate seq/i.test(m);
   }
 }

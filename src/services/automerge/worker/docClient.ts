@@ -25,6 +25,7 @@
  */
 import { withTimeout } from '@/utils/timing';
 import { deviceActorId } from '@/services/automerge/deviceActor';
+import { acquireActorLease, releaseActorLease } from '@/services/automerge/actorLease';
 import { wasHiddenSince } from '@/utils/visibilityTracker';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { reportError } from '@/utils/errorReporter';
@@ -961,10 +962,13 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // forget, and five places to remember forever; one required parameter is
   // compiler-enforced and a future sixth caller cannot omit it.
   familyKey = key;
-  // Never throws — a null actor means Automerge mints a random one, which is
-  // exactly today's behaviour. An actor-derivation failure must not be able to
-  // stop a pod from opening.
-  docActor = await deviceActorId(familyId);
+  // ⚠️ ONE WRITER PER ACTOR. The device actor is shared by every tab of this
+  // browser profile, and two realms writing under one actor make Automerge
+  // refuse to merge them (`duplicate seq`) — see `actorLease.ts`. Only the realm
+  // holding the lease pins it; every other realm passes no actor and Automerge
+  // mints a random one, which is exactly today's behaviour. Neither call throws:
+  // an actor-derivation or lease failure must not be able to stop a pod opening.
+  docActor = (await acquireActorLease(familyId)) ? await deviceActorId(familyId) : null;
   // ⚠️ ACTOR BEFORE KEY: every doc-creating op is downstream of the key, so the
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });
@@ -1251,6 +1255,7 @@ export async function reset(): Promise<void> {
   currentFamilyId = null;
   familyKey = null;
   docActor = null;
+  releaseActorLease();
   await request('reset');
   // Clear the main-thread mirror too — a worker-only reset would leave a stale
   // projection readable across a family-switch (cross-session data bleed).
@@ -1276,6 +1281,7 @@ export function __resetDocClientForTesting(): void {
   mode = 'worker';
   familyKey = null;
   docActor = null;
+  releaseActorLease();
   currentFamilyId = null;
   needsRehydrate = false;
   rehydrating = false;
