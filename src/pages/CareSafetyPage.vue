@@ -137,7 +137,7 @@ function openMedication(m: Medication): void {
 <template>
   <div class="space-y-6">
     <header
-      class="mb-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-5 py-5 sm:px-8 sm:py-7"
+      class="dark:from-surface-overlay dark:to-surface-raised mb-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-5 py-5 sm:px-8 sm:py-7"
     >
       <h1
         class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-bold sm:text-3xl"
