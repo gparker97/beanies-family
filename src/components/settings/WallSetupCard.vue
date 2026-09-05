@@ -19,12 +19,22 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import PinSettings from '@/components/settings/PinSettings.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const router = useRouter();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const authStore = useAuthStore();
 
-const member = computed(() => familyStore.currentMember);
+// ⚠️ THE SAME QUESTION `PinSettings` ASKS. It was `familyStore.currentMember`,
+// which falls back to the OWNER when nothing else resolves, while the PIN form
+// keys off `authStore.currentUser?.memberId`. With a pod open but no member
+// signed in the two disagreed: this card demanded a PIN for the owner's row and
+// the form could not set one, so the button did nothing and the loop had no
+// exit. One source, or they drift apart again.
+const member = computed(() =>
+  familyStore.members.find((m) => m.id === authStore.currentUser?.memberId)
+);
 const canEnterWall = computed(() => !!(member.value?.pinHash || member.value?.passwordHash));
 
 const pinModalOpen = ref(false);
