@@ -663,3 +663,35 @@ describe('a LINEAGE block must refuse the save, not fall through to it', () => {
     expect(syncService.isRemoteBlocked()?.blockCode).toBe('adopt-remote');
   });
 });
+
+describe('a baseline WITHOUT a revision still records its heads fingerprint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+  });
+
+  it('so a local-file family can be "fully synced" and can compact', () => {
+    // Only `GoogleDriveProvider` implements `getRemoteMarker`, so every
+    // local-file family hit `commitRemoteBaseline`'s `revision === null` early
+    // return and NEVER recorded a fingerprint. `docPushedAgainst(null)` then
+    // answered `dirty` forever: `isFullySynced()` could never be true, so
+    // compaction refused with "not synced" on a perfectly synced pod, and the
+    // lineage context was permanently `dirty`, so those families would BLOCK
+    // where they should adopt.
+    expect(syncService.getRemoteBaselineHeadsFp()).toBeNull();
+
+    syncService.commitRemoteBaseline(['h-a', 'h-b']);
+
+    const fp = syncService.getRemoteBaselineHeadsFp();
+    expect(fp).not.toBeNull();
+    // Same heads => same fingerprint => provably nothing unpushed.
+    expect(headsFingerprint(['h-a', 'h-b'])).toBe(fp);
+  });
+
+  it('records nothing when there are no heads to record', () => {
+    // `null` heads means "we cannot prove what Drive holds" and must stay the
+    // fail-safe unknown, never a fingerprint of nothing.
+    syncService.commitRemoteBaseline(null);
+    expect(syncService.getRemoteBaselineHeadsFp()).toBeNull();
+  });
+});
