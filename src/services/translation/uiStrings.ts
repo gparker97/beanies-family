@@ -4283,6 +4283,59 @@ const STRING_DEFS = {
   // The two ways a lineage check can BLOCK. Both are recoverable, and both name
   // the action, because the alternative — a merge — would silently discard one
   // side's work about half the time.
+  // Pod compaction (owner-only, dev-flagged). The confirm names the two things
+  // that actually change for the family: other devices must catch up, and the
+  // edit history goes.
+  'compaction.confirmTitle': { en: 'Slim down your family file?', beanie: 'slim down your pod?' },
+  'compaction.confirmMessage': {
+    en: 'beanies will rewrite your family file without its edit history, so it opens faster and works on older tablets. Your data is not changed. beanies saves a copy to your device first. Every other device will pick up the slimmer file next time it is online — until then, they will say they need to catch up.',
+    beanie:
+      'beanies will rewrite your pod without its edit history, so it opens faster and works on older tablets. your beans are not changed. beanies saves a copy to your device first. every other device will pick up the slimmer pod next time it is online.',
+  },
+  'compaction.confirmCta': { en: 'Slim it down', beanie: 'slim it down' },
+  'compaction.refused': {
+    en: "beanies didn't slim your file down",
+    beanie: "beanies didn't slim your pod down",
+  },
+  'compaction.refused.not-synced': {
+    en: 'Some changes have not reached the cloud yet. Wait for the sync to finish, then try again.',
+    beanie:
+      'some beans have not reached the cloud yet. wait for the sync to finish, then try again.',
+  },
+  'compaction.refused.backup-not-delivered': {
+    en: 'The backup was not saved, so beanies stopped. Nothing has changed. Try again and save the file when asked.',
+    beanie:
+      'the backup was not saved, so beanies stopped. nothing has changed. try again and save the file when asked.',
+  },
+  'compaction.refused.no-envelope': {
+    en: 'beanies could not find your family file details. Reload and try again.',
+    beanie: 'beanies could not find your pod details. reload and try again.',
+  },
+  'compaction.done': { en: 'Your family file is slimmer', beanie: 'your pod is slimmer' },
+  'compaction.failed': {
+    en: "beanies couldn't slim your file down",
+    beanie: "beanies couldn't slim your pod down",
+  },
+  'compaction.failedHelp': {
+    en: 'Nothing has changed and your data is safe. If it keeps happening, send support@beanies.family the details.',
+    beanie:
+      'nothing has changed and your beans are safe. if it keeps happening, send support@beanies.family the details.',
+  },
+  'compaction.publishFailed': {
+    en: 'The slimmer file was not saved to the cloud',
+    beanie: 'the slimmer pod was not saved to the cloud',
+  },
+  'compaction.publishFailedHelp': {
+    en: 'Your backup is on this device and your data is safe. Reload beanies and it will finish the job.',
+    beanie:
+      'your backup is on this device and your beans are safe. reload beanies and it will finish the job.',
+  },
+  'settings.compactPod': { en: 'Slim down family file', beanie: 'slim down pod' },
+  'settings.compactPodDesc': {
+    en: 'Rewrite your family file without its edit history so it opens faster and works on older tablets. Owner only.',
+    beanie:
+      'rewrite your pod without its edit history so it opens faster and works on older tablets. owner only.',
+  },
   'podLineage.unsyncedInline': {
     en: 'Your family file was reorganised on another device, and this one still has changes that have not been saved. Save or export them first, then reload.',
     beanie:
