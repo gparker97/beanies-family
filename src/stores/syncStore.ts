@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { PodLineageError } from '@/services/sync/podLineage';
-import { guardLineage, type LineageContext } from '@/services/sync/podLineage';
-import { decodeBaselinePayload } from '@/services/sync/remoteBaseline';
+import type { LineageBasis } from '@/services/automerge/worker/protocol';
+import { decodeBaselinePayload, decodeHeadsFingerprint } from '@/services/sync/remoteBaseline';
 import { ref, computed, shallowRef, nextTick, watch } from 'vue';
 
 // Import stores for auto-sync and reload
@@ -894,20 +894,23 @@ export const useSyncStore = defineStore('sync', () => {
     // cross-family teardown in `authStore.signOut` (defence-in-depth).
     let loadedFromCache = false;
     /**
-     * What we can PROVE about our own document, for the lineage guard below.
-     * Starts `clean` because with no local doc there is, by definition, nothing
-     * to lose.
+     * The heads DRIVE HELD at our last durable baseline — the one fact the
+     * worker cannot see, and all it needs from us.
+     *
+     * ⚠️ HEADS, not the fingerprint. `remoteBaseline.ts` is type-imported by
+     * worker code and must stay value-free so those imports are erased; sending
+     * a fingerprint would drag it into the worker bundle at runtime. Main
+     * decodes, the worker compares. `null` means "we cannot prove what Drive
+     * held", which the worker reads as `dirty` — the fail-safe direction.
      */
-    let lineageCtx: LineageContext = 'clean';
+    let baselineHeads: string[] | null = null;
     try {
       const cacheResult = await docClient.initAndLoadCache(familyId);
       loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
       // Zero extra I/O: the baseline row came back in the SAME round-trip.
-      if (loadedFromCache) {
-        lineageCtx = await syncService.docPushedAgainst(
-          cacheResult?.remoteBaseline
-            ? (decodeBaselinePayload(cacheResult.remoteBaseline.payload)?.headsFp ?? null)
-            : null
+      if (loadedFromCache && cacheResult?.remoteBaseline) {
+        baselineHeads = decodeHeadsFingerprint(
+          decodeBaselinePayload(cacheResult.remoteBaseline.payload)?.headsFp ?? null
         );
       }
     } catch (e) {
@@ -925,66 +928,60 @@ export const useSyncStore = defineStore('sync', () => {
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
 
-    // ⚠️ LINEAGE GUARD (terminus 1). A document may only be CRDT-merged with a
-    // document of the same lineage; a compacted pod shares no ancestry with the
-    // original, so merging one into a peer still on the old history destroys
-    // that peer's unsynced work about half the time, decided by actor ordering.
+    // ⚠️ THE LINEAGE GUARD NOW LIVES IN THE WORKER — see
+    // `applyAndProject.mergeRemoteEnvelope`. It has to, because it is the only
+    // place BOTH documents exist: comparing the two ENVELOPES (which is what
+    // this call site used to do) compares metadata maintained on three tracks
+    // independent of the document, so it read `same` while the documents
+    // differed and permitted the merge it exists to prevent.
     //
-    // `block` throws, and the throw lands in the latch the same way a
-    // `PayloadLoadError` already does, so the surrounding error path is unchanged.
-    const lineageAct = guardLineage(
-      remoteEnvelope.podLineage,
-      envelope.value?.podLineage,
-      lineageCtx
-    );
-    if (lineageAct === 'adopt') {
-      // Wholesale, never a merge — and deliberately NOT `clearCache()` first:
-      // the adopt's own `resetDocCursors()` makes the next persist write a fresh
-      // BASE, which already supersedes every stale-lineage row, and deleting the
-      // DB would open a window in which the device holds no copy of the pod at
-      // all.
-      const adopted = await docClient.adoptRemoteEnvelope(remoteEnvelope, familyId);
-      logEvent({
-        level: 'info',
-        surface: 'pod-lineage',
-        message: 'adopted a newer pod lineage',
-        context: { action: 'adopted', family_id: familyId },
-      });
-      await deduplicateRecurringTransactions();
-      if (adopted.dirty) syncService.triggerDebouncedSave();
-      return adopted.remoteHeads ?? null;
+    // All this site owes the worker is the one fact only IT knows: what Drive
+    // held at our last durable baseline. `loadedFromCache` false means we have
+    // no document of THIS family, which is a different question entirely.
+    const basis: LineageBasis = loadedFromCache
+      ? { kind: 'baseline', heads: baselineHeads }
+      : { kind: 'no-local-document' };
+    const merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId, basis);
+    if (merged.action === 'kept-local') {
+      keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope);
+      return null; // commit NO baseline — see the helper
     }
-
-    if (lineageAct === 'publish-local') {
-      // ⚠️ NOT A MERGE. We hold an unpublished compaction and the remote is on
-      // the old lineage; merging it in is the cross-lineage merge the guard
-      // exists to prevent, and per the measured model the OLD lineage wins
-      // deterministically in every later-added collection — silently reverting
-      // the compaction and republishing the hybrid. This is the documented
-      // failed-publish recovery path, so it is reached exactly when it matters.
-      // ⚠️ MERGE THE ENVELOPE EVEN THOUGH WE REFUSE THE DOCUMENT. The two are
-      // separate: we decline the remote's PAYLOAD (wrong lineage) but its KEY
-      // DICTS are still the newest truth, and `replaceEnvelope` ->
-      // `preserveLocalKeyDicts` is the ONLY path by which a remote-only
-      // `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches
-      // `currentEnvelope`. Returning without it meant the save we just armed
-      // wrote the LOCAL envelope over the remote and ERASED a member, passkey
-      // or invite another device had added — locking that person out. Terminus
-      // 4 makes it systematic: it is only reached when a peer HAS written.
-      const keptEnv = replaceEnvelope(remoteEnvelope);
-      syncService.setFamilyKey(familyKey.value!, keptEnv);
-      syncService.triggerDebouncedSave();
-      return null;
-    }
-    if (!loadedFromCache) await docClient.dropDoc(); // no doc for THIS family → adopt remote fresh, never merge into a foreign doc
-    const { dirty, remoteHeads } = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId);
+    logEvent({
+      level: 'info',
+      surface: 'pod-lineage',
+      message: `remote ${merged.action}`,
+      context: { action: merged.action, family_id: familyId },
+    });
     // Clean up duplicate recurring transactions from the CRDT merge.
     await deduplicateRecurringTransactions();
     // Re-upload the converged doc only if local carried unsynced changes.
-    if (dirty) syncService.triggerDebouncedSave();
+    if (merged.dirty) syncService.triggerDebouncedSave();
     // `?? null` — same fail-safe every other `remoteHeads` reader applies: a partial
     // worker double degrades to "unknown => read", never to a false skip.
-    return remoteHeads ?? null;
+    return merged.remoteHeads ?? null;
+  }
+
+  /**
+   * `kept-local`: our document is the NEWER lineage, so the worker touched
+   * nothing and we keep ours.
+   *
+   * ⚠️ ADOPT THE ENVELOPE ANYWAY. Declining the remote's PAYLOAD is a different
+   * decision from declining its KEY DICTS, and `replaceEnvelope` →
+   * `preserveLocalKeyDicts` is the ONLY path by which a remote-only
+   * `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches us.
+   * Returning without it means the save we arm below writes the LOCAL envelope
+   * over the remote and ERASES a member, passkey or invite another device
+   * added — locking that person out.
+   *
+   * ⚠️ THE CALLER MUST RETURN IMMEDIATELY AFTER THIS, committing no Drive
+   * baseline and learning no marker. Recording Drive's heads as a baseline our
+   * document provably does not contain is a false skip — the class #65 exists
+   * to prevent.
+   */
+  function keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope: BeanpodFileV4): void {
+    const keptEnv = replaceEnvelope(remoteEnvelope);
+    syncService.setFamilyKey(familyKey.value!, keptEnv);
+    syncService.triggerDebouncedSave();
   }
 
   /**
@@ -996,44 +993,28 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function hydrateFromEnvelope(env: BeanpodFileV4): Promise<void> {
     await docClient.setFamilyKey(familyKey.value!, env.familyId);
-    // ⚠️ LINEAGE GUARD (terminus 2). This runs on the background paths with a
-    // live document, so it cannot prove anything about unsynced work: `dirty`
-    // is the honest answer, which means a newer remote lineage BLOCKS here and
-    // the adopt happens at the next open (terminus 1) instead. One adopt
-    // implementation, one instruction to the user.
-    const act = guardLineage(env.podLineage, envelope.value?.podLineage, 'dirty');
-    // ⚠️ EXHAUSTIVE, not `adopt ? … : merge`. The ternary sent `publish-local`
-    // — "we hold an unpublished compaction, the remote is on the old lineage" —
-    // into a CROSS-LINEAGE merge, which is the exact operation the guard exists
-    // to prevent. `publish-local` means leave the local document alone and let
-    // the next save carry it up.
-    if (act === 'publish-local') {
-      // ⚠️ MERGE THE ENVELOPE EVEN THOUGH WE REFUSE THE DOCUMENT. The two are
-      // separate: we decline the remote's PAYLOAD (wrong lineage) but its KEY
-      // DICTS are still the newest truth, and `replaceEnvelope` ->
-      // `preserveLocalKeyDicts` is the ONLY path by which a remote-only
-      // `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches
-      // `currentEnvelope`. Returning without it meant the save we just armed
-      // wrote the LOCAL envelope over the remote and ERASED a member, passkey
-      // or invite another device had added — locking that person out. Terminus
-      // 4 makes it systematic: it is only reached when a peer HAS written.
-      const keptEnv = replaceEnvelope(env);
-      syncService.setFamilyKey(familyKey.value!, keptEnv);
+    // ⚠️ THE GUARD RUNS IN THE WORKER (see terminus 1). This path has a LIVE
+    // document and no baseline it can prove, so the honest basis is `baseline`
+    // with unknown heads — which the worker reads as `dirty`. A newer remote
+    // lineage therefore blocks here and the adopt happens at the next open,
+    // through terminus 1, which does have a baseline. One adopt implementation,
+    // one instruction to the user.
+    const merged = await docClient.mergeRemoteEnvelope(env, env.familyId, {
+      kind: 'baseline',
+      heads: null,
+    });
+    if (merged.action === 'kept-local') {
+      keepLocalDocumentAndAdoptEnvelopeKeys(env);
       pendingEncryptedFile.value = null;
-      syncService.triggerDebouncedSave();
       return;
     }
-    const { dirty } =
-      act === 'adopt'
-        ? await docClient.adoptRemoteEnvelope(env, env.familyId)
-        : await docClient.mergeRemoteEnvelope(env, env.familyId);
-    const merged = replaceEnvelope(env);
-    syncService.setFamilyKey(familyKey.value!, merged);
+    const adopted = replaceEnvelope(env);
+    syncService.setFamilyKey(familyKey.value!, adopted);
     pendingEncryptedFile.value = null;
     await reloadAllStores();
     const dupsRemoved = await deduplicateRecurringTransactions();
     if (dupsRemoved > 0) await reloadAllStores();
-    if (dirty) syncService.triggerDebouncedSave();
+    if (merged.dirty) syncService.triggerDebouncedSave();
   }
 
   /**
@@ -1195,38 +1176,31 @@ export const useSyncStore = defineStore('sync', () => {
           // the open path at all. Measured in prod on R10: zero skips in 44h.
           let driveHeads: readonly string[] | null = null;
           if (merging) {
-            // ⚠️ LINEAGE GUARD (terminus 4). This branch merged foreign bytes
-            // into the live document with NO guard at all — the poll paths
-            // (`backgroundSyncFromFile`, `reloadIfFileChanged`) reach it, so a
-            // compacted pod arriving here was CRDT-merged across lineages. That
-            // is not a coin flip: `Automerge.from` renumbers opIds, so for every
+            // ⚠️ THE GUARD RUNS IN THE WORKER (see terminus 1). This branch
+            // merged foreign bytes into the live document with NO guard at all
+            // until 2026-09-05, and the poll paths reach it — so a compacted
+            // pod arriving here was CRDT-merged across lineages. That is not a
+            // coin flip: `Automerge.from` renumbers opIds, so for every
             // collection added by a later `migrateDoc` the OLD lineage wins
             // DETERMINISTICALLY (measured 60/60), silently reverting every
             // post-compaction edit and republishing the hybrid fleet-wide.
-            const ctx = await syncService.docPushedAgainst(baselineFpBeforeLoad);
-            const act = guardLineage(remoteEnvelope.podLineage, envelope.value?.podLineage, ctx);
-            if (act === 'publish-local') {
+            //
+            // `baselineFpBeforeLoad` is captured BEFORE `syncService.load()`,
+            // which nulls the baseline and re-seeds it with a null fingerprint —
+            // reading it after the download could only ever answer "unknown",
+            // which is `dirty`, which BLOCKS. That made the guard unable to ever
+            // adopt, so no peer could take a compaction and none could
+            // propagate.
+            const mergeResult = await docClient.mergeRemoteEnvelope(
+              remoteEnvelope,
+              remoteEnvelope.familyId,
+              { kind: 'baseline', heads: decodeHeadsFingerprint(baselineFpBeforeLoad) }
+            );
+            if (mergeResult.action === 'kept-local') {
               // Our unpublished compaction stands; the next save carries it up.
-              // ⚠️ MERGE THE ENVELOPE EVEN THOUGH WE REFUSE THE DOCUMENT. The two are
-              // separate: we decline the remote's PAYLOAD (wrong lineage) but its KEY
-              // DICTS are still the newest truth, and `replaceEnvelope` ->
-              // `preserveLocalKeyDicts` is the ONLY path by which a remote-only
-              // `wrappedKeys` / `passkeyWrappedKeys` / `inviteKeys` entry reaches
-              // `currentEnvelope`. Returning without it meant the save we just armed
-              // wrote the LOCAL envelope over the remote and ERASED a member, passkey
-              // or invite another device had added — locking that person out. Terminus
-              // 4 makes it systematic: it is only reached when a peer HAS written.
-              const keptEnv = replaceEnvelope(remoteEnvelope);
-              syncService.setFamilyKey(familyKey.value!, keptEnv);
-              syncService.triggerDebouncedSave();
-              return { success: true };
+              keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope);
+              return { success: true }; // commit NO baseline — see the helper
             }
-            // CRDT merge remote into the worker's doc (or adopt it wholesale
-            // when the remote has been compacted and we are provably clean).
-            const mergeResult =
-              act === 'adopt'
-                ? await docClient.adoptRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId)
-                : await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId);
             // `?? true` is deliberate, not defensive noise: an absent field means
             // we do not KNOW the outcome, and both unknowns must resolve to the
             // safe direction — re-project rather than show stale data, re-upload
@@ -1251,9 +1225,17 @@ export const useSyncStore = defineStore('sync', () => {
               // the drop), so `remoteHeads` is exactly as sound here as on the merging
               // branch. Discarding it would forfeit the next skip and log a WARN-level
               // fail-open on an open that converged perfectly.
-              const adopted = await docClient.adoptRemoteEnvelope(
+              // ⚠️ `no-local-document`, NOT `user-file`. This is a
+              // cross-family safety install: the worker may be holding a
+              // DIFFERENT family's document, and there is nothing of THIS
+              // family to preserve. Saying `user-file` would let a `same`
+              // verdict return `merge`, CRDT-merging the remote into a foreign
+              // family's document — durable cross-family corruption. Two
+              // orthogonal questions, two arms.
+              const adopted = await docClient.mergeRemoteEnvelope(
                 remoteEnvelope,
-                remoteEnvelope.familyId
+                remoteEnvelope.familyId,
+                { kind: 'no-local-document' }
               );
               driveHeads = adopted.remoteHeads ?? null;
             }
@@ -1494,7 +1476,12 @@ export const useSyncStore = defineStore('sync', () => {
       if (famId) {
         await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
-        await docClient.adoptRemoteEnvelope(pending.envelope, pending.envelope.familyId);
+        // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
+        // installed and the lineage question is moot. Never `user-file` — that
+        // would permit a merge into whatever document the worker holds.
+        await docClient.mergeRemoteEnvelope(pending.envelope, pending.envelope.familyId, {
+          kind: 'no-local-document',
+        });
       }
 
       // Set the family key and envelope. `replaceEnvelope` is the safe path
@@ -2307,7 +2294,12 @@ export const useSyncStore = defineStore('sync', () => {
       if (famId) {
         await replaceDocWithCacheRecovery(pending.envelope, famId);
       } else {
-        await docClient.adoptRemoteEnvelope(pending.envelope, pending.envelope.familyId);
+        // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
+        // installed and the lineage question is moot. Never `user-file` — that
+        // would permit a merge into whatever document the worker holds.
+        await docClient.mergeRemoteEnvelope(pending.envelope, pending.envelope.familyId, {
+          kind: 'no-local-document',
+        });
       }
 
       familyKey.value = fk;

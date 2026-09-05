@@ -100,13 +100,13 @@ describe('a naive merge across lineages', () => {
 
 describe('the guard refuses that merge', () => {
   it('BLOCKS when the peer might hold unsynced work', () => {
-    expect(() => guardLineage({ id: 'new', seq: 1 }, undefined, 'dirty')).toThrow(PodLineageError);
+    expect(() => guardLineage({ id: 'new', seq: 1 }, null, 'dirty')).toThrow(PodLineageError);
   });
 
   it('but ADOPTS when the peer provably has nothing to lose', () => {
     // Adoption is not the dangerous half — merging is. A clean peer replaces
     // its document wholesale, which is how a compaction propagates at all.
-    expect(guardLineage({ id: 'new', seq: 1 }, undefined, 'clean')).toBe('adopt');
+    expect(guardLineage({ id: 'new', seq: 1 }, null, 'clean')).toBe('adopt');
   });
 
   it('and an ADOPT loses nothing, because there was nothing to lose', () => {

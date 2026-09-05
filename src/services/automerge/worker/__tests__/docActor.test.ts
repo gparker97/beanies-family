@@ -103,33 +103,44 @@ describe('why the actor needs a lease (actorLease.ts)', () => {
   });
 });
 
-describe('adopt is atomic, and the drop happens after the decrypt', () => {
-  // Structural, like `lineageWiring.test.ts`: driving a real worker respawn
-  // mid-RPC is not reachable from a unit test, and the failure mode here is
-  // silent — a cross-lineage merge that persists and publishes.
+describe('there is ONE merge entry point, and it never nulls the document', () => {
+  // Structural: driving a real worker respawn mid-RPC is not reachable from a
+  // unit test, and the failure mode is silent — a cross-lineage merge that
+  // persists and publishes.
   const src = fs.readFileSync(path.resolve(__dirname, '../docClient.ts'), 'utf8');
   const worker = fs.readFileSync(path.resolve(__dirname, '../applyAndProject.ts'), 'utf8');
+  const mergeBody = () => {
+    const fn = worker.slice(worker.indexOf('export async function mergeRemoteEnvelope'));
+    const end = fn.indexOf('\n}\n');
+    expect(end, 'mergeRemoteEnvelope body not found').toBeGreaterThan(-1);
+    return fn.slice(0, end);
+  };
 
-  it('adoptRemoteEnvelope is ONE rpc, never dropDoc-then-merge on main', () => {
-    // The pair was documented as atomic and was not: `mergeRemoteEnvelope` is
-    // RETRYABLE, and a respawn's rehydrator reinstalls the cached OLD-lineage
-    // doc before the retry, so the retry took the MERGE branch.
-    const body = src.slice(src.indexOf('export function adoptRemoteEnvelope'));
-    const fn = body.slice(0, body.indexOf('\n}\n'));
-    expect(fn).toContain('adopt: true');
-    expect(fn).not.toContain('dropDoc(');
+  it('`adoptRemoteEnvelope` no longer exists — the basis decides', () => {
+    // A second entry point with a boolean default is a decision nobody made,
+    // and it was forgettable: a caller could reach a merge without ever stating
+    // what it could prove about its own document.
+    expect(src).not.toContain('function adoptRemoteEnvelope');
   });
 
-  it('the adopt REPLACES in one assignment — it never nulls the doc first', () => {
-    // Nulling `currentDoc` up front was still before `headsOf(remote)` and
-    // before `migrateDoc(remote)` (a real `Automerge.change`). Either can throw
-    // on a low-memory device, and the worker was then left holding NO document
-    // for the session while main's projection still showed data: every mutate,
-    // save, getHeads and compactDoc failed.
-    const fn = worker.slice(worker.indexOf('export async function mergeRemoteEnvelope'));
-    const body = fn.slice(0, fn.indexOf('\n}\n'));
+  it('the merge REPLACES in one assignment — it never nulls the doc first', () => {
+    // Nulling `currentDoc` up front sat before `headsOf(remote)` and before
+    // `migrateDoc(remote)` (a real `Automerge.change`). Either can throw on a
+    // low-memory device, and the worker was then left holding NO document while
+    // main's projection still showed data: every mutate, save and getHeads
+    // failed for the session.
+    const body = mergeBody();
     expect(body).not.toContain('currentDoc = null');
-    // The adopt lands on the install branch instead, as one assignment.
-    expect(body).toContain('if (adopt || !currentDoc)');
+    expect(body).toContain('if (installWholesale)');
+  });
+
+  it('the guard runs after the decrypt, and ONLY when a document exists', () => {
+    // `!currentDoc` must short-circuit: deriving clean/dirty from a document
+    // that does not exist answers `dirty`, and adopt-remote x dirty BLOCKS — so
+    // a device whose cache missed could never adopt a compacted pod.
+    const body = mergeBody();
+    expect(body.indexOf('guardLineage(')).toBeGreaterThan(body.indexOf('decryptToDoc'));
+    expect(body).toContain('let installWholesale = !currentDoc;');
+    expect(body).toContain('if (currentDoc) {');
   });
 });

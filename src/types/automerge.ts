@@ -28,6 +28,7 @@ import type {
   OverlapAck,
   ListCycle,
   Settings,
+  PodLineage,
 } from './models';
 
 /**
@@ -90,10 +91,37 @@ export interface FamilyDocument {
    */
   listCycles: Record<string, ListCycle>;
   settings: Settings | null;
+  /**
+   * Which HISTORY this document descends from — see `PodLineage` and ADR-036.
+   *
+   * `| null` rather than optional, matching `settings`, for a hard reason:
+   * **Automerge refuses to store `undefined`** (`RangeError: Cannot assign
+   * undefined value at /podLineage`). And like `settings`, it is ABSENT rather
+   * than null on every pod created before this shipped, because `migrateDoc`
+   * seeds only `COLLECTION_NAMES`. Read it through `docLineage()`, never
+   * directly, so absent-or-null is normalised in ONE place.
+   */
+  podLineage: PodLineage | null;
 }
 
-/** Collection names (excludes singleton 'settings') */
-export type CollectionName = Exclude<keyof FamilyDocument, 'settings'>;
+/**
+ * The top-level keys that are NOT entity maps — the singletons.
+ *
+ * ⚠️ ONE DECLARATION, because this fact was re-encoded by hand in four places
+ * and every copy is a chance to disagree. The `satisfies` is not decoration:
+ * without it a typo (`'podLineag'`) would be a silent no-op that quietly turns a
+ * singleton into a "collection" and seeds it into every pod.
+ *
+ * Adding a top-level non-collection field WITHOUT listing it here is a COMPILE
+ * ERROR, because `COLLECTION_NAME_SEED` below is `Record<CollectionName, 0>`.
+ */
+export const NON_COLLECTION_KEYS = [
+  'settings',
+  'podLineage',
+] as const satisfies readonly (keyof FamilyDocument)[];
+
+/** Collection names (excludes the singletons — see `NON_COLLECTION_KEYS`) */
+export type CollectionName = Exclude<keyof FamilyDocument, (typeof NON_COLLECTION_KEYS)[number]>;
 
 /** Utility type: resolve a collection name to its entity type */
 export type CollectionEntity<K extends CollectionName> =

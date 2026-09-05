@@ -12,6 +12,12 @@
 
 export const FLAG_REGISTRY = [
   {
+    // ⚠️ MUST STAY OFF until #90 Tier 3 Stages 1-3 have shipped and soaked.
+    // The guard that makes compaction safe (ADR-036) is only landing now, and an
+    // old build honours no guard at all — so a compaction published before the
+    // fleet has updated is CRDT-merged across lineages by every device still on
+    // the previous version, which silently undoes it. It was flipped true by
+    // accident in `0169b49f` and pushed (not deployed, so nobody was exposed).
     id: 'podCompaction',
     label: 'Pod compaction',
     description:
