@@ -63,3 +63,46 @@ describe('the conditional drop is not collapsed into the adopt helper', () => {
     expect(src).toContain('if (!loadedFromCache) await docClient.dropDoc()');
   });
 });
+
+describe('the guard must be CONSULTED everywhere, and its answer acted on in full', () => {
+  it('terminus 4 — loadFromFile({merge:true}), the poll path that had NO guard at all', () => {
+    // This branch CRDT-merged foreign bytes into the live document with no
+    // lineage check whatsoever, and both Drive poll paths reach it
+    // (`backgroundSyncFromFile`, `reloadIfFileChanged`). A compacted pod
+    // arriving here was merged across lineages — and that is not a coin flip:
+    // `Automerge.from` renumbers opIds, so for every collection added by a
+    // later `migrateDoc` the OLD lineage wins DETERMINISTICALLY (measured
+    // 60/60), reverting every post-compaction edit and republishing the hybrid.
+    const src = read('src/stores/syncStore.ts');
+    const fn = src.slice(src.indexOf('async function loadFromFile'));
+    const body = fn.slice(0, fn.indexOf('\n  }\n'));
+    expect(body).toContain('guardLineage(');
+    expect(body).toContain('adoptRemoteEnvelope(');
+  });
+
+  it.each([
+    ['hydrateFromEnvelope', 'src/stores/syncStore.ts', 'async function hydrateFromEnvelope'],
+    ['loadFromFile', 'src/stores/syncStore.ts', 'async function loadFromFile'],
+    [
+      'fetchAndMergeRemote',
+      'src/services/sync/syncService.ts',
+      'async function fetchAndMergeRemote',
+    ],
+  ])('%s acts on publish-local instead of falling through to a merge', (_name, file, marker) => {
+    // `act === 'adopt' ? adopt : merge` is the shape that sent `publish-local`
+    // — "we hold an unpublished compaction, the remote is on the old lineage" —
+    // into a CROSS-LINEAGE merge, which is precisely what the guard exists to
+    // prevent. Every consumer must name all three non-blocking actions.
+    // Slice to the function's own closing brace at COLUMN ZERO. An earlier
+    // helper cut at the first `\n  }\n`, which is the close of the first
+    // two-space block inside the body — so it truncated before the branch it
+    // was asserting on and failed on code that was actually correct.
+    const src = read(file);
+    const start = src.indexOf(marker);
+    expect(start, `${marker} not found in ${file}`).toBeGreaterThan(-1);
+    const rest = src.slice(start);
+    const end = rest.indexOf('\n}\n');
+    const body = code(end === -1 ? rest : rest.slice(0, end));
+    expect(body).toContain("'publish-local'");
+  });
+});

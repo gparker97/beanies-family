@@ -660,12 +660,31 @@ export function noteRemoteBaseline(payload: string): void {
  */
 export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
-  id: string | null
+  id: string | null,
+  adopt = false
 ): Promise<{ heads: Heads; dirty: boolean; changed: boolean; remoteHeads: Heads }> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
     perf_doc_bytes: envelope.encryptedPayload.length,
   });
+  // ⚠️ ADOPT DROPS *HERE*, INSIDE THE SAME RPC, AND ONLY AFTER THE DECRYPT.
+  //
+  // It used to be a `dropDoc()` RPC on main followed by this one, which was
+  // documented as atomic and is not, in two directions:
+  //  • `mergeRemoteEnvelope` is RETRYABLE. A timeout respawns the worker, and
+  //    the rehydrator (`initAndLoadCache`) INSTALLS the cached OLD-lineage doc
+  //    before the retry lands — so the retry saw a `currentDoc` and took the
+  //    MERGE branch. A cross-lineage merge, persisted and pushed, which undoes
+  //    a compaction for the whole family.
+  //  • If the drop succeeded and this decrypt then threw (wrong key, OOM), the
+  //    worker held NO document for the rest of the session while the projection
+  //    still showed data: every edit threw `requireDoc`, every save failed.
+  // Dropping after the decrypt makes both impossible — a failure here leaves
+  // the old document installed, and a retry re-runs the drop from scratch.
+  if (adopt) {
+    currentDoc = null;
+    resetDocCursors();
+  }
   // #65: the heads of EXACTLY the bytes on Drive. Captured here, from the
   // UNMIGRATED decrypted doc (`decryptToDoc` does not migrate — see its doc
   // comment), before `migrateDoc`/`mergeDocs` can move anything. This is the
@@ -927,16 +946,41 @@ export function compactDoc(): {
     throw payloadFailure('materialize', e, null, beforeBytes);
   }
 
+  // ⚠️ EVERYTHING THAT CAN THROW HAPPENS BEFORE THE INSTALL.
+  //
+  // `saveDoc(compacted)` and `Automerge.stats` used to run AFTER
+  // `currentDoc = compacted` and outside the try. An OOM in that tail — the
+  // likeliest place for one, on exactly the low-memory device this feature
+  // targets — rejected the RPC, so `usePodCompaction` reported
+  // "rebuild-failed" and told the user nothing had moved, while the worker was
+  // left HOLDING the compacted document with its cursors reset and its lineage
+  // never stamped. The next persist then wrote the compacted base to cache and
+  // the next save uploaded it under the OLD lineage, where every peer reads
+  // `same` and CRDT-merges across lineages — undoing the compaction fleet-wide.
+  let stats: {
+    beforeBytes: number;
+    afterBytes: number;
+    changesBefore: number;
+    changesAfter: number;
+    actorsBefore: number;
+  };
+  try {
+    stats = {
+      beforeBytes,
+      afterBytes: saveDoc(compacted).byteLength,
+      changesBefore: beforeStats.numChanges,
+      changesAfter: Automerge.stats(compacted).numChanges,
+      actorsBefore: (beforeStats as { numActors?: number }).numActors ?? 0,
+    };
+  } catch (e) {
+    // The OLD document is still installed and still current. Nothing moved.
+    throw payloadFailure('materialize', e, null, beforeBytes);
+  }
+
   currentDoc = compacted;
   resetDocCursors(); // see (2) above — the next persist MUST write a base
   pushProjection(compacted);
-  return {
-    beforeBytes,
-    afterBytes: saveDoc(compacted).byteLength,
-    changesBefore: beforeStats.numChanges,
-    changesAfter: Automerge.stats(compacted).numChanges,
-    actorsBefore: (beforeStats as { numActors?: number }).numActors ?? 0,
-  };
+  return stats;
 }
 
 /** Serialize the doc to a raw (unencrypted) binary. DEV/E2E-only snapshot path. */
@@ -983,7 +1027,8 @@ export async function dispatch(
       return {
         result: await mergeRemoteEnvelope(
           a.envelope as BeanpodFileV4,
-          (a.familyId as string | null) ?? null
+          (a.familyId as string | null) ?? null,
+          a.adopt === true
         ),
       };
     case 'exportEncryptedPayload':
