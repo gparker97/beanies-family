@@ -105,7 +105,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
   <div class="space-y-6">
     <!-- Hero -->
     <header
-      class="dark:bg-surface-raised relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6"
+      class="dark:from-surface-overlay dark:via-surface-raised dark:to-surface-overlay dark:border-line relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6"
     >
       <div
         class="dark:bg-surface-overlay flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-[var(--card-shadow)] sm:h-14 sm:w-14 sm:text-3xl"
