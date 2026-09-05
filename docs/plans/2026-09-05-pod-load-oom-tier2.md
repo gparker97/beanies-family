@@ -67,7 +67,17 @@ So Tier 2 needs BOTH.
 ### ⚠️ The finding that shapes this entire plan
 
 **A compacted pod merged into a peer that still holds the original history
-destroys that peer's unsynced changes — 200 out of 200 runs.**
+destroys that peer's unsynced changes about HALF the time — a coin flip.**
+
+> ⚠️ CORRECTION (2026-09-05). This was first written as "200 out of 200 runs",
+> and that figure was an artefact of the probe: it built the pod and its
+> compaction ONCE at module scope and looped 200 times, so every iteration
+> inherited a single random actor-id ordering. The same probe reported 200/200
+> LOST on one run and 200/200 KEPT on the next. Rebuilding both inside the loop
+> gives ~40-50% loss, stable across runs. **Non-deterministic loss is worse than
+> deterministic loss, not better** — it survives testing, demos and the first
+> few families, and then takes someone's data. The design does not change; the
+> claim does. Measured by `src/services/sync/__tests__/lineageProtectsPeerEdits.test.ts`.
 
 `Automerge.from(Automerge.toJS(doc))` mints brand-new object ids, so the
 compacted document shares no ancestry with the original. A merge is therefore a
@@ -837,8 +847,8 @@ All emitted **from main**, because the worker cannot telemeter.
 - [ ] Phase B ships to production UNGATED and soaks before Phase C is enabled
       anywhere.
 - [ ] A device on the old lineage ADOPTS rather than merges — proven by a test
-      that reproduces the 200/200 loss without the guard and shows it gone with
-      it — and does so through `adoptRemoteEnvelope`, with no new adopt code and
+      that reproduces the coin-flip loss without the guard and shows it gone
+      with it — and does so through `adoptRemoteEnvelope`, with no new adopt code and
       no mode parameter anywhere.
 - [ ] A device with unsynced changes never adopts silently: it latches, is
       visible, and refuses saves.
@@ -927,7 +937,7 @@ All emitted **from main**, because the worker cannot telemeter.
   and replaced the ones that did not hold. (a) **The epoch design was unsound** —
   a monotonic counter gives direction but not identity, so two concurrent
   compactions produce equal epochs on incompatible lineages and merge, silently,
-  which is the exact 200/200 failure; replaced with `{id, seq}` and a total
+  which is the exact failure the guard exists to prevent; replaced with `{id, seq}` and a total
   four-verdict comparator with no default branch. (b) **The push-before-adopt
   rule was destructive as written** — pushing an old-lineage doc over a compacted
   remote silently discards every post-compaction edit; replaced with

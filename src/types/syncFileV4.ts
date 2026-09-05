@@ -52,6 +52,14 @@ export interface InviteKeyPackage {
 }
 
 /** Beanpod file format v4.0 */
+/** See `BeanpodFileV4.podLineage`. */
+export interface PodLineage {
+  /** Minted per compaction. The identity — two lineages are the same iff equal. */
+  id: string;
+  /** Monotonic, and ONLY for direction. Never an identity on its own. */
+  seq: number;
+}
+
 export interface BeanpodFileV4 {
   version: '4.0';
   familyId: UUID;
@@ -84,6 +92,26 @@ export interface BeanpodFileV4 {
    * one device cannot be silently reverted by another device's stale in-memory copy.
    */
   recoveryPassphrase?: WrappedMemberKey & { createdAt?: ISODateString };
+
+  /**
+   * Which LINEAGE this document belongs to (ADDITIVE OPTIONAL on '4.0', the same
+   * contract as `recoveryKeys` — never a version bump). Absent means "legacy,
+   * never compacted", which is every pod in existence today.
+   *
+   * ⚠️ The invariant this exists to enforce: a document may only be CRDT-MERGED
+   * with a document of the same lineage. `Automerge.from(toJS(doc))` — the only
+   * way to drop history in Automerge 3.x — mints brand-new object ids, so the
+   * compacted document shares no ancestry with the original and a merge is a
+   * map-level conflict rather than a reconciliation. Measured: merging a
+   * compacted pod into a peer still on the old history destroyed that peer's
+   * unsynced changes 200 times out of 200.
+   *
+   * `id` is minted per compaction and is the IDENTITY: a bare counter gives
+   * direction but cannot tell two concurrent compactions apart, and two devices
+   * that both produced generation 1 would read as equal and merge — the exact
+   * failure this field exists to prevent. `seq` exists ONLY to give direction.
+   */
+  podLineage?: PodLineage;
 
   /** base64( IV || AES-GCM(FK, automerge_binary) ) */
   encryptedPayload: string;
