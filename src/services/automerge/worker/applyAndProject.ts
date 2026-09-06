@@ -34,8 +34,6 @@ import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
-  legacyEnvelopeLineage,
-  stampLineage,
   migrateDoc,
   loadDoc,
   saveDoc,
@@ -735,25 +733,32 @@ export async function mergeRemoteEnvelope(
   // respawn rehydrates a document, so a replayed `no-local-document` found one
   // and merged. The intent has to travel WITH the request, not be re-inferred
   // from state the rehydrator can change underneath it.
-  // ⚠️ THE LEGACY FALLBACK IS REMOTE-ONLY, AND THAT ASYMMETRY IS DELIBERATE.
-  // A file compacted by the Tier-2 code carries its stamp only on the envelope
-  // (see `legacyEnvelopeLineage`). Reading it here is sound because envelope and
-  // payload are bytes out of the same blob. The LOCAL side has no equivalent —
-  // our envelope copy drifts from our document, which is why ADR-036 exists —
-  // so an unstamped local document stays `null`. That leaves one ambiguous
-  // pairing (unstamped local, legacy-stamped remote): we cannot tell whether we
-  // already hold that compacted document or are still on the pre-compaction
-  // history. We do not need to. BOTH readings resolve to `adopt-remote`, whose
-  // policy is safe either way — adopt when clean, block when dirty — and the
-  // adopt below stamps the document, so the ambiguity exists for exactly one
-  // sync per device and then never again.
-  const remoteLineage = docLineage(remote) ?? legacyEnvelopeLineage(envelope);
+  // ⚠️ NO ENVELOPE FALLBACK HERE, AND THAT IS A DECISION, NOT AN OMISSION.
+  //
+  // A pod compacted by the retired Tier-2 code recorded its lineage ONLY on the
+  // envelope, so after ADR-036 such a file reads as never-compacted. A reader
+  // for that field was written and then REMOVED, because it cannot be made
+  // correct: the local side has no sound equivalent (our envelope copy drifts
+  // from our document — that drift IS ADR-036), so `compareLineage(legacy, null)`
+  // answers `adopt-remote` even when the truth is `same`. The device that RAN
+  // the compaction holds a compacted-but-unstamped document beside its own
+  // legacy-stamped file, so it blocked on its own pod, and the block's only
+  // recovery ADOPTS — destroying real, same-lineage unsynced edits that a plain
+  // merge would have kept. Strictly worse than reading nothing.
+  //
+  // Telling the two apart needs a shared-ancestry walk over the change graph, on
+  // the low-memory device this whole tier exists to spare. Not worth it: the
+  // entire affected population is one dev family (`podCompaction` is OFF and has
+  // never shipped enabled). Reading nothing means such a pod compares `same` and
+  // MERGES, which is right for every device that already holds it and wrong only
+  // for one still on the pre-compaction history — a case Stage 2's rebase is what
+  // actually fixes. Do not reintroduce the reader.
   let installWholesale = !currentDoc || basis.kind === 'no-local-document';
   if (currentDoc && basis.kind !== 'no-local-document') {
     const lineageCtx = lineageContextFor(basis, currentDoc);
     // Throws `PodLineageError` on a block; every caller between here and the
     // user dispatches on `isRemoteBlocker` FIRST, before any wrapping.
-    const act = guardLineage(remoteLineage, docLineage(currentDoc), lineageCtx);
+    const act = guardLineage(docLineage(remote), docLineage(currentDoc), lineageCtx);
     if (act === 'publish-local') {
       // Our document is the newer lineage. Touch NOTHING — not the document,
       // not the cursors, not the cache. The caller keeps its own document and
@@ -802,12 +807,7 @@ export async function mergeRemoteEnvelope(
     // fully built: nothing between the decrypt and this line can leave the
     // worker document-less, and `resetDocCursors()` below is the drop's other
     // half. A retry re-runs the whole operation from the decrypt.
-    // Stamp BEFORE the heads are read, so the change is part of what we publish:
-    // `dirty` below compares against the unmigrated remote's heads, so this
-    // shows up as "we moved past the file", the document goes back to Drive
-    // carrying its own lineage, and the retired envelope field stops mattering
-    // for this family forever. A no-op whenever there is nothing to adopt.
-    currentDoc = stampLineage(migrateDoc(remote), remoteLineage);
+    currentDoc = migrateDoc(remote);
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();

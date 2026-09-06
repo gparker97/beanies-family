@@ -4,6 +4,73 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Wiring a policy column to _any_ producer is worse than leaving it unwired
+
+**Date:** 2026-09-06
+**Context:** Round 1 of the review found that the lineage guard's `user-file`
+context had no producer, so the rollback it exists to protect resolved to the
+opposite decision. I wired it to `rebindPodFile`, reasoning that a rebind is "the
+one flow where a human points the app at a specific file".
+
+It is not. `rebindPodFile` is the shared recovery for four `POD_ACCESS_ERRORS`
+codes — permission denied, file not found, canonical mismatch, no home — plus the
+save-failure banner. In none of those is the person answering a lineage question;
+they are repairing access. But `user-file` means _never block_, and the action it
+unlocks replaces the local document wholesale. So a canonical-mismatch repair
+would have silently destroyed work that existed only in the device's private copy,
+and `conflict × user-file = adopt` made a plain access repair take the choice the
+banner deliberately refuses to offer.
+
+The tell was in the same commit: my banner action is gated behind a danger
+confirmation; `rebindPodFile` reached the identical outcome with none. And
+`podAccess.ts` states the rule in its own header — verification may REPORT a
+problem, it may never RESOLVE one.
+
+**Rules:**
+
+1. **A destructive context needs a producer where a human was actually asked**,
+   not merely one where a human clicked something. If the two producers do not
+   both carry a confirmation, one of them is wrong.
+2. **When a review says "this has no producer", the fix is the CORRECT producer or
+   none.** Reaching for the nearest plausible call site converts a dead branch
+   into a live data-loss path, which is strictly worse than the dead branch.
+3. **Grep the recovery primitive's callers before arming anything from it.** A
+   function named for one flow is frequently shared by five.
+
+---
+
+## A backwards-compat reader that only reads one side inverts its own verdict
+
+**Date:** 2026-09-06
+**Context:** Pod lineage moved from the `.beanpod` envelope into the document.
+Files compacted by the previous build carried the stamp only on the envelope, so
+they would read as never-compacted. I added a reader for the retired field,
+justified as sound "because envelope and payload are bytes out of the same blob"
+— true — and safe "because both readings of the ambiguous case resolve to
+adopt-remote" — false.
+
+The second reading is `same`: we already hold that compacted document and merely
+never stamped it. Because the local side deliberately never reads the envelope,
+the comparison returns `adopt-remote` unconditionally, and those two policy rows
+diverge — `same` merges, `adopt-remote` blocks or adopts. The population landing
+in the wrong reading was the exact one the reader was written for: the device that
+_ran_ the compaction blocked on its own file, and the recovery I had just added
+destroyed its unsynced edits. Before the reader, that pairing merged and kept them.
+
+**Rules:**
+
+1. **A comparison needs both sides from the same kind of source.** Recovering a
+   value for the remote and leaving the local side null does not make the
+   comparison partially correct; it makes it confidently wrong in one direction.
+2. **Write out every reading of an ambiguous input and check the policy rows they
+   land on.** "Safe either way" is a claim about a table, so go and read the
+   table. Mine differed in two of three columns.
+3. **Weigh the population.** The whole affected set was one disposable dev family
+   behind a flag that has never shipped enabled. Deleting the reader and
+   documenting the limitation beat a fix that regressed the same family.
+
+---
+
 ## A policy table column with no producer is a promise the code does the opposite of
 
 **Date:** 2026-09-06

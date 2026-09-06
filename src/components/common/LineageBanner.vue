@@ -71,20 +71,35 @@ function goToExport(): void {
 }
 
 async function useTheFamilyFile(): Promise<void> {
+  // ⚠️ CLAIM `busy` BEFORE THE AWAIT, not after the confirm resolves. Setting it
+  // later leaves the whole length of the confirmation dialog unguarded: the
+  // button is not disabled yet (`:disabled="busy"`) and the flag is still false,
+  // so two clicks open two dialogs and run two adopts. Claiming it here makes
+  // the guard and the disabled attribute cover the same window.
   if (busy.value) return;
-  const ok = await confirm({
-    title: 'podLineage.useFileConfirmTitle',
-    message: 'podLineage.useFileConfirmMessage',
-    confirmLabel: 'podLineage.useFileConfirmAction',
-    variant: 'danger',
-  });
-  if (!ok) return;
   busy.value = true;
   try {
+    const ok = await confirm({
+      title: 'podLineage.useFileConfirmTitle',
+      message: 'podLineage.useFileConfirmMessage',
+      confirmLabel: 'podLineage.useFileConfirmAction',
+      variant: 'danger',
+    });
+    if (!ok) return;
     // The store reports its own failure to the firehose; the toast is what the
     // person in front of the screen needs, because the banner has already gone.
     const adopted = await syncStore.useRemoteFileOverLocalDocument();
-    if (!adopted) showToast('error', t('podLineage.useFileFailed'));
+    showToast(
+      adopted ? 'success' : 'error',
+      t(adopted ? 'podLineage.useFileDone' : 'podLineage.useFileFailed')
+    );
+  } catch {
+    // ⚠️ CATCH, not just `finally`. The store already reports and re-mirrors the
+    // latch, but if anything escapes it the banner has ALREADY been removed (the
+    // latch was cleared before the download), so a bare `finally` would leave the
+    // user believing it worked. `PodAccessBanner` carries the same last-resort
+    // guard for the same reason.
+    showToast('error', t('podLineage.useFileFailed'));
   } finally {
     busy.value = false;
   }
@@ -98,20 +113,25 @@ async function useTheFamilyFile(): Promise<void> {
     <template #actions>
       <button
         v-if="!isConflict"
-        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30"
+        type="button"
+        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
+        :disabled="busy"
         @click="goToExport"
       >
         {{ t('podLineage.bannerCta') }}
       </button>
       <button
         v-if="!isConflict"
-        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+        type="button"
+        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
         :disabled="busy"
+        :aria-busy="busy"
         @click="useTheFamilyFile"
       >
-        {{ t('podLineage.useFileCta') }}
+        {{ busy ? t('podLineage.useFileBusy') : t('podLineage.useFileCta') }}
       </button>
       <button
+        type="button"
         class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/10"
         @click="dismissed = true"
       >

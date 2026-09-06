@@ -92,7 +92,12 @@ export interface BeanpodFileV4 {
   // INCLUDING on the branch that exists because our lineage is newer. The
   // lineage is a property of the HISTORY, so it belongs to the document.
   // A value already present in an older file is carried through untouched by
-  // `reEncryptEnvelope`'s spread and simply never read.
+  // `reEncryptEnvelope`'s spread and simply never read. ⚠️ A reader for it WAS
+  // written (2026-09-06) and removed the same day: the local side has no sound
+  // equivalent, so reading only the remote half answers `adopt-remote` even when
+  // the truth is `same`, and the block's recovery then destroys real
+  // same-lineage edits. See the long comment in
+  // `applyAndProject.mergeRemoteEnvelope` before considering it again.
 
   /** base64( IV || AES-GCM(FK, automerge_binary) ) */
   encryptedPayload: string;

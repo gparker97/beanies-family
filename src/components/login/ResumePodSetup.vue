@@ -370,7 +370,25 @@ async function handleAutoLoadSubmit() {
         formError.value = result.error.message || t('setup.fileCreateFailed');
         phase.value = 'auto-load';
         return;
+      case 'lineage-blocked':
+        // ⚠️ THIS SURFACE CANNOT FALL BACK ON THE BANNER. `LineageBanner` lives
+        // inside App.vue's `showLayout` branch, and `shouldShowAppLayout` is
+        // false while `needsPodSetup` is true — which is exactly this screen. So
+        // a missing case here is not "a slightly worse message", it is the
+        // password form coming back with NOTHING on it: "the data just didn't
+        // sync", the precise symptom the whole banner exists to eliminate, at
+        // the one surface where the user is actively waiting.
+        formError.value = t(result.error.inlineMessageKey);
+        phase.value = 'auto-load';
+        return;
     }
+    // ⚠️ EXHAUSTIVENESS. Every arm above `return`s and the function is
+    // `Promise<void>`, so TypeScript cannot see a fall-through — which is how
+    // `lineage-blocked` was added to `CompleteAutoLoadResult`, wired into every
+    // other login surface, and silently missed here. This line makes the next
+    // variant a compile error instead of a blank form.
+    const unhandled: never = result;
+    void unhandled;
   } finally {
     busy.value = false;
     // If we didn't navigate away (every non-success branch), restore the

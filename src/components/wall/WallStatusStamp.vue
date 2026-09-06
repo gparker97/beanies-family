@@ -125,7 +125,11 @@ watch(attention, (isDegraded, was) => {
   <p
     v-if="visible"
     class="font-inter wall-stamp flex items-center justify-end gap-1.5"
-    :class="attention ? 'text-primary-500 font-semibold' : 'text-[var(--muted-text,#4d5d6c)]'"
+    :class="
+      attention
+        ? 'text-primary-500 dark:text-accent-lift font-semibold'
+        : 'text-[var(--muted-text,#4d5d6c)]'
+    "
   >
     <span
       class="h-[7px] w-[7px] rounded-full"

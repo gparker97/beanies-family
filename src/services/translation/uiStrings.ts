@@ -4356,14 +4356,19 @@ const STRING_DEFS = {
     beanie: 'your family file needs a hand',
   },
   'podLineage.useFileCta': { en: 'Use the family file', beanie: 'use the family file' },
+  'podLineage.useFileBusy': { en: 'Opening…', beanie: 'opening…' },
+  'podLineage.useFileDone': {
+    en: 'This device is now on the reorganised family file.',
+    beanie: 'this bean is now on the reorganised family file.',
+  },
   'podLineage.useFileConfirmTitle': {
     en: 'Use the family file?',
     beanie: 'use the family file?',
   },
   'podLineage.useFileConfirmMessage': {
-    en: 'This device will take the reorganised family file. Any changes made here that were never saved to it will be let go. Export them first if you want to keep them.',
+    en: 'This device will take the reorganised family file, and the changes made here that were never saved to it will be let go for good. Export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
     beanie:
-      'this bean will take the reorganised family file. any beans made here that were never saved to it will be let go. export them first if you want to keep them.',
+      'this bean will take the reorganised family file, and the beans made here that were never saved to it will be let go for good. export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
   },
   'podLineage.useFileConfirmAction': { en: 'Use the family file', beanie: 'use the family file' },
   'podLineage.useFileFailed': {
@@ -4394,9 +4399,9 @@ const STRING_DEFS = {
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.
   'resumeSetup.podLineageBlocked': {
-    en: 'Your family file was reorganised on another device and this one cannot safely combine the two. Nothing has been lost. If this device has changes that were never saved, export them from Settings first; otherwise reload and beanies will pick up the reorganised copy.',
+    en: 'Your family file was reorganised on another device and this one cannot safely combine the two. Nothing has been lost. Sign in, then choose Use the family file on the message at the top of the screen.',
     beanie:
-      'your family file was reorganised on another device and this one cannot safely combine the two. nothing has been lost. if this device has beans that were never saved, export them from settings first; otherwise reload and beanies will pick up the reorganised copy.',
+      'your family file was reorganised on another bean and this one cannot safely combine the two. nothing has been lost. sign in, then choose use the family file on the message at the top of the screen.',
   },
   'podCredentialStale.inline': {
     en: "Your family's data could not be unlocked. Your saved key may be out of date, so try your password. If that does not work, contact support@beanies.family.",

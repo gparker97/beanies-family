@@ -150,3 +150,52 @@ fixed. The four that mattered:
   reads that field for the REMOTE side only (sound, because envelope and payload
   are bytes from one blob) and writes it into the document as it adopts, so the
   reader extinguishes itself after one sync per family.
+
+### 2026-09-06 (Stage 1 review, round 2)
+
+**~15:10** — "agreed to remove the legacy reader if that is yor suggestion, but
+lets wait until all agents and reviews come back, comprehensively validate all
+findings, and then determine the best approach for the fixes and go ahead to
+implement"
+
+**~15:40** — "proceed with the comprehensive validation and fixes once the test
+auditor finishes"
+
+Round 2 ran six parallel reviewers over `25e2fc73` (legacy reader, the
+`user-file` one-shot, key threading + save arming, UI/brand, test quality,
+backwards compat + security). Every finding was validated against the code
+before any fix. **Four of round 1's own fixes were defects:**
+
+1. **The legacy-envelope reader is REMOVED.** It read the retired stamp for the
+   REMOTE side only; the local side has no sound equivalent (our envelope copy
+   drifts from our document — that drift IS ADR-036), so
+   `compareLineage(legacy, null)` answers `adopt-remote` even when the truth is
+   `same`. The device that RAN the compaction therefore blocked on its own file,
+   and the block's only recovery ADOPTS — destroying real same-lineage edits a
+   plain merge would have kept. Strictly worse than reading nothing.
+2. **The `user-file` arm is removed from `rebindPodFile`.** Round 1 fixed "zero
+   producers" by reaching for the nearest plausible call site. `rebindPodFile`
+   is the shared access repair for four `POD_ACCESS_ERRORS` codes plus the
+   save-failure banner; `user-file` never blocks and `adopt` replaces the local
+   document wholesale, so a canonical-mismatch repair would have silently
+   discarded work living only in the private copy.
+3. **The banner recovery had no `catch`** around a `loadFromFile` that throws by
+   design, after the latch had already been cleared — banner gone, no toast,
+   nothing reported. It also left the poller stopped on success and raced a
+   debounced save.
+4. **`ResumePodSetup` never got the `lineage-blocked` case** and had no
+   `default`, so the resume screen came back as a blank password form — the one
+   surface where the banner cannot render.
+
+Test audit: three of round 1's new tests could not fail for the reasons they
+stated, the mounted banner rewrite had lost two assertions the grep version
+carried, and eleven behaviours had no test at all — including both `user-file`
+producers, which could be deleted outright with 875 tests green. Fixed, and every
+fix mutation-checked. Two of my own new tests were wrong on the first attempt
+(the watcher is not `immediate`, and the re-entrancy guard was claimed after an
+await) — both caught by mutation, and the second one was a real component bug.
+
+Raised for greg rather than changed: `ErrorBanner`'s white-on-Heritage-Orange
+title is 3.32:1 and no ink fixes it (the ground is too light; `primary-700` gives
+5.81:1, across four banners); `flags.ts` reads the localStorage override before
+the prod gate, so `podCompaction` is enable-able on production.

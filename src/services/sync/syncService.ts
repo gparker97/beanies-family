@@ -760,12 +760,21 @@ export function getProviderFamilyId(): string | null {
  * Set the storage provider directly (used by Google Drive flow)
  */
 /**
- * ⚠️ ONE-SHOT. Set by `rebindPodFile` — the only flow in which a human points
- * the app at a SPECIFIC pod file — and consumed by the next real read in
- * `fetchAndMergeRemote`. It is what turns "the user chose these bytes" into the
- * `user-file` lineage context, whose whole job is to never block. Module state
- * rather than a parameter because the two ends are separated by the poll timer,
- * not by a call. Cleared on `reset()` so it cannot survive a family switch.
+ * ⚠️ ONE-SHOT, AND ONE PRODUCER. Set ONLY by
+ * `syncStore.useRemoteFileOverLocalDocument` — the lineage banner's action,
+ * behind a danger confirmation that names what is discarded — and consumed by
+ * the next real read. It turns "the human chose these bytes, having been told
+ * the cost" into the `user-file` lineage context, whose whole job is to never
+ * block. Module state rather than a parameter because the two ends can be
+ * separated by a poll tick, not by a call. Cleared on `reset()` so it cannot
+ * survive a family switch.
+ *
+ * ⚠️ DO NOT ARM THIS FROM AN ACCESS REPAIR. `rebindPodFile` armed it for one
+ * day and that was a data-loss bug: it is the shared recovery for four
+ * `POD_ACCESS_ERRORS` codes plus the save-failure banner, none of which asks
+ * the human a lineage question, and `user-file` makes `adopt` (total
+ * replacement of the local document) unconditional — including for `conflict`,
+ * the verdict the banner deliberately refuses to offer a choice on.
  */
 let userChoseRemoteFile = false;
 
@@ -1587,21 +1596,16 @@ async function fetchAndMergeRemote(): Promise<void> {
   // ⚠️ HEADS, not the fingerprint: `remoteBaseline.ts` is type-imported by the
   // worker and must stay value-free, so main decodes and the worker compares.
   //
-  // ⚠️ AND `user-file` IS PRODUCED HERE, WHICH IS THE ONLY PLACE IT CAN BE.
-  // The POLICY table's `user-file` column exists to keep the ROLLBACK route
-  // open: a family that regrets a compaction re-points at the pre-compaction
-  // `.beanpod`, and the guard must not refuse the recovery it mandates. But
-  // `rebindPodFile` does not merge anything — it swaps the provider and lets
-  // the ordinary poll reconcile — so without the one-shot below that deliberate
-  // choice arrived here as a plain `baseline`, compared `ours-newer`, and
-  // PUBLISHED the compacted document straight back over the file the human had
-  // just chosen. The column had zero producers and the rollback did the
-  // opposite of what the table promised.
+  // ⚠️ `user-file` — the human pressed "Use the family file" on the lineage
+  // banner and confirmed the loss. Consumed here as well as on the open
+  // terminus so ONE decision can never govern two reads.
   //
-  // Consumed here, exactly once, and after the download: a read that fails
-  // before this point keeps the intent for the retry, and a merge that throws
-  // spends it, so the next attempt is an ordinary (blocking) compare rather
-  // than a silent second adopt.
+  // A merge that throws spends the intent. That is deliberate but it is not
+  // free: the next attempt compares as `ours-newer` → `publish-local`, not as a
+  // block, so a transient RPC failure quietly turns the user's choice back into
+  // "keep ours". The recovery action therefore reports its own failure and the
+  // banner comes back, which is what makes the spend safe — see
+  // `useRemoteFileOverLocalDocument`.
   const chosenByUser = consumeUserFileIntent();
   const basis: LineageBasis = chosenByUser
     ? { kind: 'user-file' }
@@ -1688,14 +1692,33 @@ async function fetchAndMergeRemote(): Promise<void> {
       message: 'kept local document on the poll path; publishing it',
       context: { action: 'kept-local', family_id: remoteEnvelope.familyId },
     });
-    // Not when a save is already running: `doSave` calls this very function as
-    // its pre-save merge and goes on to upload our document regardless, so
-    // arming here would queue a second, identical upload behind the one already
-    // in flight.
-    if (!getState().isSyncing) triggerDebouncedSave();
+    // ⚠️ `saveInProgress`, NOT `state.isSyncing`. `doSave` calls this very
+    // function as its pre-save merge and goes on to upload our document anyway,
+    // so arming here would queue a second identical upload — but `isSyncing` is
+    // also set for every READ (`load`, `openAndLoadFile`, `loadFromNewFile`), so
+    // testing it suppressed the publish whenever a poll landed inside the
+    // store's own 10s read. `saveInProgress` is the promise that means exactly
+    // "a save is running", which is what this guard is about.
+    if (!saveInProgress) triggerDebouncedSave();
     return;
   }
   const { dirty, remoteHeads } = merged;
+
+  // ⚠️ THE SUCCESS PATH HAS TO SPEAK, OR PROPAGATION IS UNMEASURABLE. This is
+  // THE route by which a compaction reaches a peer, and it emitted nothing on
+  // `adopted` or `merged` — so "did the fleet take it?" was answerable only by
+  // the ABSENCE of blocks, which is exactly the failure-rate blindness the
+  // observability rules forbid (an event that only fires on failure cannot tell
+  // you the rate). `adopted` here also means we replaced a document that was
+  // RESIDENT, which is the one fact that would expose a wrong `clean`
+  // derivation losing edits. Two constant messages, so the 50/surface/min
+  // limiter buckets them apart from each other and from the blocks.
+  logEvent({
+    level: 'info',
+    surface: 'pod-lineage',
+    message: `poll terminus ${merged.action}`,
+    context: { action: merged.action, family_id: remoteEnvelope.familyId },
+  });
 
   // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
   // gap between the probe and the read, this records the OLDER revision → the next

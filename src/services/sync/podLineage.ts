@@ -41,8 +41,22 @@ export type LineageAction = 'merge' | 'adopt' | 'rebase' | 'publish-local' | 'bl
  *
  *  - `clean`     — our document provably holds nothing the remote has not seen.
  *  - `dirty`     — it might. Never adopt over this.
- *  - `user-file` — the human explicitly chose these bytes. That IS the decision
- *                  the guard exists to demand, so it never blocks.
+ *  - `user-file` — the human explicitly chose these bytes, having been shown
+ *                  what is lost. That IS the decision the guard exists to
+ *                  demand, so it never blocks.
+ *
+ * ⚠️ `user-file` HAS EXACTLY ONE PRODUCER, and adding a second is a data-loss
+ * change. It is `syncStore.useRemoteFileOverLocalDocument` — the lineage
+ * banner's action, behind a `confirm({variant:'danger'})` that names what is
+ * let go. It was briefly also armed by `rebindPodFile`, which is WRONG:
+ * `rebindPodFile` is the generic access repair for PERMISSION_DENIED,
+ * FILE_NOT_FOUND, CANONICAL_MISMATCH and NO_HOME (plus the save-failure
+ * banner), and in none of those is the human answering a lineage question.
+ * `user-file` never blocks and `adopt` destroys the local document, so a
+ * canonical-mismatch repair would silently discard work that lived only in the
+ * private copy — and `conflict` × `user-file` = `adopt` is precisely the choice
+ * the banner refuses to offer. `podAccess.ts` states the rule: verification may
+ * REPORT a problem, never RESOLVE one.
  */
 export type LineageContext = 'clean' | 'dirty' | 'user-file';
 

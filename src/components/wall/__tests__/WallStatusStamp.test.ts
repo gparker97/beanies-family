@@ -73,8 +73,14 @@ describe('WallStatusStamp', () => {
     expect(w.text()).not.toContain('wall.status.needsAttention');
   });
 
-  it('still reports the older flags that have no saveStatus of their own', () => {
-    syncState.driveFileNotFound = true;
+  // Each arm INDIVIDUALLY — the previous single-flag version stayed green when
+  // both `podAccessError` and `cachePersistFailed` were dropped from `blocked`.
+  it.each([
+    ['driveFileNotFound', () => (syncState.driveFileNotFound = true)],
+    ['podAccessError', () => (syncState.podAccessError = { code: 'NO_HOME' })],
+    ['cachePersistFailed', () => (syncState.cachePersistFailed = true)],
+  ])('still reports %s, which has no saveStatus of its own', (_name, set) => {
+    set();
     expect(mount(WallStatusStamp).text()).toContain('wall.status.blocked');
   });
 });
