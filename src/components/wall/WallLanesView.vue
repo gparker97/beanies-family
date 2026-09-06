@@ -17,7 +17,6 @@ import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
-import { railFits } from '@/components/wall/wallLayout';
 import { addDaysYmd, weekdayShort } from '@/utils/date';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -36,8 +35,13 @@ const props = defineProps<{
   todayYmd: string;
   portrait: boolean;
   now: Date;
-  /** Live viewport width, so the rail decision can account for family size. */
-  viewportWidth: number;
+  /**
+   * Whether the rail fits beside these lanes — decided by the page, from the whole
+   * family's size rather than the filtered `members`. Keying it on `members` meant
+   * tapping one bean's avatar, an act that should only change what is SHOWN,
+   * re-laid out the entire shell and silently dropped a to-do row from the card.
+   */
+  lanesRail: boolean;
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
@@ -157,20 +161,6 @@ const inlineHeaders = computed(() => !props.portrait && members.value.length <= 
  * wall gives it up rather than crushing every lane past the sliver threshold.
  * See `LANES_RAIL_MAX_COLUMNS`.
  */
-/**
- * The rail costs 296px of the lanes' own width, so a large family gives it up
- * rather than crushing every lane past the sliver threshold. See `railFits`.
- *
- * ⚠️ Keyed on the WHOLE family, not on `members`. `members` is already filtered
- * by the wall's person filter, so keying on it meant tapping one bean's avatar —
- * an act that should only change what is SHOWN — re-laid out the entire shell,
- * flipping band to rail and silently dropping a to-do row from the card. The
- * question the threshold asks is "how big is this family", and that does not
- * change when someone focuses a bean.
- */
-const rail = computed(() =>
-  railFits(props.viewportWidth, Math.max(1, familyStore.sortedHumans.length))
-);
 
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
@@ -201,7 +191,7 @@ function subtitleFor(memberId: string) {
 <template>
   <WallViewShell
     :portrait="portrait"
-    :rail="rail"
+    :rail="lanesRail"
     :busiest="busiest"
     :meals-ymd="anchorYmd"
     :peripherals="peripherals"

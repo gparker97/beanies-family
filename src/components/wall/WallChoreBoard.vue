@@ -150,7 +150,14 @@ const partitioned = computed(() => {
     // future edit that breaks that invariant drops one chip from a kitchen wall
     // instead of throwing the whole board away.
     const column = columnByMember.value.get(member.id);
-    if (!column) continue;
+    if (!column) {
+      // Impossible today — both maps are built from the same list in the same
+      // tick — but silently dropping a bean off a family's wall is exactly the
+      // kind of failure that must not be quiet. Treated as having no chores, so
+      // they stay visible and named.
+      idle.push(member);
+      continue;
+    }
     if (column.total > 0) active.push({ member, column });
     else idle.push(member);
   }
@@ -348,6 +355,22 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         </div>
       </div>
     </div>
+
+    <!--
+      ⚠️ No beans at all. Reachable without anyone doing anything odd: the wall's
+      person filter is never reconciled when the roster changes underneath a
+      mounted wall, so a cross-device merge that removes a member — or re-tags a
+      human as a pet — leaves `visibleMemberIds` pointing at nobody, with no
+      filter chip lit to explain it. Without this the board rendered a title, a
+      0 / 0 bar and an empty void.
+    -->
+    <p
+      v-if="!hasBoard && !partitioned.idle.length"
+      data-test="board-empty"
+      class="font-caveat m-auto text-[var(--muted-text)]"
+    >
+      {{ t('wall.jobs.none') }}
+    </p>
 
     <!--
       Beans with nothing on. A collapsed column would still cost a full track of

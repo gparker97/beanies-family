@@ -33,6 +33,7 @@ import { useWallOrientation } from '@/composables/useWallOrientation';
 import { resetCelebrationMode, setCelebrationMode } from '@/composables/useCelebration';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useActivityStore } from '@/stores/activityStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getWallReturnPath } from '@/router';
@@ -40,7 +41,7 @@ import { useToast } from '@/composables/useToast';
 import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
 import { anchorOffsetDays } from '@/utils/wallAnchor';
-import { DAYS_RAIL_QUERY } from '@/components/wall/wallLayout';
+import { railFits } from '@/components/wall/wallLayout';
 import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
@@ -52,6 +53,7 @@ const { today } = useToday();
 const { t } = useTranslation();
 const { showToast } = useToast();
 const activityStore = useActivityStore();
+const familyStore = useFamilyStore();
 
 const activeView = ref<WallViewId>(DEFAULT_WALL_VIEW);
 /** Where "back" from the jobs board returns to — never the jobs board itself. */
@@ -158,22 +160,39 @@ const isPortrait = useMediaQuery('(orientation: portrait)');
  * turning it on shrinks the plot below the threshold, which turns it off, which
  * widens it again. See `DAYS_RAIL_MIN_VIEWPORT_PX` for the arithmetic.
  */
-const railWide = useMediaQuery(DAYS_RAIL_QUERY, true);
-const daysRail = computed(() => railWide.value && !isPortrait.value);
-
 /**
- * Live viewport width, for the lanes view — whose column count is the family
- * size and so cannot be expressed as a fixed media query.
+ * Live viewport width — the single input both rail decisions read.
  *
- * Measuring the VIEWPORT is safe in a way measuring the plot is not: the rail
- * changes the plot's width, so a plot measurement oscillates, but nothing here
- * changes the size of the window.
+ * ⚠️ ONE mechanism, deliberately. Days briefly used a `matchMedia` breakpoint
+ * while lanes used `innerWidth`; those disagree by the scrollbar width and by
+ * fractional zoom, so near the threshold the two views could reach opposite
+ * conclusions on the same screen at the same instant.
+ *
+ * Measuring the VIEWPORT is safe in the way measuring the plot is not: the rail
+ * changes the plot's width, so a plot measurement oscillates by construction,
+ * but nothing here changes the size of the window.
+ *
+ * Coalesced to one write per frame — `resize` fires ~60/s during a window drag
+ * or an iPad Split View change, and each write repaints four views and re-runs
+ * the grid's ladder.
  */
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth);
+let resizeFrame = 0;
 function onViewportResize() {
-  viewportWidth.value = window.innerWidth;
+  if (resizeFrame) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = 0;
+    viewportWidth.value = window.innerWidth;
+  });
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', onViewportResize);
+
+/** Seven day columns; the lanes view asks the same question about its own beans. */
+const daysRail = computed(() => !isPortrait.value && railFits(viewportWidth.value, 7));
+const lanesRail = computed(
+  () =>
+    !isPortrait.value && railFits(viewportWidth.value, Math.max(1, familyStore.sortedHumans.length))
+);
 
 /**
  * Whether the threshold is right for the screens families actually own is not
@@ -184,20 +203,23 @@ if (typeof window !== 'undefined') window.addEventListener('resize', onViewportR
  * Whether the thresholds are right for the screens families actually own is not
  * answerable from here, so both go to the firehose.
  *
- * ⚠️ Not `immediate`, and not hardcoded to `days`. Firing on mount inflated the
- * days signal with sessions that never opened the days view, and again on every
- * rotation; naming only `days` left `railFits`'s lanes threshold — the one with
- * no field evidence at all — reporting nothing.
+ * ⚠️ Not `immediate`, and each view reports its OWN rail state. Firing on mount
+ * inflated the days signal with sessions that never opened that view; and an
+ * earlier version labelled the row `lanes` while reporting the DAYS rail, which
+ * is inverted in exactly the cases that matter — a large family on a 1300px wall
+ * has a lanes BAND while `daysRail` is true.
  */
-watch([daysRail, activeView], ([rail, view], previous) => {
-  if (previous && previous[0] === rail && previous[1] === view) return;
-  const stepped = wallViewById(view);
-  if (stepped.id !== 'days' && stepped.id !== 'lanes') return;
+watch([daysRail, lanesRail, activeView], ([days, lanes, view]) => {
+  if (view !== 'days' && view !== 'lanes') return;
   logEvent({
     level: 'info',
     surface: SURFACE,
     message: 'wall_rail_mode',
-    context: { action: 'layout', kind: view, stage: rail ? 'rail' : 'band' },
+    context: {
+      action: 'layout',
+      kind: view,
+      stage: (view === 'days' ? days : lanes) ? 'rail' : 'band',
+    },
   });
 });
 
@@ -232,6 +254,18 @@ const backLabel = computed(() => t(wallViewById(lastCalendarView.value).labelKey
  * re-derived so the wall and the planner cannot describe the same seven days
  * differently. ⚠️ It takes `Date`, not ymd.
  */
+/**
+ * Whether each arrow can still move. Without this the button at the range
+ * boundary looks completely live and does nothing, which on a kitchen tablet is
+ * indistinguishable from a frozen screen — and from a tap that simply missed.
+ */
+const canStepBack = computed(() =>
+  currentView.value.stepUnit ? anchor.canStep(currentView.value.stepUnit, -1) : false
+);
+const canStepForward = computed(() =>
+  currentView.value.stepUnit ? anchor.canStep(currentView.value.stepUnit, 1) : false
+);
+
 const anchorLabel = computed(() => {
   if (currentView.value.stepUnit === 'week') {
     const days = weekDays.value;
@@ -398,7 +432,10 @@ if (typeof window !== 'undefined') {
 onScopeDispose(() => {
   // The two matchMedia listeners that used to be released here now belong to
   // `useMediaQuery`, which disposes them with this same scope.
-  if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportResize);
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', onViewportResize);
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+  }
   clearInterval(clockTimer);
   resetCelebrationMode();
   logEvent({ level: 'info', surface: SURFACE, message: 'wall_exit', context: { action: 'exit' } });
@@ -495,6 +532,8 @@ watch(activeView, () => (sheet.value = null));
             type="button"
             class="font-outfit text-secondary-500 wall-nav-arrow dark:bg-surface-raised dark:text-ink rounded-xl bg-white px-2.5 py-1.5 font-bold shadow-[var(--card-shadow)]"
             :aria-label="t('planner.prevPeriod')"
+            :disabled="!canStepBack"
+            :class="canStepBack ? '' : 'pointer-events-none opacity-40'"
             @click="onStep(-1)"
           >
             <span aria-hidden="true">‹</span>
@@ -517,6 +556,8 @@ watch(activeView, () => (sheet.value = null));
             type="button"
             class="font-outfit text-secondary-500 wall-nav-arrow dark:bg-surface-raised dark:text-ink rounded-xl bg-white px-2.5 py-1.5 font-bold shadow-[var(--card-shadow)]"
             :aria-label="t('planner.nextPeriod')"
+            :disabled="!canStepForward"
+            :class="canStepForward ? '' : 'pointer-events-none opacity-40'"
             @click="onStep(1)"
           >
             <span aria-hidden="true">›</span>
@@ -567,7 +608,7 @@ watch(activeView, () => (sheet.value = null));
         :peripherals="peripherals"
         :week-of-anchor="anchor.weekOfAnchor.value"
         :rail="daysRail"
-        :viewport-width="viewportWidth"
+        :lanes-rail="lanesRail"
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"
         :back-label="backLabel"
@@ -691,10 +732,19 @@ watch(activeView, () => (sheet.value = null));
 }
 
 /* The period navigator. rem-based like the rest of the wall scale, so Large
-   reading mode carries it too. */
+   reading mode carries it too.
+
+   ⚠️ Sized to the same 44px floor as its siblings in this header row
+   (.wall-switch-btn is 2.75rem x 2.9rem). Padding alone gave the arrows about
+   27x30px — a third the area of every other control a child reaches for on a
+   wall-mounted tablet, and a missed tap looks identical to the range boundary. */
 .wall-root :deep(.wall-nav-arrow) {
+  display: grid;
   font-size: 1.1rem;
+  height: 2.75rem;
   line-height: 1;
+  min-width: 2.75rem;
+  place-items: center;
 }
 
 .wall-root :deep(.wall-nav-label) {
@@ -703,6 +753,7 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-nav-today) {
   font-size: 0.85rem;
+  min-height: 2.75rem;
 }
 
 .wall-root :deep(.wall-card-title) {
@@ -967,6 +1018,8 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-portrait :deep(.wall-nav-arrow) {
   font-size: 1rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
 }
 
 .wall-portrait :deep(.wall-nav-label) {
@@ -975,6 +1028,7 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-portrait :deep(.wall-nav-today) {
   font-size: 0.78rem;
+  min-height: 2.5rem;
 }
 
 .wall-portrait :deep(.wall-switch-btn) {
