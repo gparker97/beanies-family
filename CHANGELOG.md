@@ -15,7 +15,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **beanies is much better at telling when two devices' copies of a family file cannot safely be combined.** The check that protects this had been looking at the wrong thing: a label kept alongside the file rather than the file's own history, and the two could drift apart. It now reads the history itself, in the one place both copies are open together, so it cannot be fooled.
 - **A device that cannot combine its changes now says so, and keeps saying so.** That warning used to be a message that faded after a few seconds, so it was easy to miss entirely. It is now a banner that stays until you dismiss it, and it appears on the beanie wall too.
 - **That warning now offers a way out.** It used to tell you to export your changes and reload, which did not actually resolve anything. There is now a button that takes the reorganised family file, after a confirmation that says plainly what will be let go.
-- **A family file you deliberately re-point beanies at is now honoured.** Choosing an older copy of your family file is how you undo a reorganisation, and beanies was quietly writing the newer copy back over it.
+- **Repairing access to a family file can no longer discard a device's unsaved work.** A recovery meant for one situation was briefly allowed to settle a different, more serious question on its own. It cannot any more; only the message that asks you directly can do that, and it still asks first.
+- **The message about a file that cannot be combined now offers a way out that works, and says when it worked.** It also comes back if the attempt fails, rather than quietly disappearing.
+- **The setup screen no longer goes blank when a family file cannot be combined.** It was the one screen that could show neither the message nor an explanation.
+- **A device holding a newly reorganised file now publishes it after signing in.** On several sign-in routes that upload was cancelled a moment after being scheduled, so the file was re-downloaded ten seconds later instead.
 - **The beanie wall no longer shows a green dot over a family file it cannot open.** It only spoke up for one kind of problem; it now speaks up for all of them, and it no longer says "can't reach your family file" about a file it read perfectly well.
 
 ## 2026-09-05

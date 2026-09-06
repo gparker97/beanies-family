@@ -15,6 +15,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
+// The real reporter DEDUPES by surface+message, so a second identical failure in
+// the same run records nothing and an assertion on it fails for the wrong reason.
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+
 const { mockLookupFamily, mockProviderRead, mockProvider } = vi.hoisted(() => {
   const mockProviderRead = vi.fn(async () => '');
   const mockProvider = {
@@ -704,5 +708,119 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     await syncStore.backgroundSyncFromFile();
     expect(docClient.mergeRemoteEnvelope).toHaveBeenCalled();
     expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The lineage recovery, driven through the store rather than through the
+ * banner's mock of it.
+ *
+ * ⚠️ WHY THIS EXISTS. A test audit proved that BOTH `user-file` producers could
+ * be deleted outright and 875 tests stayed green, because the shared
+ * `syncService` double defaults `consumeUserFileIntent` to `false` and nothing
+ * anywhere overrode it. The POLICY table's `user-file` column — the one context
+ * that never blocks, and whose `adopt` destroys the local document — had zero
+ * TESTED producers. These are that coverage.
+ */
+describe('syncStore — the lineage banner recovery', () => {
+  let pinia: Pinia;
+
+  beforeEach(() => {
+    pinia = createPinia();
+    setActivePinia(pinia);
+    vi.resetAllMocks();
+    const ctx = useFamilyContextStore();
+    ctx.activeFamily = {
+      id: 'fam-resume-1',
+      name: 'LaFleur',
+      createdAt: '2026-05-10',
+      updatedAt: '2026-05-14',
+    };
+  });
+
+  async function svc() {
+    return await import('@/services/sync/syncService');
+  }
+
+  it('cancels the armed save, unlatches, and declares the intent before re-opening', async () => {
+    const syncService = await svc();
+    const syncStore = useSyncStore();
+    // No provider configured -> loadFromFile returns a plain failure. The
+    // ORDERING is what this pins, and it holds on both outcomes.
+    await syncStore.useRemoteFileOverLocalDocument();
+
+    // Cancelling first is what stops a debounced save from running its own merge
+    // concurrently with the re-open once the latch is clear.
+    expect(syncService.cancelPendingSave).toHaveBeenCalled();
+    expect(syncService.retryAfterRemoteBlock).toHaveBeenCalled();
+    // THE producer. Deleting this call used to leave the whole suite green.
+    expect(syncService.noteUserChoseRemoteFile).toHaveBeenCalled();
+  });
+
+  it('reports a failed adopt instead of letting the banner vanish silently', async () => {
+    const { reportError } = await import('@/utils/errorReporter');
+    const syncStore = useSyncStore();
+
+    const ok = await syncStore.useRemoteFileOverLocalDocument();
+
+    expect(ok).toBe(false);
+    // The latch was cleared before the re-open, so the banner is already gone;
+    // without this report the failure reaches nobody at all.
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'pod-lineage',
+        severity: 'critical',
+        context: expect.objectContaining({ action: 'user-file-recovery-failed' }),
+      })
+    );
+  });
+
+  it('sends `user-file` to the worker when the intent is armed', async () => {
+    // The store terminus. `consumeUserFileIntent` defaults to false in the shared
+    // double, which is why nothing exercised this arm.
+    const syncService = await svc();
+    vi.mocked(syncService.consumeUserFileIntent).mockReturnValue(true);
+    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValue({
+      loaded: true,
+    } as unknown as Awaited<ReturnType<typeof docClient.initAndLoadCache>>);
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
+      action: 'adopted' as const,
+      heads: [],
+      dirty: false,
+      changed: true,
+      remoteHeads: [],
+    } as unknown as Awaited<ReturnType<typeof docClient.mergeRemoteEnvelope>>);
+
+    const syncStore = useSyncStore();
+    syncStore.familyKey = {} as CryptoKey;
+    await syncStore.loadFromFile();
+
+    const basis = vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2];
+    expect(basis).toEqual({ kind: 'user-file' });
+  });
+
+  it('sends a plain baseline when no one armed it', async () => {
+    const syncService = await svc();
+    vi.mocked(syncService.consumeUserFileIntent).mockReturnValue(false);
+    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValue({
+      loaded: true,
+    } as unknown as Awaited<ReturnType<typeof docClient.initAndLoadCache>>);
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
+      action: 'adopted' as const,
+      heads: [],
+      dirty: false,
+      changed: true,
+      remoteHeads: [],
+    } as unknown as Awaited<ReturnType<typeof docClient.mergeRemoteEnvelope>>);
+
+    const syncStore = useSyncStore();
+    syncStore.familyKey = {} as CryptoKey;
+    await syncStore.loadFromFile();
+
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toMatchObject({
+      kind: 'baseline',
+    });
   });
 });
