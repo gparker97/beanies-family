@@ -86,6 +86,13 @@ poll reconcile, which arrives as a plain `baseline` compare, resolves `ours-newe
 publishes the compacted document straight back over the file the human just chose. The
 table did not merely fail to help. It documented a recovery the code inverted.
 
+> **Where this landed (2026-09-06).** `rebindPodFile` is NOT the rollback route and no
+> longer pretends to be: it refuses a compaction safety copy by name, before any I/O,
+> because it is the shared repair for four access-error codes and none of them asks a
+> lineage question. The route that works is Settings → Family Data Options → **Load
+> another family data file**, which confirms "this will replace all local data" and
+> passes `userChoseThisFile` from that confirmed site.
+
 The same review found a second instance: `docClient`'s `dropDoc` was documented as the
 way to ask for a wholesale adopt, and no production path had called it for that since
 the basis replaced it.
@@ -97,8 +104,20 @@ the basis replaced it.
    from one the app actually reaches. Cheapest possible check, and it caught two.
 2. **When a decision and its consequence are separated by a timer** (the user chooses a
    file; the poll ten seconds later does the merging), the intent has to be RECORDED for
-   the second half to find. A parameter cannot cross that gap, so a one-shot that is read
-   and cleared in the same call is the honest shape.
+   the second half to find.
+
+   > ⚠️ **CORRECTED 2026-09-06, and the correction is the real lesson.** This rule
+   > originally ended "…a one-shot that is read and cleared in the same call is the
+   > honest shape", and that shape was built and then removed. The one-shot lived on
+   > the store, but `loadFromNewFile` has FOUR callers and only one of them had shown
+   > the human a dialog — so the other three silently inherited a consent nobody gave
+   > them, on the one context whose whole job is to make `adopt` unconditional.
+   > **Consent must travel WITH the call, from the site that obtained it**, which
+   > means a parameter (`decryptPendingFile(password, { userChoseThisFile })`), not
+   > ambient state a later reader picks up. If a parameter genuinely cannot reach the
+   > second half, that is a signal the decision is being made in the wrong place, not
+   > a licence to leave it lying around.
+
 3. **Delete the documented-but-unreachable path or wire it, never leave it.** A comment
    saying "use X for Y" that no caller follows will be believed by the next reader.
 

@@ -12,12 +12,19 @@
 
 export const FLAG_REGISTRY = [
   {
-    // ⚠️ MUST STAY OFF until #90 Tier 3 Stages 1-3 have shipped and soaked.
+    // ⚠️ MUST STAY OFF until the whole FLEET is on a guard-honouring build.
+    // All four Tier 3 stages have shipped to `main`; that is not the gate.
+    // The gate is deployment: production is still a build with no lineage
+    // concept, and one device on it defeats the guard for the whole family.
     // The guard that makes compaction safe (ADR-036) is only landing now, and an
     // old build honours no guard at all — so a compaction published before the
     // fleet has updated is CRDT-merged across lineages by every device still on
     // the previous version, which silently undoes it. It was flipped true by
     // accident in `0169b49f` and pushed (not deployed, so nobody was exposed).
+    // ⚠️ A per-browser localStorage override still beats the prod gate (see
+    // `flags.ts`). That is deliberate — it is how the soak gets run at all —
+    // but for THIS flag one device's override starts a family-wide, one-way
+    // migration. Raised to greg 2026-09-06; left as is on purpose.
     id: 'podCompaction',
     label: 'Pod compaction',
     description:

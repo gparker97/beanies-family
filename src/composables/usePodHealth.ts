@@ -2,10 +2,9 @@
  * Is this family's file big enough that compacting it is worth doing?
  *
  * ⚠️ MEASURING MUST NEVER COST A `saveDoc`. A whole-document serialize on every
- * open is precisely the regression this tier exists to prevent, so both numbers
- * come from values already in hand: the encrypted payload's decoded size, which
- * is arithmetic on a base64 length, and `Automerge.stats`, which is a handle
- * read rather than a serialize.
+ * open is precisely the regression this tier exists to prevent, so the number
+ * comes from a value already in hand: the byte length recorded on the last
+ * persist or load. No serialize, no decode, no allocation.
  *
  * ⚠️ AND A REAL FAILURE OUTRANKS THE HEURISTIC. If any family member's device
  * has reported that it could not open the pod for want of memory, the file is
@@ -21,18 +20,6 @@ import { anyDeviceReportedTooLarge } from '@/services/pod/podSoak';
 
 /** Below this the file opens comfortably even on an old tablet. */
 export const DUE_BYTES = 1_000_000;
-
-/**
- * Decoded byte length of a base64 payload, WITHOUT decoding it.
- *
- * Decoding a multi-megabyte payload to measure it would allocate the very thing
- * this whole tier is about.
- */
-export function decodedSizeOf(base64: string): number {
-  if (!base64) return 0;
-  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
-  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
-}
 
 export function usePodHealth() {
   const syncStore = useSyncStore();

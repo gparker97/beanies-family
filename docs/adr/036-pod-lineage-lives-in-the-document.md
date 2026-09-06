@@ -33,9 +33,11 @@ Concretely:
    Automerge refuses to store `undefined`. Read it through `docOps.docLineage`,
    which normalises the legacy absent case in one place.
 2. `BeanpodFileV4` carries NO lineage field, and must never carry one again.
-3. `compareLineage` has exactly ONE production call site, inside
+3. `guardLineage` has exactly ONE production call site, inside
    `applyAndProject.mergeRemoteEnvelope`, after the decrypt and before any
-   merge. A `no-restricted-imports` rule enforces that.
+   merge. A `no-restricted-imports` rule enforces that. (It bans
+   `compareLineage` and `lineageAction` too — `guardLineage` composes them, and
+   both are now unimported outside their own module and its tests.)
 4. Callers pass a required, exhaustive `LineageBasis` describing what THEY can
    prove (`no-local-document` / `user-file` / `baseline` + heads). There is no
    default, because a default is a decision nobody made.
@@ -82,14 +84,26 @@ believes the metadata.
   graph, on the low-memory device this tier exists to spare. The affected
   population is one dev family (`podCompaction` has never shipped enabled), and
   Stage 2's rebase is what makes the remaining case recoverable in general.
-- **`user-file` has exactly ONE producer, and a second is a data-loss change.**
-  It is `syncStore.useRemoteFileOverLocalDocument`, the lineage banner's action,
-  behind a danger confirmation that names what is discarded. It was briefly also
-  armed by `rebindPodFile` — wrong, because that is the shared access repair for
-  four `POD_ACCESS_ERRORS` codes plus the save-failure banner, none of which asks
-  the human a lineage question, and `user-file` makes `adopt` unconditional
-  including for `conflict`. `podAccess.ts` states the rule it broke: verification
-  may REPORT a problem, never RESOLVE one.
+- **`user-file` is produced ONLY where a human was shown what it discards.** Two
+  producers, both confirmed, and a third is a data-loss change:
+  1. `syncStore.useRemoteFileOverLocalDocument` — the lineage banner's action,
+     behind a danger confirmation that names what is let go.
+  2. `SettingsPage`'s Load-another-family-data-file decrypt, which passes
+     `userChoseThisFile` from behind "this will replace all local data with the
+     contents of the selected file". This is the rollback route, so it needs the
+     context that can never dead-end. (Corrected 2026-09-06: this ADR said "exactly
+     ONE producer" after the second one had already shipped.)
+
+  It was briefly also armed by `rebindPodFile` — wrong, because that is the shared
+  access repair for four `POD_ACCESS_ERRORS` codes plus the save-failure banner,
+  none of which asks the human a lineage question, and `user-file` makes `adopt`
+  unconditional including for `conflict`. `podAccess.ts` states the rule it broke:
+  verification may REPORT a problem, never RESOLVE one.
+
+  ⚠️ **The test is the DIALOG, not the caller.** Both producers pass the intent as
+  an argument from the site that showed the confirmation. Ambient state a later
+  reader picks up is how three unconfirmed callers inherited this once already.
+
 - **The worker gains a runtime dependency on `podLineage.ts`.** Acceptable: it
   already imported it for the error codec, and that module is pure.
 - **`remoteBaseline.ts` must stay value-free from the worker's point of view.**
