@@ -80,6 +80,19 @@ describe('fetchUpdateFloor', () => {
   it.each([
     ['a network error', 'Network request failed', 'offline'],
     ['a timeout', 'Request timeout', 'timeout'],
+    // ⚠️ THE STRINGS REAL PLATFORMS ACTUALLY PRODUCE, which is the whole point.
+    // iOS surfaces `localizedDescription`, and its timeout says "timed out",
+    // not "timeout". A classifier matching only the latter labelled every iOS
+    // timeout `malformed`, which is the class that means "the JSON we deployed
+    // by hand is broken" and would send triage to entirely the wrong file.
+    ['an iOS timeout', 'The request timed out.', 'timeout'],
+    ['an iOS offline', 'The Internet connection appears to be offline.', 'offline'],
+    ['an iOS DNS failure', 'A server with the specified hostname could not be found.', 'offline'],
+    ['an Android connect failure', 'Failed to connect to beanies.family/1.2.3.4:443', 'offline'],
+    ['an Android DNS failure', 'Unable to resolve host "beanies.family"', 'offline'],
+    // Unrecognised is `unknown`, never `malformed`. Guessing "the file is
+    // wrong" about an error we do not understand is worse than admitting it.
+    ['something nobody predicted', 'kernel said no', 'unknown'],
   ])('fails OPEN when the request throws (%s)', async (_label, message, expected) => {
     http.get.mockRejectedValueOnce(new Error(message));
     await expect(fetchUpdateFloor()).resolves.toBeNull();

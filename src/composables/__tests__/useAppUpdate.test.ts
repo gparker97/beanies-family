@@ -33,7 +33,8 @@ vi.mock('@capacitor/app', () => ({
 }));
 
 const floor = vi.hoisted(() => ({ value: null as string | null }));
-vi.mock('@/services/appUpdate/versionPolicy', () => ({
+vi.mock('@/services/appUpdate/versionPolicy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/appUpdate/versionPolicy')>()),
   fetchUpdateFloor: () => Promise.resolve(floor.value),
 }));
 
@@ -42,7 +43,14 @@ vi.mock('@/composables/useOnline', () => ({
   useOnline: () => ({ isOnline: { value: gates.online } }),
 }));
 vi.mock('@/utils/appQuiet', () => ({ isAppQuiet: () => gates.quiet }));
-vi.mock('@/services/automerge/projection', () => ({ isLoaded: () => gates.loaded }));
+// Only `isLoaded` is stubbed. `docVersion` stays the REAL shallowRef, because
+// the composable watches it to learn the family document has arrived and a stub
+// number would make that watcher fire never — which is precisely the defect the
+// test below exists to catch.
+vi.mock('@/services/automerge/projection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/automerge/projection')>()),
+  isLoaded: () => gates.loaded,
+}));
 
 const confirmMock = vi.hoisted(() =>
   vi.fn((_opts: Record<string, unknown>) => Promise.resolve(true))
@@ -53,7 +61,9 @@ vi.mock('@/constants/appVersion', () => ({ APP_VERSION: '0.16' }));
 
 import { logEvent } from '@/services/telemetry/logEvent';
 import { STORE_URL } from '@beanies/brand/nav';
-import { useAppUpdate, storeUrlFor, __resetAppUpdateForTesting } from '../useAppUpdate';
+import { docVersion } from '@/services/automerge/projection';
+import { useAppUpdate, __resetAppUpdateForTesting } from '../useAppUpdate';
+import { storeUrlFor } from '@/services/appUpdate/storeUrl';
 
 /** Start the composable and let its launch check settle. */
 async function launch(): Promise<void> {
@@ -72,6 +82,7 @@ describe('useAppUpdate', () => {
     gates.quiet = true;
     gates.loaded = true;
     resume.handler = null;
+    docVersion.value = 0;
     confirmMock.mockResolvedValue(true);
   });
 
@@ -138,8 +149,12 @@ describe('useAppUpdate', () => {
     floor.value = 'v0.17-beta';
     await launch();
     expect(confirmMock).not.toHaveBeenCalled();
+    // ⚠️ ITS OWN CLASS, not the floor file's `unparseable-version`.
+    // `versionPolicy` already screened the floor, so reaching this branch means
+    // `APP_VERSION` itself does not parse: a different file, a different fix,
+    // and a defect that silences the prompt for the entire fleet.
     expect(vi.mocked(logEvent).mock.calls.map((c) => c[0].context?.detail)).toContain(
-      'unparseable-version'
+      'app-version-unparseable'
     );
   });
 
@@ -163,6 +178,51 @@ describe('useAppUpdate', () => {
     gates.loaded = true;
     resume.handler!();
     await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('asks WITHOUT a resume once the family document arrives', async () => {
+    // ⚠️ THE DEFECT THAT MADE THE WHOLE FEATURE ALMOST NEVER FIRE. The floor
+    // resolves in a couple of hundred milliseconds while the document is still
+    // loading, so the launch check always found `isLoaded()` false. With resume
+    // as the only other trigger, a launch nobody backgrounds asked nobody.
+    gates.loaded = false;
+    await launch();
+    expect(confirmMock).not.toHaveBeenCalled();
+
+    gates.loaded = true;
+    docVersion.value++; // the same bump that flips `loaded` true in projection
+    await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('says WHY it stayed quiet, once per reason, not once per re-evaluation', async () => {
+    // A fleet reporting behind=true and never prompting has to be explicable.
+    // But every gate is re-checked on resume and on every document change, so
+    // the answer has to be bounded or it is a flood from exactly the devices
+    // with something to say.
+    gates.loaded = false;
+    await launch();
+    resume.handler!();
+    docVersion.value++;
+    docVersion.value++;
+    await Promise.resolve();
+
+    const deferred = vi
+      .mocked(logEvent)
+      .mock.calls.map((c) => c[0])
+      .filter((e) => e.context?.action === 'prompt-deferred');
+    expect(deferred).toHaveLength(1);
+    expect(deferred[0]!.context?.detail).toBe('booting');
+  });
+
+  it('names the FIRST closed gate, so the reason is the one that mattered', async () => {
+    gates.online = false;
+    gates.loaded = false;
+    await launch();
+    const deferred = vi
+      .mocked(logEvent)
+      .mock.calls.map((c) => c[0])
+      .filter((e) => e.context?.action === 'prompt-deferred');
+    expect(deferred[0]!.context?.detail).toBe('offline');
   });
 
   it('counts the check on every launch, so a dead floor is distinguishable from a healthy fleet', async () => {

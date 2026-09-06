@@ -85,12 +85,49 @@ describe('FatalErrorOverlay', () => {
     expect(w.get('button').classes()).toContain('border-gray-300');
   });
 
-  it('renders no anchor when the href was screened away, but still shows nothing broken', () => {
-    // `actionHref` is `safeExternalHref(action.url)`, so a non-http(s) url
-    // arrives here as null. The overlay must not render a bare `href`.
+  it('STILL shows the URL when the href was screened away, which is the dead-end case', () => {
+    // ⚠️ THE FINDING THIS PINS. The caption used to be gated on the screened
+    // href, so the moment the link could not be followed the address vanished
+    // too — leaving a person who cannot use the app at all with nothing on
+    // screen to act on, in exactly the case where they needed it most. The
+    // caption prints `action.url`; only the anchor depends on the screen.
     const w = mountOverlay({ action, actionHref: null });
     expect(w.find('a').exists()).toBe(false);
+    expect(w.findAll('p').some((p) => p.text() === STORE)).toBe(true);
     expect(w.get('button').classes()).toContain('bg-[#F15D22]');
+  });
+
+  it('closes the destructive panel BEFORE the sign-out it starts', async () => {
+    // ⚠️ A DOUBLE-TAP USED TO START TWO SIGN-OUTS. Clearing the family database
+    // takes real time and the panel stayed on screen for all of it. In
+    // `App.vue` the flag was cleared on the handler's first line; the move had
+    // to carry that with it.
+    const w = mountOverlay();
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'app.initError.clearData')!
+      .trigger('click');
+    const acting = w
+      .findAll('button')
+      .filter((b) => b.text() === 'app.initError.clearData')
+      .at(-1);
+    await acting!.trigger('click');
+    expect(w.text()).not.toContain('app.initError.clearConfirm');
+    expect(w.emitted('clearData')).toHaveLength(1);
+  });
+
+  it('closes the destructive panel for a NEW fatal that happens to read the same', async () => {
+    // Two failures can carry the same sentence and different detail. Watching
+    // the message alone left an open "clear my data" panel under an unrelated
+    // error; `App.vue`'s store watcher had reset on the whole tuple.
+    const w = mountOverlay();
+    await w
+      .findAll('button')
+      .find((b) => b.text() === 'app.initError.clearData')!
+      .trigger('click');
+    expect(w.text()).toContain('app.initError.clearConfirm');
+    await w.setProps({ detail: '{"fileVersion":"6.0"}' });
+    expect(w.text()).not.toContain('app.initError.clearConfirm');
   });
 
   it('asks before clearing data, and only then emits', async () => {

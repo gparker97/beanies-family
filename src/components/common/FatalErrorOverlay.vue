@@ -46,11 +46,28 @@ const { t } = useTranslation();
  */
 const showClearConfirm = ref(false);
 watch(
-  () => props.message,
+  // ⚠️ THE WHOLE FATAL, not only its message. Two different failures can carry
+  // the same sentence and different detail; watching the message alone would
+  // leave an open "clear my data and start fresh" panel sitting under an error
+  // it has nothing to do with. This is the tuple `App.vue`'s store watcher used
+  // to reset on.
+  () => [props.message, props.detail, props.clearDataHelps] as const,
   () => {
     showClearConfirm.value = false;
   }
 );
+
+/**
+ * ⚠️ CLOSES BEFORE IT EMITS, and the ordering is the point. Signing out and
+ * clearing the family database takes real time, during which the panel used to
+ * stay on screen, so a second tap started a CONCURRENT `signOutAndClearData()`.
+ * In `App.vue` this line was the first statement of the handler; it has to
+ * survive the move, and the flag lives here now.
+ */
+function confirmClearData(): void {
+  showClearConfirm.value = false;
+  emit('clearData');
+}
 </script>
 
 <template>
@@ -130,11 +147,8 @@ watch(
            true: an external open can resolve while nothing visibly happens,
            so there is no reliable trigger for showing a fallback only on
            failure. The link is the convenience; this is the guarantee. -->
-      <p
-        v-if="action && actionHref"
-        class="dark:text-ink-soft mt-1 mb-4 text-xs break-all text-gray-500"
-      >
-        {{ actionHref }}
+      <p v-if="action" class="dark:text-ink-soft mt-1 mb-4 text-xs break-all text-gray-500">
+        {{ action.url }}
       </p>
 
       <!-- Clear data confirmation -->
@@ -148,7 +162,7 @@ watch(
         <div class="flex gap-2">
           <button
             class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-            @click="emit('clearData')"
+            @click="confirmClearData"
           >
             {{ t('app.initError.clearData') }}
           </button>

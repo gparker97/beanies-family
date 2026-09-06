@@ -117,7 +117,7 @@ describe('payloadFailureSurface tables', () => {
     expect(vi.mocked(logEvent).mock.calls[0]![0]).toMatchObject({
       surface: 'app-update',
       level: 'warn',
-      context: { action: 'blocked', os: 'ios' },
+      context: { action: 'blocked', os: 'ios', detail: 'store-link' },
     });
   });
 
@@ -136,8 +136,28 @@ describe('payloadFailureSurface tables', () => {
     surfacePayloadFatal(errorFor(kind), ctx);
     const opts = vi.mocked(fatal.setFatal).mock.calls[0]![2] as { action?: unknown };
     expect(opts.action ?? null).toBeNull();
-    expect(logEvent).not.toHaveBeenCalled();
   });
+
+  it('counts a version block on WEB too, where there is no button to count', () => {
+    // The event belongs to the block, not to the affordance. Gating it on the
+    // store link made every browser block invisible on this surface, which is
+    // where "how often does this actually happen" would have been answered.
+    platform.value = 'web';
+    surfacePayloadFatal(new UnsupportedBeanpodVersionError('6.0', 'fam-1'), ctx);
+    expect(vi.mocked(logEvent).mock.calls[0]![0]).toMatchObject({
+      surface: 'app-update',
+      context: { action: 'blocked', os: 'web', detail: 'no-store-link' },
+    });
+  });
+
+  it.each(ALL_KINDS.filter((k) => k !== 'needs-update'))(
+    'counts nothing on the app-update surface for %s',
+    (kind) => {
+      platform.value = 'ios';
+      surfacePayloadFatal(errorFor(kind), ctx);
+      expect(logEvent).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(ALL_KINDS.filter((k) => k !== 'needs-update'))(
     'attaches NO action on native either, for %s',
