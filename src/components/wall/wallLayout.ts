@@ -37,18 +37,36 @@ export const DAYS_RAIL_MIN_VIEWPORT_PX = 1270;
 /** The media query behind `DAYS_RAIL_MIN_VIEWPORT_PX`. */
 export const DAYS_RAIL_QUERY = `(min-width: ${DAYS_RAIL_MIN_VIEWPORT_PX}px)`;
 
+/** Everything the rail costs a view's columns, in px. */
+const RAIL_GAP_PX = 16;
+const PAGE_PADDING_PX = 56; // px-7, both sides
+const AXIS_PX = 62; // AXIS_WIDTH_PX — imported by value in the arithmetic below
+
 /**
- * The most lanes that stay readable beside the rail on a narrow landscape wall.
- *
- * ⚠️ The days view is not the only one that can be crowded by the rail. A lane
- * is a PERSON, and a large family has six or seven — at which point the same
- * arithmetic bites harder than it does for days: on a 1024px tablet,
- * 1024 − 56 padding − 296 rail − 16 gap − 62 axis leaves 594px, i.e. ~85px for
- * seven lanes, below `WallTimeBlock`'s SLIVER_PX (95). Every block would drop
- * its title on the one view whose entire purpose is comparing people.
- *
- * Four lanes get ~148px each, comfortably clear of the sliver threshold, so a
- * narrow wall keeps the rail for a small family and drops it for a large one.
- * A wide wall (>= DAYS_RAIL_MIN_VIEWPORT_PX) has room for either.
+ * A column width that keeps a block's title. Comfortably above `WallTimeBlock`'s
+ * SLIVER_PX (95) and below its WIDE_PX (210), so columns land in the readable
+ * "tight" density rather than the cramped one.
  */
-export const LANES_RAIL_MAX_COLUMNS = 4;
+const MIN_READABLE_COLUMN_PX = 120;
+
+/**
+ * Does the rail fit beside `columns` columns at this viewport width?
+ *
+ * ⚠️ ONE rule for both views, because the crowding is the same arithmetic and
+ * two rules drifted immediately. An earlier version gave days a fixed 1270px
+ * threshold and lanes a `railWide || members <= 4` shortcut, which failed in
+ * three directions at once: the `railWide ||` short-circuit meant a wide wall
+ * never checked the count at all (nine lanes at 1270px get 93px, under the
+ * sliver threshold this was written to prevent); dropping the rail for a large
+ * family on a narrow wall pushed the cards into a band whose ~250px cost
+ * `WallLanesView`'s own docblock had already measured and rejected; and four
+ * lanes at 1024px gives ~148px, five pixels below the width that same file
+ * measures inline-header truncation starting at.
+ *
+ * Substituting 7 reproduces DAYS_RAIL_MIN_VIEWPORT_PX exactly, which is the
+ * check that this generalisation did not move the days view.
+ */
+export function railFits(viewportPx: number, columns: number): boolean {
+  const forColumns = viewportPx - PAGE_PADDING_PX - RAIL_WIDTH_PX - RAIL_GAP_PX - AXIS_PX;
+  return forColumns >= columns * MIN_READABLE_COLUMN_PX;
+}

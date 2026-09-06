@@ -32,7 +32,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **A big screen is no longer half empty.** Cards had a fixed maximum height chosen for a tablet, so on a large display the day ran out well before the screen did. That maximum now grows with the space available, up to a sensible limit. An hour is still exactly as tall on a quiet day as on a busy one, so the wall reads the same from across the room, and nothing changes at all on a smaller screen.
 - **The week view now puts its cards down the side**, like the day and bean-lane views already did, which gives the calendar its full height back. Only on screens wide enough to afford it — below that the cards stay underneath, because seven days squeezed into what is left is worse than the space it saves.
-- **The chore board gives its room to the beans who actually have chores.** Beans with nothing on used to take up a whole column each to say so. They are now a row of faces along the bottom, under "all clear", and the columns go to whoever has the work. A bean who has finished everything keeps their full column, their green ring and their stars — that is the reward, and it was never the same thing as having nothing to do.
+- **The chore board gives its room to the beans who actually have chores.** Beans with nothing on used to take up a whole column each to say so. They are now a row of faces along the bottom, under "no chores today", and the columns go to whoever has the work. A bean who has finished everything keeps their full column, their green ring and their stars — that is the reward, and it was never the same thing as having nothing to do.
 
 ### Fixed
 
@@ -47,6 +47,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **The confirmation before compacting no longer promises more than beanies does.** It said a device that could not have its changes carried across would keep them until someone decided; that is true when nothing can be carried across, but if the same thing was changed in two places the already-saved version wins. It now says so.
 - **On phones and tablets, the check that your backup saved no longer says your family is about to be deleted.** It was borrowed word-for-word from the delete-family flow. Compacting deletes nothing.
 - **Compacting now checks you are the family owner when you ask for it, not only when the button is drawn.**
+
+- **Faint grey text across the beanie wall is readable after dark.** About thirty labels, counts and captions on the wall referred to a colour that was never defined anywhere in the app, so all of them quietly fell back to a daytime grey — around 2.2 to 1 against a dark background, where 4.5 is the readable floor.
 
 - **beanies is much better at telling when two devices' copies of a family file cannot safely be combined.** The check that protects this had been looking at the wrong thing: a label kept alongside the file rather than the file's own history, and the two could drift apart. It now reads the history itself, in the one place both copies are open together, so it cannot be fooled.
 - **A device that cannot combine its changes now says so, and keeps saying so.** That warning used to be a message that faded after a few seconds, so it was easy to miss entirely. It is now a banner that stays until you dismiss it, and it appears on the beanie wall too.

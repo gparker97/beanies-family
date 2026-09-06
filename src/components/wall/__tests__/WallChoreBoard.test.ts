@@ -151,22 +151,39 @@ describe('WallChoreBoard', () => {
     expect(w.find('[data-test="idle-strip"]').text()).toContain('Leo');
   });
 
-  it('⚠️ never calls a bean clear who still has to-dos outstanding', () => {
-    // `wallJobs` suppresses a list item when a to-do of the same owner and title
-    // is due today, so a bean's whole list can dedupe away to `total === 0` while
-    // the to-dos card beside them shows the work. "All clear" is a claim about a
-    // PERSON, by name, on a kitchen wall — it has to be true of everything they
-    // owe, not just of the chore column.
+  it('⚠️ every bean lands in exactly one group — never in neither', () => {
+    // An earlier fix excluded beans with outstanding to-dos from BOTH the
+    // columns and the strip, to avoid calling them clear. That made them vanish
+    // from the wall entirely, indistinguishable from having left the family —
+    // and a family who keeps to-dos but no lists got a blank board.
     const w = mountBoard({ m1: [group('l1', [])] }, [], { m1: [job('t1', false)] });
 
-    expect(w.find('[data-test="idle-strip"]').text()).not.toContain('Leo');
-    // Milo and Ana genuinely have nothing, so they are still named.
-    expect(w.find('[data-test="idle-strip"]').text()).toContain('Milo');
+    const named = w.find('[data-test="idle-strip"]').text();
+    for (const m of members) expect(named).toContain(m.name);
+    expect(w.findAll('[data-test="board-column"]')).toHaveLength(0);
   });
 
-  it('does call a bean clear once their to-dos are done', () => {
-    const w = mountBoard({}, [], { m1: [job('t1', true)] });
-    expect(w.find('[data-test="idle-strip"]').text()).toContain('Leo');
+  it('never renders a board with nothing on it at all', () => {
+    // The blank-board regression, stated directly: whatever the inputs, the
+    // screen shows either columns or the strip.
+    for (const w of [
+      mountBoard({}),
+      mountBoard({}, [], { m1: [job('t1', false)] }),
+      mountBoard({ m1: [group('l1', [])] }, [], { m1: [job('t1', false)] }),
+    ]) {
+      const hasSomething =
+        w.findAll('[data-test="board-column"]').length > 0 ||
+        w.find('[data-test="idle-strip"]').exists() ||
+        w.find('[data-test="orphan-column"]').exists();
+      expect(hasSomething).toBe(true);
+    }
+  });
+
+  it('scopes its claim to chores, since chores are all it knows about', () => {
+    // The strip must not make a whole-person claim: this board never sees
+    // to-dos, so "no chores today" is the most it can honestly say.
+    const w = mountBoard({});
+    expect(w.find('[data-test="idle-strip"]').text()).toContain('wall.jobs.allClear');
   });
 
   it('honours the wall’s person filter — a hidden bean is absent, not idle', () => {

@@ -114,7 +114,20 @@ const columnByMember = computed(() => {
 });
 
 /**
- * Beans with jobs, and beans without — computed once, in one pass.
+ * Beans with chores, and beans without — computed once, in one pass.
+ *
+ * ⚠️ Every bean lands in exactly one of the two. An earlier attempt excluded
+ * beans who had outstanding to-dos from BOTH, on the reasoning that calling
+ * them clear was a false claim — and that was true, but the cure was worse: it
+ * created a third state nothing renders, so a family who keeps to-dos but has
+ * never made a list saw a completely blank board, and any bean in that state
+ * simply vanished from the wall, indistinguishable from having been removed
+ * from the family.
+ *
+ * The false claim was in the WORD, not the partition. This board knows about
+ * chores and nothing else, so it now says "no chores today" — true of the
+ * column it is standing in — rather than "all clear", which is a claim about a
+ * whole person that this screen has no standing to make.
  *
  * ⚠️ This also fixes a performance regression the old `columnFor()` helper
  * reintroduced at the call site: the template asked it for each member THIRTEEN
@@ -128,20 +141,6 @@ const columnByMember = computed(() => {
  * green ring and the row of stars — that is the reward, and collapsing it would
  * punish the one bean who did everything asked.
  */
-/**
- * ⚠️ "All clear" is a claim about a PERSON, not about a column, so it has to be
- * true of everything they owe — and `buildColumn` only sees lists.
- *
- * `wallJobs` deliberately suppresses a list item whenever a to-do of the same
- * owner and title is due today, to avoid showing the same job twice. A bean
- * whose list is entirely such items therefore has `total === 0` while the
- * to-dos card beside them shows the work outstanding. Calling that bean clear,
- * by name, on a kitchen wall, is worse than saying nothing.
- */
-function hasOutstandingTodos(memberId: string): boolean {
-  return props.peripherals.todosFor(memberId).some((job) => !job.done);
-}
-
 const partitioned = computed(() => {
   const active: { member: FamilyMember; column: ReturnType<typeof buildColumn> }[] = [];
   const idle: FamilyMember[] = [];
@@ -153,9 +152,7 @@ const partitioned = computed(() => {
     const column = columnByMember.value.get(member.id);
     if (!column) continue;
     if (column.total > 0) active.push({ member, column });
-    else if (!hasOutstandingTodos(member.id)) idle.push(member);
-    // A bean with no list jobs but outstanding to-dos is neither: they get no
-    // column (there is nothing to put in one) and they are NOT called clear.
+    else idle.push(member);
   }
   return { active, idle };
 });
@@ -231,12 +228,15 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       jsdom has no layout engine, so no unit test here can catch it.
 
       The cap belongs on the CARD instead, inside a `1fr` track that still counts
-      correctly. `justify-items: center` keeps a capped card centred in its track
-      rather than stranding the slack on one side.
+      correctly. BOTH justifications are load-bearing and do different jobs:
+      `justify-items` centres a capped card inside its own track (without it,
+      `w-full` makes the box non-auto and it sits hard left), while
+      `justify-content` keeps the group of tracks together rather than letting
+      two capped cards drift to opposite edges of a 1920px wall.
     -->
     <div
       v-if="hasBoard"
-      class="grid min-h-0 flex-1 justify-items-center gap-2.5"
+      class="grid min-h-0 flex-1 justify-center justify-items-center gap-2.5"
       style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
     >
       <div
@@ -316,7 +316,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <div
         v-if="peripherals.orphanLists.length"
         data-test="orphan-column"
-        class="ring-dashed dark:bg-surface-raised flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
+        class="ring-dashed dark:bg-surface-raised dark:ring-line-strong flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
       >
         <div
           class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"

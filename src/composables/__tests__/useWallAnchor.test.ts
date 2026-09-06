@@ -83,32 +83,37 @@ describe('useWallAnchor', () => {
   });
 
   it('saturates at the range limit instead of teleporting home', () => {
+    // ⚠️ restored in `finally`: `beforeEach` uses resetAllMocks (mockReset, not
+    // mockRestore), so an assertion failure inside would otherwise leave the spy
+    // installed and the NEXT test would stack a second one on it, turning one
+    // real failure into a cascade of misleading ones.
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      withAnchor((anchor) => {
+        // Walking the arrow to the boundary is an ordinary gesture — 54 presses of
+        // `›` in the days view reaches it. It must not be mistaken for bad input:
+        // the wall used to jump silently back to today mid-browse AND file a
+        // warning accusing the caller of passing something unparseable.
+        let moved = true;
+        let presses = 0;
+        while (moved && presses < 500) {
+          moved = anchor.step('week', 1);
+          presses++;
+        }
 
-    withAnchor((anchor) => {
-      // Walking the arrow to the boundary is an ordinary gesture — 54 presses of
-      // `›` in the days view reaches it. It must not be mistaken for bad input:
-      // the wall used to jump silently back to today mid-browse AND file a
-      // warning accusing the caller of passing something unparseable.
-      let moved = true;
-      let presses = 0;
-      while (moved && presses < 500) {
-        moved = anchor.step('week', 1);
-        presses++;
-      }
+        expect(presses).toBeLessThan(500);
+        // Stopped at the edge, still far from today, and still renderable.
+        expect(anchor.isAnchoredToToday.value).toBe(false);
+        expect(anchor.anchorYmd.value).not.toBe('2026-09-06');
+        expect(reportError).not.toHaveBeenCalled();
+        expect(consoleError).not.toHaveBeenCalled();
 
-      expect(presses).toBeLessThan(500);
-      // Stopped at the edge, still far from today, and still renderable.
-      expect(anchor.isAnchoredToToday.value).toBe(false);
-      expect(anchor.anchorYmd.value).not.toBe('2026-09-06');
-      expect(reportError).not.toHaveBeenCalled();
-      expect(consoleError).not.toHaveBeenCalled();
-
-      // And it is not stuck: the other direction still works.
-      expect(anchor.step('week', -1)).toBe(true);
-    });
-
-    consoleError.mockRestore();
+        // And it is not stuck: the other direction still works.
+        expect(anchor.step('week', -1)).toBe(true);
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('honours the family’s weekStartDay when stepping by week', () => {
@@ -153,28 +158,29 @@ describe('useWallAnchor', () => {
 
   it('refuses an unparseable anchor, reports it once, and lands on today', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      withAnchor((anchor) => {
+        anchor.setAnchor('NaN-NaN-NaN', 'day_tap');
 
-    withAnchor((anchor) => {
-      anchor.setAnchor('NaN-NaN-NaN', 'day_tap');
-
-      // The wall keeps rendering rather than propagating "NaN-NaN-NaN" forever.
-      expect(anchor.anchorYmd.value).toBe('2026-09-06');
-      expect(reportError).toHaveBeenCalledTimes(1);
-      expect(reportError).toHaveBeenCalledWith(
-        expect.objectContaining({
-          surface: 'beanie-wall',
-          message: 'wall_anchor_rejected',
-          severity: 'warning',
-          context: expect.objectContaining({ error_code: 'bad_anchor', kind: 'day_tap' }),
-        })
-      );
-      // The console line has to name the cause AND the fix — this branch is a
-      // developer's only signal, since no toast is shown.
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(String(consoleError.mock.calls[0]![0])).toContain('parseLocalDate does NOT throw');
-    });
-
-    consoleError.mockRestore();
+        // The wall keeps rendering rather than propagating "NaN-NaN-NaN" forever.
+        expect(anchor.anchorYmd.value).toBe('2026-09-06');
+        expect(reportError).toHaveBeenCalledTimes(1);
+        expect(reportError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            surface: 'beanie-wall',
+            message: 'wall_anchor_rejected',
+            severity: 'warning',
+            context: expect.objectContaining({ error_code: 'bad_anchor', kind: 'day_tap' }),
+          })
+        );
+        // The console line has to name the cause AND the fix — this branch is a
+        // developer's only signal, since no toast is shown.
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(String(consoleError.mock.calls[0]![0])).toContain('parseLocalDate does NOT throw');
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('does not report anything on a valid step', () => {

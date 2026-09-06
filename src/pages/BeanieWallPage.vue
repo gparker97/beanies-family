@@ -162,22 +162,44 @@ const railWide = useMediaQuery(DAYS_RAIL_QUERY, true);
 const daysRail = computed(() => railWide.value && !isPortrait.value);
 
 /**
+ * Live viewport width, for the lanes view — whose column count is the family
+ * size and so cannot be expressed as a fixed media query.
+ *
+ * Measuring the VIEWPORT is safe in a way measuring the plot is not: the rail
+ * changes the plot's width, so a plot measurement oscillates, but nothing here
+ * changes the size of the window.
+ */
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth);
+function onViewportResize() {
+  viewportWidth.value = window.innerWidth;
+}
+if (typeof window !== 'undefined') window.addEventListener('resize', onViewportResize);
+
+/**
  * Whether the threshold is right for the screens families actually own is not
  * answerable from here, so it goes to the firehose. Once per transition, which
  * in practice is once per wall session.
  */
-watch(
-  daysRail,
-  (rail) => {
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'wall_rail_mode',
-      context: { action: 'layout', kind: 'days', stage: rail ? 'rail' : 'band' },
-    });
-  },
-  { immediate: true }
-);
+/**
+ * Whether the thresholds are right for the screens families actually own is not
+ * answerable from here, so both go to the firehose.
+ *
+ * ⚠️ Not `immediate`, and not hardcoded to `days`. Firing on mount inflated the
+ * days signal with sessions that never opened the days view, and again on every
+ * rotation; naming only `days` left `railFits`'s lanes threshold — the one with
+ * no field evidence at all — reporting nothing.
+ */
+watch([daysRail, activeView], ([rail, view], previous) => {
+  if (previous && previous[0] === rail && previous[1] === view) return;
+  const stepped = wallViewById(view);
+  if (stepped.id !== 'days' && stepped.id !== 'lanes') return;
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'wall_rail_mode',
+    context: { action: 'layout', kind: view, stage: rail ? 'rail' : 'band' },
+  });
+});
 
 /**
  * The job/list bundle, built once and forwarded whole. Passing its five members
@@ -245,9 +267,11 @@ function logAnchorChange(stage: string) {
 function onStep(direction: -1 | 1) {
   const unit = currentView.value.stepUnit;
   if (!unit) return;
-  // A refused step is a no-op at the range boundary, not an event: logging it
-  // would report `count` unchanged after a `next` and muddy the browse signal.
+  // A refused step still emits — with its OWN stage, so it neither corrupts the
+  // browse signal with an unchanged `count` after a `next`, nor goes silent.
+  // Silence here is indistinguishable from the family walking away.
   if (anchor.step(unit, direction)) logAnchorChange(direction === 1 ? 'next' : 'prev');
+  else logAnchorChange('range_limit');
 }
 
 function onGoToToday() {
@@ -261,8 +285,12 @@ function onGoToToday() {
  * Thursday. Week *stepping* snaps; a tap is a direct placement.
  */
 function onFocusDay(ymd: string) {
-  anchor.setAnchor(ymd, 'day_tap');
-  logAnchorChange('day_tap');
+  // ⚠️ `setAnchor` can refuse. A day header at the forward edge of the range can
+  // name a day beyond it, and reporting that tap as a move would file a `count`
+  // of 0 straight after a `day_tap` — the same signal corruption the step
+  // boundary avoids.
+  if (anchor.setAnchor(ymd, 'day_tap')) logAnchorChange('day_tap');
+  else logAnchorChange('range_limit');
 }
 
 function selectView(id: WallViewId) {
@@ -370,6 +398,7 @@ if (typeof window !== 'undefined') {
 onScopeDispose(() => {
   // The two matchMedia listeners that used to be released here now belong to
   // `useMediaQuery`, which disposes them with this same scope.
+  if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportResize);
   clearInterval(clockTimer);
   resetCelebrationMode();
   logEvent({ level: 'info', surface: SURFACE, message: 'wall_exit', context: { action: 'exit' } });
@@ -474,11 +503,13 @@ watch(activeView, () => (sheet.value = null));
             `--muted-text` has no definition anywhere in the app, so the #4d5d6c
             fallback is what always renders — about 2.5:1 on the dark ground.
             The dark partner is the thing doing the work here.
-            `whitespace-nowrap` stops the label reflowing and shoving the arrows
-            sideways between presses on a wall-mounted tablet.
+            `truncate` (nowrap + overflow-hidden + ellipsis) stops the label
+            reflowing and shoving the arrows sideways between presses — and,
+            unlike a bare `whitespace-nowrap` beside `min-w-0`, stops it spilling
+            over them in a long locale or in Large reading mode.
           -->
           <p
-            class="font-inter wall-nav-label dark:text-ink-soft min-w-0 text-center whitespace-nowrap text-[var(--muted-text,#4d5d6c)]"
+            class="font-inter wall-nav-label dark:text-ink-soft min-w-0 truncate text-center text-[var(--muted-text,#4d5d6c)]"
           >
             {{ anchorLabel }}
           </p>
@@ -534,8 +565,9 @@ watch(activeView, () => (sheet.value = null));
         :portrait="isPortrait"
         :now="clockNow"
         :peripherals="peripherals"
+        :week-of-anchor="anchor.weekOfAnchor.value"
         :rail="daysRail"
-        :rail-wide="railWide"
+        :viewport-width="viewportWidth"
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"
         :back-label="backLabel"

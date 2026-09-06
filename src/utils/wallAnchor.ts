@@ -13,7 +13,7 @@
  * because all four views render through one `<component :is>`. Both are replaced
  * by this.
  */
-import { addDaysYmd, parseLocalDate, startOfWeekYmd, toDateInputValue } from '@/utils/date';
+import { addDaysYmd, isRealYmd, parseLocalDate, startOfWeekYmd } from '@/utils/date';
 
 /** How the arrows move, per view. `null` views (the jobs board) have no arrows. */
 export type WallStepUnit = 'week' | 'day';
@@ -62,16 +62,9 @@ export function anchorOffsetDays(ymd: string, todayYmd: string): number {
  * MAX_ANCHOR_DRIFT_DAYS, so the wall always lands somewhere it can render.
  */
 export function clampAnchorYmd(next: string, todayYmd: string): string {
-  // Shape first: parseLocalDate only special-cases length 10, so "2026-9-1" and
-  // "NaN-NaN-NaN" would otherwise take the permissive `new Date(...)` path.
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return todayYmd;
-
-  const parsed = parseLocalDate(next);
-  if (Number.isNaN(parsed.getTime())) return todayYmd;
-
-  // Round-trip catches an in-range-looking date that rolled over: `2026-02-30`
-  // parses to March 2nd, which is a date the caller never named.
-  if (toDateInputValue(parsed) !== next) return todayYmd;
+  // `isRealYmd` is the shared shape + round-trip check; a second copy here had
+  // already drifted from the one in `date.ts`.
+  if (!isRealYmd(next)) return todayYmd;
 
   const drift = anchorOffsetDays(next, todayYmd);
   if (Number.isNaN(drift) || Math.abs(drift) > MAX_ANCHOR_DRIFT_DAYS) return todayYmd;
@@ -106,7 +99,10 @@ export function nextAnchorYmd(
 ): string {
   if (unit === 'day') return addDaysYmd(anchor, direction);
 
-  const alignedToWeek = anchor === startOfWeekYmd(anchor, weekStartDay);
+  // ⚠️ `startOfWeekYmd` fails OPEN — it returns its input unchanged when that
+  // input is not a real date — so an equality test alone reads garbage as
+  // "already week-aligned" and takes the blind ±7 branch.
+  const alignedToWeek = isRealYmd(anchor) && anchor === startOfWeekYmd(anchor, weekStartDay);
   if (alignedToWeek) return addDaysYmd(anchor, direction * WEEK_LENGTH);
 
   // Off-week — which on a fresh wall means anchored on today, and after a day tap
