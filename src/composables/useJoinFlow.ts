@@ -18,7 +18,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { type PayloadLoadError } from '@/types/sync';
+import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { lookupFamily } from '@/services/registry/registryService';
 import { features } from '@/config/features';
 import {
@@ -85,11 +85,17 @@ export type JoinErrorCode =
  */
 function asJoinDecryptError(result: {
   error?: string;
-  payloadError?: PayloadLoadError;
+  // Any blocker: a lineage block reaches the join path too, and must not be
+  // reported as a wrong password.
+  payloadError?: RemoteBlocker;
 }): Error & { joinCode?: JoinErrorCode } {
   const err: Error & { joinCode?: JoinErrorCode } =
     result.payloadError ?? new Error(result.error ?? 'Decryption failed');
-  const payload = result.payloadError;
+  // ⚠️ Payload-family only. The join path can now also receive a lineage or
+  // merge block, and neither is a decrypt problem: they carry their own copy
+  // and must not be tagged `FILE_CORRUPT` (which tells a joiner the family's
+  // data is damaged and pages Slack).
+  const payload = result.payloadError instanceof PayloadLoadError ? result.payloadError : null;
   if (payload && !payload.keyMayBeWrong) {
     // `keyMayBeWrong` gates this deliberately. A `CorruptPayloadError` at the
     // decrypt step is the ROTATED-KEY signature (a member was removed, or the

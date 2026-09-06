@@ -546,7 +546,7 @@ async function handleDecryptFile(password: string) {
   } else if (result.payloadError) {
     // A memory limit or a damaged payload, not a wrong password. Re-prompting
     // would loop. Same classification the login and join flows use.
-    encryptionError.value = t(payloadErrorMessageKey(result.payloadError));
+    encryptionError.value = t(result.payloadError.inlineMessageKey);
   } else {
     // `result.error` is a developer-facing string (it can be a raw exception
     // message), so it is not rendered here: a non-English user would get a

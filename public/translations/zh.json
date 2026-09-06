@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-05",
-    "translationCount": 4513
+    "lastUpdated": "2026-09-06",
+    "translationCount": 4526
   },
   "translations": {
     "app.name": {
@@ -22482,9 +22482,9 @@
       "lastUpdated": "2026-09-05"
     },
     "podLineage.unsyncedInline": {
-      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有尚未保存的更改。先保存或导出，然后重新加载。",
-      "hash": "xbp8zs",
-      "lastUpdated": "2026-09-05"
+      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有从未保存的更改。如果要保留它们，请从“设置”中导出，然后选择“使用家庭文件”。",
+      "hash": "kxitrb",
+      "lastUpdated": "2026-09-06"
     },
     "podLineage.conflictInline": {
       "translation": "两台设备同时重组了您的家庭文件。beanies无法安全地在它们之间进行选择。在进行更多更改之前，请联系support@beanies.family。",
@@ -22570,6 +22570,71 @@
       "translation": "beanies无法将家庭文件中的更改与此设备上的更改合并，因此未写入任何内容。您的更改将保留在此处。关闭任何其他beanies选项卡并重新加载；如果继续发生这种情况，请从“设置”中导出更改并联系support@beanies.family。",
       "hash": "g39z74",
       "lastUpdated": "2026-09-05"
+    },
+    "compaction.refused.no-permission": {
+      "translation": "beanies目前无法写入您的家庭文件，因此没有任何变化。重新连接存储，或再次授予对文件的访问权限，然后再次尝试对其进行整理。",
+      "hash": "cowmrm",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.bannerTitle": {
+      "translation": "此设备上的某些更改正在等待",
+      "hash": "dpz4jj",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.bannerMessage": {
+      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有从未保存的更改。没有任何东西丢失。如果要保留这些更改，请先导出，然后选择使用家庭文件。",
+      "hash": "fspiwb",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.bannerCta": {
+      "translation": "导出我的更改",
+      "hash": "k4qzvf",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.conflictTitle": {
+      "translation": "您的家庭文件需要帮忙",
+      "hash": "vmcbei",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileCta": {
+      "translation": "使用家庭文件",
+      "hash": "6zwyeo",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileConfirmTitle": {
+      "translation": "使用家庭文件？",
+      "hash": "3u1gnl",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileConfirmMessage": {
+      "translation": "此设备将获取重组的家庭文件。此处所做的任何更改从未保存到它将被放弃。如果您想保留它们，请先导出它们。",
+      "hash": "y2scqa",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileConfirmAction": {
+      "translation": "使用家庭文件",
+      "hash": "6zwyeo",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileFailed": {
+      "translation": "beanies刚才无法打开家庭文件。此设备上的任何内容均未更改。请检查您的网络连接，然后重试。",
+      "hash": "6c8ab3",
+      "lastUpdated": "2026-09-06"
+    },
+    "podUnreadable.inline": {
+      "translation": "beanies这次无法读取您的家庭文件。它可能是保存在另一台设备上的中途，也可能是由较新版本的beanies编写的。未更改任何内容。请稍后重试，如果消息不断返回，请在此设备上更新beanies。",
+      "hash": "k9dshf",
+      "lastUpdated": "2026-09-06"
+    },
+    "pin.noSignedInMember": {
+      "translation": "beanies还不知道您在此设备上的身份，因此无法设置您的PIN码。首先从欢迎屏幕以您自己的身份登录，然后在此处设置PIN码。",
+      "hash": "x0m1tf",
+      "lastUpdated": "2026-09-06"
+    },
+    "wall.status.needsAttention": {
+      "translation": "您的家庭文件需要处理",
+      "hash": "qu4axm",
+      "lastUpdated": "2026-09-06"
     }
   }
 }

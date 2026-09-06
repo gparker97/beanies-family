@@ -61,6 +61,50 @@ export function docLineage(doc: Doc): PodLineage | null {
   return (doc as { podLineage?: PodLineage | null }).podLineage ?? null;
 }
 
+/**
+ * The RETIRED envelope stamp, read for exactly one reason: files compacted by
+ * the Tier-2 code (2026-09-05, dev flag only) recorded their lineage ONLY here,
+ * because `podLineage` did not exist on the document yet. After Stage 1 removed
+ * the field from `BeanpodFileV4`, such a file reads as never-compacted, and a
+ * peer still on the pre-compaction history would CRDT-merge across lineages —
+ * the exact corruption the guard exists to prevent.
+ *
+ * ⚠️ THIS IS SOUND WHERE THE LIVE ENVELOPE STAMP WAS NOT. ADR-036 retired the
+ * field because the LOCAL envelope is maintained on three tracks independent of
+ * the local document, so it drifts. There is no drift HERE: this reads the
+ * envelope of a file that has just been fetched, and `podLineage` and
+ * `encryptedPayload` are bytes out of the SAME blob. It is only ever consulted
+ * for the REMOTE side, never re-derived for the local document.
+ *
+ * Self-extinguishing: `mergeRemoteEnvelope` stamps the value into the document
+ * as it installs it, and the next publish writes that document back — so the
+ * file stops needing this reader after one adopt per family, and this function
+ * (plus its call site) can be deleted once no pre-Stage-1 compacted file is
+ * left. Nothing WRITES this field; there is deliberately no setter.
+ */
+export function legacyEnvelopeLineage(envelope: BeanpodFileV4): PodLineage | null {
+  const value = (envelope as { podLineage?: PodLineage | null }).podLineage;
+  // Shape-checked, not trusted: this is JSON off a decrypted file and the field
+  // is no longer covered by the type, so a malformed value must read as absent
+  // rather than reach `compareLineage` and make `seq` comparisons NaN.
+  if (!value || typeof value.id !== 'string' || typeof value.seq !== 'number') return null;
+  return { id: value.id, seq: value.seq };
+}
+
+/**
+ * Write a lineage into a document that has none.
+ *
+ * One change, and only when there is something to record — an unstamped
+ * document being adopted from an unstamped file must stay unstamped, or every
+ * legacy pod in the fleet would grow a change on first open for no reason.
+ */
+export function stampLineage(doc: Doc, lineage: PodLineage | null): Doc {
+  if (!lineage || docLineage(doc)) return doc;
+  return Automerge.change(doc, 'adopt pod lineage', (d) => {
+    (d as unknown as AnyRecord).podLineage = { id: lineage.id, seq: lineage.seq };
+  });
+}
+
 export function migrateDoc(doc: Doc): Doc {
   const missing = COLLECTION_NAMES.filter((name) => doc[name] === undefined || doc[name] === null);
   if (missing.length === 0) return doc;

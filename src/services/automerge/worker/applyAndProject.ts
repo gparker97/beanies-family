@@ -20,13 +20,22 @@
 import * as Automerge from '@automerge/automerge';
 import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
-import { guardLineage, type LineageContext } from '@/services/sync/podLineage';
+// ⚠️ NOT a bare `crypto.randomUUID()`. It is undefined on a NON-SECURE origin —
+// which is exactly how a tablet is tested (`npm run dev -- --host` on a LAN IP)
+// — and the resulting TypeError matches none of `isAllocationFailure`'s
+// patterns, so `payloadFailure` classifies it as a CorruptPayloadError and the
+// user is told their family data may be damaged. `generateUUID` has the
+// fallback this needs and is what the rest of the app uses.
+import { generateUUID } from '@/utils/id';
+import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis } from './protocol';
 import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
+  legacyEnvelopeLineage,
+  stampLineage,
   migrateDoc,
   loadDoc,
   saveDoc,
@@ -672,9 +681,9 @@ export function noteRemoteBaseline(payload: string): void {
  */
 function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
   if (basis.kind === 'user-file') return 'user-file';
-  // `no-local-document` never reaches here — the caller short-circuits on
-  // `!currentDoc` — but the arm is exhaustive so a future basis cannot slip
-  // through as an unconsidered default.
+  // `no-local-document` never reaches here: the caller installs wholesale
+  // without consulting the context at all. Kept exhaustive so a future basis
+  // cannot slip through as an unconsidered default.
   if (basis.kind === 'no-local-document') return 'clean';
   // `null` heads means "we cannot prove what Drive held", which is `dirty` —
   // the fail-safe direction, since it never adopts over unsynced work.
@@ -715,12 +724,36 @@ export async function mergeRemoteEnvelope(
   // be permanently unable to adopt a compacted pod. "There is no local document"
   // is a fact this function can observe, and it outranks anything the caller
   // asserted. The lineage question is moot when there is nothing to lose.
-  let installWholesale = !currentDoc;
-  if (currentDoc) {
+  //
+  // ⚠️ AND `no-local-document` MEANS IT. The arm is an INSTRUCTION, not a hint:
+  // three store paths use it because the worker may be holding a DIFFERENT
+  // family's document, and `initAndLoadCache` on a cache MISS leaves that
+  // document installed. Deriving the install from `!currentDoc` alone made the
+  // arm decorative — `clean` + `same` resolves to `merge`, so the remote was
+  // CRDT-merged into the foreign document, persisted to the wrong family's
+  // cache and uploaded to the wrong family's file. It also broke the retry: a
+  // respawn rehydrates a document, so a replayed `no-local-document` found one
+  // and merged. The intent has to travel WITH the request, not be re-inferred
+  // from state the rehydrator can change underneath it.
+  // ⚠️ THE LEGACY FALLBACK IS REMOTE-ONLY, AND THAT ASYMMETRY IS DELIBERATE.
+  // A file compacted by the Tier-2 code carries its stamp only on the envelope
+  // (see `legacyEnvelopeLineage`). Reading it here is sound because envelope and
+  // payload are bytes out of the same blob. The LOCAL side has no equivalent —
+  // our envelope copy drifts from our document, which is why ADR-036 exists —
+  // so an unstamped local document stays `null`. That leaves one ambiguous
+  // pairing (unstamped local, legacy-stamped remote): we cannot tell whether we
+  // already hold that compacted document or are still on the pre-compaction
+  // history. We do not need to. BOTH readings resolve to `adopt-remote`, whose
+  // policy is safe either way — adopt when clean, block when dirty — and the
+  // adopt below stamps the document, so the ambiguity exists for exactly one
+  // sync per device and then never again.
+  const remoteLineage = docLineage(remote) ?? legacyEnvelopeLineage(envelope);
+  let installWholesale = !currentDoc || basis.kind === 'no-local-document';
+  if (currentDoc && basis.kind !== 'no-local-document') {
     const lineageCtx = lineageContextFor(basis, currentDoc);
     // Throws `PodLineageError` on a block; every caller between here and the
     // user dispatches on `isRemoteBlocker` FIRST, before any wrapping.
-    const act = guardLineage(docLineage(remote), docLineage(currentDoc), lineageCtx);
+    const act = guardLineage(remoteLineage, docLineage(currentDoc), lineageCtx);
     if (act === 'publish-local') {
       // Our document is the newer lineage. Touch NOTHING — not the document,
       // not the cursors, not the cache. The caller keeps its own document and
@@ -734,6 +767,12 @@ export async function mergeRemoteEnvelope(
         remoteHeads: headsOf(remote),
       };
     }
+    // ⚠️ EXHAUSTIVE. `guardLineage` returns `Exclude<LineageAction,'block'>`,
+    // and `'rebase'` is ALREADY in that union — Stage 3 flips one POLICY cell to
+    // it, in a different file, with no compile error and no failing test here.
+    // Falling through to `mergeDocs` would be the cross-lineage merge in which
+    // the OLD lineage wins deterministically. Refuse until Stage 3 implements it.
+    if (act === 'rebase') throw lineageBlockError('adopt-remote');
     installWholesale = act === 'adopt';
   }
 
@@ -763,7 +802,12 @@ export async function mergeRemoteEnvelope(
     // fully built: nothing between the decrypt and this line can leave the
     // worker document-less, and `resetDocCursors()` below is the drop's other
     // half. A retry re-runs the whole operation from the decrypt.
-    currentDoc = migrateDoc(remote);
+    // Stamp BEFORE the heads are read, so the change is part of what we publish:
+    // `dirty` below compares against the unmigrated remote's heads, so this
+    // shows up as "we moved past the file", the document goes back to Drive
+    // carrying its own lineage, and the retired envelope field stops mattering
+    // for this family forever. A no-op whenever there is nothing to adopt.
+    currentDoc = stampLineage(migrateDoc(remote), remoteLineage);
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();
@@ -994,8 +1038,20 @@ export function compactDoc(): {
   actorsBefore: number;
 } {
   const before = requireDoc('compactDoc');
-  const beforeStats = Automerge.stats(before);
-  const beforeBytes = saveDoc(before).byteLength;
+  // ⚠️ INSIDE the classifier. `saveDoc(before)` is a full serialize of the
+  // LARGEST (uncompacted) document — the single biggest allocation here — and
+  // it sat outside the try whose entire purpose is to turn an out-of-memory
+  // failure into a `PayloadTooLargeError`. A RangeError there reached the
+  // firehose unclassified, so the one signal that says "this device cannot
+  // compact its own pod" was missing on exactly the devices that produce it.
+  let beforeStats: ReturnType<typeof Automerge.stats>;
+  let beforeBytes: number;
+  try {
+    beforeStats = Automerge.stats(before);
+    beforeBytes = saveDoc(before).byteLength;
+  } catch (e) {
+    throw payloadFailure('materialize', e, null, null);
+  }
 
   let compacted: Doc;
   try {
@@ -1013,7 +1069,7 @@ export function compactDoc(): {
     // the bytes actually installed.
     const source = {
       ...plain,
-      podLineage: { id: crypto.randomUUID(), seq: (docLineage(before)?.seq ?? 0) + 1 },
+      podLineage: { id: generateUUID(), seq: (docLineage(before)?.seq ?? 0) + 1 },
     };
     compacted = Automerge.from(source, docInitOpts()) as Doc;
     // Proves the rebuild round-tripped EXACTLY — including the stamp, which is
@@ -1077,11 +1133,15 @@ export function compactDoc(): {
   try {
     pushProjection(compacted);
   } catch (e) {
-    // Put the old document back, cursors and all, so the caller's "nothing
-    // moved" really is true.
+    // ⚠️ RESTORE, DO NOT RE-PUSH. Retrying the very operation that just threw —
+    // on the OOM-prone device this feature targets — throws again, escapes this
+    // catch, and replaces the classified `PayloadTooLargeError` with a raw
+    // RangeError, so the composable reports "rebuild-failed" with no
+    // out-of-memory signal at all. Main's projection is still the OLD one
+    // (nothing replaced it), and `firstJsonDifference` already proved the
+    // rebuilt document holds identical DATA, so there is nothing to re-push.
     currentDoc = previous;
     resetDocCursors();
-    pushProjection(previous);
     throw payloadFailure('materialize', e, null, beforeBytes);
   }
   return stats;
