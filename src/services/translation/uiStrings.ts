@@ -4304,6 +4304,13 @@ const STRING_DEFS = {
     beanie:
       'on an older phone or tablet the record can grow big enough to stop your pod opening at all. compacting is what fixes that.',
   },
+  // The rebase conflict rule, moved OUT of the confirm and into the "?" popover
+  // with the rest of the mechanism.
+  'compaction.why.conflict': {
+    en: 'If the same thing was changed in two places, the version already saved here is the one kept.',
+    beanie:
+      'if the same thing was changed in two places, the version already saved here is the one kept.',
+  },
   'compaction.bringDevicesOnline': {
     en: "Before you start, bring your family's other devices online so they are up to date. beanies carries across changes made on a device that was offline, but if it cannot, that device will be asked to give them up.",
     beanie:
@@ -4324,9 +4331,9 @@ const STRING_DEFS = {
   },
   'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
   'compaction.confirmMessage': {
-    en: "beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online, and beanies carries across what they changed while offline. If the same thing was changed in two places, the version already saved here is the one kept. If a device's changes cannot be carried across at all, that device is told and keeps all of them until someone decides.",
+    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies keeps a copy of the current file first. Your other devices pick up the compacted file on their own, and beanies carries across anything they changed while offline. A device still on an older version of beanies shows a message and stops syncing until it updates; anything added on it before then is not kept.',
     beanie:
-      "beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this bean is lost, and beanies saves a copy of your current pod first. your other beans pick the compacted pod up next time they are online, and beanies carries across what they changed while offline. if the same thing was changed in two places, the version already saved here is the one kept. if a bean's changes cannot be carried across at all, that bean is told and keeps all of them until someone decides.",
+      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this bean is lost, and beanies keeps a copy of your current pod first. your other beans pick up the compacted pod on their own, and beanies carries across anything they changed while offline. a bean still on an older version of beanies shows a message and stops syncing until it updates; anything added on it before then is not kept.',
   },
   'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {
@@ -4398,27 +4405,6 @@ const STRING_DEFS = {
     en: 'Only the person who set up your family can compact the family file.',
     beanie: 'only the bean who set up your family can compact the family pod.',
   },
-  // The STANDING notice, in the Settings section, shown instead of the
-  // bring-your-devices-online caution while the gate is unsatisfied. It answers
-  // the three questions a refusal toast cannot: who, what do I do, and why does
-  // beanies name a person rather than the device that is actually behind.
-  'compaction.waitingOn': {
-    en: 'beanies is waiting on {names} before it can compact. Ask them to update beanies and open it once on each device they use it on. A device still on an older version could undo the compaction for the whole family, and beanies can only tell that a device is ready once someone opens beanies on it, which is why it names people rather than devices.',
-    beanie:
-      'beanies is waiting on {names} before it can compact. ask them to update beanies and open it once on each bean they use it on. a bean still on an older version could undo the compaction for the whole family, and beanies can only tell that a bean is ready once someone opens beanies on it, which is why it names people rather than beans.',
-  },
-  'compaction.refused.not-soaked': {
-    en: 'Someone in your family is using an older version of beanies. Ask everyone to update beanies and open it once on each device they use it on.',
-    beanie:
-      'someone in your family is using an older version of beanies. ask everyone to update beanies and open it once on each bean they use it on.',
-  },
-  // The named variant, used once the projection is current and beanies can say
-  // WHO — a refusal you can act on beats one you can only be puzzled by.
-  'compaction.refused.not-soaked.named': {
-    en: 'beanies is waiting on {names}. Ask them to update beanies and open it once on each device they use it on, then try again.',
-    beanie:
-      'beanies is waiting on {names}. ask them to update beanies and open it once on each bean they use it on, then try again.',
-  },
   // The DUE note. Two variants, because a device that has actually failed to
   // open the file is a different fact from a file that has merely grown — and
   // the first is the one a family should act on today.
@@ -4436,10 +4422,23 @@ const STRING_DEFS = {
     en: 'Nothing else to do. Your other devices will pick this up on their own.',
     beanie: 'nothing else to do. your other beans will pick this up on their own.',
   },
-  'compaction.doneButBehind': {
-    en: 'One thing to watch: beanies is still waiting on {names}, who is on an older version. Ask them to update before using it again, so their changes come across safely.',
+  'compaction.doneOlderVersion': {
+    en: 'Done. {list} last opened beanies on an older version; that device will show a message and sync again once it updates.',
     beanie:
-      'one thing to watch: beanies is still waiting on {names}, who is on an older version. ask them to update before using it again, so their changes come across safely.',
+      'done. {list} last opened beanies on an older version; that device will show a message and sync again once it updates.',
+  },
+  // The standing notice in Settings and the confirm's detail, composed ONCE in
+  // `usePodHealth`. Names people, never versions (absent on exactly those
+  // rows) and never devices (beanies has no per-device identity).
+  'compaction.olderVersion.notice': {
+    en: '{list} last opened beanies on an older version. Once you compact, a device that is still on an older version shows a message and stops syncing until it updates, and anything added on it before then is not kept. Ask them to update beanies first if you can. Nothing else changes for anyone.',
+    beanie:
+      '{list} last opened beanies on an older version. once you compact, a bean that is still on an older version shows a message and stops syncing until it updates, and anything added on it before then is not kept. ask them to update beanies first if you can. nothing else changes for anyone.',
+  },
+  'compaction.olderVersion.rule': {
+    en: 'beanies can only see when each person last opened it, not every device they own. Any device that has not updated will say so when it next opens, and will sync again once it does.',
+    beanie:
+      'beanies can only see when each bean last opened it, not every device they own. any device that has not updated will say so when it next opens, and will sync again once it does.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',

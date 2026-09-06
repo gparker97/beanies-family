@@ -22502,8 +22502,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失，beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件，并且beanies会在离线时传递更改的内容。如果在两个地方更改了相同的内容，则此处已保存的版本就是保留的版本。如果设备的更改根本无法进行，则会告知该设备并保留所有更改，直到有人做出决定。",
-      "hash": "qjk88g",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保留当前文件的副本。您的其他设备会自行拾取压缩文件，并且在离线时， beanies会携带它们更改的任何内容。仍然使用较旧版本Beanies的设备会显示一条消息并停止同步，直到更新为止；在此之前添加的任何内容都不会保留。",
+      "hash": "bclfcm",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
@@ -22696,16 +22696,6 @@
       "hash": "80fmnh",
       "lastUpdated": "2026-09-06"
     },
-    "compaction.refused.not-soaked": {
-      "translation": "您家中有人正在使用较旧版本的便帽。要求每个人更新Bean ，并在他们使用的每台设备上打开一次。",
-      "hash": "vooyji",
-      "lastUpdated": "2026-09-06"
-    },
-    "compaction.refused.not-soaked.named": {
-      "translation": "beanies正在等待{names}。要求他们更新Bean ，并在他们使用的每台设备上打开一次，然后重试。",
-      "hash": "55idbn",
-      "lastUpdated": "2026-09-06"
-    },
     "compaction.dueBecauseLarge": {
       "translation": "您的家庭文件已经足够大，以至于较旧的手机和平板电脑可能很难打开它。现在压实是个好主意。",
       "hash": "2hwwlz",
@@ -22721,11 +22711,6 @@
       "hash": "tfzlk9",
       "lastUpdated": "2026-09-06"
     },
-    "compaction.doneButBehind": {
-      "translation": "有一件事要注意： Beanies仍在等待{names} ，他正在使用旧版本。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
-      "hash": "psb9s4",
-      "lastUpdated": "2026-09-06"
-    },
     "compaction.refused.not-owner": {
       "translation": "只有建立家庭的人才能压缩家庭文件。",
       "hash": "kikvoi",
@@ -22734,11 +22719,6 @@
     "compaction.exportCheckMsg": {
       "translation": "请检查您的文件，并确保副本确实存在。无论哪种方式都不会删除任何内容；如果您需要，可以返回此副本。",
       "hash": "kpnhii",
-      "lastUpdated": "2026-09-06"
-    },
-    "compaction.waitingOn": {
-      "translation": "beanies正在等待{names}才能压缩。要求他们更新Bean ，并在他们使用的每台设备上打开一次。仍然使用旧版本的设备可能会取消整个家庭的压缩，并且beanies只能在有人打开设备上的beanies后才能告诉设备已准备就绪，这就是为什么它会命名人而不是设备的原因。",
-      "hash": "kp6j2t",
       "lastUpdated": "2026-09-06"
     },
     "podNewerVersion.inline": {
@@ -22779,6 +22759,26 @@
     "join.error.newerVersion": {
       "translation": "该家庭文件由较新版本的beanies保存。在此设备上更新Beanies ，然后再次打开邀请链接。此设备上的任何内容都不会丢失。",
       "hash": "i9zdbs",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.why.conflict": {
+      "translation": "如果在两个地方更改了相同的内容，则此处已保存的版本就是保留的版本。",
+      "hash": "4x56tz",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.doneOlderVersion": {
+      "translation": "完成。{list}最后一次在旧版本上打开beanies ；该设备将显示一条消息，并在更新后再次同步。",
+      "hash": "rea46f",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.olderVersion.notice": {
+      "translation": "{list}上次在旧版本上打开的beanies。压缩后，仍使用旧版本的设备会显示一条消息并停止同步，直到更新为止，并且在此之前添加的任何内容都不会保留。如果可以的话，请他们先更新beanies。其他任何人都不会改变。",
+      "hash": "hyvzft",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.olderVersion.rule": {
+      "translation": "beanies只能看到每个人上次打开它的时间，而不是他们拥有的每个设备。任何未更新的设备将在下次打开时进行更新，并在更新后再次同步。",
+      "hash": "b9ejqm",
       "lastUpdated": "2026-09-06"
     }
   }
