@@ -16,6 +16,8 @@ import {
   foldHeightFor,
   MAX_ATTEMPTS,
   defaultMaxBlock,
+  MAX_BLOCK_PX,
+  MAX_BLOCK_CEILING_PX,
   clusterOverlapping,
   findFolds,
   foldThresholdMinutes,
@@ -412,7 +414,14 @@ describe('the cap', () => {
   it('⭐ the cap is SOFT, so a longer event is never drawn shorter than a shorter one', () => {
     // A hard clamp is not monotonic: two events that both exceed the cap come out
     // identical, and the later one then ends lower than the longer one.
-    const l = layoutTimeGrid([[ev('09:00', '17:00'), ev('10:00', '14:00')]], 720);
+    // ⚠️ maxBlock is PINNED rather than left to the default. This asserts the
+    // softness of the cap, not the shape of the responsive curve, and it passes
+    // on a two-pixel margin: at 720px the 240-minute block is 192px raw against
+    // a 190px cap. Leaving it on the default made a test about monotonicity
+    // silently depend on `defaultMaxBlock(720)` staying at exactly 190.
+    const l = layoutTimeGrid([[ev('09:00', '17:00'), ev('10:00', '14:00')]], 720, {
+      maxBlock: MAX_BLOCK_PX,
+    });
     const long = l.columns[0]!.find((b) => b.end - b.start === 480)!;
     const short = l.columns[0]!.find((b) => b.end - b.start === 240)!;
     expect(long.capped && short.capped).toBe(true);
@@ -629,5 +638,51 @@ describe('clusterOverlapping / mergeBusy', () => {
     );
     expect(folds).toHaveLength(1);
     expect(folds[0]).toMatchObject({ startMinutes: 10, resumeMinutes: 40 });
+  });
+});
+
+describe('defaultMaxBlock', () => {
+  // The cap responds to the VIEWPORT, never to the content — which is what keeps
+  // "an hour is the same height on a quiet day and a busy one" true.
+  it('returns the historical flat cap when there is no measurement to go on', () => {
+    expect(defaultMaxBlock(undefined)).toBe(MAX_BLOCK_PX);
+    expect(defaultMaxBlock(0)).toBe(MAX_BLOCK_PX);
+    expect(defaultMaxBlock(-100)).toBe(MAX_BLOCK_PX);
+    expect(defaultMaxBlock(NaN)).toBe(MAX_BLOCK_PX);
+  });
+
+  it('never drops below the historical cap, so small screens are unchanged', () => {
+    // Every device at or below the reference height must render byte-for-byte as
+    // it did before the cap became responsive.
+    for (const height of [220, 300, 420, 560, 700, 719]) {
+      expect(defaultMaxBlock(height)).toBe(MAX_BLOCK_PX);
+    }
+  });
+
+  it('⭐ returns exactly MAX_BLOCK_PX at the reference height', () => {
+    // Load-bearing, and easy to break silently: the "cap is SOFT" test above lays
+    // out at 720px and depends on a 240-minute block (192px raw) still exceeding
+    // the cap. It now pins maxBlock explicitly, but this keeps the underlying
+    // property stated rather than implied.
+    expect(defaultMaxBlock(720)).toBe(MAX_BLOCK_PX);
+  });
+
+  it('grows with the plot above the reference height', () => {
+    expect(defaultMaxBlock(1080)).toBeCloseTo(285, 0);
+    expect(defaultMaxBlock(900)).toBeGreaterThan(MAX_BLOCK_PX);
+    expect(defaultMaxBlock(1080)).toBeGreaterThan(defaultMaxBlock(900));
+  });
+
+  it('stops at the ceiling, so one block never owns the whole wall', () => {
+    expect(defaultMaxBlock(4000)).toBe(MAX_BLOCK_CEILING_PX);
+    expect(defaultMaxBlock(10_000)).toBe(MAX_BLOCK_CEILING_PX);
+  });
+
+  it('is monotonic in height', () => {
+    const heights = [200, 500, 720, 800, 1000, 1440, 2160];
+    const caps = heights.map(defaultMaxBlock);
+    for (let i = 1; i < caps.length; i++) {
+      expect(caps[i]!).toBeGreaterThanOrEqual(caps[i - 1]!);
+    }
   });
 });

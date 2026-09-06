@@ -27,7 +27,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring } from '@/utils/listLifecycle';
 import { jobsProgress } from '@/utils/wallJobs';
 import type { FamilyList, FamilyMember } from '@/types/models';
-import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
+import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 const props = defineProps<{
   /**
@@ -47,13 +47,8 @@ const props = defineProps<{
    * chore and list cards are today's work by construction and carry no date label.
    */
   mealsYmd: string;
-  todosFor: (memberId: string) => WallJob[];
-  /** Due-now work nobody has claimed — counted and shown like anyone else's. */
-  unassignedTodos: WallJob[];
-  listsFor: (memberId: string) => WallListGroup[];
-  orphanLists: WallListGroup[];
-  /** The wall's person filter, so the card agrees with the view above it. */
-  visibleMemberIds: string[] | null;
+  /** The job/list bundle, as one object — see `WallPeripheralData`. */
+  peripherals: WallPeripheralData;
 }>();
 const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
 
@@ -66,8 +61,8 @@ const rows = computed(() => (props.variant === 'band' ? 3 : props.variant === 'r
 
 const beans = computed(() => {
   const humans = familyStore.sortedHumans;
-  if (!props.visibleMemberIds) return humans;
-  const allowed = new Set(props.visibleMemberIds);
+  if (!props.peripherals.visibleMemberIds) return humans;
+  const allowed = new Set(props.peripherals.visibleMemberIds);
   return humans.filter((m) => allowed.has(m.id));
 });
 
@@ -77,7 +72,10 @@ const beans = computed(() => {
  * once a person filter is applied.
  */
 const todoProgress = computed(() =>
-  jobsProgress([...beans.value.flatMap((m) => props.todosFor(m.id)), ...props.unassignedTodos])
+  jobsProgress([
+    ...beans.value.flatMap((m) => props.peripherals.todosFor(m.id)),
+    ...props.peripherals.unassignedTodos,
+  ])
 );
 
 /** Only beans who still owe something — a finished bean is not news. */
@@ -94,8 +92,8 @@ const outstandingTodos = computed(() => {
   // Named `entries`, not `rows`: a local `rows` shadowed the `rows` computed
   // above, so the cap that limits this list silently became `slice(0, its own
   // length)` — a no-op.
-  const entries = outstandingFor(props.todosFor);
-  const loose = props.unassignedTodos.filter((j) => !j.done);
+  const entries = outstandingFor(props.peripherals.todosFor);
+  const loose = props.peripherals.unassignedTodos.filter((j) => !j.done);
   // Unclaimed work still needs a way in: the card is what opens the drawer, and
   // gating it on assigned counts alone left a family whose only to-do was added
   // at the wall (which creates them unassigned) with no route back to it.
@@ -145,8 +143,8 @@ const bandColumns = computed(() =>
  * nothing under it.
  */
 const allGroups = computed(() => [
-  ...beans.value.flatMap((m) => props.listsFor(m.id)),
-  ...props.orphanLists,
+  ...beans.value.flatMap((m) => props.peripherals.listsFor(m.id)),
+  ...props.peripherals.orphanLists,
 ]);
 const visibleLists = computed(() =>
   allGroups.value.filter((g) => g.jobs.length).slice(0, props.variant === 'rail' ? 1 : 4)

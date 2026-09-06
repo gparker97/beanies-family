@@ -26,7 +26,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { jobsProgress } from '@/utils/wallJobs';
 import { isRecurring } from '@/utils/listLifecycle';
-import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
+import type { WallJob, WallListGroup, WallPeripheralData, WallSheetTarget } from '@/types/wall';
+import type { FamilyMember } from '@/types/models';
 
 defineOptions({ inheritAttrs: false });
 
@@ -34,10 +35,13 @@ defineOptions({ inheritAttrs: false });
 const COLUMN_ROWS = 7;
 
 const props = defineProps<{
-  listsFor: (memberId: string) => WallListGroup[];
-  orphanLists: WallListGroup[];
+  /**
+   * The job/list bundle, the same object the calendar views forward to their
+   * shell. The board reads `listsFor`, `orphanLists` and `visibleMemberIds` from
+   * it — one shape for the wall's job data, rather than a second spelling here.
+   */
+  peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
-  visibleMemberIds: string[] | null;
   backLabel: string;
 }>();
 const emit = defineEmits<{ toggle: [WallJob]; back: []; open: [WallSheetTarget] }>();
@@ -57,8 +61,8 @@ const canAdd = computed(() => lock?.isLocked.value === false);
 
 const members = computed(() => {
   const humans = familyStore.sortedHumans;
-  if (!props.visibleMemberIds) return humans;
-  const allowed = new Set(props.visibleMemberIds);
+  if (!props.peripherals.visibleMemberIds) return humans;
+  const allowed = new Set(props.peripherals.visibleMemberIds);
   return humans.filter((m) => allowed.has(m.id));
 });
 
@@ -68,7 +72,7 @@ const members = computed(() => {
  * other list of that bean's off the board.
  */
 function buildColumn(memberId: string) {
-  const groups = props.listsFor(memberId);
+  const groups = props.peripherals.listsFor(memberId);
   const shown: WallListGroup[] = [];
   let rows = 0;
   let hidden = 0;
@@ -109,9 +113,48 @@ const columnByMember = computed(() => {
   return map;
 });
 
-function columnFor(memberId: string) {
-  return columnByMember.value.get(memberId) ?? buildColumn(memberId);
-}
+/**
+ * Beans with jobs, and beans without — computed once, in one pass.
+ *
+ * ⚠️ This also fixes a performance regression the old `columnFor()` helper
+ * reintroduced at the call site: the template asked it for each member THIRTEEN
+ * times per render (the ring, the count, the lists, the overflow, the total and
+ * the stars), on a screen that re-renders every 20s forever, on a tablet. That
+ * is the exact cost `columnByMember`'s docblock above exists to prevent. The
+ * template now reads `entry.column` and never calls a function.
+ *
+ * `total === 0` is the ONLY definition of idle. A bean who has FINISHED their
+ * jobs is `done === total` with `total > 0`, keeps a full column, and keeps the
+ * green ring and the row of stars — that is the reward, and collapsing it would
+ * punish the one bean who did everything asked.
+ */
+const partitioned = computed(() => {
+  const active: { member: FamilyMember; column: ReturnType<typeof buildColumn> }[] = [];
+  const idle: FamilyMember[] = [];
+  for (const member of members.value) {
+    // `members` and `columnByMember` are built from the same filtered list in the
+    // same tick, so a miss is impossible today. `continue` rather than `!` so a
+    // future edit that breaks that invariant drops one chip from a kitchen wall
+    // instead of throwing the whole board away.
+    const column = columnByMember.value.get(member.id);
+    if (!column) continue;
+    if (column.total > 0) active.push({ member, column });
+    else idle.push(member);
+  }
+  return { active, idle };
+});
+
+/**
+ * Is there a grid to draw at all?
+ *
+ * ⚠️ Orphan lists count. They live in the grid but are NOT a member, so a board
+ * where every bean is clear but an unowned list exists must still render the
+ * grid — otherwise that list vanishes, which is the exact failure the orphan
+ * column was built to prevent.
+ */
+const hasBoard = computed(
+  () => partitioned.value.active.length > 0 || props.peripherals.orphanLists.length > 0
+);
 
 const boardProgress = computed(() => {
   let done = 0;
@@ -162,19 +205,24 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       </span>
     </div>
 
+    <!--
+      Columns are CAPPED, not `1fr`. With one or two beans holding the jobs a
+      `1fr` track stretched a single list into a billboard; capped tracks stay a
+      readable width and centre, so the surplus reads as margin rather than as a
+      rendering fault. Capping unconditionally avoids a "if exactly one active
+      member" special case that would have to be kept correct forever.
+    -->
     <div
-      class="grid min-h-0 flex-1 gap-2.5"
-      style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
+      v-if="hasBoard"
+      class="grid min-h-0 flex-1 justify-center gap-2.5"
+      style="grid-template-columns: repeat(auto-fit, minmax(210px, 420px))"
     >
       <div
-        v-for="member in members"
+        v-for="{ member, column } in partitioned.active"
         :key="member.id"
+        data-test="board-column"
         class="dark:bg-surface-raised flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
-        :class="
-          columnFor(member.id).total && columnFor(member.id).done === columnFor(member.id).total
-            ? 'ring-[2.5px] ring-[#27AE60]'
-            : ''
-        "
+        :class="column.total && column.done === column.total ? 'ring-[2.5px] ring-[#27AE60]' : ''"
       >
         <div
           class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
@@ -186,11 +234,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
               {{ member.name }}
             </p>
             <p class="font-inter wall-bean-count text-[var(--muted-text,#4d5d6c)]">
-              {{
-                columnFor(member.id).total
-                  ? `${columnFor(member.id).done} / ${columnFor(member.id).total}`
-                  : t('wall.jobs.none')
-              }}
+              {{ `${column.done} / ${column.total}` }}
             </p>
           </div>
         </div>
@@ -199,7 +243,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2"
           :style="{ background: `${member.color}0d` }"
         >
-          <div v-for="group in columnFor(member.id).shown" :key="group.list.id">
+          <div v-for="group in column.shown" :key="group.list.id">
             <button
               type="button"
               class="font-outfit wall-list-title mb-0.5 flex w-full items-center gap-1.5 text-left font-bold tracking-[0.06em] text-[var(--muted-text,#4d5d6c)] uppercase"
@@ -228,33 +272,19 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           </div>
 
           <button
-            v-if="columnFor(member.id).hidden"
+            v-if="column.hidden"
             type="button"
             class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2 py-1 font-bold"
             @click="emit('open', { kind: 'lists' })"
           >
-            {{ fillTemplate(t('wall.card.more'), { count: columnFor(member.id).hidden }) }}
+            {{ fillTemplate(t('wall.card.more'), { count: column.hidden }) }}
             <span aria-hidden="true">›</span>
           </button>
-
-          <p
-            v-if="!columnFor(member.id).total"
-            class="font-caveat m-auto text-[var(--muted-text,#4d5d6c)] opacity-70"
-          >
-            {{ t('wall.jobs.none') }}
-          </p>
         </div>
 
-        <p
-          v-if="columnFor(member.id).total"
-          class="wall-stars shrink-0 px-3 pt-1 pb-3 tracking-[2px]"
-          aria-hidden="true"
-        >
-          <span v-for="n in columnFor(member.id).done" :key="`s${n}`">⭐</span>
-          <span
-            v-for="n in columnFor(member.id).total - columnFor(member.id).done"
-            :key="`d${n}`"
-            class="text-[#d7dee5]"
+        <p class="wall-stars shrink-0 px-3 pt-1 pb-3 tracking-[2px]" aria-hidden="true">
+          <span v-for="n in column.done" :key="`s${n}`">⭐</span>
+          <span v-for="n in column.total - column.done" :key="`d${n}`" class="text-[#d7dee5]"
             >·</span
           >
         </p>
@@ -262,7 +292,8 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 
       <!-- lists whose owner the wall cannot resolve — labelled, not hidden -->
       <div
-        v-if="orphanLists.length"
+        v-if="peripherals.orphanLists.length"
+        data-test="orphan-column"
         class="ring-dashed dark:bg-surface-raised flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
       >
         <div
@@ -279,7 +310,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           </p>
         </div>
         <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
-          <div v-for="group in orphanLists" :key="group.list.id">
+          <div v-for="group in peripherals.orphanLists" :key="group.list.id">
             <p
               class="font-outfit wall-list-title mb-0.5 flex items-center gap-1.5 font-bold tracking-[0.06em] text-[var(--muted-text,#4d5d6c)] uppercase"
             >
@@ -293,6 +324,36 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
             />
           </div>
         </div>
+      </div>
+    </div>
+
+    <!--
+      Beans with nothing on. A collapsed column would still cost a full track of
+      visual weight while saying nothing, and a grey sliver per child every day
+      reads as an absence on a family's kitchen wall. One row, everyone still
+      named, and phrased as a state rather than a lack.
+
+      When no bean has jobs this IS the board (`flex-1`), rather than a strip
+      under an empty grid.
+    -->
+    <div
+      v-if="partitioned.idle.length"
+      data-test="idle-strip"
+      class="dark:bg-surface-raised flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[22px] bg-white px-4 py-3 shadow-[var(--card-shadow)]"
+      :class="hasBoard ? 'shrink-0' : 'min-h-0 flex-1 justify-center'"
+    >
+      <p class="font-outfit text-secondary-500 wall-list-title dark:text-ink font-bold uppercase">
+        {{ t('wall.jobs.allClear') }}
+      </p>
+      <div
+        v-for="member in partitioned.idle"
+        :key="member.id"
+        class="flex shrink-0 items-center gap-1.5"
+      >
+        <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
+        <span class="font-inter wall-bean-count text-[var(--muted-text,#4d5d6c)]">
+          {{ member.name }}
+        </span>
       </div>
     </div>
   </div>

@@ -40,7 +40,8 @@ import { useToast } from '@/composables/useToast';
 import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
 import { anchorOffsetDays } from '@/utils/wallAnchor';
-import type { WallJob, WallSheetTarget, WallViewId } from '@/types/wall';
+import { DAYS_RAIL_QUERY } from '@/components/wall/wallLayout';
+import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
 /** Long enough that a celebration is seen, short enough that it never camps. */
@@ -138,6 +139,30 @@ const subtitle = computed(() => {
  * (seven columns crushed into portrait) until someone reloaded it.
  */
 const isPortrait = useMediaQuery('(orientation: portrait)');
+
+/**
+ * Can the days view afford the side rail?
+ *
+ * A media query on the VIEWPORT, deliberately, not a measurement of the plot:
+ * the rail's own width comes out of the plot it would be measured against, so
+ * turning it on shrinks the plot below the threshold, which turns it off, which
+ * widens it again. See `DAYS_RAIL_MIN_VIEWPORT_PX` for the arithmetic.
+ */
+const railWide = useMediaQuery(DAYS_RAIL_QUERY, true);
+const daysRail = computed(() => railWide.value && !isPortrait.value);
+
+/**
+ * The job/list bundle, built once and forwarded whole. Passing its five members
+ * individually meant a ten-prop `WallPeripheralCards` invocation written out in
+ * every calendar view.
+ */
+const peripherals = computed<WallPeripheralData>(() => ({
+  todosFor: jobs.todosFor,
+  unassignedTodos: jobs.unassignedTodos.value,
+  listsFor: jobs.listsFor,
+  orphanLists: jobs.orphanLists.value,
+  visibleMemberIds: visibleMemberIds.value,
+}));
 
 /**
  * The night clock must actually tick: it is the largest type on screen and the
@@ -470,10 +495,8 @@ watch(activeView, () => (sheet.value = null));
         :tomorrow-ymd="tomorrowYmd"
         :portrait="isPortrait"
         :now="clockNow"
-        :todos-for="jobs.todosFor"
-        :unassigned-todos="jobs.unassignedTodos.value"
-        :lists-for="jobs.listsFor"
-        :orphan-lists="jobs.orphanLists.value"
+        :peripherals="peripherals"
+        :rail="daysRail"
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"
         :back-label="backLabel"

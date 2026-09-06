@@ -5980,6 +5980,10 @@ const STRING_DEFS = {
   // Used when the wall is browsing a day that is not today, where "{count} today"
   // would be a plain lie. `{day}` is a short weekday name.
   'wall.lane.onDay': { en: '{count} on {day}', beanie: '{count} on {day}' },
+  // Names the beans with nothing assigned, on the chore board's footer strip.
+  // Affirmative on purpose: "all clear" is a state, "nothing assigned" is a lack,
+  // and this is a row of children's faces on a kitchen wall.
+  'wall.jobs.allClear': { en: 'All clear', beanie: 'all clear' },
   'lists.cycle.archiveFailed': {
     en: 'Couldn’t save this list’s history. It’ll try again next time you open the app.',
     beanie: 'couldn’t save this list’s history. it’ll try again next time you open beanies.',

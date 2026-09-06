@@ -18,15 +18,15 @@
  */
 import { computed } from 'vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
-import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
-import { wallDayAllDay, wallEvents, wallPeripheralVariant } from '@/utils/wallActivities';
+import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
-import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
+import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 // The page renders all four views through one `<component :is>` with a single
 // prop bag, so every view receives props it does not declare.
@@ -37,10 +37,15 @@ const props = defineProps<{
   todayYmd: string;
   portrait: boolean;
   now: Date;
-  todosFor: (memberId: string) => WallJob[];
-  unassignedTodos: WallJob[];
-  listsFor: (memberId: string) => WallListGroup[];
-  orphanLists: WallListGroup[];
+  /**
+   * Whether there is room for the side rail. Days view is the only one with
+   * SEVEN columns, so the rail's 296px comes out of theirs — see
+   * `DAYS_RAIL_MIN_VIEWPORT_PX`. Decided by the page, from a media query.
+   */
+  rail: boolean;
+  /** The job/list bundle, forwarded whole to the shell. */
+  peripherals: WallPeripheralData;
+  /** The wall's person filter, which this view applies to its own content too. */
   visibleMemberIds: string[] | null;
 }>();
 const emit = defineEmits<{
@@ -118,9 +123,6 @@ const showsToday = computed(() => props.weekDays.includes(props.todayYmd));
 
 /** Content-derived, never layout-derived — see `wallPeripheralVariant`. */
 const busiest = computed(() => Math.max(0, ...visible.value.map((ymd) => eventsFor(ymd).length)));
-const peripheralVariant = computed(() =>
-  wallPeripheralVariant('band', busiest.value, props.portrait)
-);
 
 /** The rest-of-week strip still needs a colour per pip. */
 function colourFor(activity: FamilyActivity) {
@@ -129,92 +131,89 @@ function colourFor(activity: FamilyActivity) {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-2.5">
-    <!-- day headers, on the same column track as the plot below -->
-    <div
-      class="grid shrink-0 gap-0"
-      :style="{
-        paddingLeft: `${AXIS_WIDTH_PX}px`,
-        gridTemplateColumns: `repeat(${visible.length}, 1fr)`,
-      }"
-    >
-      <button
-        v-for="ymd in visible"
-        :key="ymd"
-        type="button"
-        class="rounded-t-2xl px-2 py-1.5 text-center"
-        :class="
-          ymd === todayYmd
-            ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
-            : 'text-secondary-500 dark:text-ink'
-        "
-        @click="emit('focusDay', ymd)"
+  <WallViewShell
+    :portrait="portrait"
+    :rail="rail"
+    :busiest="busiest"
+    :meals-ymd="todayYmd"
+    :peripherals="peripherals"
+    @open="emit('open', $event)"
+    @open-chores="emit('openChores')"
+  >
+    <template #main>
+      <!-- day headers, on the same column track as the plot below -->
+      <div
+        class="grid shrink-0 gap-0"
+        :style="{
+          paddingLeft: `${AXIS_WIDTH_PX}px`,
+          gridTemplateColumns: `repeat(${visible.length}, 1fr)`,
+        }"
       >
-        <span class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70">
-          {{ weekdayShort(ymd) }}
-        </span>
-        <span class="font-outfit wall-dnum block leading-tight font-extrabold">
-          {{ dayOfMonth(ymd) }}
-        </span>
-      </button>
-    </div>
+        <button
+          v-for="ymd in visible"
+          :key="ymd"
+          type="button"
+          class="rounded-t-2xl px-2 py-1.5 text-center"
+          :class="
+            ymd === todayYmd
+              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
+              : 'text-secondary-500 dark:text-ink'
+          "
+          @click="emit('focusDay', ymd)"
+        >
+          <span class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70">
+            {{ weekdayShort(ymd) }}
+          </span>
+          <span class="font-outfit wall-dnum block leading-tight font-extrabold">
+            {{ dayOfMonth(ymd) }}
+          </span>
+        </button>
+      </div>
 
-    <WallTimeGrid
-      :columns="gridColumns"
-      :all-day-spans="allDaySpans"
-      :now="now"
-      :dim-past="true"
-      :show-now="showsToday"
-      :axis-width="AXIS_WIDTH_PX"
-      view-id="days"
-      @open="emit('open', $event)"
-    />
+      <WallTimeGrid
+        :columns="gridColumns"
+        :all-day-spans="allDaySpans"
+        :now="now"
+        :dim-past="true"
+        :show-now="showsToday"
+        :axis-width="AXIS_WIDTH_PX"
+        view-id="days"
+        @open="emit('open', $event)"
+      />
 
-    <!-- portrait only: the rest of the week, tappable -->
-    <div
-      v-if="rest.length"
-      class="grid shrink-0 gap-2"
-      :style="{ gridTemplateColumns: `repeat(${rest.length}, 1fr)` }"
-    >
-      <button
-        v-for="ymd in rest"
-        :key="ymd"
-        type="button"
-        class="dark:bg-surface-raised flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)]"
-        @click="emit('focusDay', ymd)"
+      <!-- portrait only: the rest of the week, tappable -->
+      <div
+        v-if="rest.length"
+        class="grid shrink-0 gap-2"
+        :style="{ gridTemplateColumns: `repeat(${rest.length}, 1fr)` }"
       >
-        <span
-          class="font-outfit text-secondary-500 wall-rest-day dark:text-ink font-bold uppercase"
+        <button
+          v-for="ymd in rest"
+          :key="ymd"
+          type="button"
+          class="dark:bg-surface-raised flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)]"
+          @click="emit('focusDay', ymd)"
         >
-          {{ weekdayShort(ymd) }} {{ dayOfMonth(ymd) }}
-        </span>
-        <span class="ml-auto flex gap-1" aria-hidden="true">
-          <i
-            v-for="entry in eventsFor(ymd).slice(0, 4)"
-            :key="entry.activity.id + entry.date"
-            class="block h-1.5 w-1.5 rounded-full"
-            :style="{ background: colourFor(entry.activity) }"
-          />
-        </span>
-        <span
-          class="font-outfit text-primary-500 wall-rest-count rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 font-bold"
-        >
-          {{ eventsFor(ymd).length }}
-        </span>
-      </button>
-    </div>
-
-    <WallPeripheralCards
-      :variant="peripheralVariant"
-      :portrait="portrait"
-      :meals-ymd="todayYmd"
-      :todos-for="todosFor"
-      :unassigned-todos="unassignedTodos"
-      :lists-for="listsFor"
-      :orphan-lists="orphanLists"
-      :visible-member-ids="visibleMemberIds"
-      @open="emit('open', $event)"
-      @open-chores="emit('openChores')"
-    />
-  </div>
+          <span
+            class="font-outfit text-secondary-500 wall-rest-day dark:text-ink font-bold uppercase"
+          >
+            {{ weekdayShort(ymd) }} {{ dayOfMonth(ymd) }}
+          </span>
+          <span class="ml-auto flex gap-1" aria-hidden="true">
+            <i
+              v-for="entry in eventsFor(ymd).slice(0, 4)"
+              :key="entry.activity.id + entry.date"
+              class="block h-1.5 w-1.5 rounded-full"
+              :style="{ background: colourFor(entry.activity) }"
+            />
+          </span>
+          <span
+            class="font-outfit text-primary-500 wall-rest-count rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 font-bold"
+          >
+            {{ eventsFor(ymd).length }}
+          </span>
+        </button>
+      </div>
+    </template>
+  </WallViewShell>
 </template>
