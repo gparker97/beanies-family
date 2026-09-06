@@ -55,28 +55,46 @@ describe('useWallAnchor', () => {
     });
   });
 
-  it('re-anchors to the new day at midnight rollover', async () => {
+  it('rolls to the new day at midnight when the wall is showing today', async () => {
     // Not `withAnchor`: the watcher flushes on the microtask queue ('pre'), so a
     // synchronous assertion inside the scope runs BEFORE it fires. Awaiting
-    // nextTick is what tests the real behaviour instead of a convenient one.
+    // nextTick tests the real behaviour rather than a convenient one — an
+    // earlier version asserted synchronously and passed with the watcher
+    // deleted, which is how it went unnoticed.
     const scope = effectScope();
     try {
       const anchor = scope.run(() => useWallAnchor())!;
-      // ⚠️ Park the anchor somewhere the new `today` CANNOT coincidentally be.
-      // A previous version of this test stepped one week from an unaligned
-      // Sunday — landing on 2026-09-07 — and then set `today` to 2026-09-07,
-      // so it passed with the watcher deleted. Verified: it did.
-      anchor.setAnchor('2026-09-20', 'day_tap');
-      expect(anchor.anchorYmd.value).toBe('2026-09-20');
-      expect(anchor.isAnchoredToToday.value).toBe(false);
+      expect(anchor.isAnchoredToToday.value).toBe(true);
 
-      // The wall is left running; `useToday` ticks over at midnight. Without the
-      // watcher a wall sits on a stale week indefinitely.
       today.value = '2026-09-07';
       await nextTick();
 
       expect(anchor.anchorYmd.value).toBe('2026-09-07');
       expect(anchor.isAnchoredToToday.value).toBe(true);
+    } finally {
+      scope.stop();
+    }
+  });
+
+  it('⚠️ does NOT drag a browsing family home at midnight', async () => {
+    // A wall being read at 23:59 must not silently jump to today at 00:00 —
+    // that is the same "returned to today with no indication why" this whole
+    // change removed from WallTodayView's old local focus.
+    const scope = effectScope();
+    try {
+      const anchor = scope.run(() => useWallAnchor())!;
+      anchor.setAnchor('2026-09-20', 'day_tap');
+      expect(anchor.anchorYmd.value).toBe('2026-09-20');
+
+      today.value = '2026-09-07';
+      await nextTick();
+
+      expect(anchor.anchorYmd.value).toBe('2026-09-20');
+      expect(anchor.isAnchoredToToday.value).toBe(false);
+
+      // And "today" still means the NEW today, not the stale one.
+      anchor.goToToday();
+      expect(anchor.anchorYmd.value).toBe('2026-09-07');
     } finally {
       scope.stop();
     }

@@ -1,3 +1,5 @@
+import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
+
 /**
  * Page-layout facts about the wall's chrome.
  *
@@ -13,7 +15,8 @@
 export const RAIL_WIDTH_PX = 296;
 
 /**
- * The viewport width at which the days view can afford the rail.
+ * The viewport width at which the days view can afford the rail — `railFits(x, 7)`
+ * expressed as a number, kept only for the derivation it documents.
  *
  * Days view is the only one with SEVEN columns, and the rail's width comes out
  * of theirs. Derived, not invented:
@@ -34,13 +37,16 @@ export const RAIL_WIDTH_PX = 296;
  */
 export const DAYS_RAIL_MIN_VIEWPORT_PX = 1270;
 
-/** The media query behind `DAYS_RAIL_MIN_VIEWPORT_PX`. */
-export const DAYS_RAIL_QUERY = `(min-width: ${DAYS_RAIL_MIN_VIEWPORT_PX}px)`;
+/**
+ * ⚠️ There is no longer a media-query path. Days used `matchMedia` while lanes
+ * used `innerWidth`; those disagree by the scrollbar width and by fractional
+ * zoom, so near the threshold the two views could reach opposite conclusions on
+ * the same screen at the same instant. Both now call `railFits`.
+ */
 
 /** Everything the rail costs a view's columns, in px. */
 const RAIL_GAP_PX = 16;
 const PAGE_PADDING_PX = 56; // px-7, both sides
-const AXIS_PX = 62; // AXIS_WIDTH_PX — imported by value in the arithmetic below
 
 /**
  * A column width that keeps a block's title. Comfortably above `WallTimeBlock`'s
@@ -67,6 +73,6 @@ const MIN_READABLE_COLUMN_PX = 120;
  * check that this generalisation did not move the days view.
  */
 export function railFits(viewportPx: number, columns: number): boolean {
-  const forColumns = viewportPx - PAGE_PADDING_PX - RAIL_WIDTH_PX - RAIL_GAP_PX - AXIS_PX;
+  const forColumns = viewportPx - PAGE_PADDING_PX - RAIL_WIDTH_PX - RAIL_GAP_PX - AXIS_WIDTH_PX;
   return forColumns >= columns * MIN_READABLE_COLUMN_PX;
 }
