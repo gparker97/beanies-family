@@ -31,6 +31,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePodExport } from '@/composables/usePodExport';
+import { usePodHealth } from '@/composables/usePodHealth';
 import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import * as syncService from '@/services/sync/syncService';
@@ -43,6 +44,12 @@ import { PayloadLoadError } from '@/types/sync';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
 type RefusalCode =
+  // Not the owner. The Settings section is already `v-if`-ed on this, so
+  // reaching it means something other than the button called `compact()` — a
+  // stale render, a keyboard activation mid-role-change, a future caller. A
+  // `v-if` hides a control; it does not gate an action, and the action is the
+  // one that rewrites everyone's file.
+  | 'not-owner'
   | 'not-soaked'
   | 'not-synced'
   | 'backup-not-delivered'
@@ -66,6 +73,7 @@ export function usePodCompaction() {
   const familyContext = useFamilyContextStore();
   const { t } = useTranslation();
   const { deliverPod, confirmBackupLanded } = usePodExport();
+  const { canCompactPod } = usePodHealth();
   const busy = ref(false);
 
   function refuse(code: RefusalCode, detail?: string): void {
@@ -113,6 +121,7 @@ export function usePodCompaction() {
       //    is going to refuse to honour. This reading is provisional — the
       //    projection is only current after the pull at step 2b — so it exists
       //    to fail FAST, and step 2d is the authoritative one.
+      if (!canCompactPod.value) return refuse('not-owner');
       const preSoak = soak();
       if (!preSoak.ok) return refuse('not-soaked', `behind=${preSoak.behind.length}`);
 
@@ -226,7 +235,17 @@ export function usePodCompaction() {
       if (!(await deliverPod(built, { errorUi: 'caller' }))) {
         return refuse('backup-not-delivered');
       }
-      if (!(await confirmBackupLanded())) return refuse('backup-not-delivered');
+      if (
+        !(await confirmBackupLanded({
+          message: 'compaction.exportCheckMsg',
+          // `info`, not `danger`: the CIG reserves red for delete and leave, and
+          // a compaction deletes nothing. (The delete-family caller passes
+          // `danger`, which is what red is for.)
+          variant: 'info',
+        }))
+      ) {
+        return refuse('backup-not-delivered');
+      }
 
       const envelope = syncStore.envelope;
       if (!envelope) return refuse('no-envelope');

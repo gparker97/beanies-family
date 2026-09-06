@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { reactive, isReactive } from 'vue';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
 import { serializeError, type RpcRequest } from '../protocol';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
@@ -30,6 +31,7 @@ import {
   mutate,
   fireAndForgetMutate,
   mergeRemoteEnvelope,
+  logMergeTerminus,
   setLocalChangeHandler,
   checkWorkerLiveness,
   initAndLoadCache,
@@ -232,6 +234,131 @@ describe('docClient', () => {
       })
     ).rejects.toBeInstanceOf(CorruptPayloadError);
     expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('logs a rebase terminus with what it carried, at warn when it dropped a write', () => {
+    // ⚠️ ONE LOGGER, BOTH TERMINI. They were two copies of the same question and
+    // they drifted: the poll terminus carried `replayed`/`conflicts` and warned
+    // on a dropped write, while the OPEN terminus — the path an offline peer
+    // actually takes when it comes back and gets rebased — logged a bare `info`
+    // with neither field. The case the soak exists to measure was the case
+    // reporting nothing.
+    logMergeTerminus('open terminus', { action: 'rebased', replayed: 7, conflicts: 2 }, 'fam-1');
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'pod-lineage',
+        message: 'open terminus rebased',
+        context: expect.objectContaining({
+          action: 'rebased',
+          family_id: 'fam-1',
+          detail: 'replayed=7,conflicts=2',
+        }),
+      })
+    );
+  });
+
+  it('stays at info for a clean rebase, and omits the detail for every other action', () => {
+    logMergeTerminus('poll terminus', { action: 'rebased', replayed: 3, conflicts: 0 }, 'fam-1');
+    expect(logEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        // ⚠️ ON THE SUCCESS PATH TOO, or the RATE is unmeasurable and only
+        // failures are visible.
+        context: expect.objectContaining({ detail: 'replayed=3,conflicts=0' }),
+      })
+    );
+
+    logMergeTerminus('poll terminus', { action: 'merged' }, 'fam-1');
+    const last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    // The field's presence is itself the answer to "did a rebase happen".
+    expect(last.context).not.toHaveProperty('detail');
+    expect(last.level).toBe('info');
+  });
+
+  it('reports a rebase that could not run — on the BLOCKED half', async () => {
+    // ⚠️ THE SOAK'S DECIDING SIGNAL. This was a `sink.perf(..., 1)` sample and
+    // `perfTiming.record` only escalates to telemetry at/above 250ms, so it
+    // reached the console and nothing else. Without it, "the rebase machinery
+    // is broken" and "the guard correctly refused" are the same row in
+    // CloudWatch and there is no evidence on which to enable compaction.
+    useWorker((req) => ({
+      cid: req.cid,
+      ok: false,
+      error: serializeError(lineageBlockError('adopt-remote', { rebaseUnavailable: true })),
+    }));
+
+    await expect(
+      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+        kind: 'baseline',
+        heads: ['h1'],
+      })
+    ).rejects.toBeInstanceOf(PodLineageError);
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'pod-rebase',
+        context: expect.objectContaining({
+          action: 'rebase-unavailable',
+          error_code: 'blocked',
+          family_id: 'fam-1',
+        }),
+      })
+    );
+  });
+
+  it('reports a rebase that could not run — on the ADOPTED half', async () => {
+    // The `user-file` fallback resolves rather than throwing, so reporting only
+    // the rejected side would leave a whole class dark.
+    useWorker((req) => ({
+      cid: req.cid,
+      ok: true,
+      result: {
+        action: 'adopted',
+        heads: [],
+        remoteHeads: [],
+        dirty: false,
+        changed: true,
+        rebaseUnavailable: true,
+      },
+    }));
+
+    await mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+      kind: 'user-file',
+      heads: ['h1'],
+    });
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'pod-rebase',
+        context: expect.objectContaining({ error_code: 'adopted' }),
+      })
+    );
+  });
+
+  it('says nothing when the rebase was never asked for', async () => {
+    // Anti-vacuity: an unconditional emit would make both tests above pass and
+    // poison the metric with every ordinary merge.
+    useWorker((req) => ({
+      cid: req.cid,
+      ok: true,
+      result: {
+        action: 'merged',
+        heads: [],
+        remoteHeads: [],
+        dirty: false,
+        changed: true,
+      },
+    }));
+
+    await mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+      kind: 'baseline',
+      heads: ['h1'],
+    });
+
+    expect(logEvent).not.toHaveBeenCalledWith(expect.objectContaining({ surface: 'pod-rebase' }));
   });
 
   it('reports an OOM exactly ONCE, with no toast, in WORKER mode', async () => {

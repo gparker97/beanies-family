@@ -33,6 +33,10 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
 import { PayloadLoadError, isRemoteBlocker } from '@/types/sync';
+// Type + `instanceof` only — never `guardLineage`, which the eslint rule
+// correctly bans outside the worker. Reading a flag off a thrown error is
+// not making a lineage decision.
+import { PodLineageError } from '@/services/sync/podLineage';
 import { deviceMemoryScalar } from '@/utils/diagnostics';
 import { getPlatform } from '@/services/sync/capabilities';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
@@ -1197,25 +1201,114 @@ export async function mergeRemoteEnvelope(
   /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
   replayed?: number;
   conflicts?: number;
+  /** The policy asked for a rebase and it could not run. Diagnostic only. */
+  rebaseUnavailable?: true;
   heads: Heads;
   dirty: boolean;
   changed: boolean;
   remoteHeads: Heads;
 }> {
-  const res = await request<{
-    action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-    /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
-    replayed?: number;
-    conflicts?: number;
-    heads: Heads;
-    dirty: boolean;
-    changed: boolean;
-    remoteHeads: Heads;
-  }>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
+  let res;
+  try {
+    res = await request<{
+      action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+      /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
+      replayed?: number;
+      conflicts?: number;
+      rebaseUnavailable?: true;
+      heads: Heads;
+      dirty: boolean;
+      changed: boolean;
+      remoteHeads: Heads;
+    }>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
+  } catch (err) {
+    // ⚠️ THE OTHER HALF OF THE SAME SIGNAL. A rebase that could not run either
+    // adopts (`user-file`) or throws (everything else), so reporting only the
+    // resolved side would leave the COMMON case dark. Rethrown untouched — this
+    // observes, it does not handle.
+    if (err instanceof PodLineageError && err.rebaseUnavailable) {
+      noteRebaseUnavailable(familyId, 'blocked');
+    }
+    throw err;
+  }
+  if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
   // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');
   return res;
+}
+
+/** What a merge terminus needs to report. Structural subset of the outcome. */
+export interface MergeTerminusOutcome {
+  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+  replayed?: number;
+  conflicts?: number;
+}
+
+/**
+ * Report where a merge ended up. ONE implementation, both termini.
+ *
+ * ⚠️ THE TWO TERMINI DRIFTED, and the one that drifted is the one that matters
+ * most. The poll terminus carried `replayed`/`conflicts` and escalated to
+ * `warn` when the replay dropped a write; the OPEN terminus — the path an
+ * offline peer actually takes when it comes back and gets rebased — logged a
+ * bare `info` with neither field. So the case the soak exists to measure was
+ * the case that reported nothing. Two copies of one question is how that
+ * happens; there is now one.
+ *
+ * `where` separates the buckets for the 50/surface/min limiter, which keys on
+ * (surface, message).
+ */
+export function logMergeTerminus(
+  where: string,
+  outcome: MergeTerminusOutcome,
+  familyId: string | null
+): void {
+  logEvent({
+    // A rebase that dropped a write is not routine: `conflicts` counts edits the
+    // replay could not carry, so a family that lost something is findable
+    // without a repro.
+    level: outcome.conflicts ? 'warn' : 'info',
+    surface: 'pod-lineage',
+    message: `${where} ${outcome.action}`,
+    context: {
+      action: outcome.action,
+      ...(familyId ? { family_id: familyId } : {}),
+      // ⚠️ ON THE SUCCESS PATH TOO, so the RATE is measurable and not just the
+      // failures. Absent for every other action, so the field's presence is
+      // itself the answer to "did a rebase happen".
+      ...(outcome.action === 'rebased'
+        ? { detail: `replayed=${outcome.replayed ?? 0},conflicts=${outcome.conflicts ?? 0}` }
+        : {}),
+    },
+  });
+}
+
+/**
+ * The rebase was asked for and could not run.
+ *
+ * ⚠️ THIS IS THE SOAK'S DECIDING SIGNAL, and it has to be a `logEvent`. It was
+ * a `sink.perf('automerge.rebaseUnavailable', 1)` — a 1ms sample, and
+ * `perfTiming.record` escalates to telemetry only at/above 250ms, so it reached
+ * the console and nothing else. Without it, "the rebase machinery is broken"
+ * and "the guard correctly refused" are indistinguishable in CloudWatch and
+ * there is no evidence on which to enable compaction.
+ *
+ * `warn`, not `error`: nothing failed for the user — the peer got the same
+ * outcome it would have got before the rebase existed. It is a degradation of a
+ * safety net, which is exactly what a soak wants to count.
+ */
+function noteRebaseUnavailable(familyId: string | null, outcome: string): void {
+  logEvent({
+    level: 'warn',
+    surface: 'pod-rebase',
+    message: 'rebase unavailable',
+    context: {
+      action: 'rebase-unavailable',
+      error_code: outcome,
+      ...(familyId ? { family_id: familyId } : {}),
+    },
+  });
 }
 
 /** Serialize + encrypt the current doc; main assembles the envelope + uploads.

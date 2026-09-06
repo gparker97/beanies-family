@@ -28,6 +28,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **A device that was offline while the family file was compacted now actually publishes the work it rescued.** The rescue itself worked, but the upload was cancelled a moment later by the reload that followed it, so the rescued changes sat on that one device and nobody else saw them. This was the fourth time the same cancel had swallowed a publish, so it is fixed where the cancel lives rather than at the place that noticed.
+- **The confirmation before compacting no longer promises more than beanies does.** It said a device that could not have its changes carried across would keep them until someone decided; that is true when nothing can be carried across, but if the same thing was changed in two places the already-saved version wins. It now says so.
+- **On phones and tablets, the check that your backup saved no longer says your family is about to be deleted.** It was borrowed word-for-word from the delete-family flow. Compacting deletes nothing.
+- **Compacting now checks you are the family owner when you ask for it, not only when the button is drawn.**
+
 - **beanies is much better at telling when two devices' copies of a family file cannot safely be combined.** The check that protects this had been looking at the wrong thing: a label kept alongside the file rather than the file's own history, and the two could drift apart. It now reads the history itself, in the one place both copies are open together, so it cannot be fooled.
 - **A device that cannot combine its changes now says so, and keeps saying so.** That warning used to be a message that faded after a few seconds, so it was easy to miss entirely. It is now a banner that stays until you dismiss it, and it appears on the beanie wall too.
 - **That warning now offers a way out.** It used to tell you to export your changes and reload, which did not actually resolve anything. There is now a button that takes the reorganised family file, after a confirmation that says plainly what will be let go.

@@ -4324,9 +4324,9 @@ const STRING_DEFS = {
   },
   'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
   'compaction.confirmMessage': {
-    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online, and beanies carries across most of what they changed while offline. Where it cannot, that device is told and keeps its changes until someone decides.',
+    en: "beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online, and beanies carries across what they changed while offline. If the same thing was changed in two places, the version already saved here is the one kept. If a device's changes cannot be carried across at all, that device is told and keeps all of them until someone decides.",
     beanie:
-      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this device is lost, and beanies saves a copy of your current pod first. your other devices pick the compacted pod up next time they are online, and beanies carries across most of what they changed while offline. where it cannot, that device is told and keeps its changes until someone decides.',
+      "beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this bean is lost, and beanies saves a copy of your current pod first. your other beans pick the compacted pod up next time they are online, and beanies carries across what they changed while offline. if the same thing was changed in two places, the version already saved here is the one kept. if a bean's changes cannot be carried across at all, that bean is told and keeps all of them until someone decides.",
   },
   'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {
@@ -4357,6 +4357,15 @@ const STRING_DEFS = {
     en: 'This device ran out of memory making the backup, so beanies stopped before changing anything. Nothing has changed. Try again on a device with more memory.',
     beanie:
       'this bean ran out of memory making the backup, so beanies stopped before changing anything. nothing has changed. try again on a bean with more memory.',
+  },
+  'compaction.exportCheckMsg': {
+    en: "Check your files and make sure the copy is really there. Nothing is deleted either way; this is the copy you'd go back to if you ever needed it.",
+    beanie:
+      "check your files and make sure the copy is really there. nothing is deleted either way; this is the copy you'd go back to if you ever needed it.",
+  },
+  'compaction.refused.not-owner': {
+    en: 'Only the person who set up your family can compact the family file.',
+    beanie: 'only the bean who set up your family can compact the family pod.',
   },
   'compaction.refused.not-soaked': {
     en: 'Someone in your family has a device that has not opened beanies recently enough for beanies to know it can handle a compacted file. Ask them to open beanies once, then try again.',

@@ -8,6 +8,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
+import { flushPendingSave } from '@/services/sync/syncService';
 import { reportError } from '@/utils/errorReporter';
 import { PayloadTooLargeError } from '@/types/sync';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -24,6 +25,14 @@ const hooks = vi.hoisted(() => ({
   // Empty by default: `evaluateSoak([])` passes, so every existing test keeps
   // exercising the path it was written for.
   members: [] as unknown[],
+  isOwner: true,
+}));
+
+// The owner check itself is derived and tested in `usePodHealth.dueSignal`;
+// here it is a hook so the ladder's gate can be flipped without dragging the
+// permissions store into a suite about compaction ordering.
+vi.mock('@/composables/usePodHealth', () => ({
+  usePodHealth: () => ({ canCompactPod: { value: hooks.isOwner } }),
 }));
 
 vi.mock('@/composables/useConfirm', () => ({
@@ -126,6 +135,7 @@ beforeEach(() => {
     hasProvider: true,
     auxAvailable: true,
     members: [],
+    isOwner: true,
   });
 });
 
@@ -360,6 +370,31 @@ describe('the automatic safety copy', () => {
     await usePodCompaction().compact();
 
     expect(docClient.compactDoc).toHaveBeenCalled();
+  });
+});
+
+describe('the owner gate', () => {
+  it('refuses a non-owner before anything moves', async () => {
+    // ⚠️ THE `v-if` IS NOT THE GATE. Hiding the Settings section stops the
+    // button from rendering; it does not stop `compact()` from running — a
+    // stale render, a keyboard activation as a role changes, or any future
+    // caller reaches the function directly. The action that rewrites every
+    // device's copy has to check for itself.
+    hooks.isOwner = false;
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    // Before the confirm, so a non-owner is never asked a question that would
+    // then be refused.
+    expect(confirm).not.toHaveBeenCalled();
+    expect(flushPendingSave).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'warning',
+      'compaction.refused',
+      'compaction.refused.not-owner',
+      expect.anything()
+    );
   });
 });
 

@@ -825,7 +825,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       // human one: ask. On web the anchor download is deterministic
       // (`preferDownload` above keeps it off `navigator.share`), so there is
       // nothing to ask about and the flow is unchanged.
-      if (!(await confirmBackupLanded())) {
+      if (
+        !(await confirmBackupLanded({
+          message: 'settings.deleteFamilyExportCheckMsg',
+          variant: 'danger',
+        }))
+      ) {
         deleteConfirmText.value = '';
         isDeleting.value = false;
         showDeleteFamilyConfirm.value = true;

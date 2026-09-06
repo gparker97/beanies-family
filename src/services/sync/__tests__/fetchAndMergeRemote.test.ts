@@ -42,6 +42,11 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   mergeRemoteEnvelope: vi.fn(async () => ({ dirty: false, remoteHeads: ['h-remote'] })),
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
+  // Both termini log through this one function now (it carries `replayed`/
+  // `conflicts` and picks the level). A manual factory that omits it makes
+  // every merge throw 'No export is defined' INSIDE the try that classifies
+  // decrypt failures, so the suite fails as "the merge never ran".
+  logMergeTerminus: vi.fn(),
   noteRemoteBaseline: vi.fn(),
   // #65: the open-guard probes doc heads before the metadata probe. Default to
   // MATCHING the seeded baseline fingerprint so the pre-existing guard cases keep
