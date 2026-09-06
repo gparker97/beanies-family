@@ -2970,8 +2970,10 @@ export const useSyncStore = defineStore('sync', () => {
     } finally {
       await nextTick();
       isReloading = false;
-      // Put back what the cancel above took. After `isReloading` clears, so the
-      // save it arms is not itself suppressed by the guard.
+      // Put back what the cancel above took, once the projection has settled,
+      // so the restored intent describes the post-reload state.
+      // (Ordering is not load-bearing: `isReloading` gates only
+      // `reloadIfFileChanged`'s early return, never `triggerDebouncedSave`.)
       if (publishWasArmed) syncService.triggerDebouncedSave();
     }
 

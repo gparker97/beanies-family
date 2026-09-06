@@ -191,6 +191,36 @@ describe('syncService.save → fetchAndMergeRemote — local-wins merge', () => 
     expect(writtenEnv.wrappedKeys.m1).toEqual({ wrapped: 'NEW-w', salt: 'NEW-s' });
   });
 
+  it('reports the poll terminus, with the counts a rebase soak reads', async () => {
+    // ⚠️ THE CALL, NOT JUST THE FUNCTION. `logMergeTerminus` had unit tests but
+    // neither call site was asserted, so deleting this one left the whole suite
+    // green — and compaction PROPAGATION would have gone dark exactly as it did
+    // before the terminus logging was added at all.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'rebased',
+      dirty: false,
+      remoteHeads: ['h-remote'],
+      replayed: 4,
+      conflicts: 1,
+    } as never);
+
+    const provider = makeProvider({
+      remoteText: JSON.stringify(buildEnvelope({})),
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {},
+    });
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope({}));
+
+    await syncService.save();
+
+    expect(docClient.logMergeTerminus).toHaveBeenCalledWith(
+      'poll terminus',
+      expect.objectContaining({ action: 'rebased', replayed: 4, conflicts: 1 }),
+      expect.anything()
+    );
+  });
+
   it('remote-only wrappedKey entry is preserved', async () => {
     const remoteEnv = buildEnvelope({
       wrappedKeys: { m2: { wrapped: 'remote-only', salt: 'rs' } },

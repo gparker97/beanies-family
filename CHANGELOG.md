@@ -28,6 +28,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **A device coming back online after a compaction can no longer overwrite saved family data with its own older copy.** When both sides held the same item but the returning device had no shared starting point for it, every field it held won, fields only the saved copy had were deleted, and beanies counted none of it as a conflict, so it looked like a clean result. The saved version now wins any disagreement, nothing is deleted, and the disagreements are counted.
+- **The note about going back to a saved copy named a button that is not on the screen.** It said "Load Existing Family Data File", which only appears before a family file is set up; the one you actually see is "Load another Family Data File".
+- **beanies no longer says "Sam are on an older version".**
+
 - **A device that was offline while the family file was compacted now actually publishes the work it rescued.** The rescue itself worked, but the upload was cancelled a moment later by the reload that followed it, so the rescued changes sat on that one device and nobody else saw them. This was the fourth time the same cancel had swallowed a publish, so it is fixed where the cancel lives rather than at the place that noticed.
 - **The confirmation before compacting no longer promises more than beanies does.** It said a device that could not have its changes carried across would keep them until someone decided; that is true when nothing can be carried across, but if the same thing was changed in two places the already-saved version wins. It now says so.
 - **On phones and tablets, the check that your backup saved no longer says your family is about to be deleted.** It was borrowed word-for-word from the delete-family flow. Compacting deletes nothing.

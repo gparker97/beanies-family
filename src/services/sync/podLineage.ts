@@ -45,11 +45,19 @@ export type LineageAction = 'merge' | 'adopt' | 'rebase' | 'publish-local' | 'bl
  *                  what is lost. That IS the decision the guard exists to
  *                  demand, so it never blocks.
  *
- * ⚠️ `user-file` HAS EXACTLY ONE PRODUCER, and adding a second is a data-loss
- * change. It is `syncStore.useRemoteFileOverLocalDocument` — the lineage
- * banner's action, behind a `confirm({variant:'danger'})` that names what is let
- * go — and the choice travels as an ARGUMENT on that one call, never as module
- * state. It was briefly armed by `rebindPodFile` as well, which is WRONG:
+ * ⚠️ `user-file` IS PRODUCED ONLY WHERE A HUMAN WAS SHOWN WHAT IT DISCARDS, and
+ * a producer that does not meet that test is a data-loss change. There are two,
+ * and in both the choice travels as an ARGUMENT on the call that obtained it,
+ * never as module state:
+ *
+ *   1. `syncStore.useRemoteFileOverLocalDocument` — the lineage banner's
+ *      action, behind a `confirm({variant:'danger'})` naming what is let go.
+ *   2. `SettingsPage`'s Load-another-family-data-file decrypt, behind "this
+ *      will replace all local data with the contents of the selected file".
+ *      This is the ROLLBACK route, which is why it needs the one context that
+ *      can never dead-end.
+ *
+ * It was briefly armed by `rebindPodFile` as well, which is WRONG:
  * `rebindPodFile` is the generic access repair for PERMISSION_DENIED,
  * FILE_NOT_FOUND, CANONICAL_MISMATCH and NO_HOME (plus the save-failure banner),
  * and in none of those is the human answering a lineage question. `user-file`
@@ -59,14 +67,13 @@ export type LineageAction = 'merge' | 'adopt' | 'rebase' | 'publish-local' | 'bl
  * to offer. `podAccess.ts` states the rule: verification may REPORT a problem,
  * never RESOLVE one.
  *
- * ⚠️ SO TWO CELLS OF THIS COLUMN ARE CURRENTLY UNREACHABLE, and that is a known
- * gap, not an oversight. Only `adopt-remote` × `user-file` is produced. Nothing
- * reaches `ours-newer` × `user-file`, which means THE ROLLBACK IS NOT WIRED:
- * re-pointing at a pre-compaction `.beanpod` compares `ours-newer` →
- * `publish-local`, so this device republishes its compacted document over the
- * file the family just chose, with no block and therefore no banner to recover
- * from. Wiring it needs a surface that asks the human first — Stage 2's job,
- * alongside the rebase. Do NOT close the gap by arming an access repair.
+ * ⚠️ THE ROLLBACK IS WIRED, and producer 2 is what wires it. Re-pointing at a
+ * pre-compaction `.beanpod` compares `ours-newer`, which under any other
+ * context resolves to `publish-local` — the device would republish its
+ * compacted document straight over the file the family just chose, with no
+ * block and so no banner to recover from. `ours-newer` × `user-file` = `adopt`
+ * is what makes the restore actually restore. Do NOT close any remaining gap by
+ * arming an access repair; the test is the dialog, not the caller.
  */
 export type LineageContext = 'clean' | 'dirty' | 'user-file';
 
@@ -80,7 +87,12 @@ export class PodLineageError extends Error implements RemoteBlocker {
    * needs to distinguish broken machinery from a correct refusal. Set by
    * `lineageBlockError`, carried across the worker boundary by the codec below.
    */
-  rebaseUnavailable?: boolean;
+  // ⚠️ `declare`, so the class field emits NO definition. Under
+  // `useDefineForClassFields` a bare `rebaseUnavailable?: boolean` is defined
+  // as an own property valued `undefined` on EVERY instance, which makes
+  // `'rebaseUnavailable' in err` and `{...err}` report it as present on every
+  // ordinary block. The flag must be absent unless something sets it.
+  declare rebaseUnavailable?: boolean;
   constructor(verdict: LineageVerdict, message: string) {
     super(message);
     // ⚠️ LITERAL, never `new.target.name`. The worker error registry keys on

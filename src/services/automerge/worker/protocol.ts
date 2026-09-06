@@ -257,10 +257,16 @@ const lineageCodec: ErrorCodec = {
     err instanceof PodLineageError
       ? { verdict: err.verdict, rebaseUnavailable: err.rebaseUnavailable }
       : undefined,
-  reconstruct: (message, data) =>
-    Object.assign(new PodLineageError((data?.verdict as LineageVerdict) ?? 'conflict', message), {
-      rebaseUnavailable: data?.rebaseUnavailable === true ? true : undefined,
-    }),
+  reconstruct: (message, data) => {
+    const err = new PodLineageError((data?.verdict as LineageVerdict) ?? 'conflict', message);
+    // ⚠️ ONLY SET IT WHEN TRUE. Assigning `undefined` still MINTS the own
+    // property, so `'rebaseUnavailable' in err` and `{...err}` would both
+    // report it on every ordinary block. Nothing reads it that way today, and
+    // `toBeUndefined()` cannot tell absent from present-and-undefined — so the
+    // test would not catch the day something does.
+    if (data?.rebaseUnavailable === true) err.rebaseUnavailable = true;
+    return err;
+  },
 };
 
 const ERROR_REGISTRY: Record<string, ErrorCodec> = {

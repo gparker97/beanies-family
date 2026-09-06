@@ -779,8 +779,19 @@ export function buildRebaseOps(
       // baseline for it we cannot attribute changes, so the conservative
       // reading applies: carry only fields the target does not have, and treat
       // the rest as conflicts rather than reverting saved data.
-      const baselineFor = wasPresent ? beforeColl[id] : targetColl[id];
-      const patch = threeWayFields(baselineFor, now, targetColl[id]);
+      //
+      // ⚠️ AND THAT READING NEEDS ITS OWN FUNCTION, not `threeWayFields` with
+      // the target passed as the baseline. That looks equivalent and is its
+      // exact inverse: with `before === target`, the rule "the compactor did
+      // not change it, so the peer's wins" (`same(a[key], t[key])`) is true for
+      // EVERY key, so the peer's older entity overwrote the saved one wholesale
+      // and every target-only field landed in `deleteKeys` — with `conflicts`
+      // at 0, so the telemetry reported a clean rebase while saved data was
+      // being replaced. The comment above was right; the call under it did the
+      // opposite.
+      const patch = wasPresent
+        ? threeWayFields(beforeColl[id], now, targetColl[id])
+        : carryOnlyNewFields(now, targetColl[id]);
       if (!patch) continue;
       conflicts += patch.conflicts;
       if (!Object.keys(patch.set).length && !patch.deleteKeys.length) continue;
@@ -842,6 +853,45 @@ export function buildRebaseOps(
  * has no splice, so a rebase can only write one whole array. Preferring the
  * saved one loses the peer's edit to that one list rather than the family's.
  */
+/**
+ * The same entity id on both sides, with NO baseline that ever held it.
+ *
+ * There is no third point to attribute a change to, so "who edited this field"
+ * is unanswerable. Only one reading is safe: the target's values are already
+ * saved to the family file and the peer's are not, so
+ *
+ *  - a field the target does not have is free to carry (nothing saved is at
+ *    risk, and losing it would drop the peer's work for no gain);
+ *  - a field both hold with the same value is a no-op;
+ *  - a field both hold with DIFFERENT values is a conflict — the saved value
+ *    stays, and it is counted;
+ *  - nothing is ever deleted. A key the peer lacks is not evidence the peer
+ *    deleted it; with no baseline, its absence says nothing at all.
+ *
+ * Deliberately NOT `threeWayFields(target, now, target)`. That is the inverse
+ * of this rule, not a shorthand for it — see the call site.
+ */
+function carryOnlyNewFields(
+  now: unknown,
+  target: unknown
+): { set: Record<string, unknown>; deleteKeys: string[]; conflicts: number } | null {
+  const b = (toPlain(now) ?? {}) as AnyRecord;
+  const t = (toPlain(target) ?? {}) as AnyRecord;
+  const set: Record<string, unknown> = {};
+  let conflicts = 0;
+
+  for (const key of Object.keys(b)) {
+    if (!(key in t)) {
+      set[key] = b[key];
+      continue;
+    }
+    if (same(b[key], t[key])) continue;
+    conflicts++; // both hold it, differently, and nothing can attribute it
+  }
+
+  return Object.keys(set).length || conflicts ? { set, deleteKeys: [], conflicts } : null;
+}
+
 function threeWayFields(
   before: unknown,
   now: unknown,

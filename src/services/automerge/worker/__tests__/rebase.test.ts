@@ -397,6 +397,72 @@ describe('a three-way merge, not a two-way diff', () => {
   });
 });
 
+describe('an entity with no shared baseline', () => {
+  /**
+   * ⚠️ THE CASE WITH NO BASELINE TO ATTRIBUTE CHANGES TO. The peer holds an
+   * entity its baseline never had, and the compacted target holds one under the
+   * SAME id — the peer received it from a third device after its last sync,
+   * while the compactor edited its own copy. Nothing can say who changed what.
+   *
+   * The conservative reading is the only safe one: carry the fields the target
+   * does not have, and treat every disagreement as a conflict, because the
+   * target's values are already saved to the family file and the peer's are
+   * not. Reverting saved data to replay unsaved data is the worst trade this
+   * code can make, and it must never be silent.
+   *
+   * Reachable wherever ids are deterministic rather than minted — the same
+   * property that makes `driveConnections` (keyed by email) and
+   * `notificationReads` (keyed by member id) collide without shared ancestry.
+   */
+  function noBaselineScenario() {
+    const shared = base();
+    const baselineHeads = Automerge.getHeads(shared);
+
+    // The peer learned about `a1` after its baseline, with older values.
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      (d.accounts as Coll).a1 = { id: 'a1', nickname: 'PEER-OLD', balance: 10, note: 'peer-only' };
+    });
+
+    // The compactor's copy: different values, plus a field only it has.
+    let remote = compact(shared);
+    remote = Automerge.change(remote, (d) => {
+      (d.accounts as Coll).a1 = {
+        id: 'a1',
+        nickname: 'COMPACTOR-SAVED',
+        balance: 99,
+        extra: 'saved-only',
+      };
+    });
+    return { peer, remote, baselineHeads };
+  }
+
+  it('never overwrites a saved field, and never deletes one', async () => {
+    const { peer, remote, baselineHeads } = noBaselineScenario();
+
+    ap.loadSnapshot(Automerge.save(peer));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    const a1 = out.accounts.a1!;
+    // Both already in the family file — the peer's older copies must not win.
+    expect(a1.nickname).toBe('COMPACTOR-SAVED');
+    expect(a1.balance).toBe(99);
+    // A field only the target has is NOT a peer deletion. There is no baseline
+    // in which the peer ever held it, so its absence says nothing.
+    expect(a1.extra).toBe('saved-only');
+    // A field only the PEER has is safe to carry: nothing saved is at risk.
+    expect(a1.note).toBe('peer-only');
+    // ⚠️ AND THE LOSS IS COUNTED. Two saved fields disagreed, and a conflict
+    // count of 0 here is exactly how this went unnoticed: the telemetry said a
+    // clean rebase while the peer's values had overwritten the family's.
+    expect(res.conflicts).toBe(2);
+  });
+});
+
 describe('the guards that only show up in the edge cases', () => {
   it('does not honour a peer delete of a field the compactor changed', async () => {
     // A delete is a write like any other. If the compactor gave the field a new

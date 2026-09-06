@@ -671,6 +671,30 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
   });
 
+  it('arms NOTHING when there was no publish to put back', async () => {
+    // ⚠️ THE GUARD, NOT JUST THE RESTORE. Without `if (publishWasArmed)` the
+    // reload would arm a save on EVERY path it runs on — every poll tick, tab
+    // wake and cache load — which is a full pod re-encrypt and upload each
+    // time, on exactly the low-memory devices this tier exists to spare. The
+    // test above proves the intent comes back; this one proves it is not
+    // invented.
+    const { syncService } = await mergeWith({ dirty: false, changed: true });
+    expect(syncService.triggerDebouncedSave).not.toHaveBeenCalled();
+  });
+
+  it('reports the open terminus with what the merge carried', async () => {
+    // The open terminus is the path an offline peer takes when it comes back
+    // and gets rebased, so it is the one a rebase soak actually reads. It
+    // logged a bare `info` with no counts until the shared logger landed, and
+    // nothing asserted the call at all — deleting it left the suite green.
+    await mergeWith({ dirty: false, changed: true });
+    expect(docClient.logMergeTerminus).toHaveBeenCalledWith(
+      'open terminus',
+      expect.objectContaining({ action: 'merged' }),
+      'fam-resume-1'
+    );
+  });
+
   it('DOES re-upload when the converged doc still carries local changes (dirty:true)', async () => {
     const { syncService } = await mergeWith({ dirty: true, changed: true });
     // The invariant that matters more than the optimisation: a local change must
