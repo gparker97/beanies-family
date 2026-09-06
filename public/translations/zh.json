@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4546
+    "translationCount": 4547
   },
   "translations": {
     "app.name": {
@@ -22697,13 +22697,13 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.not-soaked": {
-      "translation": "您家中有人拥有的设备最近没有打开beanies ， beanies知道它可以处理压缩文件。让他们打开帽子一次，然后再试一次。",
-      "hash": "gb4f43",
+      "translation": "您家中有人正在使用较旧版本的便帽。要求每个人更新Bean ，并在他们使用的每台设备上打开一次。",
+      "hash": "vooyji",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.not-soaked.named": {
-      "translation": "beanies正在等待{names}打开应用程序一次，因此它知道他们的设备可以处理压缩文件。让他们打开帽子，然后再试一次。",
-      "hash": "7czpt2",
+      "translation": "beanies正在等待{names}。要求他们更新Bean ，并在他们使用的每台设备上打开一次，然后重试。",
+      "hash": "55idbn",
       "lastUpdated": "2026-09-06"
     },
     "compaction.dueBecauseLarge": {
@@ -22734,6 +22734,11 @@
     "compaction.exportCheckMsg": {
       "translation": "请检查您的文件，并确保副本确实存在。无论哪种方式都不会删除任何内容；如果您需要，可以返回此副本。",
       "hash": "kpnhii",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.waitingOn": {
+      "translation": "beanies正在等待{names}才能压缩。要求他们更新Bean ，并在他们使用的每台设备上打开一次。仍然使用旧版本的设备可能会取消整个家庭的压缩，并且beanies只能在有人打开设备上的beanies后才能告诉设备已准备就绪，这就是为什么它会命名人而不是设备的原因。",
+      "hash": "kp6j2t",
       "lastUpdated": "2026-09-06"
     }
   }

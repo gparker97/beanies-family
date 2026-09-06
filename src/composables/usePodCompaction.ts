@@ -26,7 +26,7 @@
 import { ref } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { evaluateSoak } from '@/services/pod/podSoak';
+import { evaluateSoak, formatNames, type SoakVerdict } from '@/services/pod/podSoak';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -89,6 +89,43 @@ export function usePodCompaction() {
   }
 
   /**
+   * Refuse because someone is behind — from EITHER reading, never twice.
+   *
+   * ⚠️ THE FAST-FAIL READING THREW THE NAMES AWAY. The pre-confirm gate called
+   * the generic `refuse('not-soaked')`, which resolves to the un-named string
+   * ("someone in your family has a device that has not opened beanies
+   * recently") — while `preSoak.behind` held the names right there. And that is
+   * the reading a person actually hits, because it returns before the confirm.
+   * The named string existed and was only reachable from the SECOND reading,
+   * which is reached only after the confirm and a full pod download.
+   *
+   * The cause was two implementations of one refusal: this site's `refuse` and
+   * a hand-rolled `showToast` + `logEvent` at the authoritative reading. They
+   * drifted, as two copies of one decision always do. There is one now.
+   */
+  function refuseSoak(v: SoakVerdict): void {
+    showToast(
+      'warning',
+      t('compaction.refused'),
+      v.behind.length
+        ? fillTemplate(t('compaction.refused.not-soaked.named'), {
+            names: formatNames(v.behind),
+          })
+        : // Only when the verdict refuses without naming anyone, which the rule
+          // cannot currently produce — kept because a silent refusal would be
+          // worse than a vague one.
+          t('compaction.refused.not-soaked'),
+      { surface: 'pod-compaction' }
+    );
+    logEvent({
+      level: 'warn',
+      surface: 'pod-compaction',
+      message: 'compaction refused',
+      context: { action: 'refused', error_code: 'not-soaked', detail: `behind=${v.behind.length}` },
+    });
+  }
+
+  /**
    * The soak reading, from the CURRENT member projection.
    *
    * ⚠️ ONE PURE FUNCTION, CALLED TWICE, AND NEVER A SECOND IMPLEMENTATION. The
@@ -123,7 +160,7 @@ export function usePodCompaction() {
       //    to fail FAST, and step 2d is the authoritative one.
       if (!canCompactPod.value) return refuse('not-owner');
       const preSoak = soak();
-      if (!preSoak.ok) return refuse('not-soaked', `behind=${preSoak.behind.length}`);
+      if (!preSoak.ok) return refuseSoak(preSoak);
 
       // 1. Warn, in the user's own words, before anything moves.
       if (
@@ -172,27 +209,7 @@ export function usePodCompaction() {
       //     build ten minutes ago on another device is simply not in our copy
       //     until it lands. Step 0 fails fast; this one decides.
       const soaked = soak();
-      if (!soaked.ok) {
-        showToast(
-          'warning',
-          t('compaction.refused'),
-          fillTemplate(t('compaction.refused.not-soaked.named'), {
-            names: soaked.behind.join(', '),
-          }),
-          { surface: 'pod-compaction' }
-        );
-        logEvent({
-          level: 'warn',
-          surface: 'pod-compaction',
-          message: 'compaction refused',
-          context: {
-            action: 'refused',
-            error_code: 'not-soaked',
-            detail: `behind=${soaked.behind.length}`,
-          },
-        });
-        return;
-      }
+      if (!soaked.ok) return refuseSoak(soaked);
 
       if (!(await syncService.isFullySynced())) {
         if (!(await syncStore.syncNow(false))) return refuse('not-synced');

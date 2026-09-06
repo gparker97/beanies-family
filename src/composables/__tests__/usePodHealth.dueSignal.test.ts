@@ -77,3 +77,47 @@ describe('usePodHealth', () => {
     expect(usePodHealth().compactionIsDue.value).toBe(false);
   });
 });
+
+/**
+ * ⚠️ THE ANSWER BELONGS ON THE PAGE, NOT BEHIND A BUTTON PRESS. The soak gate
+ * used to be discoverable only by attempting a one-way, family-wide migration
+ * and reading a toast that vanished a few seconds later. `waitingOn` puts the
+ * same names in the section itself, before anything is pressed.
+ */
+describe('usePodHealth — who the soak gate is waiting on', () => {
+  const TODAY = new Date().toISOString().slice(0, 10);
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    Object.assign(hooks, { isOwner: true, bytes: 0, members: [] });
+  });
+
+  it('names the members who have not been seen on a guard-honouring build', () => {
+    hooks.members = [
+      { id: 'm1', name: 'Greg', lastLoginAt: TODAY, lineageEpoch: 1 },
+      { id: 'm2', name: 'Sam', lastLoginAt: TODAY },
+      { id: 'm3', name: 'Alex', lastLoginAt: TODAY },
+    ];
+    expect(usePodHealth().waitingOn.value).toEqual(['Sam', 'Alex']);
+  });
+
+  it('is empty when everyone recently active has been seen', () => {
+    // Anti-vacuity: a `waitingOn` that always listed everyone would satisfy the
+    // test above and put a permanent caution on the page.
+    hooks.members = [
+      { id: 'm1', name: 'Greg', lastLoginAt: TODAY, lineageEpoch: 1 },
+      { id: 'm2', name: 'Sam', lastLoginAt: TODAY, lineageEpoch: 1 },
+    ];
+    expect(usePodHealth().waitingOn.value).toEqual([]);
+  });
+
+  it('does not wait on someone who has not signed in for months', () => {
+    // A child's account created and never opened, or a member who left, must
+    // not hold their family's compaction open forever.
+    hooks.members = [
+      { id: 'm1', name: 'Greg', lastLoginAt: TODAY, lineageEpoch: 1 },
+      { id: 'm2', name: 'Sam', lastLoginAt: '2024-01-01' },
+    ];
+    expect(usePodHealth().waitingOn.value).toEqual([]);
+  });
+});

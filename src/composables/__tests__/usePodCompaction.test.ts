@@ -449,6 +449,30 @@ describe('the soak gate', () => {
     expect(docClient.compactDoc).not.toHaveBeenCalled();
   });
 
+  it('NAMES who it is waiting on from the FIRST reading too', async () => {
+    // ⚠️ THE READING A PERSON ACTUALLY HITS. The fast-fail gate returns before
+    // the confirm, so it is the refusal almost everyone sees — and it called the
+    // generic `refuse('not-soaked')`, whose string is "someone in your family
+    // has a device that has not opened beanies recently". The names were in
+    // `preSoak.behind` the whole time. Greg hit this on the first step of the
+    // soak and could not tell who or what to do, which is the whole point of
+    // the gate being actionable.
+    hooks.members = [
+      { id: 'm2', name: 'Sam', lastLoginAt: TODAY },
+      { id: 'm3', name: 'Alex', lastLoginAt: TODAY },
+    ];
+
+    await usePodCompaction().compact();
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'warning',
+      'compaction.refused',
+      'compaction.refused.not-soaked.named:Sam, Alex',
+      expect.anything()
+    );
+  });
+
   it('names who it is waiting for once the projection is current', async () => {
     // ⚠️ The second reading is the AUTHORITATIVE one: the pull at step 2b is
     // what makes the member projection current, so a device that signed in on
