@@ -76,6 +76,7 @@ import type { OpenToken, OpenOutcome } from '@/services/telemetry/openCycle';
 import { slackNotify } from '@/utils/slackNotify';
 import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import type { SaveFailureLevel } from '@/services/sync/syncService';
+import { isSafetyCopyName } from '@/constants/compaction';
 import {
   searchBeanpodFilesGlobal,
   clearFolderCache,
@@ -4656,6 +4657,27 @@ export const useSyncStore = defineStore('sync', () => {
     fileId: string,
     fileName_param: string
   ): Promise<{ ok: true } | { ok: false; code: PodAccessErrorCode }> {
+    // ⚠️ REFUSE OUR OWN BACKUP. This is the shared repair behind four
+    // `POD_ACCESS_ERRORS` codes and the save-failure banner, and its only
+    // content gate is the family-id check below — which a safety copy passes
+    // BY CONSTRUCTION, because it IS this family. Accepting one would persist
+    // it as the provider and then move the REGISTRY POINTER to it
+    // (`registerCurrentFamily`, below), so every other member would be healed
+    // onto the backup. That is the ADR-033 fork this file exists to prevent,
+    // reached by tapping the row above the right one in a picker.
+    //
+    // Restoring a backup deliberately is a different flow with a different
+    // question: Settings → Family Data Options → Load another family data
+    // file, which confirms "this will replace all local data" first.
+    if (isSafetyCopyName(fileName_param)) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-access',
+        message: 'refused to rebind onto a compaction safety copy',
+        context: { action: 'rebind-refused-safety-copy', file_id_tail: tail(fileId) },
+      });
+      return { ok: false, code: 'FILE_NOT_FOUND' };
+    }
     // The supported repair for a latched pod — it must be allowed one attempt.
     syncService.retryAfterRemoteBlock();
     try {

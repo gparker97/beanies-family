@@ -18,11 +18,22 @@ export const SAFETY_COPY_INFIX = ' (before compacting)';
 
 const BEANPOD_EXT = '.beanpod';
 
-/** `family.beanpod` → `family (before compacting).beanpod`. */
+/**
+ * `family.beanpod` → `family (before compacting).beanpod`.
+ *
+ * ⚠️ IDEMPOTENT. A family that rolled back onto its own safety copy is now
+ * LIVING on a file called `family (before compacting).beanpod`, and compacting
+ * again must not produce `family (before compacting) (before compacting).beanpod`
+ * — a name that stacks forever and, worse, leaves the family's ACTUAL pod
+ * matching `isSafetyCopyName`, so the repair primitives would refuse it.
+ */
 export function safetyCopyName(podFileName: string): string {
-  const base = podFileName.endsWith(BEANPOD_EXT)
+  const withoutExt = podFileName.endsWith(BEANPOD_EXT)
     ? podFileName.slice(0, -BEANPOD_EXT.length)
     : podFileName;
+  const base = withoutExt.endsWith(SAFETY_COPY_INFIX)
+    ? withoutExt.slice(0, -SAFETY_COPY_INFIX.length)
+    : withoutExt;
   return `${base}${SAFETY_COPY_INFIX}${BEANPOD_EXT}`;
 }
 
@@ -35,5 +46,10 @@ export function safetyCopyName(podFileName: string): string {
  * name has to read as a backup at a glance, which is why the infix is prose.
  */
 export function isSafetyCopyName(fileName: string): boolean {
-  return fileName.includes(SAFETY_COPY_INFIX);
+  // ⚠️ ANCHORED, not a substring test. `safetyCopyName` only ever puts the
+  // marker immediately before the extension, so matching it anywhere would
+  // classify a family's REAL pod as a backup the moment a human renamed their
+  // file to something containing the phrase — and the repair primitives would
+  // then refuse the only pod they have.
+  return fileName.endsWith(`${SAFETY_COPY_INFIX}${BEANPOD_EXT}`);
 }

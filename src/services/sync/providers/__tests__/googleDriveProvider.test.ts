@@ -658,10 +658,12 @@ describe('GoogleDriveProvider', () => {
     });
 
     it('matches the name EXACTLY, because Drive queries by substring', async () => {
-      // `name contains 'family.beanpod'` also returns
-      // "family before tidy.beanpod". Resolving to the wrong file here would
-      // overwrite the rollback copy with the live pod, or vice versa.
-      folder = [{ id: 'wrong-id', name: 'family before tidy.beanpod' }];
+      // ⚠️ THE HAZARD RUNS THIS WAY ROUND, and the first version of this test
+      // had it backwards: a query for the SHORTER name matches a LONGER
+      // sibling. With the fixture reversed the mocked query returned nothing,
+      // so `files.find(...)` was never reached and the test passed whether the
+      // code compared names or just took `files[0]`. Verified by mutation.
+      folder = [{ id: 'wrong-id', name: 'my family.beanpod' }];
 
       const out = await provider.readAux('family.beanpod');
 
