@@ -34,15 +34,28 @@ import * as syncService from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { getAuxStore } from '@/services/sync/storageProvider';
+import { safetyCopyName } from '@/constants/compaction';
+import { PayloadLoadError } from '@/types/sync';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
-type RefusalCode = 'not-synced' | 'backup-not-delivered' | 'no-envelope' | 'no-permission';
+type RefusalCode =
+  | 'not-synced'
+  | 'backup-not-delivered'
+  | 'no-envelope'
+  | 'no-permission'
+  | 'safety-copy-failed'
+  // ⚠️ ITS OWN CODE, deliberately. "This device ran out of memory making the
+  // safety copy" is a different sentence from "the safety copy is unreadable",
+  // and only the second means the bytes are bad. Collapsing them would tell a
+  // family their backup is corrupt when their tablet simply could not open it.
+  | 'safety-copy-too-large';
 
 export function usePodCompaction() {
   const syncStore = useSyncStore();
   const familyContext = useFamilyContextStore();
   const { t } = useTranslation();
-  const { exportEncryptedPod, confirmBackupLanded } = usePodExport();
+  const { deliverPod, confirmBackupLanded } = usePodExport();
   const busy = ref(false);
 
   function refuse(code: RefusalCode): void {
@@ -107,14 +120,78 @@ export function usePodCompaction() {
         if (!(await syncService.isFullySynced())) return refuse('not-synced');
       }
 
-      // 3. Backup, gated on DELIVERY. The only rollback route.
-      if (!(await exportEncryptedPod({ errorUi: 'caller' }))) {
+      // 3. Backup, gated on DELIVERY. The rollback route the family keeps.
+      //
+      // ⚠️ BUILT ONCE, USED TWICE. The same envelope is handed to the OS AND
+      // written beside the pod as the automatic safety copy. Two whole-document
+      // serialize + AES-GCM passes back to back is exactly the wrong thing on
+      // the low-memory device this feature exists for — which is why
+      // `usePodExport` splits build from deliver rather than being called twice.
+      let built: { json: string; filename: string };
+      try {
+        built = await syncStore.buildExportEnvelope();
+      } catch {
+        return refuse('backup-not-delivered');
+      }
+      if (!(await deliverPod(built, { errorUi: 'caller' }))) {
         return refuse('backup-not-delivered');
       }
       if (!(await confirmBackupLanded())) return refuse('backup-not-delivered');
 
       const envelope = syncStore.envelope;
       if (!envelope) return refuse('no-envelope');
+
+      // 3b. The AUTOMATIC safety copy, beside the pod (R2). The manual export
+      //     above is a file the family has to keep track of; this one sits in
+      //     the same folder as the pod and is findable in the picker months
+      //     later. A provider with no aux store simply keeps the manual gate.
+      const provider = syncService.getProvider();
+      const aux = provider ? getAuxStore(provider) : null;
+      if (aux && provider) {
+        const copyName = safetyCopyName(provider.getDisplayName());
+        try {
+          await aux.write(copyName, built.json);
+        } catch (e) {
+          reportError({
+            surface: 'pod-compaction',
+            severity: 'warning',
+            message: 'safety copy could not be written beside the pod',
+            error: e,
+            context: { action: 'safety-copy-failed', error_code: 'write' },
+          });
+          return refuse('safety-copy-failed');
+        }
+
+        // ⚠️ "WRITTEN" IS NOT "LANDED", AND "LANDED" IS NOT "OPENS". Only the
+        // third is the gate that matters for a one-way migration, so read it
+        // back through the worker's own decrypt + materialize check rather than
+        // a bare read.
+        try {
+          const roundTripped = await aux.read(copyName);
+          if (!roundTripped) return refuse('safety-copy-failed');
+          await docClient.verifyEnvelope(JSON.parse(roundTripped), { quiet: true });
+        } catch (e) {
+          // A device that cannot inflate its own pod has not proved the copy is
+          // bad — it has proved this device is out of room. Different sentence.
+          if (e instanceof PayloadLoadError && e.deviceCannotOpen) {
+            return refuse('safety-copy-too-large');
+          }
+          reportError({
+            surface: 'pod-compaction',
+            severity: 'warning',
+            message: 'safety copy did not read back cleanly',
+            error: e,
+            context: { action: 'safety-copy-failed', error_code: 'verify' },
+          });
+          return refuse('safety-copy-failed');
+        }
+        logEvent({
+          level: 'info',
+          surface: 'pod-compaction',
+          message: 'safety copy written and verified',
+          context: { action: 'safety-copy-ok' },
+        });
+      }
 
       // 4. Rebuild + verify, in the worker. Throws (keeping the old document)
       //    on any difference; nothing has moved yet if it does.

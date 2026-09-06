@@ -6,6 +6,8 @@
  * thing in the app that deliberately produces a document no peer can merge with.
  */
 import { setActivePinia, createPinia } from 'pinia';
+import { showToast } from '@/composables/useToast';
+import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const hooks = vi.hoisted(() => ({
@@ -15,6 +17,8 @@ const hooks = vi.hoisted(() => ({
   backupLanded: true,
   canWrite: true,
   pulled: true,
+  hasAux: true,
+  verifyThrows: null as unknown,
 }));
 
 vi.mock('@/composables/useConfirm', () => ({
@@ -30,7 +34,10 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/composables/usePodExport', () => ({
   usePodExport: () => ({
     isExporting: { value: false },
-    exportEncryptedPod: vi.fn(async () => hooks.exported),
+    // R2: the compaction builds the envelope ONCE and hands the same bytes to
+    // the OS and to the safety copy, so it calls `deliverPod`, not the
+    // build-and-deliver wrapper.
+    deliverPod: deliverPod,
     confirmBackupLanded: vi.fn(async () => hooks.backupLanded),
   }),
 }));
@@ -43,8 +50,16 @@ vi.mock('@/services/sync/syncService', () => ({
   // The write proof: a revoked file permission or an expired token must be
   // caught BEFORE the lineage is stamped, not at the publish.
   hasPermission: vi.fn(async () => hooks.canWrite),
+  getProvider: () => (hooks.hasAux ? providerStub : null),
+}));
+vi.mock('@/services/sync/storageProvider', () => ({
+  getAuxStore: (p: unknown) => (p ? auxStub : null),
 }));
 vi.mock('@/services/automerge/worker/docClient', () => ({
+  verifyEnvelope: vi.fn(async () => {
+    if (hooks.verifyThrows) throw hooks.verifyThrows;
+    return { ok: true as const };
+  }),
   compactDoc: vi.fn(async () => ({
     beforeBytes: 2_000_000,
     afterBytes: 170_000,
@@ -56,6 +71,15 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 }));
 
 const syncNow = vi.fn(async () => true);
+const deliverPod = vi.fn(async () => hooks.exported);
+const buildExportEnvelope = vi.fn(async () => ({
+  json: '{"version":"4.0"}',
+  filename: 'f.beanpod',
+}));
+const auxWrite = vi.fn(async () => {});
+const auxRead = vi.fn(async () => '{"version":"4.0"}');
+const auxStub = { list: vi.fn(), read: auxRead, write: auxWrite, delete: vi.fn() };
+const providerStub = { getDisplayName: () => 'family.beanpod' };
 const replaceEnvelope = vi.fn();
 // The unconditional pull. `isFullySynced` trusts a change probe that, with no
 // revision, compares mtimes — so compaction pulls without consulting it.
@@ -65,6 +89,7 @@ vi.mock('@/stores/syncStore', () => ({
     syncNow,
     replaceEnvelope,
     loadFromFile,
+    buildExportEnvelope,
     envelope: { version: '4.0', familyId: 'fam-1', podLineage: undefined },
   }),
 }));
@@ -83,6 +108,8 @@ beforeEach(() => {
     backupLanded: true,
     canWrite: true,
     pulled: true,
+    hasAux: true,
+    verifyThrows: null,
   });
 });
 
@@ -174,5 +201,92 @@ describe('the happy path', () => {
     const flushOrder = vi.mocked(docClient.flush).mock.invocationCallOrder[0]!;
     const publishOrder = syncNow.mock.invocationCallOrder.at(-1)!;
     expect(flushOrder).toBeLessThan(publishOrder);
+  });
+});
+
+/**
+ * R2 — the automatic safety copy beside the pod.
+ *
+ * The manual export is a file the family has to keep track of. This one sits in
+ * the same folder as the pod, is findable months later, and is written before
+ * anything is destroyed.
+ */
+describe('the automatic safety copy', () => {
+  it('writes it beside the pod, named from the pod own file name', async () => {
+    await usePodCompaction().compact();
+
+    // ⚠️ DERIVED, never a fixed constant. The Drive app folder is per-ACCOUNT,
+    // so one account owning two families keeps both pods in one folder and a
+    // global name would have each compaction overwrite the other's copy.
+    expect(auxWrite).toHaveBeenCalledWith(
+      'family (before compacting).beanpod',
+      '{"version":"4.0"}'
+    );
+  });
+
+  it('builds the envelope ONCE and gives the same bytes to both', async () => {
+    await usePodCompaction().compact();
+
+    // Two whole-document serialize + AES-GCM passes back to back is exactly the
+    // wrong thing on the low-memory device this feature exists for.
+    expect(buildExportEnvelope).toHaveBeenCalledTimes(1);
+    expect(deliverPod).toHaveBeenCalledWith(
+      { json: '{"version":"4.0"}', filename: 'f.beanpod' },
+      expect.anything()
+    );
+  });
+
+  it('reads it back and OPENS it before destroying anything', async () => {
+    await usePodCompaction().compact();
+
+    // "Written" is not "landed", and "landed" is not "opens". Only the third is
+    // the gate that matters for a one-way migration.
+    expect(auxRead).toHaveBeenCalledWith('family (before compacting).beanpod');
+    expect(docClient.verifyEnvelope).toHaveBeenCalled();
+    expect(docClient.compactDoc).toHaveBeenCalled();
+  });
+
+  it('REFUSES, changing nothing, when the copy cannot be written', async () => {
+    auxWrite.mockRejectedValueOnce(new Error('drive said no'));
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('REFUSES, changing nothing, when the copy will not open', async () => {
+    hooks.verifyThrows = new CorruptPayloadError('bad bytes', 'load', 'fam-1');
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('tells an out-of-memory verify apart from a bad copy', async () => {
+    // ⚠️ DIFFERENT SENTENCES. "This device ran out of memory checking the copy"
+    // is not "your backup is corrupt", and only the second means the bytes are
+    // bad. Collapsing them tells a family their one rollback route is ruined.
+    hooks.verifyThrows = new PayloadTooLargeError('oom', 'load', 'fam-1');
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'warning',
+      'compaction.refused',
+      'compaction.refused.safety-copy-too-large',
+      expect.anything()
+    );
+  });
+
+  it('keeps the manual gate when the provider cannot write siblings', async () => {
+    // A local-file family has no aux store. It still gets the export gate, and
+    // the compaction still runs.
+    hooks.hasAux = false;
+
+    await usePodCompaction().compact();
+
+    expect(auxWrite).not.toHaveBeenCalled();
+    expect(docClient.compactDoc).toHaveBeenCalled();
   });
 });

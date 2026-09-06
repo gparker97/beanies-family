@@ -6,6 +6,7 @@
  */
 
 import { getGoogleAccountEmail, fetchGoogleUserEmail } from './googleAuth';
+import { isSafetyCopyName } from '@/constants/compaction';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
@@ -359,6 +360,8 @@ export interface BeanpodFileEntry {
  * If folder-based search returns empty, falls back to a Drive-wide search
  * for .beanpod files (handles broken folder associations).
  */
+// ⚠️ NOT filtered for safety copies — see the note in `findBeanpodInFolder`.
+// The pre-create collision check must see every file in the folder.
 export async function listBeanpodFiles(
   token: string,
   folderId: string
@@ -733,7 +736,25 @@ export async function findBeanpodInFolder(
   const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=10`;
   const res = await driveRequest(token, url);
   const data = await res.json();
-  const files = mapFileResults(data.files).filter((f) => f.name.endsWith('.beanpod'));
+  // ⚠️ THE SAFETY COPY IS EXCLUDED HERE, AND ONLY HERE (ADR-033). This helper
+  // AUTO-SELECTS — it returns `files[0]` — and is documented as the preferred
+  // join/recovery entry point, so handing a joiner the pre-compaction file is
+  // exactly the "never fork a family pod" failure. Stated where pods are
+  // IDENTIFIED rather than at a call site, so a future caller inherits it.
+  //
+  // Deliberately NOT applied to its two neighbours: `searchBeanpodFilesGlobal`
+  // feeds the human file picker, where the copy MUST stay visible — that is
+  // what makes it a rollback route someone can choose — and `listBeanpodFiles`
+  // backs the pre-create collision check, which has to see EVERY file in the
+  // folder or it re-opens the 2026-05-15 duplicate-pod incident. Do not
+  // "finish the job" on either.
+  const all = mapFileResults(data.files).filter((f) => f.name.endsWith('.beanpod'));
+  const files = all.filter((f) => !isSafetyCopyName(f.name));
+  if (all.length !== files.length) {
+    console.warn(
+      `[driveService] findBeanpodInFolder: skipped ${all.length - files.length} safety copy/copies in ${folderId}`
+    );
+  }
   if (files.length === 0) throw new NoBeanpodInFolderError(folderId);
   return files[0];
 }

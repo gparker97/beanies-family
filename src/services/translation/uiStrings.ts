@@ -4286,13 +4286,40 @@ const STRING_DEFS = {
   // Pod compaction (owner-only, dev-flagged). The confirm names the two things
   // that actually change for the family: other devices must catch up, and the
   // edit history goes.
-  'compaction.confirmTitle': { en: 'Slim down your family file?', beanie: 'slim down your pod?' },
-  'compaction.confirmMessage': {
-    en: 'beanies will rewrite your family file without its edit history, so it opens faster and works on older tablets. Your data is not changed. beanies saves a copy to your device first. Every other device will pick up the slimmer file next time it is online — until then, they will say they need to catch up.',
+  // The "?" popover. The question a person actually has is "if the history is
+  // not needed, why is it there?" — and the honest answer is that it IS needed,
+  // right up until every device is level.
+  'compaction.why.record': {
+    en: 'Your family file keeps a record of every change ever made to it. That record is how two devices work out what each other changed, so both sets of edits survive instead of one writing over the other.',
     beanie:
-      'beanies will rewrite your pod without its edit history, so it opens faster and works on older tablets. your beans are not changed. beanies saves a copy to your device first. every other device will pick up the slimmer pod next time it is online.',
+      'your pod keeps a record of every change ever made to it. that record is how two beans work out what each other changed, so both sets of edits survive instead of one writing over the other.',
   },
-  'compaction.confirmCta': { en: 'Slim it down', beanie: 'slim it down' },
+  'compaction.why.settled': {
+    en: 'Once every device is up to date there is nothing left for that record to settle, so it can go. Your beans, and every date, note and photo, are untouched.',
+    beanie:
+      'once every bean is up to date there is nothing left for that record to settle, so it can go. your beans, and every date, note and photo, are untouched.',
+  },
+  'compaction.why.older': {
+    en: 'On an older phone or tablet the record can grow big enough to stop the family file opening at all. Compacting is what fixes that.',
+    beanie:
+      'on an older phone or tablet the record can grow big enough to stop your pod opening at all. compacting is what fixes that.',
+  },
+  'compaction.bringDevicesOnline': {
+    en: "Before you start, bring your family's other devices online so they are up to date. A device that has been offline with changes it never saved will ask you what to do when it comes back.",
+    beanie:
+      "before you start, bring your family's other beans online so they are up to date. a bean that has been offline with beans it never saved will ask you what to do when it comes back.",
+  },
+  'compaction.safetyCopyNote': {
+    en: 'beanies saves a copy of the current file beside it first, so you can go back.',
+    beanie: 'beanies saves a copy of your current pod beside it first, so you can go back.',
+  },
+  'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
+  'compaction.confirmMessage': {
+    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. None of your beans change, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online; one that has been offline with changes it never saved will ask you what to do.',
+    beanie:
+      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. none of your beans change, and beanies saves a copy of your current pod first. your other beans pick the compacted pod up next time they are online; one that has been offline with beans it never saved will ask you what to do.',
+  },
+  'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {
     en: "beanies didn't slim your file down",
     beanie: "beanies didn't slim your pod down",
@@ -4306,6 +4333,16 @@ const STRING_DEFS = {
     en: 'The backup was not saved, so beanies stopped. Nothing has changed. Try again and save the file when asked.',
     beanie:
       'the backup was not saved, so beanies stopped. nothing has changed. try again and save the file when asked.',
+  },
+  'compaction.refused.safety-copy-failed': {
+    en: 'beanies could not save a copy of your family file next to it, so it stopped before changing anything. Check your storage connection and try again.',
+    beanie:
+      'beanies could not save a copy of your pod next to it, so it stopped before changing anything. check your storage connection and try again.',
+  },
+  'compaction.refused.safety-copy-too-large': {
+    en: 'This device ran out of memory checking the copy beanies saved, so it stopped before changing anything. The copy itself is fine. Try again on a device with more memory.',
+    beanie:
+      'this bean ran out of memory checking the copy beanies saved, so it stopped before changing anything. the copy itself is fine. try again on a bean with more memory.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',
@@ -4335,11 +4372,12 @@ const STRING_DEFS = {
     beanie:
       'your backup is on this device and your beans are safe. reload beanies and it will finish the job.',
   },
-  'settings.compactPod': { en: 'Slim down family file', beanie: 'slim down pod' },
-  'settings.compactPodDesc': {
-    en: 'Rewrite your family file without its edit history so it opens faster and works on older tablets. Owner only.',
+  'settings.compactPod': { en: 'Compact Family File', beanie: 'compact pod' },
+  'settings.compactSection': { en: 'Compact Your Family File', beanie: 'compact your pod' },
+  'settings.compactSectionDesc': {
+    en: 'Compacting clears the record of past changes and keeps every one of your beans. beanies checks the compacted file matches the original exactly before it replaces anything, and stops if a single thing differs.',
     beanie:
-      'rewrite your pod without its edit history so it opens faster and works on older tablets. owner only.',
+      'compacting clears the record of past changes and keeps every one of your beans. beanies checks the compacted pod matches the original exactly before it replaces anything, and stops if a single bean differs.',
   },
   'podLineage.bannerTitle': {
     en: 'Some changes on this device are waiting',

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4528
+    "translationCount": 4536
   },
   "translations": {
     "app.name": {
@@ -22497,19 +22497,19 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmTitle": {
-      "translation": "精简您的家庭文件？",
-      "hash": "w8axl3",
-      "lastUpdated": "2026-09-05"
+      "translation": "压缩您的家庭文件？",
+      "hash": "dabjhz",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将在没有编辑历史记录的情况下重写您的家庭文件，因此它打开速度更快，适用于较旧的平板电脑。您的数据未更改。Beanies会先将副本保存到您的设备。下次在线时，其他所有设备都会拿起更薄的文件—在此之前，他们会说他们需要赶上。",
-      "hash": "48lmsb",
-      "lastUpdated": "2026-09-05"
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。您的beans都不会更改， beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件；已离线但从未保存更改的设备会询问您该怎么做。",
+      "hash": "iagbvw",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
-      "translation": "减肥",
-      "hash": "6vssl0",
-      "lastUpdated": "2026-09-05"
+      "translation": "压紧它",
+      "hash": "is0294",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.refused": {
       "translation": "beanies没有精简您的文件",
@@ -22557,14 +22557,9 @@
       "lastUpdated": "2026-09-05"
     },
     "settings.compactPod": {
-      "translation": "精简家庭文件",
-      "hash": "enkmn1",
-      "lastUpdated": "2026-09-05"
-    },
-    "settings.compactPodDesc": {
-      "translation": "在没有编辑历史记录的情况下重写家庭文件，使其更快地打开并在旧版平板电脑上运行。仅限所有者。",
-      "hash": "1zopem",
-      "lastUpdated": "2026-09-05"
+      "translation": "压缩系列文件",
+      "hash": "nwql0l",
+      "lastUpdated": "2026-09-06"
     },
     "podMerge.failedInline": {
       "translation": "beanies无法将家庭文件中的更改与此设备上的更改合并，因此未写入任何内容。您的更改将保留在此处。关闭任何其他beanies选项卡并重新加载；如果继续发生这种情况，请从“设置”中导出更改并联系support@beanies.family。",
@@ -22644,6 +22639,51 @@
     "podLineage.useFileDone": {
       "translation": "此设备现在位于重组后的家庭文件中。",
       "hash": "qhg4op",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.why.record": {
+      "translation": "您的家庭文件会保留每次更改的记录。该记录是两个设备如何计算出彼此更改的内容，因此两组编辑都会保存下来，而不是一个写在另一个上面。",
+      "hash": "47kt49",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.why.settled": {
+      "translation": "一旦每台设备都更新到最新状态，就没有任何东西可供该记录结算，因此它可以继续使用。你的豆子，以及每一个日期，笔记和照片，都没有受到影响。",
+      "hash": "u760si",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.why.older": {
+      "translation": "在较旧的手机或平板电脑上，记录可能会变得足够大，以至于完全无法打开家庭文件。压实是解决这个问题的方法。",
+      "hash": "shs23d",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.bringDevicesOnline": {
+      "translation": "在开始之前，请将家人的其他设备上线，以便更新。已离线但从未保存更改的设备将询问您在返回时该怎么做。",
+      "hash": "oem3j6",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.safetyCopyNote": {
+      "translation": "beanies首先在其旁边保存当前文件的副本，因此您可以返回。",
+      "hash": "ekujqb",
+      "lastUpdated": "2026-09-06"
+    },
+    "settings.compactSection": {
+      "translation": "压缩您的家庭文件",
+      "hash": "kxkanc",
+      "lastUpdated": "2026-09-06"
+    },
+    "settings.compactSectionDesc": {
+      "translation": "压缩将清除过去更改的记录，并保留每个beans。beanies会在压缩文件替换任何内容之前检查压缩文件是否与原始文件完全匹配，并在单个内容不同时停止。",
+      "hash": "jj3ro2",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.safety-copy-failed": {
+      "translation": "beanies无法保存您的家庭文件旁边的副本，因此它在更改任何内容之前停止。请检查您的存储空间连接，然后重试。",
+      "hash": "8nymn5",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.safety-copy-too-large": {
+      "translation": "此设备在检查保存的复制beanies时内存不足，因此在更改任何内容之前停止。副本本身就没问题。请在具有更多内存的设备上重试。",
+      "hash": "md5m1v",
       "lastUpdated": "2026-09-06"
     }
   }
