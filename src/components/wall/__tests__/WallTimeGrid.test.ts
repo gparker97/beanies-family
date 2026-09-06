@@ -93,6 +93,10 @@ beforeEach(() => {
 
 describe('WallTimeGrid', () => {
   it('renders a fold band labelled with the time the day resumes', async () => {
+    // ⚠️ Cramped on purpose. Folding is the CONSTRAINED-space answer now: given
+    // room the grid draws the real gap instead of collapsing it, so at the
+    // default 480px this day no longer folds at all. That is the feature.
+    stubMeasurement(240);
     const w = await mountGrid();
     expect(w.find('.wall-fold').exists()).toBe(true);
     expect(w.text()).toContain('wall.grid.quietUntil');
@@ -109,6 +113,7 @@ describe('WallTimeGrid', () => {
   });
 
   it('paints the fold LABEL after the blocks, so a nudged block cannot bury it', async () => {
+    stubMeasurement(240); // see the fold-band test above
     const w = await mountGrid();
     const html = w.html();
     expect(html.indexOf('wall-fold-label')).toBeGreaterThan(html.indexOf('wall-tblock'));
