@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4555
+    "translationCount": 4554
   },
   "translations": {
     "app.name": {
@@ -22502,8 +22502,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保留当前文件的副本。您的其他设备会自行拾取压缩文件，并且在离线时， beanies会携带它们更改的任何内容。仍然使用较旧版本Beanies的设备会显示一条消息并停止同步，直到更新为止；在此之前添加的任何内容都不会保留。",
-      "hash": "bclfcm",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开得更快。您添加的所有房源。Beanies会先保存当前文件的副本，其他设备会自行切换。",
+      "hash": "2wl26l",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
@@ -22642,23 +22642,23 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.why.record": {
-      "translation": "您的家庭文件会保留每次更改的记录。该记录是两个设备如何计算出彼此更改的内容，因此两组编辑都会保存下来，而不是一个写在另一个上面。",
-      "hash": "47kt49",
+      "translation": "beanies会记录过去的更改，以便您的设备在脱机后可以互相追赶。一旦他们都赶上了，就不需要记录了。",
+      "hash": "x5h3st",
       "lastUpdated": "2026-09-06"
     },
     "compaction.why.settled": {
-      "translation": "一旦每台设备都更新到最新状态，就没有任何东西可供该记录结算，因此它可以继续使用。你的豆子，以及每一个日期，笔记和照片，都没有受到影响。",
-      "hash": "u760si",
+      "translation": "压缩会保留每个帐户、交易、任务和内存。仅删除过去更改的记录。",
+      "hash": "svks60",
       "lastUpdated": "2026-09-06"
     },
     "compaction.why.older": {
-      "translation": "在较旧的手机或平板电脑上，记录可能会变得足够大，以至于完全无法打开家庭文件。压实是解决这个问题的方法。",
-      "hash": "shs23d",
+      "translation": "beanies首先保存当前文件的副本，因此如果需要，您可以返回该文件。",
+      "hash": "fr6nw7",
       "lastUpdated": "2026-09-06"
     },
     "compaction.bringDevicesOnline": {
-      "translation": "在开始之前，请将您家庭的其他设备联机，以便它们保持最新状态。beanies会传递在离线设备上所做的更改，但如果无法传输，则会要求该设备放弃更改。",
-      "hash": "gc3fvo",
+      "translation": "在开始之前，请确保您家人的其他设备最近已上线，以便更新。",
+      "hash": "wlilxm",
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNote": {
@@ -22672,8 +22672,8 @@
       "lastUpdated": "2026-09-06"
     },
     "settings.compactSectionDesc": {
-      "translation": "压缩将清除过去更改的记录，并保留每个beans。beanies会在压缩文件替换任何内容之前检查压缩文件是否与原始文件完全匹配，并在单个内容不同时停止。",
-      "hash": "jj3ro2",
+      "translation": "beanies会记录您家庭档案的每次更改。随着时间的推移，该记录会使文件变得更大，打开速度更慢，尤其是在较旧的手机和平板电脑上。压缩会删除记录并保留您添加的所有内容。",
+      "hash": "knwakg",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.safety-copy-failed": {
@@ -22697,13 +22697,13 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.dueBecauseLarge": {
-      "translation": "您的家庭文件已经足够大，以至于较旧的手机和平板电脑可能很难打开它。现在压实是个好主意。",
-      "hash": "2hwwlz",
+      "translation": "您的家庭文件已变大。现在压实是个好主意。",
+      "hash": "ktn4kr",
       "lastUpdated": "2026-09-06"
     },
     "compaction.dueBecauseFailed": {
-      "translation": "您家族中的设备无法打开家庭文件，因为内存不足。压实将为他们解决这个问题。",
-      "hash": "bfgp1y",
+      "translation": "您家庭中的设备无法打开家庭文件。压实可以解决这个问题。",
+      "hash": "9t8tb3",
       "lastUpdated": "2026-09-06"
     },
     "compaction.doneNothingToDo": {
@@ -22761,24 +22761,19 @@
       "hash": "i9zdbs",
       "lastUpdated": "2026-09-06"
     },
-    "compaction.why.conflict": {
-      "translation": "如果在两个地方更改了相同的内容，则此处已保存的版本就是保留的版本。",
-      "hash": "4x56tz",
-      "lastUpdated": "2026-09-06"
-    },
     "compaction.doneOlderVersion": {
-      "translation": "完成。{list}最后一次在旧版本上打开beanies ；该设备将显示一条消息，并在更新后再次同步。",
-      "hash": "rea46f",
+      "translation": "完成。{list}需要更新beanies才能再次同步。",
+      "hash": "unfztl",
       "lastUpdated": "2026-09-06"
     },
     "compaction.olderVersion.notice": {
-      "translation": "{list}上次在旧版本上打开的beanies。压缩后，仍使用旧版本的设备会显示一条消息并停止同步，直到更新为止，并且在此之前添加的任何内容都不会保留。如果可以的话，请他们先更新beanies。其他任何人都不会改变。",
-      "hash": "hyvzft",
+      "translation": "{list}上次在旧版本上打开的beanies。在紧凑之前，请他们更新Beanies。",
+      "hash": "a2mhf5",
       "lastUpdated": "2026-09-06"
     },
-    "compaction.olderVersion.rule": {
-      "translation": "beanies只能看到每个人上次打开它的时间，而不是他们拥有的每个设备。任何未更新的设备将在下次打开时进行更新，并在更新后再次同步。",
-      "hash": "b9ejqm",
+    "compaction.why.devices": {
+      "translation": "您的其他设备会自行切换到压缩文件。仍然使用较旧版本Beanies的设备会显示一条消息，并在更新后再次同步。",
+      "hash": "z4i42z",
       "lastUpdated": "2026-09-06"
     }
   }
