@@ -128,6 +128,20 @@ const columnByMember = computed(() => {
  * green ring and the row of stars — that is the reward, and collapsing it would
  * punish the one bean who did everything asked.
  */
+/**
+ * ⚠️ "All clear" is a claim about a PERSON, not about a column, so it has to be
+ * true of everything they owe — and `buildColumn` only sees lists.
+ *
+ * `wallJobs` deliberately suppresses a list item whenever a to-do of the same
+ * owner and title is due today, to avoid showing the same job twice. A bean
+ * whose list is entirely such items therefore has `total === 0` while the
+ * to-dos card beside them shows the work outstanding. Calling that bean clear,
+ * by name, on a kitchen wall, is worse than saying nothing.
+ */
+function hasOutstandingTodos(memberId: string): boolean {
+  return props.peripherals.todosFor(memberId).some((job) => !job.done);
+}
+
 const partitioned = computed(() => {
   const active: { member: FamilyMember; column: ReturnType<typeof buildColumn> }[] = [];
   const idle: FamilyMember[] = [];
@@ -139,7 +153,9 @@ const partitioned = computed(() => {
     const column = columnByMember.value.get(member.id);
     if (!column) continue;
     if (column.total > 0) active.push({ member, column });
-    else idle.push(member);
+    else if (!hasOutstandingTodos(member.id)) idle.push(member);
+    // A bean with no list jobs but outstanding to-dos is neither: they get no
+    // column (there is nothing to put in one) and they are NOT called clear.
   }
   return { active, idle };
 });
@@ -206,22 +222,28 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     </div>
 
     <!--
-      Columns are CAPPED, not `1fr`. With one or two beans holding the jobs a
-      `1fr` track stretched a single list into a billboard; capped tracks stay a
-      readable width and centre, so the surplus reads as margin rather than as a
-      rendering fault. Capping unconditionally avoids a "if exactly one active
-      member" special case that would have to be kept correct forever.
+      ⚠️ The track max stays `1fr`. A definite max (`minmax(210px, 420px)`) looks
+      like the obvious way to stop one bean's list becoming a billboard, but
+      auto-fit computes its repetition count from the track's MAX when that max
+      is definite — so 420px HALVED the column count at every size: five columns
+      became two at 1280px, three became one at 800px, and the surplus beans
+      wrapped onto rows this grid has no room to show and no overflow to scroll.
+      jsdom has no layout engine, so no unit test here can catch it.
+
+      The cap belongs on the CARD instead, inside a `1fr` track that still counts
+      correctly. `justify-items: center` keeps a capped card centred in its track
+      rather than stranding the slack on one side.
     -->
     <div
       v-if="hasBoard"
-      class="grid min-h-0 flex-1 justify-center gap-2.5"
-      style="grid-template-columns: repeat(auto-fit, minmax(210px, 420px))"
+      class="grid min-h-0 flex-1 justify-items-center gap-2.5"
+      style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
     >
       <div
         v-for="{ member, column } in partitioned.active"
         :key="member.id"
         data-test="board-column"
-        class="dark:bg-surface-raised flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
+        class="dark:bg-surface-raised flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
         :class="column.total && column.done === column.total ? 'ring-[2.5px] ring-[#27AE60]' : ''"
       >
         <div
@@ -294,7 +316,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <div
         v-if="peripherals.orphanLists.length"
         data-test="orphan-column"
-        class="ring-dashed dark:bg-surface-raised flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
+        class="ring-dashed dark:bg-surface-raised flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
       >
         <div
           class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
@@ -351,7 +373,9 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         class="flex shrink-0 items-center gap-1.5"
       >
         <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
-        <span class="font-inter wall-bean-count text-[var(--muted-text,#4d5d6c)]">
+        <span
+          class="font-inter wall-bean-count dark:text-ink-soft text-[var(--muted-text,#4d5d6c)]"
+        >
           {{ member.name }}
         </span>
       </div>

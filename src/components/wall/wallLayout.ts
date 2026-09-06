@@ -36,3 +36,19 @@ export const DAYS_RAIL_MIN_VIEWPORT_PX = 1270;
 
 /** The media query behind `DAYS_RAIL_MIN_VIEWPORT_PX`. */
 export const DAYS_RAIL_QUERY = `(min-width: ${DAYS_RAIL_MIN_VIEWPORT_PX}px)`;
+
+/**
+ * The most lanes that stay readable beside the rail on a narrow landscape wall.
+ *
+ * ⚠️ The days view is not the only one that can be crowded by the rail. A lane
+ * is a PERSON, and a large family has six or seven — at which point the same
+ * arithmetic bites harder than it does for days: on a 1024px tablet,
+ * 1024 − 56 padding − 296 rail − 16 gap − 62 axis leaves 594px, i.e. ~85px for
+ * seven lanes, below `WallTimeBlock`'s SLIVER_PX (95). Every block would drop
+ * its title on the one view whose entire purpose is comparing people.
+ *
+ * Four lanes get ~148px each, comfortably clear of the sliver threshold, so a
+ * narrow wall keeps the rail for a small family and drops it for a large one.
+ * A wide wall (>= DAYS_RAIL_MIN_VIEWPORT_PX) has room for either.
+ */
+export const LANES_RAIL_MAX_COLUMNS = 4;

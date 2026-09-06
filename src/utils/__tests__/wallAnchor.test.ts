@@ -148,6 +148,20 @@ describe('nextAnchorYmd', () => {
     });
   });
 
+  describe('asymmetry after a day tap — documented, not accidental', () => {
+    it('back-then-forward from an unaligned anchor lands a week start ahead', () => {
+      // greg's approved rule is "leaving today enters calendar weeks", and a day
+      // tap leaves an arbitrary anchor. So `‹` from Tuesday snaps to Monday, and
+      // `›` from an aligned Monday is a plain +7 — a net +6, not a round trip.
+      // That is the cost of snapping, and it is asserted here so a later reader
+      // meets it as a decision rather than discovering it as a surprise.
+      const tuesday = '2026-09-08';
+      const back = nextAnchorYmd(tuesday, 'week', -1, MONDAY);
+      expect(back).toBe('2026-09-07');
+      expect(nextAnchorYmd(back, 'week', 1, MONDAY)).toBe('2026-09-14');
+    });
+  });
+
   describe('round-tripping', () => {
     it.each<[WallStepUnit, number]>([
       ['week', MONDAY],
