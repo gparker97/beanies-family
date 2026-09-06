@@ -619,4 +619,99 @@ describe('GoogleDriveProvider', () => {
       expect(mockDeleteFile).not.toHaveBeenCalled();
     });
   });
+
+  /**
+   * The aux surface had to address a `.beanpod`-named sibling before the
+   * automatic safety copy (R2) could exist at all. Two bugs, both silent.
+   */
+  describe('aux objects that are not .beanchanges', () => {
+    /**
+     * ⚠️ THE MOCK MUST HONOUR `nameContains`, or these tests prove nothing.
+     * A `mockResolvedValueOnce` returns its list whatever was queried, so a
+     * `.beanchanges`-scoped lookup would still "find" a `.beanpod` sibling and
+     * the original bug passes. Drive's filter is a SUBSTRING match, and
+     * modelling that is also what makes the exact-match test meaningful.
+     */
+    let folder: { id: string; name: string }[];
+
+    beforeEach(() => {
+      mockGetFileMetadata.mockResolvedValue({ parents: ['parent-folder'] });
+      folder = [];
+      mockListFilesInFolder.mockImplementation(
+        async (_token: string, _folderId: string, nameContains?: string) =>
+          nameContains ? folder.filter((f) => f.name.includes(nameContains)) : [...folder]
+      );
+    });
+
+    it('finds a sibling whose name listAux would never have mapped', async () => {
+      // ⚠️ `listAux()` queries `.beanchanges` ONLY and REPLACES the name→id map
+      // with the result. `readAux`/`deleteAux` refreshed through it on a miss, so
+      // any other suffix was unreachable — and `deleteAux` reports "already
+      // gone" as success, so the no-op looked like a delete.
+      folder = [{ id: 'copy-id', name: 'family before tidy.beanpod' }];
+      mockReadFile.mockResolvedValueOnce('{"version":"4.0"}');
+
+      const out = await provider.readAux('family before tidy.beanpod');
+
+      expect(out).toBe('{"version":"4.0"}');
+      expect(mockReadFile).toHaveBeenCalledWith('mock-token', 'copy-id');
+    });
+
+    it('matches the name EXACTLY, because Drive queries by substring', async () => {
+      // `name contains 'family.beanpod'` also returns
+      // "family before tidy.beanpod". Resolving to the wrong file here would
+      // overwrite the rollback copy with the live pod, or vice versa.
+      folder = [{ id: 'wrong-id', name: 'family before tidy.beanpod' }];
+
+      const out = await provider.readAux('family.beanpod');
+
+      expect(out).toBeNull();
+      expect(mockReadFile).not.toHaveBeenCalled();
+    });
+
+    it('OVERWRITES a name that already exists, instead of duplicating it', async () => {
+      // Drive allows two files with one name in a folder. `writeAux` only ever
+      // created, so every compaction would have left another rollback copy
+      // behind and the file picker would fill up with them. The `AuxStore`
+      // contract has always said "create/overwrite".
+      folder = [{ id: 'existing-id', name: 'family before tidy.beanpod' }];
+
+      await provider.writeAux('family before tidy.beanpod', 'payload');
+
+      expect(mockUpdateFile).toHaveBeenCalledWith('mock-token', 'existing-id', 'payload');
+      expect(mockCreateFile).not.toHaveBeenCalled();
+    });
+
+    it('creates it the first time', async () => {
+      folder = [];
+
+      await provider.writeAux('family before tidy.beanpod', 'payload');
+
+      expect(mockCreateFile).toHaveBeenCalled();
+      expect(mockUpdateFile).not.toHaveBeenCalled();
+    });
+
+    it('really deletes one, rather than reporting an idempotent no-op', async () => {
+      folder = [{ id: 'copy-id', name: 'family before tidy.beanpod' }];
+
+      await provider.deleteAux('family before tidy.beanpod');
+
+      expect(mockDeleteFile).toHaveBeenCalledWith('mock-token', 'copy-id');
+    });
+
+    it('leaves listAux scoped to .beanchanges — the transport owns that map', async () => {
+      // Widening it would have been the tempting fix and is the wrong one: its
+      // only caller is the change-log transport, which must keep seeing exactly
+      // its own chunks.
+      folder = [{ id: 'copy-id', name: 'family before tidy.beanpod' }];
+      const names = await provider.listAux();
+      // The `.beanpod` sibling is in the folder and must NOT appear.
+      expect(names).toEqual([]);
+      expect(mockListFilesInFolder).toHaveBeenCalledWith(
+        'mock-token',
+        'parent-folder',
+        '.beanchanges'
+      );
+    });
+  });
 });

@@ -446,6 +446,38 @@ export class GoogleDriveProvider implements StorageProvider {
     return parent;
   }
 
+  /**
+   * Resolve ONE aux object's file id by name — the cached map first, then an
+   * exact-name query.
+   *
+   * ⚠️ THIS EXISTS BECAUSE `listAux()` IS SCOPED TO `.beanchanges`, AND MUST
+   * STAY THAT WAY. `readAux` and `deleteAux` used to refresh through it on a
+   * miss, which silently made the whole aux surface unable to address any
+   * sibling with a different suffix: `deleteAux('… before tidy.beanpod')` missed
+   * the map, listed only `.beanchanges`, missed again, and returned — a no-op
+   * reported as success, because delete is documented as idempotent. Widening
+   * `listAux`'s own query is NOT the fix: its single caller is the change-log
+   * transport, which owns that name→id map and must keep seeing exactly its own
+   * chunks.
+   *
+   * Drive's `name contains` is a SUBSTRING match, so the exact comparison below
+   * is load-bearing — "pod.beanpod" would otherwise match
+   * "pod before tidy.beanpod".
+   */
+  private async resolveAuxId(
+    token: string,
+    folderId: string,
+    name: string
+  ): Promise<string | null> {
+    const cached = this.auxIdByName.get(name);
+    if (cached) return cached;
+    const files = await withRetry(() => listFilesInFolder(token, folderId, name));
+    const match = files.find((f) => f.name === name);
+    if (!match) return null;
+    this.auxIdByName.set(name, match.id);
+    return match.id;
+  }
+
   async listAux(): Promise<string[]> {
     const token = await getValidTokenSilent();
     const folderId = await this.resolveAuxFolder(token);
@@ -456,29 +488,39 @@ export class GoogleDriveProvider implements StorageProvider {
 
   async readAux(name: string): Promise<string | null> {
     const token = await getValidTokenSilent();
-    let id = this.auxIdByName.get(name);
-    if (!id) {
-      await this.listAux(); // refresh the name→id map (e.g. after a reload)
-      id = this.auxIdByName.get(name);
-    }
+    const folderId = await this.resolveAuxFolder(token);
+    const id = await this.resolveAuxId(token, folderId, name);
     if (!id) return null; // absent (pruned/never-written) → transport falls back
     return withRetry(() => readFile(token, id));
   }
 
+  /**
+   * Create OR overwrite one aux object — which is what the `AuxStore` contract
+   * has always said, and what the implementation did not do.
+   *
+   * ⚠️ IT ONLY EVER CREATED. Drive permits two files with the same name in one
+   * folder, so re-writing a name produced a DUPLICATE rather than a new version.
+   * Nothing noticed because the only caller until now was the change-log
+   * transport, whose chunk names are immutable and never reused. A rollback copy
+   * IS re-written, every compaction, so without this each one would leave
+   * another copy behind and the picker would fill with them.
+   */
   async writeAux(name: string, content: string): Promise<void> {
     const token = await getValidTokenSilent();
     const folderId = await this.resolveAuxFolder(token);
+    const existing = await this.resolveAuxId(token, folderId, name);
+    if (existing) {
+      await withRetry(() => updateFile(token, existing, content));
+      return;
+    }
     const { fileId } = await withRetry(() => createFile(token, folderId, name, content));
     this.auxIdByName.set(name, fileId);
   }
 
   async deleteAux(name: string): Promise<void> {
     const token = await getValidTokenSilent();
-    let id = this.auxIdByName.get(name);
-    if (!id) {
-      await this.listAux();
-      id = this.auxIdByName.get(name);
-    }
+    const folderId = await this.resolveAuxFolder(token);
+    const id = await this.resolveAuxId(token, folderId, name);
     if (!id) return; // already gone — delete is idempotent
     await withRetry(() => deleteFile(token, id));
     this.auxIdByName.delete(name);
