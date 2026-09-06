@@ -124,6 +124,8 @@ export function usePodCompaction() {
           confirmLabel: 'compaction.confirmCta',
           variant: 'info',
           detail: olderVersion.value.length ? olderVersionNotice.value : undefined,
+          // Same slab as the Settings notice, so the two surfaces agree.
+          detailTone: 'caution',
         }))
       ) {
         return;

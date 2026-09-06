@@ -8,6 +8,12 @@ interface ConfirmOptions {
   message: UIStringKey;
   /** Additional detail text shown below the message (plain string, not translated) */
   detail?: string;
+  /**
+   * `caution` renders `detail` as the Heritage Orange caution slab the Settings
+   * page uses, so a warning a person saw on the page is styled the same way
+   * when it is repeated at the moment they decide. Default: a faint caption.
+   */
+  detailTone?: 'caution';
   variant?: ConfirmVariant;
   showCancel?: boolean;
   /** Custom confirm button label (overrides default "Delete" / "OK") */
@@ -21,6 +27,7 @@ interface ConfirmState {
   title: UIStringKey;
   message: UIStringKey;
   detail?: string;
+  detailTone?: 'caution';
   variant: ConfirmVariant;
   showCancel: boolean;
   confirmLabel?: UIStringKey;
@@ -37,6 +44,7 @@ const state = ref<ConfirmState>({
   showCancel: true,
   resolve: null,
   detail: undefined,
+  detailTone: undefined,
   confirmLabel: undefined,
   cancelLabel: undefined,
 });
@@ -52,6 +60,7 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
       title: options.title,
       message: options.message,
       detail: options.detail,
+      detailTone: options.detailTone,
       variant: options.variant ?? 'danger',
       showCancel: options.showCancel ?? true,
       confirmLabel: options.confirmLabel,

@@ -469,7 +469,10 @@ describe('who is on an older version is a notice, never a gate', () => {
     hooks.behind = ['Sam', 'Alex'];
     await usePodCompaction().compact();
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: 'compaction.olderVersion.notice:Sam, Alex' })
+      expect.objectContaining({
+        detail: 'compaction.olderVersion.notice:Sam, Alex',
+        detailTone: 'caution',
+      })
     );
   });
 

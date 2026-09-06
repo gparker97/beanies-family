@@ -34,7 +34,23 @@ const { state, handleConfirm, handleCancel } = useConfirm();
       <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t(state.message) }}
       </p>
-      <p v-if="state.detail" class="dark:text-ink-soft text-xs text-gray-500">
+      <!-- The caution tone is the SAME slab as Settings' standing notice (Heritage
+           Orange, never Alert Red: nothing is being destroyed), so a warning
+           seen on the page reads as the same warning here. -->
+      <div
+        v-if="state.detail && state.detailTone === 'caution'"
+        class="dark:border-accent-lift/40 dark:bg-accent-lift/10 flex w-full gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-left"
+      >
+        <BeanieIcon
+          name="exclamation-circle"
+          class="text-primary-500 dark:text-accent-lift mt-0.5 h-4 w-4 flex-shrink-0"
+          aria-hidden="true"
+        />
+        <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
+          {{ state.detail }}
+        </p>
+      </div>
+      <p v-else-if="state.detail" class="dark:text-ink-soft text-xs text-gray-500">
         {{ state.detail }}
       </p>
     </div>
