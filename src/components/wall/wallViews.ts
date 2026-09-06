@@ -33,10 +33,11 @@ export interface WallViewDef {
    * maintainability test is "one component + one row", and a row that can be
    * half-filled fails it.
    *
-   * ⚠️ It also settles what a DAY TAP means, which now differs per view and is
-   * exactly the kind of thing a later reader gets wrong: a day header re-anchors
-   * in a view that can render that day itself (`days`, `today`), and opens the
-   * day sheet in a view that cannot (`lanes`, whose columns are people).
+   * ⚠️ It does NOT settle what a day tap means. That rule belongs to the
+   * AFFORDANCE rather than to the view — a day the wall is not drawing in full
+   * re-anchors, a day it IS drawing drills in — so stating it per-view here is
+   * what made the previous version of this paragraph false. It lives once, on
+   * `onOpenDay` in `BeanieWallPage`, beside the handler for its other half.
    */
   stepUnit: WallStepUnit | null;
   /**
@@ -96,4 +97,36 @@ export const DEFAULT_WALL_VIEW: WallViewId = 'days';
 
 export function wallViewById(id: WallViewId): WallViewDef {
   return WALL_VIEWS.find((v) => v.id === id) ?? WALL_VIEWS[0];
+}
+
+/** Where the wall is, and the view its back control returns to. */
+export interface WallViewState {
+  active: WallViewId;
+  back: WallViewId;
+}
+
+/**
+ * Move to a view, and work out what "back" should mean afterwards.
+ *
+ * ⚠️ Pure, and extracted, because three review passes got this wrong in a row.
+ * There are TWO ways to end up with a back control that names the view you are
+ * already in, and each needs a different guard:
+ *
+ *   1. Re-tapping the tab you are on. Without `id !== active`, selecting `today`
+ *      while in `today` records `today` as the place to go back to.
+ *   2. `today -> jobs -> back`. Entering jobs records `today`; leaving jobs
+ *      SKIPS the write, because the write is gated on not being in jobs — so
+ *      `back` is still `today` while `active` becomes `today` again.
+ *
+ * This function closes (1). `canGoBack` — comparing the two — closes (2), and it
+ * has to be a read-side check because no write-side rule can see it coming.
+ */
+export function wallViewTransition(state: WallViewState, id: WallViewId): WallViewState {
+  const recordsBack = id !== state.active && state.active !== 'jobs';
+  return { active: id, back: recordsBack ? state.active : state.back };
+}
+
+/** Is there a DIFFERENT view to go back to? See `wallViewTransition` for why. */
+export function canGoBackFrom(state: WallViewState): boolean {
+  return state.back !== state.active;
 }
