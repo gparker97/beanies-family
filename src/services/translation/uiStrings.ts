@@ -4313,14 +4313,14 @@ const STRING_DEFS = {
   // provider can write one. Promising it to a local-file family would be asking
   // for consent to a one-way migration on a guarantee they were never given.
   'compaction.safetyCopyNote': {
-    en: 'beanies keeps a copy of the current file beside it in your storage, and asks you to save one to this device too. To go back to the saved one, use Load Existing Family Data File above. The one in your storage is there if you ever need support to help you back.',
+    en: 'beanies keeps a copy of the current file beside it in your storage, and asks you to save one to this device too. To go back to the saved one, use Load another Family Data File above. The one in your storage is there if you ever need support to help you back.',
     beanie:
-      'beanies keeps a copy of your current pod beside it in your storage, and asks you to save one to this device too. to go back to the saved one, use load existing family data file above. the one in your storage is there if you ever need support to help you back.',
+      'beanies keeps a copy of your current pod beside it in your storage, and asks you to save one to this device too. to go back to the saved one, use load another family data file above. the one in your storage is there if you ever need support to help you back.',
   },
   'compaction.safetyCopyNoteManual': {
-    en: 'beanies asks you to save a copy of the current file first. To go back to it, use Load Existing Family Data File above.',
+    en: 'beanies asks you to save a copy of the current file first. To go back to it, use Load another Family Data File above.',
     beanie:
-      'beanies asks you to save a copy of your current pod first. to go back to it, use load existing family data file above.',
+      'beanies asks you to save a copy of your current pod first. to go back to it, use load another family data file above.',
   },
   'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
   'compaction.confirmMessage': {
@@ -4393,13 +4393,13 @@ const STRING_DEFS = {
       'a bean in your family could not open the family file because it ran out of memory. compacting will fix that for them.',
   },
   'compaction.doneNothingToDo': {
-    en: 'Nothing else to do — your other devices will pick this up on their own.',
-    beanie: 'nothing else to do - your other beans will pick this up on their own.',
+    en: 'Nothing else to do. Your other devices will pick this up on their own.',
+    beanie: 'nothing else to do. your other beans will pick this up on their own.',
   },
   'compaction.doneButBehind': {
-    en: 'One thing to watch: {names} are on an older version of beanies. Ask them to update before they use it again, so their changes come across safely.',
+    en: 'One thing to watch: beanies is still waiting on {names}, who is on an older version. Ask them to update before using it again, so their changes come across safely.',
     beanie:
-      'one thing to watch: {names} are on an older version of beanies. ask them to update before they use it again, so their changes come across safely.',
+      'one thing to watch: beanies is still waiting on {names}, who is on an older version. ask them to update before using it again, so their changes come across safely.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',

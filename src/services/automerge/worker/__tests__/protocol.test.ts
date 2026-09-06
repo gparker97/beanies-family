@@ -44,6 +44,11 @@ describe('protocol — error transport', () => {
     // report every correct refusal as broken machinery.
     const rebuilt = reconstructError(serializeError(lineageBlockError('adopt-remote')));
     expect((rebuilt as PodLineageError).rebaseUnavailable).toBeUndefined();
+    // ⚠️ ABSENT, not present-and-undefined. `toBeUndefined()` cannot tell those
+    // apart, and assigning `undefined` still mints an own property that `in`
+    // and spread both report — so the flag would read as SET on every ordinary
+    // block for any future consumer that checks it that way.
+    expect('rebaseUnavailable' in rebuilt).toBe(false);
     expect((rebuilt as PodLineageError).verdict).toBe('adopt-remote');
   });
 

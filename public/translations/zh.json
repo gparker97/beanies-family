@@ -22662,8 +22662,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNote": {
-      "translation": "beanies会将当前文件的副本保存在您的存储设备中，并要求您也将其保存到此设备中。要返回已保存的文件，请使用上面的“加载现有家庭数据文件”。如果您需要帮助，可以随时使用存储空间中的存储空间。",
-      "hash": "3mkias",
+      "translation": "beanies会将当前文件的副本保存在您的存储设备中，并要求您也将其保存到此设备中。要返回已保存的家庭数据文件，请使用上面的“加载其他家庭数据文件”。如果您需要帮助，可以随时使用存储空间中的存储空间。",
+      "hash": "n0dg16",
       "lastUpdated": "2026-09-06"
     },
     "settings.compactSection": {
@@ -22682,8 +22682,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNoteManual": {
-      "translation": "beanies要求您先保存当前文件的副本。要返回，请使用上面的“加载现有家庭数据文件”。",
-      "hash": "x9r970",
+      "translation": "beanies要求您先保存当前文件的副本。如需返回，请使用上方的“加载其他家庭数据文件”。",
+      "hash": "2ffnfc",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.safety-copy-damaged": {
@@ -22717,13 +22717,13 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.doneNothingToDo": {
-      "translation": "无需执行其他操作—您的其他设备将自行接收此信息。",
-      "hash": "odhl8r",
+      "translation": "没有其他事情可做。您的其他设备将自行接收此信息。",
+      "hash": "tfzlk9",
       "lastUpdated": "2026-09-06"
     },
     "compaction.doneButBehind": {
-      "translation": "值得注意的一点是： {names}使用的是旧版的beanies。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
-      "hash": "fs9h60",
+      "translation": "有一件事要注意： Beanies仍在等待{names} ，他正在使用旧版本。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
+      "hash": "psb9s4",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.not-owner": {
