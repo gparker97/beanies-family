@@ -101,9 +101,21 @@ const VIEWS = [
   { id: 'today', label: 'Today' },
 ] as const;
 
+/**
+ * Six viewports, not two.
+ *
+ * The height rules only differ from one another ACROSS heights: the fold, the
+ * hour scale and the day window all pick different rungs at 768, 800, 1200 and
+ * 1440, and the column count changes at 1024 and again at 1280. A capture set
+ * that only had 1280x800 could not have shown any of it.
+ */
 const SIZES = [
+  { name: 'tablet-1024', width: 1024, height: 768 },
   { name: 'landscape', width: 1280, height: 800 },
+  { name: 'tall-1600', width: 1600, height: 1200 },
+  { name: 'tall-1920', width: 1920, height: 1440 },
   { name: 'portrait', width: 800, height: 1180 },
+  { name: 'portrait-1024', width: 1024, height: 1366 },
 ] as const;
 
 test.describe('design screenshots', () => {
