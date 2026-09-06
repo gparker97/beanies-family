@@ -14807,7 +14807,7 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.offline.message": {
-      "translation": "连接到互联网， Beanies可以为您阅读此内容。",
+      "translation": "连接到互联网，beanies可以为您阅读此内容。",
       "hash": "msu8wf",
       "lastUpdated": "2026-08-27"
     },
@@ -19282,7 +19282,7 @@
       "lastUpdated": "2026-08-05"
     },
     "accountDetails.card.cvvNote": {
-      "translation": "您的CVV/安全码永远不会被存储— Beanies只会保留您识别卡所需的内容。",
+      "translation": "您的CVV/安全码永远不会被存储—beanies只会保留您识别卡所需的内容。",
       "hash": "912byg",
       "lastUpdated": "2026-08-05"
     },
@@ -20842,7 +20842,7 @@
       "lastUpdated": "2026-08-27"
     },
     "recipeExtract.strip.subtitle": {
-      "translation": "粘贴食谱页面或YouTube链接， Beanies会为您填写。",
+      "translation": "粘贴食谱页面或YouTube链接，beanies会为您填写。",
       "hash": "pa5jav",
       "lastUpdated": "2026-08-27"
     },
@@ -20982,7 +20982,7 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitDescription": {
-      "translation": "一页备份密钥，可在忘记所有密码和PIN码时解锁您的家庭数据。将其保存在安全的地方—没有它， Beanies无法恢复您的数据。",
+      "translation": "一页备份密钥，可在忘记所有密码和PIN码时解锁您的家庭数据。将其保存在安全的地方—没有它，beanies无法恢复您的数据。",
       "hash": "5p6pti",
       "lastUpdated": "2026-08-28"
     },
@@ -22502,7 +22502,7 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件，并且beanies会在离线时传递更改的内容。如果在两个地方更改了相同的内容，则此处已保存的版本就是保留的版本。如果设备的更改根本无法进行，则会告知该设备并保留所有更改，直到有人做出决定。",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失，beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件，并且beanies会在离线时传递更改的内容。如果在两个地方更改了相同的内容，则此处已保存的版本就是保留的版本。如果设备的更改根本无法进行，则会告知该设备并保留所有更改，直到有人做出决定。",
       "hash": "qjk88g",
       "lastUpdated": "2026-09-06"
     },
@@ -22522,7 +22522,7 @@
       "lastUpdated": "2026-09-05"
     },
     "compaction.refused.backup-not-delivered": {
-      "translation": "备份未保存，因此Beanies已停止。什么都没有改变。请重试，并在询问时保存文件。",
+      "translation": "备份未保存，因此beanies已停止。什么都没有改变。请重试，并在询问时保存文件。",
       "hash": "spjvc7",
       "lastUpdated": "2026-09-05"
     },
@@ -22722,7 +22722,7 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.doneButBehind": {
-      "translation": "值得注意的一点是： {names}使用的是旧版的Beanies。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
+      "translation": "值得注意的一点是： {names}使用的是旧版的beanies。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
       "hash": "fs9h60",
       "lastUpdated": "2026-09-06"
     },
