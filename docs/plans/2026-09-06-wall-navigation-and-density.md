@@ -498,6 +498,47 @@ a responsive lift to `NATURAL_PX_PER_MIN` is a **separate, later** lever; do not
 
 ### 4. Scroll as the last resort — a MEASUREMENT in this change, code only in a later one
 
+> ## ✅ MEASUREMENT TAKEN — 2026-09-06. The floor IS reached. §4 is JUSTIFIED.
+>
+> Run against `layoutTimeGrid` directly: the tier is a pure function of the column
+> set and the plot height, so this needed no device. Seven columns with the busiest
+> carrying a back-to-back 07:00–21:00 day, at plot heights a 1024×768 landscape
+> tablet plausibly gives the grid:
+>
+> | plot  | 6 events             | 8          | 10         | 12         | 16                   | 20         |
+> | ----- | -------------------- | ---------- | ---------- | ---------- | -------------------- | ---------- |
+> | 380px | **overflow, 23.5px** | floored 36 | floored 33 | floored 27 | **overflow, 21.5px** | floored 33 |
+> | 430px | **overflow, 26.6px** | floored 36 | floored 36 | floored 33 | **overflow, 24.3px** | floored 36 |
+> | 480px | floored 33           | floored 36 | floored 36 | floored 36 | floored 27           | floored 36 |
+> | 520px | gentle 36            | floored 36 | floored 36 | floored 36 | floored 27           | floored 36 |
+>
+> `overflow` is the existing tier name for `outcome === 'squeezed'` — the uniform
+> last-resort squeeze. At 380–430px it produces blocks of **21.5–26.6px**, below
+> the 27px floor `MIN_BLOCK_STEPS` bottoms out at. That is exactly greg's
+> "squeezed to the point they can be hard to read".
+>
+> **The expectation was wrong.** Passes 3 and 4 both assumed the squeeze would not
+> fire on a supported device, and gated §4 on this measurement precisely so the
+> assumption would be tested rather than trusted. It fired.
+>
+> Two findings to carry into that plan:
+>
+> 1. **It is not monotonic in event count.** Six events overflow where eight do
+>    not: six spread across fourteen hours leaves large gaps, which widens the
+>    window and costs more compression than a denser day. Any trigger reasoned
+>    from "how busy is the day" would be wrong — it has to be the resulting block
+>    height.
+> 2. **§3's cap change does not help here, and never could.** The cap binds on LONG
+>    events; this is the floor binding on short ones. Opposite ends of the same
+>    ladder.
+>
+> **Per this plan's own rule, §4 is NOT folded into this change.** It is the
+> largest and most invariant-dense edit proposed, against a file with zero headroom
+> in its stated line budget, and it deserves its own plan with the measurement
+> above as its premise. The existing `wall_grid_tier` telemetry already reports
+> `overflow`, so the real-world rate is measurable from CloudWatch before a line of
+> it is written.
+
 ⚠️ Requirement 6 is closed in this change by a **recorded measurement**, not by code.
 
 The case: **`WallTimeGrid.vue`'s script ends at line 296**, against a docblock budget of ~300
