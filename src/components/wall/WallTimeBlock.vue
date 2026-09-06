@@ -23,11 +23,10 @@ import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import type { ActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
+// The density thresholds live in wallLayout.ts, beside the column-width rules
+// that are defined in terms of them — see the three-widths block there.
+import { BLOCK_FULL_PX, BLOCK_SLIVER_PX } from '@/components/wall/wallLayout';
 
-/** Above this width a block earns its detail line. */
-const WIDE_PX = 210;
-/** Below this it gives up its title — never its position. */
-const SLIVER_PX = 95;
 /** Below this the "now" marker would collide with the title. */
 const NOW_TAG_MIN_PX = 150;
 /** A block shorter than this has no room for a second line. */
@@ -66,7 +65,7 @@ defineEmits<{ open: [] }>();
 const { t } = useTranslation();
 
 const density = computed<'full' | 'tight' | 'sliver'>(() =>
-  props.width < SLIVER_PX ? 'sliver' : props.width > WIDE_PX ? 'full' : 'tight'
+  props.width < BLOCK_SLIVER_PX ? 'sliver' : props.width > BLOCK_FULL_PX ? 'full' : 'tight'
 );
 /**
  * A capped block ALWAYS states its range once there is room, so the clamp is
