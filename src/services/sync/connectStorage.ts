@@ -24,7 +24,6 @@ import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvid
 import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
-import { detectFileVersion } from '@/services/sync/fileSync';
 import { FileNameCollisionError, CollisionCheckUnavailableError } from '@/types/sync';
 
 // `RESUME_SETUP_PATH` now lives in the lightweight `resumePaths.ts` (so it can
@@ -241,13 +240,23 @@ export async function resolveExistingBeanpod(collision: {
   }
 }
 
-/** True when the file is the empty placeholder `createNew` wrote (never populated). */
+/**
+ * True when the file is the empty placeholder `createNew` wrote (never populated).
+ *
+ * ⚠️ STRUCTURAL, AND IT PARSES NOTHING. This used to end in a version sniff
+ * (`!== '4.0'`), so any real envelope at a version this build did not know (a
+ * compacted 5.0 pod, on a stale build) was classed as an EMPTY PLACEHOLDER,
+ * adopted as the create target with no confirm, and overwritten with a
+ * brand-new family. Any non-empty text other than the literal `{}` is a
+ * populated file: it falls to `adopt-existing`, which is confirm-gated, and the
+ * confirmed open then goes through `parseBeanpodV4` like every other read, so a
+ * newer version surfaces its own copy. Not parsing is also cheaper: this was a
+ * second full JSON.parse of a multi-megabyte file to read one field.
+ */
 function isStubBeanpod(text: string | null): boolean {
   if (!text) return true; // empty / zero-byte
   const trimmed = text.trim();
-  if (trimmed === '' || trimmed === '{}') return true; // the createNew placeholder
-  // Anything that isn't a real V4 envelope is treated as a non-pod stub.
-  return detectFileVersion(text) !== '4.0';
+  return trimmed === '' || trimmed === '{}'; // the createNew placeholder
 }
 
 /**

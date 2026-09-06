@@ -1485,7 +1485,11 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Open file picker to select a new file, load its data, and set it as sync target.
    */
-  async function loadFromNewFile(): Promise<{ success: boolean; needsPassword?: boolean }> {
+  async function loadFromNewFile(): Promise<{
+    success: boolean;
+    needsPassword?: boolean;
+    payloadError?: RemoteBlocker;
+  }> {
     const result = await syncService.openAndLoadFile();
 
     if (result.needsPassword && result.envelope) {
@@ -1511,7 +1515,9 @@ export const useSyncStore = defineStore('sync', () => {
       );
       setupAutoSync();
     }
-    return { success: result.success };
+    // The classified failure travels; a bare `{ success: false }` here is how
+    // picking an unreadable file showed the user NOTHING in Settings.
+    return { success: result.success, payloadError: result.payloadError };
   }
 
   /**
@@ -1520,7 +1526,7 @@ export const useSyncStore = defineStore('sync', () => {
   async function loadFromDroppedFile(
     file: File,
     fileHandle?: FileSystemFileHandle
-  ): Promise<{ success: boolean; needsPassword?: boolean }> {
+  ): Promise<{ success: boolean; needsPassword?: boolean; payloadError?: RemoteBlocker }> {
     const result = await syncService.loadDroppedFile(file, fileHandle);
 
     if (result.needsPassword && result.envelope) {
@@ -1546,7 +1552,9 @@ export const useSyncStore = defineStore('sync', () => {
       );
       setupAutoSync();
     }
-    return { success: result.success };
+    // The classified failure travels; a bare `{ success: false }` here is how
+    // picking an unreadable file showed the user NOTHING in Settings.
+    return { success: result.success, payloadError: result.payloadError };
   }
 
   /**
@@ -2857,12 +2865,18 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Manual import — opens picker, validates V4, prompts for password
    */
-  async function manualImport(): Promise<{ success: boolean; error?: string }> {
+  async function manualImport(): Promise<{
+    success: boolean;
+    /** Developer-facing, for logs. The page renders a translated key, never this. */
+    error?: string;
+    needsPassword?: boolean;
+    payloadError?: RemoteBlocker;
+  }> {
     const result = await loadFromNewFile();
     if (result.needsPassword) {
-      return { success: false, error: 'Encrypted file requires password' };
+      return { success: false, needsPassword: true, error: 'Encrypted file requires password' };
     }
-    return { success: result.success };
+    return { success: result.success, payloadError: result.payloadError };
   }
 
   // Guard: suppress auto-sync during store reloads
