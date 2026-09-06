@@ -2002,7 +2002,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           v-if="compactionIsDue"
           class="dark:border-silk-lift/40 dark:bg-silk-lift/10 mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3"
         >
-          <p class="dark:text-ink text-xs leading-relaxed text-sky-900">
+          <!-- ⚠️ `ink-soft`, matching the caution below. `ink` made the merely
+               informational note LOUDER on dark (10.70) than the one warning
+               that unsynced work is at stake (7.70) — the hierarchy inverted. -->
+          <p class="dark:text-ink-soft text-xs leading-relaxed text-sky-900">
             {{
               someoneCannotOpenIt
                 ? t('compaction.dueBecauseFailed')

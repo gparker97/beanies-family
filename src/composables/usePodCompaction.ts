@@ -68,7 +68,7 @@ export function usePodCompaction() {
   const { deliverPod, confirmBackupLanded } = usePodExport();
   const busy = ref(false);
 
-  function refuse(code: RefusalCode): void {
+  function refuse(code: RefusalCode, detail?: string): void {
     showToast('warning', t('compaction.refused'), t(`compaction.refused.${code}`), {
       surface: 'pod-compaction',
     });
@@ -76,7 +76,7 @@ export function usePodCompaction() {
       level: 'warn',
       surface: 'pod-compaction',
       message: 'compaction refused',
-      context: { action: 'refused', error_code: code },
+      context: { action: 'refused', error_code: code, ...(detail ? { detail } : {}) },
     });
   }
 
@@ -92,6 +92,19 @@ export function usePodCompaction() {
     return evaluateSoak(useFamilyStore().members);
   }
 
+  /** Drop the "this device ran out of memory" marks a compaction just resolved. */
+  async function clearTooLargeMarks(): Promise<void> {
+    const family = useFamilyStore();
+    for (const m of family.members.filter((x) => x.podTooLargeSeenAt)) {
+      try {
+        await family.updateMember(m.id, { podTooLargeSeenAt: undefined });
+      } catch {
+        // Best effort: the compaction already succeeded, and a stale mark only
+        // costs a note that is bounded by its own recency window anyway.
+      }
+    }
+  }
+
   async function compact(): Promise<void> {
     if (busy.value) return;
     busy.value = true;
@@ -100,7 +113,8 @@ export function usePodCompaction() {
       //    is going to refuse to honour. This reading is provisional — the
       //    projection is only current after the pull at step 2b — so it exists
       //    to fail FAST, and step 2d is the authoritative one.
-      if (!soak().ok) return refuse('not-soaked');
+      const preSoak = soak();
+      if (!preSoak.ok) return refuse('not-soaked', `behind=${preSoak.behind.length}`);
 
       // 1. Warn, in the user's own words, before anything moves.
       if (
@@ -372,6 +386,12 @@ export function usePodCompaction() {
       // information it holds, which is the same defect as the transient toast
       // the lineage banner replaced. Read from the SAME pure function as the
       // gate, so the two can never disagree.
+      // ⚠️ AND CLEAR THE OUT-OF-MEMORY MARKS THIS JUST RESOLVED. Nothing else
+      // clears them, so without this the due note would keep telling the owner a
+      // device cannot open the file — inviting the same one-way migration again,
+      // forever, on a file that is now small.
+      void clearTooLargeMarks();
+
       const after = soak();
       const size = `${Math.round(stats.beforeBytes / 1024)}KB → ${Math.round(stats.afterBytes / 1024)}KB`;
       showToast(
@@ -379,7 +399,12 @@ export function usePodCompaction() {
         t('compaction.done'),
         after.ok
           ? `${size}. ${t('compaction.doneNothingToDo')}`
-          : `${size}. ${fillTemplate(t('compaction.doneWaitingFor'), { names: after.behind.join(', ') })}`,
+          : // ⚠️ NOT "they will pick this up". Everyone in `behind` is on a build
+            // that does NOT honour the guard, so when they next open beanies
+            // they will merge across lineages — the fleet-wide destruction the
+            // soak gate exists to prevent. Saying they will pick it up is the
+            // most dangerously reassuring sentence this could produce.
+            `${size}. ${fillTemplate(t('compaction.doneButBehind'), { names: after.behind.join(', ') })}`,
         { surface: 'pod-compaction' }
       );
     } catch (e) {

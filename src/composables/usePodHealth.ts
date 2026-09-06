@@ -14,6 +14,7 @@
  */
 import { computed } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
+import * as syncService from '@/services/sync/syncService';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { anyDeviceReportedTooLarge } from '@/services/pod/podSoak';
@@ -47,7 +48,19 @@ export function usePodHealth() {
    */
   const canCompactPod = computed(() => isOwner.value);
 
-  const podBytes = computed(() => decodedSizeOf(syncStore.envelope?.encryptedPayload ?? ''));
+  /**
+   * ⚠️ NOT `syncStore.envelope.encryptedPayload` — THAT FIELD IS ALWAYS BLANK.
+   * Every write to the long-lived envelope goes through `replaceEnvelope`,
+   * which applies `withoutPayload()`; the invariant has its own test file. The
+   * first cut read it anyway, so `podBytes` was 0 for every family at every pod
+   * size and the due note could never appear. `getLastPersistedBytes` is the
+   * true on-disk size of the `.beanpod`, recorded on every persist and every
+   * load, and costs nothing — no serialize, no decode.
+   */
+  const podBytes = computed(() => {
+    void syncStore.lastSync; // re-read after each save/load rather than once
+    return syncService.getLastPersistedBytes() ?? 0;
+  });
 
   const someoneCannotOpenIt = computed(() => anyDeviceReportedTooLarge(familyStore.members));
 

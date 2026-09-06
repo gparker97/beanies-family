@@ -12,10 +12,12 @@
  * all. So the gate requires a marker from every recently-active member, and
  * absence refuses. It self-heals the moment that person opens a current build.
  *
- * ⚠️ RECENTLY ACTIVE, not "every member ever". `lastLoginAt` is DATE-ONLY, so
- * the window is compared at date granularity, and a member who has never logged
- * in has no value and is correctly not counted — a child's account created but
- * never opened must not block their family forever.
+ * ⚠️ RECENTLY ACTIVE, not "every member ever". The window is compared at DATE
+ * granularity — `lastLoginAt` is a full ISO timestamp, not the date-only value
+ * an earlier version of this comment claimed, so the truncation here is what
+ * makes the comparison date-based rather than the field's shape. A member who
+ * has never signed in has no value and is correctly not counted: a child's
+ * account created but never opened must not block their family forever.
  */
 import type { FamilyMember, ISODateString } from '@/types/models';
 
@@ -43,7 +45,13 @@ function withinWindow(lastLoginAt: ISODateString | undefined, today: Date, days:
   const then = Date.parse(`${lastLoginAt.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(then)) return false;
   const now = Date.parse(`${today.toISOString().slice(0, 10)}T00:00:00Z`);
-  return now - then <= days * 86_400_000;
+  // ⚠️ BOUNDED ON BOTH SIDES. A device with a badly-skewed clock writes a
+  // FUTURE date, and a one-sided test reads that as "recently active" for as
+  // long as the skew lasts — so a retired tablet dated 2030 would block its
+  // family for years, with the refusal naming someone whose device no longer
+  // exists. A future date is not evidence of anything.
+  const age = now - then;
+  return age >= 0 && age <= days * 86_400_000;
 }
 
 export function evaluateSoak(
@@ -68,6 +76,17 @@ export function evaluateSoak(
  * A real failure outranks the size heuristic — the family whose tablet cannot
  * open the file is due regardless of what the byte threshold says.
  */
-export function anyDeviceReportedTooLarge(members: readonly FamilyMember[]): boolean {
-  return members.some((m) => !!m.podTooLargeSeenAt);
+export function anyDeviceReportedTooLarge(
+  members: readonly FamilyMember[],
+  opts: { today?: Date; windowDays?: number } = {}
+): boolean {
+  // ⚠️ BOUNDED, like the soak window. A bare truthiness scan latches forever:
+  // a tablet that ran out of memory in March, was replaced in April, and whose
+  // row still carries the stamp would keep telling the owner in 2027 that
+  // compacting "will fix that for them" — inviting a one-way,
+  // history-destroying migration that would now free nothing. Compaction also
+  // clears the stamps it resolves; this is the second belt.
+  const today = opts.today ?? new Date();
+  const windowDays = opts.windowDays ?? SOAK_WINDOW_DAYS;
+  return members.some((m) => withinWindow(m.podTooLargeSeenAt, today, windowDays));
 }
