@@ -372,8 +372,13 @@ export default [
     files: ['src/**/*.ts', 'src/**/*.vue'],
     ignores: [
       '**/__tests__/**',
-      // The one legitimate caller: the guard runs where both documents exist.
-      'src/services/automerge/worker/**',
+      // ⚠️ THE ONE FILE, NOT THE DIRECTORY. `worker/**` exempted nine other
+      // modules, and `docClient.ts` among them is MAIN-THREAD code that merely
+      // lives in the worker folder — so the one import ADR-036 exists to
+      // prevent would have linted clean in exactly the layer most likely to
+      // attempt it. The guard runs where both documents exist, and that is one
+      // function in one file.
+      'src/services/automerge/worker/applyAndProject.ts',
       // The module itself, and the ADR-036 policy it owns.
       'src/services/sync/podLineage.ts',
     ],
