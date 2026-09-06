@@ -77,3 +77,6 @@ scripts/store-screenshots/.tmp/
 
 # Design-review screenshots (rendered artifacts — see CLAUDE.md: these belong on Drive)
 screenshots/
+
+# Wall grid capture output — rendered artifacts belong in Drive, not here.
+scratch-shots/
