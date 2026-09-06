@@ -66,8 +66,12 @@ describe('lineageAction — the policy table', () => {
     expect(lineageAction('adopt-remote', 'clean')).toBe('adopt');
   });
 
-  it('BLOCKS an adopt that would discard unsynced work', () => {
-    expect(lineageAction('adopt-remote', 'dirty')).toBe('block');
+  it('REBASES rather than discarding unsynced work', () => {
+    // ⚠️ Stage 3 flipped this one cell from `block`. A peer that was offline
+    // while the family compacted now has its work replayed onto the new
+    // lineage instead of being asked to give it up. Every way that replay can
+    // fail falls back to the block this replaced, so it can only lose less.
+    expect(lineageAction('adopt-remote', 'dirty')).toBe('rebase');
   });
 
   it('never blocks a file the user explicitly chose', () => {
@@ -81,7 +85,10 @@ describe('lineageAction — the policy table', () => {
 
   it('is total: all 12 pairs answer with a real action', () => {
     const verdicts: LineageVerdict[] = ['same', 'adopt-remote', 'ours-newer', 'conflict'];
-    const valid: LineageAction[] = ['merge', 'adopt', 'publish-local', 'block'];
+    // All five actions, since Stage 3 made `rebase` reachable. Listing them
+    // explicitly is the point: a new action must be considered here, not
+    // silently accepted.
+    const valid: LineageAction[] = ['merge', 'adopt', 'publish-local', 'block', 'rebase'];
     const seen = verdicts.flatMap((v) => CONTEXTS.map((c) => lineageAction(v, c)));
     expect(seen).toHaveLength(12);
     for (const a of seen) expect(valid).toContain(a);

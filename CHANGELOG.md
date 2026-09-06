@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **A device that was offline while the family file was compacted no longer has to give up its work.** beanies now replays the changes made on that device onto the reorganised file, so an edit made on a phone with no signal survives a reorganisation done at home. If the replay cannot be done safely for any reason, beanies falls back to the message it showed before and keeps everything on the device — it can only ever save more than it did, never less.
+
 - **beanies now keeps a copy of your family file beside it before compacting.** It sits in the same folder as the family file, named after it, so you can find it months later without having kept track of a download. beanies reads the copy back and checks it arrived intact before changing anything, and removes it and stops if it did not. Deleting your family removes the copy too.
 
 ### Changed

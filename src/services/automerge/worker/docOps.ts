@@ -176,47 +176,66 @@ export function mergeDocs(local: Doc, remote: Doc): { doc: Doc; dirty: boolean; 
  * Closed over the known doc shape (`COLLECTION_NAMES` + the `settings` singleton),
  * so a future schema change degrades to correct-but-full, never a wrong delta.
  */
+/**
+ * Which entities changed between two points in one document's history?
+ *
+ * Extracted so the projection delta builder and the Stage 3 REBASE share one
+ * implementation. Both need exactly this — "what did the peer touch since its
+ * last synced baseline?" — and its null-on-anything-unexpected contract is what
+ * makes both safe: the projection falls back to a full rebuild, the rebase falls
+ * back to the block it was replacing.
+ *
+ * ⚠️ `podLineage` AND EVERY OTHER SINGLETON ARE IGNORED, and that is
+ * load-bearing twice over. Folding one into `settingsChanged` would push a
+ * spurious settings delta on every compaction, and — far worse — make a lineage
+ * write look like a settings change to the rebase, which would then carry the
+ * peer's settings over the compactor's.
+ */
+export function touchedBetween(
+  doc: Doc,
+  fromHeads: Heads,
+  toHeads: Heads
+): { touched: Map<CollectionName, Set<string>>; settingsChanged: boolean } | null {
+  const patches = Automerge.diff(doc, fromHeads, toHeads);
+  const touched = new Map<CollectionName, Set<string>>();
+  let settingsChanged = false;
+  for (const patch of patches) {
+    const top = patch.path[0];
+    if (top === 'settings') {
+      settingsChanged = true;
+      continue;
+    }
+    if (typeof top === 'string' && (NON_COLLECTION_KEYS as readonly string[]).includes(top)) {
+      continue;
+    }
+    if (patch.path.length < 2) continue; // top-level/migrate create — no entity
+    if (typeof top !== 'string' || !(COLLECTION_NAMES as readonly string[]).includes(top)) {
+      console.warn(
+        `[docOps] touchedBetween: unexpected diff path root "${String(top)}" — caller must fall back.`
+      );
+      return null;
+    }
+    const collection = top as CollectionName;
+    const id = String(patch.path[1]);
+    let ids = touched.get(collection);
+    if (!ids) {
+      ids = new Set();
+      touched.set(collection, ids);
+    }
+    ids.add(id);
+  }
+  return { touched, settingsChanged };
+}
+
 export function projectionDeltasBetween(
   doc: Doc,
   fromHeads: Heads,
   toHeads: Heads
 ): ProjectionDelta[] | null {
   try {
-    const patches = Automerge.diff(doc, fromHeads, toHeads);
-    const touched = new Map<CollectionName, Set<string>>();
-    let settingsChanged = false;
-    for (const patch of patches) {
-      const top = patch.path[0];
-      if (top === 'settings') {
-        settingsChanged = true;
-        continue;
-      }
-      // ⚠️ EVERY OTHER SINGLETON IS IGNORED, and `podLineage` must NEVER be
-      // folded into `settingsChanged`. Doing so would push a spurious settings
-      // delta on every compaction and — far worse — make a lineage write look
-      // like a settings change to the Stage 3 rebase, which would then carry the
-      // peer's settings over the compactor's. It is also not an entity, so it
-      // cannot fall through to the collection branch below.
-      if (typeof top === 'string' && (NON_COLLECTION_KEYS as readonly string[]).includes(top)) {
-        continue;
-      }
-      if (patch.path.length < 2) continue; // top-level/migrate create — no entity
-      if (typeof top !== 'string' || !(COLLECTION_NAMES as readonly string[]).includes(top)) {
-        // Unknown top-level key / unexpected shape → fall back to a full rebuild.
-        console.warn(
-          `[docOps] projectionDeltasBetween: unexpected diff path root "${String(top)}" — falling back to full projection.`
-        );
-        return null;
-      }
-      const collection = top as CollectionName;
-      const id = String(patch.path[1]);
-      let ids = touched.get(collection);
-      if (!ids) {
-        ids = new Set();
-        touched.set(collection, ids);
-      }
-      ids.add(id);
-    }
+    const scan = touchedBetween(doc, fromHeads, toHeads);
+    if (!scan) return null; // unexpected shape → full rebuild, as before
+    const { touched, settingsChanged } = scan;
     const deltas: ProjectionDelta[] = [];
     for (const [collection, ids] of touched) {
       const coll = (doc[collection] ?? {}) as AnyRecord;
@@ -645,6 +664,139 @@ export function applyMutation(
   // read-after-write); structural ops return the affected entity.
   const result = op.op === 'named' ? namedResults[0] : structuralResult;
   return { doc: after, result, delta };
+}
+
+/**
+ * Compose the peer's unsynced work as ops that can be replayed onto a document
+ * of a DIFFERENT lineage (Stage 3, R1).
+ *
+ * ⚠️ A PURE COMPOSER. It reads two documents and returns a `MutationOp`; it
+ * mutates nothing. The caller applies it with `applyMutation`, which is exactly
+ * one `Automerge.change`, so the whole replay lands atomically or not at all.
+ *
+ * ⚠️ IT IS STRUCTURALLY INCAPABLE OF WRITING `podLineage`. `MutationOp`'s
+ * `collection` is typed `CollectionName`, which EXCLUDES the non-collection
+ * keys, and the only op that writes a singleton is `named:setSettings`. That is
+ * what makes it safe to replay onto the compacted document at all: an op that
+ * stamped the OLD lineage onto the NEW document would be self-inflicted lineage
+ * corruption with no external cause. `touchedBetween` ignoring `podLineage` is
+ * the second belt.
+ *
+ * ⚠️ TWO DIFFERENT EMPTY ANSWERS, and conflating them costs a family a working
+ * sync. `null` means CANNOT COMPOSE — an unexpected diff shape, or a baseline
+ * this history does not contain — and the caller must fall back to the block it
+ * was replacing. `{ op: null }` means NOTHING TO REPLAY: the peer is level with
+ * its baseline (or moved only on ignored singletons, which a `migrateDoc` alone
+ * can do), so adopting the remote outright loses nothing and blocking would
+ * strand it for no reason.
+ *
+ * Shallow field comparison is deliberate. `notificationReads[memberId]`,
+ * `asset.loan` and friends are written WHOLE, which is the documented
+ * last-writer-wins semantic; a deep differ would be new, untested machinery for
+ * a case that resolves identically.
+ */
+export function buildRebaseOps(
+  local: Doc,
+  baselineHeads: Heads,
+  target: Doc
+): { op: MutationOp | null; count: number } | null {
+  // The peer's own history must contain the baseline, or "what changed since"
+  // has no meaning. `hasHeads` answers that without materializing anything.
+  if (!Automerge.hasHeads(local, baselineHeads)) return null;
+
+  let before: Doc;
+  try {
+    before = Automerge.view(local, baselineHeads) as Doc;
+  } catch {
+    return null;
+  }
+
+  const scan = touchedBetween(local, baselineHeads, getHeads(local));
+  if (!scan) return null;
+
+  const ops: MutationOp[] = [];
+  for (const [collection, ids] of scan.touched) {
+    const localColl = (local[collection] ?? {}) as AnyRecord;
+    const beforeColl = (before[collection] ?? {}) as AnyRecord;
+    const targetColl = (target[collection] ?? {}) as AnyRecord;
+    for (const id of ids) {
+      const now = localColl[id];
+      if (now === undefined) {
+        // The peer deleted it. Deleting something the compacted document does
+        // not have is a no-op, so this is safe either way.
+        ops.push({ op: 'delete', collection, id });
+        continue;
+      }
+      const wasPresent = beforeColl[id] !== undefined;
+      const inTarget = targetColl[id] !== undefined;
+      // ⚠️ `toPlain` ON EVERY PAYLOAD. Values read out of an Automerge document
+      // are frozen and structurally shared with it, and assigning one into a
+      // DIFFERENT document's draft is not a supported operation. Every other op
+      // payload in this file does the same.
+      //
+      // Defensive, and honestly so: on Automerge 3.4 a read outside a `change`
+      // callback yields a frozen plain object rather than a proxy, so removing
+      // this passes every test. It is kept because the contract — not the
+      // current implementation — is what the op crossing a `postMessage`
+      // boundary depends on, and because a payload that is a live view of
+      // another document is a bug waiting for a version bump.
+      if (!wasPresent || !inTarget) {
+        ops.push({ op: 'set', collection, id, entity: toPlain(now) });
+        continue;
+      }
+      const patch = shallowChangedFields(beforeColl[id], now);
+      if (!patch) continue; // nothing actually moved
+      ops.push({
+        op: 'patch',
+        collection,
+        id,
+        patch: patch.set,
+        ...(patch.deleteKeys.length ? { deleteKeys: patch.deleteKeys } : {}),
+        // The entity exists in the target by the check above, but a peer can
+        // have deleted it there concurrently. Skipping is the honest answer:
+        // the compactor's delete wins, and nothing throws mid-replay.
+        onMissing: 'skip',
+      });
+    }
+  }
+
+  if (scan.settingsChanged) {
+    // ⚠️ FIELD-MERGED, NEVER WHOLE-REPLACED. `setSettings` replaces the
+    // singleton, so emitting the peer's entire settings object would silently
+    // revert a currency, locale or theme the compactor changed.
+    const changed = shallowChangedFields(before.settings, local.settings);
+    if (changed) {
+      const merged = { ...(toPlain(target.settings) ?? {}), ...changed.set };
+      for (const key of changed.deleteKeys) delete (merged as AnyRecord)[key];
+      ops.push({ op: 'named', name: 'setSettings', args: { settings: merged } });
+    }
+  }
+
+  if (ops.length === 0) return { op: null, count: 0 }; // nothing to replay
+  return { op: ops.length === 1 ? ops[0]! : { op: 'batch', ops }, count: ops.length };
+}
+
+/**
+ * The shallow field difference between two entity snapshots, or `null` when
+ * nothing moved. Values are compared by their JSON form, so a nested object
+ * that is written whole reads as one changed field — which is the documented
+ * last-writer-wins semantic for those fields.
+ */
+function shallowChangedFields(
+  before: unknown,
+  now: unknown
+): { set: Record<string, unknown>; deleteKeys: string[] } | null {
+  const a = (toPlain(before) ?? {}) as AnyRecord;
+  const b = (toPlain(now) ?? {}) as AnyRecord;
+  const set: Record<string, unknown> = {};
+  const deleteKeys: string[] = [];
+  for (const key of Object.keys(b)) {
+    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) set[key] = b[key];
+  }
+  for (const key of Object.keys(a)) {
+    if (!(key in b)) deleteKeys.push(key);
+  }
+  return Object.keys(set).length || deleteKeys.length ? { set, deleteKeys } : null;
 }
 
 /** Test-only: clear plugin ops but keep the core domain ops registered. */
