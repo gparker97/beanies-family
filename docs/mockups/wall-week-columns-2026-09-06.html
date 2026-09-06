@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beanie wall — week columns, arrows and taps</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --slate: #2c3e50;
+        --silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud: #f8f9fa;
+        --muted: #4d5d6c;
+        --line: rgba(44, 62, 80, 0.08);
+        --card: 0 4px 20px rgb(44 62 80 / 8%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px 24px 64px;
+        background: #eef1f4;
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--slate);
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.6rem;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.92rem;
+        margin: 0 0 28px;
+      }
+      h2 {
+        font-family: Outfit, sans-serif;
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin: 36px 0 10px;
+      }
+      .note {
+        font-size: 0.86rem;
+        color: var(--muted);
+        margin: 0 0 14px;
+        max-width: 78ch;
+        line-height: 1.55;
+      }
+
+      /* ── the wall frame ────────────────────────────────────────────── */
+      .wall {
+        background: var(--cloud);
+        border-radius: 22px;
+        box-shadow: var(--card);
+        padding: 18px 20px;
+        overflow: hidden;
+      }
+      .wall-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+      .wall-date {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.35rem;
+        line-height: 1.1;
+      }
+      .wall-sub {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .head-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .period {
+        font-size: 0.86rem;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .chip {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.78rem;
+        color: var(--orange);
+        background: rgb(241 93 34 / 8%);
+        border-radius: 11px;
+        padding: 7px 11px;
+      }
+      .switcher {
+        display: flex;
+        gap: 5px;
+      }
+      .switcher span {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: var(--card);
+        font-size: 0.95rem;
+      }
+      .switcher span.on {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+      }
+
+      .body {
+        display: flex;
+        gap: 14px;
+      }
+      .main {
+        flex: 1;
+        min-width: 0;
+      }
+
+      /* ── date row, arrows flanking ─────────────────────────────────── */
+      .daterow {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+      }
+      .arrow {
+        width: 46px;
+        flex: 0 0 46px;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        border-radius: 13px;
+        box-shadow: var(--card);
+        font-family: Outfit, sans-serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--slate);
+        align-self: center;
+        height: 46px;
+      }
+      .arrow.ghost {
+        opacity: 0.34;
+      }
+      .days {
+        flex: 1;
+        display: grid;
+        gap: 0;
+        min-width: 0;
+      }
+      .day {
+        text-align: center;
+        padding: 7px 4px 8px;
+        border-radius: 14px 14px 0 0;
+      }
+      .day.today {
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: #fff;
+      }
+      .dow {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.66rem;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        opacity: 0.72;
+      }
+      .dnum {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.35rem;
+        line-height: 1.15;
+      }
+
+      /* ── the plot ──────────────────────────────────────────────────── */
+      .plot {
+        display: flex;
+        margin-top: 6px;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: var(--card);
+        overflow: hidden;
+        height: 300px;
+      }
+      .axis {
+        width: 46px;
+        flex: 0 0 46px;
+        padding-top: 8px;
+        border-right: 1px solid var(--line);
+      }
+      .axis div {
+        font-size: 0.6rem;
+        color: var(--muted);
+        text-align: right;
+        padding-right: 7px;
+        height: 48px;
+      }
+      .cols {
+        flex: 1;
+        display: grid;
+        position: relative;
+        min-width: 0;
+      }
+      .col {
+        border-right: 1px solid var(--line);
+        position: relative;
+        padding: 8px 5px;
+      }
+      .col:last-child {
+        border-right: 0;
+      }
+      .ev {
+        border-radius: 11px;
+        padding: 5px 7px;
+        margin-bottom: 5px;
+        font-size: 0.68rem;
+        line-height: 1.25;
+        border-left: 3px solid;
+        background: #fff;
+        box-shadow: 0 1px 6px rgb(44 62 80 / 9%);
+      }
+      .ev b {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        display: block;
+        font-size: 0.72rem;
+      }
+      .ev small {
+        color: var(--muted);
+        font-size: 0.6rem;
+      }
+      .o {
+        border-color: var(--orange);
+        background: rgb(241 93 34 / 6%);
+      }
+      .b {
+        border-color: #5b9bd5;
+        background: rgb(91 155 213 / 8%);
+      }
+      .g {
+        border-color: #27ae60;
+        background: rgb(39 174 96 / 7%);
+      }
+      .p {
+        border-color: #8e6fc4;
+        background: rgb(142 111 196 / 8%);
+      }
+      .tall {
+        min-height: 74px;
+      }
+
+      /* ── collapsed strip ───────────────────────────────────────────── */
+      .strip {
+        display: grid;
+        gap: 8px;
+        margin-top: 9px;
+      }
+      .sday {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: var(--card);
+        padding: 9px 12px;
+      }
+      .sday .lbl {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .pips {
+        margin-left: auto;
+        display: flex;
+        gap: 4px;
+      }
+      .pips i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: block;
+      }
+      .count {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.7rem;
+        color: var(--orange);
+        background: rgb(241 93 34 / 8%);
+        border-radius: 999px;
+        padding: 2px 9px;
+      }
+
+      /* ── rail ──────────────────────────────────────────────────────── */
+      .rail {
+        width: 240px;
+        flex: 0 0 240px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      .rcard {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: var(--card);
+        padding: 11px 13px;
+      }
+      .rcard h4 {
+        font-family: Outfit, sans-serif;
+        font-size: 0.68rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 7px;
+      }
+      .rcard p {
+        margin: 0;
+        font-size: 0.78rem;
+        line-height: 1.5;
+      }
+
+      /* ── annotation ────────────────────────────────────────────────── */
+      .callout {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: #fff;
+        border-left: 3px solid var(--orange);
+        border-radius: 0 12px 12px 0;
+        padding: 11px 14px;
+        margin: 10px 0 0;
+        box-shadow: var(--card);
+      }
+      .callout .k {
+        font-family: Caveat, cursive;
+        font-size: 1.15rem;
+        color: var(--orange);
+        flex: 0 0 auto;
+        line-height: 1.2;
+      }
+      .callout p {
+        margin: 0;
+        font-size: 0.83rem;
+        line-height: 1.55;
+        color: var(--slate);
+      }
+      .cols-4 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .cols-7 {
+        grid-template-columns: repeat(7, 1fr);
+      }
+      .strip-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .tag {
+        display: inline-block;
+        font-family: Outfit, sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border-radius: 999px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .tag.now {
+        background: rgb(44 62 80 / 8%);
+        color: var(--muted);
+      }
+      .tag.new {
+        background: rgb(39 174 96 / 12%);
+        color: #1e8449;
+      }
+      .squash .ev {
+        font-size: 0.56rem;
+        padding: 3px 4px;
+      }
+      .squash .ev b {
+        font-size: 0.58rem;
+      }
+      .squash .ev small {
+        display: none;
+      }
+
+      /* ── height comparison ─────────────────────────────────────────── */
+      .heights {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .hcol {
+        flex: 1;
+        min-width: 0;
+      }
+      .hlabel {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+      }
+      .hlabel span {
+        font-family: Inter, sans-serif;
+        font-weight: 400;
+        color: var(--muted);
+        font-size: 0.74rem;
+      }
+      .hplot {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: var(--card);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+      }
+      .hax {
+        width: 42px;
+        flex: 0 0 42px;
+        border-right: 1px solid var(--line);
+        position: relative;
+      }
+      .hax b {
+        position: absolute;
+        right: 6px;
+        font-size: 0.56rem;
+        font-weight: 400;
+        color: var(--muted);
+        transform: translateY(-50%);
+      }
+      .hbody {
+        flex: 1;
+        position: relative;
+      }
+      .rule {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 1px solid var(--line);
+      }
+      .hev {
+        position: absolute;
+        left: 7px;
+        right: 7px;
+        border-radius: 9px;
+        border-left: 3px solid var(--orange);
+        background: rgb(241 93 34 / 7%);
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.62rem;
+        padding: 3px 6px;
+        overflow: hidden;
+        box-shadow: 0 1px 5px rgb(44 62 80 / 8%);
+      }
+      .hev.b {
+        border-left-color: #5b9bd5;
+        background: rgb(91 155 213 / 8%);
+      }
+      .hev.g {
+        border-left-color: #27ae60;
+        background: rgb(39 174 96 / 7%);
+      }
+      .empty {
+        position: absolute;
+        left: 42px;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+          -45deg,
+          rgb(44 62 80 / 3%),
+          rgb(44 62 80 / 3%) 6px,
+          transparent 6px,
+          transparent 12px
+        );
+        display: grid;
+        place-items: center;
+        font-family: Caveat, cursive;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .scaletable td,
+      .scaletable th {
+        padding: 7px 10px;
+      }
+      .back {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.78rem;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: var(--card);
+        padding: 9px 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Beanie wall — week columns, arrows and taps</h1>
+      <p class="sub">
+        Landscape. Three proposals side by side against what ships today. 2026-09-06.
+      </p>
+
+      <!-- ══════════════ TODAY ══════════════ -->
+      <h2>What ships today <span class="tag now">current</span></h2>
+      <p class="note">
+        Seven columns share one time axis. The window is the union of every visible day, so one
+        06:30 swim and one 20:30 finish stretch the grid for the whole week — measured at 960
+        minutes, which pushes the layout onto the compression ladder and shrinks every block to
+        36px. The cards take another 296px from the right.
+      </p>
+      <div class="wall">
+        <div class="wall-head">
+          <div>
+            <div class="wall-date">Sunday, 6 September</div>
+            <div class="wall-sub">Week of 6 September · 6 things on today</div>
+          </div>
+          <div class="head-right">
+            <span class="arrow" style="height: 34px; width: 34px; flex: 0 0 34px">‹</span>
+            <span class="period">6 – 12 Sep, 2026</span>
+            <span class="arrow" style="height: 34px; width: 34px; flex: 0 0 34px">›</span>
+            <div class="switcher"><span class="on">▦</span><span>👥</span><span>☀</span></div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="main">
+            <div class="daterow">
+              <div style="width: 46px; flex: 0 0 46px"></div>
+              <div class="days cols-7">
+                <div class="day today"><div class="dow">Sun</div><div class="dnum">6</div></div>
+                <div class="day"><div class="dow">Mon</div><div class="dnum">7</div></div>
+                <div class="day"><div class="dow">Tue</div><div class="dnum">8</div></div>
+                <div class="day"><div class="dow">Wed</div><div class="dnum">9</div></div>
+                <div class="day"><div class="dow">Thu</div><div class="dnum">10</div></div>
+                <div class="day"><div class="dow">Fri</div><div class="dnum">11</div></div>
+                <div class="day"><div class="dow">Sat</div><div class="dnum">12</div></div>
+              </div>
+            </div>
+            <div class="plot squash">
+              <div class="axis">
+                <div>06:00</div><div>10:00</div><div>14:00</div><div>18:00</div><div>22:00</div>
+              </div>
+              <div class="cols cols-7">
+                <div class="col"><div class="ev o"><b>Church</b></div></div>
+                <div class="col"><div class="ev b"><b>Swim</b></div><div class="ev o"><b>Football</b></div></div>
+                <div class="col"><div class="ev g"><b>Dentist</b></div></div>
+                <div class="col"><div class="ev p"><b>Piano</b></div><div class="ev o"><b>Shop</b></div></div>
+                <div class="col"><div class="ev b"><b>Spelling</b></div></div>
+                <div class="col"><div class="ev o"><b>Cinema</b></div></div>
+                <div class="col"><div class="ev g"><b>Market</b></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="rail">
+            <div class="rcard"><h4>Tonight</h4><p>🍝 Spaghetti · mum cooking</p></div>
+            <div class="rcard"><h4>Jobs</h4><p>4 of 9 done</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ PROPOSED ══════════════ -->
+      <h2>Proposed <span class="tag new">four columns + strip</span></h2>
+      <p class="note">
+        The column count comes from readable width, not from the number 7 — four here at 1024px,
+        five at 1280px, all seven only when they genuinely fit. The rest of the week drops to the
+        strip, exactly as portrait already does. The window narrows to 720 minutes, which takes the
+        layout off the compression ladder entirely: blocks return to full height with no other
+        change. The arrows move down to flank the dates they move.
+      </p>
+      <div class="wall">
+        <div class="wall-head">
+          <div>
+            <div class="wall-date">Sunday, 6 September</div>
+            <div class="wall-sub">Week of 6 September · 6 things on today</div>
+          </div>
+          <div class="head-right">
+            <span class="period">6 – 12 Sep, 2026</span>
+            <span class="chip">Today</span>
+            <div class="switcher"><span class="on">▦</span><span>👥</span><span>☀</span></div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="main">
+            <div class="daterow">
+              <div class="arrow">‹</div>
+              <div class="days cols-4">
+                <div class="day today"><div class="dow">Sun</div><div class="dnum">6</div></div>
+                <div class="day"><div class="dow">Mon</div><div class="dnum">7</div></div>
+                <div class="day"><div class="dow">Tue</div><div class="dnum">8</div></div>
+                <div class="day"><div class="dow">Wed</div><div class="dnum">9</div></div>
+              </div>
+              <div class="arrow">›</div>
+            </div>
+            <div class="plot">
+              <div class="axis">
+                <div>08:00</div><div>11:00</div><div>14:00</div><div>17:00</div><div>20:00</div>
+              </div>
+              <div class="cols cols-4">
+                <div class="col">
+                  <div class="ev o tall"><b>Church</b><small>09:00 – 10:30 · everyone</small></div>
+                </div>
+                <div class="col">
+                  <div class="ev b tall"><b>Swim lesson</b><small>08:00 – 09:00 · Milo</small></div>
+                  <div class="ev o tall"><b>Football</b><small>16:00 – 17:30 · Leo</small></div>
+                </div>
+                <div class="col">
+                  <div class="ev g tall"><b>Dentist</b><small>11:00 – 11:45 · Ana</small></div>
+                </div>
+                <div class="col">
+                  <div class="ev p tall"><b>Piano</b><small>15:30 – 16:15 · Milo</small></div>
+                  <div class="ev o tall"><b>Big shop</b><small>18:00 – 19:00 · mum</small></div>
+                </div>
+              </div>
+            </div>
+            <div class="strip strip-3">
+              <div class="sday">
+                <span class="lbl">Thu 10</span>
+                <span class="pips"><i style="background: #5b9bd5"></i><i style="background: var(--orange)"></i></span>
+                <span class="count">2</span>
+              </div>
+              <div class="sday">
+                <span class="lbl">Fri 11</span>
+                <span class="pips"><i style="background: var(--orange)"></i></span>
+                <span class="count">1</span>
+              </div>
+              <div class="sday">
+                <span class="lbl">Sat 12</span>
+                <span class="pips"><i style="background: #27ae60"></i><i style="background: #8e6fc4"></i><i style="background: var(--orange)"></i></span>
+                <span class="count">3</span>
+              </div>
+            </div>
+          </div>
+          <div class="rail">
+            <div class="rcard"><h4>Tonight</h4><p>🍝 Spaghetti · mum cooking</p></div>
+            <div class="rcard"><h4>Jobs</h4><p>4 of 9 done</p></div>
+            <div class="rcard"><h4>Lists</h4><p>Swim bag · 3 left</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="k">arrows</span>
+        <p>
+          Flanking the date row rather than sitting in the header, so the control is beside the
+          thing it moves. The left arrow occupies the axis gutter, which is empty at this height
+          anyway, so it costs nothing; only the right gutter is new width. Both are 46px, matching
+          the other controls a child reaches for. The header keeps the period label and the
+          <em>Today</em> chip, which name where you are rather than moving you.
+        </p>
+      </div>
+
+      <div class="callout">
+        <span class="k">tap a date</span>
+        <p>
+          <strong>Opens the today view on that day.</strong> The day is already on screen, so the
+          useful next step is depth, not repositioning — and the today view is a far better day
+          renderer than the sheet this replaces. This is the gesture that currently re-anchors the
+          week, which was never the intent.
+        </p>
+      </div>
+
+      <div class="callout">
+        <span class="k">tap a strip day</span>
+        <p>
+          <strong>Brings that day into the columns.</strong> Tapping Thu 10 redraws the grid
+          starting Thursday, and Sun–Wed collapse into the strip. This is the only re-anchoring
+          gesture, and it is the one that was asked for: a day you cannot see becomes a day you
+          can.
+        </p>
+      </div>
+
+      <h2>Why fewer columns buys vertical space</h2>
+      <p class="note">
+        Measured against a realistic week — most days ordinary, one 06:30 start, one 20:30 finish.
+        The time window is the union across every <em>visible</em> day, so the two outliers tax
+        every other day on screen. This is a layout change that pays a legibility dividend without
+        touching the scale at all.
+      </p>
+      <div class="wall" style="padding: 16px 20px">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem">
+          <thead>
+            <tr style="text-align: left; color: var(--muted)">
+              <th style="padding: 7px 10px; font-weight: 600">Columns</th>
+              <th style="padding: 7px 10px; font-weight: 600">Time window</th>
+              <th style="padding: 7px 10px; font-weight: 600">Tier</th>
+              <th style="padding: 7px 10px; font-weight: 600">Smallest block</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top: 1px solid var(--line)">
+              <td style="padding: 8px 10px">7</td>
+              <td style="padding: 8px 10px">960 min · 16 h</td>
+              <td style="padding: 8px 10px; color: var(--orange); font-weight: 600">floored</td>
+              <td style="padding: 8px 10px">36px</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line)">
+              <td style="padding: 8px 10px"><strong>4</strong></td>
+              <td style="padding: 8px 10px">720 min · 12 h</td>
+              <td style="padding: 8px 10px; color: #1e8449; font-weight: 600">gentle</td>
+              <td style="padding: 8px 10px"><strong>48px</strong></td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line)">
+              <td style="padding: 8px 10px">3</td>
+              <td style="padding: 8px 10px">660 min · 11 h</td>
+              <td style="padding: 8px 10px; color: #1e8449; font-weight: 600">gentle</td>
+              <td style="padding: 8px 10px">48px</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+<!-- ══════════════ HOUR HEIGHT ══════════════ -->
+      <h2>The hour scales with the screen <span class="tag new">the other half</span></h2>
+      <p class="note">
+        The column change alone does not fill a tall screen. The grid enters its ladder at a
+        fixed 0.8px per minute and only ever steps <em>down</em> from there, so an hour is 48px
+        whether the plot is 480px or 1440px — measured, identical block heights at every height.
+        The fix is to choose the entry point from the plot height rather than from a constant.
+      </p>
+
+      <div class="heights">
+        <div class="hcol">
+          <div class="hlabel">720px plot <span>— hour = 48px, unchanged</span></div>
+          <div class="hplot" style="height: 240px">
+            <div class="hax">
+              <b style="top: 8px">08:00</b><b style="top: 56px">10:00</b>
+              <b style="top: 104px">12:00</b><b style="top: 152px">14:00</b>
+              <b style="top: 200px">16:00</b>
+            </div>
+            <div class="hbody">
+              <div class="rule" style="top: 8px"></div>
+              <div class="rule" style="top: 56px"></div>
+              <div class="rule" style="top: 104px"></div>
+              <div class="rule" style="top: 152px"></div>
+              <div class="rule" style="top: 200px"></div>
+              <div class="hev b" style="top: 10px; height: 22px">Swim</div>
+              <div class="hev" style="top: 106px; height: 22px">Football</div>
+              <div class="hev g" style="top: 166px; height: 22px">Dinner</div>
+            </div>
+            <div class="empty" style="height: 44px">wasted</div>
+          </div>
+        </div>
+
+        <div class="hcol">
+          <div class="hlabel">1440px plot <span>— hour = 96px, today it is still 48px</span></div>
+          <div class="hplot" style="height: 240px">
+            <div class="hax">
+              <b style="top: 8px">08:00</b><b style="top: 56px">09:00</b>
+              <b style="top: 104px">10:00</b><b style="top: 152px">11:00</b>
+              <b style="top: 200px">12:00</b>
+            </div>
+            <div class="hbody">
+              <div class="rule" style="top: 8px"></div>
+              <div class="rule" style="top: 56px"></div>
+              <div class="rule" style="top: 104px"></div>
+              <div class="rule" style="top: 152px"></div>
+              <div class="rule" style="top: 200px"></div>
+              <div class="hev b" style="top: 10px; height: 44px">
+                Swim<br /><small style="font-weight: 400; opacity: 0.7">08:00 – 09:00</small>
+              </div>
+              <div class="hev" style="top: 106px; height: 44px">
+                Football<br /><small style="font-weight: 400; opacity: 0.7">10:00 – 11:00</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="note" style="margin-top: 12px">
+        Same day, same grid, twice the hour. The rules spread out, blocks get room for their
+        times back, and the wasted band at the foot shrinks. Both panels are drawn at the same
+        size here so the <em>rhythm</em> is comparable — on real glass the right-hand one is
+        twice as tall.
+      </p>
+
+      <div class="wall" style="padding: 16px 20px; margin-top: 14px">
+        <table class="scaletable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem">
+          <thead>
+            <tr style="text-align: left; color: var(--muted)">
+              <th style="font-weight: 600">Plot height</th>
+              <th style="font-weight: 600">Hour</th>
+              <th style="font-weight: 600">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top: 1px solid var(--line)">
+              <td>480px</td><td>48px</td>
+              <td style="color: var(--muted)">unchanged — every device tested so far</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line)">
+              <td>720px</td><td>48px</td>
+              <td style="color: var(--muted)">unchanged</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line)">
+              <td>1080px</td><td><strong>72px</strong></td>
+              <td style="color: #1e8449">steps up</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line)">
+              <td>1440px</td><td><strong>96px</strong></td>
+              <td style="color: #1e8449">steps up</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="k">the floor</span>
+        <p>
+          The hour is <strong>floored at today's 48px</strong>, so nothing moves on any screen at
+          or below 720px — including every device already tested and every existing test, which
+          run at 480px. Only genuinely tall plots grow.
+        </p>
+      </div>
+
+      <div class="callout">
+        <span class="k">still quiet</span>
+        <p>
+          It is chosen from the <strong>screen</strong>, never from the day. The old failure —
+          "two events and one of them half a wall" — came from dividing the available height
+          among the day's live minutes, so a quiet day inflated. Here, two different days on the
+          same screen still get the same hour. A quiet day stays quiet; it is only legible.
+        </p>
+      </div>
+
+      <!-- ══════════════ DRILL-IN ══════════════ -->
+      <h2>Tapping a date opens that day <span class="tag new">with a way back</span></h2>
+      <p class="note">
+        The day is already on screen, so the useful next step is depth rather than
+        repositioning. The back button names where it returns to, matching the jobs board's
+        existing pattern.
+      </p>
+      <div class="wall">
+        <div class="wall-head">
+          <span class="back">‹ week</span>
+          <div style="margin-left: 4px">
+            <div class="wall-date">Tuesday, 8 September</div>
+            <div class="wall-sub">3 things on</div>
+          </div>
+          <div class="head-right">
+            <span class="arrow" style="height: 34px; width: 34px; flex: 0 0 34px">‹</span>
+            <span class="period">Tue 8 Sep</span>
+            <span class="arrow" style="height: 34px; width: 34px; flex: 0 0 34px">›</span>
+            <div class="switcher"><span>▦</span><span>👥</span><span class="on">☀</span></div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="main">
+            <div class="plot" style="height: 190px">
+              <div class="axis">
+                <div>09:00</div><div>11:00</div><div>13:00</div><div>15:00</div>
+              </div>
+              <div class="cols" style="grid-template-columns: 1fr">
+                <div class="col">
+                  <div class="ev g tall"><b>Dentist</b><small>11:00 – 11:45 · Ana</small></div>
+                  <div class="ev o tall"><b>Pick up Leo</b><small>15:30 · mum</small></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="rail">
+            <div class="rcard"><h4>Tonight</h4><p>🥘 Leftovers</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="k">back</span>
+        <p>
+          greg's call, overriding my recommendation: the view switcher is always visible, but an
+          explicit <em>‹ week</em> says where you came from, and the jobs board already
+          establishes the pattern. It names the view it returns to, so it reads correctly whether
+          you arrived from the week or somewhere else.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
