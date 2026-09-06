@@ -31,6 +31,8 @@ import { isAppQuiet } from '@/utils/appQuiet';
 import { docVersion, isLoaded } from '@/services/automerge/projection';
 import { useOnline } from '@/composables/useOnline';
 import { confirm } from '@/composables/useConfirm';
+import { claimInterruption } from '@/composables/useSessionInterruption';
+import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { fetchUpdateFloor, reportCheckFailure } from '@/services/appUpdate/versionPolicy';
 import { storeUrlFor } from '@/services/appUpdate/storeUrl';
@@ -95,16 +97,28 @@ async function checkForUpdate(): Promise<void> {
 }
 
 /** Why now is not the moment, or `null` when it is. */
-type PromptBlocker = 'offline' | 'busy' | 'booting';
+type PromptBlocker = 'offline' | 'busy' | 'booting' | 'fatal' | 'yielded';
 
 function promptBlocker(isOnline: boolean): PromptBlocker | null {
   if (!isOnline) return 'offline';
   if (!isAppQuiet()) return 'busy';
   // ⚠️ NOT BEFORE THE APP IS PAST BOOT. `ConfirmModal` renders at z-250 and the
-  // boot spinner and fatal overlay are both z-300, so a prompt raised during
-  // boot is a modal nobody can see or dismiss, holding `hasOpenOverlays()` true
-  // for the rest of the session.
+  // boot spinner is z-300, so a prompt raised during boot is a modal nobody can
+  // see or dismiss, holding `hasOpenOverlays()` true for the rest of the
+  // session.
   if (!isLoaded()) return 'booting';
+  // ⚠️ AND NOT UNDER THE RECOVERY OVERLAY, which `isLoaded()` does NOT cover and
+  // `isAppQuiet()` cannot see. The fatal overlay is a bare `<div>` at z-300, not
+  // a `BaseModal`, so it never enters the overlay stack — and the 35-second init
+  // watchdog can raise it with the document already loaded, opening every gate
+  // above. The prompt would then be a modal underneath it: invisible,
+  // untappable, and it would burn the one prompt this session gets while
+  // logging that somebody was asked.
+  if (useFatalErrorStore().message !== null) return 'fatal';
+  // ⚠️ ONE UNSOLICITED SURFACE PER LOAD (#45). Claimed HERE, at the true show
+  // site, and only once every other gate is open, so a prompt that was going to
+  // be deferred anyway does not consume the slot the PIN modal needs.
+  if (!claimInterruption('app-update')) return 'yielded';
   return null;
 }
 
@@ -136,8 +150,15 @@ async function maybePrompt(isOnline: boolean): Promise<void> {
     return;
   }
 
+  // Unreachable in practice: this composable is native-only and `storeUrlFor`
+  // answers `null` only for `'web'`. It is here because the TYPE says
+  // `string | null`, and it reports rather than returning quietly, because an
+  // impossible branch that is also silent is how a wrong assumption survives.
   const url = storeUrlFor(getPlatform());
-  if (!url) return;
+  if (!url) {
+    reportCheckFailure('no-store-url');
+    return;
+  }
 
   // Dismissed on the FIRST show, not on the answer: whichever way they go, they
   // have now been asked once this session. A nag on every launch teaches people

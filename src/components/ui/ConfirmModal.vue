@@ -15,6 +15,20 @@ const { state, handleConfirm, handleCancel } = useConfirm();
  * caller passes a frozen constant, so this is defence rather than expectation.
  */
 const safeConfirmHref = computed(() => safeExternalHref(state.value.confirmHref) ?? undefined);
+
+/**
+ * Space activates a `<button>`; it does nothing on an `<a>`.
+ *
+ * Somebody driving this sheet from a keyboard has just been told to press the
+ * primary control, and on the one variant that is a link the most obvious key
+ * would do nothing at all. Enter already works on both, so this only adds the
+ * missing half.
+ */
+function onConfirmKeydown(e: KeyboardEvent): void {
+  if (!safeConfirmHref.value || e.key !== ' ') return;
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).click();
+}
 </script>
 
 <template>
@@ -96,6 +110,7 @@ const safeConfirmHref = computed(() => safeExternalHref(state.value.confirmHref)
               : 'bg-primary-500 hover:bg-primary-600'
           "
           @click="handleConfirm"
+          @keydown="onConfirmKeydown"
         >
           {{
             state.confirmLabel

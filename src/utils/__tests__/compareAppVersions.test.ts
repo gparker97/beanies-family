@@ -52,6 +52,35 @@ describe('compareAppVersions', () => {
     }
   });
 
+  it('refuses a padded field rather than silently reading it as another version', () => {
+    // ⚠️ WRONG, NOT UNDECIDED, which is the worse failure. `'0.09'` used to
+    // parse as major 0 minor 9 and compare EQUAL to `'0.9'`, so a leading zero
+    // typed into a hand-edited, hand-deployed file would have moved the floor
+    // silently rather than being ignored.
+    expect(compareAppVersions('0.09', '0.9')).toBeNull();
+    expect(compareAppVersions('0.016', '0.16')).toBeNull();
+    expect(isComparableVersion('01')).toBe(false);
+    // A bare zero is still a number.
+    expect(compareAppVersions('0.0', '0')).toBe(0);
+  });
+
+  it('refuses a field too long to compare exactly', () => {
+    // Past 2^53 two different versions compare equal, which is the same class
+    // of confident-and-wrong. Six digits per field is far beyond anything this
+    // app can produce and well inside the exact range.
+    expect(compareAppVersions('9007199254740993', '9007199254740992')).toBeNull();
+    expect(compareAppVersions('1234567', '1')).toBeNull();
+    expect(compareAppVersions('999999.999999', '1')).toBe(1);
+  });
+
+  it('still accepts every version this app can actually produce', () => {
+    // The tightening must not reject the real thing. `APP_VERSION`'s stated
+    // convention, plus the shapes a future release can take.
+    for (const v of ['0.16', '1.0', '10.0', '0.16.1', '0.16.10', '0.15R2', '0.15R10', '0.9.4R1']) {
+      expect(isComparableVersion(v), v).toBe(true);
+    }
+  });
+
   it('agrees with isComparableVersion on the same inputs', () => {
     // One regex, shared. If these ever disagree, the floor's shape check and
     // the comparison have drifted apart and one of them is lying.
