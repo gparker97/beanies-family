@@ -181,6 +181,22 @@ const tripDates = computed(() => {
   return `${start} – ${end}`;
 });
 
+/**
+ * Does the strip have anything to show?
+ *
+ * Mirrors the four `v-if`s inside it, so the container cannot outlive its own
+ * contents. The band gets this for free — each of its cards owns its own guard
+ * and an empty band collapses to zero height — and the strip's single row had to
+ * state it once.
+ */
+const stripHasContent = computed(
+  () =>
+    Boolean(tonight.value) ||
+    todoProgress.value.total > 0 ||
+    visibleLists.value.length > 0 ||
+    Boolean(trip.value)
+);
+
 const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
@@ -191,8 +207,16 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     through the card markup below: the cards only ever see 'band' or 'rail',
     so no read site can be missed.
   -->
+  <!--
+    ⚠️ The strip renders only if it has something to say. The band's cards each
+    carry their own `v-if`, so an empty family collapses it to nothing; the strip
+    did not, and once the height gate started forcing `strip` on every window
+    under 1000px a family with no to-dos, no meal, no lists and no trip got a
+    full-width slab reading "✅ 0 / 0" — taking height from the very grid the
+    gate exists to protect.
+  -->
   <div
-    v-if="variant === 'strip'"
+    v-if="variant === 'strip' && stripHasContent"
     class="dark:bg-surface-raised flex shrink-0 items-center rounded-[18px] bg-white p-1.5 shadow-[var(--card-shadow)]"
   >
     <button
@@ -205,6 +229,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <span class="truncate">{{ tonight.name }}</span>
     </button>
     <button
+      v-if="todoProgress.total"
       type="button"
       class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
       :aria-label="t('wall.card.todos')"

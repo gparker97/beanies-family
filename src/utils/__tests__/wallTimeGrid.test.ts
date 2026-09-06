@@ -176,7 +176,12 @@ describe('the window', () => {
   it('returns a usable empty layout rather than throwing when nothing is on', () => {
     const l = layoutTimeGrid([[], []], HEIGHT);
     expect(l.columns).toHaveLength(2);
-    expect(l.tier).toBe('gentle');
+    // ⚠️ Was pinned to 'gentle', which the deleted empty-day branch hard-coded
+    // whether or not the day fitted. An empty day now takes the ordinary path
+    // and reports the tier it ACTUALLY reached; what matters is that it reached
+    // one and drew a real window.
+    expect(l.tier).toBeTruthy();
+    expect(l.windowEnd).toBeGreaterThan(l.windowStart);
     expect(Number.isFinite(l.yFor(600))).toBe(true);
   });
 });
@@ -754,6 +759,20 @@ describe('the axis at midnight', () => {
       for (const tick of layout.ticks) expect(tick.minutes).toBeLessThan(24 * 60);
     }
   });
+
+  it('⭐ but an OVERNIGHT day keeps every rule past midnight', () => {
+    // The first cut of the rule above was `minutes >= MINUTES_IN_DAY`, and
+    // `activitySpanMinutes` deliberately carries an overnight event past 1440 —
+    // so a 22:00-07:00 sleepover drew its window to 1860 and then had no ruler
+    // at all over the eight hours the event actually occupies. Mid-axis,
+    // "00:00" is the right label; only midnight AS THE END is the wrong one.
+    const layout = layoutTimeGrid([[ev('22:00', '07:00')]], 1200);
+    expect(layout.windowEnd).toBeGreaterThan(24 * 60);
+    const ticks = layout.ticks.map((t) => t.minutes);
+    expect(ticks).toContain(24 * 60);
+    expect(ticks).toContain(25 * 60);
+    expect(ticks[ticks.length - 1]).toBe(layout.windowEnd);
+  });
 });
 
 describe('an empty day', () => {
@@ -771,13 +790,19 @@ describe('an empty day', () => {
     }
   });
 
-  it('still draws hours rather than an empty rectangle', () => {
-    // The reason the branch existed at all: a clear day must read as "nothing
-    // on", not as "this is broken".
-    const layout = layoutTimeGrid([[]], 900);
-    expect(layout.ticks.length).toBeGreaterThan(6);
-    expect(layout.columns[0]).toEqual([]);
-    expect(layout.folds).toEqual([]);
+  it('⭐ still draws hours rather than an empty rectangle, AT EVERY HEIGHT', () => {
+    // The reason the deleted branch existed at all — and the half of it that was
+    // genuinely load-bearing. With nothing on the day there is exactly one span,
+    // the whole window, and it clears both the fold threshold and the economics
+    // test: below ~576px of plot a clear day rendered as a single 107px "quiet
+    // until 20:00" band with two hour labels. 283px is the plot a 1024x768
+    // tablet has with the strip, i.e. the device this change set targets.
+    for (const height of [200, 283, 400, 500, 560, 900, 1440]) {
+      const layout = layoutTimeGrid([[]], height);
+      expect(layout.folds).toEqual([]);
+      expect(layout.ticks.length).toBeGreaterThan(6);
+      expect(layout.columns[0]).toEqual([]);
+    }
   });
 });
 
@@ -1001,10 +1026,17 @@ describe('the zoom — how the wall grows with the glass', () => {
   });
 
   it('an empty day zooms too, rather than sitting at the base hour', () => {
-    // The load-bearing line: without it an empty day renders at 0.8 on a screen
-    // where every other day renders at 1.6.
-    expect(layoutTimeGrid([[]], 480).scale).toBe(0.8);
+    // Still the point: an empty day must not render at 0.8 on a screen where
+    // every other day renders at 1.6.
     expect(layoutTimeGrid([[]], 1440).scale).toBeCloseTo(1.6, 6);
+    // ⚠️ 480px used to be pinned at 0.8, which is 720 minutes x 0.8 = 576px of
+    // axis in a 480px plot — the hard-coded branch drew past the bottom of the
+    // glass and the `overflow: hidden` plot ate the difference. Taking the
+    // ordinary path steps down one rung and draws the whole waking day inside
+    // the space it was given.
+    const short = layoutTimeGrid([[]], 480);
+    expect(short.scale).toBe(0.6);
+    expect((short.windowEnd - short.windowStart) * short.scale).toBeLessThanOrEqual(480);
   });
 
   it('a genuinely packed day still compresses, at any plot height', () => {

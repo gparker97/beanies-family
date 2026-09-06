@@ -33,6 +33,8 @@ const props = defineProps<{
   weekOfAnchor: string[];
   todayYmd: string;
   portrait: boolean;
+  /** Forwarded to the shell — the page owns the wall's one viewport mechanism. */
+  roomForBand: boolean;
   /** Ticks with the page clock, so "happening now" moves through the day. */
   now: Date;
   /** The wall's shared anchor — the day this panel renders. */
@@ -154,6 +156,7 @@ const focusLabel = computed(() =>
 <template>
   <WallViewShell
     :portrait="portrait"
+    :room-for-band="roomForBand"
     :rail="true"
     :busiest="busiest"
     :meals-ymd="focusYmd"

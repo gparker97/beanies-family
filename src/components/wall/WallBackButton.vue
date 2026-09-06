@@ -8,8 +8,10 @@
  * and a chevron, which is four things to keep in step by memory.
  *
  * It carries NO chrome of its own beyond `.wall-back`, which `BeanieWallPage`
- * styles through `:deep()`: its rem sizing, its 44px target floor and its
- * dark-mode partner all come across intact.
+ * styles through `:deep()`, so its rem sizing and dark-mode partner come across
+ * intact. ⚠️ `.wall-back` sets font-size only — the 44px target comes from the
+ * `px-4 py-2.5` here, not from the class, and an earlier version of this comment
+ * credited the class with a floor it does not provide.
  *
  * Existing at all is greg's call, over my recommendation that the
  * always-visible view switcher made a back control unnecessary.
@@ -33,6 +35,7 @@ const { t } = useTranslation();
     class="font-outfit text-secondary-500 wall-back dark:bg-surface-raised dark:text-ink shrink-0 rounded-2xl bg-white px-4 py-2.5 font-bold shadow-[var(--card-shadow)]"
     @click="emit('back')"
   >
-    ‹ {{ fillTemplate(t('wall.jobsBoard.back'), { view: backLabel }) }}
+    <span aria-hidden="true">‹</span>
+    {{ fillTemplate(t('wall.jobsBoard.back'), { view: backLabel }) }}
   </button>
 </template>

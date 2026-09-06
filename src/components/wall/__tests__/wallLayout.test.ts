@@ -13,10 +13,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  BAND_MIN_VIEWPORT_HEIGHT_PX,
   BLOCK_FULL_PX,
   BLOCK_SLIVER_PX,
   MAX_DAY_COLUMNS,
   MIN_DAY_COLUMNS,
+  bandFitsHeight,
   daysLayoutFor,
   railFits,
 } from '../wallLayout';
@@ -140,5 +142,29 @@ describe('the three column widths', () => {
     const { columns } = daysLayoutFor(1440, false);
     const contentWidth = 1440 - 56 - 62 - 296 - 16 - 56;
     expect(contentWidth / columns).toBeGreaterThan(BLOCK_FULL_PX);
+  });
+});
+
+describe("bandFitsHeight — the band's HEIGHT rule", () => {
+  it('⭐ refuses the band on the short windows that produced the overlap', () => {
+    // 1024x768 and 1366x768 are both real wall hardware, and both left the grid
+    // ~101px with a full band under it — a whole day in the height of three
+    // lines, drawn over by the cards.
+    expect(bandFitsHeight(768)).toBe(false);
+    expect(bandFitsHeight(800)).toBe(false);
+    expect(bandFitsHeight(BAND_MIN_VIEWPORT_HEIGHT_PX - 1)).toBe(false);
+  });
+
+  it('keeps it on the windows where it was always fine', () => {
+    expect(bandFitsHeight(BAND_MIN_VIEWPORT_HEIGHT_PX)).toBe(true);
+    expect(bandFitsHeight(1180)).toBe(true);
+    expect(bandFitsHeight(1366)).toBe(true);
+  });
+
+  it('⚠️ prefers the band when it has no measurement to go on', () => {
+    // The band is the preference; a first real measurement corrects it. Erring
+    // the other way would flash a strip onto every wall on mount.
+    expect(bandFitsHeight(NaN)).toBe(true);
+    expect(bandFitsHeight(Infinity)).toBe(true);
   });
 });

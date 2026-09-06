@@ -38,6 +38,8 @@ const props = defineProps<{
   weekDays: string[];
   todayYmd: string;
   portrait: boolean;
+  /** Forwarded to the shell — the page owns the wall's one viewport mechanism. */
+  roomForBand: boolean;
   /**
    * How many day columns to draw. Decided by the page from the viewport, after
    * the rail has taken its width — see `daysLayoutFor`.
@@ -174,6 +176,7 @@ function colourFor(activity: FamilyActivity) {
 <template>
   <WallViewShell
     :portrait="portrait"
+    :room-for-band="roomForBand"
     :rail="rail"
     :busiest="busiest"
     :meals-ymd="todayYmd"

@@ -181,15 +181,26 @@ watch(
 
     /*
      * The hour, not just the tier — the change's whole new degree of freedom.
+     * Two walls both reporting `roomy` can be drawing a 48px hour and a 96px one.
      *
-     * `scale` now ranges over 0.8..1.6 px/min across 28 zoom/window combinations,
-     * so two walls both reporting `roomy` can be drawing a 48px hour and a 96px
-     * one. Without the number in the event they are indistinguishable, and the
-     * gate keyed on the tier alone stayed silent through a resize that changed
-     * nothing BUT the hour. `count` is already allowlisted.
+     * ⚠️ Measured through `yFor`, NOT from `result.scale`. `squeeze()` returns
+     * `{ ...a, yFor: (t) => inner(t) * k }` without overriding `scale`, so on a
+     * squeezed layout `scale` is the rate the search ASKED for rather than the
+     * one drawn — 0.35 reported against a real 0.26 at the extreme. `yFor` is
+     * what the axis is actually drawn with, so it cannot disagree with the
+     * screen.
+     *
+     * ⚠️ And it stays OUT of the gate key. Keyed on `tier:hourPx` the signature
+     * changes at every zoom and window boundary — ten distinct values sweeping
+     * 300..1800px against two or three for the tier alone — and the plot height
+     * comes from a rAF-coalesced ResizeObserver, so a drag resting on a boundary
+     * re-emits every frame and empties the 50-per-minute bucket in about a
+     * second. That bucket holds the transitions the gate exists to preserve.
      */
-    const hourPx = Math.round(result.scale * 60);
-    if (tierGate(`${props.viewId}:${result.tier}:${hourPx}`)) {
+    const hourPx = Math.round(
+      result.yFor(result.windowStart + 60) - result.yFor(result.windowStart)
+    );
+    if (tierGate(`${props.viewId}:${result.tier}`)) {
       logEvent({
         level: 'info',
         surface: SURFACE,
@@ -378,18 +389,24 @@ function openActivity(occurrence: WallOccurrence): void {
         go OVER them, because a block nudged down by the height floor may overrun
         a fold and the sentence explaining the fold must stay readable.
 
-        `min-h-0` is as load-bearing as `min-w-0`, and it failed the same way. A
-        column flex item defaults to `min-height: auto`, so the plot refused to
-        shrink below its own content and simply OVERFLOWED its share: on a
-        1024x768 tablet the bean lanes ran 103px past the bottom of their slot,
-        and the peripheral cards — laid out where flexbox actually put them —
-        painted straight over the last two hours of the day. Nothing warned,
-        because the plot is `overflow-hidden`: it clipped its own contents
-        tidily while sitting in the wrong place.
+        ⚠️ The plot's floor is the ROW's `min-h-[13.75rem]` above, and that is
+        what made the bean lanes run 103px past the bottom of their slot on a
+        1024x768 tablet while the peripheral cards painted over the last two
+        hours of the day. Nothing warned, because the plot is `overflow-hidden`:
+        it clipped its own contents tidily while sitting in the wrong place.
+
+        `min-h-0` here is belt-and-braces, NOT the fix — this is an item of a ROW
+        flex container, so its automatic minimum applies on the horizontal axis,
+        and `overflow: hidden` disables it in any case. The two things that
+        actually keep the calendar inside its slot are the band's height gate
+        (`BAND_MIN_VIEWPORT_HEIGHT_PX`) and the peripheral wrapper being
+        shrinkable rather than `shrink-0`, which is the policy the comment above
+        states: if the wall is genuinely too short for everything, the
+        peripherals clip — the calendar never does.
       -->
       <div
         ref="plot"
-        class="dark:bg-surface-raised relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
+        class="wall-plot dark:bg-surface-raised relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
       >
         <template v-if="layout && !failed">
           <!--

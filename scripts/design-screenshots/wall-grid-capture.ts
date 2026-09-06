@@ -320,6 +320,10 @@ test.describe('design screenshots', () => {
     }
     console.log('[wall-grid] blocks on the first view:', rendered);
 
+    // Collected rather than thrown at the first offender: one bad frame must not
+    // cost the other 17 captures, which are the point of the run.
+    const overruns: string[] = [];
+
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await page.waitForTimeout(700);
@@ -337,26 +341,41 @@ test.describe('design screenshots', () => {
          * contents tidily WHILE SITTING IN THE WRONG PLACE, and the peripheral
          * cards paint over the hours it stole. Six bean lanes on a 1024x768
          * tablet overlapped by 103px and the frame still looked plausible.
+         *
+         * ⚠️ It measures `.wall-plot` against `.wall-peripherals` — two stable
+         * hooks — NOT `.wall-card` against a Tailwind rounding utility. The
+         * first cut did the latter and was VACUOUS at exactly the viewport that
+         * motivated it: the `strip` variant renders no `.wall-card` at all, so
+         * `cards.length === 0` short-circuited to a pass on 1024x768, and every
+         * other size takes the rail. A missing hook now FAILS rather than
+         * passing quietly.
          */
-        const overlap = await page.evaluate(() => {
-          const blocks = [...document.querySelectorAll('.wall-tblock')];
-          const plot = blocks[0]?.closest('.overflow-hidden.rounded-\\[20px\\]');
-          const cards = [...document.querySelectorAll('.wall-card')];
-          if (!plot || !cards.length) return 0;
-          const box = plot.getBoundingClientRect();
-          const cardTop = Math.min(...cards.map((c) => c.getBoundingClientRect().top));
-          // Cards sitting BESIDE the grid (the rail) start above its bottom by
-          // design; only a card stacked BELOW it can be overlapped.
-          if (cardTop <= box.top) return 0;
-          return Math.max(0, Math.round(box.bottom - cardTop));
+        const geometry = await page.evaluate(() => {
+          const plot = document.querySelector('.wall-plot');
+          const cards = document.querySelector('.wall-peripherals');
+          if (!plot) return { error: 'no .wall-plot' };
+          if (!cards) return { error: 'no .wall-peripherals' };
+          const p = plot.getBoundingClientRect();
+          const c = cards.getBoundingClientRect();
+          // Beside the grid (the rail) is not stacked, and cannot overlap it.
+          const stacked = c.top >= p.top;
+          return { overlap: stacked ? Math.round(p.bottom - c.top) : 0, stacked };
         });
-        if (overlap > 2) {
+        if ('error' in geometry) {
           throw new Error(
-            `[wall-grid] ${view.id} at ${size.name}: the plot overruns its slot and the ` +
-              `peripheral cards paint over ${overlap}px of the day.`
+            `[wall-grid] ${view.id} at ${size.name}: ${geometry.error} — the overrun check ` +
+              `cannot run, which is the state it was written to stop being possible.`
+          );
+        }
+        if (geometry.stacked && geometry.overlap > 2) {
+          overruns.push(
+            `${view.id} at ${size.name}: the plot overruns its slot and the peripheral ` +
+              `cards paint over ${geometry.overlap}px of the day`
           );
         }
       }
     }
+
+    if (overruns.length) throw new Error(`[wall-grid]\n  ${overruns.join('\n  ')}`);
   });
 });

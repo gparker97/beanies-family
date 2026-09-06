@@ -48,7 +48,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **A clear day now draws the same hours as a day with something on it.** Stepping from a quiet Tuesday to a free Wednesday moved the whole grid up by an hour and back.
 - **Tapping a bean's name in the bean-lane view now focuses that bean**, rather than leaving the per-person view for everyone's day — which is what all six of them did.
 - **Tapping a day a year out no longer throws the wall back to today without saying so.** It goes as far as the wall will go.
-- **The wall no longer prints "00:00" under 23:00** at the bottom of its longest day, half of it cut off by the edge of the calendar.
+- **The wall no longer prints "00:00" under 23:00** at the bottom of its longest day, half of it cut off by the edge of the calendar. An event that runs overnight still gets a ruler for every hour past midnight.
+- **A clear day draws its hours at any screen size.** On a short screen it collapsed into a single "quiet until 20:00" band in empty space, which reads as broken rather than as free.
+- **Coming back from a day no longer rewinds the week when you reached the chore board first.**
+- **Tapping a bean's name in the bean-lane view now announces itself as a filter** to a screen reader, and shows which bean is selected.
 
 - **Settings now says who beanies is waiting on before you press anything.** When a family member is on an older version, the compaction section names them and says what to ask them to do. You no longer have to attempt the compaction to find out it will not run, and read a message that named nobody.
 - **The message about waiting for a family member said "someone in your family" when beanies knew exactly who.** The refusal you actually saw first had the names available and threw them away; only the second, much later check used them.
