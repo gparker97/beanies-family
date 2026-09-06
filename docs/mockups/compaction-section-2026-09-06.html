@@ -62,12 +62,20 @@
   .note{font-size:.75rem;color:#6b7684;margin:8px 2px 0}
   .dk .note{color:#8b9aa6}
   .phone{max-width:360px;margin:0 auto}
+  .badge{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;
+         border-radius:999px;background:var(--accent);color:#fff;font-size:.62rem;font-weight:700;
+         vertical-align:middle;margin-left:5px;font-family:Inter,sans-serif}
+  .pop{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:14px 15px;
+       max-width:288px;box-shadow:0 8px 24px rgba(16,24,40,.14)}
+  .pop p{margin:0 0 9px;font-size:.79rem;line-height:1.55;color:var(--ink-soft)}
+  .pop p:last-child{margin-bottom:0}
+  .pop strong{color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
 <div class="page">
-  <h1>R5 — the compaction control, as its own section</h1>
-  <p class="lede">Left is today: a small secondary button in a row beside <em>Transfer Ownership</em>, reading as a tidy-up. Right is the proposal, light and dark, plus the phone width. The dashed box is where the R3 "due" note lands in Stage&nbsp;4 — the only thing that ever says <em>yes, now</em>.</p>
+  <h1>R5 — the compaction control, as its own section (v2)</h1>
+  <p class="lede">Left is today: a small secondary button in a row beside <em>Transfer Ownership</em>, reading as a tidy-up. Then the proposal — its own section, the long explanation behind the existing “?” badge, and no type-to-confirm. The dashed box is where the R3 “due” note lands in Stage&nbsp;4, the only thing that ever says <em>yes, now</em>. The one thing needing action sits <em>outside</em> the popover.</p>
 
   <div class="cols">
 
@@ -91,46 +99,51 @@
     <div class="pane">
       <p class="paneLabel">Proposed — light</p>
       <div class="card">
-        <p class="sectionTitle">If your family file will not open</p>
-        <p class="sectionBody">Over years of use, a family file collects a record of every change ever made. On an older phone or tablet that record can grow big enough to stop the file opening at all. beanies can rebuild it without that history. Your beans are not changed — only the record of how they got there.</p>
+        <p class="sectionTitle">Compact your family file
+          <span class="badge" title="popover trigger">?</span>
+        </p>
+        <p class="sectionBody">Compacting clears the record of past changes and keeps every one of your beans. beanies checks the compacted file matches the original exactly before it replaces anything — if a single thing differs, it stops and changes nothing.</p>
 
         <div class="slot">Stage 4 · the “due” note appears here when the file is actually large</div>
 
         <div class="warn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F15D22" stroke-width="2.5" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <p>Only use this if beanies is slow to open, or will not open, on one of your devices. It is not routine tidying, it affects everyone in your family, and it cannot be undone.</p>
+          <p>Before you start, bring your family's other devices online so they are up to date. A device that has been offline with changes it never saved will ask you what to do when it comes back.</p>
         </div>
 
-        <div class="field">
-          <label for="a">Type REBUILD to continue</label>
-          <input id="a" placeholder="REBUILD" />
-        </div>
-
-        <button class="btn" disabled>Rebuild the family file</button>
-        <p class="meta">beanies saves a copy of the current file first, next to it, so you can go back.</p>
+        <button class="btn">Compact family file</button>
+        <p class="meta">beanies saves a copy of the current file beside it first, so you can go back.</p>
       </div>
+    </div>
+
+    <div class="pane">
+      <p class="paneLabel">The “?” popover (InfoHintBadge)</p>
+      <div class="pop">
+        <p><strong>Why is there a record of past changes at all?</strong></p>
+        <p>It is how two devices work out what each other has changed, so their edits can be brought together without anything being lost. It is not a backup, and nothing in your family's data depends on it.</p>
+        <p>Once every device is up to date there is nothing left for that record to reconcile, so it can be cleared. Your beans, and every date, note and photo, are untouched.</p>
+        <p>On an older phone or tablet the record can grow big enough to stop the file opening at all. Compacting is what fixes that.</p>
+      </div>
+      <p class="note">Rendered by the existing <code>InfoHintBadge</code>, the same “?” badge used on Reminders, Todos and the Nook.</p>
     </div>
 
     <div class="pane dk dark">
       <p class="paneLabel">Proposed — dark</p>
       <div class="card">
-        <p class="sectionTitle">If your family file will not open</p>
-        <p class="sectionBody">Over years of use, a family file collects a record of every change ever made. On an older phone or tablet that record can grow big enough to stop the file opening at all. beanies can rebuild it without that history. Your beans are not changed — only the record of how they got there.</p>
+        <p class="sectionTitle">Compact your family file
+          <span class="badge" title="popover trigger">?</span>
+        </p>
+        <p class="sectionBody">Compacting clears the record of past changes and keeps every one of your beans. beanies checks the compacted file matches the original exactly before it replaces anything — if a single thing differs, it stops and changes nothing.</p>
 
         <div class="slot">Stage 4 · the “due” note appears here when the file is actually large</div>
 
         <div class="warn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8b5e" stroke-width="2.5" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <p>Only use this if beanies is slow to open, or will not open, on one of your devices. It is not routine tidying, it affects everyone in your family, and it cannot be undone.</p>
+          <p>Before you start, bring your family's other devices online so they are up to date. A device that has been offline with changes it never saved will ask you what to do when it comes back.</p>
         </div>
 
-        <div class="field">
-          <label for="b">Type REBUILD to continue</label>
-          <input id="b" value="REBUILD" />
-        </div>
-
-        <button class="btn">Rebuild the family file</button>
-        <p class="meta">beanies saves a copy of the current file first, next to it, so you can go back.</p>
+        <button class="btn">Compact family file</button>
+        <p class="meta">beanies saves a copy of the current file beside it first, so you can go back.</p>
       </div>
     </div>
 
@@ -138,18 +151,14 @@
       <p class="paneLabel">Proposed — phone (360px)</p>
       <div class="phone">
         <div class="card">
-          <p class="sectionTitle">If your family file will not open</p>
-          <p class="sectionBody">Over years of use, a family file collects a record of every change ever made. On an older phone or tablet that record can grow big enough to stop the file opening at all. beanies can rebuild it without that history.</p>
+          <p class="sectionTitle">Compact your family file <span class="badge">?</span></p>
+          <p class="sectionBody">Compacting clears the record of past changes and keeps every one of your beans.</p>
           <div class="warn">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F15D22" stroke-width="2.5" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <p>Only use this if beanies is slow to open, or will not open, on one of your devices. It cannot be undone.</p>
+            <p>Bring your other devices online first, so they are up to date.</p>
           </div>
-          <div class="field">
-            <label for="c">Type REBUILD to continue</label>
-            <input id="c" placeholder="REBUILD" />
-          </div>
-          <button class="btn" disabled>Rebuild the family file</button>
-          <p class="meta">A copy of the current file is saved next to it first.</p>
+          <button class="btn">Compact family file</button>
+          <p class="meta">A copy of the current file is saved beside it first.</p>
         </div>
       </div>
     </div>
