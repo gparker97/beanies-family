@@ -16,7 +16,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import * as syncService from '@/services/sync/syncService';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePermissions } from '@/composables/usePermissions';
-import { anyDeviceReportedTooLarge } from '@/services/pod/podSoak';
+import { anyDeviceReportedTooLarge, evaluateSoak } from '@/services/pod/podSoak';
 
 /** Below this the file opens comfortably even on an old tablet. */
 export const DUE_BYTES = 1_000_000;
@@ -51,9 +51,29 @@ export function usePodHealth() {
 
   const someoneCannotOpenIt = computed(() => anyDeviceReportedTooLarge(familyStore.members));
 
+  /**
+   * Who the soak gate is waiting on, or empty when it is satisfied.
+   *
+   * ⚠️ SO THE ANSWER IS ON THE PAGE, NOT BEHIND A BUTTON PRESS. The gate used
+   * to be discoverable only by trying: press Compact, get a refusal. Even named,
+   * that is a bad shape — the person has to attempt a one-way, family-wide
+   * migration to find out they cannot, and the refusal is gone in a few seconds.
+   * The section now says who it is waiting on before anything is pressed.
+   *
+   * Same `evaluateSoak` the ladder gates on, so the page and the refusal cannot
+   * disagree. The LADDER still checks for itself: this is display, and a
+   * displayed value is not a gate.
+   *
+   * `behind` alone, with no `ok` guard: the verdict defines `ok` AS
+   * `behind.length === 0`, so a guard here would be unreachable code posing as
+   * a safety net — it cannot be tested, and an untestable branch is a place for
+   * a bug to live rather than a defence against one.
+   */
+  const waitingOn = computed(() => evaluateSoak(familyStore.members).behind);
+
   const compactionIsDue = computed(
     () => canCompactPod.value && (someoneCannotOpenIt.value || podBytes.value >= DUE_BYTES)
   );
 
-  return { canCompactPod, compactionIsDue, podBytes, someoneCannotOpenIt };
+  return { canCompactPod, compactionIsDue, podBytes, someoneCannotOpenIt, waitingOn };
 }

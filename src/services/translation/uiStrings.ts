@@ -4367,17 +4367,26 @@ const STRING_DEFS = {
     en: 'Only the person who set up your family can compact the family file.',
     beanie: 'only the bean who set up your family can compact the family pod.',
   },
-  'compaction.refused.not-soaked': {
-    en: 'Someone in your family has a device that has not opened beanies recently enough for beanies to know it can handle a compacted file. Ask them to open beanies once, then try again.',
+  // The STANDING notice, in the Settings section, shown instead of the
+  // bring-your-devices-online caution while the gate is unsatisfied. It answers
+  // the three questions a refusal toast cannot: who, what do I do, and why does
+  // beanies name a person rather than the device that is actually behind.
+  'compaction.waitingOn': {
+    en: 'beanies is waiting on {names} before it can compact. Ask them to update beanies and open it once on each device they use it on. A device still on an older version could undo the compaction for the whole family, and beanies can only tell that a device is ready once someone opens beanies on it, which is why it names people rather than devices.',
     beanie:
-      'someone in your family has a bean that has not opened beanies recently enough for beanies to know it can handle a compacted pod. ask them to open beanies once, then try again.',
+      'beanies is waiting on {names} before it can compact. ask them to update beanies and open it once on each bean they use it on. a bean still on an older version could undo the compaction for the whole family, and beanies can only tell that a bean is ready once someone opens beanies on it, which is why it names people rather than beans.',
+  },
+  'compaction.refused.not-soaked': {
+    en: 'Someone in your family is using an older version of beanies. Ask everyone to update beanies and open it once on each device they use it on.',
+    beanie:
+      'someone in your family is using an older version of beanies. ask everyone to update beanies and open it once on each bean they use it on.',
   },
   // The named variant, used once the projection is current and beanies can say
   // WHO — a refusal you can act on beats one you can only be puzzled by.
   'compaction.refused.not-soaked.named': {
-    en: 'beanies is waiting for {names} to open the app once, so it knows their device can handle a compacted file. Ask them to open beanies, then try again.',
+    en: 'beanies is waiting on {names}. Ask them to update beanies and open it once on each device they use it on, then try again.',
     beanie:
-      'beanies is waiting for {names} to open the app once, so it knows their bean can handle a compacted pod. ask them to open beanies, then try again.',
+      'beanies is waiting on {names}. ask them to update beanies and open it once on each bean they use it on, then try again.',
   },
   // The DUE note. Two variants, because a device that has actually failed to
   // open the file is a different fact from a file that has merely grown — and

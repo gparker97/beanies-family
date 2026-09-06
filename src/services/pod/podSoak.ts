@@ -54,6 +54,18 @@ function withinWindow(lastLoginAt: ISODateString | undefined, today: Date, days:
   return age >= 0 && age <= days * 86_400_000;
 }
 
+/**
+ * The people being waited on, as one readable string.
+ *
+ * ⚠️ ONE IMPLEMENTATION. The refusal toast and the standing Settings notice
+ * render the same list, and a family seeing two spellings of one fact is how
+ * they conclude the app is guessing. Comma-joined rather than "A and B",
+ * because the conjunction is English and this renders inside translated copy.
+ */
+export function formatNames(names: readonly string[]): string {
+  return names.join(', ');
+}
+
 export function evaluateSoak(
   members: readonly FamilyMember[],
   opts: { today?: Date; requiredEpoch?: number; windowDays?: number } = {}
