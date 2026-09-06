@@ -12,7 +12,7 @@
  * (`activitySpanMinutes` + the block's own state), so the marker here and the
  * marker on every other view can no longer disagree.
  */
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
@@ -33,6 +33,8 @@ const props = defineProps<{
   portrait: boolean;
   /** Ticks with the page clock, so "happening now" moves through the day. */
   now: Date;
+  /** The wall's shared anchor — the day this panel renders. */
+  anchorYmd: string;
   todosFor: (memberId: string) => WallJob[];
   unassignedTodos: WallJob[];
   listsFor: (memberId: string) => WallListGroup[];
@@ -42,6 +44,8 @@ const props = defineProps<{
 // `openDay` is deliberately NOT declared: in THIS view tapping a day moves the
 // panel to that day rather than opening a sheet over it.
 const emit = defineEmits<{
+  /** Move the wall's shared anchor to this day. See `useWallAnchor`. */
+  focusDay: [string];
   open: [WallSheetTarget];
   openChores: [];
 }>();
@@ -53,16 +57,16 @@ const { identityFor } = useActivityIdentity();
 /**
  * The day the big panel is showing. Tapping the week strip moves this rather
  * than opening a drawer: the drawer covered the very panel that already renders
- * a day in full. Follows `todayYmd` so the midnight rollover pulls the wall back
- * to the real today instead of stranding it on yesterday.
+ * a day in full.
+ *
+ * ⚠️ This used to be a LOCAL ref with its own midnight watcher, and that was a
+ * bug: all four views render through one `<component :is>`, so moving to Thursday
+ * and flicking to another view destroyed it and returned the wall to today with
+ * no indication why. It is now the wall's shared anchor, owned by the page in
+ * `useWallAnchor` — which also carries the midnight re-anchor this used to do.
+ * Do not reintroduce a per-view date.
  */
-const focusYmd = ref(props.todayYmd);
-watch(
-  () => props.todayYmd,
-  (ymd) => {
-    focusYmd.value = ymd;
-  }
-);
+const focusYmd = computed(() => props.anchorYmd);
 const isToday = computed(() => focusYmd.value === props.todayYmd);
 
 const events = computed(() =>
@@ -140,7 +144,7 @@ const focusLabel = computed(() =>
           v-if="!isToday"
           type="button"
           class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1 font-bold"
-          @click="focusYmd = todayYmd"
+          @click="emit('focusDay', todayYmd)"
         >
           {{ t('wall.today.backToToday') }}
         </button>
@@ -169,7 +173,7 @@ const focusLabel = computed(() =>
               : 'dark:bg-surface-raised bg-white'
           "
           :aria-pressed="ymd === focusYmd"
-          @click="focusYmd = ymd"
+          @click="emit('focusDay', ymd)"
         >
           <span
             class="font-outfit wall-strip-day block font-bold tracking-[0.1em] uppercase opacity-70"

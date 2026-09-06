@@ -5977,6 +5977,9 @@ const STRING_DEFS = {
   'wall.list.progress': { en: '{done} of {total} done', beanie: '{done} of {total} done' },
   'wall.lane.today': { en: '{count} today', beanie: '{count} today' },
   'wall.lane.tomorrow': { en: '{count} tomorrow', beanie: '{count} tomorrow' },
+  // Used when the wall is browsing a day that is not today, where "{count} today"
+  // would be a plain lie. `{day}` is a short weekday name.
+  'wall.lane.onDay': { en: '{count} on {day}', beanie: '{count} on {day}' },
   'lists.cycle.archiveFailed': {
     en: 'Couldn’t save this list’s history. It’ll try again next time you open the app.',
     beanie: 'couldn’t save this list’s history. it’ll try again next time you open beanies.',

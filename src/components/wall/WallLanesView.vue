@@ -17,6 +17,7 @@ import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
+import { addDaysYmd, weekdayShort } from '@/utils/date';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -28,8 +29,10 @@ import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
+  /** The wall's shared anchor — the day these lanes render. */
+  anchorYmd: string;
+  /** The REAL today. Decides the now-line and past-dimming, never the content. */
   todayYmd: string;
-  tomorrowYmd: string;
   portrait: boolean;
   now: Date;
   todosFor: (memberId: string) => WallJob[];
@@ -58,8 +61,20 @@ const members = computed(() => {
 });
 const memberIds = computed(() => members.value.map((m) => m.id));
 
-const todayEvents = computed(() => activityStore.activitiesForDate(props.todayYmd));
-const tomorrowEvents = computed(() => activityStore.activitiesForDate(props.tomorrowYmd));
+/**
+ * The lanes render the ANCHORED day, not necessarily today.
+ *
+ * Everything below used to read `todayYmd`/`tomorrowYmd` directly, which meant
+ * that once the wall could browse, this view kept showing today's lanes while
+ * the header said otherwise. `todayYmd` is still passed and still means the real
+ * today — it decides the now-line and the past-dimming, neither of which may
+ * fire on a day the wall is only visiting.
+ */
+const isToday = computed(() => props.anchorYmd === props.todayYmd);
+const nextYmd = computed(() => addDaysYmd(props.anchorYmd, 1));
+
+const todayEvents = computed(() => activityStore.activitiesForDate(props.anchorYmd));
+const tomorrowEvents = computed(() => activityStore.activitiesForDate(nextYmd.value));
 
 /**
  * Memoised per member rather than recomputed per template read.
@@ -97,7 +112,7 @@ const gridColumns = computed(() =>
     // The lane wears the bean's colour for its whole height — which is also why
     // the cards inside it do not. See `WallTimeBlock`'s `washed` prop.
     tint: member.color,
-    isToday: true,
+    isToday: isToday.value,
     occurrences: eventsFor(member.id).filter((e) => !e.activity.isAllDay),
   }))
 );
@@ -141,13 +156,23 @@ const inlineHeaders = computed(() => !props.portrait && members.value.length <= 
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
 }
-/** "2 today · 1 tomorrow" — the second half is what makes a lane worth reading tonight. */
+/**
+ * "2 today · 1 tomorrow" — the second half is what makes a lane worth reading
+ * tonight. Off-anchor neither word is true, so the day is named instead and the
+ * tomorrow clause is dropped: "2 on Thursday" says something; "2 today" on a day
+ * that is not today says something false.
+ */
 function subtitleFor(memberId: string) {
-  const today = eventsFor(memberId).length;
+  const count = eventsFor(memberId).length;
+
+  if (!isToday.value) {
+    return count
+      ? fillTemplate(t('wall.lane.onDay'), { count, day: weekdayShort(props.anchorYmd) })
+      : t('wall.day.nothingOn');
+  }
+
   const tomorrow = tomorrowCount(memberId);
-  const head = today
-    ? fillTemplate(t('wall.lane.today'), { count: today })
-    : t('wall.day.nothingOn');
+  const head = count ? fillTemplate(t('wall.lane.today'), { count }) : t('wall.day.nothingOn');
   return tomorrow
     ? `${head} · ${fillTemplate(t('wall.lane.tomorrow'), { count: tomorrow })}`
     : head;
@@ -178,7 +203,7 @@ function subtitleFor(memberId: string) {
           :key="member.id"
           type="button"
           class="min-w-0 px-1.5 py-1"
-          @click="emit('openDay', todayYmd)"
+          @click="emit('openDay', anchorYmd)"
         >
           <WallBeanHeader
             :member="member"
@@ -194,7 +219,7 @@ function subtitleFor(memberId: string) {
         :all-day-spans="allDaySpans"
         :now="now"
         :dim-past="true"
-        :show-now="true"
+        :show-now="isToday"
         :axis-width="AXIS_WIDTH_PX"
         view-id="lanes"
         @open="emit('open', $event)"
@@ -205,7 +230,7 @@ function subtitleFor(memberId: string) {
       <WallPeripheralCards
         :variant="peripheralVariant"
         :portrait="portrait"
-        :meals-ymd="todayYmd"
+        :meals-ymd="anchorYmd"
         :todos-for="todosFor"
         :unassigned-todos="unassignedTodos"
         :lists-for="listsFor"

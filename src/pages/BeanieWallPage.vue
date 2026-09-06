@@ -22,8 +22,10 @@ import WallViewSwitcher from '@/components/wall/WallViewSwitcher.vue';
 import { DEFAULT_WALL_VIEW, wallViewById } from '@/components/wall/wallViews';
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
+import { useMediaQuery } from '@/composables/useMediaQuery';
 import { useToday } from '@/composables/useToday';
 import { useWakeLock } from '@/composables/useWakeLock';
+import { useWallAnchor } from '@/composables/useWallAnchor';
 import { useWallJobs } from '@/composables/useWallJobs';
 import { useWallLock } from '@/composables/useWallLock';
 import { useWallBurst } from '@/composables/useWallBurst';
@@ -35,7 +37,9 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getWallReturnPath } from '@/router';
 import { useToast } from '@/composables/useToast';
-import { addDaysYmd } from '@/utils/date';
+import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
+import { formatWeekRange } from '@/composables/useCalendarNavigation';
+import { anchorOffsetDays } from '@/utils/wallAnchor';
 import type { WallJob, WallSheetTarget, WallViewId } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
@@ -83,15 +87,7 @@ useWakeLock(SURFACE);
  * Reactive via matchMedia, so rotating a device or resizing a browser window
  * moves between the wall and the gate rather than stranding anyone on either.
  */
-const roomQuery =
-  typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(min-width: 600px) and (min-height: 600px)')
-    : null;
-const hasRoom = ref(roomQuery?.matches ?? true);
-function onRoomChange(e: MediaQueryListEvent) {
-  hasRoom.value = e.matches;
-}
-roomQuery?.addEventListener('change', onRoomChange);
+const hasRoom = useMediaQuery('(min-width: 600px) and (min-height: 600px)', true);
 const tooNarrow = computed(() => !hasRoom.value);
 
 // The wall may rotate; every other screen keeps the declarative default. Not
@@ -101,8 +97,16 @@ if (!tooNarrow.value) orientation.release();
 provide(WALL_LOCK, { isLocked: lock.isLocked, noteActivity: lock.noteActivity });
 provide(WALL_BURST, burst);
 
-/** A week starting today — the wall is about what is coming, not what has gone. */
-const weekDays = computed(() => Array.from({ length: 7 }, (_, i) => addDaysYmd(today.value, i)));
+/**
+ * The wall's ONE date concept, owned here so it survives a view switch.
+ *
+ * Anchored on today it is still a week starting today — the wall is about what is
+ * coming, not what has gone — and stepping enters whole calendar weeks from there.
+ * `today` stays separate and keeps meaning the real today: it drives the is-today
+ * highlight, the now-line and the header, none of which may lie while browsing.
+ */
+const anchor = useWallAnchor();
+const { anchorYmd, weekDays, isAnchoredToToday } = anchor;
 const tomorrowYmd = computed(() => addDaysYmd(today.value, 1));
 
 /**
@@ -133,15 +137,7 @@ const subtitle = computed(() => {
  * taken at setup meant rotating a mounted tablet kept the landscape layout
  * (seven columns crushed into portrait) until someone reloaded it.
  */
-const portraitQuery =
-  typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(orientation: portrait)')
-    : null;
-const isPortrait = ref(portraitQuery?.matches ?? false);
-function onOrientationChange(e: MediaQueryListEvent) {
-  isPortrait.value = e.matches;
-}
-portraitQuery?.addEventListener('change', onOrientationChange);
+const isPortrait = useMediaQuery('(orientation: portrait)');
 
 /**
  * The night clock must actually tick: it is the largest type on screen and the
@@ -153,6 +149,67 @@ const clockTimer = setInterval(() => (clockNow.value = new Date()), 20_000);
 const currentView = computed(() => wallViewById(activeView.value));
 /** Names the jobs board's back button after the view it returns to. */
 const backLabel = computed(() => t(wallViewById(lastCalendarView.value).labelKey).toLowerCase());
+
+/**
+ * The navigator's label — what period the wall is currently looking at.
+ *
+ * `formatWeekRange` is the planner's own week label, shared here rather than
+ * re-derived so the wall and the planner cannot describe the same seven days
+ * differently. ⚠️ It takes `Date`, not ymd.
+ */
+const anchorLabel = computed(() => {
+  if (currentView.value.stepUnit === 'week') {
+    const days = weekDays.value;
+    return formatWeekRange(parseLocalDate(days[0]!), parseLocalDate(days[days.length - 1]!));
+  }
+  return isAnchoredToToday.value ? t('wall.today.today') : formatDayLong(anchorYmd.value);
+});
+
+/**
+ * `count` is the SIGNED distance from the real today, so the firehose can answer
+ * "do families browse forward, or back?" and can show a wall stranded off-today.
+ *
+ * ⚠️ Emitted UNGATED, deliberately. A `createChangeGate` keyed on the offset would
+ * change signature on every single step and so could never suppress anything — a
+ * safeguard that reads as one but does nothing is worse than none, because the
+ * next reader trusts it. This is a hand-driven event on a wall-mounted tablet;
+ * `logEvent`'s 50-per-surface-per-minute floor is the correct backstop.
+ */
+function logAnchorChange(stage: string) {
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'wall_anchor_change',
+    context: {
+      action: 'anchor',
+      kind: activeView.value,
+      stage,
+      count: anchorOffsetDays(anchorYmd.value, today.value),
+    },
+  });
+}
+
+function onStep(direction: -1 | 1) {
+  const unit = currentView.value.stepUnit;
+  if (!unit) return;
+  anchor.step(unit, direction);
+  logAnchorChange(direction === 1 ? 'next' : 'prev');
+}
+
+function onGoToToday() {
+  anchor.goToToday();
+  logAnchorChange('today');
+}
+
+/**
+ * A day tap places the anchor on that day EXACTLY — not snapped to its calendar
+ * week. A week that starts Saturday, with Thursday tapped, redraws starting
+ * Thursday. Week *stepping* snaps; a tap is a direct placement.
+ */
+function onFocusDay(ymd: string) {
+  anchor.setAnchor(ymd, 'day_tap');
+  logAnchorChange('day_tap');
+}
 
 function selectView(id: WallViewId) {
   if (activeView.value !== 'jobs') lastCalendarView.value = activeView.value;
@@ -257,8 +314,8 @@ if (typeof window !== 'undefined') {
 }
 
 onScopeDispose(() => {
-  portraitQuery?.removeEventListener('change', onOrientationChange);
-  roomQuery?.removeEventListener('change', onRoomChange);
+  // The two matchMedia listeners that used to be released here now belong to
+  // `useMediaQuery`, which disposes them with this same scope.
   clearInterval(clockTimer);
   resetCelebrationMode();
   logEvent({ level: 'info', surface: SURFACE, message: 'wall_exit', context: { action: 'exit' } });
@@ -339,6 +396,47 @@ watch(activeView, () => (sheet.value = null));
         </p>
       </div>
       <div class="ml-auto flex items-center gap-3">
+        <!--
+          The period navigator. Hidden on the jobs board, which has no date at
+          all (`stepUnit: null` in the registry).
+
+          Rendered inline rather than as a shared `PeriodNavigator` component:
+          two other clusters exist (`MonthNavigator`, `CalendarCommandBar`), but
+          the command bar cannot adopt one — its label sits outside the cluster
+          behind a load-bearing Transition — so an extraction would consolidate
+          two of three while putting a regression surface on the transactions
+          page. Consolidating all three is a follow-up with one owner.
+        -->
+        <div v-if="currentView.stepUnit" class="flex items-center gap-1.5">
+          <button
+            type="button"
+            class="font-outfit text-secondary-500 wall-nav-arrow dark:bg-surface-raised dark:text-ink rounded-xl bg-white px-2.5 py-1.5 font-bold shadow-[var(--card-shadow)]"
+            :aria-label="t('planner.prevPeriod')"
+            @click="onStep(-1)"
+          >
+            <span aria-hidden="true">‹</span>
+          </button>
+          <p class="font-inter wall-nav-label min-w-0 text-center text-[var(--muted-text,#4d5d6c)]">
+            {{ anchorLabel }}
+          </p>
+          <button
+            type="button"
+            class="font-outfit text-secondary-500 wall-nav-arrow dark:bg-surface-raised dark:text-ink rounded-xl bg-white px-2.5 py-1.5 font-bold shadow-[var(--card-shadow)]"
+            :aria-label="t('planner.nextPeriod')"
+            @click="onStep(1)"
+          >
+            <span aria-hidden="true">›</span>
+          </button>
+          <!-- Only offered when it would do something. -->
+          <button
+            v-if="!isAnchoredToToday"
+            type="button"
+            class="font-outfit text-primary-500 dark:text-primary-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold"
+            @click="onGoToToday"
+          >
+            {{ t('date.today') }}
+          </button>
+        </div>
         <WallViewSwitcher :active="activeView" @select="selectView" />
         <div class="text-right">
           <p class="font-outfit wall-clock leading-none font-extrabold">
@@ -367,6 +465,7 @@ watch(activeView, () => (sheet.value = null));
       <component
         :is="currentView.component"
         :week-days="weekDays"
+        :anchor-ymd="anchorYmd"
         :today-ymd="today"
         :tomorrow-ymd="tomorrowYmd"
         :portrait="isPortrait"
@@ -381,6 +480,7 @@ watch(activeView, () => (sheet.value = null));
         @toggle="onToggle"
         @back="selectView(lastCalendarView)"
         @open-day="openSheet({ kind: 'day', ymd: $event })"
+        @focus-day="onFocusDay"
         @open="openSheet"
         @open-chores="selectView('jobs')"
       />
@@ -494,6 +594,21 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-clock) {
   font-size: 2.3rem;
+}
+
+/* The period navigator. rem-based like the rest of the wall scale, so Large
+   reading mode carries it too. */
+.wall-root :deep(.wall-nav-arrow) {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.wall-root :deep(.wall-nav-label) {
+  font-size: 0.92rem;
+}
+
+.wall-root :deep(.wall-nav-today) {
+  font-size: 0.85rem;
 }
 
 .wall-root :deep(.wall-card-title) {
@@ -754,6 +869,18 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-portrait :deep(.wall-clock) {
   font-size: 1.7rem;
+}
+
+.wall-portrait :deep(.wall-nav-arrow) {
+  font-size: 1rem;
+}
+
+.wall-portrait :deep(.wall-nav-label) {
+  font-size: 0.82rem;
+}
+
+.wall-portrait :deep(.wall-nav-today) {
+  font-size: 0.78rem;
 }
 
 .wall-portrait :deep(.wall-switch-btn) {
