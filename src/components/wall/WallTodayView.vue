@@ -20,7 +20,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
-import { dayOfMonth, weekdayShort } from '@/utils/date';
+import { addDaysYmd, dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
@@ -66,6 +66,21 @@ const { identityFor } = useActivityIdentity();
  * Do not reintroduce a per-view date.
  */
 const focusYmd = computed(() => props.anchorYmd);
+
+/**
+ * The strip is seven days from the REAL today — deliberately not from the anchor.
+ *
+ * ⚠️ It was briefly `props.weekDays`, and that broke it. `weekDays` is now
+ * `anchor..anchor+6`, and the anchor is what a strip tap sets, so the tapped day
+ * became chip #1 every time: tapping Thursday relabelled the strip Thu–Wed,
+ * putting Mon/Tue/Wed out of reach and leaving `aria-pressed` true only ever for
+ * the first cell. A picker whose options move when you pick one is not a picker.
+ *
+ * Anchored on today the two are identical, which is why it looked right.
+ */
+const stripDays = computed(() =>
+  Array.from({ length: 7 }, (_, i) => addDaysYmd(props.todayYmd, i))
+);
 const isToday = computed(() => focusYmd.value === props.todayYmd);
 
 const events = computed(() =>
@@ -104,7 +119,7 @@ const busiest = computed(() => events.value.length);
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {
   const map = new Map<string, ReturnType<typeof wallEvents>>();
-  for (const ymd of props.weekDays) {
+  for (const ymd of stripDays.value) {
     map.set(ymd, wallEvents(activityStore.activitiesForDate(ymd), props.visibleMemberIds));
   }
   return map;
@@ -146,14 +161,6 @@ const focusLabel = computed(() =>
         <p class="font-outfit text-secondary-500 wall-slot-title dark:text-ink font-bold">
           {{ focusLabel }}
         </p>
-        <button
-          v-if="!isToday"
-          type="button"
-          class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1 font-bold"
-          @click="emit('focusDay', todayYmd)"
-        >
-          {{ t('wall.today.backToToday') }}
-        </button>
       </div>
 
       <WallTimeGrid
@@ -169,7 +176,7 @@ const focusLabel = computed(() =>
 
       <div class="grid shrink-0 gap-2" style="grid-template-columns: repeat(7, 1fr)">
         <button
-          v-for="ymd in weekDays"
+          v-for="ymd in stripDays"
           :key="ymd"
           type="button"
           class="rounded-2xl px-2 py-2 text-center shadow-[var(--card-shadow)]"

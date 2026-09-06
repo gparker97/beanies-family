@@ -118,8 +118,13 @@ const allDaySpans = computed(() => {
  * Without this the wall drew a red line through an arbitrary column of next
  * week. `dim-past` needs no equivalent: the grid already gates dimming per
  * column on `column.isToday`.
+ *
+ * ⚠️ Tested against `visible`, NOT `weekDays`. Portrait renders three columns of
+ * the seven, so a week that contains today but does not SHOW it would otherwise
+ * paint a now-line and a live "now at HH:MM" pill across three days that have
+ * already happened.
  */
-const showsToday = computed(() => props.weekDays.includes(props.todayYmd));
+const showsToday = computed(() => visible.value.includes(props.todayYmd));
 
 /** Content-derived, never layout-derived — see `wallPeripheralVariant`. */
 const busiest = computed(() => Math.max(0, ...visible.value.map((ymd) => eventsFor(ymd).length)));

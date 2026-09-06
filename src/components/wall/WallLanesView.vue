@@ -17,6 +17,7 @@ import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
+import { LANES_RAIL_MAX_COLUMNS } from '@/components/wall/wallLayout';
 import { addDaysYmd, weekdayShort } from '@/utils/date';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -35,6 +36,8 @@ const props = defineProps<{
   todayYmd: string;
   portrait: boolean;
   now: Date;
+  /** True when the viewport is wide enough that the rail crowds nothing. */
+  railWide: boolean;
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
@@ -149,6 +152,13 @@ const busiest = computed(() => Math.max(0, ...members.value.map((m) => eventsFor
  */
 const inlineHeaders = computed(() => !props.portrait && members.value.length <= 4);
 
+/**
+ * The rail costs 296px of the lanes' own width, so a large family on a narrow
+ * wall gives it up rather than crushing every lane past the sliver threshold.
+ * See `LANES_RAIL_MAX_COLUMNS`.
+ */
+const rail = computed(() => props.railWide || members.value.length <= LANES_RAIL_MAX_COLUMNS);
+
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
 }
@@ -178,7 +188,7 @@ function subtitleFor(memberId: string) {
 <template>
   <WallViewShell
     :portrait="portrait"
-    :rail="true"
+    :rail="rail"
     :busiest="busiest"
     :meals-ymd="anchorYmd"
     :peripherals="peripherals"
