@@ -15,6 +15,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **beanies on iPhone and Android now offers to update itself when a newer version is out.** It asks once, when nothing else is going on, and "Not now" is always an answer. The browser and the installed web app have always updated themselves; the phone apps could not, so the only way anyone knew to update was for somebody in the family to tell them.
 - **When a family file genuinely cannot be opened without a newer beanies, the message now comes with a way out.** The App Store or Google Play is one tap away, and the address is printed on screen as well, so the screen is never a dead end even if the store does not open.
 
+### Fixed
+
+- **In Chinese, several "Not now" buttons said "Buy Now".** The install prompt, the passkey prompt, the community nudge and the trust prompt all offered to sell you something when you declined them. They now say "later".
+- **Chinese text now writes the app's name in lowercase**, the way it is written everywhere else.
+
 ## 2026-09-06
 
 ### Added

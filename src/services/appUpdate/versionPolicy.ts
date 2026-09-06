@@ -31,7 +31,13 @@ import { logEvent } from '@/services/telemetry/logEvent';
 
 /** Why the floor could not be read. Rides in `detail`, never the raw error. */
 export type FloorFailure =
-  'offline' | 'timeout' | `http-${number}` | 'malformed' | 'unparseable-version' | 'unknown';
+  | 'offline'
+  | 'timeout'
+  | 'tls'
+  | `http-${number}`
+  | 'malformed'
+  | 'unparseable-version'
+  | 'unknown';
 
 interface FloorFile {
   promptBelowVersion?: unknown;
@@ -41,6 +47,11 @@ interface FloorFile {
  * Memoised for the process. The value changes at most on a manual web deploy,
  * so a per-resume fetch would buy nothing and would inflate the `checked` rate
  * that is meant to be one row per launch.
+ *
+ * ⚠️ THE PROCESS, NOT THE LAUNCH, and on iOS those are very different things: a
+ * phone that is only ever backgrounded and resumed can hold this value for days.
+ * That is the intended trade (a raised floor is never urgent), but it means the
+ * fleet moves over days rather than hours, and the runbook says so.
  */
 let cached: { value: string | null } | null = null;
 
@@ -52,12 +63,12 @@ export function __resetVersionPolicyForTesting(): void {
 /**
  * Everything that can stop the update check from reaching an answer.
  *
- * `app-version-unparseable` is the odd one out and is deliberately in the same
- * union: it is not a fact about the floor FILE but about the build reading it,
- * and it belongs to the composable. It lives here so the two sites cannot drift
- * into different spellings of the same CloudWatch filter.
+ * `app-version-unparseable` and `no-store-url` are the odd ones out and are
+ * deliberately in the same union: neither is a fact about the floor FILE, both
+ * belong to the composable. They live here so the two sites cannot drift into
+ * different spellings of the same CloudWatch filter.
  */
-export type UpdateCheckFailure = FloorFailure | 'app-version-unparseable';
+export type UpdateCheckFailure = FloorFailure | 'app-version-unparseable' | 'no-store-url';
 
 /**
  * The one shape of the `check-failed` event, exported so the composable emits
@@ -101,9 +112,11 @@ function classify(e: unknown): FloorFailure {
   const msg = e instanceof Error ? e.message.toLowerCase() : '';
   if (!msg) return 'unknown';
   if (/tim(e|ed)\s?out|timeout/.test(msg)) return 'timeout';
-  if (/network|internet|connect|offline|unreachable|host|dns|resolve|ssl|certificate/.test(msg)) {
-    return 'offline';
-  }
+  // TLS gets its own class rather than joining `offline`. A certificate or ATS
+  // failure is PERMANENT and ours to fix; folded in with connectivity it would
+  // read as a fleet with bad signal and hide a real misconfiguration.
+  if (/ssl|certificate|tls|secure connection|trust/.test(msg)) return 'tls';
+  if (/network|internet|connect|offline|unreachable|host|dns|resolve/.test(msg)) return 'offline';
   return 'unknown';
 }
 

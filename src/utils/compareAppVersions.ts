@@ -62,10 +62,13 @@ export function compareAppVersions(a: string, b: string): -1 | 0 | 1 | null {
 
   // Groups 1-4: major, minor, patch, revision. `?? '0'` is what makes a missing
   // field zero, so `0.16` === `0.16.0` and `0.15` < `0.15R1`.
+  /* eslint-disable security/detect-object-injection -- `i` is a literal loop
+     counter over a fixed range, indexing a RegExpExecArray. */
   for (let i = 1; i <= 4; i++) {
     const l = Number(left[i] ?? '0');
     const r = Number(right[i] ?? '0');
     if (l !== r) return l < r ? -1 : 1;
   }
+  /* eslint-enable security/detect-object-injection */
   return 0;
 }

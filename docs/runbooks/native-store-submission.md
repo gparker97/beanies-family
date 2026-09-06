@@ -571,8 +571,14 @@ told before it hits a file it cannot open, rather than after.
 3. Commit, push, then run the **Deploy web (Astro marketing site)** workflow by hand.
    `deploy-web.yml` is `workflow_dispatch` only, so a push alone publishes nothing.
    The deploy syncs to S3 and invalidates CloudFront on `/*`, so the new floor is
-   live at the edge as soon as it finishes. Devices pick it up within about an hour
-   (the request carries an hour bucket to defeat the device's own HTTP cache).
+   live at the edge as soon as it finishes.
+   - ⚠️ **A DEVICE PICKS IT UP ON ITS NEXT COLD LAUNCH, NOT WITHIN THE HOUR.** The
+     floor is fetched once and memoised for the PROCESS, and on iOS a process
+     survives backgrounding for a long time, so a phone that is only ever resumed
+     may not re-read the file for days. The hour bucket on the request defeats the
+     DEVICE's own HTTP cache; it does not shorten the memo. Expect the fleet to
+     move over days, not hours, and read the rollout off `checked` rather than
+     assuming it.
 4. Watch CloudWatch on surface `app-update`. `action=checked` carries
    `detail: floor=<version>,behind=<bool>` and fires once per launch whether or not
    there is anything to say, so it is both the denominator and the proof the file is

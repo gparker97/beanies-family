@@ -177,3 +177,103 @@ The three manual proofs the plan named, all greg's to run on a device:
 Plus the operational step: the floor file only exists once the Astro site is deployed,
 and `promptBelowVersion` should only be raised once the new build is live on **both**
 stores. Runbook § 7.
+
+---
+
+# Round 2
+
+Two more reviewers on the fixes themselves, because 15 fixes is enough that the fixes
+need reviewing. One verified each claim was present, effective, and had not introduced a
+regression of its own (R5); one swept the combined result for what round 1 missed (R6).
+
+R5 confirmed all 15 present and 14 of 15 effective in shipped code, and verified rather
+than assumed the things most likely to have been fudged: `npm run translate` reports "up
+to date" and `zh.json` is byte-identical afterwards with no `hash` touched; the new
+watcher is disposed by `scope.stop()`, proved with a standalone script; `import type`
+leaves no runtime import; the tightened grammar rejects nothing this app can produce.
+
+**Both reviewers independently found the same worst defect**, which is the second time
+that has happened on this change.
+
+## Fixed in round 2
+
+### 16. The prompt could open UNDERNEATH the recovery overlay (R5-N2, R6-2)
+
+`isLoaded()` was doing duty as a fatal-overlay guard and its comment claimed as much,
+but the fatal overlay is a bare `<div>` at z-300, not a `BaseModal`, so it never enters
+the overlay stack and `isAppQuiet()` cannot see it. The 35-second init watchdog raises
+that overlay **with the document already loaded**, which opens every gate at once. A
+`ConfirmModal` at z-250 then opens beneath it: invisible, untappable, holding the
+body-scroll lock for the session, spending the one prompt this session gets, and logging
+`prompted` for a prompt nobody saw. `promptBlocker` now reads the fatal store directly,
+with its own `fatal` class so the case is countable.
+
+### 17. The prompt ignored the one-interruption-per-session rule (R6-1)
+
+`useSessionInterruption` (#45) says every unsolicited auto-popup claims the slot at its
+true show site; six surfaces do and this one did not. A fresh native sign-in would have
+got the PIN modal **and** the update prompt. Now claims `'app-update'` — and claims it
+**last**, after every other gate, so a prompt that was going to be deferred anyway does
+not consume the slot something more urgent needs. Both halves are pinned.
+
+### 18. Every test logged `[Vue warn]: Invalid watch source` (R5-N1)
+
+The `useOnline` stub was a plain `{ value }`, which `watch` rejects. So the `isOnline`
+half of the fix-1 watcher was pinned by nothing at all: deleting it left the suite green.
+A real `ref` now, and a test that turns the network back on with no resume and no
+document change.
+
+### 19. The version grammar shipped with no test (R5 overclaim)
+
+Fix 11 tightened the regex and the record described it in the same "pinned by" voice as
+the others, while `compareAppVersions.test.ts` was untouched by the commit. Three cases
+now: what it rejects (padded fields, fields past `Number`'s exact range), and — the one
+that matters more — that it still accepts every shape this app can actually produce.
+
+### 20. Fix 12's test was driven from the wrong end (R5 overclaim)
+
+It fed a bad **floor** through a mocked fetch while asserting the class that means the
+floor was fine and `APP_VERSION` was not. That branch is unreachable from a bad floor,
+because `versionPolicy` screens it with the same grammar first. Split in two: the floor
+typo asserts only that nobody is nagged, and a separate suite re-imports the composable
+with a deliberately unparseable `APP_VERSION`.
+
+### 21. TLS failures were counted as being offline (R5-N3, R6)
+
+A permanent certificate or ATS misconfiguration is ours to fix and would have read as a
+fleet with bad signal. It has its own `tls` class now.
+
+### 22. The last silent suppression (R6-4)
+
+`if (!url) return` was both unreachable (this composable is native-only) and unlogged.
+Kept, because the type says `string | null`, and now reports `no-store-url`. An
+impossible branch that is also silent is how a wrong assumption survives.
+
+### 23. Two small ones (R6-5, R6-6, R6-9)
+
+`updateAvailable` was exported with no consumer, which is the exact shape the plan
+refused for `mustUpdate` — a test now observes it, so the member is genuinely live.
+Space activates a `<button>` but not an `<a>`, so the store link was unreachable from a
+keyboard by the most obvious key; a `keydown` handler adds the missing half. And a new
+`detect-object-injection` warning sat beside a suppressed one for the identical pattern.
+
+## Corrected rather than fixed
+
+**The runbook said devices pick up a raised floor "within about an hour". They do not.**
+The floor is memoised for the PROCESS, and on iOS a process survives backgrounding for
+days, so a phone that is only ever resumed may not re-read the file for a long time. The
+hour bucket defeats the DEVICE's HTTP cache; it does not shorten the memo. The behaviour
+is right (a raised floor is never urgent) and the sentence describing it was not; both
+the runbook and the code comment now say "next cold launch", and say to read the rollout
+off `checked` rather than assume it.
+
+## Round 2, considered and left alone
+
+- **`confirm()` is a module singleton with no re-entrancy guard**, and this is its first
+  non-user-initiated caller (R6). Real, and now much harder to reach: the prompt is
+  gated on `isAppQuiet()`, on the fatal store, and on the interruption slot. A general
+  re-entrancy guard on `useConfirm` is the right fix and belongs to `useConfirm`, not to
+  this change.
+- **Middle-click on the anchor** fires `auxclick`, so `handleConfirm` does not run and
+  the sheet stays open while the store opens in a background tab (R6). Desktop-only, and
+  the prompt is native-only.

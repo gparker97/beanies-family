@@ -1065,3 +1065,45 @@ broken again in the very next pass, twice, so two of them get sharper:
     shape and caught the omission only because its own list was compared to the
     registry. Assert the list against `Object.keys(registry)` once, and the
     loop is honest forever.
+
+## 2026-09-07 — The native update gate: four things a passing suite did not say
+
+26. **A feature can be fully implemented, fully tested, fully green, and still
+    never run.** The update prompt's launch check resolved in a couple of
+    hundred milliseconds while the family document was still loading, so its
+    boot gate was always shut and `resume` was the only other trigger: a person
+    who opens beanies and closes it was never asked. Every test passed, because
+    every test called the resume handler by hand. The telemetry would not have
+    said so either — `behind=true` with a near-zero prompt rate reads as
+    "rarely interrupts anyone" and was in fact "never asks anyone". **When a
+    trigger races something else in the app, the test has to model the race, not
+    reach past it.** Watch the signal the app already has (`docVersion`) instead
+    of firing once and hoping.
+27. **The classifier that says "your fault" needs the platform's real strings.**
+    The floor's error classes were written from imagination: `timeout` matched
+    the literal word, so iOS's actual message — "The request timed out.", with
+    "timed out" — fell through to `malformed`, the class that means "the JSON we
+    hand-deployed is broken". A routine 3-second mobile timeout would have sent
+    triage to entirely the wrong file, and the test agreed because it used a
+    synthetic string no platform produces. Pin the strings the platform emits,
+    and make the unmatched case `unknown` rather than the most specific class in
+    reach. Guessing is worse than admitting.
+28. **A fallback gated on the thing it is a fallback FOR is not a fallback.**
+    The block screen printed the store URL as selectable text so it could never
+    be a dead end — but gated that text on the SCREENED href, so the address
+    disappeared in exactly the case where the link had already failed. Screening
+    decides whether the browser may follow an address; it does not decide
+    whether a person stuck behind a block may read it. Whenever two renderings
+    exist so that one covers the other's failure, check that they do not share a
+    condition.
+29. **Extracting a component to make it testable moves bugs into the seams, and
+    they are always the lines that were doing invisible work.** Pulling the fatal
+    overlay out of `App.vue` cost exactly two defects, both of them a single
+    deleted line: `showClearConfirm.value = false` at the top of the sign-out
+    handler (so a double tap started two concurrent sign-outs), and a
+    `getDeviceDiagnostics()` call that had been sitting inside `v-if="initError"`
+    and became an unconditional prop expression running six Web Storage
+    round-trips on every root render. The extraction was still right — the screen
+    had no test at all before it. But diff the SCRIPT with the same care as the
+    template, and read every line the move deletes as a question: what was this
+    doing that nothing else does now?
