@@ -12,7 +12,6 @@
  */
 import { computed, inject, onMounted, onBeforeUnmount, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import { activityEmoji } from '@/utils/activityEmoji';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
@@ -26,7 +25,6 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
-import { wallEvents } from '@/utils/wallActivities';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { activityDetailRows } from '@/utils/activityDetails';
@@ -123,12 +121,14 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKeydown));
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 
-const dayEvents = computed(() => {
-  const value = target.value;
-  return value.kind === 'day'
-    ? wallEvents(activityStore.activitiesForDate(value.ymd), props.visibleMemberIds)
-    : [];
-});
+/**
+ * The day the open activity falls on.
+ *
+ * Read through a narrowed computed rather than `target.ymd` in the template:
+ * with the day sheet gone, `ymd` is no longer on every member of the union, and
+ * a template cannot narrow it.
+ */
+const activityYmd = computed(() => (target.value.kind === 'activity' ? target.value.ymd : ''));
 
 const activity = computed(() => {
   const value = target.value;
@@ -182,8 +182,6 @@ const tripDetail = computed(() => {
 const sheetTitle = computed(() => {
   const value = target.value;
   switch (value.kind) {
-    case 'day':
-      return dateLabel(value.ymd);
     case 'activity':
       return activity.value?.title ?? t('wall.sheet.activity');
     case 'lists':
@@ -329,36 +327,8 @@ const { identityFor } = useActivityIdentity();
       </div>
 
       <div class="wall-sheet-body min-h-0 flex-1 overflow-y-auto">
-        <!-- a day's events -->
-        <template v-if="target.kind === 'day'">
-          <button
-            v-for="entry in dayEvents"
-            :key="entry.activity.id + entry.date"
-            type="button"
-            class="dark:border-line flex w-full items-center gap-4 border-b border-[rgba(44,62,80,0.06)] py-3 text-left last:border-b-0"
-            @click="
-              emit('open', { kind: 'activity', activityId: entry.activity.id, ymd: entry.date })
-            "
-          >
-            <span class="font-outfit wall-slot-time w-24 shrink-0 font-extrabold">
-              {{ entry.activity.startTime || t('planner.allDay') }}
-            </span>
-            <span class="min-w-0 flex-1">
-              <span
-                class="font-outfit wall-slot-title text-secondary-500 dark:text-ink block font-bold"
-              >
-                {{ entry.activity.title }}
-              </span>
-            </span>
-            <ActivityOwnerStack :members="membersForActivity(entry.activity)" size="sm" />
-          </button>
-          <p v-if="!dayEvents.length" class="font-caveat wall-sheet-empty py-8 text-center">
-            {{ t('wall.day.nothingOn') }}
-          </p>
-        </template>
-
         <!-- one activity, read only -->
-        <template v-else-if="target.kind === 'activity'">
+        <template v-if="target.kind === 'activity'">
           <!--
             The drawer celebrates too. Opening a celebratory card should not land on a
             plain panel — the tier is about the OCCASION, so it belongs anywhere the
@@ -410,7 +380,7 @@ const { identityFor } = useActivityIdentity();
                   </template>
                   <template v-else>{{ t('planner.allDay') }}</template>
                 </p>
-                <p class="font-inter wall-hero-sub">{{ dateLabel(target.ymd) }}</p>
+                <p class="font-inter wall-hero-sub">{{ dateLabel(activityYmd) }}</p>
               </div>
               <!--
                 Location ALWAYS means location. It used to hand its cell to the category

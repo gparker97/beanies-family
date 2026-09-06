@@ -110,7 +110,6 @@ export interface WallJobsInput {
  * activity and a card all open the SAME sheet with different content.
  */
 export type WallSheetTarget =
-  | { kind: 'day'; ymd: string }
   | { kind: 'activity'; activityId: string; ymd: string }
   | { kind: 'lists' }
   | { kind: 'todos' }

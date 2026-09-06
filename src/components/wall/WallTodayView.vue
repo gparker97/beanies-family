@@ -18,6 +18,7 @@ import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
@@ -36,6 +37,10 @@ const props = defineProps<{
   now: Date;
   /** The wall's shared anchor — the day this panel renders. */
   anchorYmd: string;
+  /** Names the view the back control returns to. */
+  backLabel: string;
+  /** False when there is nowhere different to go — see `canGoBackFrom`. */
+  canGoBack: boolean;
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   /** The wall's person filter, which this view applies to its own content too. */
@@ -46,6 +51,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** Move the wall's shared anchor to this day. See `useWallAnchor`. */
   focusDay: [string];
+  /** Return to the view this one was opened from. */
+  back: [];
   open: [WallSheetTarget];
   openChores: [];
 }>();
@@ -162,6 +169,23 @@ const focusLabel = computed(() =>
         <p class="font-outfit text-secondary-500 wall-slot-title dark:text-ink font-bold">
           {{ focusLabel }}
         </p>
+        <!--
+          The way back, named after where you came from. Reuses the jobs board's
+          control and its string — greg's call, over my recommendation that the
+          always-visible view switcher made it unnecessary.
+
+          Shown only when there is somewhere different to go: `canGoBack` is a
+          READ-side check because no write-side rule can see `today -> jobs ->
+          back` coming, which leaves this naming the view you are already in.
+        -->
+        <button
+          v-if="canGoBack"
+          type="button"
+          class="font-outfit text-secondary-500 wall-back dark:bg-surface-raised dark:text-ink shrink-0 rounded-2xl bg-white px-4 py-2.5 font-bold shadow-[var(--card-shadow)]"
+          @click="emit('back')"
+        >
+          ‹ {{ fillTemplate(t('wall.jobsBoard.back'), { view: backLabel }) }}
+        </button>
       </div>
 
       <WallTimeGrid
