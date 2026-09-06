@@ -1575,7 +1575,7 @@ async function fetchAndMergeRemote(): Promise<void> {
   // the SAME shape as `merged`, so the baseline commit, `setEnvelope`, the latch
   // clear and the `if (dirty)` tail below are all unchanged.
   let merged: {
-    action: 'merged' | 'adopted' | 'kept-local';
+    action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
     dirty: boolean;
     remoteHeads: string[] | null;
   };

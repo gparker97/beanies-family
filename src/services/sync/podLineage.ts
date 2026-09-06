@@ -140,9 +140,11 @@ export function compareLineage(
  */
 const POLICY: Record<LineageVerdict, Record<LineageContext, LineageAction>> = {
   same: { clean: 'merge', dirty: 'merge', 'user-file': 'merge' },
-  // ⚠️ `dirty` becomes `'rebase'` in Stage 3 (R1), NOT a special case around
-  // `block`. Until then it blocks, which is the safe half of the same decision.
-  'adopt-remote': { clean: 'adopt', dirty: 'block', 'user-file': 'adopt' },
+  // ⚠️ `dirty` REBASES (Stage 3, R1) — it does not block. The peer's unsynced
+  // work is replayed onto the new lineage instead of the family being asked to
+  // give it up. Every way that replay can fail falls back to this cell's old
+  // value, so the rebase can only ever lose LESS than the block it replaced.
+  'adopt-remote': { clean: 'adopt', dirty: 'rebase', 'user-file': 'adopt' },
   'ours-newer': { clean: 'publish-local', dirty: 'publish-local', 'user-file': 'adopt' },
   conflict: { clean: 'block', dirty: 'block', 'user-file': 'adopt' },
 };

@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as Automerge from '@automerge/automerge';
-import { guardLineage, PodLineageError } from '@/services/sync/podLineage';
+import { guardLineage, lineageAction, PodLineageError } from '@/services/sync/podLineage';
 
 type Doc = {
   accounts: Record<string, { id: string; balance: number }>;
@@ -104,8 +104,26 @@ describe('a naive merge across lineages', () => {
 });
 
 describe('the guard refuses that merge', () => {
-  it('BLOCKS when the peer might hold unsynced work', () => {
-    expect(() => guardLineage({ id: 'new', seq: 1 }, null, 'dirty')).toThrow(PodLineageError);
+  it('REBASES when the peer might hold unsynced work', () => {
+    // Stage 3: the peer's edits are replayed onto the new lineage rather than
+    // refused. The refusal is still there underneath — every failure inside the
+    // replay falls back to it — but it is no longer the first answer.
+    expect(lineageAction('adopt-remote', 'dirty')).toBe('rebase');
+    // And `guardLineage` hands the caller that action rather than throwing.
+    expect(guardLineage({ id: 'new', seq: 1 }, null, 'dirty')).toBe('rebase');
+  });
+
+  it('still REFUSES outright when no machine can choose', () => {
+    // ⚠️ The block did not go away — it moved. Two devices that compacted
+    // concurrently are the case a rebase cannot help with: there is no single
+    // lineage to replay onto, so the guard throws exactly as before. This is
+    // also what the rebase falls back to whenever its replay cannot be built.
+    expect(() => guardLineage({ id: 'a', seq: 1 }, { id: 'b', seq: 1 }, 'dirty')).toThrow(
+      PodLineageError
+    );
+    expect(() => guardLineage({ id: 'a', seq: 1 }, { id: 'b', seq: 1 }, 'clean')).toThrow(
+      PodLineageError
+    );
   });
 
   it('but ADOPTS when the peer provably has nothing to lose', () => {
