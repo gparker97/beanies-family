@@ -523,7 +523,69 @@ is nothing to create there, no separate version, and no separate review.
     oversized image, and a `.txt` (must not offer beanies at all); cold and warm; and a
     deliberately unreadable item to confirm the container is cleared and the NEXT share works.
 
-## 7. Notes
+## 7. Raising the update floor
+
+The native apps cannot update themselves. There is no service worker in the native
+shell (ADR-029), so a phone stays on whatever build the store last installed until
+somebody taps Update. The floor is how beanies asks.
+
+**What it is.** One static file, `web/public/min-app-version.json`, served from the
+apex at `https://beanies.family/min-app-version.json`:
+
+```json
+{
+  "promptBelowVersion": "0.16",
+  "reason": "Not rendered anywhere. For whoever edits this file, and for telemetry.",
+  "_docs": "docs/runbooks/native-store-submission.md#7-raising-the-update-floor"
+}
+```
+
+Every native launch reads it once and compares it against `APP_VERSION`
+(`src/constants/appVersion.ts`). A build below the floor gets ONE dismissible prompt
+per session, and only while the app is online, past boot, not mid-save and with no
+overlay open.
+
+**⚠️ THE FLOOR CAN ONLY EVER PROMPT. It can never block anyone.** There is no code
+path from this file to a lockout, and there must never be one. That is deliberate and
+it is what makes a hand-deployed file safe: the worst case of getting it wrong is an
+unnecessary nag. The field is called `promptBelowVersion` and not
+`minSupportedVersion` for exactly that reason. If you find yourself wiring it to a
+block, stop: the only thing that may block a person is a family file their build
+genuinely cannot read, which the app decides for itself
+(`UnsupportedBeanpodVersionError`).
+
+**A normal release does NOT raise the floor.** Bumping `APP_VERSION` and shipping to
+the stores changes nothing here. Raise it only when there is a reason everyone should
+move, and the usual reason is a new `.beanpod` format: a device below the floor is
+told before it hits a file it cannot open, rather than after.
+
+**How to raise it.**
+
+1. Wait until the new build is actually **live on both stores**. Prompting people to
+   fetch a version Apple has not finished reviewing sends them to a listing that
+   still offers the old one.
+2. Edit `promptBelowVersion` to the first version people should be on. Use the
+   product version including any `R<n>` suffix (`0.16.1`, `0.15R2`); the comparison
+   understands them and orders `0.9 < 0.16 < 0.16.1 < 0.17` and `0.15 < 0.15R1`.
+   Anything the grammar cannot parse is ignored and reported, never guessed at.
+3. Commit, push, then run the **Deploy web (Astro marketing site)** workflow by hand.
+   `deploy-web.yml` is `workflow_dispatch` only, so a push alone publishes nothing.
+   The deploy syncs to S3 and invalidates CloudFront on `/*`, so the new floor is
+   live at the edge as soon as it finishes. Devices pick it up within about an hour
+   (the request carries an hour bucket to defeat the device's own HTTP cache).
+4. Watch CloudWatch on surface `app-update`. `action=checked` carries
+   `detail: floor=<version>,behind=<bool>` and fires once per launch whether or not
+   there is anything to say, so it is both the denominator and the proof the file is
+   reachable. **`floor=none` across the whole fleet means the file is not being read**,
+   however healthy the prompt rate looks, because the floor fails open on every error.
+
+**Lowering it** is the rollback and needs nothing but the same edit and deploy.
+
+**No new diagnostic keys.** The events use `action`, `error_code`, `detail` and `os`,
+all already allowlisted, so §1's data-collection table is unchanged by this feature and
+must not be edited for it.
+
+## 8. Notes
 
 - **Prereq to verify:** the Google **Web** OAuth client must already have
   `https://beanies.family/oauth/native` as an authorized redirect URI, else OAuth fails

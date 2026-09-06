@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-07
+
+### Added
+
+- **beanies on iPhone and Android now offers to update itself when a newer version is out.** It asks once, when nothing else is going on, and "Not now" is always an answer. The browser and the installed web app have always updated themselves; the phone apps could not, so the only way anyone knew to update was for somebody in the family to tell them.
+- **When a family file genuinely cannot be opened without a newer beanies, the message now comes with a way out.** The App Store or Google Play is one tap away, and the address is printed on screen as well, so the screen is never a dead end even if the store does not open.
+
 ## 2026-09-06
 
 ### Added
@@ -52,7 +59,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **A clear day draws its hours at any screen size.** On a short screen it collapsed into a single "quiet until 20:00" band in empty space, which reads as broken rather than as free.
 - **Coming back from a day no longer rewinds the week when you reached the chore board first.**
 - **Tapping a bean's name in the bean-lane view now announces itself as a filter** to a screen reader, and shows which bean is selected.
-
 
 - **A device coming back online after a compaction can no longer overwrite saved family data with its own older copy.** When both sides held the same item but the returning device had no shared starting point for it, every field it held won, fields only the saved copy had were deleted, and beanies counted none of it as a conflict, so it looked like a clean result. The saved version now wins any disagreement, nothing is deleted, and the disagreements are counted.
 - **The note about going back to a saved copy named a button that is not on the screen.** It said "Load Existing Family Data File", which only appears before a family file is set up; the one you actually see is "Load another Family Data File".

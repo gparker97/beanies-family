@@ -10,6 +10,11 @@
  * on `reason` / `kind`, never on out-of-band store state.
  */
 
+// The only import this module has. `@/constants/appVersion` imports nothing
+// itself, so the three worker modules that reach `@/types/sync` gain one
+// string constant and no dependency.
+import { APP_VERSION } from '@/constants/appVersion';
+
 // ─── createNewFile ────────────────────────────────────────────────────────
 
 /**
@@ -515,6 +520,10 @@ export function payloadErrorDetail(
       familyId: err.familyId ?? familyId,
       step: err.step,
       payloadBytes: err.payloadBytes,
+      // Which release is running, so a support conversation about a refused
+      // file does not start by asking. The FILE's version is already here,
+      // inside `message`, clamped at construction.
+      appVersion: APP_VERSION,
       message: err.message,
     },
     null,

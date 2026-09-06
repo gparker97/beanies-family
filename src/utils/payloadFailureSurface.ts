@@ -22,6 +22,11 @@
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
+// Type-and-predicate only. `capabilities.ts` derives module-level constants
+// with no side effects, and every importer of this file is main thread.
+import { getPlatform } from '@/services/sync/capabilities';
+import { storeUrlFor } from '@/composables/useAppUpdate';
 import { PayloadLoadError, payloadErrorDetail, payloadErrorKind } from '@/types/sync';
 import type { PayloadErrorKind } from '@/types/sync';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -161,7 +166,32 @@ export function surfacePayloadFatal(
   // against four) under a comment claiming they matched; a two-way one before
   // that produced "try your password" inline and "your data may be damaged,
   // contact support" full-screen for the same error.
-  const overlayKey = PAYLOAD_OVERLAY_KEY[payloadErrorKind(err)];
+  // ONE question, asked once, and read twice: the overlay copy and the way out
+  // are two answers to the same "what kind of failure is this".
+  const kind = payloadErrorKind(err);
+  // `kind` is a closed union and the table is `satisfies Record<PayloadErrorKind,
+  // ...>`, so every possible index is a key the table declares.
+  // eslint-disable-next-line security/detect-object-injection
+  const overlayKey = PAYLOAD_OVERLAY_KEY[kind];
+  // ⚠️ THE ONLY THING IN THE APP THAT CAN BLOCK A PERSON OVER A VERSION, and it
+  // is a fact about the file they just tried to open, never something we
+  // deployed. On native there is a way out (the store); on web the service
+  // worker has already updated the app, so the overlay stays exactly as it is.
+  //
+  // No `isNative()` beside this. `storeUrlFor` is typed on `getPlatform()`'s
+  // union and answers `null` for `'web'`, so the platform is asked once, by the
+  // function whose job that mapping is. A second reader here would be a guard
+  // no test could make fail, which is the kind of safety net that reads as
+  // covered without being it.
+  const storeUrl = kind === 'needs-update' ? storeUrlFor(getPlatform()) : null;
+  if (storeUrl) {
+    logEvent({
+      level: 'warn',
+      surface: 'app-update',
+      message: 'blocked on an app update',
+      context: { action: 'blocked', error_code: 'needs-update', os: getPlatform() },
+    });
+  }
   useFatalErrorStore().setFatal(
     useTranslationStore().t(overlayKey),
     // The envelope's family id reaches the user through this blob. It is
@@ -169,7 +199,12 @@ export function surfacePayloadFatal(
     // overwrites `family_id` with the ACTIVE family, so on a cross-family open
     // the argument would be silently discarded and the two would disagree.
     payloadErrorDetail(err, ctx.fileId, ctx.familyId),
-    { clearDataHelps: false }
+    {
+      clearDataHelps: false,
+      // DATA, not a callback: this file must not learn about the update
+      // composable, and through it a native plugin. See `FatalActionLink`.
+      action: storeUrl ? { labelKey: 'appUpdate.openStore', url: storeUrl } : null,
+    }
   );
 }
 

@@ -14,6 +14,20 @@ interface ConfirmOptions {
    * when it is repeated at the moment they decide. Default: a faint caption.
    */
   detailTone?: 'caution';
+  /**
+   * Make the confirm control a real link to this URL.
+   *
+   * ⚠️ THE REASON THIS EXISTS, and it is a correctness one. `confirm()` returns
+   * a promise that `ConfirmModal` resolves, so a caller resumes a microtask
+   * AFTER the click handler returned, which is exactly the situation
+   * `openExternal` refuses to be used in (see its header: it must be called
+   * synchronously inside the originating gesture or the popup blocker treats
+   * the navigation as programmatic). `if (await confirm(...)) openExternal(url)`
+   * reads correct and fails as "I tapped it and nothing happened". Rendering an
+   * anchor makes the navigation the browser's own default action on a genuine
+   * click, so no gesture has to survive a promise.
+   */
+  confirmHref?: string;
   variant?: ConfirmVariant;
   showCancel?: boolean;
   /** Custom confirm button label (overrides default "Delete" / "OK") */
@@ -28,6 +42,7 @@ interface ConfirmState {
   message: UIStringKey;
   detail?: string;
   detailTone?: 'caution';
+  confirmHref?: string;
   variant: ConfirmVariant;
   showCancel: boolean;
   confirmLabel?: UIStringKey;
@@ -45,6 +60,7 @@ const state = ref<ConfirmState>({
   resolve: null,
   detail: undefined,
   detailTone: undefined,
+  confirmHref: undefined,
   confirmLabel: undefined,
   cancelLabel: undefined,
 });
@@ -61,6 +77,7 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
       message: options.message,
       detail: options.detail,
       detailTone: options.detailTone,
+      confirmHref: options.confirmHref,
       variant: options.variant ?? 'danger',
       showCancel: options.showCancel ?? true,
       confirmLabel: options.confirmLabel,

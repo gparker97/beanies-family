@@ -447,6 +447,33 @@ export default [
       ],
     },
   },
+
+  {
+    // THE UPDATE FLOOR MUST NOT USE `fetch`, and the reason is not style.
+    //
+    // The apex serves no CORS headers, and the native WebView origin is a
+    // different host either way (`capacitor://app.beanies.family` on iOS,
+    // `https://app.beanies.family` on Android). A browser fetch from the app
+    // origin to the apex is refused on every real device, the floor's
+    // fail-open swallows the refusal, and the whole feature becomes dead code
+    // that reports nothing while looking perfectly healthy. `CapacitorHttp`
+    // runs on the native layer and is not subject to CORS.
+    //
+    // A lint zone rather than a comment, for the same reason as the two
+    // `no-restricted-imports` zones above: this repo has been bitten by rules
+    // that lived only in prose.
+    files: ['src/services/appUpdate/**'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message:
+            'Use CapacitorHttp.get() here, never fetch: the apex sends no CORS headers and a fetch from the native WebView origin is refused on every device, which the fail-open then hides. Known limit of this rule: it catches a bare `fetch` only, not `window.fetch` or `globalThis.fetch`.',
+        },
+      ],
+    },
+  },
   {
     // Dev-only admin tooling (rendered only in `import.meta.env.DEV`) — its
     // copy is for the developer, not end users, so it is intentionally exempt
