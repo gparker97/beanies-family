@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-06
 
+### Added
+
+- **beanies now keeps a copy of your family file beside it before compacting.** It sits in the same folder as the family file, named after it, so you can find it months later without having kept track of a download. beanies reads the copy back and checks it opens before it changes anything, and stops if it does not.
+
+### Changed
+
+- **Compacting your family file has its own section in Settings, and says what it does.** It used to be a small button in a row beside Restart Onboarding, which made a one-way change to everyone's copy look like a tidy-up. The explanation of why a family file keeps a record of past changes now sits behind the "?" badge, and the one thing you need to do — bring your other devices online first — is on the page where you cannot miss it.
+
 ### Fixed
 
 - **beanies is much better at telling when two devices' copies of a family file cannot safely be combined.** The check that protects this had been looking at the wrong thing: a label kept alongside the file rather than the file's own history, and the two could drift apart. It now reads the history itself, in the one place both copies are open together, so it cannot be fooled.

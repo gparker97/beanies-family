@@ -25,6 +25,7 @@ import { CALENDAR_SYNC_OPEN, REMINDERS_OPEN } from '@/constants/settingsDeepLink
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import BaseCombobox from '@/components/ui/BaseCombobox.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -1900,33 +1901,77 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         </div>
       </div>
 
-      <!-- ── Slim down the family file (pod compaction) ──────────────────
-           Owner-only, dev-flagged. Beside Pod Ownership because this is the
-           same class of action: rare, owner-only, once in a pod's lifetime. -->
+      <!-- ── Compact the family file (pod compaction) ────────────────────
+           Owner-only, dev-flagged, and its OWN section — not a row beside
+           Transfer Ownership, where a one-way, family-wide migration read as a
+           tidy-up next to a link that restarts onboarding.
+
+           The long "why does this record exist at all" explanation sits behind
+           the existing `?` badge (`InfoHintBadge`, as on Reminders and Todos),
+           because the headline here is that compacting is SAFE. What the person
+           must actually DO stays outside the popover, in the standing notice.
+
+           Heritage Orange for that notice, never Alert Red — nothing is being
+           destroyed at this point. Red belongs to the final confirm, which
+           legitimately is destructive. -->
       <div
         v-if="isFlagEnabled('podCompaction') && isOwner"
         class="dark:border-line mt-6 border-t border-gray-200 pt-4"
       >
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0 flex-1">
-            <p class="dark:text-ink font-medium text-gray-900">
-              {{ t('settings.compactPod') }}
-            </p>
-            <p class="dark:text-ink-soft text-xs text-gray-500">
-              {{ t('settings.compactPodDesc') }}
-            </p>
-          </div>
-          <BaseButton
-            variant="secondary"
-            size="sm"
-            class="flex-shrink-0"
-            :disabled="isCompacting"
-            data-testid="compact-pod"
-            @click="compactPod"
+        <h3
+          class="font-outfit dark:text-ink mb-1 flex items-center gap-1.5 text-base font-semibold text-gray-900"
+        >
+          {{ t('settings.compactSection') }}
+          <InfoHintBadge
+            :items="[
+              t('compaction.why.record'),
+              t('compaction.why.settled'),
+              t('compaction.why.older'),
+            ]"
+          />
+        </h3>
+        <p class="dark:text-ink-soft mb-3 text-xs text-gray-500">
+          {{ t('settings.compactSectionDesc') }}
+        </p>
+
+        <!-- The one thing that needs a decision, deliberately NOT behind the
+             badge: a device that was offline with unsaved changes cannot merge
+             across the boundary and will ask on reconnect (the lineage banner).
+             Stage 3's rebase is what removes even this. -->
+        <div
+          class="dark:border-accent-lift/40 dark:bg-accent-lift/10 mb-3 flex gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3"
+        >
+          <svg
+            class="text-primary-500 dark:text-accent-lift mt-0.5 h-4 w-4 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
           >
-            {{ t('settings.compactPod') }}
-          </BaseButton>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"
+            />
+          </svg>
+          <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
+            {{ t('compaction.bringDevicesOnline') }}
+          </p>
         </div>
+
+        <BaseButton
+          variant="primary"
+          size="sm"
+          :disabled="isCompacting"
+          data-testid="compact-pod"
+          @click="compactPod"
+        >
+          {{ t('settings.compactPod') }}
+        </BaseButton>
+        <p class="dark:text-ink-faint mt-2 text-xs text-gray-500">
+          {{ t('compaction.safetyCopyNote') }}
+        </p>
       </div>
 
       <!-- ── Restart Onboarding ──────────────────────────────────────────
