@@ -817,3 +817,116 @@ describe('syncStore — the lineage banner recovery', () => {
     });
   });
 });
+
+/**
+ * "Load another family data file" — the route a family actually uses to revert
+ * to a backup.
+ *
+ * ⚠️ WHY THIS EXISTS. The Settings confirmation promises, verbatim, "This will
+ * replace all local data with the contents of the selected file and set it as
+ * your data file." The lineage guard made that a lie for the one case it matters
+ * most in: restoring a PRE-COMPACTION backup. The backup is older than the local
+ * document, so the guard answered `ours-newer`, kept the local document, and
+ * armed a publish — over the backup, which `decryptPendingFile` had already made
+ * the provider. The restore silently failed and destroyed the backup with it.
+ */
+describe('syncStore — restoring from a backup file', () => {
+  let pinia: Pinia;
+
+  beforeEach(() => {
+    pinia = createPinia();
+    setActivePinia(pinia);
+    vi.resetAllMocks();
+    const ctx = useFamilyContextStore();
+    ctx.activeFamily = {
+      id: 'fam-resume-1',
+      name: 'LaFleur',
+      createdAt: '2026-05-10',
+      updatedAt: '2026-05-14',
+    };
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValue({
+      loaded: true,
+    } as unknown as Awaited<ReturnType<typeof docClient.initAndLoadCache>>);
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
+      action: 'adopted' as const,
+      heads: [],
+      dirty: false,
+      changed: true,
+      remoteHeads: [],
+    } as unknown as Awaited<ReturnType<typeof docClient.mergeRemoteEnvelope>>);
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValue({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+  });
+
+  function preload(syncStore: ReturnType<typeof useSyncStore>, userChose: boolean) {
+    syncStore.pendingEncryptedFile = {
+      envelope: {
+        version: '4.0',
+        familyId: 'fam-resume-1',
+        familyName: 'LaFleur',
+        keyId: 'k',
+        wrappedKeys: { 'm-1': { salt: 'AAAA', wrapped: 'BBBB' } },
+        passkeyWrappedKeys: {},
+        inviteKeys: {},
+        encryptedPayload: 'base64==',
+      },
+      userChose,
+    };
+  }
+
+  it('marks the file the Settings picker returned as explicitly chosen', async () => {
+    // ⚠️ THE PRODUCER HALF. Without this, deleting `userChose: true` from
+    // `loadFromNewFile` leaves every other test in this block green — they set
+    // the pending file by hand and only exercise the consumer.
+    const syncService = await import('@/services/sync/syncService');
+    vi.mocked(syncService.openAndLoadFile).mockResolvedValue({
+      success: false,
+      needsPassword: true,
+      envelope: {
+        version: '4.0',
+        familyId: 'fam-resume-1',
+        familyName: 'LaFleur',
+        keyId: 'k',
+        wrappedKeys: {},
+        passkeyWrappedKeys: {},
+        inviteKeys: {},
+        encryptedPayload: 'base64==',
+      },
+    } as unknown as Awaited<ReturnType<typeof syncService.openAndLoadFile>>);
+
+    const syncStore = useSyncStore();
+    const result = await syncStore.loadFromNewFile();
+
+    expect(result.needsPassword).toBe(true);
+    expect(syncStore.pendingEncryptedFile?.userChose).toBe(true);
+  });
+
+  it('tells the worker the human chose these bytes, so an OLDER file still wins', async () => {
+    const syncStore = useSyncStore();
+    preload(syncStore, true);
+
+    await syncStore.decryptPendingFile('right-pw');
+
+    // `user-file` is the only context that never blocks, and the only one under
+    // which `ours-newer` adopts instead of republishing over the chosen file.
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toEqual({
+      kind: 'user-file',
+    });
+  });
+
+  it('does NOT claim an explicit choice on the ordinary load path', async () => {
+    // The same function serves the routine sign-in decrypt, where nobody has
+    // been shown a "this replaces all local data" dialog. Arming it there would
+    // make every cold boot adopt over unsynced work without asking.
+    const syncStore = useSyncStore();
+    preload(syncStore, false);
+
+    await syncStore.decryptPendingFile('right-pw');
+
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toMatchObject({
+      kind: 'baseline',
+    });
+  });
+});

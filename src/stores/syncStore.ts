@@ -244,6 +244,16 @@ export const useSyncStore = defineStore('sync', () => {
     driveFileId?: string;
     driveFileName?: string;
     driveAccountEmail?: string;
+    /**
+     * The human picked THESE bytes through "Load another family data file",
+     * past a confirmation that says in so many words: "This will replace all
+     * local data with the contents of the selected file and set it as your data
+     * file." That promise is the `user-file` lineage context, and without it the
+     * restore does the OPPOSITE of what the dialog said — see
+     * `decryptPendingFile`. Set by `loadFromNewFile` alone; the ordinary Drive
+     * load and the login-surface pickers leave it false.
+     */
+    userChose?: boolean;
   } | null>(null);
 
   // Single source of truth for "is a non-interruptible write in flight?".
@@ -1492,6 +1502,15 @@ export const useSyncStore = defineStore('sync', () => {
         envelope: result.envelope,
         fileHandle: result.fileHandle,
         provider: result.provider,
+        // ⚠️ THE RESTORE ROUTE. This is the ONLY flow whose confirmation promises
+        // "This will replace all local data with the contents of the selected
+        // file", and it is how a family reverts to a backup — including after a
+        // compaction they regret. Without this marker the lineage guard sees a
+        // BACKUP older than the local document, answers `ours-newer`, keeps the
+        // local document and PUBLISHES it over the file just chosen: the restore
+        // silently fails AND the backup is destroyed, because `decryptPendingFile`
+        // has already made that file the provider.
+        userChose: true,
       };
       return { success: false, needsPassword: true };
     }
@@ -1617,7 +1636,9 @@ export const useSyncStore = defineStore('sync', () => {
         // exactly this reason; these two paths discarded the return value, so
         // TypeScript could not see it. Re-arm rather than skip the reload: the
         // stores still need the projection this open produced.
-        keptLocal = (await replaceDocWithCacheRecovery(pending.envelope, famId, fk)) === KEPT_LOCAL;
+        keptLocal =
+          (await replaceDocWithCacheRecovery(pending.envelope, famId, fk, !!pending.userChose)) ===
+          KEPT_LOCAL;
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -2458,7 +2479,9 @@ export const useSyncStore = defineStore('sync', () => {
         // exactly this reason; these two paths discarded the return value, so
         // TypeScript could not see it. Re-arm rather than skip the reload: the
         // stores still need the projection this open produced.
-        keptLocal = (await replaceDocWithCacheRecovery(pending.envelope, famId, fk)) === KEPT_LOCAL;
+        keptLocal =
+          (await replaceDocWithCacheRecovery(pending.envelope, famId, fk, !!pending.userChose)) ===
+          KEPT_LOCAL;
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
