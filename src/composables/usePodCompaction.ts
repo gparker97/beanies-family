@@ -229,7 +229,13 @@ export function usePodCompaction() {
       // resident; holding it across that call raises the peak for no reason.
       let built: { json: string; filename: string } | null = null;
       try {
-        built = await syncStore.buildExportEnvelope();
+        // `compactionBackup`: the pre-compaction pair (this export and the
+        // Drive safety copy, same bytes) is written as a 5.0 file even though
+        // its payload is not yet compacted. A build that predates the lineage
+        // guard could otherwise open it from a picker and fork the family onto
+        // the backup. A family that has compacted is a 5.0 family from this
+        // moment; a current build opens the copy exactly as before.
+        built = await syncStore.buildExportEnvelope({ compactionBackup: true });
       } catch (e) {
         // ⚠️ NOT a bare `catch {}`. `buildExportEnvelope` serializes and
         // encrypts the whole document, so on the device this tier is about it

@@ -254,6 +254,11 @@ describe('the automatic safety copy', () => {
     await usePodCompaction().compact();
 
     expect(buildExportEnvelope).toHaveBeenCalledTimes(1);
+    // ⚠️ The backup pair is a 5.0 file (R5). `buildExportEnvelope` is mocked
+    // here, so the pin is on the INTENT it is asked for; the derivation itself
+    // (`beanpodVersionFor(null, { compactionBackup: true }) === '5.0'`) is
+    // pinned against the real function in `fileSync.test.ts`.
+    expect(buildExportEnvelope).toHaveBeenCalledWith({ compactionBackup: true });
     expect(deliverPod).toHaveBeenCalledWith(
       { json: '{"version":"4.0"}', filename: 'f.beanpod' },
       expect.anything()
