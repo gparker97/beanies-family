@@ -696,7 +696,7 @@ describe('a baseline WITHOUT a revision still records its heads fingerprint', ()
   });
 });
 
-describe('the user-file intent — the rollback route out of a compaction', () => {
+describe('the poll path can never choose `user-file` for itself', () => {
   const fakeKey = {} as CryptoKey;
 
   beforeEach(() => {
@@ -705,13 +705,14 @@ describe('the user-file intent — the rollback route out of a compaction', () =
     parseMock.mockImplementation((text) => JSON.parse(text) as BeanpodFileV4);
   });
 
-  it('sends `user-file` to the worker for the read after a rebind, and only that read', async () => {
-    // ⚠️ THE POLICY TABLE'S `user-file` COLUMN HAD ZERO PRODUCERS. It exists so
-    // the guard cannot refuse the pre-compaction `.beanpod` a family re-points
-    // at, which is the only rollback there is — but `rebindPodFile` merges
-    // nothing itself, so the human's choice arrived at the poll as a plain
-    // baseline compare, resolved `ours-newer`, and PUBLISHED the compacted
-    // document back over the file they had just chosen.
+  it('always sends a baseline basis, whatever else has happened', async () => {
+    // ⚠️ THIS IS THE UNATTENDED PATH. `user-file` never blocks and makes `adopt`
+    // — wholesale replacement of this device's document — unconditional, so the
+    // poll and the pre-save merge must never be able to reach it. It briefly
+    // could: the choice lived in a module-level one-shot, and a recovery that
+    // failed before reaching a terminus left it armed for the next ordinary
+    // save to spend, discarding the document with no banner and no confirmation.
+    // The choice now travels as a parameter on the one call a human authorised.
     const provider = makeProvider({
       remoteText: JSON.stringify(buildEnvelope()),
       remoteTimestamp: '2026-05-16T10:00:00Z',
@@ -720,42 +721,17 @@ describe('the user-file intent — the rollback route out of a compaction', () =
     syncService.setProvider(provider as never);
     syncService.setFamilyKey(fakeKey, buildEnvelope());
 
-    syncService.noteUserChoseRemoteFile();
     await syncService.save();
 
-    const firstBasis = vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2];
-    expect(firstBasis).toEqual({ kind: 'user-file' });
-
-    // One-shot: the NEXT read is an ordinary baseline compare again. A flag that
-    // stuck would apply a single decision to every subsequent sync, and
-    // `user-file` never blocks.
-    vi.mocked(docClient.mergeRemoteEnvelope).mockClear();
-    // A later remote, so the read actually happens (the first save learned the
-    // marker, after which `remoteChanged()` answers "unchanged" and
-    // `fetchAndMergeRemote` returns before it reaches the basis at all).
-    syncService.setProvider(
-      makeProvider({
-        remoteText: JSON.stringify(buildEnvelope()),
-        remoteTimestamp: '2026-05-16T11:00:00Z',
-        onWrite: () => {},
-      }) as never
-    );
-    await syncService.save();
-    const secondBasis = vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2];
-    expect(secondBasis).toMatchObject({ kind: 'baseline' });
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toMatchObject({
+      kind: 'baseline',
+    });
   });
 
-  it('does not survive a family switch', () => {
-    syncService.noteUserChoseRemoteFile();
-    syncService.reset();
-    // Applying it to a different family's first read would adopt a remote the
-    // guard should have weighed on its merits.
-    expect(syncService.consumeUserFileIntent()).toBe(false);
-  });
-
-  it('is consumed by whichever terminus reads it first', () => {
-    syncService.noteUserChoseRemoteFile();
-    expect(syncService.consumeUserFileIntent()).toBe(true);
-    expect(syncService.consumeUserFileIntent()).toBe(false);
+  it('exposes no way to arm it from outside', () => {
+    // A regression guard with teeth: re-adding a module-level setter is what
+    // would let an unattended read pick the destructive context back up.
+    expect('noteUserChoseRemoteFile' in syncService).toBe(false);
+    expect('consumeUserFileIntent' in syncService).toBe(false);
   });
 });

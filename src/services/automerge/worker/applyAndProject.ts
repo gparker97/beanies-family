@@ -751,8 +751,15 @@ export async function mergeRemoteEnvelope(
   // entire affected population is one dev family (`podCompaction` is OFF and has
   // never shipped enabled). Reading nothing means such a pod compares `same` and
   // MERGES, which is right for every device that already holds it and wrong only
-  // for one still on the pre-compaction history — a case Stage 2's rebase is what
-  // actually fixes. Do not reintroduce the reader.
+  // for one still on the pre-compaction history.
+  //
+  // ⚠️ NOTHING IN THE PLAN FIXES THAT LAST CASE, and an earlier version of this
+  // comment wrongly said the rebase would. The rebase changes exactly ONE POLICY
+  // cell — `adopt-remote` × `dirty` — and a pod compacted by the retired code
+  // carries NO document stamp, so its verdict is `same`, which never routes to
+  // that cell in any context. (It is also Stage THREE, not two.) The only
+  // mitigation is resetting the one affected dev family before soaking. Do not
+  // reintroduce the reader.
   let installWholesale = !currentDoc || basis.kind === 'no-local-document';
   if (currentDoc && basis.kind !== 'no-local-document') {
     const lineageCtx = lineageContextFor(basis, currentDoc);
@@ -1009,8 +1016,13 @@ export function loadSnapshot(binary: Uint8Array): { loaded: true } {
  *
  * `Automerge.from(Automerge.toJS(doc))` is the only way to drop history in
  * Automerge 3.x. It mints brand-new object ids, so the result is a different
- * LINEAGE — see `services/sync/podLineage.ts`. The caller is responsible for
- * stamping and publishing that; this function only produces it.
+ * LINEAGE — see `services/sync/podLineage.ts`.
+ *
+ * ⚠️ THE CALLER MUST NOT STAMP. This function does it, inside the rebuild, so
+ * the verify gate compares the document it actually installs. An earlier version
+ * of this line said the caller was responsible — true only while the stamp lived
+ * on the envelope; following it now emits two changes where one is allowed. The
+ * caller publishes.
  *
  * ⚠️ THREE things here are load-bearing:
  *

@@ -742,68 +742,55 @@ describe('syncStore — the lineage banner recovery', () => {
     return await import('@/services/sync/syncService');
   }
 
-  it('cancels the armed save, unlatches, and declares the intent before re-opening', async () => {
+  it('stands the other readers off, and restores everything on failure', async () => {
+    // ⚠️ THE FAILURE PATH IS THE ONE THAT KEPT BREAKING. The first version
+    // cleared the block latch BEFORE a multi-megabyte read, so any failure left
+    // the banner gone, the poller dead and the user believing it had worked.
+    // Nothing may be torn down until something has actually succeeded.
     const syncService = await svc();
     const syncStore = useSyncStore();
-    // No provider configured -> loadFromFile returns a plain failure. The
-    // ORDERING is what this pins, and it holds on both outcomes.
-    await syncStore.useRemoteFileOverLocalDocument();
 
-    // Cancelling first is what stops a debounced save from running its own merge
-    // concurrently with the re-open once the latch is clear.
-    expect(syncService.cancelPendingSave).toHaveBeenCalled();
-    expect(syncService.retryAfterRemoteBlock).toHaveBeenCalled();
-    // THE producer. Deleting this call used to leave the whole suite green.
-    expect(syncService.noteUserChoseRemoteFile).toHaveBeenCalled();
-  });
-
-  it('reports a failed adopt instead of letting the banner vanish silently', async () => {
-    const { reportError } = await import('@/utils/errorReporter');
-    const syncStore = useSyncStore();
-
+    // No provider configured -> loadFromFile returns a plain failure.
     const ok = await syncStore.useRemoteFileOverLocalDocument();
 
     expect(ok).toBe(false);
-    // The latch was cleared before the re-open, so the banner is already gone;
-    // without this report the failure reaches nobody at all.
+    // Cancelling first is what stops a debounced save racing the re-open.
+    expect(syncService.cancelPendingSave).toHaveBeenCalled();
+    // NOT unlatched: the block is still true, so the banner must still be up.
+    expect(syncService.retryAfterRemoteBlock).not.toHaveBeenCalled();
+    // And the banner is reconciled back on, not left cleared.
+    expect(syncStore.podUnopenable).toBe(false); // no latch was ever armed here
+  });
+
+  it('reports a failed adopt instead of letting it pass unnoticed', async () => {
+    const { reportError } = await import('@/utils/errorReporter');
+    const syncStore = useSyncStore();
+
+    await syncStore.useRemoteFileOverLocalDocument();
+
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'pod-lineage',
-        severity: 'critical',
         context: expect.objectContaining({ action: 'user-file-recovery-failed' }),
       })
     );
   });
 
-  it('sends `user-file` to the worker when the intent is armed', async () => {
-    // The store terminus. `consumeUserFileIntent` defaults to false in the shared
-    // double, which is why nothing exercised this arm.
-    const syncService = await svc();
-    vi.mocked(syncService.consumeUserFileIntent).mockReturnValue(true);
-    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
-    vi.mocked(docClient.initAndLoadCache).mockResolvedValue({
-      loaded: true,
-    } as unknown as Awaited<ReturnType<typeof docClient.initAndLoadCache>>);
-    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
-      action: 'adopted' as const,
-      heads: [],
-      dirty: false,
-      changed: true,
-      remoteHeads: [],
-    } as unknown as Awaited<ReturnType<typeof docClient.mergeRemoteEnvelope>>);
-
+  it('does not page Slack for a plain connection failure', async () => {
+    // `critical` pages #beanies-errors. The toast for this case says "check your
+    // connection and try again", so paging on it trains the alert to be ignored.
+    const { reportError } = await import('@/utils/errorReporter');
     const syncStore = useSyncStore();
-    syncStore.familyKey = {} as CryptoKey;
-    await syncStore.loadFromFile();
 
-    const basis = vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2];
-    expect(basis).toEqual({ kind: 'user-file' });
+    await syncStore.useRemoteFileOverLocalDocument();
+
+    expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
   });
 
-  it('sends a plain baseline when no one armed it', async () => {
-    const syncService = await svc();
-    vi.mocked(syncService.consumeUserFileIntent).mockReturnValue(false);
-    vi.mocked(syncService.load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
+  it('sends `user-file` to the worker ONLY when the caller asked for it', async () => {
+    // The choice is a parameter now, not module state, so this is the whole of
+    // its reachable surface.
+    vi.mocked((await svc()).load).mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
     vi.mocked(docClient.initAndLoadCache).mockResolvedValue({
       loaded: true,
     } as unknown as Awaited<ReturnType<typeof docClient.initAndLoadCache>>);
@@ -817,8 +804,14 @@ describe('syncStore — the lineage banner recovery', () => {
 
     const syncStore = useSyncStore();
     syncStore.familyKey = {} as CryptoKey;
-    await syncStore.loadFromFile();
 
+    await syncStore.loadFromFile({ userChoseThisFile: true });
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toEqual({
+      kind: 'user-file',
+    });
+
+    vi.mocked(docClient.mergeRemoteEnvelope).mockClear();
+    await syncStore.loadFromFile();
     expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toMatchObject({
       kind: 'baseline',
     });
