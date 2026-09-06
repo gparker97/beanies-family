@@ -132,16 +132,3 @@ export const getRemoteBaselineHeadsFp = vi.fn<() => string | null>(() => null);
 export const noteLineageBlocked = vi.fn();
 export const noteMergeFailed = vi.fn();
 export const noteRemoteBlocked = vi.fn();
-
-/**
- * The user-file one-shot (see `noteUserChoseRemoteFile` in the real module).
- *
- * ⚠️ THESE MUST EXIST, for exactly the reason written above `docPushedAgainst`.
- * `consumeUserFileIntent` is called on the store's OPEN terminus inside a `try`,
- * so an absent double threw there and every cold-boot path reported
- * `network-error` — eight suites failed at once and none of them named the
- * cause. `false` is the right default: it is the ordinary baseline compare, and
- * a suite testing the rollback route overrides it.
- */
-export const noteUserChoseRemoteFile = vi.fn();
-export const consumeUserFileIntent = vi.fn(() => false);
