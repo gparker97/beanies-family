@@ -7,6 +7,7 @@
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { showToast } from '@/composables/useToast';
+import { confirm } from '@/composables/useConfirm';
 import { reportError } from '@/utils/errorReporter';
 import { PayloadTooLargeError } from '@/types/sync';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -20,6 +21,9 @@ const hooks = vi.hoisted(() => ({
   pulled: true,
   hasProvider: true,
   auxAvailable: true,
+  // Empty by default: `evaluateSoak([])` passes, so every existing test keeps
+  // exercising the path it was written for.
+  members: [] as unknown[],
 }));
 
 vi.mock('@/composables/useConfirm', () => ({
@@ -44,6 +48,9 @@ vi.mock('@/composables/usePodExport', () => ({
 }));
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({ activeFamilyId: 'fam-1' }),
+}));
+vi.mock('@/stores/familyStore', () => ({
+  useFamilyStore: () => ({ members: hooks.members }),
 }));
 vi.mock('@/services/sync/syncService', () => ({
   flushPendingSave: vi.fn(async () => {}),
@@ -108,6 +115,7 @@ beforeEach(() => {
     pulled: true,
     hasProvider: true,
     auxAvailable: true,
+    members: [],
   });
 });
 
@@ -342,5 +350,82 @@ describe('the automatic safety copy', () => {
     await usePodCompaction().compact();
 
     expect(docClient.compactDoc).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The soak gate — the reason compaction cannot run while a family member's
+ * device has not yet seen a build that honours the lineage guard.
+ */
+describe('the soak gate', () => {
+  const stale = [{ id: 'm2', name: 'Sam', lastLoginAt: new Date().toISOString().slice(0, 10) }];
+  const current = [
+    { id: 'm2', name: 'Sam', lastLoginAt: new Date().toISOString().slice(0, 10), lineageEpoch: 1 },
+  ];
+
+  it('refuses BEFORE asking, so the app never asks a question it will not honour', async () => {
+    hooks.members = stale;
+
+    await usePodCompaction().compact();
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('names who it is waiting for once the projection is current', async () => {
+    // ⚠️ The second reading is the AUTHORITATIVE one: the pull at step 2b is
+    // what makes the member projection current, so a device that signed in on
+    // an old build ten minutes ago is not in our copy until then. The first
+    // reading only fails fast.
+    hooks.members = current;
+    loadFromFile.mockImplementationOnce(async () => {
+      hooks.members = stale; // the pull brought a stale member into view
+      return { success: true };
+    });
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'warning',
+      'compaction.refused',
+      expect.any(String),
+      expect.anything()
+    );
+  });
+
+  it('says plainly that nothing is left to do when everyone is current', async () => {
+    hooks.members = current;
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).toHaveBeenCalled();
+    const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
+    expect(detail).toContain('compaction.doneNothingToDo');
+  });
+
+  it('NAMES the exception rather than reporting a bare done', async () => {
+    // A completion silent about a device that cannot converge withholds
+    // information it holds — the same defect as the transient toast the lineage
+    // banner replaced.
+    hooks.members = current;
+    let compacted = false;
+    vi.mocked(docClient.compactDoc).mockImplementation((() => {
+      compacted = true;
+      hooks.members = stale; // someone joined on an old build mid-flight
+      return {
+        beforeBytes: 2_000_000,
+        afterBytes: 170_000,
+        changesBefore: 10_000,
+        changesAfter: 1,
+        actorsBefore: 2_600,
+      };
+    }) as never);
+
+    await usePodCompaction().compact();
+
+    expect(compacted).toBe(true);
+    const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
+    expect(detail).toContain('compaction.doneWaitingFor');
   });
 });

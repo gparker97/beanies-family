@@ -328,6 +328,39 @@ export interface FamilyMember {
   requiresPassword: boolean; // true when member needs to set a password
   lastLoginAt?: ISODateString;
   /**
+   * Which pod lineage generation this member's device had seen when it last
+   * signed in. Written by `familyStore.updateMember` whenever a patch carries
+   * `lastLoginAt`, so it costs ZERO additional changes in steady state — a
+   * per-device heartbeat collection would write ~365 changes per device per
+   * year into the very history the compaction threshold measures.
+   *
+   * ⚠️ POSITIVE EVIDENCE, and that shape is the whole point. "Refuse while any
+   * device is on an old build" can never match, because an old build writes no
+   * value at all. The soak gate instead REQUIRES a value from every recently
+   * active member, so an absent one refuses. Self-healing: it appears the moment
+   * that person opens a guard-honouring build.
+   *
+   * Known limit, accepted: this is per-MEMBER, not per-device, so someone with
+   * an upgraded phone and a stale tablet reads as soaked. It is the second belt.
+   */
+  lineageEpoch?: number;
+  /**
+   * The app version that last wrote this row. DIAGNOSTICS ONLY — never
+   * load-bearing in the soak gate, because it is absent on exactly the devices
+   * the gate is about.
+   */
+  appVersion?: string;
+  /**
+   * When this member's device last failed to open the pod for want of memory.
+   *
+   * ⚠️ IT LIVES IN THE DOCUMENT, not in telemetry, and that is not a
+   * preference: a CloudWatch query is not something a family's Settings page
+   * can ask, and the device that hit the error is the one device that cannot
+   * fix it. Written here, the family member who CAN act sees their pod read as
+   * due — a real failure outranking the size heuristic.
+   */
+  podTooLargeSeenAt?: ISODateString;
+  /**
    * True when this member is a pet. Pets count in the family roster and
    * can have favorites, allergies, and medications, but never receive an
    * invite, own permissions, or need a password. Added 2026-04.
