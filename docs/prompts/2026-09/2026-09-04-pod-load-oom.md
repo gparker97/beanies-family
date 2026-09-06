@@ -231,3 +231,21 @@ Three things to establish next session:
 3. **Whether the second device should have been offered the kit alone.** The
    fallback affordances are chosen by the login flow's capability check, not by
    what the family actually has.
+
+### 2026-09-06 — Stage 1 soak: PASSED
+
+greg, after resetting to a fresh family and running the two-browser soak:
+
+> "all steps performed exactly as expected - well done. received the orange
+> banner, it worked to resume from the family file and removed the todo after
+> offline, and got an error toast and the orange banner stayed when i tried to
+> click the resume button while offline."
+
+That is the Stage 1 acceptance criterion met in a real client: the banner is
+visible and persistent, the recovery adopts, and — the part that regressed twice
+— a failed recovery reports and leaves the banner up instead of silently
+vanishing. Stage 1 (R0 + R4) is done. Five review rounds, thirteen reviewers.
+
+Not exercised, and deliberately: the retired-Tier-2 legacy-stamp case. The family
+was reset rather than restored, so no pod with an envelope-only lineage was in
+play. That residual stands as documented.
