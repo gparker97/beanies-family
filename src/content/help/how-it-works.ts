@@ -9,7 +9,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       'What the message means, why nothing on your device is lost, and the one step that fixes it: update beanies.',
     icon: '\u{1F504}',
     readTime: 2,
-    updatedDate: '2026-09-06',
+    updatedDate: '2026-09-07',
     sections: [
       {
         type: 'paragraph',
@@ -37,6 +37,11 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
           'Update beanies on this device. In a browser, reload the page and beanies updates itself. In the iPhone or Android app, update it from the App Store or Google Play.',
           'Open beanies again. The family file opens normally and syncing resumes.',
         ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On an iPhone or Android device, beanies now offers to update itself when a newer version is out, so this message should become rare. Tapping Update opens the App Store or Google Play, where you install it as you would any other app. beanies only insists on the update when it genuinely cannot open your family file without it, and it shows the store link on screen when it does.',
       },
       {
         type: 'heading',

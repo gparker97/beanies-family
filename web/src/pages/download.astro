@@ -9,10 +9,10 @@
 // /android; this page forwards to those so there is a single source of truth.
 //
 // Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer.
-import { SITE_URL } from '@beanies/brand/nav';
+import { SITE_URL, STORE_URL } from '@beanies/brand/nav';
 
-const APP_STORE_URL = 'https://apps.apple.com/app/id6798513944';
-const PLAY_URL = 'https://play.google.com/store/apps/details?id=family.beanies.app';
+const APP_STORE_URL = STORE_URL.ios;
+const PLAY_URL = STORE_URL.android;
 
 const DESCRIPTION =
   'one app to manage your family\u2019s money, activities, and all the little beans. private, encrypted, no ads.';

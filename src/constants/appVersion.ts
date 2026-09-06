@@ -31,4 +31,9 @@
 // The web and Play accept any `R<n>` freely (Play keys on `versionCode`), so an R revision is
 // fine for a web-only or Play-only ship. **If a release is going to the App Store, use a new
 // numeric version** (`0.15.1`, not `0.15R3`).
+// ⚠️ BUMPING THIS DOES NOT ASK ANYONE TO UPDATE. The native update prompt reads a
+// separate floor, `web/public/min-app-version.json`, which is deployed by hand and
+// deliberately lags this constant: a normal release does not raise it. Raise it only
+// when there is a reason everyone should move.
+// See `docs/runbooks/native-store-submission.md` § 7. Raising the update floor.
 export const APP_VERSION = '0.16';
