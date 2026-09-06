@@ -38,11 +38,28 @@ vi.mock('@/services/appUpdate/versionPolicy', async (importOriginal) => ({
   fetchUpdateFloor: () => Promise.resolve(floor.value),
 }));
 
-const gates = vi.hoisted(() => ({ online: true, quiet: true, loaded: true }));
-vi.mock('@/composables/useOnline', () => ({
-  useOnline: () => ({ isOnline: { value: gates.online } }),
-}));
+const gates = vi.hoisted(() => ({ quiet: true, loaded: true }));
+// ⚠️ A REAL REF. A plain `{ value }` is not a valid `watch` source: Vue warns
+// and watches nothing, so every case here logged "Invalid watch source" and the
+// `isOnline` half of the composable's watcher was pinned by nothing at all.
+const isOnline = vi.hoisted(() => {
+  return { ref: null as null | { value: boolean } };
+});
+vi.mock('@/composables/useOnline', async () => {
+  const { ref } = await import('vue');
+  isOnline.ref = ref(true);
+  return { useOnline: () => ({ isOnline: isOnline.ref }) };
+});
 vi.mock('@/utils/appQuiet', () => ({ isAppQuiet: () => gates.quiet }));
+
+const fatalMessage = vi.hoisted(() => ({ value: null as string | null }));
+vi.mock('@/stores/fatalErrorStore', () => ({
+  useFatalErrorStore: () => ({ message: fatalMessage.value }),
+}));
+
+vi.mock('@/composables/useSessionInterruption', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/composables/useSessionInterruption')>()),
+}));
 // Only `isLoaded` is stubbed. `docVersion` stays the REAL shallowRef, because
 // the composable watches it to learn the family document has arrived and a stub
 // number would make that watcher fire never — which is precisely the defect the
@@ -62,6 +79,7 @@ vi.mock('@/constants/appVersion', () => ({ APP_VERSION: '0.16' }));
 import { logEvent } from '@/services/telemetry/logEvent';
 import { STORE_URL } from '@beanies/brand/nav';
 import { docVersion } from '@/services/automerge/projection';
+import { __resetSessionInterruptionForTests, claimInterruption } from '../useSessionInterruption';
 import { useAppUpdate, __resetAppUpdateForTesting } from '../useAppUpdate';
 import { storeUrlFor } from '@/services/appUpdate/storeUrl';
 
@@ -72,15 +90,52 @@ async function launch(): Promise<void> {
   await Promise.resolve();
 }
 
-describe('useAppUpdate', () => {
+describe('useAppUpdate, with a build whose own version does not parse', () => {
+  // ⚠️ DRIVEN FROM `APP_VERSION`, NOT FROM THE FLOOR, which is the only way this
+  // branch is reachable: `versionPolicy` has already screened the floor with the
+  // same grammar, so a bad floor never gets this far. Reaching here means a bad
+  // constant SHIPPED, which silences the prompt for the whole fleet and is fixed
+  // in an entirely different file — hence its own CloudWatch class.
   beforeEach(() => {
+    __resetSessionInterruptionForTests();
     __resetAppUpdateForTesting();
     vi.clearAllMocks();
     platform.value = 'ios';
     floor.value = '0.17';
-    gates.online = true;
+    isOnline.ref!.value = true;
     gates.quiet = true;
     gates.loaded = true;
+    fatalMessage.value = null;
+  });
+
+  it('reports its own class, and asks nobody', async () => {
+    vi.doMock('@/constants/appVersion', () => ({ APP_VERSION: 'nightly' }));
+    vi.resetModules();
+    const mod = await import('../useAppUpdate');
+    const telemetry = await import('@/services/telemetry/logEvent');
+    mod.__resetAppUpdateForTesting();
+    mod.useAppUpdate();
+    await vi.waitFor(() => expect(telemetry.logEvent).toHaveBeenCalled());
+    expect(vi.mocked(telemetry.logEvent).mock.calls.map((c) => c[0].context?.detail)).toContain(
+      'app-version-unparseable'
+    );
+    expect(confirmMock).not.toHaveBeenCalled();
+    vi.doUnmock('@/constants/appVersion');
+    vi.resetModules();
+  });
+});
+
+describe('useAppUpdate', () => {
+  beforeEach(() => {
+    __resetAppUpdateForTesting();
+    vi.clearAllMocks();
+    __resetSessionInterruptionForTests();
+    platform.value = 'ios';
+    floor.value = '0.17';
+    isOnline.ref!.value = true;
+    gates.quiet = true;
+    gates.loaded = true;
+    fatalMessage.value = null;
     resume.handler = null;
     docVersion.value = 0;
     confirmMock.mockResolvedValue(true);
@@ -137,31 +192,44 @@ describe('useAppUpdate', () => {
     expect(confirmMock).not.toHaveBeenCalled();
   });
 
+  it('exposes whether an update is available, which is what makes that member live', async () => {
+    const { updateAvailable } = useAppUpdate();
+    await vi.waitFor(() => expect(updateAvailable.value).toBe(true));
+
+    __resetAppUpdateForTesting();
+    floor.value = '0.16';
+    const after = useAppUpdate();
+    await vi.waitFor(() => expect(logEvent).toHaveBeenCalled());
+    expect(after.updateAvailable.value).toBe(false);
+  });
+
   it('says nothing when the floor could not be read at all', async () => {
     floor.value = null;
     await launch();
     expect(confirmMock).not.toHaveBeenCalled();
   });
 
-  it('says nothing when the floor is a typo, and reports the reason', async () => {
-    // A hand-edited, hand-deployed file WILL be mistyped one day. It must nag
-    // nobody, and it must not do so invisibly.
+  it('says nothing when the floor is a typo, and nags nobody', async () => {
+    // A hand-edited, hand-deployed file WILL be mistyped one day. `versionPolicy`
+    // screens it and answers `null`, so this build simply never learns of a
+    // floor. It must not nag, and it must not throw.
     floor.value = 'v0.17-beta';
     await launch();
     expect(confirmMock).not.toHaveBeenCalled();
-    // ⚠️ ITS OWN CLASS, not the floor file's `unparseable-version`.
-    // `versionPolicy` already screened the floor, so reaching this branch means
-    // `APP_VERSION` itself does not parse: a different file, a different fix,
-    // and a defect that silences the prompt for the entire fleet.
-    expect(vi.mocked(logEvent).mock.calls.map((c) => c[0].context?.detail)).toContain(
-      'app-version-unparseable'
-    );
   });
 
   it.each([
-    ['offline', () => (gates.online = false)],
+    ['offline', () => (isOnline.ref!.value = false)],
     ['mid-save or with an overlay open', () => (gates.quiet = false)],
     ['still booting', () => (gates.loaded = false)],
+    // ⚠️ THE RECOVERY OVERLAY, which none of the gates above can see. It is a
+    // bare div at z-300, not a `BaseModal`, so it never enters the overlay
+    // stack, and the init watchdog can raise it with the document already
+    // loaded. A prompt then opens UNDERNEATH it: invisible, untappable, and it
+    // spends the one prompt this session gets.
+    ['stopped by the recovery overlay', () => (fatalMessage.value = 'spilled beans')],
+    // #45: one unsolicited surface per load. The PIN modal got there first.
+    ['another surface has already interrupted', () => claimInterruption('pin-prompt')],
   ])('holds its tongue while %s', async (_label, close) => {
     close();
     await launch();
@@ -178,6 +246,25 @@ describe('useAppUpdate', () => {
     gates.loaded = true;
     resume.handler!();
     await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('asks when the device comes back online, with no resume and no new document', async () => {
+    // The other half of the watcher. Suppressed while offline, and the moment
+    // signal returns there is nothing else to prod it.
+    isOnline.ref!.value = false;
+    await launch();
+    expect(confirmMock).not.toHaveBeenCalled();
+
+    isOnline.ref!.value = true;
+    await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not consume the one interruption slot when it was going to stay quiet', async () => {
+    // Claimed at the show site, not at the check: a prompt deferred for boot
+    // must leave the slot for the PIN modal that is about to need it.
+    gates.loaded = false;
+    await launch();
+    expect(claimInterruption('someone-else')).toBe(true);
   });
 
   it('asks WITHOUT a resume once the family document arrives', async () => {
@@ -215,7 +302,7 @@ describe('useAppUpdate', () => {
   });
 
   it('names the FIRST closed gate, so the reason is the one that mattered', async () => {
-    gates.online = false;
+    isOnline.ref!.value = false;
     gates.loaded = false;
     await launch();
     const deferred = vi
