@@ -24,7 +24,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
 import { sortByTime, wallSharedAllDay } from '@/utils/wallActivities';
-import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
+import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
 
@@ -34,6 +34,8 @@ const props = defineProps<{
   /** The REAL today. Decides the now-line and past-dimming, never the content. */
   todayYmd: string;
   portrait: boolean;
+  /** Forwarded to the shell — the page owns the wall's one viewport mechanism. */
+  roomForBand: boolean;
   now: Date;
   /**
    * Whether the rail fits beside these lanes — decided by the page, from the whole
@@ -44,12 +46,10 @@ const props = defineProps<{
   lanesRail: boolean;
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
-  isPending: (job: WallJob) => boolean;
   /** The wall's person filter, which this view applies to its own lanes too. */
   visibleMemberIds: string[] | null;
 }>();
 const emit = defineEmits<{
-  toggle: [WallJob];
   open: [WallSheetTarget];
   /**
    * ⚠️ A lane header names a PERSON, not a day, so it must not be wired to the
@@ -172,6 +172,17 @@ const inlineHeaders = computed(() => !props.portrait && members.value.length <= 
  * See `LANES_RAIL_MAX_COLUMNS`.
  */
 
+/**
+ * Is the wall currently filtered to just this bean?
+ *
+ * Read from `visibleMemberIds` rather than from a new prop: the page already
+ * derives it from `focusedMemberId` and every view already receives it, so a
+ * second channel for the same fact could disagree with the one that filters.
+ */
+function isFocused(memberId: string) {
+  return props.visibleMemberIds?.length === 1 && props.visibleMemberIds[0] === memberId;
+}
+
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
 }
@@ -201,6 +212,7 @@ function subtitleFor(memberId: string) {
 <template>
   <WallViewShell
     :portrait="portrait"
+    :room-for-band="roomForBand"
     :rail="lanesRail"
     :busiest="busiest"
     :meals-ymd="anchorYmd"
@@ -225,11 +237,21 @@ function subtitleFor(memberId: string) {
         Portrait stacks the plate instead of running it inline; 123px of column
         is not enough for a face and a name side by side.
       -->
+        <!--
+          ⚠️ `aria-pressed`, because this is a TOGGLE now and no longer a way to
+          navigate. `WallFooter`'s bean chips and the today view's week strip
+          both carry it; a lane header that filters the whole wall and announces
+          itself as "Milo, button" before and after leaves a screen-reader user
+          with no way to tell the filter is on — and once it IS on, the five
+          lanes that gave the visual clue are the ones that disappeared.
+        -->
         <button
           v-for="member in members"
           :key="member.id"
           type="button"
-          class="min-w-0 px-1.5 py-1"
+          class="min-w-0 rounded-2xl px-1.5 py-1"
+          :class="isFocused(member.id) ? 'bg-[var(--tint-orange-8)]' : ''"
+          :aria-pressed="isFocused(member.id)"
           @click="emit('focusMember', member.id)"
         >
           <WallBeanHeader

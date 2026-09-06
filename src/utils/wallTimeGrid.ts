@@ -36,7 +36,7 @@
  *  4. A fold is PROPORTIONAL to what it skips, or it cannot say how much.
  *  5. (Rendering, in WallTimeGrid.vue) the now-line goes BEHIND the blocks.
  */
-import { activitySpanMinutes, ASSUMED_DURATION_MIN } from '@/utils/wallActivities';
+import { activitySpanMinutes, ASSUMED_DURATION_MIN, MINUTES_PER_DAY } from '@/utils/wallActivities';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { WallOccurrence } from '@/utils/wallActivities';
 
@@ -348,11 +348,8 @@ export function zoomCandidates(availableHeight: number): readonly number[] {
  * Each is a FLOOR, never a clip — the real window is the union with the day's
  * own events, so an early riser widens it further rather than being cut off.
  */
-/** Minutes in a day. The widest window ENDS here, and no tick is drawn at it. */
-const MINUTES_IN_DAY = 24 * 60;
-
 const DAY_WINDOWS = [
-  { start: 6 * 60, end: MINUTES_IN_DAY }, // 18h
+  { start: 6 * 60, end: MINUTES_PER_DAY }, // 18h
   { start: 6 * 60, end: 22 * 60 }, // 16h
   { start: 7 * 60, end: 21 * 60 }, // 14h
   { start: 8 * 60, end: 20 * 60 }, // 12h — the narrowest, and the terminal fallback
@@ -650,14 +647,24 @@ export function findFolds(
     cursor = Math.max(cursor, end);
   }
   if (windowEnd - cursor >= thresholdMinutes) spans.push([cursor, windowEnd]);
-  return spans
-    .filter(([start, end]) => foldHeightFor(end - start, zoom) < (end - start) * pxPerMin)
-    .map(([start, end]) => ({
-      top: 0,
-      height: foldHeightFor(end - start, zoom),
-      startMinutes: start,
-      resumeMinutes: end,
-    }));
+  return (
+    spans
+      .map(([start, end]) => ({
+        top: 0,
+        height: foldHeightFor(end - start, zoom),
+        startMinutes: start,
+        resumeMinutes: end,
+      }))
+      // ⚠️ `drawn` is computed rather than inlined as `(end - start) * pxPerMin`:
+      // with the infinite default, a zero-length span gives `0 * Infinity`, which
+      // is NaN, and every comparison against NaN is false — so a degenerate span
+      // would be dropped by accident rather than by the rule.
+      .filter((fold) => {
+        const minutes = fold.resumeMinutes - fold.startMinutes;
+        const drawn = minutes <= 0 ? 0 : minutes * pxPerMin;
+        return fold.height < drawn;
+      })
+  );
 }
 
 /** The piecewise minutes→px mapping: linear outside folds, fixed across them. */
@@ -947,8 +954,17 @@ function attempt(
    * bottom of the family's day with no exception and no telemetry.
    */
   const pxPerMin = rung.scale * zoom;
+  /*
+   * ⚠️ `input.items.length` is load-bearing, and its absence was a regression.
+   * With nothing on the day there is one span — the WHOLE window — and it clears
+   * both the threshold and the economics test, so a clear day below ~576px of
+   * plot rendered as a single 107px "quiet until 20:00" band in white space with
+   * two hour labels. That is the "an empty rectangle reads as this is broken"
+   * the deleted empty-day branch used to prevent; this is the half of it that
+   * was actually load-bearing.
+   */
   const folds =
-    axis === 'folded'
+    axis === 'folded' && input.items.length
       ? findFolds(
           input.busy,
           windowStart,
@@ -1093,15 +1109,20 @@ function buildTicks(
     // (windowStart is already on the hour, so this begins at the plot's top edge)
     if (insideFold(minutes)) continue;
     /*
-     * ⚠️ No tick AT midnight-as-an-end. The widest day window runs to minute
-     * 1440, and the renderer's `hhmm` wraps that to "00:00" — so the tallest
-     * screens drew a label reading as the day starting over, directly under
-     * 23:00, and drew it at `y = total` where `-translate-y-1/2` puts half of it
-     * outside an `overflow: hidden` plot. A day that also STARTS at 00:00 then
-     * carried the same label at both ends of its axis. The last hour of the day
-     * is marked by 23:00; the plot's own bottom edge says where it ends.
+     * ⚠️ No tick at midnight WHEN MIDNIGHT IS THE END. The widest day window runs
+     * to minute 1440 and `hhmm` wraps that to "00:00", so the tallest screens
+     * drew a label reading as the day starting over directly under 23:00 — at
+     * `y = total`, where `-translate-y-1/2` puts half of it outside an
+     * `overflow: hidden` plot.
+     *
+     * ⚠️ It must be `=== windowEnd`, not `>=`. `activitySpanMinutes` deliberately
+     * carries an overnight event past 1440 (a sleepover, a night shift, a
+     * red-eye), so a 22:00–07:00 day has a window of 480..1860 — and a blanket
+     * `>= MINUTES_PER_DAY` silently dropped every rule after midnight, leaving the
+     * eight hours the event actually occupies with no ruler at all. Mid-axis,
+     * "00:00" is exactly the right label.
      */
-    if (minutes >= MINUTES_IN_DAY) continue;
+    if (minutes === windowEnd && minutes % MINUTES_PER_DAY === 0) continue;
     ticks.push({ minutes, y: yFor(minutes) });
   }
   return ticks;

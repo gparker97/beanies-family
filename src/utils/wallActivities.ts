@@ -117,7 +117,8 @@ export function wallActivityColour(
 export const ASSUMED_DURATION_MIN = 90;
 
 /** So an activity running past midnight is a real span, not a negative one. */
-const MINUTES_PER_DAY = 1440;
+/** Shared with `wallTimeGrid`, which draws the axis this wraps around. */
+export const MINUTES_PER_DAY = 1440;
 
 /**
  * The TRUE minute span of a timed occurrence — the one definition of "when is

@@ -47,7 +47,7 @@ import { useToast } from '@/composables/useToast';
 import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
 import { anchorOffsetDays } from '@/utils/wallAnchor';
-import { daysLayoutFor, railFits } from '@/components/wall/wallLayout';
+import { bandFitsHeight, daysLayoutFor, railFits } from '@/components/wall/wallLayout';
 import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
@@ -183,12 +183,20 @@ const isPortrait = useMediaQuery('(orientation: portrait)');
  * the grid's ladder.
  */
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth);
+/**
+ * The same mechanism, the other axis. It rides the SAME listener and the same
+ * frame: a second `resize` listener, or a `useMediaQuery` inside a view, would
+ * be the third viewport mechanism in a file whose comment above explains why
+ * there is exactly one.
+ */
+const viewportHeight = ref(typeof window === 'undefined' ? 800 : window.innerHeight);
 let resizeFrame = 0;
 function onViewportResize() {
   if (resizeFrame) return;
   resizeFrame = requestAnimationFrame(() => {
     resizeFrame = 0;
     viewportWidth.value = window.innerWidth;
+    viewportHeight.value = window.innerHeight;
   });
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', onViewportResize);
@@ -201,6 +209,8 @@ if (typeof window !== 'undefined') window.addEventListener('resize', onViewportR
  * them, and that trade is what produced the squeezed-both-ways layout.
  */
 const daysLayout = computed(() => daysLayoutFor(viewportWidth.value, isPortrait.value));
+/** Whether a stacked band still leaves the grid a real day — see `bandFitsHeight`. */
+const roomForBand = computed(() => bandFitsHeight(viewportHeight.value));
 const lanesRail = computed(
   () =>
     !isPortrait.value && railFits(viewportWidth.value, Math.max(1, familyStore.sortedHumans.length))
@@ -222,28 +232,57 @@ const lanesRail = computed(
  * has a lanes BAND while `daysRail` is true.
  */
 watch(
-  [() => daysLayout.value.rail, () => daysLayout.value.columns, lanesRail, activeView],
-  ([days, columns, lanes, view]) => {
+  [() => daysLayout.value.rail, () => daysLayout.value.columns, lanesRail, roomForBand, activeView],
+  ([days, columns, lanes, room, view]) => {
     if (view !== 'days' && view !== 'lanes') return;
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'wall_rail_mode',
-      context: {
-        action: 'layout',
-        kind: view,
-        stage: (view === 'days' ? days : lanes) ? 'rail' : 'band',
-        // ⚠️ The COLUMN COUNT is the headline behaviour change — a 1280px wall
-        // now draws 3 of 7 days where it drew 7 — and the watcher must depend on
-        // it as well as report it. Keyed on the rail alone, a 1440→1920 resize
-        // that moves 4 columns to 6 changed neither source and filed nothing, so
-        // "my week only shows 3 days" was untriageable. Days only: a lane is a
-        // person, and its count is the family's size, not a layout decision.
-        ...(view === 'days' ? { count: columns } : {}),
-      },
-    });
+    const rail = view === 'days' ? days : lanes;
+    /*
+     * ⚠️ Debounced, because adding the column count multiplied the emitter.
+     * The old key had two states and one boundary at 1119px; the new one has
+     * seven, with a boundary every 211px, and `viewportWidth` updates once per
+     * animation frame. Dragging a window edge across one boundary flips the
+     * count every frame, and `logEvent`'s 50-per-surface-per-minute bucket is
+     * gone in under a second — taking `wall_anchor_change` and
+     * `wall_view_change` with it. A change gate cannot help: A->B->A is a real
+     * change each time. What we want is the layout the family SETTLED on.
+     */
+    if (railEmitTimer) clearTimeout(railEmitTimer);
+    railEmitTimer = setTimeout(() => {
+      railEmitTimer = undefined;
+      emitRailMode(view, rail, room, columns);
+    }, RAIL_SETTLE_MS);
   }
 );
+
+/** How long the layout must hold still before it is worth a row in CloudWatch. */
+const RAIL_SETTLE_MS = 300;
+let railEmitTimer: ReturnType<typeof setTimeout> | undefined;
+
+function emitRailMode(view: 'days' | 'lanes', rail: boolean, room: boolean, columns: number) {
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'wall_rail_mode',
+    context: {
+      action: 'layout',
+      kind: view,
+      // ⚠️ The variant RENDERED, not the rail decision. This said `band` on
+      // every window the height gate was actually drawing as a strip — a
+      // filterable field asserting the opposite of what the family could see,
+      // on exactly the device class (1024x768, 1366x768) the gate exists for.
+      // The busiest-column downgrade is content-driven and still unreported
+      // here; `wall_grid_tier` carries the shape of the day.
+      stage: rail ? 'rail' : room ? 'band' : 'strip',
+      // ⚠️ The COLUMN COUNT is the headline behaviour change — a 1280px wall
+      // now draws 3 of 7 days where it drew 7 — and the watcher must depend on
+      // it as well as report it. Keyed on the rail alone, a 1440→1920 resize
+      // that moves 4 columns to 6 changed neither source and filed nothing, so
+      // "my week only shows 3 days" was untriageable. Days only: a lane is a
+      // person, and its count is the family's size, not a layout decision.
+      ...(view === 'days' ? { count: columns } : {}),
+    },
+  });
+}
 
 /**
  * The job/list bundle, built once and forwarded whole. Passing its five members
@@ -344,8 +383,6 @@ function logAnchorChange(stage: string) {
 function onStep(direction: -1 | 1) {
   const unit = currentView.value.stepUnit;
   if (!unit) return;
-  // A deliberate move supersedes the drill-in's return address; see it there.
-  anchorBeforeDrill.value = null;
   // A refused step still emits — with its OWN stage, so it neither corrupts the
   // browse signal with an unchanged `count` after a `next`, nor goes silent.
   // Silence here is indistinguishable from the family walking away.
@@ -354,7 +391,6 @@ function onStep(direction: -1 | 1) {
 }
 
 function onGoToToday() {
-  anchorBeforeDrill.value = null;
   anchor.goToToday();
   logAnchorChange('today');
 }
@@ -384,16 +420,26 @@ function onGoToToday() {
  */
 function onOpenDay(ymd: string) {
   const from = anchorYmd.value;
-  if (!anchor.setAnchor(ymd, 'day_tap')) return logAnchorChange('range_limit');
+  /*
+   * ⚠️ Open on BOTH paths. `setAnchor` refuses a day past the drift limit and
+   * still writes the clamped value, so an early return here left the week
+   * visibly slid sideways with no day opened and nothing said — the affordance
+   * promised depth and delivered a silent scroll. Now that `clampAnchorYmd`
+   * lands on the LIMIT rather than on today, the day it reaches is the adjacent
+   * one, and opening it is the honest answer to the gesture: this is as far as
+   * the wall goes. The refusal is still reported under its own stage.
+   */
+  const exact = anchor.setAnchor(ymd, 'day_tap');
   // Only NOW is the drill-in real, so this is the only place the return address
   // may be written — see `onGoBack`.
-  anchorBeforeDrill.value = from;
-  logAnchorChange('day_tap');
+  drill.value = { from, at: anchorYmd.value };
+  logAnchorChange(exact ? 'day_tap' : 'range_limit');
   selectView('today');
 }
 
 /**
- * Where the week was standing when someone drilled into one of its days.
+ * Where the week was standing when someone drilled into one of its days, and
+ * WHICH DAY that drill landed on.
  *
  * ⚠️ Drilling in moves the SHARED anchor, so without this the back control lands
  * on a different week than the one it was pressed from: leaving Sun 6 via the
@@ -402,17 +448,29 @@ function onOpenDay(ymd: string) {
  * the clock, the highlight and the header all read it — so the fix is to
  * remember the address, not to add a second anchor.
  *
- * Any deliberate move in the today view (a step, or Today) clears it: at that
- * point the family has chosen where they are, and silently undoing that on the
- * way back would be its own surprise.
+ * ⭐ It carries `at` so it INVALIDATES ITSELF, which is the whole reason this is
+ * one rule rather than a clear() at every call site. Five things move the
+ * anchor — a step, the Today button, the today view's own week strip, a view
+ * switch, and the midnight rollover — and the first cut cleared it in three of
+ * them, one of them before it knew the step had been refused. Any move at all
+ * makes `at` stale, and a stale address is simply not used.
  */
-const anchorBeforeDrill = ref<string | null>(null);
+const drill = ref<{ from: string; at: string } | null>(null);
 
 function onGoBack() {
-  const restore = anchorBeforeDrill.value;
-  anchorBeforeDrill.value = null;
-  if (restore && restore !== anchorYmd.value && anchor.setAnchor(restore, 'day_tap')) {
-    logAnchorChange('back_restore');
+  const address = drill.value;
+  drill.value = null;
+  /*
+   * ⚠️ Restore only when LEAVING THE DAY we drilled into. The back control is
+   * shared with the chore board, which is reachable from the today view — days
+   * -> drill into Sep 8 -> chores -> back would otherwise rewind the wall to
+   * Sep 6, and `wallViewTransition` then leaves `back` naming the view we are
+   * in, so `canGoBack` goes false and the family is stranded on the wrong day
+   * with no control left.
+   */
+  const stillOnTheDrilledDay = activeView.value === 'today' && address?.at === anchorYmd.value;
+  if (stillOnTheDrilledDay && address.from !== anchorYmd.value) {
+    if (anchor.setAnchor(address.from, 'back_restore')) logAnchorChange('back_restore');
   }
   selectView(lastCalendarView.value);
 }
@@ -543,6 +601,7 @@ onScopeDispose(() => {
     window.removeEventListener('resize', onViewportResize);
     if (resizeFrame) cancelAnimationFrame(resizeFrame);
   }
+  if (railEmitTimer) clearTimeout(railEmitTimer);
   clearInterval(clockTimer);
   resetCelebrationMode();
   logEvent({ level: 'info', surface: SURFACE, message: 'wall_exit', context: { action: 'exit' } });
@@ -706,6 +765,7 @@ watch(activeView, () => (sheet.value = null));
         :today-ymd="today"
         :tomorrow-ymd="tomorrowYmd"
         :portrait="isPortrait"
+        :room-for-band="roomForBand"
         :now="clockNow"
         :peripherals="peripherals"
         :week-of-anchor="anchor.weekOfAnchor.value"

@@ -16,9 +16,8 @@
  */
 import { computed } from 'vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
-import { useMediaQuery } from '@/composables/useMediaQuery';
 import { wallPeripheralVariant } from '@/utils/wallActivities';
-import { BAND_HEIGHT_QUERY, RAIL_WIDTH_PX } from '@/components/wall/wallLayout';
+import { RAIL_WIDTH_PX } from '@/components/wall/wallLayout';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
@@ -40,6 +39,18 @@ const props = defineProps<{
    * feeding it a measured height instead would oscillate.
    */
   busiest: number;
+  /**
+   * Is the window tall enough for a stacked band to leave the grid a real day?
+   *
+   * ⚠️ A PROP, deliberately, rather than a `useMediaQuery` read here. The page
+   * already owns the wall's ONE viewport mechanism — a rAF-coalesced `resize`
+   * listener feeding `viewportWidth`/`viewportHeight` — and its docblock says
+   * why: two mechanisms disagree by the scrollbar and by fractional zoom, so
+   * near a threshold two views can reach opposite conclusions about the same
+   * screen at the same instant. Adding a media query here would have been the
+   * third. It is also what lets the page REPORT the variant it actually got.
+   */
+  roomForBand: boolean;
   /** The day the meals card opens — the anchored day, not necessarily today. */
   mealsYmd: string;
   peripherals: WallPeripheralData;
@@ -49,26 +60,12 @@ const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
 
 const useRail = computed(() => props.rail && !props.portrait);
 
-/**
- * Is the window tall enough for a stacked band to leave the grid a real day?
- *
- * Read here rather than plumbed down from the page: all three views ask the same
- * question of the same window, and a prop would have to be threaded through each
- * of them to arrive at the one component that uses it. `useMediaQuery` is
- * reactive and releases with the scope, so rotating a mounted tablet re-answers
- * it — the wall's stated requirement for every other layout decision.
- *
- * Defaults to `true` under SSR/jsdom, matching the pre-existing behaviour: the
- * band is the preference, and the first real match corrects it.
- */
-const roomForBand = useMediaQuery(BAND_HEIGHT_QUERY, true);
-
 const peripheralVariant = computed(() =>
   wallPeripheralVariant(
     useRail.value ? 'rail' : 'band',
     props.busiest,
     props.portrait,
-    roomForBand.value
+    props.roomForBand
   )
 );
 </script>
@@ -79,8 +76,27 @@ const peripheralVariant = computed(() =>
       <slot name="main" />
     </div>
 
+    <!--
+      ⚠️ A stacked band SHRINKS AND CLIPS; it is not `shrink-0`.
+
+      `WallTimeGrid` states the policy — "if the wall is genuinely too short for
+      everything, the peripherals clip" — and the calendar backs it with a
+      `min-h-[13.75rem]` floor. While this wrapper refused to shrink, the two
+      rules fought and the calendar lost QUIETLY: on a 1024x768 tablet the plot
+      held its 220px floor, ran past the bottom of its slot, and the cards drew
+      over the last two hours of the day. Nothing threw, because the plot is
+      `overflow-hidden` and clipped its own contents tidily in the wrong place.
+
+      With `min-h-0 shrink` the arithmetic can only resolve one way, so a wrong
+      answer from `bandFitsHeight` — Large reading mode, an unusually tall
+      portrait band — costs a clipped card instead of a covered evening.
+
+      The rail keeps `shrink-0`: it sits BESIDE the grid and takes no height from
+      it, and shrinking it would just narrow the cards for nothing.
+    -->
     <div
-      :class="useRail ? 'shrink-0 overflow-y-auto' : 'shrink-0'"
+      class="wall-peripherals"
+      :class="useRail ? 'shrink-0 overflow-y-auto' : 'min-h-0 shrink overflow-hidden'"
       :style="useRail ? { width: `${RAIL_WIDTH_PX}px` } : undefined"
     >
       <WallPeripheralCards

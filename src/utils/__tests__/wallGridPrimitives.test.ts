@@ -282,10 +282,12 @@ describe('wallPeripheralVariant', () => {
     expect(wallPeripheralVariant('rail', 3, false, false)).toBe('rail');
   });
 
-  it('defaults to having room, so an unmeasured window keeps the preference', () => {
-    // SSR and jsdom have no `matchMedia`; the band is the preference and the
-    // first real match corrects it. A default of `false` would have flashed a
-    // strip onto every wall on mount.
+  it('defaults to having room, for the ONE caller that cannot know', () => {
+    // ⚠️ The previous version of this test claimed to cover an SSR/jsdom
+    // fallback. It covered nothing: the shell now takes `roomForBand` as a prop
+    // and always passes it, so the default is reached only by a call site that
+    // has no viewport to ask — and `band` is the right answer there, because the
+    // band is the preference and the first real measurement corrects it.
     expect(wallPeripheralVariant('band', 3, false)).toBe('band');
   });
 });

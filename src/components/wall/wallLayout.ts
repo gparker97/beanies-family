@@ -167,5 +167,25 @@ export function daysLayoutFor(
  */
 export const BAND_MIN_VIEWPORT_HEIGHT_PX = 1000;
 
-/** The same threshold as a media query, so no call site restates the number. */
-export const BAND_HEIGHT_QUERY = `(min-height: ${BAND_MIN_VIEWPORT_HEIGHT_PX}px)`;
+/**
+ * Is this window tall enough to stack a full band under the grid?
+ *
+ * ⚠️ An APPROXIMATION, and knowingly so. Two things move the real number and a
+ * viewport height in CSS px can see neither: the portrait band lays its cards
+ * out `grid-cols-2`, so a family with three or more cards gets a second row the
+ * landscape measurement never paid for; and Large reading mode scales every
+ * padding, gap and font by 1.1875 while `innerHeight` does not move, pushing the
+ * true cutoff to roughly 1120.
+ *
+ * It is allowed to be an approximation because it is no longer the only thing
+ * standing between the cards and the calendar: `WallViewShell`'s peripheral
+ * wrapper is shrinkable and clipped, so a wrong answer here costs a clipped card
+ * rather than cards painted over the family's evening. Sizing this properly
+ * means measuring the chrome in rem against a shared `MIN_READABLE_PLOT_PX` that
+ * the grid's own `min-h-[13.75rem]` also consumes — worth doing, not worth doing
+ * inside a change about the hour.
+ */
+export function bandFitsHeight(viewportHeightPx: number): boolean {
+  if (!Number.isFinite(viewportHeightPx)) return true;
+  return viewportHeightPx >= BAND_MIN_VIEWPORT_HEIGHT_PX;
+}
