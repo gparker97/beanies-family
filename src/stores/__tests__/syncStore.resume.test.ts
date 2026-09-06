@@ -860,7 +860,7 @@ describe('syncStore — restoring from a backup file', () => {
     });
   });
 
-  function preload(syncStore: ReturnType<typeof useSyncStore>, userChose: boolean) {
+  function preload(syncStore: ReturnType<typeof useSyncStore>) {
     syncStore.pendingEncryptedFile = {
       envelope: {
         version: '4.0',
@@ -872,14 +872,55 @@ describe('syncStore — restoring from a backup file', () => {
         inviteKeys: {},
         encryptedPayload: 'base64==',
       },
-      userChose,
     };
   }
 
-  it('marks the file the Settings picker returned as explicitly chosen', async () => {
-    // ⚠️ THE PRODUCER HALF. Without this, deleting `userChose: true` from
-    // `loadFromNewFile` leaves every other test in this block green — they set
-    // the pending file by hand and only exercise the consumer.
+  const basisOfFirstMerge = () => vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2];
+
+  it('sends `user-file` when the CALLER says the human confirmed the replacement', async () => {
+    // The one confirmed site is Settings, whose dialog says "This will replace
+    // all local data with the contents of the selected file". `user-file` is the
+    // only context under which an OLDER file (a backup) wins instead of being
+    // republished over.
+    const syncStore = useSyncStore();
+    preload(syncStore);
+
+    await syncStore.decryptPendingFile('right-pw', { userChoseThisFile: true });
+
+    expect(basisOfFirstMerge()).toEqual({ kind: 'user-file' });
+  });
+
+  it('does NOT claim an explicit choice when the caller says nothing', async () => {
+    // The same function serves the routine sign-in decrypt. Arming it there
+    // would make every cold boot adopt over unsynced work without asking.
+    const syncStore = useSyncStore();
+    preload(syncStore);
+
+    await syncStore.decryptPendingFile('right-pw');
+
+    expect(basisOfFirstMerge()).toMatchObject({ kind: 'baseline' });
+  });
+
+  it('CANNOT be reached by proving your identity', async () => {
+    // ⚠️ `decryptPendingFileWithKey` backs passkey, biometric, trusted-device and
+    // PIN. Those answer "who are you", not "replace all my data", so the path has
+    // no parameter to pass the destructive context and must never send it. A
+    // stored marker made exactly this reachable: it outlived a cancelled decrypt
+    // and the silent trusted-device probe spent it.
+    const syncStore = useSyncStore();
+    preload(syncStore);
+
+    await syncStore.decryptPendingFileWithKey({} as CryptoKey);
+
+    expect(basisOfFirstMerge()).toMatchObject({ kind: 'baseline' });
+  });
+
+  it('has exactly ONE producer, and the shared picker is not it', async () => {
+    // ⚠️ THE INVARIANT THE LAST ATTEMPT GOT WRONG. `loadFromNewFile` has four
+    // callers — Settings, LoadPodView, JoinPodView and manualImport — and only
+    // Settings confirms anything. Marking the file inside that shared function
+    // armed a destructive adopt for the login-screen picker with no dialog ever
+    // shown. Nothing it returns may carry consent.
     const syncService = await import('@/services/sync/syncService');
     vi.mocked(syncService.openAndLoadFile).mockResolvedValue({
       success: false,
@@ -897,36 +938,11 @@ describe('syncStore — restoring from a backup file', () => {
     } as unknown as Awaited<ReturnType<typeof syncService.openAndLoadFile>>);
 
     const syncStore = useSyncStore();
-    const result = await syncStore.loadFromNewFile();
+    await syncStore.loadFromNewFile();
 
-    expect(result.needsPassword).toBe(true);
-    expect(syncStore.pendingEncryptedFile?.userChose).toBe(true);
-  });
-
-  it('tells the worker the human chose these bytes, so an OLDER file still wins', async () => {
-    const syncStore = useSyncStore();
-    preload(syncStore, true);
-
+    // Whatever the picker produced, decrypting it without an explicit argument
+    // must still be an ordinary baseline compare.
     await syncStore.decryptPendingFile('right-pw');
-
-    // `user-file` is the only context that never blocks, and the only one under
-    // which `ours-newer` adopts instead of republishing over the chosen file.
-    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toEqual({
-      kind: 'user-file',
-    });
-  });
-
-  it('does NOT claim an explicit choice on the ordinary load path', async () => {
-    // The same function serves the routine sign-in decrypt, where nobody has
-    // been shown a "this replaces all local data" dialog. Arming it there would
-    // make every cold boot adopt over unsynced work without asking.
-    const syncStore = useSyncStore();
-    preload(syncStore, false);
-
-    await syncStore.decryptPendingFile('right-pw');
-
-    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toMatchObject({
-      kind: 'baseline',
-    });
+    expect(basisOfFirstMerge()).toMatchObject({ kind: 'baseline' });
   });
 });

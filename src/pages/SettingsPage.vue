@@ -533,7 +533,12 @@ async function handleDecryptFile(password: string) {
   isProcessingEncryption.value = true;
   encryptionError.value = null;
 
-  const result = await syncStore.decryptPendingFile(password);
+  // ⚠️ THE ONE CONFIRMED SITE. Both buttons that reach here go through
+  // `handleLoadFromFileClick` → a dialog that says "This will replace all local
+  // data with the contents of the selected file". That is what authorises the
+  // `user-file` lineage context, and it is passed from here rather than stored,
+  // so no other flow can inherit it.
+  const result = await syncStore.decryptPendingFile(password, { userChoseThisFile: true });
 
   isProcessingEncryption.value = false;
 
