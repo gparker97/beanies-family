@@ -244,16 +244,6 @@ export const useSyncStore = defineStore('sync', () => {
     driveFileId?: string;
     driveFileName?: string;
     driveAccountEmail?: string;
-    /**
-     * The human picked THESE bytes through "Load another family data file",
-     * past a confirmation that says in so many words: "This will replace all
-     * local data with the contents of the selected file and set it as your data
-     * file." That promise is the `user-file` lineage context, and without it the
-     * restore does the OPPOSITE of what the dialog said — see
-     * `decryptPendingFile`. Set by `loadFromNewFile` alone; the ordinary Drive
-     * load and the login-surface pickers leave it false.
-     */
-    userChose?: boolean;
   } | null>(null);
 
   // Single source of truth for "is a non-interruptible write in flight?".
@@ -1502,15 +1492,6 @@ export const useSyncStore = defineStore('sync', () => {
         envelope: result.envelope,
         fileHandle: result.fileHandle,
         provider: result.provider,
-        // ⚠️ THE RESTORE ROUTE. This is the ONLY flow whose confirmation promises
-        // "This will replace all local data with the contents of the selected
-        // file", and it is how a family reverts to a backup — including after a
-        // compaction they regret. Without this marker the lineage guard sees a
-        // BACKUP older than the local document, answers `ours-newer`, keeps the
-        // local document and PUBLISHES it over the file just chosen: the restore
-        // silently fails AND the backup is destroyed, because `decryptPendingFile`
-        // has already made that file the provider.
-        userChose: true,
       };
       return { success: false, needsPassword: true };
     }
@@ -1574,7 +1555,30 @@ export const useSyncStore = defineStore('sync', () => {
    * The password is used to derive a member wrapping key, which unwraps the
    * family key. The family key then decrypts the Automerge binary payload.
    */
-  async function decryptPendingFile(password: string): Promise<{
+  async function decryptPendingFile(
+    password: string,
+    /**
+     * ⚠️ CONSENT TRAVELS WITH THE CALL, FROM THE SITE THAT OBTAINED IT.
+     *
+     * `true` only from Settings → Family Data Options, whose confirmation reads
+     * "This will replace all local data with the contents of the selected file
+     * and set it as your data file." That sentence IS the `user-file` lineage
+     * context, which never blocks and turns `ours-newer` into a wholesale adopt.
+     *
+     * It was briefly a `userChose` marker stored on `pendingEncryptedFile`, and
+     * that was wrong twice over. `loadFromNewFile` has FOUR callers — Settings,
+     * `LoadPodView`, `JoinPodView` and `manualImport` — and only the first
+     * confirms anything, so the login-screen file picker armed a destructive
+     * adopt with no dialog ever rendered. And a marker on the ref OUTLIVES the
+     * flow that set it: `clearPendingEncryptedFile` has one call site in the
+     * whole app, so a cancelled decrypt left it armed for the silent
+     * trusted-device probe, the biometric unlock and the PIN path to spend — a
+     * person answering "prove it's you", not "replace all my data". Same failure
+     * as the module-level one-shot before it; storing it on a ref merely made
+     * the lifetime longer.
+     */
+    opts: { userChoseThisFile?: boolean } = {}
+  ): Promise<{
     success: boolean;
     error?: string;
     memberIds?: string[];
@@ -1637,8 +1641,12 @@ export const useSyncStore = defineStore('sync', () => {
         // TypeScript could not see it. Re-arm rather than skip the reload: the
         // stores still need the projection this open produced.
         keptLocal =
-          (await replaceDocWithCacheRecovery(pending.envelope, famId, fk, !!pending.userChose)) ===
-          KEPT_LOCAL;
+          (await replaceDocWithCacheRecovery(
+            pending.envelope,
+            famId,
+            fk,
+            !!opts.userChoseThisFile
+          )) === KEPT_LOCAL;
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -2480,8 +2488,12 @@ export const useSyncStore = defineStore('sync', () => {
         // TypeScript could not see it. Re-arm rather than skip the reload: the
         // stores still need the projection this open produced.
         keptLocal =
-          (await replaceDocWithCacheRecovery(pending.envelope, famId, fk, !!pending.userChose)) ===
-          KEPT_LOCAL;
+          // ⚠️ NEVER `user-file` HERE, and deliberately no parameter to pass
+          // one. This is the passkey / biometric / trusted-device / PIN path:
+          // the human proved WHO THEY ARE. Nobody showed them a dialog about
+          // replacing their data, so this path may not reach the context that
+          // discards it.
+          (await replaceDocWithCacheRecovery(pending.envelope, famId, fk)) === KEPT_LOCAL;
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that

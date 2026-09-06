@@ -199,3 +199,35 @@ Raised for greg rather than changed: `ErrorBanner`'s white-on-Heritage-Orange
 title is 3.32:1 and no ink fixes it (the ground is too light; `primary-700` gives
 5.81:1, across four banners); `flags.ts` reads the localStorage override before
 the prod gate, so `podCompaction` is enable-able on production.
+
+### 2026-09-06 — OPEN, unrelated to #90: PIN-only family cannot unlock on a second device
+
+Raised by greg mid-soak, parked for a future session. Not a lineage/compaction
+issue; capturing verbatim so it is not lost.
+
+> "i've set up a new family and as per the setup process i've set a PIN, but not
+> a password as we're no longer asked for a password. now when i'm trying to
+> login from edge it's asking for the recovery code, with the option 'use
+> password instead' also shown. if i click on the use password option, the PIN I
+> set does not work and i was never asked to set a password. however, i went to
+> the logged in pod and set a pass phrase, and when i tried to unlock with the
+> phrase, i got the error: No wrapped keys in beanpod file — cannot unlock"
+>
+> "what is the expected path here? why do we ask for a password if we don't ask
+> users to set a password anymore?"
+
+Three things to establish next session:
+
+1. **What the intended second-device path IS for a Phase-4 (PIN-only, born
+   password-free) family.** The create flow sets a PIN and issues a recovery kit;
+   the PIN is a per-device unlock, so it cannot be the cross-device credential.
+   If the kit is the only route, the "use password instead" affordance is offering
+   a credential that family never had.
+2. **Why `wrappedKeys` was empty.** "No wrapped keys in beanpod file — cannot
+   unlock" after setting a passphrase suggests the passphrase write either did not
+   reach the envelope or did not reach the FILE (a save that never landed, or an
+   envelope replacement that dropped the dict). `recoveryPassphrase` is a separate
+   envelope member from `wrappedKeys`; check which one the unlock path reads.
+3. **Whether the second device should have been offered the kit alone.** The
+   fallback affordances are chosen by the login flow's capability check, not by
+   what the family actually has.
