@@ -39,16 +39,38 @@ export interface WallViewDef {
    * day sheet in a view that cannot (`lanes`, whose columns are people).
    */
   stepUnit: WallStepUnit | null;
+  /**
+   * Does this view draw its OWN step arrows, beside the dates they move?
+   *
+   * `false` means the page's header navigator draws them. Read only when
+   * `stepUnit` is non-null — a view with no date has no arrows at all, and that
+   * fact is already recorded above.
+   *
+   * ⚠️ A boolean, not a `'row' | 'header' | null` tri-state. A tri-state records
+   * "no arrows" TWICE — here and as `stepUnit: null` — and makes
+   * `{ stepUnit: null, arrows: 'header' }` a constructible, type-checking,
+   * meaningless row: a view with no date and a pair of arrows that step nothing.
+   * Two fields that compose cannot be set to contradict each other.
+   */
+  arrowsInView: boolean;
 }
 
 export const WALL_VIEWS: readonly WallViewDef[] = [
-  { id: 'days', labelKey: 'wall.view.days', glyph: '▦', component: WallDaysView, stepUnit: 'week' },
+  {
+    id: 'days',
+    labelKey: 'wall.view.days',
+    glyph: '▦',
+    component: WallDaysView,
+    stepUnit: 'week',
+    arrowsInView: true,
+  },
   {
     id: 'lanes',
     labelKey: 'wall.view.lanes',
     glyph: '👥',
     component: WallLanesView,
     stepUnit: 'day',
+    arrowsInView: false,
   },
   {
     id: 'today',
@@ -56,6 +78,7 @@ export const WALL_VIEWS: readonly WallViewDef[] = [
     glyph: '☀',
     component: WallTodayView,
     stepUnit: 'day',
+    arrowsInView: false,
   },
   {
     id: 'jobs',
@@ -64,6 +87,8 @@ export const WALL_VIEWS: readonly WallViewDef[] = [
     component: WallChoreBoard,
     dividerBefore: true,
     stepUnit: null,
+    // Unread: `stepUnit` is null, so the page never asks.
+    arrowsInView: false,
   },
 ] as const;
 

@@ -18,7 +18,9 @@
  */
 import { computed } from 'vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
+import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
+import { ARROW_GUTTER_PX } from '@/components/wall/wallLayout';
 import { useActivityStore } from '@/stores/activityStore';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
@@ -53,6 +55,9 @@ const props = defineProps<{
   peripherals: WallPeripheralData;
   /** The wall's person filter, which this view applies to its own content too. */
   visibleMemberIds: string[] | null;
+  /** Whether each arrow can still move — the range boundary, from the page. */
+  canStepBack: boolean;
+  canStepForward: boolean;
 }>();
 const emit = defineEmits<{
   /**
@@ -66,6 +71,8 @@ const emit = defineEmits<{
    * reachable from the lanes view's header and from any individual event.
    */
   focusDay: [string];
+  /** A step arrow was pressed. The page owns the anchor, so it owns the move. */
+  step: [-1 | 1];
   open: [WallSheetTarget];
   openChores: [];
 }>();
@@ -164,78 +171,113 @@ function colourFor(activity: FamilyActivity) {
     @open-chores="emit('openChores')"
   >
     <template #main>
-      <!-- day headers, on the same column track as the plot below -->
-      <div
-        class="grid shrink-0 gap-0"
-        :style="{
-          paddingLeft: `${AXIS_WIDTH_PX}px`,
-          gridTemplateColumns: `repeat(${visible.length}, 1fr)`,
-        }"
-      >
-        <button
-          v-for="ymd in visible"
-          :key="ymd"
-          type="button"
-          class="rounded-t-2xl px-2 py-1.5 text-center"
-          :class="
-            ymd === todayYmd
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
-              : 'text-secondary-500 dark:text-ink'
-          "
-          @click="emit('focusDay', ymd)"
-        >
-          <span class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70">
-            {{ weekdayShort(ymd) }}
-          </span>
-          <span class="font-outfit wall-dnum block leading-tight font-extrabold">
-            {{ dayOfMonth(ymd) }}
-          </span>
-        </button>
-      </div>
+      <!--
+        ⚠️ ONE wrapper carries the arrow gutter, so the date row, the plot and
+        the strip all lose the same width. Reserving it on the date row alone
+        would put every day header off the column it labels — which is the one
+        thing the markup comment below says it exists to guarantee.
 
-      <WallTimeGrid
-        :columns="gridColumns"
-        :all-day-spans="allDaySpans"
-        :now="now"
-        :dim-past="true"
-        :show-now="showsToday"
-        :axis-width="AXIS_WIDTH_PX"
-        view-id="days"
-        @open="emit('open', $event)"
-      />
-
-      <!-- the days that did not fit as columns, tappable. Landscape too, now. -->
+        The arrows are absolutely positioned INSIDE it: the back one over the
+        axis gutter, which is empty at this height, and the forward one in the
+        reserved space. Both sit outside the header row's own grid track, so
+        neither can overlap a day button. The padding is viewport-derived and
+        stable, so the plot's ResizeObserver cannot be fed a width that depends
+        on what it measured.
+      -->
       <div
-        v-if="rest.length"
-        class="grid shrink-0 gap-2"
-        :style="{ gridTemplateColumns: `repeat(${rest.length}, 1fr)` }"
+        class="relative flex min-h-0 flex-1 flex-col gap-2.5"
+        :style="{ paddingRight: `${ARROW_GUTTER_PX}px` }"
       >
-        <button
-          v-for="ymd in rest"
-          :key="ymd"
-          type="button"
-          class="dark:bg-surface-raised flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)]"
-          @click="emit('focusDay', ymd)"
+        <WallNavArrow
+          class="absolute top-0 left-0 z-10"
+          :style="{ width: `${AXIS_WIDTH_PX}px` }"
+          :direction="-1"
+          :enabled="canStepBack"
+          @step="emit('step', $event)"
+        />
+        <WallNavArrow
+          class="absolute top-0 right-0 z-10"
+          :style="{ width: `${ARROW_GUTTER_PX}px` }"
+          :direction="1"
+          :enabled="canStepForward"
+          @step="emit('step', $event)"
+        />
+
+        <!-- day headers, on the same column track as the plot below -->
+        <div
+          class="grid shrink-0 gap-0"
+          :style="{
+            paddingLeft: `${AXIS_WIDTH_PX}px`,
+            gridTemplateColumns: `repeat(${visible.length}, 1fr)`,
+          }"
         >
-          <span
-            class="font-outfit text-secondary-500 wall-rest-day dark:text-ink font-bold uppercase"
+          <button
+            v-for="ymd in visible"
+            :key="ymd"
+            type="button"
+            class="rounded-t-2xl px-2 py-1.5 text-center"
+            :class="
+              ymd === todayYmd
+                ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
+                : 'text-secondary-500 dark:text-ink'
+            "
+            @click="emit('focusDay', ymd)"
           >
-            {{ weekdayShort(ymd) }} {{ dayOfMonth(ymd) }}
-          </span>
-          <span class="ml-auto flex gap-1" aria-hidden="true">
-            <i
-              v-for="entry in eventsFor(ymd).slice(0, 4)"
-              :key="entry.activity.id + entry.date"
-              class="block h-1.5 w-1.5 rounded-full"
-              :style="{ background: colourFor(entry.activity) }"
-            />
-          </span>
-          <span
-            class="font-outfit text-primary-500 wall-rest-count rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 font-bold"
+            <span
+              class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70"
+            >
+              {{ weekdayShort(ymd) }}
+            </span>
+            <span class="font-outfit wall-dnum block leading-tight font-extrabold">
+              {{ dayOfMonth(ymd) }}
+            </span>
+          </button>
+        </div>
+
+        <WallTimeGrid
+          :columns="gridColumns"
+          :all-day-spans="allDaySpans"
+          :now="now"
+          :dim-past="true"
+          :show-now="showsToday"
+          :axis-width="AXIS_WIDTH_PX"
+          view-id="days"
+          @open="emit('open', $event)"
+        />
+
+        <!-- the days that did not fit as columns, tappable. Landscape too, now. -->
+        <div
+          v-if="rest.length"
+          class="grid shrink-0 gap-2"
+          :style="{ gridTemplateColumns: `repeat(${rest.length}, 1fr)` }"
+        >
+          <button
+            v-for="ymd in rest"
+            :key="ymd"
+            type="button"
+            class="dark:bg-surface-raised flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)]"
+            @click="emit('focusDay', ymd)"
           >
-            {{ eventsFor(ymd).length }}
-          </span>
-        </button>
+            <span
+              class="font-outfit text-secondary-500 wall-rest-day dark:text-ink font-bold uppercase"
+            >
+              {{ weekdayShort(ymd) }} {{ dayOfMonth(ymd) }}
+            </span>
+            <span class="ml-auto flex gap-1" aria-hidden="true">
+              <i
+                v-for="entry in eventsFor(ymd).slice(0, 4)"
+                :key="entry.activity.id + entry.date"
+                class="block h-1.5 w-1.5 rounded-full"
+                :style="{ background: colourFor(entry.activity) }"
+              />
+            </span>
+            <span
+              class="font-outfit text-primary-500 wall-rest-count rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 font-bold"
+            >
+              {{ eventsFor(ymd).length }}
+            </span>
+          </button>
+        </div>
       </div>
     </template>
   </WallViewShell>

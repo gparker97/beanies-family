@@ -17,6 +17,7 @@ import WallLockMenu from '@/components/wall/WallLockMenu.vue';
 import WallNightScreen from '@/components/wall/WallNightScreen.vue';
 import WallSheet from '@/components/wall/WallSheet.vue';
 import WallTickBurst from '@/components/wall/WallTickBurst.vue';
+import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallStatusStamp from '@/components/wall/WallStatusStamp.vue';
 import WallViewSwitcher from '@/components/wall/WallViewSwitcher.vue';
 import { DEFAULT_WALL_VIEW, wallViewById } from '@/components/wall/wallViews';
@@ -526,24 +527,23 @@ watch(activeView, () => (sheet.value = null));
           The period navigator. Hidden on the jobs board, which has no date at
           all (`stepUnit: null` in the registry).
 
-          Rendered inline rather than as a shared `PeriodNavigator` component:
-          two other clusters exist (`MonthNavigator`, `CalendarCommandBar`), but
-          the command bar cannot adopt one — its label sits outside the cluster
-          behind a load-bearing Transition — so an extraction would consolidate
-          two of three while putting a regression surface on the transactions
-          page. Consolidating all three is a follow-up with one owner.
+          The ARROWS move into the days view, beside the dates they move — see
+          `arrowsInView` in the registry. The label and the Today chip stay here
+          in every view, because they NAME where you are rather than moving you.
+
+          Still not the shared `PeriodNavigator` the planner would want: two
+          other clusters exist, but `CalendarCommandBar` cannot adopt one (its
+          label sits outside the cluster behind a load-bearing Transition), so an
+          extraction would consolidate two of three while putting a regression
+          surface on the transactions page. One owner, one follow-up.
         -->
         <div v-if="currentView.stepUnit" class="flex items-center gap-1.5">
-          <button
-            type="button"
-            class="font-outfit text-secondary-500 wall-nav-arrow dark:bg-surface-raised dark:text-ink rounded-xl bg-white px-2.5 py-1.5 font-bold shadow-[var(--card-shadow)]"
-            :aria-label="t('planner.prevPeriod')"
-            :disabled="!canStepBack"
-            :class="canStepBack ? '' : 'pointer-events-none opacity-40'"
-            @click="onStep(-1)"
-          >
-            <span aria-hidden="true">‹</span>
-          </button>
+          <WallNavArrow
+            v-if="!currentView.arrowsInView"
+            :direction="-1"
+            :enabled="canStepBack"
+            @step="onStep"
+          />
           <!--
             `--muted-text` has no definition anywhere in the app, so the #4d5d6c
             fallback is what always renders — about 2.5:1 on the dark ground.
@@ -558,16 +558,12 @@ watch(activeView, () => (sheet.value = null));
           >
             {{ anchorLabel }}
           </p>
-          <button
-            type="button"
-            class="font-outfit text-secondary-500 wall-nav-arrow dark:bg-surface-raised dark:text-ink rounded-xl bg-white px-2.5 py-1.5 font-bold shadow-[var(--card-shadow)]"
-            :aria-label="t('planner.nextPeriod')"
-            :disabled="!canStepForward"
-            :class="canStepForward ? '' : 'pointer-events-none opacity-40'"
-            @click="onStep(1)"
-          >
-            <span aria-hidden="true">›</span>
-          </button>
+          <WallNavArrow
+            v-if="!currentView.arrowsInView"
+            :direction="1"
+            :enabled="canStepForward"
+            @step="onStep"
+          />
           <!-- Only offered when it would do something. -->
           <button
             v-if="!isAnchoredToToday"
@@ -615,6 +611,8 @@ watch(activeView, () => (sheet.value = null));
         :week-of-anchor="anchor.weekOfAnchor.value"
         :rail="daysLayout.rail"
         :day-columns="daysLayout.columns"
+        :can-step-back="canStepBack"
+        :can-step-forward="canStepForward"
         :lanes-rail="lanesRail"
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"
@@ -623,6 +621,7 @@ watch(activeView, () => (sheet.value = null));
         @back="selectView(lastCalendarView)"
         @open-day="openSheet({ kind: 'day', ymd: $event })"
         @focus-day="onFocusDay"
+        @step="onStep"
         @open="openSheet"
         @open-chores="selectView('jobs')"
       />
