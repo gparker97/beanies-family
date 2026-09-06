@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4538
+    "translationCount": 4544
   },
   "translations": {
     "app.name": {
@@ -22242,14 +22242,14 @@
       "lastUpdated": "2026-09-04"
     },
     "resumeSetup.podTooLarge": {
-      "translation": "此设备内存不足，无法打开此尺寸的pod。您的pod文件是安全的：没有任何损坏，也没有任何内容被删除。重新加载值得一试；清除数据无济于事，因为文件本身没有变化。如果问题仍然存在，请向support@beanies.family发送以下详细信息。",
-      "hash": "q02qft",
-      "lastUpdated": "2026-09-04"
+      "translation": "打开此大小的家庭文件时，此设备内存不足。您的文件是安全的：没有任何损坏，也没有任何内容被删除。重新加载值得一试；清除数据无济于事，因为文件本身没有变化。持久的解决方案是压缩家庭文件，所有者可以在计算机或其他仍打开它的设备上的“设置”中执行此操作—然后该设备将正常打开它。如果问题仍然存在，请向support@beanies.family发送以下详细信息。",
+      "hash": "vbzhfz",
+      "lastUpdated": "2026-09-06"
     },
     "podTooLarge.inline": {
-      "translation": "此设备打开您的Pod时内存不足。您的文件是安全的；问题在于此设备，而不是您的数据。",
-      "hash": "hy9l2g",
-      "lastUpdated": "2026-09-04"
+      "translation": "打开您的家庭文件时，此设备内存不足。您的文件是安全的；问题在于此设备，而不是您的数据。所有者可以从仍然打开它的设备上的“设置”中压缩家庭文件，然后该文件将正常打开。",
+      "hash": "wlpioi",
+      "lastUpdated": "2026-09-06"
     },
     "settings.decryptFailed": {
       "translation": "无法打开该文件。请检查您选择了正确的.beanpod文件，然后重试。",
@@ -22694,6 +22694,36 @@
     "compaction.refused.backup-too-large": {
       "translation": "此设备内存不足，无法进行备份，因此beanies在更改任何内容之前停止。没有任何变化。请在具有更多内存的设备上重试。",
       "hash": "80fmnh",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.not-soaked": {
+      "translation": "您家中有人拥有的设备最近没有打开beanies ， beanies知道它可以处理压缩文件。让他们打开帽子一次，然后再试一次。",
+      "hash": "gb4f43",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.not-soaked.named": {
+      "translation": "beanies正在等待{names}打开应用程序一次，因此它知道他们的设备可以处理压缩文件。让他们打开帽子，然后再试一次。",
+      "hash": "7czpt2",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.dueBecauseLarge": {
+      "translation": "您的家庭文件已经足够大，以至于较旧的手机和平板电脑可能很难打开它。现在压实是个好主意。",
+      "hash": "2hwwlz",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.dueBecauseFailed": {
+      "translation": "您家族中的设备无法打开家庭文件，因为内存不足。压实将为他们解决这个问题。",
+      "hash": "bfgp1y",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.doneNothingToDo": {
+      "translation": "无需执行其他操作—您的其他设备将自行接收此信息。",
+      "hash": "odhl8r",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.doneWaitingFor": {
+      "translation": "还有一件事： {names}将在下次打开便帽时拾取此信息。",
+      "hash": "vb3ovz",
       "lastUpdated": "2026-09-06"
     }
   }

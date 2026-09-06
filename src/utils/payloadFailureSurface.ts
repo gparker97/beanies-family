@@ -118,6 +118,15 @@ export function surfacePayloadFatal(
   // be damaged, contact support" full-screen — and the full-screen one is what a
   // fresh install restoring from a .beanpod sees, which is precisely the
   // population whose saved key is most likely to be stale.
+  // ⚠️ RECORD IT IN THE DOCUMENT, NOT IN TELEMETRY. The device that hit this is
+  // the ONE device that cannot fix it — compaction needs three copies of the
+  // document resident, strictly more than an open — so the fix has to reach
+  // whoever CAN act. A CloudWatch query is not something a family's Settings
+  // page can ask; a field on the member's own row is. Best-effort and detached:
+  // a family already looking at a failure must not also be made to wait on a
+  // write, and a failure here must never replace the message on screen.
+  if (err.deviceCannotOpen) void noteDeviceCannotOpen();
+
   const overlayKey = err.keyMayBeWrong
     ? 'resumeSetup.podCredentialStale'
     : err.deviceCannotOpen
@@ -132,6 +141,29 @@ export function surfacePayloadFatal(
     payloadErrorDetail(err, ctx.fileId, ctx.familyId),
     { clearDataHelps: false }
   );
+}
+
+/**
+ * Leave a mark on this member's own row saying this device could not open the
+ * pod, so the person who CAN compact it sees their family file read as due.
+ *
+ * ⚠️ EVERY FAILURE IS SWALLOWED, DELIBERATELY. This runs while a fatal overlay
+ * is being raised: the document may be unopenable, the store may be empty, and
+ * a throw here would replace an honest message about memory with an unrelated
+ * one. A missed mark costs a heuristic; a throw costs the explanation.
+ */
+async function noteDeviceCannotOpen(): Promise<void> {
+  try {
+    const { useFamilyStore } = await import('@/stores/familyStore');
+    const family = useFamilyStore();
+    const me = family.currentMember;
+    if (!me) return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (me.podTooLargeSeenAt === today) return; // already said so today
+    await family.updateMember(me.id, { podTooLargeSeenAt: today });
+  } catch {
+    // See above. The overlay is what matters here.
+  }
 }
 
 /**

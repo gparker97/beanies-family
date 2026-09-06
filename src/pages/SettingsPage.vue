@@ -41,6 +41,7 @@ import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
+import { usePodHealth } from '@/composables/usePodHealth';
 import { showToast } from '@/composables/useToast';
 import { requireReauth, canStepUp } from '@/composables/useReauth';
 import { reportError } from '@/utils/errorReporter';
@@ -593,6 +594,7 @@ function formatLastSync(timestamp: string | null): string {
 // bindings keep reading the same name.
 const { isExporting: isExportingBeanpod, exportEncryptedPod, confirmBackupLanded } = usePodExport();
 const { busy: isCompacting, compact: compactPod } = usePodCompaction();
+const { canCompactPod, compactionIsDue, someoneCannotOpenIt } = usePodHealth();
 /**
  * Does this family's storage keep the automatic copy beside the pod?
  *
@@ -1972,7 +1974,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
            destroyed at this point. Red belongs to the final confirm, which
            legitimately is destructive. -->
       <div
-        v-if="isFlagEnabled('podCompaction') && isOwner"
+        v-if="isFlagEnabled('podCompaction') && canCompactPod"
         class="dark:border-line mt-6 border-t border-gray-200 pt-4"
       >
         <h3
@@ -1990,6 +1992,24 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         <p class="dark:text-ink-soft mb-3 text-xs text-gray-500">
           {{ t('settings.compactSectionDesc') }}
         </p>
+
+        <!-- The DUE note: the only thing in this section that ever says "yes,
+             now". Everything else describes a capability; this says the file has
+             actually grown enough to matter, or that a device has already failed
+             to open it — a real failure outranking the size heuristic. Sky Silk,
+             not Heritage Orange: it is information, not a caution. -->
+        <div
+          v-if="compactionIsDue"
+          class="dark:border-silk-lift/40 dark:bg-silk-lift/10 mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3"
+        >
+          <p class="dark:text-ink text-xs leading-relaxed text-sky-900">
+            {{
+              someoneCannotOpenIt
+                ? t('compaction.dueBecauseFailed')
+                : t('compaction.dueBecauseLarge')
+            }}
+          </p>
+        </div>
 
         <!-- The one thing that needs a decision, deliberately NOT behind the
              badge: a device that was offline with unsaved changes cannot merge

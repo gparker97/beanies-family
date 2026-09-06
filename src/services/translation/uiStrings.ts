@@ -4213,9 +4213,9 @@ const STRING_DEFS = {
   // start again" — and because the app cannot hide the Clear-data control in
   // Settings. Do not delete it on the grounds that the button is gone.
   'resumeSetup.podTooLarge': {
-    en: 'This device ran out of memory opening a pod this size. Your pod file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. If it keeps happening, send support@beanies.family the details below.',
+    en: 'This device ran out of memory opening a family file this size. Your file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. The lasting fix is to compact the family file, which the owner can do from Settings on a computer or another device that still opens it — this device will then open it normally. If it keeps happening, send support@beanies.family the details below.',
     beanie:
-      'this device ran out of memory opening a pod this size. your pod file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. if it keeps happening, send support@beanies.family the details below.',
+      'this bean ran out of memory opening a family file this size. your file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. the lasting fix is to compact the family file, which the owner can do from settings on a computer or another bean that still opens it - this bean will then open it normally. if it keeps happening, send support@beanies.family the details below.',
   },
   // The INLINE variant, for the compact error slots under a password field
   // (LoadPodView, SettingsPage, the join and login flows). The overlay copy
@@ -4223,9 +4223,9 @@ const STRING_DEFS = {
   // button that exist only on the fatal overlay — using it here would reference
   // UI the user cannot see.
   'podTooLarge.inline': {
-    en: 'This device ran out of memory opening your pod. Your file is safe; the problem is this device, not your data.',
+    en: 'This device ran out of memory opening your family file. Your file is safe; the problem is this device, not your data. The owner can compact the family file from Settings on a device that still opens it, and this one will then open it normally.',
     beanie:
-      'this device ran out of memory opening your pod. your file is safe; the problem is this device, not your data.',
+      'this bean ran out of memory opening your family file. your file is safe; the problem is this bean, not your data. the owner can compact the family file from settings on a bean that still opens it, and this one will then open it normally.',
   },
   // The corrupt-payload INLINE variant. `loginFlow.recoveryCorruptBody` cannot
   // stand in for it: that string was written for OpenRecoveryPanel, which has a
@@ -4357,6 +4357,39 @@ const STRING_DEFS = {
     en: 'This device ran out of memory making the backup, so beanies stopped before changing anything. Nothing has changed. Try again on a device with more memory.',
     beanie:
       'this bean ran out of memory making the backup, so beanies stopped before changing anything. nothing has changed. try again on a bean with more memory.',
+  },
+  'compaction.refused.not-soaked': {
+    en: 'Someone in your family has a device that has not opened beanies recently enough for beanies to know it can handle a compacted file. Ask them to open beanies once, then try again.',
+    beanie:
+      'someone in your family has a bean that has not opened beanies recently enough for beanies to know it can handle a compacted pod. ask them to open beanies once, then try again.',
+  },
+  // The named variant, used once the projection is current and beanies can say
+  // WHO — a refusal you can act on beats one you can only be puzzled by.
+  'compaction.refused.not-soaked.named': {
+    en: 'beanies is waiting for {names} to open the app once, so it knows their device can handle a compacted file. Ask them to open beanies, then try again.',
+    beanie:
+      'beanies is waiting for {names} to open the app once, so it knows their bean can handle a compacted pod. ask them to open beanies, then try again.',
+  },
+  // The DUE note. Two variants, because a device that has actually failed to
+  // open the file is a different fact from a file that has merely grown — and
+  // the first is the one a family should act on today.
+  'compaction.dueBecauseLarge': {
+    en: 'Your family file has grown large enough that older phones and tablets may struggle to open it. Compacting now is a good idea.',
+    beanie:
+      'your pod has grown large enough that older phones and tablets may struggle to open it. compacting now is a good idea.',
+  },
+  'compaction.dueBecauseFailed': {
+    en: 'A device in your family could not open the family file because it ran out of memory. Compacting will fix that for them.',
+    beanie:
+      'a bean in your family could not open your pod because it ran out of memory. compacting will fix that for them.',
+  },
+  'compaction.doneNothingToDo': {
+    en: 'Nothing else to do — your other devices will pick this up on their own.',
+    beanie: 'nothing else to do - your other beans will pick this up on their own.',
+  },
+  'compaction.doneWaitingFor': {
+    en: 'One thing left: {names} will pick this up when they next open beanies.',
+    beanie: 'one thing left: {names} will pick this up when they next open beanies.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',
