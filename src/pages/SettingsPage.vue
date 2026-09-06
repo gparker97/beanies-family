@@ -2004,7 +2004,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               t('compaction.why.record'),
               t('compaction.why.settled'),
               t('compaction.why.older'),
-              t('compaction.why.conflict'),
+              t('compaction.why.devices'),
             ]"
           />
         </h3>
@@ -2055,16 +2055,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             class="text-primary-500 dark:text-accent-lift mt-0.5 h-4 w-4 flex-shrink-0"
             aria-hidden="true"
           />
-          <div v-if="olderVersion.length" class="space-y-2">
-            <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
-              {{ olderVersionNotice }}
-            </p>
-            <!-- The per-member limit, stated once rather than hidden: beanies sees
-                 people, not devices. -->
-            <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
-              {{ t('compaction.olderVersion.rule') }}
-            </p>
-          </div>
+          <p
+            v-if="olderVersion.length"
+            class="dark:text-ink-soft text-xs leading-relaxed text-orange-900"
+          >
+            {{ olderVersionNotice }}
+          </p>
           <p v-else class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
             {{ t('compaction.bringDevicesOnline') }}
           </p>

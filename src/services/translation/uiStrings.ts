@@ -4290,31 +4290,29 @@ const STRING_DEFS = {
   // not needed, why is it there?" — and the honest answer is that it IS needed,
   // right up until every device is level.
   'compaction.why.record': {
-    en: 'Your family file keeps a record of every change ever made to it. That record is how two devices work out what each other changed, so both sets of edits survive instead of one writing over the other.',
+    en: 'beanies keeps a record of past changes so your devices can catch up with each other after being offline. Once they have all caught up, the record is not needed.',
     beanie:
-      'your pod keeps a record of every change ever made to it. that record is how two beans work out what each other changed, so both sets of edits survive instead of one writing over the other.',
+      'beanies keeps a record of past changes so your beans can catch up with each other after being offline. once they have all caught up, the record is not needed.',
   },
   'compaction.why.settled': {
-    en: 'Once every device is up to date there is nothing left for that record to settle, so it can go. Your beans, and every date, note and photo, are untouched.',
+    en: 'Compacting keeps every account, transaction, task and memory. Only the record of past changes is removed.',
     beanie:
-      'once every bean is up to date there is nothing left for that record to settle, so it can go. your beans, and every date, note and photo, are untouched.',
+      'compacting keeps every account, transaction, task and memory. only the record of past changes is removed.',
   },
   'compaction.why.older': {
-    en: 'On an older phone or tablet the record can grow big enough to stop the family file opening at all. Compacting is what fixes that.',
+    en: 'beanies saves a copy of the current file first, so you can go back to it if you ever need to.',
     beanie:
-      'on an older phone or tablet the record can grow big enough to stop your pod opening at all. compacting is what fixes that.',
+      'beanies saves a copy of your current pod first, so you can go back to it if you ever need to.',
   },
-  // The rebase conflict rule, moved OUT of the confirm and into the "?" popover
-  // with the rest of the mechanism.
-  'compaction.why.conflict': {
-    en: 'If the same thing was changed in two places, the version already saved here is the one kept.',
+  'compaction.why.devices': {
+    en: 'Your other devices switch to the compacted file on their own. A device still on an older version of beanies shows a message and syncs again once it updates.',
     beanie:
-      'if the same thing was changed in two places, the version already saved here is the one kept.',
+      'your other beans switch to the compacted pod on their own. a bean still on an older version of beanies shows a message and syncs again once it updates.',
   },
   'compaction.bringDevicesOnline': {
-    en: "Before you start, bring your family's other devices online so they are up to date. beanies carries across changes made on a device that was offline, but if it cannot, that device will be asked to give them up.",
+    en: "Before you start, make sure your family's other devices have been online recently, so they are up to date.",
     beanie:
-      "before you start, bring your family's other devices online so they are up to date. beanies carries across changes made on a device that was offline, but if it cannot, that device will be asked to give them up.",
+      "before you start, make sure your family's other beans have been online recently, so they are up to date.",
   },
   // Two variants, because the sibling copy is written only where the storage
   // provider can write one. Promising it to a local-file family would be asking
@@ -4331,9 +4329,9 @@ const STRING_DEFS = {
   },
   'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
   'compaction.confirmMessage': {
-    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies keeps a copy of the current file first. Your other devices pick up the compacted file on their own, and beanies carries across anything they changed while offline. A device still on an older version of beanies shows a message and stops syncing until it updates; anything added on it before then is not kept.',
+    en: "beanies will rebuild your family file without its record of past changes, so it opens faster. Everything you've added stays. beanies saves a copy of the current file first, and your other devices switch over on their own.",
     beanie:
-      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this bean is lost, and beanies keeps a copy of your current pod first. your other beans pick up the compacted pod on their own, and beanies carries across anything they changed while offline. a bean still on an older version of beanies shows a message and stops syncing until it updates; anything added on it before then is not kept.',
+      'beanies will rebuild your pod without its record of past changes, so it opens faster. every one of your beans stays. beanies saves a copy of your current pod first, and your other beans switch over on their own.',
   },
   'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {
@@ -4409,36 +4407,28 @@ const STRING_DEFS = {
   // open the file is a different fact from a file that has merely grown — and
   // the first is the one a family should act on today.
   'compaction.dueBecauseLarge': {
-    en: 'Your family file has grown large enough that older phones and tablets may struggle to open it. Compacting now is a good idea.',
-    beanie:
-      'your family file has grown large enough that older phones and tablets may struggle to open it. compacting now is a good idea.',
+    en: 'Your family file has grown large. Compacting now is a good idea.',
+    beanie: 'your pod has grown large. compacting now is a good idea.',
   },
   'compaction.dueBecauseFailed': {
-    en: 'A device in your family could not open the family file because it ran out of memory. Compacting will fix that for them.',
-    beanie:
-      'a bean in your family could not open the family file because it ran out of memory. compacting will fix that for them.',
+    en: 'A device in your family could not open the family file. Compacting will fix that.',
+    beanie: 'a bean in your family could not open the pod. compacting will fix that.',
   },
   'compaction.doneNothingToDo': {
     en: 'Nothing else to do. Your other devices will pick this up on their own.',
     beanie: 'nothing else to do. your other beans will pick this up on their own.',
   },
   'compaction.doneOlderVersion': {
-    en: 'Done. {list} last opened beanies on an older version; that device will show a message and sync again once it updates.',
-    beanie:
-      'done. {list} last opened beanies on an older version; that device will show a message and sync again once it updates.',
+    en: 'Done. {list} will need to update beanies before it syncs again.',
+    beanie: 'done. {list} will need to update beanies before it syncs again.',
   },
   // The standing notice in Settings and the confirm's detail, composed ONCE in
   // `usePodHealth`. Names people, never versions (absent on exactly those
   // rows) and never devices (beanies has no per-device identity).
   'compaction.olderVersion.notice': {
-    en: '{list} last opened beanies on an older version. Once you compact, a device that is still on an older version shows a message and stops syncing until it updates, and anything added on it before then is not kept. Ask them to update beanies first if you can. Nothing else changes for anyone.',
+    en: '{list} last opened beanies on an older version. Ask them to update beanies before you compact.',
     beanie:
-      '{list} last opened beanies on an older version. once you compact, a bean that is still on an older version shows a message and stops syncing until it updates, and anything added on it before then is not kept. ask them to update beanies first if you can. nothing else changes for anyone.',
-  },
-  'compaction.olderVersion.rule': {
-    en: 'beanies can only see when each person last opened it, not every device they own. Any device that has not updated will say so when it next opens, and will sync again once it does.',
-    beanie:
-      'beanies can only see when each bean last opened it, not every device they own. any device that has not updated will say so when it next opens, and will sync again once it does.',
+      '{list} last opened beanies on an older version. ask them to update beanies before you compact.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',
@@ -4471,9 +4461,9 @@ const STRING_DEFS = {
   'settings.compactPod': { en: 'Compact Family File', beanie: 'compact pod' },
   'settings.compactSection': { en: 'Compact Your Family File', beanie: 'compact your pod' },
   'settings.compactSectionDesc': {
-    en: 'Compacting clears the record of past changes and keeps every one of your beans. beanies checks the compacted file matches the original exactly before it replaces anything, and stops if a single thing differs.',
+    en: "beanies keeps a record of every change to your family file. Over time that record makes the file bigger and slower to open, especially on older phones and tablets. Compacting removes the record and keeps everything you've added.",
     beanie:
-      'compacting clears the record of past changes and keeps every one of your beans. beanies checks the compacted pod matches the original exactly before it replaces anything, and stops if a single bean differs.',
+      'beanies keeps a record of every change to your pod. over time that record makes the pod bigger and slower to open, especially on older phones and tablets. compacting removes the record and keeps every one of your beans.',
   },
   'podLineage.bannerTitle': {
     en: 'Some changes on this device are waiting',
