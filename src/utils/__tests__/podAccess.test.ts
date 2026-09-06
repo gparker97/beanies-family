@@ -18,6 +18,7 @@ import {
 } from '../podAccess';
 import { DriveApiError, DriveFileNotFoundError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
+import { UnsupportedBeanpodVersionError } from '@/types/sync';
 
 const ALL_CODES: PodAccessErrorCode[] = [
   'OFFLINE',
@@ -27,6 +28,7 @@ const ALL_CODES: PodAccessErrorCode[] = [
   'VERIFY_UNAVAILABLE',
   'CANONICAL_MISMATCH',
   'NO_HOME',
+  'FILE_NEWER_VERSION',
 ];
 
 function setOnline(value: boolean): void {
@@ -116,6 +118,13 @@ describe('evaluatePodMetadata', () => {
 });
 
 describe('POD_ACCESS_ERRORS registry', () => {
+  it('lists EVERY code in ALL_CODES, so the loops below cannot skip one', () => {
+    // ⚠️ A loop over a hand-written list is not an exhaustiveness test. A code
+    // added to the registry but not to this array was checked by nothing.
+    expect([...ALL_CODES].sort()).toEqual(Object.keys(POD_ACCESS_ERRORS).sort());
+    expect([...ALL_CODES].sort()).toEqual(Object.keys(POD_ACCESS_SEVERITY).sort());
+  });
+
   it('has an entry and a severity for every code', () => {
     for (const code of ALL_CODES) {
       expect(POD_ACCESS_ERRORS[code], code).toBeDefined();
@@ -148,5 +157,23 @@ describe('POD_ACCESS_ERRORS registry', () => {
         expect(String(action).toLowerCase()).not.toMatch(/creat|new|duplicat|copy/);
       }
     }
+  });
+});
+
+describe('classifyDriveFailure and a file from a newer beanies', () => {
+  it('returns FILE_NEWER_VERSION for the typed error even while offline (the ordering pin)', () => {
+    // A typed, definite classification must outrank ambient network state.
+    setOnline(false);
+    expect(classifyDriveFailure(new UnsupportedBeanpodVersionError('6.0'))).toBe(
+      'FILE_NEWER_VERSION'
+    );
+  });
+  it('does not page for it, and offers no recovery button', () => {
+    expect(POD_ACCESS_SEVERITY.FILE_NEWER_VERSION).toBe('warning');
+    expect(POD_ACCESS_ERRORS.FILE_NEWER_VERSION.recoveries).toEqual([]);
+  });
+  it('still reads a plain offline failure as OFFLINE', () => {
+    setOnline(false);
+    expect(classifyDriveFailure(new Error('fetch failed'))).toBe('OFFLINE');
   });
 });

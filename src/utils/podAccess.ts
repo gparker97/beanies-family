@@ -29,6 +29,7 @@
 
 import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
+import { PayloadLoadError } from '@/types/sync';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 
 export type PodAccessErrorCode =
@@ -38,7 +39,11 @@ export type PodAccessErrorCode =
   | 'FILE_NOT_FOUND'
   | 'VERIFY_UNAVAILABLE'
   | 'CANONICAL_MISMATCH'
-  | 'NO_HOME';
+  | 'NO_HOME'
+  // The file was saved by a NEWER beanies. `recoveries: []` is deliberate and
+  // has precedent (`JOIN_ERRORS.NO_UNCLAIMED_MEMBERS`): no button in the app
+  // can update the app.
+  | 'FILE_NEWER_VERSION';
 
 /** The four recovery actions. Every one restores access to the ORIGINAL file. */
 export type PodRecoveryAction =
@@ -94,6 +99,11 @@ export const POD_ACCESS_ERRORS = {
     recoveries: ['pickFamilyFile'],
     severity: 'critical',
   },
+  FILE_NEWER_VERSION: {
+    messageKey: 'podAccess.error.newerVersion',
+    recoveries: [],
+    severity: 'warning',
+  },
 } as const satisfies Record<PodAccessErrorCode, PodAccessEntry>;
 
 /**
@@ -112,6 +122,8 @@ export const POD_ACCESS_SEVERITY: Record<PodAccessErrorCode, 'warning' | 'critic
   VERIFY_UNAVAILABLE: 'warning',
   CANONICAL_MISMATCH: 'critical',
   NO_HOME: 'critical',
+  // "Please update beanies" is not an incident and must not page.
+  FILE_NEWER_VERSION: 'warning',
 };
 
 /**
@@ -126,6 +138,11 @@ export const POD_ACCESS_SEVERITY: Record<PodAccessErrorCode, 'warning' | 'critic
  * closed buys no safety and would only manufacture false pages.
  */
 export function classifyDriveFailure(e: unknown): PodAccessErrorCode {
+  // ⚠️ FIRST, above the `navigator.onLine` check. A typed, definite
+  // classification must outrank ambient network state, or a connection blip
+  // mid-read turns "update beanies" into "you are offline". Read through the
+  // base-class member, never an `instanceof` of the subclass.
+  if (e instanceof PayloadLoadError && e.needsAppUpdate) return 'FILE_NEWER_VERSION';
   // `typeof` guard so this module stays importable outside a DOM (worker/SSR/unit).
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'OFFLINE';
   if (e instanceof TokenExpiredError) return 'CONSENT_EXPIRED';

@@ -4384,6 +4384,16 @@ const STRING_DEFS = {
     en: 'That file is encrypted. Enter its password to import it.',
     beanie: 'that file is locked. enter its password to import it.',
   },
+  'podAccess.error.newerVersion': {
+    en: 'That family file was saved by a newer version of beanies. Update beanies on this device to open it. Nothing on this device is lost.',
+    beanie:
+      'that pod was saved by a newer version of beanies. update beanies on this bean to open it. nothing on this bean is lost.',
+  },
+  'join.error.newerVersion': {
+    en: 'That family file was saved by a newer version of beanies. Update beanies on this device, then open your invite link again. Nothing on this device is lost.',
+    beanie:
+      'that pod was saved by a newer version of beanies. update beanies on this bean, then open your invite link again. nothing on this bean is lost.',
+  },
   'compaction.refused.not-owner': {
     en: 'Only the person who set up your family can compact the family file.',
     beanie: 'only the bean who set up your family can compact the family pod.',

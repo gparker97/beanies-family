@@ -768,3 +768,97 @@ describe('the composer cannot corrupt the lineage it lands on', () => {
     expect(built).toEqual({ op: null, count: 0, conflicts: 0 });
   });
 });
+
+describe('a restore is a lineage event', () => {
+  /**
+   * The pre-compaction safety copy has NO lineage; the device restoring it
+   * holds the compacted one (seq 1). Adopting it as-is would leave the device
+   * on the old lineage, and every peer still on seq 1 would read `ours-newer`
+   * and republish over the restore within one poll.
+   */
+  function lineageOf() {
+    return (Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { podLineage?: unknown })
+      .podLineage as { id: string; seq: number } | undefined;
+  }
+
+  it('mints a NEW generation on a user-file adopt of an OLDER lineage, and marks it dirty to publish', async () => {
+    const original = base();
+    const compacted = compact(original, 'L-1');
+    ap.loadSnapshot(Automerge.save(compacted));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(original, key), 'fam', {
+      kind: 'user-file',
+      heads: Automerge.getHeads(compacted),
+    });
+    expect(res.action).toBe('adopted');
+    const after = lineageOf();
+    expect(after?.seq).toBe(2);
+    expect(after?.id).not.toBe('L-1');
+    // The stamp moved the heads past the file's, so the caller publishes it.
+    expect(res.dirty).toBe(true);
+  });
+
+  it('is what makes a peer ADOPT the restore instead of reverting it', async () => {
+    // Device A restored (above): its document is the original data at seq 2.
+    const original = base();
+    const restored = Automerge.change(compact(original, 'L-1'), (d) => {
+      (d as { podLineage: unknown }).podLineage = { id: 'L-2', seq: 2 };
+    });
+    // Device B still holds the compacted seq-1 document, clean.
+    const b = compact(original, 'L-1');
+    ap.loadSnapshot(Automerge.save(b));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(restored, key), 'fam', {
+      kind: 'baseline',
+      heads: Automerge.getHeads(b),
+    });
+    // `adopted` when B is clean, `rebased` when the fixture's migration made
+    // it read as dirty; either way B lands on the restore's generation. The
+    // failure this pins is `kept-local`: B keeping seq 1 and republishing it.
+    expect(res.action).not.toBe('kept-local');
+    expect(lineageOf()).toEqual({ id: 'L-2', seq: 2 });
+  });
+
+  it('mints NOTHING when a user-file choice takes a NEWER file over a stale local document', async () => {
+    // `adopt-remote x user-file` is the rebase (or its adopt fallback), not a
+    // restore: the file already carries the newest generation.
+    const original = base();
+    ap.loadSnapshot(Automerge.save(original));
+    const res = await ap.mergeRemoteEnvelope(
+      await envelopeFor(compact(original, 'L-1'), key),
+      'fam',
+      {
+        kind: 'user-file',
+        heads: Automerge.getHeads(original),
+      }
+    );
+    expect(['adopted', 'rebased']).toContain(res.action);
+    expect(lineageOf()).toEqual({ id: 'L-1', seq: 1 });
+  });
+
+  it('mints NOTHING when a human resolves a CONFLICT by choosing one of two compactions', async () => {
+    const original = base();
+    ap.loadSnapshot(Automerge.save(compact(original, 'L-mine')));
+    const res = await ap.mergeRemoteEnvelope(
+      await envelopeFor(compact(original, 'L-theirs'), key),
+      'fam',
+      {
+        kind: 'user-file',
+        heads: Automerge.getHeads(compact(original, 'L-mine')),
+      }
+    );
+    expect(res.action).toBe('adopted');
+    expect(lineageOf()).toEqual({ id: 'L-theirs', seq: 1 });
+  });
+
+  it('mints NOTHING on a first-load adopt with no local document', async () => {
+    // A fresh device joining must not churn the fleet.
+    const original = base();
+    ap.reset();
+    ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {} });
+    ap.setKey(key);
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(original, key), 'fam', {
+      kind: 'no-local-document',
+    });
+    expect(res.action).toBe('adopted');
+    expect(lineageOf()).toBeUndefined();
+  });
+});

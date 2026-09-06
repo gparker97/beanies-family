@@ -19,7 +19,16 @@ import { PodLineageError } from '@/services/sync/podLineage';
 // refusal that guards it cannot be exercised without forcing the verdict. This
 // hook is the only way to test the line before Stage 3 flips the cell — and the
 // line is precisely the one that must not be allowed to become a merge.
-const guardHook = vi.hoisted(() => ({ force: null as string | null }));
+// ⚠️ TYPED AS THE GUARD'S RESULT, not `string`. The call site destructures
+// `{ action, verdict }`; a forced bare string would yield `action ===
+// undefined`, and the one test pinning "a rebase must never become a merge"
+// would pass while exercising a path it was not written for.
+const guardHook = vi.hoisted(() => ({
+  force: null as {
+    action: 'rebase' | 'adopt' | 'merge' | 'publish-local';
+    verdict: 'adopt-remote' | 'ours-newer' | 'same' | 'conflict';
+  } | null,
+}));
 vi.mock('@/services/sync/podLineage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/sync/podLineage')>();
   return {
@@ -123,7 +132,7 @@ describe("a 'rebase' verdict refuses until Stage 3 implements it", () => {
     // this test branched on the live POLICY value, so today it re-ran the
     // `block` path and asserted nothing about the refusal; deleting the refusal
     // left the whole suite green. Verified by mutation.
-    guardHook.force = 'rebase';
+    guardHook.force = { action: 'rebase', verdict: 'adopt-remote' };
     // Same-ancestry documents, so a fall-through would genuinely MERGE (and
     // return `'merged'`) rather than fail for some unrelated reason.
     const base = Automerge.save(
