@@ -144,7 +144,15 @@ const POLICY: Record<LineageVerdict, Record<LineageContext, LineageAction>> = {
   // work is replayed onto the new lineage instead of the family being asked to
   // give it up. Every way that replay can fail falls back to this cell's old
   // value, so the rebase can only ever lose LESS than the block it replaced.
-  'adopt-remote': { clean: 'adopt', dirty: 'rebase', 'user-file': 'adopt' },
+  // ⚠️ `user-file` REBASES TOO, and getting this wrong made the DELIBERATE
+  // choice the destructive one. With `dirty` rebasing, a peer that did nothing
+  // kept every offline edit — while a peer whose owner explicitly picked the
+  // file (which our own copy tells them to do) had the lot discarded by
+  // `adopt`. The column exists so an explicit choice never BLOCKS; `rebase`
+  // does not block either, so there was never an argument for losing the work.
+  // The worker falls back to `adopt` here — not to the block — because the
+  // human already said "replace what is on this device".
+  'adopt-remote': { clean: 'adopt', dirty: 'rebase', 'user-file': 'rebase' },
   'ours-newer': { clean: 'publish-local', dirty: 'publish-local', 'user-file': 'adopt' },
   conflict: { clean: 'block', dirty: 'block', 'user-file': 'adopt' },
 };

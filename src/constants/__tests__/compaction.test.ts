@@ -40,13 +40,22 @@ describe('safety copy naming', () => {
     expect(isSafetyCopyName('parker (before compacting).beanpod')).toBe(true);
   });
 
-  it('is IDEMPOTENT, so compacting a rolled-back pod does not stack the marker', () => {
-    // A family that restored its own safety copy is now LIVING on that file.
-    // Compacting again must not produce "… (before compacting) (before
-    // compacting).beanpod" — which stacks forever and, worse, leaves the real
-    // pod matching `isSafetyCopyName`.
-    const once = safetyCopyName('parker.beanpod');
-    expect(safetyCopyName(once)).toBe(once);
+  it('NEVER returns the pod own name, even for a pod already named as a copy', () => {
+    // ⚠️ THE INVARIANT THAT MATTERS, and plain idempotency violated it. A family
+    // that restored its own safety copy is LIVING on
+    // `parker (before compacting).beanpod`. Returning that name unchanged means
+    // the writer — which resolves by exact name — overwrites the LIVE POD,
+    // reads it back, matches, and reports "safety copy written and verified".
+    // They would be told they have a backup they do not have, immediately
+    // before the history is destroyed. Stacking is ugly; a collision is
+    // catastrophic.
+    const live = 'parker (before compacting).beanpod';
+    expect(safetyCopyName(live)).not.toBe(live);
+    expect(isSafetyCopyName(safetyCopyName(live))).toBe(true);
+  });
+
+  it('does not stack the marker for an ordinary pod', () => {
+    expect(safetyCopyName('parker.beanpod')).toBe('parker (before compacting).beanpod');
   });
 
   it('keeps the marker untranslated and readable as a backup', () => {

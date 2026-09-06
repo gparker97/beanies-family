@@ -602,6 +602,13 @@ const { busy: isCompacting, compact: compactPod } = usePodCompaction();
  * give them.
  */
 const podKeepsSiblingCopy = computed(() => {
+  // ⚠️ READ THE REACTIVE REF FIRST. `syncService.getProvider()` is plain module
+  // state, so a computed over it alone has NO dependency: Vue evaluates it once
+  // and never again. Moving a family Drive → local left the note still
+  // promising a copy beside the pod that a local provider cannot write — the
+  // family consenting to a one-way migration on a guarantee the code had
+  // stopped giving. `storageProviderType` changes on every provider swap.
+  void syncStore.storageProviderType;
   const provider = syncService.getProvider();
   return !!provider && !!getAuxStore(provider);
 });
@@ -823,6 +830,25 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
     // 2. Delete Drive file if requested
     if (wantDeleteDrive.value) {
+      // ⚠️ THE SAFETY COPY GOES FIRST. `deleteAux` resolves the copy's folder by
+      // reading the POD'S OWN `parents`, so deleting the pod first makes that
+      // lookup 404 and the copy silently survives — a family who asked for
+      // erasure keeping a complete, key-openable second copy of everything in
+      // Drive. Ordering is the whole fix.
+      try {
+        const provider = syncService.getProvider();
+        const aux = provider ? getAuxStore(provider) : null;
+        if (aux && provider) await aux.delete(safetyCopyName(provider.getDisplayName()));
+      } catch (e) {
+        // Never silent: this is a privacy outcome, not a convenience.
+        reportError({
+          surface: 'pod-compaction',
+          severity: 'warning',
+          message: 'safety copy survived a family deletion',
+          error: e,
+          context: { action: 'delete-family', error_code: 'safety-copy-delete-failed' },
+        });
+      }
       try {
         const config = await getProviderConfig(familyId);
         if (config?.type === 'google_drive' && config.driveFileId) {
@@ -831,19 +857,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         }
       } catch (e) {
         console.warn('[deleteFamily] Drive file deletion failed, continuing:', e);
-      }
-      // ⚠️ AND THE COMPACTION SAFETY COPY. The checkbox says "the encrypted
-      // .beanpod file", singular, and after any compaction there are TWO — both
-      // complete, both openable with the family key. Deleting one and leaving
-      // the other means a family who asked for their data to be gone still has
-      // all of it sitting in Drive. Best-effort and separate from the pod's own
-      // deletion, so a failure here cannot strand the rest of the teardown.
-      try {
-        const provider = syncService.getProvider();
-        const aux = provider ? getAuxStore(provider) : null;
-        if (aux && provider) await aux.delete(safetyCopyName(provider.getDisplayName()));
-      } catch (e) {
-        console.warn('[deleteFamily] safety copy deletion failed, continuing:', e);
       }
     }
 
