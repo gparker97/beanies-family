@@ -15,7 +15,7 @@
 import { computed } from 'vue';
 import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
-import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { addDaysYmd, weekdayShort } from '@/utils/date';
 import { useActivityStore } from '@/stores/activityStore';
@@ -23,8 +23,8 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
-import { sortByTime, wallPeripheralVariant, wallSharedAllDay } from '@/utils/wallActivities';
-import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
+import { sortByTime, wallSharedAllDay } from '@/utils/wallActivities';
+import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
 
@@ -35,11 +35,10 @@ const props = defineProps<{
   todayYmd: string;
   portrait: boolean;
   now: Date;
-  todosFor: (memberId: string) => WallJob[];
-  unassignedTodos: WallJob[];
-  listsFor: (memberId: string) => WallListGroup[];
-  orphanLists: WallListGroup[];
+  /** The job/list bundle, forwarded whole to the shell. */
+  peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
+  /** The wall's person filter, which this view applies to its own lanes too. */
   visibleMemberIds: string[] | null;
 }>();
 const emit = defineEmits<{
@@ -141,9 +140,6 @@ const allDaySpans = computed(() =>
  * no width to spare, so it keeps the band.
  */
 const busiest = computed(() => Math.max(0, ...members.value.map((m) => eventsFor(m.id).length)));
-const peripheralVariant = computed(() =>
-  wallPeripheralVariant(props.portrait ? 'band' : 'rail', busiest.value, props.portrait)
-);
 
 /**
  * A face beside a name needs room. Six lanes across a landscape tablet is ~153px
@@ -180,8 +176,16 @@ function subtitleFor(memberId: string) {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 gap-4" :class="portrait ? 'flex-col' : 'flex-row'">
-    <div class="flex min-h-0 flex-1 flex-col gap-2.5">
+  <WallViewShell
+    :portrait="portrait"
+    :rail="true"
+    :busiest="busiest"
+    :meals-ymd="anchorYmd"
+    :peripherals="peripherals"
+    @open="emit('open', $event)"
+    @open-chores="emit('openChores')"
+  >
+    <template #main>
       <!-- lane headers, on the same column track as the plot -->
       <div
         class="grid shrink-0 gap-0"
@@ -224,21 +228,6 @@ function subtitleFor(memberId: string) {
         view-id="lanes"
         @open="emit('open', $event)"
       />
-    </div>
-
-    <div :class="portrait ? 'shrink-0' : 'w-[296px] shrink-0 overflow-y-auto'">
-      <WallPeripheralCards
-        :variant="peripheralVariant"
-        :portrait="portrait"
-        :meals-ymd="anchorYmd"
-        :todos-for="todosFor"
-        :unassigned-todos="unassignedTodos"
-        :lists-for="listsFor"
-        :orphan-lists="orphanLists"
-        :visible-member-ids="visibleMemberIds"
-        @open="emit('open', $event)"
-        @open-chores="emit('openChores')"
-      />
-    </div>
-  </div>
+    </template>
+  </WallViewShell>
 </template>

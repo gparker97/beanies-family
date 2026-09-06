@@ -14,16 +14,16 @@
  */
 import { computed } from 'vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
-import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { wallDayAllDay, wallEvents, wallPeripheralVariant } from '@/utils/wallActivities';
+import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
-import type { WallJob, WallListGroup, WallSheetTarget } from '@/types/wall';
+import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
 
@@ -35,10 +35,9 @@ const props = defineProps<{
   now: Date;
   /** The wall's shared anchor — the day this panel renders. */
   anchorYmd: string;
-  todosFor: (memberId: string) => WallJob[];
-  unassignedTodos: WallJob[];
-  listsFor: (memberId: string) => WallListGroup[];
-  orphanLists: WallListGroup[];
+  /** The job/list bundle, forwarded whole to the shell. */
+  peripherals: WallPeripheralData;
+  /** The wall's person filter, which this view applies to its own content too. */
   visibleMemberIds: string[] | null;
 }>();
 // `openDay` is deliberately NOT declared: in THIS view tapping a day moves the
@@ -99,9 +98,8 @@ const allDaySpans = computed(() => {
   return wallDayAllDay(result, days, (activity, ymd) => ({ activity, date: ymd }));
 });
 
-const peripheralVariant = computed(() =>
-  wallPeripheralVariant(props.portrait ? 'band' : 'rail', events.value.length, props.portrait)
-);
+/** Content-derived; the shell turns it into a band/rail/strip choice. */
+const busiest = computed(() => events.value.length);
 
 /** Memoised for the same reason as view A — see `eventsByDay` there. */
 const stripByDay = computed(() => {
@@ -131,8 +129,16 @@ const focusLabel = computed(() =>
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 gap-4" :class="portrait ? 'flex-col' : 'flex-row'">
-    <div class="flex min-h-0 flex-1 flex-col gap-2.5">
+  <WallViewShell
+    :portrait="portrait"
+    :rail="true"
+    :busiest="busiest"
+    :meals-ymd="focusYmd"
+    :peripherals="peripherals"
+    @open="emit('open', $event)"
+    @open-chores="emit('openChores')"
+  >
+    <template #main>
       <div
         class="flex shrink-0 items-center justify-between gap-3"
         :style="{ paddingLeft: `${AXIS_WIDTH_PX}px` }"
@@ -194,21 +200,6 @@ const focusLabel = computed(() =>
           </span>
         </button>
       </div>
-    </div>
-
-    <div :class="portrait ? 'shrink-0' : 'w-[296px] shrink-0 overflow-y-auto'">
-      <WallPeripheralCards
-        :variant="peripheralVariant"
-        :portrait="portrait"
-        :meals-ymd="focusYmd"
-        :todos-for="todosFor"
-        :unassigned-todos="unassignedTodos"
-        :lists-for="listsFor"
-        :orphan-lists="orphanLists"
-        :visible-member-ids="visibleMemberIds"
-        @open="emit('open', $event)"
-        @open-chores="emit('openChores')"
-      />
-    </div>
-  </div>
+    </template>
+  </WallViewShell>
 </template>
