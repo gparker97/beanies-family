@@ -51,14 +51,25 @@ describe('fatalErrorStore', () => {
     // The invariant `App.vue`'s computed depends on: an action can never be
     // rendered beside a message it does not belong to, because `setFatal` is
     // the only writer of both.
+    //
+    // Asserted as an explicit implication rather than a guarded `expect`. The
+    // first version wrote `if (store.action !== null) expect(...)`, which
+    // silently ran no assertion at all in two of its three steps — a test
+    // shaped like a proof and doing nothing.
     const store = useFatalErrorStore();
-    for (const step of [
-      () => store.setFatal('too old', null, { action: link }),
-      () => store.setFatal('plain'),
-      () => store.clear(),
-    ]) {
-      step();
-      if (store.action !== null) expect(store.message).not.toBeNull();
-    }
+    const holdsWithoutMessage = () => store.action !== null && store.message === null;
+
+    store.setFatal('too old', null, { action: link });
+    expect(store.action).not.toBeNull();
+    expect(holdsWithoutMessage()).toBe(false);
+
+    store.setFatal('plain');
+    expect(store.action).toBeNull();
+    expect(holdsWithoutMessage()).toBe(false);
+
+    store.setFatal('too old again', null, { action: link });
+    store.clear();
+    expect(store.action).toBeNull();
+    expect(holdsWithoutMessage()).toBe(false);
   });
 });

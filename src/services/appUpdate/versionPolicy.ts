@@ -31,7 +31,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 
 /** Why the floor could not be read. Rides in `detail`, never the raw error. */
 export type FloorFailure =
-  'offline' | 'timeout' | `http-${number}` | 'malformed' | 'unparseable-version';
+  'offline' | 'timeout' | `http-${number}` | 'malformed' | 'unparseable-version' | 'unknown';
 
 interface FloorFile {
   promptBelowVersion?: unknown;
@@ -49,14 +49,62 @@ export function __resetVersionPolicyForTesting(): void {
   cached = null;
 }
 
-function report(reason: FloorFailure): null {
+/**
+ * Everything that can stop the update check from reaching an answer.
+ *
+ * `app-version-unparseable` is the odd one out and is deliberately in the same
+ * union: it is not a fact about the floor FILE but about the build reading it,
+ * and it belongs to the composable. It lives here so the two sites cannot drift
+ * into different spellings of the same CloudWatch filter.
+ */
+export type UpdateCheckFailure = FloorFailure | 'app-version-unparseable';
+
+/**
+ * The one shape of the `check-failed` event, exported so the composable emits
+ * it identically. A constant `message` on purpose: `logEvent` rate-limits on
+ * (surface, normalized message), so a per-device message would give every
+ * failing device its own bucket and defeat the limiter.
+ */
+export function reportCheckFailure(detail: UpdateCheckFailure): void {
   logEvent({
     level: 'warn',
     surface: 'app-update',
     message: 'update floor unavailable',
-    context: { action: 'check-failed', error_code: 'floor', detail: reason },
+    context: { action: 'check-failed', error_code: 'floor', detail },
   });
+}
+
+function report(reason: FloorFailure): null {
+  reportCheckFailure(reason);
   return null;
+}
+
+/**
+ * A thrown request, reduced to ONE of the reason classes.
+ *
+ * ⚠️ THE RAW MESSAGE NEVER SHIPS. It can carry a URL or a platform string, and
+ * would give every device its own dedup bucket in the rate limiter.
+ *
+ * ⚠️ AND AN UNRECOGNISED THROW IS `unknown`, NOT `malformed`. `malformed` means
+ * "the JSON we hand-deployed is wrong", which is a person's mistake and a
+ * person's fix; a network error wearing that label sends whoever is triaging
+ * straight to the wrong file. The platform strings are not ours to predict:
+ * iOS surfaces `localizedDescription`, whose timeout reads "The request timed
+ * out." (note: "timed out", not "timeout"), and Android surfaces whatever
+ * `java.net` threw. So match generously, and when nothing matches, say so.
+ */
+function classify(e: unknown): FloorFailure {
+  // The one throw inside the `try` that is OURS: `JSON.parse` on a string body.
+  // It is genuinely a malformed file, so it keeps that class rather than
+  // falling through the message matching below.
+  if (e instanceof SyntaxError) return 'malformed';
+  const msg = e instanceof Error ? e.message.toLowerCase() : '';
+  if (!msg) return 'unknown';
+  if (/tim(e|ed)\s?out|timeout/.test(msg)) return 'timeout';
+  if (/network|internet|connect|offline|unreachable|host|dns|resolve|ssl|certificate/.test(msg)) {
+    return 'offline';
+  }
+  return 'unknown';
 }
 
 /**
@@ -107,15 +155,7 @@ export async function fetchUpdateFloor(): Promise<string | null> {
     }
     value = raw.trim();
   } catch (e) {
-    // The reason CLASS only. The raw message can carry a URL or a platform
-    // string and would give every device its own dedup bucket.
-    const msg = e instanceof Error ? e.message.toLowerCase() : '';
-    const reason: FloorFailure = msg.includes('timeout')
-      ? 'timeout'
-      : msg.includes('network') || msg.includes('internet') || msg.includes('connect')
-        ? 'offline'
-        : 'malformed';
-    return (cached = { value: report(reason) }).value;
+    return (cached = { value: report(classify(e)) }).value;
   }
 
   cached = { value };
