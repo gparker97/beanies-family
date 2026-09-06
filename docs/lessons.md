@@ -4,6 +4,76 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A guard that has never been seen to fail is not yet a guard
+
+**Date:** 2026-09-07
+**Context:** The beanie wall's plot overran its flex slot on a 1024x768 tablet
+and the peripheral cards painted over the last two hours of the day. I fixed it
+and added an assertion to the screenshot harness so it could never come back.
+
+The assertion measured `.wall-card` against a Tailwind rounding utility. The
+`strip` variant renders no `.wall-card` at all — and the fix I had just shipped
+was precisely what forces `strip` at that viewport, so the check found zero
+cards and short-circuited to a pass. Every other captured size takes the side
+rail, which the check also skips by design. It was therefore VACUOUS at the only
+viewport it existed for, and green forever.
+
+A second review found it. Reverting both fixes and re-running the harness made
+it print `lanes at tablet-1024 ... 103px` — which is the only evidence that a
+guard guards anything.
+
+Compounding it: my written diagnosis of the original bug was wrong. I credited
+`min-h-0` on the plot, but the plot is an item of a ROW flex container and is
+`overflow: hidden` — both of which disable the automatic minimum size. The real
+floor was the parent row's `min-h-[13.75rem]` (the plot measured exactly 220px),
+and what actually repaired the viewport was the unrelated band-to-strip
+downgrade in the same commit. I applied two fixes and verified once, so the code
+worked for a reason my comment denied.
+
+**Rules:**
+
+- **Prove a new guard by reverting the bug and watching it fail.** Do it before
+  committing, not when a reviewer asks. Green is not evidence.
+- **Bind assertions to stable hooks, never to styling utilities.** A selector
+  built from `rounded-[20px]` fails open the day someone changes a radius.
+  Missing hook = throw, not pass.
+- **A guard that cannot fire at the viewport/input class that motivated it is
+  not a smaller guard — it is no guard.** Ask "which case sends this down the
+  early-return?" before writing the early return.
+- **When two fixes ship together, verify which one worked.** Otherwise the
+  comment records a theory, and the next person removes the load-bearing half.
+
+---
+
+## A SHA is not quotable until it is on the remote
+
+**Date:** 2026-09-07
+**Context:** `docs/STATUS.md` records which commit introduced which behaviour.
+I wrote the beanie-wall entry citing seven SHAs; a parallel session pushed while
+the work was in flight, the rebase rewrote every hash, and all seven were
+dangling before the entry was ever read. I corrected them — and the next rebase
+invalidated the corrections too.
+
+`git merge-base --is-ancestor <sha> origin/main` settles it in a second, and a
+`git gc` would have turned the record into `git show` errors.
+
+Related, from the same session: a `/code-review max` run's subagents cleaned up
+their own probe artifacts and reverted two of my UNCOMMITTED working-tree edits
+with them. Silently. Nothing in the review's output said which files it touched
+until the final report.
+
+**Rules:**
+
+- **Cite commit hashes only after pushing**, and verify each with
+  `git merge-base --is-ancestor` rather than trusting a `git log` from before a
+  rebase. On a repo with a parallel session running, treat every local SHA as
+  provisional.
+- **Commit finished work before launching anything that can touch the tree** — a
+  code review, a subagent sweep, a formatter run. The reflog is a poor substitute
+  for a commit you could simply have made.
+
+---
+
 ## Wiring a policy column to _any_ producer is worse than leaving it unwired
 
 **Date:** 2026-09-06
