@@ -2,6 +2,7 @@ import { computed, readonly, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { useToday } from '@/composables/useToday';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { reportError } from '@/utils/errorReporter';
+import { startOfWeekYmd } from '@/utils/date';
 import {
   MAX_ANCHOR_DRIFT_DAYS,
   anchorWeekDays,
@@ -19,16 +20,28 @@ export interface WallAnchor {
   weekDays: ComputedRef<string[]>;
   /** True when the wall is showing the rolling `today + 6` default. */
   isAnchoredToToday: ComputedRef<boolean>;
-  /** Place the anchor on a specific day (a day tap). `reason` names the caller. */
-  setAnchor: (next: string, reason: string) => void;
+  /**
+   * Place the anchor on a specific day (a day tap). `reason` names the caller.
+   * Returns false when the value was refused and the wall landed on today
+   * instead — callers must not report a move that did not happen.
+   */
+  setAnchor: (next: string, reason: string) => boolean;
   /**
    * Move by one week or one day. See `nextAnchorYmd` for the snapping rule.
    * Returns false when the step would leave the browsable range, in which case
    * the anchor does not move.
    */
   step: (unit: WallStepUnit, direction: -1 | 1) => boolean;
+  /** Whether that step would land inside the browsable range. */
+  canStep: (unit: WallStepUnit, direction: -1 | 1) => boolean;
   /** Return to the rolling default. */
   goToToday: () => void;
+  /**
+   * The CALENDAR week containing the anchor — for a day picker that must be able
+   * to show its own selection. `weekDays` starts AT the anchor, so a picker built
+   * on it re-bases itself every time someone picks.
+   */
+  weekOfAnchor: ComputedRef<string[]>;
 }
 
 /**
@@ -70,7 +83,7 @@ export function useWallAnchor(): WallAnchor {
    * structural rather than a convention someone has to remember — which is also
    * why `anchorYmd` is handed out `readonly`.
    */
-  function setAnchor(next: string, reason: string): void {
+  function setAnchor(next: string, reason: string): boolean {
     const safe = clampAnchorYmd(next, today.value);
 
     if (safe !== next) {
@@ -95,6 +108,7 @@ export function useWallAnchor(): WallAnchor {
     }
 
     anchorYmd.value = safe;
+    return safe === next;
   }
 
   /**
@@ -112,22 +126,39 @@ export function useWallAnchor(): WallAnchor {
    * a value that should never have been constructed at all.
    */
   function step(unit: WallStepUnit, direction: -1 | 1): boolean {
+    if (!canStep(unit, direction)) return false;
     const next = nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay);
-    if (clampAnchorYmd(next, today.value) !== next) return false;
-    setAnchor(next, direction === 1 ? 'next' : 'prev');
-    return true;
+    return setAnchor(next, direction === 1 ? 'next' : 'prev');
   }
 
   function goToToday(): void {
     setAnchor(today.value, 'today');
   }
 
+  /**
+   * Could the arrow move, if pressed? Drives the navigator's disabled state so a
+   * child pressing `›` at the boundary gets a visibly dead button rather than a
+   * screen that appears frozen.
+   */
+  function canStep(unit: WallStepUnit, direction: -1 | 1): boolean {
+    const next = nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay);
+    return clampAnchorYmd(next, today.value) === next;
+  }
+
   return {
     anchorYmd: readonly(anchorYmd),
     weekDays: computed(() => anchorWeekDays(anchorYmd.value)),
     isAnchoredToToday: computed(() => anchorYmd.value === today.value),
+    // The CALENDAR week containing the anchor. `weekDays` starts AT the anchor,
+    // which is right for the week view but wrong for a day picker: a picker
+    // built on it re-bases every time someone picks, putting the days before
+    // the chosen one out of reach.
+    weekOfAnchor: computed(() =>
+      anchorWeekDays(startOfWeekYmd(anchorYmd.value, settingsStore.weekStartDay))
+    ),
     setAnchor,
     step,
+    canStep,
     goToToday,
   };
 }

@@ -202,28 +202,44 @@ export function weekStartOffset(dayOfWeek: number, weekStartDay: number): number
 }
 
 /**
+ * Is this a real `YYYY-MM-DD` calendar date?
+ *
+ * ⚠️ Two checks, and BOTH are needed. `parseLocalDate` never throws, so an
+ * Invalid-Date test alone misses the dangerous class: `new Date(y, m - 1, d)`
+ * NORMALISES out-of-range components rather than failing, so `2026-13-45`
+ * silently becomes February 2027 and `2026-02-30` becomes March 2nd — a
+ * plausible-looking wrong answer rather than an obvious one. The round-trip is
+ * what catches those.
+ *
+ * The regex is checked FIRST and separately, because a round-trip alone also
+ * rejects things that are perfectly real: `parseLocalDate` handles the unpadded
+ * `2026-9-6` correctly, but `toDateInputValue` re-prints it padded, so a
+ * comparison would refuse a date it had just parsed right.
+ */
+export function isRealYmd(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = parseLocalDate(value);
+  return !Number.isNaN(parsed.getTime()) && toDateInputValue(parsed) === value;
+}
+
+/**
  * `YYYY-MM-DD` → the ymd of the first day of its week, per the user's `weekStartDay`.
  *
- * Returns the input unchanged if it is not a real date.
+ * Returns the input unchanged if it is not a real date — see `isRealYmd`.
  *
- * ⚠️ Checking for an Invalid Date is NOT enough, and that mistake shipped here
- * once. `new Date(y, m - 1, d)` NORMALISES out-of-range components rather than
- * failing, so `2026-13-45` silently becomes February 2027 and `2026-02-30`
- * becomes March 2nd — a plausible-looking wrong week rather than an obvious
- * wrong answer. The round-trip is what catches it. `parseLocalDate` cannot help:
- * it never throws, and for garbage it yields an Invalid Date whose
- * `toDateInputValue` is the literal string "NaN-NaN-NaN".
+ * ⚠️ Callers must not treat the return value as a week start without checking:
+ * this fails OPEN, so `startOfWeekYmd(x) === x` is true both when `x` is a real
+ * week start and when `x` was refused. `wallAnchor`'s alignment test depends on
+ * that distinction, which is why it validates before asking.
  *
- * This matters beyond the wall: this is the shared primitive the five existing
+ * This matters beyond the wall: it is the shared primitive the five existing
  * week-start copies are meant to migrate onto, and a date picker can hand it
  * components a human typed.
  */
 export function startOfWeekYmd(ymd: string, weekStartDay: number): string {
   const day = ymd.slice(0, 10);
-  const date = parseLocalDate(day);
-  // Round-trip: an overflow date parses fine and comes back as a DIFFERENT day.
-  if (Number.isNaN(date.getTime()) || toDateInputValue(date) !== day) return ymd;
-  return addDaysYmd(day, -weekStartOffset(date.getDay(), weekStartDay));
+  if (!isRealYmd(day)) return ymd;
+  return addDaysYmd(day, -weekStartOffset(parseLocalDate(day).getDay(), weekStartDay));
 }
 
 /**
