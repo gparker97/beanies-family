@@ -26,13 +26,29 @@ const hooks = vi.hoisted(() => ({
   // exercising the path it was written for.
   members: [] as unknown[],
   isOwner: true,
+  /** Names the health reading reports as last seen on an older version. */
+  behind: [] as string[],
 }));
 
 // The owner check itself is derived and tested in `usePodHealth.dueSignal`;
 // here it is a hook so the ladder's gate can be flipped without dragging the
 // permissions store into a suite about compaction ordering.
 vi.mock('@/composables/usePodHealth', () => ({
-  usePodHealth: () => ({ canCompactPod: { value: hooks.isOwner } }),
+  // `satisfies` over the real return's keys: a field the composable gains and
+  // this mock forgets is a compile error, not an `undefined` at run time.
+  usePodHealth: () =>
+    ({
+      canCompactPod: { value: hooks.isOwner },
+      compactionIsDue: { value: false },
+      podBytes: { value: 0 },
+      someoneCannotOpenIt: { value: false },
+      olderVersion: { value: hooks.behind },
+      olderVersionNames: { value: hooks.behind.join(', ') },
+      olderVersionNotice: { value: `compaction.olderVersion.notice:${hooks.behind.join(', ')}` },
+    }) satisfies Record<
+      keyof ReturnType<typeof import('@/composables/usePodHealth').usePodHealth>,
+      unknown
+    >,
 }));
 
 vi.mock('@/composables/useConfirm', () => ({
@@ -41,15 +57,11 @@ vi.mock('@/composables/useConfirm', () => ({
 }));
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/composables/useTranslation', () => ({
-  // ⚠️ RETURN A REAL TEMPLATE for the two keys that interpolate names. With the
-  // stub echoing the key, both "names who it is waiting for" tests passed with
-  // the `fillTemplate(...)` call removed — they asserted the key, which the
-  // un-named variant also contains.
+  // ⚠️ RETURN A REAL TEMPLATE for the key that interpolates names. With the
+  // stub echoing the key, a naming test passes with the `fillTemplate(...)`
+  // call removed, because it asserts the key alone.
   useTranslation: () => ({
-    t: (k: string) =>
-      k === 'compaction.refused.not-soaked.named' || k === 'compaction.doneButBehind'
-        ? `${k}:{names}`
-        : k,
+    t: (k: string) => (k === 'compaction.doneOlderVersion' ? `${k}:{list}` : k),
   }),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
@@ -136,6 +148,7 @@ beforeEach(() => {
     auxAvailable: true,
     members: [],
     isOwner: true,
+    behind: [],
   });
 });
 
@@ -439,102 +452,46 @@ describe('after a successful compaction', () => {
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
-describe('the soak gate', () => {
-  const stale = [{ id: 'm2', name: 'Sam', lastLoginAt: new Date().toISOString().slice(0, 10) }];
-  const current = [
-    { id: 'm2', name: 'Sam', lastLoginAt: new Date().toISOString().slice(0, 10), lineageEpoch: 1 },
-  ];
+describe('who is on an older version is a notice, never a gate', () => {
+  const compactedOk = () => expect(docClient.compactDoc).toHaveBeenCalled();
 
-  it('refuses BEFORE asking, so the app never asks a question it will not honour', async () => {
-    hooks.members = stale;
-
+  it('does NOT refuse when someone last opened beanies on an older version', async () => {
+    // ⚠️ THE GATE IS GONE ON PURPOSE. It could not verify what it asked and
+    // asked families to enumerate every device they own. The file format
+    // protects the fleet now (a compacted pod is 5.0, refused at parse by a
+    // pre-guard build); this reading only names people.
+    hooks.behind = ['Sam'];
     await usePodCompaction().compact();
-
-    expect(confirm).not.toHaveBeenCalled();
-    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    compactedOk();
   });
 
-  it('NAMES who it is waiting on from the FIRST reading too', async () => {
-    // ⚠️ THE READING A PERSON ACTUALLY HITS. The fast-fail gate returns before
-    // the confirm, so it is the refusal almost everyone sees — and it called the
-    // generic `refuse('not-soaked')`, whose string is "someone in your family
-    // has a device that has not opened beanies recently". The names were in
-    // `preSoak.behind` the whole time. Greg hit this on the first step of the
-    // soak and could not tell who or what to do, which is the whole point of
-    // the gate being actionable.
-    hooks.members = [
-      { id: 'm2', name: 'Sam', lastLoginAt: TODAY },
-      { id: 'm3', name: 'Alex', lastLoginAt: TODAY },
-    ];
-
+  it('puts the names in the confirm, as its detail, composed once in usePodHealth', async () => {
+    hooks.behind = ['Sam', 'Alex'];
     await usePodCompaction().compact();
-
-    expect(confirm).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(
-      'warning',
-      'compaction.refused',
-      'compaction.refused.not-soaked.named:Sam, Alex',
-      expect.anything()
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: 'compaction.olderVersion.notice:Sam, Alex' })
     );
   });
 
-  it('names who it is waiting for once the projection is current', async () => {
-    // ⚠️ The second reading is the AUTHORITATIVE one: the pull at step 2b is
-    // what makes the member projection current, so a device that signed in on
-    // an old build ten minutes ago is not in our copy until then. The first
-    // reading only fails fast.
-    hooks.members = current;
-    loadFromFile.mockImplementationOnce(async () => {
-      hooks.members = stale; // the pull brought a stale member into view
-      return { success: true };
-    });
-
+  it('sends no detail when nobody is behind', async () => {
+    hooks.behind = [];
     await usePodCompaction().compact();
-
-    expect(docClient.compactDoc).not.toHaveBeenCalled();
-    // The NAME, not just the key: a refusal you can act on beats one you can
-    // only be puzzled by, and the generic refusal satisfies the key alone.
-    expect(showToast).toHaveBeenCalledWith(
-      'warning',
-      'compaction.refused',
-      expect.stringContaining('Sam'),
-      expect.anything()
-    );
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: undefined }));
   });
 
   it('says plainly that nothing is left to do when everyone is current', async () => {
-    hooks.members = current;
-
+    hooks.behind = [];
     await usePodCompaction().compact();
-
-    expect(docClient.compactDoc).toHaveBeenCalled();
+    compactedOk();
     const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
     expect(detail).toContain('compaction.doneNothingToDo');
   });
 
-  it('NAMES the exception rather than reporting a bare done', async () => {
-    // A completion silent about a device that cannot converge withholds
-    // information it holds — the same defect as the transient toast the lineage
-    // banner replaced.
-    hooks.members = current;
-    let compacted = false;
-    vi.mocked(docClient.compactDoc).mockImplementation((() => {
-      compacted = true;
-      hooks.members = stale; // someone joined on an old build mid-flight
-      return {
-        beforeBytes: 2_000_000,
-        afterBytes: 170_000,
-        changesBefore: 10_000,
-        changesAfter: 1,
-        actorsBefore: 2_600,
-      };
-    }) as never);
-
+  it('NAMES who last opened beanies on an older version in the completion toast', async () => {
+    hooks.behind = ['Sam'];
     await usePodCompaction().compact();
-
-    expect(compacted).toBe(true);
+    compactedOk();
     const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
-    expect(detail).toContain('compaction.doneButBehind');
-    expect(detail).toContain('Sam');
+    expect(detail).toContain('compaction.doneOlderVersion:Sam');
   });
 });

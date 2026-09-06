@@ -26,7 +26,6 @@
 import { ref } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { evaluateSoak, formatNames, type SoakVerdict } from '@/services/pod/podSoak';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -50,7 +49,6 @@ type RefusalCode =
   // `v-if` hides a control; it does not gate an action, and the action is the
   // one that rewrites everyone's file.
   | 'not-owner'
-  | 'not-soaked'
   | 'not-synced'
   | 'backup-not-delivered'
   | 'no-envelope'
@@ -73,7 +71,7 @@ export function usePodCompaction() {
   const familyContext = useFamilyContextStore();
   const { t } = useTranslation();
   const { deliverPod, confirmBackupLanded } = usePodExport();
-  const { canCompactPod } = usePodHealth();
+  const { canCompactPod, olderVersion, olderVersionNames, olderVersionNotice } = usePodHealth();
   const busy = ref(false);
 
   function refuse(code: RefusalCode, detail?: string): void {
@@ -86,55 +84,6 @@ export function usePodCompaction() {
       message: 'compaction refused',
       context: { action: 'refused', error_code: code, ...(detail ? { detail } : {}) },
     });
-  }
-
-  /**
-   * Refuse because someone is behind — from EITHER reading, never twice.
-   *
-   * ⚠️ THE FAST-FAIL READING THREW THE NAMES AWAY. The pre-confirm gate called
-   * the generic `refuse('not-soaked')`, which resolves to the un-named string
-   * ("someone in your family has a device that has not opened beanies
-   * recently") — while `preSoak.behind` held the names right there. And that is
-   * the reading a person actually hits, because it returns before the confirm.
-   * The named string existed and was only reachable from the SECOND reading,
-   * which is reached only after the confirm and a full pod download.
-   *
-   * The cause was two implementations of one refusal: this site's `refuse` and
-   * a hand-rolled `showToast` + `logEvent` at the authoritative reading. They
-   * drifted, as two copies of one decision always do. There is one now.
-   */
-  function refuseSoak(v: SoakVerdict): void {
-    showToast(
-      'warning',
-      t('compaction.refused'),
-      v.behind.length
-        ? fillTemplate(t('compaction.refused.not-soaked.named'), {
-            names: formatNames(v.behind),
-          })
-        : // Only when the verdict refuses without naming anyone, which the rule
-          // cannot currently produce — kept because a silent refusal would be
-          // worse than a vague one.
-          t('compaction.refused.not-soaked'),
-      { surface: 'pod-compaction' }
-    );
-    logEvent({
-      level: 'warn',
-      surface: 'pod-compaction',
-      message: 'compaction refused',
-      context: { action: 'refused', error_code: 'not-soaked', detail: `behind=${v.behind.length}` },
-    });
-  }
-
-  /**
-   * The soak reading, from the CURRENT member projection.
-   *
-   * ⚠️ ONE PURE FUNCTION, CALLED TWICE, AND NEVER A SECOND IMPLEMENTATION. The
-   * gate and the completion message both ask "who has not caught up"; two
-   * copies of that question is how a gate and a message end up contradicting
-   * each other in front of a user.
-   */
-  function soak() {
-    return evaluateSoak(useFamilyStore().members);
   }
 
   /** Drop the "this device ran out of memory" marks a compaction just resolved. */
@@ -159,16 +108,22 @@ export function usePodCompaction() {
       //    projection is only current after the pull at step 2b — so it exists
       //    to fail FAST, and step 2d is the authoritative one.
       if (!canCompactPod.value) return refuse('not-owner');
-      const preSoak = soak();
-      if (!preSoak.ok) return refuseSoak(preSoak);
+      // ⚠️ NO SOAK GATE. There used to be one here and again after the pull. It
+      // could not verify what it asked (per-member, blind to a person's other
+      // devices) and asked families to enumerate every device they own. The
+      // file format protects the fleet now: a compacted pod is 5.0, which a
+      // pre-guard build refuses at parse. What is left is to TELL the owner who
+      // will be cut off until they update, in the confirm and again at the end.
 
-      // 1. Warn, in the user's own words, before anything moves.
+      // 1. Warn, in the user's own words, before anything moves. The names ride
+      //    in `detail`, composed once in `usePodHealth` with the Settings slab.
       if (
         !(await confirm({
           title: 'compaction.confirmTitle',
           message: 'compaction.confirmMessage',
           confirmLabel: 'compaction.confirmCta',
           variant: 'info',
+          detail: olderVersion.value.length ? olderVersionNotice.value : undefined,
         }))
       ) {
         return;
@@ -203,13 +158,6 @@ export function usePodCompaction() {
       // 2c. Now push whatever the merge revealed, and prove we are level.
       //     Still cheapest-proof-first: `syncNow` exports, encrypts, base64s and
       //     uploads the whole pod, so an already-level device skips it.
-      // 2d. ⚠️ THE AUTHORITATIVE SOAK READING, and this is not belt-and-braces.
-      //     The check's input is the `familyMembers` projection, and the pull
-      //     above is what makes that current — a member who signed in on an old
-      //     build ten minutes ago on another device is simply not in our copy
-      //     until it lands. Step 0 fails fast; this one decides.
-      const soaked = soak();
-      if (!soaked.ok) return refuseSoak(soaked);
 
       if (!(await syncService.isFullySynced())) {
         if (!(await syncStore.syncNow(false))) return refuse('not-synced');
@@ -434,19 +382,17 @@ export function usePodCompaction() {
       // forever, on a file that is now small.
       void clearTooLargeMarks();
 
-      const after = soak();
       const size = `${Math.round(stats.beforeBytes / 1024)}KB → ${Math.round(stats.afterBytes / 1024)}KB`;
       showToast(
         'success',
         t('compaction.done'),
-        after.ok
+        olderVersion.value.length === 0
           ? `${size}. ${t('compaction.doneNothingToDo')}`
-          : // ⚠️ NOT "they will pick this up". Everyone in `behind` is on a build
-            // that does NOT honour the guard, so when they next open beanies
-            // they will merge across lineages — the fleet-wide destruction the
-            // soak gate exists to prevent. Saying they will pick it up is the
-            // most dangerously reassuring sentence this could produce.
-            `${size}. ${fillTemplate(t('compaction.doneButBehind'), { names: after.behind.join(', ') })}`,
+          : // Under 5.0 a person on an older build does NOT merge across
+            // lineages: their build refuses the file at parse and stops syncing
+            // until it updates, and what they add before then is not kept. Say
+            // that, and name them, through the ONE joiner.
+            `${size}. ${fillTemplate(t('compaction.doneOlderVersion'), { list: olderVersionNames.value })}`,
         { surface: 'pod-compaction' }
       );
     } catch (e) {

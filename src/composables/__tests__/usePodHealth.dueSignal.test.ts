@@ -81,7 +81,7 @@ describe('usePodHealth', () => {
 /**
  * ⚠️ THE ANSWER BELONGS ON THE PAGE, NOT BEHIND A BUTTON PRESS. The soak gate
  * used to be discoverable only by attempting a one-way, family-wide migration
- * and reading a toast that vanished a few seconds later. `waitingOn` puts the
+ * and reading a toast that vanished a few seconds later. `olderVersion` puts the
  * same names in the section itself, before anything is pressed.
  */
 describe('usePodHealth — who the soak gate is waiting on', () => {
@@ -98,17 +98,17 @@ describe('usePodHealth — who the soak gate is waiting on', () => {
       { id: 'm2', name: 'Sam', lastLoginAt: TODAY },
       { id: 'm3', name: 'Alex', lastLoginAt: TODAY },
     ];
-    expect(usePodHealth().waitingOn.value).toEqual(['Sam', 'Alex']);
+    expect(usePodHealth().olderVersion.value).toEqual(['Sam', 'Alex']);
   });
 
   it('is empty when everyone recently active has been seen', () => {
-    // Anti-vacuity: a `waitingOn` that always listed everyone would satisfy the
+    // Anti-vacuity: a `olderVersion` that always listed everyone would satisfy the
     // test above and put a permanent caution on the page.
     hooks.members = [
       { id: 'm1', name: 'Greg', lastLoginAt: TODAY, lineageEpoch: 1 },
       { id: 'm2', name: 'Sam', lastLoginAt: TODAY, lineageEpoch: 1 },
     ];
-    expect(usePodHealth().waitingOn.value).toEqual([]);
+    expect(usePodHealth().olderVersion.value).toEqual([]);
   });
 
   it('does not wait on someone who has not signed in for months', () => {
@@ -118,6 +118,6 @@ describe('usePodHealth — who the soak gate is waiting on', () => {
       { id: 'm1', name: 'Greg', lastLoginAt: TODAY, lineageEpoch: 1 },
       { id: 'm2', name: 'Sam', lastLoginAt: '2024-01-01' },
     ];
-    expect(usePodHealth().waitingOn.value).toEqual([]);
+    expect(usePodHealth().olderVersion.value).toEqual([]);
   });
 });

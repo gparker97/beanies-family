@@ -16,7 +16,13 @@ import { useSyncStore } from '@/stores/syncStore';
 import * as syncService from '@/services/sync/syncService';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePermissions } from '@/composables/usePermissions';
-import { anyDeviceReportedTooLarge, evaluateSoak } from '@/services/pod/podSoak';
+import {
+  anyDeviceReportedTooLarge,
+  membersOnOlderVersions,
+  formatNames,
+} from '@/services/pod/podSoak';
+import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 
 /** Below this the file opens comfortably even on an old tablet. */
 export const DUE_BYTES = 1_000_000;
@@ -25,6 +31,7 @@ export function usePodHealth() {
   const syncStore = useSyncStore();
   const familyStore = useFamilyStore();
   const { isOwner } = usePermissions();
+  const { t } = useTranslation();
 
   /**
    * ⚠️ ONE COMPUTED DECIDES WHO SEES THE NOTE, THE SECTION AND THE BUTTON.
@@ -52,28 +59,34 @@ export function usePodHealth() {
   const someoneCannotOpenIt = computed(() => anyDeviceReportedTooLarge(familyStore.members));
 
   /**
-   * Who the soak gate is waiting on, or empty when it is satisfied.
+   * Who last opened beanies on an older version, or empty.
    *
-   * ⚠️ SO THE ANSWER IS ON THE PAGE, NOT BEHIND A BUTTON PRESS. The gate used
-   * to be discoverable only by trying: press Compact, get a refusal. Even named,
-   * that is a bad shape — the person has to attempt a one-way, family-wide
-   * migration to find out they cannot, and the refusal is gone in a few seconds.
-   * The section now says who it is waiting on before anything is pressed.
-   *
-   * Same `evaluateSoak` the ladder gates on, so the page and the refusal cannot
-   * disagree. The LADDER still checks for itself: this is display, and a
-   * displayed value is not a gate.
-   *
-   * `behind` alone, with no `ok` guard: the verdict defines `ok` AS
-   * `behind.length === 0`, so a guard here would be unreachable code posing as
-   * a safety net — it cannot be tested, and an untestable branch is a place for
-   * a bug to live rather than a defence against one.
+   * ⚠️ THE ANSWER IS ON THE PAGE, NOT BEHIND A BUTTON PRESS, AND IT IS A NOTICE,
+   * NOT A GATE. Compaction no longer refuses on this; the file format protects
+   * the family (a compacted pod is 5.0, which a pre-guard build cannot parse).
+   * What is left to say is who will be cut off until they update, and it is
+   * composed ONCE here because the Settings slab and the confirm dialog show the
+   * SAME sentence. The ladder reads these too, so the three cannot disagree.
+   * A Vue `computed` re-evaluates on read, so the post-pull reading at the
+   * completion toast is the current projection.
    */
-  const waitingOn = computed(() => evaluateSoak(familyStore.members).behind);
+  const olderVersion = computed(() => membersOnOlderVersions(familyStore.members));
+  const olderVersionNames = computed(() => formatNames(olderVersion.value));
+  const olderVersionNotice = computed(() =>
+    fillTemplate(t('compaction.olderVersion.notice'), { list: olderVersionNames.value })
+  );
 
   const compactionIsDue = computed(
     () => canCompactPod.value && (someoneCannotOpenIt.value || podBytes.value >= DUE_BYTES)
   );
 
-  return { canCompactPod, compactionIsDue, podBytes, someoneCannotOpenIt, waitingOn };
+  return {
+    canCompactPod,
+    compactionIsDue,
+    podBytes,
+    someoneCannotOpenIt,
+    olderVersion,
+    olderVersionNames,
+    olderVersionNotice,
+  };
 }

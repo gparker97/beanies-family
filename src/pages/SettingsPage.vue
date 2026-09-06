@@ -42,8 +42,6 @@ import { alert as showAlert, confirm } from '@/composables/useConfirm';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
 import { usePodHealth } from '@/composables/usePodHealth';
-import { formatNames } from '@/services/pod/podSoak';
-import { fillTemplate } from '@/utils/fillTemplate';
 import { showToast } from '@/composables/useToast';
 import { requireReauth, canStepUp } from '@/composables/useReauth';
 import { reportError } from '@/utils/errorReporter';
@@ -602,7 +600,8 @@ function formatLastSync(timestamp: string | null): string {
 // bindings keep reading the same name.
 const { isExporting: isExportingBeanpod, exportEncryptedPod, confirmBackupLanded } = usePodExport();
 const { busy: isCompacting, compact: compactPod } = usePodCompaction();
-const { canCompactPod, compactionIsDue, someoneCannotOpenIt, waitingOn } = usePodHealth();
+const { canCompactPod, compactionIsDue, someoneCannotOpenIt, olderVersion, olderVersionNotice } =
+  usePodHealth();
 /**
  * Does this family's storage keep the automatic copy beside the pod?
  *
@@ -2005,6 +2004,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               t('compaction.why.record'),
               t('compaction.why.settled'),
               t('compaction.why.older'),
+              t('compaction.why.conflict'),
             ]"
           />
         </h3>
@@ -2055,12 +2055,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             class="text-primary-500 dark:text-accent-lift mt-0.5 h-4 w-4 flex-shrink-0"
             aria-hidden="true"
           />
-          <p
-            v-if="waitingOn.length"
-            class="dark:text-ink-soft text-xs leading-relaxed text-orange-900"
-          >
-            {{ fillTemplate(t('compaction.waitingOn'), { names: formatNames(waitingOn) }) }}
-          </p>
+          <div v-if="olderVersion.length" class="space-y-2">
+            <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
+              {{ olderVersionNotice }}
+            </p>
+            <!-- The per-member limit, stated once rather than hidden: beanies sees
+                 people, not devices. -->
+            <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
+              {{ t('compaction.olderVersion.rule') }}
+            </p>
+          </div>
           <p v-else class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
             {{ t('compaction.bringDevicesOnline') }}
           </p>
