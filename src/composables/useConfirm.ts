@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
-type ConfirmVariant = 'danger' | 'info';
+export type ConfirmVariant = 'danger' | 'info';
 
 interface ConfirmOptions {
   title: UIStringKey;

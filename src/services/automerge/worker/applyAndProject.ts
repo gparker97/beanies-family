@@ -769,6 +769,12 @@ export async function mergeRemoteEnvelope(
   replayed?: number;
   /** Fields both sides wrote that could not be merged; the saved value stayed. */
   conflicts?: number;
+  /**
+   * The policy asked for a rebase and it could not run, so this outcome is a
+   * fallback rather than the policy's own answer. Diagnostic only — nothing
+   * branches on it. `user-file` adopts only; every other context throws.
+   */
+  rebaseUnavailable?: true;
 }> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
@@ -831,6 +837,8 @@ export async function mergeRemoteEnvelope(
   // mitigation is resetting the one affected dev family before soaking. Do not
   // reintroduce the reader.
   let installWholesale = !currentDoc || basis.kind === 'no-local-document';
+  /** The policy asked for a rebase and it could not run. Diagnostic only. */
+  let rebaseUnavailable = false;
   if (currentDoc && basis.kind !== 'no-local-document') {
     const lineageCtx = lineageContextFor(basis, currentDoc);
     // Throws `PodLineageError` on a block; every caller between here and the
@@ -901,11 +909,19 @@ export async function mergeRemoteEnvelope(
       // otherwise byte-identical in CloudWatch to a policy block that never
       // attempted one, so "the rebase machinery is broken" and "the guard
       // correctly refused" look the same — and the soak that decides whether to
-      // enable compaction cannot be judged. Emitted for a genuine failure only:
-      // counting every user-file adopt here would poison the metric with the
+      // enable compaction cannot be judged. Recorded for a genuine failure
+      // only: flagging every user-file adopt would poison the metric with the
       // routine case. The user-facing error is deliberately unchanged.
-      sink.perf('automerge.rebaseUnavailable', 1, {});
-      if (lineageCtx !== 'user-file') throw lineageBlockError('adopt-remote');
+      //
+      // ⚠️ NOT `sink.perf`. This was a 1ms sample, and `perfTiming.record`
+      // escalates to telemetry only at/above TELEMETRY_FLOOR_MS (250) — so the
+      // one signal the soak depends on never left the device. It rides the two
+      // real exits instead: the thrown error, and the outcome of the
+      // `user-file` adopt below. `docClient.mergeRemoteEnvelope` logs both.
+      rebaseUnavailable = true;
+      if (lineageCtx !== 'user-file') {
+        throw lineageBlockError('adopt-remote', { rebaseUnavailable: true });
+      }
     }
     // `rebase` reaches here only via the `user-file` fallback above.
     installWholesale = act === 'adopt' || act === 'rebase';
@@ -964,6 +980,9 @@ export async function mergeRemoteEnvelope(
       dirty: !headsEqual(remoteHeads, heads),
       changed: true,
       remoteHeads,
+      // Only ever true on the `user-file` fallback: this adopt is standing in
+      // for a rebase that could not run, and the soak needs to see that.
+      ...(rebaseUnavailable ? { rebaseUnavailable: true as const } : {}),
     };
   }
 

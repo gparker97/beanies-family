@@ -9,7 +9,8 @@
 import { ref } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { confirm } from '@/composables/useConfirm';
+import { confirm, type ConfirmVariant } from '@/composables/useConfirm';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { showToast } from '@/composables/useToast';
 import { deliverFile } from '@/utils/deliverFile';
 import { isNative } from '@/services/sync/capabilities';
@@ -105,14 +106,26 @@ export function usePodExport() {
    * not tell us. When the next step is irreversible, the only honest gate is a
    * human one. On web the download is deterministic, so there is nothing to
    * ask and this returns true unchanged.
+   *
+   * ⚠️ THE CALLER NAMES THE CONSEQUENCE, and there is no default. The question
+   * ("did your export save?") is shared; what happens next is not, and the
+   * second caller inherited the first one's answer — a compaction, which
+   * deletes nothing, told the user on native that "your family is deleted and
+   * this copy is all you'll have". A default here would just wait for a third
+   * caller to inherit it too. `variant` travels with the message for the same
+   * reason: red is for delete and leave, per the CIG, and a compaction is
+   * neither.
    */
-  async function confirmBackupLanded(): Promise<boolean> {
+  async function confirmBackupLanded(consequence: {
+    message: UIStringKey;
+    variant: ConfirmVariant;
+  }): Promise<boolean> {
     if (!isNative()) return true;
     return confirm({
       title: 'settings.deleteFamilyExportCheckTitle',
-      message: 'settings.deleteFamilyExportCheckMsg',
+      message: consequence.message,
       confirmLabel: 'settings.deleteFamilyExportCheckConfirm',
-      variant: 'danger',
+      variant: consequence.variant,
     });
   }
 

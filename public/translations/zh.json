@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4544
+    "translationCount": 4546
   },
   "translations": {
     "app.name": {
@@ -22502,8 +22502,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备下次在线时会拾取压缩文件，并且在离线时， beanies会承载大部分更改内容。如果不能，则告知该设备并保留其更改，直到有人做出决定。",
-      "hash": "medevv",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件，并且beanies会在离线时传递更改的内容。如果在两个地方更改了相同的内容，则此处已保存的版本就是保留的版本。如果设备的更改根本无法进行，则会告知该设备并保留所有更改，直到有人做出决定。",
+      "hash": "qjk88g",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
@@ -22724,6 +22724,16 @@
     "compaction.doneButBehind": {
       "translation": "值得注意的一点是： {names}使用的是旧版的Beanies。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
       "hash": "fs9h60",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.not-owner": {
+      "translation": "只有建立家庭的人才能压缩家庭文件。",
+      "hash": "kikvoi",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.exportCheckMsg": {
+      "translation": "请检查您的文件，并确保副本确实存在。无论哪种方式都不会删除任何内容；如果您需要，可以返回此副本。",
+      "hash": "kpnhii",
       "lastUpdated": "2026-09-06"
     }
   }

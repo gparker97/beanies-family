@@ -1666,26 +1666,7 @@ async function fetchAndMergeRemote(): Promise<void> {
   // RESIDENT, which is the one fact that would expose a wrong `clean`
   // derivation losing edits. Two constant messages, so the 50/surface/min
   // limiter buckets them apart from each other and from the blocks.
-  logEvent({
-    // ⚠️ A REBASE THAT DROPPED SOMETHING IS NOT ROUTINE. `conflicts` counts
-    // writes the replay could not carry across — the peer's edit to a field the
-    // compactor had also written — so a family that lost something must be
-    // findable without a repro.
-    level: merged.conflicts ? 'warn' : 'info',
-    surface: 'pod-lineage',
-    message: `poll terminus ${merged.action}`,
-    context: {
-      action: merged.action,
-      family_id: remoteEnvelope.familyId,
-      // ⚠️ ON THE SUCCESS PATH TOO. The only rebase telemetry was a failure
-      // counter, so the RATE the soak has to judge — how often a rebase runs,
-      // and how much it carries — was unmeasurable. Absent for every other
-      // action, so the field itself says whether a rebase happened.
-      ...(merged.action === 'rebased'
-        ? { detail: `replayed=${merged.replayed ?? 0},conflicts=${merged.conflicts ?? 0}` }
-        : {}),
-    },
-  });
+  docClient.logMergeTerminus('poll terminus', merged, remoteEnvelope.familyId);
 
   // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
   // gap between the probe and the read, this records the OLDER revision → the next
@@ -2261,13 +2242,23 @@ export async function saveNow(): Promise<boolean> {
 }
 
 /**
- * Cancel any pending debounced save
+ * Cancel any pending debounced save.
+ *
+ * Returns whether one was actually cancelled, so a caller that cancels only to
+ * get a quiet window can put the intent back afterwards. That return is not a
+ * convenience: a publish armed by a merge and then dropped by an unrelated
+ * reload has been fixed as a fresh bug three separate times (see
+ * `reloadAllStores`), because "did anything need saving" was re-derived at each
+ * call site from whichever branch that site happened to know about. Reading it
+ * from the timer makes the answer true for every branch, including ones written
+ * later. Cancelling and asking are the SAME call on purpose — two calls can
+ * disagree if a save is armed between them.
  */
-export function cancelPendingSave(): void {
-  if (saveDebounceTimer) {
-    clearTimeout(saveDebounceTimer);
-    saveDebounceTimer = null;
-  }
+export function cancelPendingSave(): boolean {
+  if (!saveDebounceTimer) return false;
+  clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = null;
+  return true;
 }
 
 /**
