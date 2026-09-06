@@ -41,7 +41,7 @@ import { useToast } from '@/composables/useToast';
 import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
 import { anchorOffsetDays } from '@/utils/wallAnchor';
-import { railFits } from '@/components/wall/wallLayout';
+import { daysLayoutFor, railFits } from '@/components/wall/wallLayout';
 import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
@@ -158,7 +158,7 @@ const isPortrait = useMediaQuery('(orientation: portrait)');
  * A media query on the VIEWPORT, deliberately, not a measurement of the plot:
  * the rail's own width comes out of the plot it would be measured against, so
  * turning it on shrinks the plot below the threshold, which turns it off, which
- * widens it again. See `DAYS_RAIL_MIN_VIEWPORT_PX` for the arithmetic.
+ * widens it again. See `daysLayoutFor` for the arithmetic.
  */
 /**
  * Live viewport width — the single input both rail decisions read.
@@ -187,8 +187,14 @@ function onViewportResize() {
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', onViewportResize);
 
-/** Seven day columns; the lanes view asks the same question about its own beans. */
-const daysRail = computed(() => !isPortrait.value && railFits(viewportWidth.value, 7));
+/**
+ * The days view's rail AND its column count, from one function.
+ *
+ * The count absorbs whatever the rail leaves, which is what removed the old
+ * fixed threshold: with seven columns pinned, the rail had to be traded against
+ * them, and that trade is what produced the squeezed-both-ways layout.
+ */
+const daysLayout = computed(() => daysLayoutFor(viewportWidth.value, isPortrait.value));
 const lanesRail = computed(
   () =>
     !isPortrait.value && railFits(viewportWidth.value, Math.max(1, familyStore.sortedHumans.length))
@@ -209,7 +215,7 @@ const lanesRail = computed(
  * is inverted in exactly the cases that matter — a large family on a 1300px wall
  * has a lanes BAND while `daysRail` is true.
  */
-watch([daysRail, lanesRail, activeView], ([days, lanes, view]) => {
+watch([() => daysLayout.value.rail, lanesRail, activeView], ([days, lanes, view]) => {
   if (view !== 'days' && view !== 'lanes') return;
   logEvent({
     level: 'info',
@@ -607,7 +613,8 @@ watch(activeView, () => (sheet.value = null));
         :now="clockNow"
         :peripherals="peripherals"
         :week-of-anchor="anchor.weekOfAnchor.value"
-        :rail="daysRail"
+        :rail="daysLayout.rail"
+        :day-columns="daysLayout.columns"
         :lanes-rail="lanesRail"
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"

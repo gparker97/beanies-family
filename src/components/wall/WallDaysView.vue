@@ -36,11 +36,17 @@ const props = defineProps<{
   weekDays: string[];
   todayYmd: string;
   portrait: boolean;
+  /**
+   * How many day columns to draw. Decided by the page from the viewport, after
+   * the rail has taken its width — see `daysLayoutFor`.
+   */
+  dayColumns: number;
   now: Date;
   /**
-   * Whether there is room for the side rail. Days view is the only one with
-   * SEVEN columns, so the rail's 296px comes out of theirs — see
-   * `DAYS_RAIL_MIN_VIEWPORT_PX`. Decided by the page, from a media query.
+   * Whether the peripheral cards sit beside the grid rather than under it.
+   * Decided together with `dayColumns` by `daysLayoutFor` — the rail takes its
+   * width first and the count absorbs what is left, which is what removed the
+   * old fixed threshold.
    */
   rail: boolean;
   /** The job/list bundle, forwarded whole to the shell. */
@@ -67,9 +73,21 @@ const emit = defineEmits<{
 const activityStore = useActivityStore();
 const { identityFor } = useActivityIdentity();
 
-/** Portrait cannot hold seven readable columns; three plus a strip is the honest fit. */
-const visible = computed(() => (props.portrait ? props.weekDays.slice(0, 3) : props.weekDays));
-const rest = computed(() => (props.portrait ? props.weekDays.slice(3) : []));
+/**
+ * As many days as fit at a READABLE width; the rest go to the strip below.
+ *
+ * ⚠️ One rule for both orientations now. It was `portrait ? slice(0,3) : all`,
+ * which meant landscape always drew seven however narrow the glass — the
+ * squeeze this replaces — and portrait always drew three however wide it was.
+ * The count arrives as a prop because it depends on the rail, and the rail
+ * decision belongs to the page.
+ *
+ * ⭐ The now-line cannot be hidden by this. `weekDays` starts AT the anchor, so
+ * a wall anchored to today — its default and its resting state — always has
+ * today in column 0.
+ */
+const visible = computed(() => props.weekDays.slice(0, props.dayColumns));
+const rest = computed(() => props.weekDays.slice(props.dayColumns));
 
 /**
  * One expansion per day, memoised in a computed — NOT a function the template
@@ -186,7 +204,7 @@ function colourFor(activity: FamilyActivity) {
         @open="emit('open', $event)"
       />
 
-      <!-- portrait only: the rest of the week, tappable -->
+      <!-- the days that did not fit as columns, tappable. Landscape too, now. -->
       <div
         v-if="rest.length"
         class="grid shrink-0 gap-2"

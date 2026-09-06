@@ -26,7 +26,7 @@ const props = defineProps<{
   portrait: boolean;
   /**
    * Whether this view gets the side rail. Days view says no below
-   * `DAYS_RAIL_MIN_VIEWPORT_PX`, where seven columns plus a rail would crowd
+   * `daysLayoutFor`, where a rail and its columns are decided together and would crowd
    * every day into a sliver; today and lanes have fewer columns and always
    * prefer it in landscape.
    *

@@ -686,3 +686,36 @@ describe('defaultMaxBlock', () => {
     }
   });
 });
+
+describe('PINNED — the vertical layout before the hour zooms', () => {
+  /*
+   * ⚠️ These are LITERALS on purpose, and they are the control for the change
+   * that follows.
+   *
+   * A test cannot compare against "the code before the change" — there is no
+   * before at test time. So the current numbers are written down here, exactly,
+   * and the commit that makes the hour scale relaxes them and states the new
+   * ones alongside. The diff on this block is then that commit's entire vertical
+   * effect, in numbers, in one place.
+   *
+   * The fixture is greg's ordinary day: three normal-length events, the case
+   * that renders identically at every plot height today.
+   */
+  const ordinary = [ev('09:00', '10:00'), ev('13:00', '13:45'), ev('17:00', '18:00')];
+
+  it.each([480, 720, 1080, 1440])('renders identically at %ipx of plot', (height) => {
+    const l = layoutTimeGrid([ordinary], height);
+    expect(l.scale).toBe(0.8);
+    expect(l.tier).toBe('gentle');
+    expect(l.columns[0]!.map((b) => Math.round(b.height))).toEqual([48, 36, 48]);
+  });
+
+  it('⭐ leaves a tall screen almost entirely empty — the complaint itself', () => {
+    const short = layoutTimeGrid([ordinary], 480);
+    const tall = layoutTimeGrid([ordinary], 1440);
+    const bottom = (l: typeof short) => Math.max(...l.columns[0]!.map((b) => b.top + b.height));
+    // Byte-identical: three times the glass, not one pixel more content.
+    expect(Math.round(bottom(tall))).toBe(Math.round(bottom(short)));
+    expect(bottom(tall)).toBeLessThan(1440 * 0.25);
+  });
+});
