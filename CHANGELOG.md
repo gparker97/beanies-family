@@ -22,9 +22,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **beanies now keeps a copy of your family file beside it before compacting.** It sits in the same folder as the family file, named after it, so you can find it months later without having kept track of a download. beanies reads the copy back and checks it arrived intact before changing anything, and removes it and stops if it did not. Deleting your family removes the copy too.
 
+- **The beanie wall can look at other weeks, and other days.** It only ever showed the next seven days. There are now arrows in the header: the week view moves a week at a time, the day and bean-lane views move a day at a time, and a "today" button appears whenever you have wandered off. Weeks line up with your family's own week, so if your week starts on Sunday, so does the wall's. It still opens on today and still looks forward, and it finds its way back to today on its own overnight.
+- **Tapping a day in the week view now moves the week to start on that day**, rather than opening a panel over it. Choosing Thursday redraws the week from Thursday.
+- **The wall remembers which day you were looking at when you switch views.** It used to quietly go back to today the moment you changed view, with nothing to say why.
+
 ### Changed
 
 - **Compacting your family file has its own section in Settings, and says what it does.** It used to be a small button in a row beside Restart Onboarding, which made a one-way change to everyone's copy look like a tidy-up. The explanation of why a family file keeps a record of past changes now sits behind the "?" badge, and the one thing you need to do — bring your other devices online first — is on the page where you cannot miss it.
+
+- **A big screen is no longer half empty.** Cards had a fixed maximum height chosen for a tablet, so on a large display the day ran out well before the screen did. That maximum now grows with the space available, up to a sensible limit. An hour is still exactly as tall on a quiet day as on a busy one, so the wall reads the same from across the room, and nothing changes at all on a smaller screen.
+- **The week view now puts its cards down the side**, like the day and bean-lane views already did, which gives the calendar its full height back. Only on screens wide enough to afford it — below that the cards stay underneath, because seven days squeezed into what is left is worse than the space it saves.
+- **The chore board gives its room to the beans who actually have chores.** Beans with nothing on used to take up a whole column each to say so. They are now a row of faces along the bottom, under "all clear", and the columns go to whoever has the work. A bean who has finished everything keeps their full column, their green ring and their stars — that is the reward, and it was never the same thing as having nothing to do.
 
 ### Fixed
 
