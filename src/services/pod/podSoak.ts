@@ -1,23 +1,34 @@
 /**
- * Has every family member's device seen a build that honours the lineage guard?
+ * Who in the family last opened beanies on a build that predates the lineage
+ * guard? A READING for the compaction notice, the confirm and the completion
+ * toast. NOTHING REFUSES ON IT.
  *
- * PURE — members in, a verdict out. No stores, no I/O, no mocks needed to test
- * it, and SHARED by the pre-compaction gate and the completion message so the
- * two can never disagree about who is behind. A second implementation of "who
- * has not caught up" is how a gate and a message drift into contradicting each
- * other in front of a user.
+ * It used to be a gate: compaction refused until every recently active member
+ * had logged in on a guard-honouring build. That gate could not verify what it
+ * asked. `lineageEpoch` is written on the MEMBER row at login, so once Sam
+ * signs in once on a current build, Sam passes forever, and Sam's old tablet
+ * is still a hazard the reading cannot see. Its instruction, "open beanies on
+ * every device you use it on", was unverifiable and, for a normal family,
+ * impossible. The structural protection is the file format now: a compacted
+ * pod is a 5.0 file, which a pre-guard build refuses at parse (ADR-036
+ * addendum). What this reading can still do honestly is name the PEOPLE whose
+ * last login was on an older version, so the owner is told who will be cut off
+ * until they update, before and after compacting.
  *
- * ⚠️ POSITIVE EVIDENCE ONLY. The tempting shape — "refuse while any device is
- * on an old build" — can NEVER match, because an old build writes no marker at
- * all. So the gate requires a marker from every recently-active member, and
- * absence refuses. It self-heals the moment that person opens a current build.
+ * PURE, members in, names out, and SHARED by all three consumers so they
+ * cannot disagree about who is behind.
+ *
+ * ⚠️ POSITIVE EVIDENCE ONLY. "Anyone on an old build" can never match, because
+ * an old build writes no marker at all; so a member is named when they are
+ * recently active and no guard-honouring build has stamped their row. It
+ * self-clears the moment that person opens a current build.
  *
  * ⚠️ RECENTLY ACTIVE, not "every member ever". The window is compared at DATE
- * granularity — `lastLoginAt` is a full ISO timestamp, not the date-only value
- * an earlier version of this comment claimed, so the truncation here is what
- * makes the comparison date-based rather than the field's shape. A member who
- * has never signed in has no value and is correctly not counted: a child's
- * account created but never opened must not block their family forever.
+ * granularity. A member who has never signed in has no value and is not
+ * counted: a child's account created but never opened must not be named.
+ *
+ * ⚠️ NAMES, NEVER A VERSION. `appVersion` is written by the same login stamp as
+ * `lineageEpoch`, so it is ABSENT on exactly the members this can name.
  */
 import type { FamilyMember, ISODateString } from '@/types/models';
 
@@ -31,13 +42,6 @@ export const SOAK_WINDOW_DAYS = 30;
  * than this one.
  */
 export const REQUIRED_EPOCH = 1;
-
-export interface SoakVerdict {
-  /** Every recently-active member is on a guard-honouring build. */
-  ok: boolean;
-  /** Those who are not, by name, for a message that can be acted on. */
-  behind: string[];
-}
 
 /** Date-only comparison, because `lastLoginAt` is date-only. */
 function withinWindow(lastLoginAt: ISODateString | undefined, today: Date, days: number): boolean {
@@ -66,10 +70,11 @@ export function formatNames(names: readonly string[]): string {
   return names.join(', ');
 }
 
-export function evaluateSoak(
+/** The names of recently active members whose last login predates the guard. */
+export function membersOnOlderVersions(
   members: readonly FamilyMember[],
   opts: { today?: Date; requiredEpoch?: number; windowDays?: number } = {}
-): SoakVerdict {
+): string[] {
   const today = opts.today ?? new Date();
   const required = opts.requiredEpoch ?? REQUIRED_EPOCH;
   const windowDays = opts.windowDays ?? SOAK_WINDOW_DAYS;
@@ -79,7 +84,7 @@ export function evaluateSoak(
     .filter((m) => (m.lineageEpoch ?? 0) < required)
     .map((m) => m.name);
 
-  return { ok: behind.length === 0, behind };
+  return behind;
 }
 
 /**
