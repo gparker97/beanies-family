@@ -15,6 +15,9 @@ import {
   SCALE_STEPS,
   foldHeightFor,
   MAX_ATTEMPTS,
+  ZOOM_STEPS,
+  zoomCandidates,
+  REFERENCE_PLOT_PX,
   defaultMaxBlock,
   MAX_BLOCK_PX,
   MAX_BLOCK_CEILING_PX,
@@ -71,8 +74,8 @@ describe('the ladder is data', () => {
   });
 
   it('keeps MAX_ATTEMPTS and the arithmetic from drifting apart', () => {
-    expect(MAX_ATTEMPTS).toBe(LADDER.length);
-    expect(MAX_ATTEMPTS).toBe(120);
+    expect(MAX_ATTEMPTS).toBe(LADDER.length + ZOOM_STEPS.length);
+    expect(MAX_ATTEMPTS).toBe(123); // 120 rungs + 3 zoom candidates
   });
 
   it('is frozen, so nothing can mutate the search at runtime', () => {
@@ -687,35 +690,219 @@ describe('defaultMaxBlock', () => {
   });
 });
 
-describe('PINNED — the vertical layout before the hour zooms', () => {
+describe('PINNED — the vertical layout, before and after the hour zooms', () => {
   /*
    * ⚠️ These are LITERALS on purpose, and they are the control for the change
    * that follows.
    *
    * A test cannot compare against "the code before the change" — there is no
-   * before at test time. So the current numbers are written down here, exactly,
-   * and the commit that makes the hour scale relaxes them and states the new
-   * ones alongside. The diff on this block is then that commit's entire vertical
-   * effect, in numbers, in one place.
+   * before at test time. So the numbers were written down here as literals in
+   * the commit before the hour zoomed, and this commit states the new ones
+   * beside them. The diff on this block IS that commit's whole vertical effect.
    *
-   * The fixture is greg's ordinary day: three normal-length events, the case
-   * that renders identically at every plot height today.
+   * The fixture is greg's ordinary day: three normal-length events — the case
+   * that used to render identically at every plot height, which was the whole
+   * complaint.
+   *
+   *   plot   before              after
+   *    480   [48,36,48] b=272    [48,36,48] b=272   unchanged
+   *    720   [48,36,48] b=272    [48,36,48] b=272   unchanged
+   *   1080   [48,36,48] b=272    [72,54,72] b=403   zoom 1.5
+   *   1440   [48,36,48] b=272    [96,72,96] b=535   zoom 2
    */
   const ordinary = [ev('09:00', '10:00'), ev('13:00', '13:45'), ev('17:00', '18:00')];
 
-  it.each([480, 720, 1080, 1440])('renders identically at %ipx of plot', (height) => {
+  it.each([
+    [480, 0.8, [48, 36, 48]],
+    [720, 0.8, [48, 36, 48]],
+    [1080, 1.2, [72, 54, 72]],
+    [1440, 1.6, [96, 72, 96]],
+  ])('at %ipx of plot the hour is %f', (height, scale, heights) => {
     const l = layoutTimeGrid([ordinary], height);
-    expect(l.scale).toBe(0.8);
+    expect(l.scale).toBeCloseTo(scale as number, 6);
+    // ⭐ Still `gentle` at every size. The tier says whether the day was
+    // COMPRESSED, and a zoomed fit is not a compromise — it took rung 0.
     expect(l.tier).toBe('gentle');
-    expect(l.columns[0]!.map((b) => Math.round(b.height))).toEqual([48, 36, 48]);
+    expect(l.columns[0]!.map((b) => Math.round(b.height))).toEqual(heights);
   });
 
-  it('⭐ leaves a tall screen almost entirely empty — the complaint itself', () => {
+  it('⭐ the zoom never fires at or below the reference plot', () => {
+    // Every device tested so far renders its vertical layout byte-for-byte as
+    // before, which is what makes this safe to ship without re-testing the small
+    // end. Asserted on the CANDIDATES rather than on the resulting scale: a
+    // short plot may still descend the ladder on a busy day, which is
+    // pre-existing behaviour and nothing to do with this change.
+    for (const height of [220, 380, 480, 520, 720, 899]) {
+      expect(zoomCandidates(height)).toEqual([]);
+      // And it never grows past the natural hour, whatever the day.
+      expect(layoutTimeGrid([ordinary], height).scale).toBeLessThanOrEqual(0.8);
+    }
+  });
+
+  it('⭐ a tall screen now carries about twice the content it did', () => {
     const short = layoutTimeGrid([ordinary], 480);
     const tall = layoutTimeGrid([ordinary], 1440);
     const bottom = (l: typeof short) => Math.max(...l.columns[0]!.map((b) => b.top + b.height));
-    // Byte-identical: three times the glass, not one pixel more content.
-    expect(Math.round(bottom(tall))).toBe(Math.round(bottom(short)));
-    expect(bottom(tall)).toBeLessThan(1440 * 0.25);
+    // Was byte-identical — three times the glass, not one pixel more content.
+    expect(bottom(tall)).toBeGreaterThan(bottom(short) * 1.9);
+  });
+
+  it('⭐ but still does NOT fill it — a quiet day still looks quiet', () => {
+    // The invariant `NATURAL_PX_PER_MIN` exists to protect. Filling the screen
+    // would be content-derived stretching: "two events and one of them half a
+    // wall". 1440 goes from 81% empty to about 63%, and that is the design.
+    const tall = layoutTimeGrid([ordinary], 1440);
+    const bottom = Math.max(...tall.columns[0]!.map((b) => b.top + b.height));
+    expect(bottom).toBeLessThan(1440 * 0.5);
+  });
+
+  it('⭐ two different days on ONE screen still get the same hour', () => {
+    // The zoom is read from the plot, never from the content — which is the
+    // whole distinction that makes this safe.
+    const quiet = layoutTimeGrid([[ev('09:00', '10:00')]], 1440);
+    const busy = layoutTimeGrid([ordinary], 1440);
+    expect(quiet.scale).toBe(busy.scale);
+  });
+});
+
+describe('the zoom — how the wall grows with the glass', () => {
+  it('is empty below the reference plot, and steps up above it', () => {
+    for (const height of [0, -1, NaN, 220, 480, 720, 899]) {
+      expect(zoomCandidates(height)).toEqual([]);
+    }
+    expect(zoomCandidates(900)).toEqual([1.25]);
+    expect(zoomCandidates(1080)).toEqual([1.5, 1.25]);
+    expect(zoomCandidates(1440)).toEqual([2, 1.5, 1.25]);
+  });
+
+  it('offers the widest zoom first, and every one of them grows the hour', () => {
+    // Widest-first matters: the search takes the first that fits, so a
+    // mis-ordered list would silently pick a smaller hour than the plot affords.
+    for (let i = 1; i < ZOOM_STEPS.length; i++) {
+      expect(ZOOM_STEPS[i]!).toBeLessThan(ZOOM_STEPS[i - 1]!);
+    }
+    for (const z of ZOOM_STEPS) expect(z).toBeGreaterThan(1);
+    expect(REFERENCE_PLOT_PX).toBeGreaterThanOrEqual(720);
+  });
+
+  /*
+   * ⭐ THE STRONGEST GUARD IN THIS CHANGE.
+   *
+   * At zoom z the whole grid should be the zoom-1 grid multiplied by z. A
+   * constant that was forgotten in the zoom then shows up as a numeric
+   * mismatch here rather than as something someone has to notice in a
+   * screenshot.
+   *
+   * ⚠️ The fixture is picked to satisfy four conditions, because four constants
+   * are deliberately absolute and any of them binding makes the property false:
+   *   (a) no block hits MIN_BLOCK_STEPS — the shortest is 50 min = 40px at z=1
+   *   (b) no block exceeds defaultMaxBlock at the LARGER height — the longest is
+   *       60 min = 96px at z=2, far under the 320px ceiling. This is the easy
+   *       one to get wrong: the cap must be checked at 1440, not at 720
+   *   (c) no NUDGE_PX or settle push fires — the gaps are 60 and 70 minutes,
+   *       both under the 90-minute fold threshold, so there are NO FOLDS, and
+   *       settle's flat +4 fires once per fold
+   *   (d) the window extends past the last block, so `total` comes from the
+   *       AXIS rather than from the blocks — without this the test cannot see
+   *       the second `buildScale`, which is the site that silently clips
+   */
+  it('⭐ at zoom z the grid is exactly the zoom-1 grid times z', () => {
+    const zeroFold = [ev('09:00', '10:00'), ev('11:00', '11:50'), ev('13:00', '13:45')];
+
+    const base = layoutTimeGrid([zeroFold], 720);
+    const zoomed = layoutTimeGrid([zeroFold], 1440);
+
+    // The premise: 720 gets no zoom, 1440 gets exactly 2.
+    expect(zoomCandidates(720)).toEqual([]);
+    expect(zoomed.scale).toBeCloseTo(base.scale * 2, 6);
+    // And the fixture really is fold-free, or (c) does not hold.
+    expect(base.folds).toHaveLength(0);
+
+    // The AXIS extent. `total` is internal, so this is the observable form of
+    // the same quantity — and with no folds, `yFor` is the unshifted mapping,
+    // so `yFor(windowEnd)` is exactly what `gridBottom` computes.
+    expect(zoomed.yFor(zoomed.windowEnd)).toBeCloseTo(base.yFor(base.windowEnd) * 2, 6);
+
+    const baseBlocks = base.columns[0]!;
+    const zoomBlocks = zoomed.columns[0]!;
+    expect(zoomBlocks).toHaveLength(baseBlocks.length);
+    baseBlocks.forEach((b, i) => {
+      expect(zoomBlocks[i]!.top).toBeCloseTo(b.top * 2, 6);
+      expect(zoomBlocks[i]!.height).toBeCloseTo(b.height * 2, 6);
+    });
+  });
+
+  it('the fold threshold in MINUTES is identical at every zoom', () => {
+    // The same day folds in the same places and is drawn to the same shape,
+    // just bigger. This is the property MAX_GAP_PX is zoomed to preserve.
+    expect(foldThresholdMinutes(90, 0.8, 1)).toBe(90);
+    expect(foldThresholdMinutes(90, 1.6, 2)).toBe(90);
+    // And the case where MAX_GAP_PX actually binds — the only one that tests it.
+    expect(foldThresholdMinutes(120, 0.8, 1)).toBeCloseTo(92.5, 6);
+    expect(foldThresholdMinutes(120, 1.6, 2)).toBeCloseTo(92.5, 6);
+  });
+
+  it('a fold band grows with the zoom, exactly', () => {
+    for (const gap of [30, 90, 240, 600]) {
+      expect(foldHeightFor(gap, 2)).toBeCloseTo(foldHeightFor(gap) * 2, 6);
+      expect(foldHeightFor(gap, 1)).toBe(foldHeightFor(gap));
+    }
+  });
+
+  it('an empty day zooms too, rather than sitting at the base hour', () => {
+    // The load-bearing line: without it an empty day renders at 0.8 on a screen
+    // where every other day renders at 1.6.
+    expect(layoutTimeGrid([[]], 480).scale).toBe(0.8);
+    expect(layoutTimeGrid([[]], 1440).scale).toBeCloseTo(1.6, 6);
+  });
+
+  it('a genuinely packed day still compresses, at any plot height', () => {
+    const packed = Array.from({ length: 22 }, (_, i) => {
+      const start = 7 * 60 + i * 35;
+      const hh = String(Math.floor(start / 60)).padStart(2, '0');
+      const mm = String(start % 60).padStart(2, '0');
+      return ev(`${hh}:${mm}`, `${hh}:${mm}`);
+    });
+    // The zoom is offered first and refused, then the ladder runs as it always
+    // has — which is why this change cannot make a busy day worse.
+    const l = layoutTimeGrid([packed], 480);
+    expect(l.columns[0]).toHaveLength(22);
+    const bottom = Math.max(...l.columns[0]!.map((b) => b.top + b.height));
+    expect(bottom).toBeLessThanOrEqual(480 + 1);
+  });
+
+  /*
+   * ⚠️ THE GUARD FOR THE CLIPPING BUG.
+   *
+   * `attempt` computes the axis's own extent with a SECOND `buildScale`, and if
+   * that one is left at the un-zoomed rung scale it under-reports how tall the
+   * layout really is. The search then accepts a zoom that does not fit, and the
+   * plot — which is `overflow: hidden` — silently swallows the bottom of the
+   * family's day. No exception, no telemetry, nothing to notice.
+   *
+   * The affine test above cannot see it on its own fixture, because that day is
+   * far from the budget at every zoom. This one asserts the invariant the bug
+   * actually violates, across days of every shape and plots of every size:
+   * NOTHING the grid draws may extend past the plot it was given.
+   */
+  it('⭐ never draws past the plot it was given, at any zoom', () => {
+    const days = [
+      [ev('09:00', '10:00'), ev('11:00', '11:50'), ev('13:00', '13:45')],
+      [ev('06:30', '07:30'), ev('20:30', '22:00')],
+      [ev('08:00', '18:00')],
+      Array.from({ length: 14 }, (_, i) =>
+        ev(`${String(7 + i).padStart(2, '0')}:00`, `${String(7 + i).padStart(2, '0')}:45`)
+      ),
+    ];
+    for (const day of days) {
+      for (const height of [480, 720, 900, 1080, 1200, 1440, 2160]) {
+        const l = layoutTimeGrid([day], height);
+        const blockBottom = l.columns[0]!.length
+          ? Math.max(...l.columns[0]!.map((b) => b.top + b.height))
+          : 0;
+        const axisBottom = l.yFor(l.windowEnd);
+        expect(Math.max(blockBottom, axisBottom)).toBeLessThanOrEqual(height + 1);
+      }
+    }
   });
 });

@@ -87,9 +87,11 @@ export const MIN_FOLD_PX = 44;
 export const MAX_FOLD_PX = 110;
 export const FOLD_PX_PER_MIN = 0.09;
 
-export function foldHeightFor(gapMinutes: number): number {
+export function foldHeightFor(gapMinutes: number, zoom = 1): number {
   const over = Math.max(0, gapMinutes - MIN_FOLDABLE_MINUTES);
-  return Math.min(MAX_FOLD_PX, MIN_FOLD_PX + over * FOLD_PX_PER_MIN);
+  // Multiplying the RESULT is algebraically identical to zooming all three
+  // constants: z·min(110, 44 + over·0.09) === min(110z, 44z + over·0.09z).
+  return Math.min(MAX_FOLD_PX, MIN_FOLD_PX + over * FOLD_PX_PER_MIN) * zoom;
 }
 
 /**
@@ -133,6 +135,16 @@ export const MAX_BLOCK_PX = 190;
 const OVER_CAP_SCALE = 0.12;
 
 /**
+ * The plot the wall's absolute pixel constants are tuned for.
+ *
+ * Every fixed pixel in this module — the fold band's 44/110, MAX_GAP_PX's 74,
+ * MAX_BLOCK_PX's 190 — was measured on a plot about this tall. Naming it once is
+ * what lets a taller plot scale all of them by ONE factor instead of each being
+ * re-tuned by hand and drifting apart.
+ */
+export const REFERENCE_PLOT_PX = 720;
+
+/**
  * Plot height at which the cap reproduces its historical flat value exactly.
  *
  * ⚠️ MUST be >= 720. At exactly 720 this formula yields exactly MAX_BLOCK_PX,
@@ -142,7 +154,7 @@ const OVER_CAP_SCALE = 0.12;
  * margin. Drop this below 720 and the cap at that height rises above 192, the
  * block stops being capped, and the test silently changes subject.
  */
-const CAP_REFERENCE_HEIGHT_PX = 720;
+const CAP_REFERENCE_HEIGHT_PX = REFERENCE_PLOT_PX;
 
 /** The cap's share of the plot — derived so the reference height yields MAX_BLOCK_PX. */
 const CAP_HEIGHT_FRACTION = MAX_BLOCK_PX / CAP_REFERENCE_HEIGHT_PX;
@@ -234,8 +246,63 @@ export const LADDER: readonly Rung[] = Object.freeze(
   )
 );
 
+/**
+ * ⭐ How much bigger than the reference this plot can draw the whole grid.
+ *
+ * VIEWPORT-derived, never CONTENT-derived, and that distinction is the whole
+ * safety of this. The grid once divided the available height among the day's
+ * live minutes, so a quiet day STRETCHED to fill the screen — two events, one of
+ * them half a wall. That was content-derived. This is not: two different days on
+ * the SAME screen get the same zoom, so "an hour is the same height on a quiet
+ * day and a busy one" survives intact, now qualified by "at a given screen
+ * size". A quiet day on a big screen is still mostly empty; it is just legible.
+ *
+ * Quantized, widest-first, for the reason SCALE_STEPS is quantized: a continuous
+ * factor would give every screen its own hour height.
+ *
+ * ─── ⚠️ EVERY absolute pixel in this module, and whether it zooms ────────────
+ *
+ * This table is the maintenance contract. A constant added below without a row
+ * here is a constant nobody decided about.
+ *
+ *   ZOOMS — a statement about the GRID's own geometry:
+ *     rung.scale          the hour itself
+ *     MIN_FOLD_PX    44   the fold band's floor
+ *     MAX_FOLD_PX   110   the fold band's ceiling
+ *     FOLD_PX_PER_MIN 0.09 the fold band's slope
+ *     MAX_GAP_PX     74   ⭐ zoomed to keep it INERT — see foldThresholdMinutes
+ *
+ *   DOES NOT ZOOM — a statement about the GLASS, or about a human eye:
+ *     MIN_BLOCK_STEPS     a legibility minimum in real pixels; 27px of type is
+ *                         27px of type on any display
+ *     NUDGE_PX        3   a visible seam between two stacked blocks
+ *     settle()'s     +4   clearance above a fold band. FLAT, and it fires on
+ *                         EVERY fold, so a layout's `total` is
+ *                         `gridBottom + 4 × folds.length` and the ×z scaling
+ *                         property is exact only for a ZERO-FOLD day
+ *     MIN_FOLDABLE_MINUTES 20  a duration, not a length
+ *     MAX_BLOCK_PX / MAX_BLOCK_CEILING_PX / defaultMaxBlock
+ *                         "past this a single block dominates the wall however
+ *                         large the glass" — explicitly a claim about the glass
+ */
+export const ZOOM_STEPS = [2, 1.5, 1.25] as const;
+
+/**
+ * The zooms this plot can afford, widest first — empty below 900px, which is why
+ * every device measured so far is byte-for-byte unchanged.
+ *
+ * The test is `z * REFERENCE_PLOT_PX <= height`: at zoom z the plot has room for
+ * at least a reference plot's worth of content, so no candidate is ever absurd.
+ * Total: a zero, negative or NaN height yields [] and the search runs exactly as
+ * it does today.
+ */
+export function zoomCandidates(availableHeight: number): readonly number[] {
+  if (!Number.isFinite(availableHeight) || availableHeight <= 0) return [];
+  return ZOOM_STEPS.filter((z) => z * REFERENCE_PLOT_PX <= availableHeight);
+}
+
 /** Bound on the search. Asserted in a test so it cannot drift from the arithmetic. */
-export const MAX_ATTEMPTS = LADDER.length;
+export const MAX_ATTEMPTS = LADDER.length + ZOOM_STEPS.length;
 
 /** Window used when there is nothing at all to lay out. */
 const EMPTY_WINDOW = { start: 8 * 60, end: 20 * 60 };
@@ -458,8 +525,13 @@ export function mergeBusy(items: readonly { start: number; end: number }[]): [nu
  * problem: `pxPerMin` is now an INPUT, so this is a plain division and the
  * feedback loop cannot exist. The rule survives as a test.
  */
-export function foldThresholdMinutes(gapMinutes: number, pxPerMin: number): number {
-  const byPixels = MAX_GAP_PX / Math.max(pxPerMin, 0.0001);
+export function foldThresholdMinutes(gapMinutes: number, pxPerMin: number, zoom = 1): number {
+  // ⚠️ MAX_GAP_PX zooms to keep this INERT. At rung 0 the threshold is
+  // min(90, 74/0.8 = 92.5) = 90 — the rung's own gap step wins and the pixel
+  // term never binds. Leave MAX_GAP_PX unzoomed and it falls to 74/1.6 = 46.25
+  // at z=2, which DOES bind, so a tall screen would fold gaps a short screen
+  // draws. Zooming it is what preserves the behaviour, not what changes it.
+  const byPixels = (MAX_GAP_PX * zoom) / Math.max(pxPerMin, 0.0001);
   return Math.max(MIN_FOLDABLE_MINUTES, Math.min(gapMinutes, byPixels));
 }
 
@@ -476,7 +548,8 @@ export function findFolds(
   busy: readonly [number, number][],
   windowStart: number,
   windowEnd: number,
-  thresholdMinutes: number
+  thresholdMinutes: number,
+  zoom = 1
 ): GridFold[] {
   const spans: [number, number][] = [];
   let cursor = windowStart;
@@ -487,7 +560,7 @@ export function findFolds(
   if (windowEnd - cursor >= thresholdMinutes) spans.push([cursor, windowEnd]);
   return spans.map(([start, end]) => ({
     top: 0,
-    height: foldHeightFor(end - start),
+    height: foldHeightFor(end - start, zoom),
     startMinutes: start,
     resumeMinutes: end,
   }));
@@ -666,11 +739,56 @@ interface Attempt {
   scale: number;
 }
 
-/** Lay out once at a fixed rung. Pure; no search, no retry. */
-function attempt(input: ParsedInput, rung: Rung, maxBlock: number): Attempt {
-  const threshold = foldThresholdMinutes(rung.gapMinutes, rung.scale);
-  const folds = findFolds(input.busy, input.windowStart, input.windowEnd, threshold);
-  const { yFor } = buildScale(input.windowStart, input.windowEnd, folds, rung.scale);
+/**
+ * ⭐ Try the day at a BIGGER hour first — biggest zoom first, and GENTLY ONLY.
+ *
+ * Gently only is the point, not a shortcut. Spending gap and minBlock
+ * compromises to preserve a bigger-than-natural hour would mean folding away
+ * more of the family's day to keep a luxury; the ladder's precedence exists to
+ * protect the NATURAL hour, not a grown one. So each zoom gets exactly one
+ * question — "does this day fit comfortably at this size?" — and a no falls
+ * through to the next zoom, then to the ordinary search, unchanged.
+ *
+ * This is why the change cannot make anything worse: when this returns null the
+ * caller runs TODAY's code path, at today's rung 0, against today's budget.
+ */
+function tryZoomedFit(
+  input: ParsedInput,
+  height: number,
+  maxBlock: number
+): { attempt: Attempt; attempts: number } | null {
+  let attempts = 0;
+  for (const zoom of zoomCandidates(height)) {
+    const candidate = attempt(input, LADDER[0]!, maxBlock, zoom);
+    attempts++;
+    if (candidate.total <= height + 1) return { attempt: candidate, attempts };
+  }
+  return null;
+}
+
+/**
+ * Lay out once at a fixed rung and a fixed zoom. Pure; no search, no retry.
+ *
+ * ⚠️ `zoom` is REQUIRED here, not defaulted, unlike the exported helpers below.
+ * This function is module-private, so a required parameter makes the compiler
+ * name every call site if another is ever added — which is the cheapest possible
+ * guard against a second search path forgetting to pass it.
+ */
+function attempt(input: ParsedInput, rung: Rung, maxBlock: number, zoom: number): Attempt {
+  /*
+   * ⭐ The hour and the FOLD BUDGET zoom together; `rung.minBlock` does not.
+   * See ZOOM_STEPS' table for every constant and its verdict.
+   *
+   * ⚠️ `rung.scale` is read in FOUR places in this function and all four are
+   * `pxPerMin` now. The one below `settle` — the axis's own extent — is the
+   * dangerous one: left un-zoomed it under-reports `total`, the search accepts a
+   * layout that does not fit, and the `overflow: hidden` plot silently clips the
+   * bottom of the family's day with no exception and no telemetry.
+   */
+  const pxPerMin = rung.scale * zoom;
+  const threshold = foldThresholdMinutes(rung.gapMinutes, pxPerMin, zoom);
+  const folds = findFolds(input.busy, input.windowStart, input.windowEnd, threshold, zoom);
+  const { yFor } = buildScale(input.windowStart, input.windowEnd, folds, pxPerMin);
 
   const columns: GridBlock[][] = input.byColumn.map((columnItems, columnIndex) => {
     const placement = input.lanes[columnIndex]!;
@@ -726,14 +844,31 @@ function attempt(input: ParsedInput, rung: Rung, maxBlock: number): Attempt {
 
   const all = columns.flat();
   const { bands, shiftedYFor } = settle(all, folds, yFor);
-  const gridBottom = buildScale(input.windowStart, input.windowEnd, bands, rung.scale).total;
+  /*
+   * ⚠️ pxPerMin, NOT rung.scale — the second of the four, and the easiest to miss.
+   *
+   * Honest severity, measured rather than assumed: leaving this at `rung.scale`
+   * is currently UNREACHABLE, not merely unlikely. It only differs from
+   * `pxPerMin` when zoom > 1, which happens only in the pre-pass; and the
+   * pre-pass only accepts a zoom the plot comfortably affords, so a zoomed
+   * layout is never near its budget. Swept four day shapes across 880–1500px
+   * and nothing came within 40px of overflowing. In the ladder path — where
+   * layouts ARE near the budget — zoom is always 1 and the two agree.
+   *
+   * It is still wrong, and it is a landmine rather than a bug: the day someone
+   * makes the pre-pass less gentle, or lets a zoom be chosen closer to the
+   * budget, this under-reports the axis extent, the search accepts a layout that
+   * does not fit, and the `overflow: hidden` plot swallows the bottom of the
+   * family's day with no exception and no telemetry.
+   */
+  const gridBottom = buildScale(input.windowStart, input.windowEnd, bands, pxPerMin).total;
   const blockBottom = all.length ? Math.max(...all.map((b) => b.top + b.height)) : 0;
   return {
     columns,
     bands,
     yFor: shiftedYFor,
     total: Math.max(gridBottom, blockBottom),
-    scale: rung.scale,
+    scale: pxPerMin,
   };
 }
 
@@ -822,7 +957,11 @@ export function layoutTimeGrid(
   if (!input.items.length) {
     // A day with nothing on still draws its hours: an empty grid reads as "the
     // day is clear", where an empty rectangle reads as "this is broken".
-    const scale = SCALE_STEPS[0]!;
+    // ⚠️ Load-bearing. Without the zoom an empty day renders at the base hour on
+    // a screen where every other day renders bigger. The widest candidate always
+    // fits here by construction: the empty window is 720 minutes, needing
+    // 720 × 0.8 × z = 576z <= height, and the filter already guarantees 720z.
+    const scale = SCALE_STEPS[0]! * (zoomCandidates(height)[0] ?? 1);
     const { yFor } = buildScale(input.windowStart, input.windowEnd, [], scale);
     return {
       ...base,
@@ -847,12 +986,16 @@ export function layoutTimeGrid(
    * keeps the grid's hour on one of six known heights instead of a different one
    * every day.
    */
-  let attempts = 0;
+  const zoomed = tryZoomedFit(input, height, maxBlock);
+  if (zoomed) return finish(zoomed.attempt, base, input, 0, zoomed.attempts, 'fit');
+
+  // The candidates the pre-pass burned still count against MAX_ATTEMPTS.
+  let attempts = zoomCandidates(height).length;
   let last: Attempt | null = null;
   let acceptedRung = 0;
 
   for (let rungIndex = 0; rungIndex < LADDER.length; rungIndex++) {
-    const candidate = attempt(input, LADDER[rungIndex]!, maxBlock);
+    const candidate = attempt(input, LADDER[rungIndex]!, maxBlock, 1);
     attempts++;
     // The +1px tolerance is deliberate: without it a layout landing a hundredth
     // of a pixel over budget walks the entire ladder for nothing.
