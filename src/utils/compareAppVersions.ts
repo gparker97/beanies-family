@@ -10,6 +10,13 @@
  * shape check and the comparison cannot drift into two regexes that disagree:
  * up to three dot-separated integers, optionally followed by `R` and an
  * integer. A missing field counts as zero, so `0.16` and `0.16.0` are equal.
+ *
+ * Each field is `0` or an unpadded number of at most six digits, which closes
+ * two ways of being WRONG rather than undecided. A leading zero would make
+ * `0.09` silently equal `0.9`; seventeen digits would exceed `Number`'s exact
+ * range and make two different versions compare equal. Both are plausible
+ * typos in a file edited by hand, and both would have read as a confident
+ * answer. Now they read as `null`, which every caller already handles.
  */
 
 /**
@@ -22,8 +29,11 @@
  * nothing to backtrack over. Matching is linear in the input, which is at most a
  * short version string from a file we deploy.
  */
-// eslint-disable-next-line security/detect-unsafe-regex
-const VERSION_RE = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:R(\d+))?$/;
+/* eslint-disable security/detect-unsafe-regex -- see the note above; and a
+   `disable-next-line` does not survive Prettier wrapping this declaration. */
+const VERSION_RE =
+  /^(0|[1-9]\d{0,5})(?:\.(0|[1-9]\d{0,5}))?(?:\.(0|[1-9]\d{0,5}))?(?:R(0|[1-9]\d{0,5}))?$/;
+/* eslint-enable security/detect-unsafe-regex */
 
 /** Is this string something `compareAppVersions` can decide about? */
 export function isComparableVersion(s: string): boolean {

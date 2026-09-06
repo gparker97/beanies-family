@@ -1590,6 +1590,20 @@ onMounted(async () => {
 // Re-export for the template binding. Logic lives in `src/utils/diagnostics.ts`.
 const getDeviceDiagnostics = formatDeviceInfo;
 
+/**
+ * The overlay's diagnostics blob, gathered only when there IS a fatal.
+ *
+ * ⚠️ A COMPUTED, NOT A CALL IN THE TEMPLATE. `getDeviceDiagnostics()` used to
+ * sit inside `v-if="initError"`; moving the `v-if` into the component left the
+ * call in an unconditional prop expression, where it ran on EVERY `App.vue`
+ * render, and it is not cheap: `getDeviceInfo` probes storage with real
+ * `setItem`/`getItem`/`removeItem` round-trips against both `localStorage` and
+ * `sessionStorage`, and warns to the console twice per render on a device where
+ * storage throws. Reading `initError` first makes it cost nothing until the one
+ * moment it is needed.
+ */
+const fatalDiagnostics = computed(() => (initError.value ? getDeviceDiagnostics() : ''));
+
 function handleReload() {
   // `hardReload()` evicts the SW precache + unregisters the SW before
   // navigating — without it, a soft `location.reload()` just hits the same
@@ -1872,7 +1886,7 @@ watch(
       :clear-data-helps="initErrorClearHelps"
       :action="fatalAction"
       :action-href="fatalActionHref"
-      :diagnostics="getDeviceDiagnostics()"
+      :diagnostics="fatalDiagnostics"
       @reload="handleReload"
       @clear-data="handleClearDataAndSignOut"
     />

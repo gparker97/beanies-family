@@ -2457,7 +2457,7 @@
       "lastUpdated": "2026-03-03"
     },
     "trust.notNow": {
-      "translation": "立即购买",
+      "translation": "以后再说",
       "hash": "8bjtp3",
       "lastUpdated": "2026-03-03"
     },
@@ -2982,7 +2982,7 @@
       "lastUpdated": "2026-03-03"
     },
     "pwa.installDismiss": {
-      "translation": "立即购买",
+      "translation": "以后再说",
       "hash": "8bjtp3",
       "lastUpdated": "2026-03-03"
     },
@@ -3122,7 +3122,7 @@
       "lastUpdated": "2026-03-03"
     },
     "passkey.promptDecline": {
-      "translation": "立即购买",
+      "translation": "以后再说",
       "hash": "8bjtp3",
       "lastUpdated": "2026-03-03"
     },
@@ -12797,7 +12797,7 @@
       "lastUpdated": "2026-04-30"
     },
     "storage.localFileConflictDetected": {
-      "translation": "此文件看起来像来自云存储提供商的冲突副本。Beanies将在加载时合并它—您可以在之后删除重复项。",
+      "translation": "此文件看起来像来自云存储提供商的冲突副本。beanies将在加载时合并它—您可以在之后删除重复项。",
       "hash": "jzfklt",
       "lastUpdated": "2026-04-30"
     },
@@ -14487,7 +14487,7 @@
       "lastUpdated": "2026-05-18"
     },
     "loginV6.createTagline": {
-      "translation": "刚开始接触Beanies ？",
+      "translation": "刚开始接触beanies ？",
       "hash": "vtpspv",
       "lastUpdated": "2026-05-18"
     },
@@ -14907,7 +14907,7 @@
       "lastUpdated": "2026-06-03"
     },
     "ai.consent.afterValue": {
-      "translation": "AI服务不保留任何内容。Beanies保存的任何东西都只会与您自己家庭的数据一起保存，并附加到此项目中。",
+      "translation": "AI服务不保留任何内容。beanies保存的任何东西都只会与您自己家庭的数据一起保存，并附加到此项目中。",
       "hash": "v42bfn",
       "lastUpdated": "2026-09-03"
     },
@@ -15387,7 +15387,7 @@
       "lastUpdated": "2026-09-04"
     },
     "nav.community": {
-      "translation": "Beanies Discord",
+      "translation": "beanies Discord",
       "hash": "g7rkst",
       "lastUpdated": "2026-07-09"
     },
@@ -15437,7 +15437,7 @@
       "lastUpdated": "2026-06-07"
     },
     "communityNudge.snooze": {
-      "translation": "立即购买",
+      "translation": "以后再说",
       "hash": "8bjtp3",
       "lastUpdated": "2026-06-07"
     },
@@ -15502,7 +15502,7 @@
       "lastUpdated": "2026-06-10"
     },
     "calendarSync.intro": {
-      "translation": "关联Google日历，您的家庭活动将自动推送到该日历。Beanies始终是您的真实来源。编辑总是在这里进行。",
+      "translation": "关联Google日历，您的家庭活动将自动推送到该日历。beanies始终是您的真实来源。编辑总是在这里进行。",
       "hash": "usilru",
       "lastUpdated": "2026-06-10"
     },
@@ -16092,7 +16092,7 @@
       "lastUpdated": "2026-06-14"
     },
     "inviteGate.privacyNote": {
-      "translation": "您的电子邮件仅发送给Beanies团队，以发送您的邀请。没有公开信息，也没有存储在应用中。",
+      "translation": "您的电子邮件仅发送给beanies团队，以发送您的邀请。没有公开信息，也没有存储在应用中。",
       "hash": "o3xz6n",
       "lastUpdated": "2026-06-14"
     },
@@ -18342,7 +18342,7 @@
       "lastUpdated": "2026-07-09"
     },
     "feedback.form.commentPassive": {
-      "translation": "您希望Beanies能做什么？ （可选）",
+      "translation": "您希望beanies能做什么？ （可选）",
       "hash": "itoekp",
       "lastUpdated": "2026-07-09"
     },
@@ -20632,7 +20632,7 @@
       "lastUpdated": "2026-08-27"
     },
     "shareTarget.signIn.message": {
-      "translation": "打开Beanies并登录，然后再次分享。",
+      "translation": "打开beanies并登录，然后再次分享。",
       "hash": "vhvccd",
       "lastUpdated": "2026-08-27"
     },
@@ -20822,7 +20822,7 @@
       "lastUpdated": "2026-08-27"
     },
     "recipeExtract.noTranscript.message": {
-      "translation": "该视频的描述没有文字，也没有可以跟踪的链接，因此没有任何内容可供Beanies阅读。请自行查看描述中的链接，然后使用该链接。",
+      "translation": "该视频的描述没有文字，也没有可以跟踪的链接，因此没有任何内容可供beanies阅读。请自行查看描述中的链接，然后使用该链接。",
       "hash": "tvv6pj",
       "lastUpdated": "2026-08-27"
     },
@@ -21322,7 +21322,7 @@
       "lastUpdated": "2026-08-28"
     },
     "app.initError.registryBlocked": {
-      "translation": "beanies在另一个选项卡或窗口中打开，并且正在保留存储更新。关闭其他Beanies选项卡和窗口（包括已安装的应用） ，然后重新加载此页面。",
+      "translation": "beanies在另一个选项卡或窗口中打开，并且正在保留存储更新。关闭其他beanies选项卡和窗口（包括已安装的应用） ，然后重新加载此页面。",
       "hash": "biwkd1",
       "lastUpdated": "2026-08-28"
     },
@@ -21417,7 +21417,7 @@
       "lastUpdated": "2026-08-28"
     },
     "passkey.webRetired": {
-      "translation": "在适用于iPhone和Android的Beanies应用程序中，人脸识别和指纹会实时解锁。在浏览器中，您可以快速输入6位数PIN码，无需在此处进行设置。",
+      "translation": "在适用于iPhone和Android的beanies应用程序中，人脸识别和指纹会实时解锁。在浏览器中，您可以快速输入6位数PIN码，无需在此处进行设置。",
       "hash": "43tgpw",
       "lastUpdated": "2026-08-28"
     },
@@ -22092,7 +22092,7 @@
       "lastUpdated": "2026-09-03"
     },
     "shareTarget.text.tooLong.message": {
-      "translation": "这比Beanies一次可以阅读的文本还要多。选择包含详细信息的零件，然后重试。",
+      "translation": "这比beanies一次可以阅读的文本还要多。选择包含详细信息的零件，然后重试。",
       "hash": "xd1pcz",
       "lastUpdated": "2026-09-03"
     },
@@ -22777,12 +22777,12 @@
       "lastUpdated": "2026-09-06"
     },
     "appUpdate.prompt.title": {
-      "translation": "更新Beanies",
+      "translation": "更新beanies",
       "hash": "871gy8",
       "lastUpdated": "2026-09-06"
     },
     "appUpdate.prompt.message": {
-      "translation": "有较新版本的Beanies可供选择。请及时更新，以便与家人保持同步。",
+      "translation": "有较新版本的beanies可供选择。请及时更新，以便与家人保持同步。",
       "hash": "kzetri",
       "lastUpdated": "2026-09-06"
     },
@@ -22792,12 +22792,12 @@
       "lastUpdated": "2026-09-06"
     },
     "appUpdate.prompt.notNow": {
-      "translation": "立即购买",
+      "translation": "以后再说",
       "hash": "8bjtp3",
       "lastUpdated": "2026-09-06"
     },
     "appUpdate.openStore": {
-      "translation": "更新Beanies",
+      "translation": "更新beanies",
       "hash": "871gy8",
       "lastUpdated": "2026-09-06"
     }

@@ -22,23 +22,18 @@
  * and for a device drifting a few releases behind; today's stragglers still
  * have to be told by their family.
  */
-import { effectScope, onScopeDispose, readonly, ref } from 'vue';
+import { effectScope, onScopeDispose, readonly, ref, watch } from 'vue';
 import { App } from '@capacitor/app';
-import { STORE_URL } from '@beanies/brand/nav';
 import { APP_VERSION } from '@/constants/appVersion';
 import { getPlatform, isNative } from '@/services/sync/capabilities';
 import { compareAppVersions } from '@/utils/compareAppVersions';
 import { isAppQuiet } from '@/utils/appQuiet';
-import { isLoaded } from '@/services/automerge/projection';
+import { docVersion, isLoaded } from '@/services/automerge/projection';
 import { useOnline } from '@/composables/useOnline';
 import { confirm } from '@/composables/useConfirm';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { fetchUpdateFloor } from '@/services/appUpdate/versionPolicy';
-
-/** The store listing for a native platform, or `null` on web. */
-export function storeUrlFor(platform: ReturnType<typeof getPlatform>): string | null {
-  return platform === 'web' ? null : STORE_URL[platform];
-}
+import { fetchUpdateFloor, reportCheckFailure } from '@/services/appUpdate/versionPolicy';
+import { storeUrlFor } from '@/services/appUpdate/storeUrl';
 
 let initialized = false;
 let scope: ReturnType<typeof effectScope> | null = null;
@@ -56,6 +51,7 @@ export function __resetAppUpdateForTesting(): void {
   scope = null;
   initialized = false;
   dismissedThisSession = false;
+  suppressionsReported.clear();
   updateAvailable.value = false;
 }
 
@@ -68,14 +64,17 @@ export function __resetAppUpdateForTesting(): void {
  */
 async function checkForUpdate(): Promise<void> {
   const floor = await fetchUpdateFloor();
-  const behind = floor !== null && compareAppVersions(APP_VERSION, floor) === -1;
-  if (floor !== null && compareAppVersions(APP_VERSION, floor) === null) {
-    logEvent({
-      level: 'warn',
-      surface: 'app-update',
-      message: 'update floor unavailable',
-      context: { action: 'check-failed', error_code: 'floor', detail: 'unparseable-version' },
-    });
+  // ⚠️ ASKED ONCE. The undecidable case and the behind case are two answers to
+  // one question, and calling the comparison twice invites them to disagree.
+  const order = floor === null ? null : compareAppVersions(APP_VERSION, floor);
+  const behind = order === -1;
+  if (floor !== null && order === null) {
+    // ⚠️ NOT the floor file's `unparseable-version`. `versionPolicy` already
+    // screened the floor with the same grammar, so reaching here means
+    // `APP_VERSION` ITSELF does not parse: a bad constant in a shipped build,
+    // which silences the prompt for the whole fleet and is fixed in an entirely
+    // different file. The two must not share a bucket.
+    reportCheckFailure('app-version-unparseable');
   }
   updateAvailable.value = behind;
   // ⚠️ ONCE PER LAUNCH, and it fires whether or not there is anything to say.
@@ -95,23 +94,48 @@ async function checkForUpdate(): Promise<void> {
   });
 }
 
-/** Every reason not to interrupt right now. */
-function canPrompt(isOnline: boolean): boolean {
-  return (
-    updateAvailable.value &&
-    !dismissedThisSession &&
-    isOnline &&
-    isAppQuiet() &&
-    // ⚠️ NOT BEFORE THE APP IS PAST BOOT. `ConfirmModal` renders at z-250 and
-    // the boot spinner and fatal overlay are both z-300, so a prompt raised
-    // during boot is a modal nobody can see or dismiss, holding
-    // `hasOpenOverlays()` true for the rest of the session.
-    isLoaded()
-  );
+/** Why now is not the moment, or `null` when it is. */
+type PromptBlocker = 'offline' | 'busy' | 'booting';
+
+function promptBlocker(isOnline: boolean): PromptBlocker | null {
+  if (!isOnline) return 'offline';
+  if (!isAppQuiet()) return 'busy';
+  // ⚠️ NOT BEFORE THE APP IS PAST BOOT. `ConfirmModal` renders at z-250 and the
+  // boot spinner and fatal overlay are both z-300, so a prompt raised during
+  // boot is a modal nobody can see or dismiss, holding `hasOpenOverlays()` true
+  // for the rest of the session.
+  if (!isLoaded()) return 'booting';
+  return null;
 }
 
+/**
+ * Reasons already reported this session.
+ *
+ * ⚠️ REPORTED, BUT ONCE EACH. Every gate is re-evaluated on resume and on every
+ * document change, so an unbounded event here would be a flood from exactly the
+ * devices that have something to say. Three rows per session is the whole
+ * budget, and it is enough: a fleet showing `behind=true` with no `prompted`
+ * becomes attributable instead of a mystery.
+ */
+const suppressionsReported = new Set<PromptBlocker>();
+
 async function maybePrompt(isOnline: boolean): Promise<void> {
-  if (!canPrompt(isOnline)) return;
+  if (!updateAvailable.value || dismissedThisSession) return;
+
+  const blocker = promptBlocker(isOnline);
+  if (blocker) {
+    if (!suppressionsReported.has(blocker)) {
+      suppressionsReported.add(blocker);
+      logEvent({
+        level: 'info',
+        surface: 'app-update',
+        message: 'update prompt deferred',
+        context: { action: 'prompt-deferred', os: getPlatform(), detail: blocker },
+      });
+    }
+    return;
+  }
+
   const url = storeUrlFor(getPlatform());
   if (!url) return;
 
@@ -162,6 +186,21 @@ export function useAppUpdate(): { updateAvailable: Readonly<typeof updateAvailab
       const { isOnline } = useOnline();
 
       void checkForUpdate().then(() => maybePrompt(isOnline.value));
+
+      // ⚠️ THE LAUNCH CHECK ALONE WOULD ALMOST NEVER PROMPT, and it took a
+      // review to see it. The floor resolves in a couple of hundred
+      // milliseconds while the family document is still loading, so `isLoaded()`
+      // is false, the prompt is deferred, and the only other trigger is a
+      // `resume` the person may never produce. A launch that is never
+      // backgrounded would have asked nobody.
+      //
+      // `docVersion` is the app's single reactivity source and is bumped by the
+      // same hook that flips `loaded` true, so the first bump IS "the document
+      // is here". Watching it costs one boolean read per document change and
+      // stops mattering the moment `dismissedThisSession` is set. `isOnline` is
+      // in the same watcher because coming back online is the other gate that
+      // opens on its own.
+      watch([docVersion, isOnline], () => void maybePrompt(isOnline.value));
 
       // Resume re-evaluates the GATES, it does not re-fetch: the floor is
       // memoised for the process, but the device may have come back online, the

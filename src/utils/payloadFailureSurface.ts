@@ -26,7 +26,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 // Type-and-predicate only. `capabilities.ts` derives module-level constants
 // with no side effects, and every importer of this file is main thread.
 import { getPlatform } from '@/services/sync/capabilities';
-import { storeUrlFor } from '@/composables/useAppUpdate';
+import { storeUrlFor } from '@/services/appUpdate/storeUrl';
 import { PayloadLoadError, payloadErrorDetail, payloadErrorKind } from '@/types/sync';
 import type { PayloadErrorKind } from '@/types/sync';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -184,12 +184,22 @@ export function surfacePayloadFatal(
   // no test could make fail, which is the kind of safety net that reads as
   // covered without being it.
   const storeUrl = kind === 'needs-update' ? storeUrlFor(getPlatform()) : null;
-  if (storeUrl) {
+  if (kind === 'needs-update') {
+    // ⚠️ COUNTED FOR THE BLOCK, NOT FOR THE BUTTON. Gating this on `storeUrl`
+    // made the web's version blocks invisible on this surface, which is the
+    // half of the fleet where "how often does this happen" is answerable at
+    // all. `detail` says whether the person was given a way out, so the two
+    // populations stay separable without a second event.
     logEvent({
       level: 'warn',
       surface: 'app-update',
       message: 'blocked on an app update',
-      context: { action: 'blocked', error_code: 'needs-update', os: getPlatform() },
+      context: {
+        action: 'blocked',
+        error_code: 'needs-update',
+        os: getPlatform(),
+        detail: storeUrl ? 'store-link' : 'no-store-link',
+      },
     });
   }
   useFatalErrorStore().setFatal(
