@@ -1876,6 +1876,7 @@ async function doSave(): Promise<boolean> {
     // still the one we wrote through.
     const providerAtWrite: StorageProvider = currentProvider;
     const providerTypeForDiag = providerAtWrite.type;
+    const familyIdAtWrite = currentEnvelope.familyId;
     // C14b: the write returns its own resulting revision IN the response. Narrow
     // the `WriteAck | void` union explicitly at this ONE site.
     const ack = await providerAtWrite.write(fileContent);
@@ -1883,7 +1884,14 @@ async function doSave(): Promise<boolean> {
     // version that had not landed, and committed the transition memo with it —
     // so a failed first post-compaction save reported a 5.0 write that never
     // happened AND silenced the one that eventually did.
-    noteWrittenVersion(versionDetail, currentEnvelope.familyId);
+    //
+    // ⚠️ AND THE FAMILY ID IS THE ONE CAPTURED BEFORE THE WRITE (`familyIdAtWrite`).
+    // `currentEnvelope` is module state that `reset()` nulls, the write takes
+    // seconds, and a sign-out landing inside it would make this a TypeError on
+    // the SUCCESS path — reported by `doSave`'s catch as a failed save for a
+    // write that actually landed, with no baseline committed. Same hazard C1
+    // guards for the provider eleven lines below.
+    noteWrittenVersion(versionDetail, familyIdAtWrite);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
     const ackRevision = ack ? ack.revision : null;
 
@@ -2178,7 +2186,15 @@ async function openAndLoadFileFallback(): Promise<OpenFileResult> {
   try {
     cancelPendingSave();
     const file = await openFilePicker();
-    if (!file) return { success: false };
+    // ⚠️ THIS IS THE DISMISSAL PATH ON EVERY SHIPPING PLATFORM. The File System
+    // Access branch above needs `showOpenFilePicker`, which is Chromium desktop
+    // only; iOS, Android and Safari all route here, and `openFilePicker`
+    // resolves `null` from its `oncancel`. Marking only the other branch fixed
+    // the red "import failed" for developers and nobody else.
+    if (!file) {
+      updateState({ isSyncing: false, lastError: null });
+      return { success: false, cancelled: true };
+    }
 
     if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
       updateState({ isSyncing: false, lastError: 'Please select a .beanpod or .json file' });

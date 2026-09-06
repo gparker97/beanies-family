@@ -233,6 +233,18 @@ describe('an explicit choice keeps the work too', () => {
     });
 
     expect(res.action).toBe('adopted');
+    // ⚠️ AND IT MINTS NOTHING. This adopt lands in the SAME install branch as a
+    // restore, so a stamp condition keyed on the branch rather than the verdict
+    // would mint here and force the whole fleet to `adopt-remote`. Verified by
+    // mutation: minting on the fallback alone survives every other test.
+    const doc = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as {
+      podLineage?: { id: string; seq: number };
+    };
+    expect(doc.podLineage).toEqual({ id: 'L-NEW', seq: 1 });
+    // ⚠️ AND IT SAYS THE REBASE COULD NOT RUN. Without this the soak cannot tell
+    // "the machinery is broken" from "the guard correctly refused"; deleting the
+    // flag from the adopted return survived the whole suite.
+    expect(res.rebaseUnavailable).toBe(true);
   });
 });
 
@@ -832,15 +844,10 @@ describe('a restore is a lineage event', () => {
     );
     expect(['adopted', 'rebased']).toContain(res.action);
     expect(lineageOf()).toEqual({ id: 'L-1', seq: 1 });
-    // ⚠️ THIS COVERS THE `user-file` REBASE FALLBACK TOO, and deliberately has
-    // no sibling test. When the replay cannot run, `user-file` does not block:
-    // it falls through to the wholesale adopt, landing in the SAME install
-    // branch as a restore. But `stampNewGeneration` is keyed on the VERDICT
-    // (`ours-newer`), which both this case and the fallback share as
-    // `adopt-remote`, not on which branch set `installWholesale`. So the two
-    // paths cannot diverge on minting, and forcing the fallback here means
-    // corrupting the baseline heads, which makes Automerge reject the handle
-    // for reasons unrelated to what is being asserted.
+    // The `user-file` rebase FALLBACK is the sibling case, and it is pinned
+    // where it belongs: "still adopts when the rebase cannot run" above, which
+    // now also asserts the lineage is untouched. Both share the `adopt-remote`
+    // verdict, which is what `stampNewGeneration` keys on.
   });
 
   it('mints NOTHING when a human resolves a CONFLICT by choosing one of two compactions', async () => {

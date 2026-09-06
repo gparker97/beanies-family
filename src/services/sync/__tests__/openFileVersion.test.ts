@@ -3,12 +3,20 @@
  * beanies must come out as a classified `payloadError` with a translated
  * `lastError`, never as a raw exception string and never as nothing.
  *
- * Does not mock `@/services/sync/fileSync`, for the same reason
- * `savePathVersion.test.ts` does not: the readers used to carry their own
- * hand-rolled "Unsupported file version" string, and a mock here would hide
- * whether the typed throw from `parseBeanpodV4` actually reaches the caller.
+ * Mocks EXACTLY ONE thing from `@/services/sync/fileSync`: `openFilePicker`,
+ * which is a DOM affordance (an `<input type=file>` and a user gesture) that
+ * cannot run here. `parseBeanpodV4`, `beanpodVersionFor` and everything else
+ * are the real implementations, which is the point: the readers used to carry
+ * their own hand-rolled "Unsupported file version" string, and mocking the
+ * validator would hide whether the typed throw reaches the caller.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const pickerHook = vi.hoisted(() => ({ file: null as File | null }));
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/sync/fileSync')>()),
+  openFilePicker: vi.fn(async () => pickerHook.file),
+}));
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
 vi.mock('@/services/automerge/worker/docClient', () => ({
@@ -132,8 +140,9 @@ describe('a cancelled picker is not a failure', () => {
     } as never);
     expect(syncService.getState().lastError).toBeTruthy();
 
-    // Drive the File System Access branch, whose abort arm is the one that
-    // changed, and have the OS picker reject the way a dismissal does.
+    // Drive the File System Access branch and have the OS picker reject the way
+    // a dismissal does. The sibling test below covers the FALLBACK branch, which
+    // is the one iOS, Android and Safari actually take.
     const { supportsFileSystemAccess } = await import('../capabilities');
     vi.mocked(supportsFileSystemAccess).mockReturnValueOnce(true);
     (globalThis as { window?: unknown }).window ??= globalThis;
@@ -144,6 +153,27 @@ describe('a cancelled picker is not a failure', () => {
         throw e;
       }
     );
+    const r = await syncService.openAndLoadFile();
+
+    expect(r.cancelled).toBe(true);
+    expect(r.payloadError).toBeUndefined();
+    expect(syncService.getState().lastError).toBeNull();
+  });
+
+  it('reports `cancelled` from the FALLBACK picker too, which is the path every shipping platform takes', async () => {
+    // ⚠️ THE FIRST FIX COVERED CHROMIUM DESKTOP ONLY. `supportsFileSystemAccess`
+    // needs `showOpenFilePicker`; iOS, Android and Safari all fall through to
+    // `openAndLoadFileFallback`, whose cancel arm returned a bare
+    // `{ success: false }`. So the red "import failed" on Escape was fixed for
+    // developers and nobody else. This suite's default mock IS the fallback.
+    await syncService.loadDroppedFile({
+      name: 'x.beanpod',
+      text: async () => 'not json {',
+    } as never);
+    expect(syncService.getState().lastError).toBeTruthy();
+
+    // `openFilePicker` resolves `null` when the person dismisses the sheet.
+    pickerHook.file = null;
     const r = await syncService.openAndLoadFile();
 
     expect(r.cancelled).toBe(true);
