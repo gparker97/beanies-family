@@ -4346,15 +4346,35 @@ const STRING_DEFS = {
     beanie: 'some beans on this device are waiting',
   },
   'podLineage.bannerMessage': {
-    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved. Nothing has been lost. Export those changes from Settings, then reload, and beanies will pick up the reorganised file.',
+    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Nothing has been lost. Export those changes first if you want to keep them, then choose Use the family file.',
     beanie:
-      'your family file was reorganised on another bean, and this one still has beans that were never saved. nothing has been lost. export them from settings, then reload, and beanies will pick up the reorganised file.',
+      'your family file was reorganised on another bean, and this one still has beans that were never saved to it. nothing has been lost. export them first if you want to keep them, then choose use the family file.',
   },
   'podLineage.bannerCta': { en: 'Export my changes', beanie: 'export my beans' },
-  'podLineage.unsyncedInline': {
-    en: 'Your family file was reorganised on another device, and this one still has changes that have not been saved. Save or export them first, then reload.',
+  'podLineage.conflictTitle': {
+    en: 'Your family file needs a hand',
+    beanie: 'your family file needs a hand',
+  },
+  'podLineage.useFileCta': { en: 'Use the family file', beanie: 'use the family file' },
+  'podLineage.useFileConfirmTitle': {
+    en: 'Use the family file?',
+    beanie: 'use the family file?',
+  },
+  'podLineage.useFileConfirmMessage': {
+    en: 'This device will take the reorganised family file. Any changes made here that were never saved to it will be let go. Export them first if you want to keep them.',
     beanie:
-      'your family file was reorganised on another device, and this one still has beans that have not been saved. save or export them first, then reload.',
+      'this bean will take the reorganised family file. any beans made here that were never saved to it will be let go. export them first if you want to keep them.',
+  },
+  'podLineage.useFileConfirmAction': { en: 'Use the family file', beanie: 'use the family file' },
+  'podLineage.useFileFailed': {
+    en: 'beanies could not open the family file just now. Nothing on this device has changed. Check your connection and try again.',
+    beanie:
+      'beanies could not open the family file just now. nothing on this bean has changed. check your connection and try again.',
+  },
+  'podLineage.unsyncedInline': {
+    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Export them from Settings if you want to keep them, then choose Use the family file.',
+    beanie:
+      'your family file was reorganised on another device, and this one still has beans that were never saved to it. export them from settings if you want to keep them, then choose use the family file.',
   },
   'podLineage.conflictInline': {
     en: 'Two devices reorganised your family file at the same time. beanies cannot safely pick between them. Please contact support@beanies.family before making more changes.',
@@ -5908,6 +5928,13 @@ const STRING_DEFS = {
   'wall.status.blocked': {
     en: "Can't reach your family file",
     beanie: "can't reach your family file",
+  },
+  // A lineage block is NOT a reachability failure — the file was read perfectly
+  // well and then declined. "Can't reach your family file" sends the family to
+  // check their wifi for a problem no network will ever fix.
+  'wall.status.needsAttention': {
+    en: 'Your family file needs attention',
+    beanie: 'your family file needs attention',
   },
   'wall.jobFailed.title': { en: "That didn't save", beanie: "that didn't save" },
   'wall.jobFailed.message': {

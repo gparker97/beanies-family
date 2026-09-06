@@ -507,6 +507,14 @@ const RETRYABLE_METHODS = new Set([
   'getHeads',
   'applyChanges',
   'exportEncryptedPayload',
+  // ⚠️ RETRYABLE ONLY BECAUSE THE BASIS TRAVELS WITH THE REQUEST. A respawn
+  // rehydrates a document from cache, so a replay meets DIFFERENT worker state
+  // than the first attempt did — which is precisely why `no-local-document` is
+  // an instruction rather than something the worker re-derives from
+  // `!currentDoc`. The `baseline` heads are a fact about DRIVE, not about our
+  // document, so they do not go stale on a replay; the worker re-reads our own
+  // heads fresh each time it compares. Do NOT add a method whose meaning
+  // depends on worker state the rehydrate can change underneath it.
   'mergeRemoteEnvelope',
   'verifyEnvelope',
   'flush',
@@ -1282,8 +1290,17 @@ export async function checkWorkerLiveness(): Promise<void> {
     console.warn('[docClient] liveness probe failed — worker recovered on next request', err);
   }
 }
-/** Drop the current doc but keep the key + cache (replace-load: the next merge
- * adopts remote fresh). Does NOT clear the projection (the merge repopulates it). */
+/**
+ * Drop the current doc but keep the key + cache. Does NOT clear the projection
+ * (the merge repopulates it).
+ *
+ * ⚠️ NO LONGER THE WAY TO ASK FOR A WHOLESALE ADOPT, and no production path
+ * calls it for that any more. `mergeRemoteEnvelope` takes a `LineageBasis`, and
+ * `{ kind: 'no-local-document' }` states the intent IN the request — which
+ * survives a worker respawn, whereas a preceding `dropDoc()` RPC does not: the
+ * rehydrate installs a document again and the replayed merge would find one.
+ * Say it with the basis; this remains only for teardown-shaped callers.
+ */
 export function dropDoc(): Promise<void> {
   return request('dropDoc');
 }

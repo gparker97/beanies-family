@@ -14,6 +14,7 @@ import {
   encodeBaselinePayload,
   hasUnpushedChanges,
   headsFingerprint,
+  decodeHeadsFingerprint,
   toStoredRevision,
   withinTrustWindow,
   type RemoteBaseline,
@@ -208,5 +209,45 @@ describe('encodeBaselinePayload / decodeBaselinePayload (#65)', () => {
     for (const junk of ['{', '\u0000', 'ver:', '{"r":""}', '{"r":null}']) {
       expect(() => decodeBaselinePayload(junk)).not.toThrow();
     }
+  });
+});
+
+/**
+ * ⚠️ THE ROUND-TRIP IS LOAD-BEARING, AND NOTHING ELSE PINS IT.
+ *
+ * `decodeHeadsFingerprint` is how a stored baseline row becomes the heads the
+ * WORKER compares against, which is how the lineage guard tells `clean` from
+ * `dirty`. Hashing or truncating `headsFingerprint` — the obvious tidy-up for a
+ * value that is only ever compared for equality — would leave every caller
+ * compiling and every other test green while the guard silently answered
+ * `dirty` forever: no device could ever adopt a compaction, and none could
+ * propagate. These are the tests that fail instead.
+ */
+describe('heads fingerprint round-trip', () => {
+  // Real change hashes are 64 lowercase hex chars. Deliberately includes
+  // LETTERS: an all-digits head is unchanged by `toUpperCase()`, so the
+  // wrong-case case below would silently assert nothing.
+  const h = (n: number) => `${n}`.padStart(2, '0').repeat(32).replace(/0/g, 'e');
+
+  it('recovers the exact head list it encoded', () => {
+    for (const heads of [[], [h(1)], [h(1), h(2)], [h(1), h(2), h(3)]]) {
+      expect(decodeHeadsFingerprint(headsFingerprint(heads))).toEqual(heads);
+    }
+  });
+
+  it('answers null for "we cannot tell", never a plausible guess', () => {
+    expect(decodeHeadsFingerprint(null)).toBeNull();
+    // A hashed / truncated / re-formatted fingerprint — i.e. the exact tidy-up
+    // the comment on `headsFingerprint` warns against.
+    for (const junk of ['deadbeef', h(1).toUpperCase(), h(1).slice(0, 63), 'a b', '  ']) {
+      expect(decodeHeadsFingerprint(junk)).toBeNull();
+    }
+  });
+
+  it('distinguishes "no heads" from "unknown"', () => {
+    // Both are falsy-ish and were conflated in a draft; they mean opposite
+    // things to the guard (`[]` is a real answer, `null` blocks an adopt).
+    expect(decodeHeadsFingerprint('')).toEqual([]);
+    expect(decodeHeadsFingerprint(null)).toBeNull();
   });
 });

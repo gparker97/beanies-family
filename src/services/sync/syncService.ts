@@ -759,6 +759,32 @@ export function getProviderFamilyId(): string | null {
 /**
  * Set the storage provider directly (used by Google Drive flow)
  */
+/**
+ * ⚠️ ONE-SHOT. Set by `rebindPodFile` — the only flow in which a human points
+ * the app at a SPECIFIC pod file — and consumed by the next real read in
+ * `fetchAndMergeRemote`. It is what turns "the user chose these bytes" into the
+ * `user-file` lineage context, whose whole job is to never block. Module state
+ * rather than a parameter because the two ends are separated by the poll timer,
+ * not by a call. Cleared on `reset()` so it cannot survive a family switch.
+ */
+let userChoseRemoteFile = false;
+
+export function noteUserChoseRemoteFile(): void {
+  userChoseRemoteFile = true;
+}
+
+/**
+ * Read AND clear the intent. One-shot by construction rather than by
+ * convention: two termini consult it (this module's poll/pre-save merge and the
+ * store's open path), and a flag that only one of them cleared would apply a
+ * single user decision to every subsequent read.
+ */
+export function consumeUserFileIntent(): boolean {
+  const chose = userChoseRemoteFile;
+  userChoseRemoteFile = false;
+  return chose;
+}
+
 export function setProvider(provider: StorageProvider): void {
   // A different (or re-bound) file may well be readable. This is what makes
   // `rebindPodFile` — the supported repair for an unreadable pod — actually
@@ -882,6 +908,10 @@ export function reset(): void {
   // which every poll, save and open does a full multi-megabyte read forever.
   clearRemoteUnreadable();
   pendingMarker = null;
+  // Same reasoning: a pending "the user chose this file" intent belongs to the
+  // pod it was raised against, and applying it to a different family's first
+  // read would adopt a remote the guard should have weighed on its merits.
+  userChoseRemoteFile = false;
   cancelPendingSave();
   stopPolling();
   currentProvider = null;
@@ -1556,10 +1586,34 @@ async function fetchAndMergeRemote(): Promise<void> {
   // The basis is the #65 baseline this module already holds — no extra probe.
   // ⚠️ HEADS, not the fingerprint: `remoteBaseline.ts` is type-imported by the
   // worker and must stay value-free, so main decodes and the worker compares.
-  const basis: LineageBasis = {
-    kind: 'baseline',
-    heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null),
-  };
+  //
+  // ⚠️ AND `user-file` IS PRODUCED HERE, WHICH IS THE ONLY PLACE IT CAN BE.
+  // The POLICY table's `user-file` column exists to keep the ROLLBACK route
+  // open: a family that regrets a compaction re-points at the pre-compaction
+  // `.beanpod`, and the guard must not refuse the recovery it mandates. But
+  // `rebindPodFile` does not merge anything — it swaps the provider and lets
+  // the ordinary poll reconcile — so without the one-shot below that deliberate
+  // choice arrived here as a plain `baseline`, compared `ours-newer`, and
+  // PUBLISHED the compacted document straight back over the file the human had
+  // just chosen. The column had zero producers and the rollback did the
+  // opposite of what the table promised.
+  //
+  // Consumed here, exactly once, and after the download: a read that fails
+  // before this point keeps the intent for the retry, and a merge that throws
+  // spends it, so the next attempt is an ordinary (blocking) compare rather
+  // than a silent second adopt.
+  const chosenByUser = consumeUserFileIntent();
+  const basis: LineageBasis = chosenByUser
+    ? { kind: 'user-file' }
+    : { kind: 'baseline', heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null) };
+  if (chosenByUser) {
+    logEvent({
+      level: 'info',
+      surface: 'pod-lineage',
+      message: 'merging a pod file the user chose explicitly',
+      context: { action: 'user-file', family_id: remoteEnvelope.familyId },
+    });
+  }
 
   // The worker decrypts, runs the LINEAGE GUARD (the only place both documents
   // exist), then merges or adopts, and returns which it did. `adopted` returns
@@ -1602,13 +1656,43 @@ async function fetchAndMergeRemote(): Promise<void> {
     noteMergeFailed(blocked);
     throw blocked;
   }
+  /**
+   * Adopt the remote's KEY DICTS while leaving the payload decision to the
+   * caller. Both termini below do exactly this and for the same reason — it is
+   * the ONLY path by which a remote-only wrapped key, passkey or invite reaches
+   * this device — so it is written once: a second copy drifting would lock a
+   * family member out on whichever branch was not updated.
+   */
+  const adoptRemoteEnvelopeKeys = (): void => {
+    setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
+  };
+
   if (merged.action === 'kept-local') {
     // Our document is the NEWER lineage. Take the remote's KEY DICTS — declining
     // its payload is a different decision from declining its keys, and this is
     // the only path by which a remote-only wrapped key reaches us — then return
     // WITHOUT learning the marker or committing a baseline. Recording Drive's
     // heads for bytes we deliberately did not take is a false skip.
-    setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
+    adoptRemoteEnvelopeKeys();
+    // ⚠️ ARM THE PUBLISH, OR THIS BRANCH NEVER ENDS. Declining the marker and
+    // the baseline is right, but it also means `remoteChanged()` keeps
+    // answering "changed" — so the 10s poll re-downloads the whole pod, decides
+    // kept-local again, and repeats, forever, on a device that is by definition
+    // holding a compaction nobody else has. Publishing is the ONLY thing that
+    // resolves the disagreement, and once it lands the remote IS our lineage
+    // and the next poll is an ordinary no-op merge. Debounced, so a burst of
+    // polls still yields one upload.
+    logEvent({
+      level: 'info',
+      surface: 'pod-lineage',
+      message: 'kept local document on the poll path; publishing it',
+      context: { action: 'kept-local', family_id: remoteEnvelope.familyId },
+    });
+    // Not when a save is already running: `doSave` calls this very function as
+    // its pre-save merge and goes on to upload our document regardless, so
+    // arming here would queue a second, identical upload behind the one already
+    // in flight.
+    if (!getState().isSyncing) triggerDebouncedSave();
     return;
   }
   const { dirty, remoteHeads } = merged;
@@ -1632,7 +1716,7 @@ async function fetchAndMergeRemote(): Promise<void> {
   // passkeyWrappedKeys) — the local side is the just-mutated state about to
   // be pushed. `setEnvelope` also RPCs the worker to re-persist the envelope
   // cache (keeps cold-start unlock working after a peer key-add/rotation).
-  setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
+  adoptRemoteEnvelopeKeys();
   // Terminus 2 (C10): the worker's doc now provably contains this remote state —
   // but only commit if no family switch landed mid read+merge (C1).
   // #65: `remoteHeads` is the heads of the bytes Drive holds (captured pre-migrate,

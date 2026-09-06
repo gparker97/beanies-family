@@ -741,8 +741,17 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         // `false` sent the user to `/welcome?resume=setup` — a password screen
         // for a failure no password can fix.
         if (success !== true && success !== false) {
-          initBreadcrumbs.push(`path1b: cached-key payload ${success.payloadError.step} failure`);
-          surfaceFatal(success.payloadError);
+          const blocker = success.payloadError;
+          initBreadcrumbs.push(`path1b: cached-key ${blocker.blockCode} failure`);
+          // ⚠️ `surfaceFatal` is the PAYLOAD overlay — "your data may be damaged
+          // / this device ran out of memory". A lineage block is neither: the
+          // file is fine and this device is fine, the two histories simply
+          // cannot be combined. It already has its own latch, banner and copy,
+          // so surfacing the payload overlay over it would be a lie AND would
+          // bury the banner that carries the real recovery.
+          if (blocker instanceof PayloadLoadError) surfaceFatal(blocker);
+          else if (blocker instanceof PodLineageError)
+            surfaceLineageFatal(blocker, { familyId: familyContextStore.activeFamilyId });
           return 'failed';
         }
         if (success) {

@@ -86,6 +86,65 @@ describe('compactDoc', () => {
     expect(before.afterBytes).toBeLessThan(before.beforeBytes);
   });
 
+  /**
+   * ⚠️ THE STAMP IS THE WHOLE POINT OF STAGE 1, AND NOTHING ELSE PINNED IT.
+   *
+   * A compaction that ships without a lineage in the DOCUMENT is
+   * indistinguishable from a pod that was never compacted, so every peer merges
+   * across the lineage boundary — and in that merge the OLD lineage wins
+   * deterministically for any collection a later migration added. This file
+   * tested the size saving and the verify gate and said nothing about the stamp.
+   */
+  it('stamps a fresh lineage into the compacted document', () => {
+    seedHistory(5);
+    compactDoc();
+    const doc = Automerge.toJS(Automerge.load(exportSnapshot().binary)) as {
+      podLineage: { id: string; seq: number };
+    };
+    expect(doc.podLineage).toBeTruthy();
+    expect(typeof doc.podLineage.id).toBe('string');
+    expect(doc.podLineage.id.length).toBeGreaterThan(0);
+    // First compaction of a pod that never had one.
+    expect(doc.podLineage.seq).toBe(1);
+  });
+
+  it('increments the generation on a re-compaction, with a NEW identity', () => {
+    // `seq` orders the two, `id` distinguishes concurrent compactions on two
+    // devices — a bumped `seq` that reused the id would make `compareLineage`
+    // answer `same` and permit the very merge the stamp exists to refuse.
+    seedHistory(5);
+    compactDoc();
+    const first = (
+      Automerge.toJS(Automerge.load(exportSnapshot().binary)) as {
+        podLineage: { id: string; seq: number };
+      }
+    ).podLineage;
+
+    mutate({ op: 'set', collection: 'accounts', id: 'z', entity: { id: 'z', bal: 1 } });
+    compactDoc();
+    const second = (
+      Automerge.toJS(Automerge.load(exportSnapshot().binary)) as {
+        podLineage: { id: string; seq: number };
+      }
+    ).podLineage;
+
+    expect(second.seq).toBe(first.seq + 1);
+    expect(second.id).not.toBe(first.id);
+  });
+
+  it('carries the data across the stamp, so the verify gate still means something', () => {
+    // The stamp is written INSIDE the rebuild, before `firstJsonDifference`
+    // compares. If it were added after the compare, the gate would be verifying
+    // a document that is not the one installed.
+    seedHistory(4);
+    compactDoc();
+    const doc = Automerge.toJS(Automerge.load(exportSnapshot().binary)) as {
+      accounts: Record<string, { bal: number }>;
+    };
+    expect(Object.keys(doc.accounts).sort()).toEqual(['a0', 'a1', 'a2', 'a3']);
+    expect(doc.accounts.a2.bal).toBe(2);
+  });
+
   it('REFUSES and keeps the old document when the rebuild differs', () => {
     // The gate. `toJS -> from` is type-safe by construction for a pure-JSON
     // document, but "by construction" is not good enough when the output

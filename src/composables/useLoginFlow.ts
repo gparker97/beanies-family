@@ -675,22 +675,30 @@ export function useLoginFlow(opts: {
           // NOT a credential failure: the PIN unwrapped the key correctly and
           // the pod would not open. `auth.signInFailed` reads as a wrong PIN,
           // so the user retypes a correct PIN forever.
-          proveError.value = t(payloadErrorMessageKey(dec.payloadError));
+          proveError.value = t(dec.payloadError.inlineMessageKey);
           // Distinct outcome code — `decrypt-failed` is byte-identical to the
           // genuine credential failure below, so the two would be
           // indistinguishable in the funnel.
-          emitOutcome(false, dec.payloadError.deviceCannotOpen ? 'too-large' : 'corrupted');
+          emitOutcome(
+            false,
+            dec.payloadError instanceof PayloadLoadError && dec.payloadError.deviceCannotOpen
+              ? 'too-large'
+              : 'corrupted'
+          );
           // Report through the SHARED emitter. A hand-rolled copy here was
           // already divergent (no `file_id_tail`) and shared the (surface,
           // message) dedup bucket with the real one, so on the default sign-in
           // route the only report reaching CloudWatch could be the poorer of
           // the two. `reportPayloadFailure` also knows to stay quiet for
           // too-large, which `docClient.surface()` already emitted.
-          reportPayloadFailure(dec.payloadError, {
-            source: 'pin-unlock',
-            fileId: syncStore.driveFileId ?? null,
-            familyId: familyContextStore.activeFamilyId,
-          });
+          // Payload-only reporter; a lineage or merge block is reported once
+          // by its own latch and must not be filed as a corrupt pod.
+          if (dec.payloadError instanceof PayloadLoadError)
+            reportPayloadFailure(dec.payloadError, {
+              source: 'pin-unlock',
+              fileId: syncStore.driveFileId ?? null,
+              familyId: familyContextStore.activeFamilyId,
+            });
           return;
         }
         if (!dec.success) {
@@ -863,19 +871,26 @@ export function useLoginFlow(opts: {
                 // Two very different causes, and telling a user their file is damaged
                 // when it is merely too big for THIS device is the lie this change
                 // exists to remove.
-                const tooLarge = dec.payloadError.deviceCannotOpen;
+                // Payload-specific: only that family can be "too large for THIS
+                // device". Any other blocker is not, and must not claim to be.
+                const tooLarge =
+                  dec.payloadError instanceof PayloadLoadError && dec.payloadError.deviceCannotOpen;
                 // The INLINE key, not the overlay's: `proveError` renders in a
                 // compact slot with no diagnostic blob and no Clear-data button,
                 // so the overlay copy would point at UI that is not on screen.
-                proveError.value = t(payloadErrorMessageKey(dec.payloadError));
+                proveError.value = t(dec.payloadError.inlineMessageKey);
                 // The password branch emitted nothing at all, and
                 // `docClient.surface()` reports only the too-large half — so a
                 // corrupt pod on this route reached CloudWatch with zero events.
-                reportPayloadFailure(dec.payloadError, {
-                  source: 'password-unlock',
-                  fileId: syncStore.driveFileId ?? null,
-                  familyId: familyContextStore.activeFamilyId,
-                });
+                // Payload-only reporter; a lineage/merge block is already
+                // reported once by its own latch and must not be filed as a
+                // corrupt pod.
+                if (dec.payloadError instanceof PayloadLoadError)
+                  reportPayloadFailure(dec.payloadError, {
+                    source: 'password-unlock',
+                    fileId: syncStore.driveFileId ?? null,
+                    familyId: familyContextStore.activeFamilyId,
+                  });
                 emitProveOutcome({
                   method: 'password',
                   ok: false,

@@ -85,3 +85,68 @@ merge-loss coin flip (50.3%); found Phase A's shared-actor collision across
 tabs (Automerge `duplicate seq` → `doSave` overwrote the remote). Fixed with
 the device-actor lease + `RemoteMergeError`; see
 `docs/plans/2026-09-05-device-actor-lease.md`.
+
+### 2026-09-06 (Tier 3 Stage 1 — the lineage moves into the document)
+
+**~09:10** — "ok let's redo the tier 3 plan with this design change"
+
+**~09:40** — "once the plan is complete and verified, proceed to implementation
+directly and implement carefully and deliberately. once complete, run a
+/code-review max across the full implementation … one other thing regarding the
+design of the compaction button - 'slim down pod' seems to understate the
+importance and also riskiness of this feature … label it clearly, put the
+compaction setting in it's own section and provide a clear warning around it to
+only hit this button if you are experiencing performance or memory issues
+loading the pod … to ensure it cannot be activated by accident … once tier 3 is
+done there should not be any action required from the user after the compaction
+is done, but to be sure, let the user know if anything needs to be done after
+running compaction."
+
+**~10:05** — "go ahead and implement stage 1"
+
+**~11:15** — "one thing i wanted to add is that when any system hits an OOM error
+and gets the error message i got on the android tablet, one of the recovery
+options they are presented with is to compact their data file. it's still a
+manual trigger, but it's presented at exactly the time the family needs it. can
+this be added to the error modal?"
+
+**~12:00** — "finish the rest of stage 1"
+
+**~13:10** — "push it and run the code review"
+
+**~14:00** — "fix any issues found"
+
+**~14:20** — "note that you can increase the number of fan out reviewers if
+needed for completeness or to perform a proper investigation … please ensure you
+perform a full and complete review and investigation. if you feel fable would be
+beneficial at any point then we can run a limited review"
+
+**~14:40** — "Confirm all findings and if fully validated then go ahead to fix
+directly and run one more review over the newly implemented fixes"
+
+Outcome: Stage 1 shipped in two commits. The root cause of the field failure was
+that `podLineage` lived on the ENVELOPE, which is maintained on three tracks
+independent of the document (the store's copy, the service's copy, the worker's
+envelope cache), so a device could hold the compacted file's stamp over a
+pre-compaction document and the guard read `same`. The lineage now lives in the
+document (ADR-036) and the comparison runs in the worker, the only place both
+documents exist.
+
+Review round 1 returned 27 findings; all were confirmed against the code and
+fixed. The four that mattered:
+
+- a `no-local-document` basis was being re-derived from `!currentDoc`, so a
+  respawn (which rehydrates a document) turned the instruction into a merge — an
+  A∪B document persisted to the wrong family's cache and uploaded to the wrong
+  family's file;
+- the POLICY table's `user-file` column had **zero producers**, so the rollback
+  route it exists to keep open resolved to `publish-local` and wrote the
+  compacted document back over the pre-compaction file the user had just chosen;
+- the banner's prescribed recovery ("export, then reload") could never clear the
+  block, because a reload re-opens the same cached document against the same
+  baseline and the save path refuses on any blocker by design;
+- files compacted by the Tier-2 code carry their stamp only on the retired
+  envelope field, so post-Stage-1 they read as never-compacted. The worker now
+  reads that field for the REMOTE side only (sound, because envelope and payload
+  are bytes from one blob) and writes it into the document as it adopts, so the
+  reader extinguishes itself after one sync per family.

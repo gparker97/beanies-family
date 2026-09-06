@@ -95,7 +95,12 @@ describe('a naive merge across lineages', () => {
     // what makes an unguarded merge silently revert a whole compaction rather
     // than corrupt it visibly half the time.
     expect(survivedLate, `${survivedLate}/${N} kept a later-collection edit`).toBe(N);
-  });
+    // ⚠️ AN EXPLICIT TIMEOUT, because 200 real Automerge rebuild+merge cycles
+    // run in ~1s alone and BLEW the 5s default in a full-suite run competing for
+    // the same cores. A statistical test that fails on machine load teaches the
+    // reader to ignore it, which is worse than not having it. `N` is not
+    // reducible: the tie case needs the sample to mean anything.
+  }, 30_000);
 });
 
 describe('the guard refuses that merge', () => {

@@ -4,6 +4,91 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A policy table column with no producer is a promise the code does the opposite of
+
+**Date:** 2026-09-06
+**Context:** #90 Tier 3 Stage 1. The lineage guard's POLICY table has a `user-file`
+context whose whole job is to never block, so the guard cannot refuse the
+pre-compaction `.beanpod` a family re-points at — the only rollback route out of a
+compaction. Every review pass read that column, agreed with it, and moved on.
+
+Nothing in production ever produced it. A grep for `'user-file'` found the type, the
+worker's mapping, and four table cells — and not one call site. The real rollback flow
+(`rebindPodFile`) merges nothing itself; it swaps the provider and lets the ordinary
+poll reconcile, which arrives as a plain `baseline` compare, resolves `ours-newer`, and
+publishes the compacted document straight back over the file the human just chose. The
+table did not merely fail to help. It documented a recovery the code inverted.
+
+The same review found a second instance: `docClient`'s `dropDoc` was documented as the
+way to ask for a wholesale adopt, and no production path had called it for that since
+the basis replaced it.
+
+**Rules:**
+
+1. **Grep every enum value, policy row and error code for a PRODUCER before shipping the
+   table.** A column exercised only by unit tests is indistinguishable, at review time,
+   from one the app actually reaches. Cheapest possible check, and it caught two.
+2. **When a decision and its consequence are separated by a timer** (the user chooses a
+   file; the poll ten seconds later does the merging), the intent has to be RECORDED for
+   the second half to find. A parameter cannot cross that gap, so a one-shot that is read
+   and cleared in the same call is the honest shape.
+3. **Delete the documented-but-unreachable path or wire it, never leave it.** A comment
+   saying "use X for Y" that no caller follows will be believed by the next reader.
+
+---
+
+## "Export your changes and reload" was advice that could never work
+
+**Date:** 2026-09-06
+**Context:** The lineage banner told a blocked device to export its changes and reload.
+Reviewing my own copy against the code showed that a reload re-opens the SAME cached
+document against the SAME baseline, so the guard blocks again, forever. Saving cannot
+resolve it either — `doSave` refuses on any remote blocker, by design. Discarding the
+local document was the only exit, and there was no way to ask for it.
+
+The banner was correct about the danger, honest about the cause, and dead-ended the user.
+
+**Rules:**
+
+1. **Trace the prescribed recovery through the code before writing it into the copy.**
+   "Then reload" is the most-written and least-verified sentence in error UX. Ask which
+   line of code the reload reaches, and what that line will decide.
+2. **If the only exit is destructive, BUILD it** — behind a confirm that names what is
+   let go. Telling the user to do something the app will not let them do is worse than
+   an honest "contact support", because it costs them the attempt.
+3. **Two verdicts need two pieces of copy.** The banner rendered the recoverable text for
+   an unrecoverable `conflict` too, offering a discard between two equally valid
+   reorganisations. Branch on the message KEY, never on rendered prose — that survives a
+   wording edit and a language switch.
+
+---
+
+## A test that greps source text passes for a component that renders nothing
+
+**Date:** 2026-09-06
+**Context:** The lineage banner's test read its own `.vue` file and asserted
+`toContain("backgroundSyncErrorKind === 'lineage'")`. It would pass for a component whose
+template was empty, and fail for a correct refactor that spelled the condition
+differently. The file it replaced had already failed this way once: it sliced
+`syncStore.ts` on a delimiter occurring ZERO times, fell back to "the rest of the file",
+asserted nothing, and reported green while a broken guard shipped.
+
+Replacing it with a mounted test immediately found real defects the grep could not see:
+the conflict verdict rendering the wrong copy, and no confirmation before a discard.
+
+**Rules:**
+
+1. **Assert on rendered output or on a call that happened, never on source text.** The
+   repo has `@vue/test-utils`; a mounted banner test is ~20 lines.
+2. **A source-grep assertion is acceptable for exactly one thing: "is this mounted in the
+   shell?"** — a wiring question with no runtime surface. Everything else is behaviour.
+3. **When a lint rule can express it, prefer the lint rule.** It runs on every file and
+   cannot silently match the wrong slice. And write it with `patterns`, not `paths`:
+   `paths` matches the literal specifier only, so `./podLineage` walked straight past the
+   rule that was supposed to be structural.
+
+---
+
 ## A dark-mode sweep that only changes text colour creates the bug it is meant to fix
 
 **Date:** 2026-09-05

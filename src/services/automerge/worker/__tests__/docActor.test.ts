@@ -134,13 +134,18 @@ describe('there is ONE merge entry point, and it never nulls the document', () =
     expect(body).toContain('if (installWholesale)');
   });
 
-  it('the guard runs after the decrypt, and ONLY when a document exists', () => {
-    // `!currentDoc` must short-circuit: deriving clean/dirty from a document
-    // that does not exist answers `dirty`, and adopt-remote x dirty BLOCKS — so
-    // a device whose cache missed could never adopt a compacted pod.
+  it('the guard runs AFTER the decrypt', () => {
+    // The only ordering this file can honestly assert from source. What the
+    // guard then DECIDES is behaviour, and is covered by `lineageBasis.test.ts`
+    // against a real worker — deliberately, because the previous version of
+    // this test asserted the exact source line
+    // (`let installWholesale = !currentDoc;`) that CAUSED a live cross-family
+    // merge, so the correct fix broke the test and the bug was pinned in place.
+    // Assert order here; assert outcomes there.
     const body = mergeBody();
-    expect(body.indexOf('guardLineage(')).toBeGreaterThan(body.indexOf('decryptToDoc'));
-    expect(body).toContain('let installWholesale = !currentDoc;');
-    expect(body).toContain('if (currentDoc) {');
+    const decryptAt = body.indexOf('decryptToDoc');
+    const guardAt = body.indexOf('guardLineage(');
+    expect(decryptAt).toBeGreaterThan(-1);
+    expect(guardAt).toBeGreaterThan(decryptAt);
   });
 });

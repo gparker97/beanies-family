@@ -143,6 +143,13 @@ export type CompleteAutoLoadResult =
       familyId: string;
       error: PayloadTooLargeError;
     }
+  /**
+   * The file opened, but its history cannot be combined with this device's.
+   * Distinct from `corrupted` and `too-large` because nothing is damaged and
+   * this device has not run out of anything — telling the user either of those
+   * would be a lie, and the recovery is different (export, then reload).
+   */
+  | { kind: 'lineage-blocked'; error: RemoteBlocker }
   | { kind: 'network-error'; error: Error };
 
 // ─── Typed errors ─────────────────────────────────────────────────────────

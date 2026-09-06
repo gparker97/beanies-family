@@ -21,7 +21,7 @@
  *   rather than there being a second `silent` flag.
  */
 import { ref, type Ref } from 'vue';
-import { payloadErrorMessageKey } from '@/types/sync';
+import { PayloadLoadError } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -84,8 +84,12 @@ export function useBiometricSignIn(): {
         const fkResult = await syncStore.decryptPendingFileWithKey(result.familyKey);
         if (!fkResult.success) {
           // Same gap as the password branch: nothing reported the corrupt half.
-          if (fkResult.payloadError) {
-            reportPayloadFailure(fkResult.payloadError, {
+          // Payload-only reporter: a lineage/merge block is reported once by
+          // its own latch and must not be filed as a corrupt pod.
+          const payloadErr =
+            fkResult.payloadError instanceof PayloadLoadError ? fkResult.payloadError : null;
+          if (payloadErr) {
+            reportPayloadFailure(payloadErr, {
               source: 'biometric-unlock',
               fileId: syncStore.pendingEncryptedFile?.driveFileId ?? null,
               familyId: syncStore.pendingEncryptedFile?.envelope?.familyId ?? null,
@@ -99,7 +103,7 @@ export function useBiometricSignIn(): {
             // `passkey.signInError` reads as "your face/finger didn't work" and
             // the user re-scans forever.
             message: fkResult.payloadError
-              ? t(payloadErrorMessageKey(fkResult.payloadError))
+              ? t(fkResult.payloadError.inlineMessageKey)
               : fkResult.error?.includes('No pending')
                 ? t('passkey.fileLoadError')
                 : t('passkey.signInError'),
