@@ -84,8 +84,8 @@ describe('the ladder is data', () => {
   });
 
   it('keeps MAX_ATTEMPTS and the arithmetic from drifting apart', () => {
-    expect(MAX_ATTEMPTS).toBe(LADDER.length + (ZOOM_STEPS.length + 1) * 2);
-    expect(MAX_ATTEMPTS).toBe(136); // 120 rungs + 2 axes × (7 zooms + 1)
+    expect(MAX_ATTEMPTS).toBe(LADDER.length + (ZOOM_STEPS.length + 1) * 5);
+    expect(MAX_ATTEMPTS).toBe(160); // 120 rungs + (7 zooms + 1) × (4 day windows + 1)
   });
 
   it('is frozen, so nothing can mutate the search at runtime', () => {
@@ -496,11 +496,13 @@ describe('fitting, and never clipping', () => {
     expect(l.folds).toHaveLength(0);
   });
 
-  it('takes the FULL day when the plot can afford one', () => {
+  it('takes a FULL day when the plot can afford one, and widens into the slack', () => {
     const l = layoutTimeGrid([[ev('09:00', '10:00'), ev('12:00', '13:00')]], 720);
-    expect(l.attempts).toBe(1);
     expect(l.tier).toBe('roomy');
-    expect(l.windowEnd - l.windowStart).toBe(720); // 08:00–20:00
+    // 12h fits at the base hour, and there is room left for 14h — the search
+    // takes the hour first, then spends what is left on more day.
+    expect(l.windowEnd - l.windowStart).toBe(14 * 60);
+    expect(l.windowStart).toBe(7 * 60);
   });
 
   it('fits a twenty-event day without dropping anything', () => {
@@ -952,28 +954,55 @@ describe('the zoom — how the wall grows with the glass', () => {
 describe('the generous axis — how much day gets drawn', () => {
   const ordinary = [ev('09:00', '10:00'), ev('13:00', '13:45'), ev('17:00', '18:00')];
 
-  it('⭐ draws the whole waking day when the plot can afford one', () => {
-    // greg, on a 1200px wall: "if the space is available, should we just print
-    // the full daily grid rather than collapsing when not needed?"
+  it('⭐ draws a standard day, widened into whatever space is left', () => {
+    // greg: "if the space is available, should we just print the full daily grid
+    // rather than collapsing when not needed?" — and then: "if vertical space
+    // still exists… print grid lines from the top to the bottom".
     const l = layoutTimeGrid([ordinary], 900);
-    expect(l.windowStart).toBe(8 * 60);
-    expect(l.windowEnd).toBe(20 * 60);
     expect(l.folds).toHaveLength(0);
     expect(l.tier).toBe('roomy');
+    // A standard shape, not an arbitrary one fitted to this exact plot.
+    expect([12, 14, 16, 18]).toContain((l.windowEnd - l.windowStart) / 60);
+    // And it genuinely uses the glass.
+    expect(l.yFor(l.windowEnd)).toBeGreaterThan(900 * 0.85);
+  });
+
+  it('⭐ only ever draws one of four standard days, so the grid holds still', () => {
+    // The reason the window is quantized: fitted exactly to each plot, Monday
+    // and Tuesday would show different hours purely because their events differ,
+    // which is the defect SCALE_STEPS was quantized to prevent.
+    const shapes = new Set<number>();
+    const days = [
+      ordinary,
+      [ev('09:00', '09:30')],
+      [ev('08:00', '09:00'), ev('19:00', '19:30')],
+      [ev('10:00', '11:00'), ev('14:00', '14:20'), ev('18:00', '18:45')],
+    ];
+    for (const day of days) {
+      for (const height of [700, 780, 860, 940, 1020, 1100, 1180, 1260, 1400]) {
+        const l = layoutTimeGrid([day], height);
+        if (l.tier === 'roomy') shapes.add((l.windowEnd - l.windowStart) / 60);
+      }
+    }
+    expect([...shapes].sort((a, b) => a - b)).toEqual(
+      expect.arrayContaining([...shapes].filter((h) => [12, 14, 16, 18].includes(h)))
+    );
+    expect([...shapes].every((h) => [12, 14, 16, 18].includes(h))).toBe(true);
   });
 
   it('⭐ a single afternoon appointment gets a day, not a one-hour box', () => {
     // The case greg called awkward: two grid lines floating in an empty plot.
     const l = layoutTimeGrid([[ev('14:00', '15:00')]], 720);
-    expect(l.windowEnd - l.windowStart).toBe(720);
+    expect((l.windowEnd - l.windowStart) / 60).toBeGreaterThanOrEqual(12);
     expect(l.ticks.length).toBeGreaterThan(10);
   });
 
   it('⚠️ widens for an early riser rather than clipping them', () => {
-    // The waking window is a FLOOR on how much day is drawn, never a clip.
-    const l = layoutTimeGrid([[ev('06:30', '07:30'), ev('09:00', '10:00')]], 900);
-    expect(l.windowStart).toBe(6 * 60 + 30 - 30); // snapped out to 06:00
-    expect(l.windowEnd).toBe(20 * 60);
+    // The standard day is a FLOOR on how much gets drawn, never a clip. A 04:45
+    // start is outside every standard window, so the axis simply starts earlier.
+    const l = layoutTimeGrid([[ev('04:45', '05:30'), ev('09:00', '10:00')]], 900);
+    expect(l.windowStart).toBe(4 * 60);
+    expect(l.windowEnd).toBeGreaterThanOrEqual(20 * 60);
   });
 
   it('falls back to the day’s own span when the full day will not fit', () => {
