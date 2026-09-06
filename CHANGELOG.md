@@ -19,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **The message about a file that cannot be combined now offers a way out that works, and says when it worked.** It also comes back if the attempt fails, rather than quietly disappearing.
 - **The setup screen no longer goes blank when a family file cannot be combined.** It was the one screen that could show neither the message nor an explanation.
 - **A device holding a newly reorganised file now publishes it after signing in.** On several sign-in routes that upload was cancelled a moment after being scheduled, so the file was re-downloaded ten seconds later instead.
+- **Restoring from a backup works again, and no longer destroys the backup.** Loading another family data file promises to replace what is on the device with the file you picked. For an older file — a backup, or the copy saved before a reorganisation — it was doing the opposite: keeping what was on the device and writing that over the file you chose. So the restore appeared to do nothing, and the backup was gone.
 - **The beanie wall no longer shows a green dot over a family file it cannot open.** It only spoke up for one kind of problem; it now speaks up for all of them, and it no longer says "can't reach your family file" about a file it read perfectly well.
 
 ## 2026-09-05
