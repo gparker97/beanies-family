@@ -2020,9 +2020,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         </div>
 
         <!-- The one thing that needs a decision, deliberately NOT behind the
-             badge: a device that was offline with unsaved changes cannot merge
-             across the boundary and will ask on reconnect (the lineage banner).
-             Stage 3's rebase is what removes even this. -->
+             badge. Stage 3's rebase now replays an offline device's work onto
+             the compacted file, so the common case is silent — but a rebase
+             that cannot run safely still falls back to the block, and then that
+             device is asked to give its changes up. The notice describes the
+             fallback, because that is the case a human has to act on. -->
         <div
           class="dark:border-accent-lift/40 dark:bg-accent-lift/10 mb-3 flex gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3"
         >
