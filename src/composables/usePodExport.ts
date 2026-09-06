@@ -23,11 +23,26 @@ export function usePodExport() {
    * Write the encrypted `.beanpod` out. Returns whether a file was DELIVERED —
    * not whether the call succeeded. A cancelled share is `false`.
    */
-  async function exportEncryptedPod(opts?: { errorUi?: 'toast' | 'caller' }): Promise<boolean> {
+  /**
+   * Hand ALREADY-BUILT bytes to the OS. Split out of `exportEncryptedPod` so a
+   * caller that needs the same envelope twice — the compaction, which gates on a
+   * delivered backup AND writes a safety copy beside the pod — can build it
+   * ONCE. Two whole-document serialize + AES-GCM passes back to back is exactly
+   * the wrong thing on the low-memory device this feature exists for.
+   *
+   * ⚠️ RETURNS A BOOLEAN, and `exportEncryptedPod` must keep doing so.
+   * `usePodCompaction` gates on `if (!(await exportEncryptedPod(...)))`; an
+   * object is always truthy, TypeScript reports nothing for `if (!obj)`, and the
+   * backup gate on a one-way, history-destroying migration would silently pass.
+   */
+  async function deliverPod(
+    built: { json: string; filename: string },
+    opts?: { errorUi?: 'toast' | 'caller' }
+  ): Promise<boolean> {
     if (isExporting.value) return false;
     isExporting.value = true;
     try {
-      const { json, filename } = await syncStore.buildExportEnvelope();
+      const { json, filename } = built;
       const result = await deliverFile({
         blob: new Blob([json], { type: 'application/json' }),
         filename,
@@ -41,8 +56,8 @@ export function usePodExport() {
       if (result.delivered) syncStore.markExported();
       return result.delivered;
     } catch (e) {
-      // `buildExportEnvelope` throws with no family key, and the worker's
-      // payload export can reject. Never silent.
+      // The delivery itself can reject (a revoked handle, a share sheet error).
+      // Never silent.
       if (opts?.errorUi !== 'caller') {
         showToast('error', t('fileDelivery.failed'), t('fileDelivery.failedHelp'), {
           surface: 'file-delivery',
@@ -55,6 +70,30 @@ export function usePodExport() {
     } finally {
       isExporting.value = false;
     }
+  }
+
+  /**
+   * Build the encrypted `.beanpod` and write it out. Returns whether a file was
+   * DELIVERED — not whether the call succeeded. A cancelled share is `false`.
+   */
+  async function exportEncryptedPod(opts?: { errorUi?: 'toast' | 'caller' }): Promise<boolean> {
+    let built: { json: string; filename: string };
+    try {
+      built = await syncStore.buildExportEnvelope();
+    } catch (e) {
+      // `buildExportEnvelope` throws with no family key, and the worker's
+      // payload export can reject. Never silent.
+      if (opts?.errorUi !== 'caller') {
+        showToast('error', t('fileDelivery.failed'), t('fileDelivery.failedHelp'), {
+          surface: 'file-delivery',
+          error: e,
+          // `source`, not `encode`: no bytes ever existed.
+          context: { action: 'delivery-failed', kind: 'beanpod', stage: 'source' },
+        });
+      }
+      return false;
+    }
+    return deliverPod(built, opts);
   }
 
   /**
@@ -76,5 +115,5 @@ export function usePodExport() {
     });
   }
 
-  return { isExporting, exportEncryptedPod, confirmBackupLanded };
+  return { isExporting, exportEncryptedPod, deliverPod, confirmBackupLanded };
 }
