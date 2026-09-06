@@ -4305,17 +4305,17 @@ const STRING_DEFS = {
       'on an older phone or tablet the record can grow big enough to stop your pod opening at all. compacting is what fixes that.',
   },
   'compaction.bringDevicesOnline': {
-    en: "Before you start, bring your family's other devices online so they are up to date. A device that has been offline with changes it never saved cannot bring them across, and will have to give them up.",
+    en: "Before you start, bring your family's other devices online so they are up to date. beanies carries across changes made on a device that was offline, but if it cannot, that device will be asked to give them up.",
     beanie:
-      "before you start, bring your family's other devices online so they are up to date. a device that has been offline with changes it never saved cannot bring them across, and will have to give them up.",
+      "before you start, bring your family's other beans online so they are up to date. beanies carries across beans made on a bean that was offline, but if it cannot, that bean will be asked to give them up.",
   },
   // Two variants, because the sibling copy is written only where the storage
   // provider can write one. Promising it to a local-file family would be asking
   // for consent to a one-way migration on a guarantee they were never given.
   'compaction.safetyCopyNote': {
-    en: 'beanies keeps a copy of the current file beside it, and asks you to save one too. To go back to either, use Load Another Family Data File above.',
+    en: 'beanies keeps a copy of the current file beside it in your storage, and asks you to save one to this device too. Use the saved one with Load Another Family Data File above; the one in your storage is there if you need support to help you back.',
     beanie:
-      'beanies keeps a copy of your current pod beside it, and asks you to save one too. to go back to either, use load another family data file above.',
+      'beanies keeps a copy of your current pod beside it in your storage, and asks you to save one to this bean too. use the saved one with load another family data file above; the one in your storage is there if you need support to help you back.',
   },
   'compaction.safetyCopyNoteManual': {
     en: 'beanies asks you to save a copy of the current file first. To go back to it, use Load Another Family Data File above.',
@@ -4324,9 +4324,9 @@ const STRING_DEFS = {
   },
   'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
   'compaction.confirmMessage': {
-    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online; one that has been offline with changes it never saved will have to give those changes up.',
+    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online, and beanies carries across anything they changed while offline.',
     beanie:
-      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this device is lost, and beanies saves a copy of your current pod first. your other devices pick the compacted pod up next time they are online; one that has been offline with changes it never saved will have to give those changes up.',
+      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this bean is lost, and beanies saves a copy of your current pod first. your other beans pick the compacted pod up next time they are online, and beanies carries across anything they changed while offline.',
   },
   'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {
@@ -4349,9 +4349,9 @@ const STRING_DEFS = {
       'beanies could not save a copy of your pod next to it, so it stopped before changing anything. check your storage connection and try again.',
   },
   'compaction.refused.safety-copy-damaged': {
-    en: 'The copy beanies saved did not come back the same as it went out, so beanies removed it and stopped before changing anything. Nothing about your family file has changed. Check your storage connection and try again.',
+    en: 'The copy beanies saved did not come back the same as it went out, so beanies stopped before changing anything. Nothing about your family file has changed. Check your storage connection and try again.',
     beanie:
-      'the copy beanies saved did not come back the same as it went out, so beanies removed it and stopped before changing anything. nothing about your pod has changed. check your storage connection and try again.',
+      'the copy beanies saved did not come back the same as it went out, so beanies stopped before changing anything. nothing about your pod has changed. check your storage connection and try again.',
   },
   'compaction.refused.backup-too-large': {
     en: 'This device ran out of memory making the backup, so beanies stopped before changing anything. Nothing has changed. Try again on a device with more memory.',

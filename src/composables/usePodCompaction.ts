@@ -225,13 +225,16 @@ export function usePodCompaction() {
           // point. Remove it, then say what happened.
           try {
             await aux.delete(copyName);
-          } catch {
-            // Best effort. The refusal below is the honest outcome either way,
-            // and a leftover is reported rather than silently tolerated.
+          } catch (delErr) {
+            // Best effort, but never blind: a 403, a 404 and a dropped
+            // connection need telling apart, and the user is about to be told
+            // beanies stopped — not that the bad copy is gone, because this is
+            // exactly the path where it may not be.
             reportError({
               surface: 'pod-compaction',
               severity: 'warning',
               message: 'could not remove the damaged safety copy',
+              error: delErr,
               context: { action: 'refused', error_code: 'safety-copy-orphan' },
             });
           }

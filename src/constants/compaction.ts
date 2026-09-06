@@ -31,10 +31,18 @@ export function safetyCopyName(podFileName: string): string {
   const withoutExt = podFileName.endsWith(BEANPOD_EXT)
     ? podFileName.slice(0, -BEANPOD_EXT.length)
     : podFileName;
-  const base = withoutExt.endsWith(SAFETY_COPY_INFIX)
+  const stripped = withoutExt.endsWith(SAFETY_COPY_INFIX)
     ? withoutExt.slice(0, -SAFETY_COPY_INFIX.length)
     : withoutExt;
-  return `${base}${SAFETY_COPY_INFIX}${BEANPOD_EXT}`;
+  const candidate = `${stripped}${SAFETY_COPY_INFIX}${BEANPOD_EXT}`;
+  // ⚠️ NEVER THE SOURCE'S OWN NAME. Stripping alone stops the marker stacking,
+  // but for a family LIVING on a restored copy it makes the copy name identical
+  // to the pod name — and the writer resolves by exact name, so the next
+  // compaction would overwrite the live pod, read it back, match, and report
+  // "safety copy written and verified". The family would be told they have a
+  // backup they do not have, immediately before the history is destroyed.
+  // Stacking is ugly; a collision is catastrophic.
+  return candidate === podFileName ? `${withoutExt}${SAFETY_COPY_INFIX}${BEANPOD_EXT}` : candidate;
 }
 
 /**

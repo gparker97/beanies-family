@@ -694,7 +694,7 @@ function rebaseOntoRemote(
   local: Doc,
   baselineHeads: Heads,
   remote: Doc
-): { doc: Doc; replayed: number } | null {
+): { doc: Doc; replayed: number; conflicts: number } | null {
   try {
     const target = migrateDoc(remote);
     const ops = buildRebaseOps(local, baselineHeads, target);
@@ -702,12 +702,39 @@ function rebaseOntoRemote(
     // Nothing to replay: the peer is level with its baseline, so the remote can
     // simply be adopted. Blocking here would strand a device that has lost
     // nothing — and `migrateDoc` alone can move heads without any user edit.
-    if (!ops.op) return { doc: target, replayed: 0 };
-    return { doc: applyMutationOp(target, ops.op).doc, replayed: ops.count };
+    if (!ops.op) return { doc: target, replayed: 0, conflicts: ops.conflicts };
+    return {
+      doc: applyMutationOp(target, ops.op).doc,
+      replayed: ops.count,
+      conflicts: ops.conflicts,
+    };
   } catch (e) {
     console.warn('[applyAndProject] rebase unavailable — falling back to the block:', e);
     return null;
   }
+}
+
+/**
+ * Replace the id segment of a document path with a placeholder.
+ *
+ * `driveConnections.greg@example.com.refreshToken` → `driveConnections.<id>.refreshToken`.
+ * Entity ids are UUIDs almost everywhere, which are harmless, but one map is
+ * keyed by an email address and this message reaches the firehose and Slack.
+ * Masking positionally rather than special-casing that one collection means a
+ * future map keyed by something personal is covered the day it is added.
+ */
+function maskEntityIds(path: string): string {
+  const parts = path.split('.');
+  if (parts.length < 3) return parts.length === 2 ? `${parts[0]}.<id>` : path;
+  // ⚠️ MASK EVERYTHING BETWEEN THE COLLECTION AND THE LEAF, not just the second
+  // segment. Ids are joined into the path with '.', and an EMAIL CONTAINS DOTS
+  // — so masking positionally turned
+  // `driveConnections.someone@example.com.refreshToken` into
+  // `driveConnections.<id>.com.refreshToken`, still leaking part of the
+  // address. Keeping only the first and last segments is total: whatever the id
+  // is made of, it cannot survive. The collection and the field are what triage
+  // needs; the nesting in between is not worth a PII leak into Slack.
+  return `${parts[0]}.<id>.${parts[parts.length - 1]}`;
 }
 
 function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
@@ -732,6 +759,10 @@ export async function mergeRemoteEnvelope(
   dirty: boolean;
   changed: boolean;
   remoteHeads: Heads;
+  /** How many ops a rebase replayed. Absent on every other action. */
+  replayed?: number;
+  /** Fields both sides wrote that could not be merged; the saved value stayed. */
+  conflicts?: number;
 }> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
@@ -826,31 +857,47 @@ export async function mergeRemoteEnvelope(
     if (act === 'rebase') {
       const baseline = basis.kind === 'baseline' ? basis.heads : null;
       const rebased = baseline ? rebaseOntoRemote(currentDoc, baseline, remote) : null;
-      if (!rebased) throw lineageBlockError('adopt-remote');
-      sink.perf('automerge.rebase', rebased.replayed, {});
-      // Captured from the UNMIGRATED remote, exactly as the branches below do:
-      // it describes the bytes on Drive, so the replay cannot taint it.
-      const driveHeads = headsOf(remote);
-      currentDoc = rebased.doc;
-      resetDocCursors();
-      const heads = headsOf(currentDoc);
-      schedulePersist();
-      scheduleSnapshotPersist();
-      const doc = currentDoc;
-      time('automerge.pushProjection', () => pushProjection(doc), {
-        perf_entity_count: countEntities(doc),
-      });
-      return {
-        action: 'rebased',
-        heads,
-        // The replay moved us past the bytes Drive holds, so the caller's
-        // existing `if (dirty)` publishes the peer's work onto the new lineage.
-        dirty: !headsEqual(driveHeads, heads),
-        changed: true,
-        remoteHeads: driveHeads,
-      };
+      if (rebased) {
+        // Captured from the UNMIGRATED remote, exactly as the branches below
+        // do: it describes the bytes on Drive, so the replay cannot taint it.
+        const driveHeads = headsOf(remote);
+        currentDoc = rebased.doc;
+        resetDocCursors();
+        const heads = headsOf(currentDoc);
+        schedulePersist();
+        scheduleSnapshotPersist();
+        const doc = currentDoc;
+        time('automerge.pushProjection', () => pushProjection(doc), {
+          perf_entity_count: countEntities(doc),
+        });
+        return {
+          action: 'rebased',
+          heads,
+          // The replay moved us past the bytes Drive holds, so the caller's
+          // existing `if (dirty)` publishes the peer's work onto the new lineage.
+          dirty: !headsEqual(driveHeads, heads),
+          changed: true,
+          remoteHeads: driveHeads,
+          replayed: rebased.replayed,
+          conflicts: rebased.conflicts,
+        };
+      }
+      // ⚠️ WHERE THE FALLBACK GOES DEPENDS ON WHO ASKED. For an ordinary poll
+      // the honest answer is the block this replaced: the peer keeps its work
+      // and is told. But `user-file` means a human has already confirmed
+      // "replace what is on this device", so blocking there refuses an
+      // instruction they gave — and it is the one path that must never dead
+      // end. It adopts instead, exactly as it did before the rebase existed.
+      // ⚠️ SAY WHY. Without this a rebase that could not run is byte-identical
+      // in CloudWatch to a policy block that never attempted one — so "the
+      // rebase machinery is broken" and "the guard correctly refused" look the
+      // same, and the soak that decides whether to enable compaction cannot be
+      // judged. The user-facing error is deliberately unchanged.
+      sink.perf('automerge.rebaseUnavailable', 1, {});
+      if (lineageCtx !== 'user-file') throw lineageBlockError('adopt-remote');
     }
-    installWholesale = act === 'adopt';
+    // `rebase` reaches here only via the `user-file` fallback above.
+    installWholesale = act === 'adopt' || act === 'rebase';
   }
 
   // #65: the heads of EXACTLY the bytes on Drive. Captured here, from the
@@ -1155,7 +1202,17 @@ export function compactDoc(): {
     const differsAt = firstJsonDifference(source, Automerge.toJS(compacted));
     if (differsAt) {
       // The old doc is untouched — we never assigned `currentDoc`.
-      throw new Error(`compaction changed the document at ${differsAt}`);
+      //
+      // ⚠️ THE PATH IS MASKED BEFORE IT BECOMES A MESSAGE. `firstJsonDifference`
+      // promises "a PATH, never a value", and the value half holds — but one
+      // collection is keyed by a GOOGLE ACCOUNT EMAIL (`driveConnections`, see
+      // `driveConnectionId`), so the path itself can be
+      // `driveConnections.someone@example.com.refreshToken`. That message
+      // becomes the error's stack, which `logEvent` writes OUTSIDE the
+      // allowlisted context and `reportError` pastes into Slack. The
+      // collection and the leaf are what a person triaging needs; the id in
+      // between never is.
+      throw new Error(`compaction changed the document at ${maskEntityIds(differsAt)}`);
     }
   } catch (e) {
     // Classified, so an OOM here reads as "this device ran out of memory" with

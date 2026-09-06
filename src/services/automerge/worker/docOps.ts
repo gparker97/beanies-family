@@ -38,6 +38,14 @@ type AnyRecord = Record<string, unknown>;
 
 /** JSON round-trip an Automerge value to a plain, structured-clone-safe object. */
 function toPlain<T>(value: T): T {
+  // ⚠️ `undefined` PASSES THROUGH. `JSON.stringify(undefined)` is `undefined`,
+  // which `JSON.parse` coerces to the STRING "undefined" and throws on — so
+  // every `toPlain(x) ?? fallback` guard in this file was dead, and an absent
+  // singleton (a pod created before `settings` shipped is a documented real
+  // state) threw a `SyntaxError` from deep inside a pure composer. In the
+  // rebase that throw cost the peer its ENTIRE offline session, not just the
+  // field: it escaped to the fallback and raised the block R1 exists to remove.
+  if (value === undefined) return undefined as T;
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
@@ -699,7 +707,17 @@ export function buildRebaseOps(
   local: Doc,
   baselineHeads: Heads,
   target: Doc
-): { op: MutationOp | null; count: number } | null {
+): { op: MutationOp | null; count: number; conflicts: number } | null {
+  // ⚠️ AN EMPTY BASELINE IS NOT "THE BEGINNING OF TIME", IT IS "UNKNOWN".
+  // `decodeHeadsFingerprint('')` legitimately answers `[]` for a document with
+  // no heads, and `Automerge.hasHeads(doc, [])` is TRUE, so without this the
+  // composer would diff from the empty document, mark every entity as new, and
+  // emit a `set` for the peer's ENTIRE document over the compacted target —
+  // discarding everything the compactor did after the baseline. It only failed
+  // safe before by accident, via a `toPlain` throw on the empty view's absent
+  // settings; fixing that throw is what makes this guard load-bearing.
+  if (baselineHeads.length === 0) return null;
+
   // The peer's own history must contain the baseline, or "what changed since"
   // has no meaning. `hasHeads` answers that without materializing anything.
   if (!Automerge.hasHeads(local, baselineHeads)) return null;
@@ -715,6 +733,8 @@ export function buildRebaseOps(
   if (!scan) return null;
 
   const ops: MutationOp[] = [];
+  /** Fields both sides wrote that no machine can merge. The saved value stays. */
+  let conflicts = 0;
   for (const [collection, ids] of scan.touched) {
     const localColl = (local[collection] ?? {}) as AnyRecord;
     const beforeColl = (before[collection] ?? {}) as AnyRecord;
@@ -744,17 +764,19 @@ export function buildRebaseOps(
         ops.push({ op: 'set', collection, id, entity: toPlain(now) });
         continue;
       }
-      const patch = shallowChangedFields(beforeColl[id], now);
+      const patch = threeWayFields(beforeColl[id], now, targetColl[id]);
       if (!patch) continue; // nothing actually moved
+      conflicts += patch.conflicts;
+      if (!Object.keys(patch.set).length && !patch.deleteKeys.length) continue;
       ops.push({
         op: 'patch',
         collection,
         id,
         patch: patch.set,
         ...(patch.deleteKeys.length ? { deleteKeys: patch.deleteKeys } : {}),
-        // The entity exists in the target by the check above, but a peer can
-        // have deleted it there concurrently. Skipping is the honest answer:
-        // the compactor's delete wins, and nothing throws mid-replay.
+        // The entity is present in the target by the check above, and this all
+        // runs synchronously against a local document, so it cannot vanish in
+        // between. `skip` is belt-and-braces rather than a live case.
         onMissing: 'skip',
       });
     }
@@ -764,39 +786,95 @@ export function buildRebaseOps(
     // ⚠️ FIELD-MERGED, NEVER WHOLE-REPLACED. `setSettings` replaces the
     // singleton, so emitting the peer's entire settings object would silently
     // revert a currency, locale or theme the compactor changed.
-    const changed = shallowChangedFields(before.settings, local.settings);
-    if (changed) {
+    const changed = threeWayFields(before.settings, local.settings, target.settings);
+    if (changed && (Object.keys(changed.set).length || changed.deleteKeys.length)) {
       const merged = { ...(toPlain(target.settings) ?? {}), ...changed.set };
       for (const key of changed.deleteKeys) delete (merged as AnyRecord)[key];
       ops.push({ op: 'named', name: 'setSettings', args: { settings: merged } });
     }
+    if (changed) conflicts += changed.conflicts;
   }
 
-  if (ops.length === 0) return { op: null, count: 0 }; // nothing to replay
-  return { op: ops.length === 1 ? ops[0]! : { op: 'batch', ops }, count: ops.length };
+  if (ops.length === 0) return { op: null, count: 0, conflicts }; // nothing to replay
+  return {
+    op: ops.length === 1 ? ops[0]! : { op: 'batch', ops },
+    count: ops.length,
+    conflicts,
+  };
 }
 
 /**
- * The shallow field difference between two entity snapshots, or `null` when
- * nothing moved. Values are compared by their JSON form, so a nested object
- * that is written whole reads as one changed field — which is the documented
- * last-writer-wins semantic for those fields.
+ * A THREE-WAY field merge: what did the peer change, that the compactor did not?
+ *
+ * ⚠️ IT IS THREE-WAY, AND A TWO-WAY DIFF HERE SILENTLY REVERTS SAVED DATA. The
+ * first cut compared only baseline against local and replayed the peer's whole
+ * field value. For an object-valued field that reverts the compactor's SIBLING
+ * sub-fields: peer edits `loan.rate`, compactor edits `loan.term`, and replaying
+ * `{rate, term}` puts `term` back to its baseline value although the peer never
+ * touched it. The compactor's change was already saved to the family file; the
+ * peer's was not. Destroying saved data to preserve unsaved data, silently, is
+ * the worst trade this code could make.
+ *
+ * So each changed field is classified against the TARGET as well:
+ *  - the compactor did not touch it → take the peer's value;
+ *  - both changed, and both are plain objects → recurse one level and merge;
+ *  - both changed, and it cannot be merged (an array, a scalar, a type change)
+ *    → KEEP THE TARGET'S. The family file already holds it, and no machine can
+ *    reconcile two whole-value writes. Counted, so the loss is measurable.
+ *
+ * Arrays are the honest limitation. A same-lineage merge would reconcile a
+ * shopping list element by element through Automerge's list CRDT; the op union
+ * has no splice, so a rebase can only write one whole array. Preferring the
+ * saved one loses the peer's edit to that one list rather than the family's.
  */
-function shallowChangedFields(
+function threeWayFields(
   before: unknown,
-  now: unknown
-): { set: Record<string, unknown>; deleteKeys: string[] } | null {
+  now: unknown,
+  target: unknown
+): { set: Record<string, unknown>; deleteKeys: string[]; conflicts: number } | null {
   const a = (toPlain(before) ?? {}) as AnyRecord;
   const b = (toPlain(now) ?? {}) as AnyRecord;
+  const t = (toPlain(target) ?? {}) as AnyRecord;
   const set: Record<string, unknown> = {};
   const deleteKeys: string[] = [];
+  let conflicts = 0;
+
   for (const key of Object.keys(b)) {
-    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) set[key] = b[key];
+    if (same(a[key], b[key])) continue; // the peer did not change it
+    if (same(a[key], t[key])) {
+      set[key] = b[key]; // the compactor did not change it — the peer's wins
+      continue;
+    }
+    if (isPlainObject(a[key]) && isPlainObject(b[key]) && isPlainObject(t[key])) {
+      const inner = threeWayFields(a[key], b[key], t[key]);
+      if (inner) {
+        const merged = { ...(t[key] as AnyRecord), ...inner.set };
+        for (const k of inner.deleteKeys) delete merged[k];
+        set[key] = merged;
+        conflicts += inner.conflicts;
+      }
+      continue;
+    }
+    conflicts++; // both wrote it and it cannot be merged — the saved value stays
   }
+
   for (const key of Object.keys(a)) {
-    if (!(key in b)) deleteKeys.push(key);
+    // Only honour the peer's delete if the compactor left the field alone.
+    if (!(key in b) && same(a[key], t[key])) deleteKeys.push(key);
   }
-  return Object.keys(set).length || deleteKeys.length ? { set, deleteKeys } : null;
+
+  return Object.keys(set).length || deleteKeys.length || conflicts
+    ? { set, deleteKeys, conflicts }
+    : null;
+}
+
+/** JSON-equality. The document model is pure JSON, so this is exact. */
+function same(x: unknown, y: unknown): boolean {
+  return JSON.stringify(x) === JSON.stringify(y);
+}
+
+function isPlainObject(v: unknown): v is AnyRecord {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 /** Test-only: clear plugin ops but keep the core domain ops registered. */
