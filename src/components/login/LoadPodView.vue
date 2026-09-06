@@ -527,6 +527,10 @@ async function handleLoadFile() {
       await finishLoaded();
     } else if (result.needsPassword) {
       await handlePendingPassword(syncStore.fileName, { tryAuto: false });
+    } else if (result.payloadError) {
+      // BEFORE the `syncStore.error` arm: that ref mirrors the service's raw
+      // `lastError` and would otherwise win with an exception string.
+      formError.value = t(result.payloadError.inlineMessageKey);
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {

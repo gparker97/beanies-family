@@ -13,7 +13,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createBeanpodV4,
   parseBeanpodV4,
-  detectFileVersion,
   tryUnwrapFamilyKey,
   reEncryptEnvelope,
   beanpodVersionFor,
@@ -222,26 +221,6 @@ describe('fileSync V4 format', () => {
           })
         )
       ).toThrow('missing wrappedKeys');
-    });
-  });
-
-  // ── detectFileVersion ────────────────────────────────────────────
-
-  describe('detectFileVersion identifies V4 format', () => {
-    it('returns 4.0 for valid V4 envelope', () => {
-      expect(detectFileVersion(JSON.stringify({ version: '4.0', familyId: 'f' }))).toBe('4.0');
-    });
-
-    it('returns null for invalid JSON', () => {
-      expect(detectFileVersion('not json')).toBeNull();
-    });
-
-    it('returns null for wrong version', () => {
-      expect(detectFileVersion(JSON.stringify({ version: '3.0' }))).toBeNull();
-    });
-
-    it('returns null for missing version', () => {
-      expect(detectFileVersion(JSON.stringify({ familyId: 'f' }))).toBeNull();
     });
   });
 

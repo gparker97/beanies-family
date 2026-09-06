@@ -143,20 +143,6 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
 }
 
 /**
- * Detect the file format version from a raw JSON string.
- * Returns '4.0' for V4, or null if unrecognised.
- */
-export function detectFileVersion(jsonString: string): '4.0' | null {
-  try {
-    const parsed = JSON.parse(jsonString) as Record<string, unknown>;
-    if (parsed.version === '4.0') return '4.0';
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Try to unwrap a single wrappedKey entry with a password. Returns the family
  * key on success, or `null` on any failure (wrong password, malformed salt,
  * AES-KW unwrap error). Pure crypto — no I/O, no state mutation.

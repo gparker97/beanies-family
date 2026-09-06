@@ -21,13 +21,7 @@ import { PodLineageError } from '@/services/sync/podLineage';
 import type { LineageBasis } from '@/services/automerge/worker/protocol';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
-import {
-  parseBeanpodV4,
-  reEncryptEnvelope,
-  openFilePicker,
-  detectFileVersion,
-  beanpodVersionFor,
-} from './fileSync';
+import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, beanpodVersionFor } from './fileSync';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
@@ -74,7 +68,13 @@ export interface OpenFileResult {
   needsPassword?: boolean;
   fileHandle?: FileSystemFileHandle;
   provider?: StorageProvider;
-  rawText?: string; // raw file text for V3 fallback detection
+  /**
+   * A classified failure the caller can RENDER (`t(payloadError.inlineMessageKey)`),
+   * set when the file could be read but not accepted: a version from a newer
+   * beanies, a torn file. Callers test this BEFORE the raw `lastError` mirror,
+   * which carries a developer-facing string.
+   */
+  payloadError?: RemoteBlocker;
 }
 
 export interface SyncServiceState {
@@ -2088,6 +2088,22 @@ export async function loadAndParseV4(): Promise<{
 /**
  * Open file picker to select an existing sync file, read it, and configure as sync target.
  */
+/**
+ * ONE failure shape for the three file readers. A blocker (a file from a newer
+ * beanies, a torn read) is carried out as `payloadError` so every caller can
+ * render the same sentence, and `lastError` is set to that SAME translated
+ * sentence rather than the raw exception: `syncStore.error` mirrors `lastError`
+ * and both pages test it first, so the two channels must not disagree.
+ */
+function openFileFailure(e: unknown): OpenFileResult {
+  if (isRemoteBlocker(e)) {
+    updateState({ isSyncing: false, lastError: useTranslationStore().t(e.inlineMessageKey) });
+    return { success: false, payloadError: e };
+  }
+  updateState({ isSyncing: false, lastError: (e as Error).message });
+  return { success: false };
+}
+
 export async function openAndLoadFile(): Promise<OpenFileResult> {
   cancelPendingSave();
 
@@ -2109,33 +2125,18 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
       return { success: false };
     }
 
-    const version = detectFileVersion(text);
-
-    if (version === '4.0') {
-      const envelope = parseBeanpodV4(text);
-      updateState({ isSyncing: false, lastError: null });
-      return {
-        success: false,
-        needsPassword: true,
-        fileHandle: handle,
-        provider,
-        envelope,
-      };
-    }
-
-    // V3 or unknown format
-    updateState({
-      isSyncing: false,
-      lastError: `Unsupported file version: ${version ?? 'unknown'}`,
-    });
-    return { success: false, rawText: text };
+    // `parseBeanpodV4` validates the version itself and throws a typed error
+    // for a newer file; the old pre-call that sniffed the version first was a
+    // second full JSON.parse of the whole multi-megabyte file to read one field.
+    const envelope = parseBeanpodV4(text);
+    updateState({ isSyncing: false, lastError: null });
+    return { success: false, needsPassword: true, fileHandle: handle, provider, envelope };
   } catch (e) {
     if ((e as Error).name === 'AbortError') {
       updateState({ isSyncing: false });
       return { success: false };
     }
-    updateState({ isSyncing: false, lastError: (e as Error).message });
-    return { success: false };
+    return openFileFailure(e);
   }
 }
 
@@ -2161,26 +2162,11 @@ async function openAndLoadFileFallback(): Promise<OpenFileResult> {
       return { success: false };
     }
 
-    const version = detectFileVersion(text);
-
-    if (version === '4.0') {
-      const envelope = parseBeanpodV4(text);
-      updateState({ isSyncing: false, lastError: null });
-      return {
-        success: false,
-        needsPassword: true,
-        envelope,
-      };
-    }
-
-    updateState({
-      isSyncing: false,
-      lastError: `Unsupported file version: ${version ?? 'unknown'}`,
-    });
-    return { success: false, rawText: text };
+    const envelope = parseBeanpodV4(text);
+    updateState({ isSyncing: false, lastError: null });
+    return { success: false, needsPassword: true, envelope };
   } catch (e) {
-    updateState({ isSyncing: false, lastError: (e as Error).message });
-    return { success: false };
+    return openFileFailure(e);
   }
 }
 
@@ -2201,29 +2187,12 @@ export async function loadDroppedFile(
       return { success: false };
     }
 
-    const version = detectFileVersion(text);
-
-    if (version === '4.0') {
-      const envelope = parseBeanpodV4(text);
-      const provider = fileHandle ? LocalStorageProvider.fromHandle(fileHandle) : undefined;
-      updateState({ isSyncing: false, lastError: null });
-      return {
-        success: false,
-        needsPassword: true,
-        fileHandle,
-        provider,
-        envelope,
-      };
-    }
-
-    updateState({
-      isSyncing: false,
-      lastError: `Unsupported file version: ${version ?? 'unknown'}`,
-    });
-    return { success: false, rawText: text };
+    const envelope = parseBeanpodV4(text);
+    const provider = fileHandle ? LocalStorageProvider.fromHandle(fileHandle) : undefined;
+    updateState({ isSyncing: false, lastError: null });
+    return { success: false, needsPassword: true, fileHandle, provider, envelope };
   } catch (e) {
-    updateState({ isSyncing: false, lastError: (e as Error).message });
-    return { success: false };
+    return openFileFailure(e);
   }
 }
 
