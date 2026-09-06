@@ -188,7 +188,9 @@ function handleLocalLoadResult(result: {
   success: boolean;
   needsPassword?: boolean;
   payloadError?: RemoteBlocker;
+  cancelled?: true;
 }): void {
+  if (result.cancelled) return;
   if (result.success) {
     // No invite token → ask the user for the file password.
     showDecryptModal.value = true;

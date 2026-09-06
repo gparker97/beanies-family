@@ -523,6 +523,8 @@ async function handleLoadFile() {
 
   try {
     const result = await syncStore.loadFromNewFile();
+    // Dismissing the OS picker says nothing.
+    if (result.cancelled) return;
     if (result.success) {
       await finishLoaded();
     } else if (result.needsPassword) {
