@@ -7,9 +7,11 @@
 // Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer, a pure
 // forward. Mirrors src/pages/discord.astro.
 //
-// To change the destination: edit APP_STORE_URL below and deploy the web site.
+// To change the destination: edit STORE_URL in packages/brand/nav.ts (one copy,
+// shared with the Vue app's update prompt) and deploy the web site.
 // Region-less Apple link (/app/id…) resolves to each visitor's local storefront.
-const APP_STORE_URL = 'https://apps.apple.com/app/id6798513944';
+import { STORE_URL } from '@beanies/brand/nav';
+const APP_STORE_URL = STORE_URL.ios;
 ---
 
 <!doctype html>

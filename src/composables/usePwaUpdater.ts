@@ -2,11 +2,10 @@ import { watch, onScopeDispose, effectScope, type EffectScope } from 'vue';
 import { Capacitor } from '@capacitor/core';
 import { useRegisterSW } from 'virtual:pwa-register/vue';
 import router from '@/router';
-import { useSyncStore } from '@/stores/syncStore';
-import { hasOpenOverlays } from '@/utils/overlayStack';
 import { usePollWhileVisible } from './usePollWhileVisible';
 import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
 import { hardReload } from '@/utils/hardReload';
+import { isAppQuiet } from '@/utils/appQuiet';
 
 /**
  * PWA auto-updater. Detects a new service worker and applies it automatically
@@ -40,16 +39,6 @@ let initialized = false;
 let scope: EffectScope | null = null;
 let applying = false;
 let removeRouteGuard: (() => void) | null = null;
-
-/** Quiet = nothing the user would lose if we reload right now. */
-function isQuiet(): boolean {
-  try {
-    return !hasOpenOverlays() && !useSyncStore().isSyncing;
-  } catch {
-    // Pre-init / store not ready — treat as NOT quiet (defer the reload).
-    return false;
-  }
-}
 
 /**
  * Single, race-guarded apply path. Persists the resume route, asks
@@ -89,7 +78,7 @@ async function applyUpdate(
 function installRouteGuard(updateServiceWorker: (reloadPage?: boolean) => Promise<void>): void {
   if (removeRouteGuard) return;
   removeRouteGuard = router.beforeEach((to, _from, next) => {
-    if (!isQuiet()) {
+    if (!isAppQuiet()) {
       // Mid-edit / mid-save — let the navigation through; the guard stays armed
       // and applies on the next quiet navigation.
       next();
@@ -145,7 +134,7 @@ export function usePwaUpdater(): void {
       // Arm the guard for the busy-now → quiet-later (next navigation) case.
       installRouteGuard(updateServiceWorker);
       // And apply immediately if we're already quiet.
-      if (isQuiet()) {
+      if (isAppQuiet()) {
         void applyUpdate(updateServiceWorker, router.currentRoute.value.fullPath);
       }
     });

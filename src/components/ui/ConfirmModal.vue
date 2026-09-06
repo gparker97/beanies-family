@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { computed } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { safeExternalHref } from '@/utils/url';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
 const { state, handleConfirm, handleCancel } = useConfirm();
+
+/**
+ * The confirm href, screened. Same screen `openExternal` applies, so a value
+ * that is not http(s) renders a plain button rather than a live link. The one
+ * caller passes a frozen constant, so this is defence rather than expectation.
+ */
+const safeConfirmHref = computed(() => safeExternalHref(state.value.confirmHref) ?? undefined);
 </script>
 
 <template>
@@ -66,8 +75,20 @@ const { state, handleConfirm, handleCancel } = useConfirm();
         >
           {{ state.cancelLabel ? t(state.cancelLabel) : t('action.cancel') }}
         </button>
-        <button
-          type="button"
+        <!-- ⚠️ AN ANCHOR WHEN THERE IS AN href, A BUTTON OTHERWISE. `confirm()`
+             resolves a PROMISE, so a caller acting on the result resumes one
+             microtask after this handler returned, which the popup blocker
+             treats as a programmatic navigation. Letting the browser perform
+             its own default action on a genuine click is the only way the
+             store link opens reliably on iOS. With `confirmHref` unset every
+             existing call site renders exactly the button it always has: same
+             classes, same label, same `handleConfirm`. -->
+        <component
+          :is="safeConfirmHref ? 'a' : 'button'"
+          :type="safeConfirmHref ? undefined : 'button'"
+          :href="safeConfirmHref"
+          :target="safeConfirmHref ? '_blank' : undefined"
+          :rel="safeConfirmHref ? 'noopener noreferrer' : undefined"
           class="inline-flex touch-manipulation items-center justify-center rounded-2xl px-3 py-1.5 text-sm font-medium text-white transition-colors"
           :class="
             state.variant === 'danger'
@@ -83,7 +104,7 @@ const { state, handleConfirm, handleCancel } = useConfirm();
                 ? t('action.delete')
                 : t('action.ok')
           }}
-        </button>
+        </component>
       </div>
     </template>
   </BaseModal>

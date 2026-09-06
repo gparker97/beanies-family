@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4554
+    "translationCount": 4559
   },
   "translations": {
     "app.name": {
@@ -22774,6 +22774,31 @@
     "compaction.why.devices": {
       "translation": "您的其他设备会自行切换到压缩文件。仍然使用较旧版本的设备在更新之前会停止同步，因此值得询问尚未更新的任何人来执行此操作。",
       "hash": "u6501",
+      "lastUpdated": "2026-09-06"
+    },
+    "appUpdate.prompt.title": {
+      "translation": "更新Beanies",
+      "hash": "871gy8",
+      "lastUpdated": "2026-09-06"
+    },
+    "appUpdate.prompt.message": {
+      "translation": "有较新版本的Beanies可供选择。请及时更新，以便与家人保持同步。",
+      "hash": "kzetri",
+      "lastUpdated": "2026-09-06"
+    },
+    "appUpdate.prompt.confirm": {
+      "translation": "更新",
+      "hash": "t0vajb",
+      "lastUpdated": "2026-09-06"
+    },
+    "appUpdate.prompt.notNow": {
+      "translation": "立即购买",
+      "hash": "8bjtp3",
+      "lastUpdated": "2026-09-06"
+    },
+    "appUpdate.openStore": {
+      "translation": "更新Beanies",
+      "hash": "871gy8",
       "lastUpdated": "2026-09-06"
     }
   }

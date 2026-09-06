@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed, ref, watch } from 'vue';
+import { safeExternalHref } from '@/utils/url';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
 import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
 import MobileHamburgerMenu from '@/components/common/MobileHamburgerMenu.vue';
 import OfflineBanner from '@/components/common/OfflineBanner.vue';
+import FatalErrorOverlay from '@/components/common/FatalErrorOverlay.vue';
 import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
+import { useAppUpdate } from '@/composables/useAppUpdate';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
@@ -194,7 +197,6 @@ function writeLastToastedRelease(version: string): void {
 const isLoadingData = ref(true);
 const initError = ref<string | null>(null);
 const initErrorDetail = ref<string | null>(null);
-const showClearConfirm = ref(false);
 const initBreadcrumbs: string[] = [];
 
 // Mirror the fatalErrorStore into the local refs that drive the recovery
@@ -209,6 +211,20 @@ const fatalErrorStore = useFatalErrorStore();
  * one action that destroys the local copy.
  */
 const initErrorClearHelps = ref(true);
+/**
+ * The fatal's optional way out, read straight off the store.
+ *
+ * ⚠️ A COMPUTED, NOT A FOURTH ENTRY IN THE MIRROR TUPLE BELOW. That watcher
+ * only fires `if (msg)`, so `clear()` never resets what it mirrored; a mirrored
+ * action would outlive the fatal that justified it and appear beside an
+ * unrelated one. A computed cannot go stale.
+ *
+ * It is safe to render beside `initError` because an action can only be
+ * non-null when the store carries a message: `setFatal` is its only writer, and
+ * `setGenericInitError` returns early when the store already has a message.
+ */
+const fatalAction = computed(() => fatalErrorStore.action);
+const fatalActionHref = computed(() => safeExternalHref(fatalAction.value?.url) ?? null);
 watch(
   () => [fatalErrorStore.message, fatalErrorStore.detail, fatalErrorStore.clearDataHelps] as const,
   ([msg, detail, clearHelps]) => {
@@ -216,7 +232,6 @@ watch(
       initError.value = msg;
       initErrorDetail.value = detail;
       initErrorClearHelps.value = clearHelps;
-      showClearConfirm.value = false; // never leave the destructive panel open
     }
   }
 );
@@ -1592,7 +1607,6 @@ function handleReload() {
 }
 
 async function handleClearDataAndSignOut() {
-  showClearConfirm.value = false;
   try {
     // Use the full sign-out flow: clears family DB, auth session, trust flag, cached keys
     await authStore.signOutAndClearData();
@@ -1646,6 +1660,10 @@ watch(
 // confirmation toast. usePwaUpdater drives the update on a quiet moment and
 // sets PWA_POST_UPDATE_ROUTE_KEY; onMounted reads it into `pendingUpdateToast`.
 usePwaUpdater();
+// The native twin: `usePwaUpdater` self-updates the web, `useAppUpdate` asks
+// iOS and Android to update through the store. Each is inert on the other's
+// platform, so exactly one is live at a time.
+useAppUpdate();
 
 // Native (Capacitor) OAuth deep-link completion. On native, Google sign-in
 // returns via a verified App Link `appUrlOpen` event; the listener completes
@@ -1845,106 +1863,19 @@ watch(
       </div>
     </Transition>
 
-    <!-- Initialization error recovery screen -->
-    <div
-      v-if="initError"
-      class="fixed inset-0 z-[300] flex items-center justify-center bg-[#2C3E50] p-4"
-    >
-      <div class="dark:bg-surface-raised w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-        <div class="mb-4 text-center">
-          <div
-            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30"
-          >
-            <svg
-              class="h-6 w-6 text-[#F15D22]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5Z"
-              />
-            </svg>
-          </div>
-          <h2 class="font-outfit text-xl font-semibold text-[#2C3E50] dark:text-white">
-            {{ t('app.initError.title') }}
-          </h2>
-          <p v-if="initErrorClearHelps" class="dark:text-ink-soft mt-2 text-sm text-gray-600">
-            {{ t('app.initError.description') }}
-          </p>
-        </div>
-
-        <!-- Error message -->
-        <div class="mb-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-          <p class="dark:text-danger-lift text-sm font-medium text-red-800">{{ initError }}</p>
-        </div>
-
-        <!-- Action buttons -->
-        <div class="mb-4 flex gap-3">
-          <button
-            class="flex-1 rounded-xl bg-[#F15D22] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d9521e]"
-            @click="handleReload"
-          >
-            {{ t('app.initError.reload') }}
-          </button>
-          <button
-            v-if="initErrorClearHelps"
-            class="dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-[#2C3E50] transition-colors hover:bg-gray-50"
-            @click="showClearConfirm = true"
-          >
-            {{ t('app.initError.clearData') }}
-          </button>
-        </div>
-
-        <!-- Clear data confirmation -->
-        <div
-          v-if="showClearConfirm && initErrorClearHelps"
-          class="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3 dark:border-orange-700 dark:bg-orange-900/20"
-        >
-          <p class="dark:text-accent-lift mb-2 text-sm text-orange-800">
-            {{ t('app.initError.clearConfirm') }}
-          </p>
-          <div class="flex gap-2">
-            <button
-              class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-              @click="handleClearDataAndSignOut"
-            >
-              {{ t('app.initError.clearData') }}
-            </button>
-            <button
-              class="dark:border-line-strong dark:text-ink-soft dark:hover:bg-surface-hover rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
-              @click="showClearConfirm = false"
-            >
-              {{ t('common.cancel') }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Expandable technical details -->
-        <details class="group">
-          <summary
-            class="dark:text-ink-soft dark:hover:text-ink cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700"
-          >
-            {{ t('app.initError.details') }}
-          </summary>
-          <pre
-            v-if="initErrorDetail"
-            class="dark:bg-surface-ground dark:text-ink-soft mt-2 max-h-32 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700"
-            >{{ initErrorDetail }}</pre>
-          <div class="mt-2">
-            <p class="dark:text-ink-soft mb-1 text-xs font-medium text-gray-500">
-              {{ t('app.initError.diagnostics') }}
-            </p>
-            <pre
-              class="dark:bg-surface-ground dark:text-ink-soft max-h-24 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700"
-              >{{ getDeviceDiagnostics() }}</pre>
-          </div>
-        </details>
-      </div>
-    </div>
+    <!-- The recovery screen. Presentational and extracted (see the component's
+         header): keeping it inline made the app's most important failure
+         surface the one screen no test could mount. -->
+    <FatalErrorOverlay
+      :message="initError"
+      :detail="initErrorDetail"
+      :clear-data-helps="initErrorClearHelps"
+      :action="fatalAction"
+      :action-href="fatalActionHref"
+      :diagnostics="getDeviceDiagnostics()"
+      @reload="handleReload"
+      @clear-data="handleClearDataAndSignOut"
+    />
 
     <!-- PWA banners -->
     <OfflineBanner />

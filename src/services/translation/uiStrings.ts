@@ -4384,6 +4384,35 @@ const STRING_DEFS = {
     beanie:
       'this family file was saved by a newer version of beanies. update beanies on this device to open it. nothing on this device is lost.',
   },
+  // The native update prompt and the way out of the update block. The `beanie`
+  // values are the same words all lowercase: plain English on this surface (no
+  // bean or pod euphemism), matching the compaction copy decision, because a
+  // person being asked to update should not have to decode anything.
+  //
+  // ⚠️ NOTHING HERE IS PLATFORM-SPECIFIC. iOS cannot update inside the app (it
+  // opens the App Store); Android may. One message that is true on both.
+  'appUpdate.prompt.title': {
+    en: 'Update beanies',
+    beanie: 'update beanies',
+  },
+  'appUpdate.prompt.message': {
+    en: 'A newer version of beanies is available. Update to stay in step with your family.',
+    beanie: 'a newer version of beanies is available. update to stay in step with your family.',
+  },
+  'appUpdate.prompt.confirm': {
+    en: 'Update',
+    beanie: 'update',
+  },
+  'appUpdate.prompt.notNow': {
+    en: 'Not now',
+    beanie: 'not now',
+  },
+  // The block's action label. It repeats the overlay message's own instruction,
+  // which is what a label should do.
+  'appUpdate.openStore': {
+    en: 'Update beanies',
+    beanie: 'update beanies',
+  },
   'settings.importFailed': {
     en: 'That file could not be imported.',
     beanie: 'that file could not be imported.',

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { ref } from 'vue';
 
 /**
@@ -19,6 +20,13 @@ import { ref } from 'vue';
  * health-check paths; this store layer is additive and doesn't replace
  * those write sites.
  */
+/** A way out of a fatal, rendered as a link and as selectable text. */
+export interface FatalActionLink {
+  labelKey: UIStringKey;
+  /** http(s) only; screened again at the render site before it becomes an href. */
+  url: string;
+}
+
 export const useFatalErrorStore = defineStore('fatalError', () => {
   const message = ref<string | null>(null);
   const detail = ref<string | null>(null);
@@ -35,26 +43,50 @@ export const useFatalErrorStore = defineStore('fatalError', () => {
    */
   const clearDataHelps = ref(true);
 
+  /**
+   * An optional way OUT of this fatal, as a link.
+   *
+   * ⚠️ DATA, NEVER A CALLBACK. A `run: () => void` here would make the app's
+   * payload chokepoint (`payloadFailureSurface.ts`) import the update
+   * composable, and through it a native plugin, to hand this store a closure.
+   * It would also need `markRaw` to stop Vue proxying it, would be opaque in
+   * devtools and unserialisable, and would hold its closure scope alive for as
+   * long as the fatal state. A `url` crosses the boundary as one string.
+   *
+   * The same `url` is rendered BOTH as the button and as selectable text
+   * beneath it, so the two cannot point at different places, which is what
+   * makes "never a dead end" structurally true rather than carefully
+   * maintained.
+   */
+  const action = ref<FatalActionLink | null>(null);
+
   function setFatal(
     msg: string,
     diagnosticDetail?: string | null,
-    opts?: { clearDataHelps?: boolean }
+    opts?: { clearDataHelps?: boolean; action?: FatalActionLink | null }
   ): void {
     message.value = msg;
     detail.value = diagnosticDetail ?? null;
     clearDataHelps.value = opts?.clearDataHelps ?? true;
+    // ⚠️ ASSIGNED ON EVERY CALL, exactly as `clearDataHelps` is, and for the
+    // same reason. `surfaceLineageFatal` passes no action; without this reset a
+    // store link from an earlier needs-update fatal would survive into a
+    // lineage block that has nothing to do with the store.
+    action.value = opts?.action ?? null;
   }
 
   function clear(): void {
     message.value = null;
     detail.value = null;
     clearDataHelps.value = true;
+    action.value = null;
   }
 
   return {
     message,
     detail,
     clearDataHelps,
+    action,
     setFatal,
     clear,
   };
