@@ -2,6 +2,78 @@ import type { HelpArticle } from './types';
 
 export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
   {
+    slug: 'family-file-newer-version',
+    category: 'how-it-works',
+    title: 'beanies says my family file was saved by a newer version',
+    excerpt:
+      'What the message means, why nothing on your device is lost, and the one step that fixes it: update beanies.',
+    icon: '\u{1F504}',
+    readTime: 2,
+    updatedDate: '2026-09-06',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Someone in your family updated beanies and compacted your family file, which rebuilds it without its record of past changes so it opens faster and works on older tablets. A compacted file is saved in a newer format. A device still on an older version of beanies cannot read that format, so it shows this message and stops syncing until it updates.',
+      },
+      {
+        type: 'callout',
+        icon: '\u2705',
+        title: 'Nothing on this device is lost',
+        content:
+          'Your family file is intact and everyone else is using it. The device showing the message has simply not caught up yet.',
+      },
+      {
+        type: 'heading',
+        content: 'What to do',
+        level: 2,
+        id: 'what-to-do',
+      },
+      {
+        type: 'steps',
+        content: '',
+        ordered: true,
+        items: [
+          'Update beanies on this device. In a browser, reload the page and beanies updates itself. In the iPhone or Android app, update it from the App Store or Google Play.',
+          'Open beanies again. The family file opens normally and syncing resumes.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Why beanies stops instead of carrying on',
+        level: 2,
+        id: 'why-it-stops',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'An older version does not understand how a compacted file is put together. If it tried to combine its own copy with the family file anyway, it could quietly undo the compaction for the whole family and lose recent changes. Refusing to open the file until the device updates is what keeps everyone else\u2019s data safe.',
+      },
+      {
+        type: 'infoBox',
+        icon: '\u{1F4A1}',
+        title: 'Anything added on an older version before it updates is not kept',
+        content:
+          'If someone keeps using an out-of-date device after the family file was compacted, what they add on it cannot be brought across once it updates. Updating first is the easy way to avoid that.',
+      },
+      {
+        type: 'heading',
+        content: 'What not to do',
+        level: 2,
+        id: 'what-not-to-do',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Do not clear your data or sign out to fix this; it changes nothing and removes your local copy.',
+          'Do not re-enter a password; this is not a password problem.',
+          'Do not pick a different family file. The one beanies is pointing at is the right one; it just needs a newer beanies to open it.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'net-worth-calculation',
     category: 'how-it-works',
     title: 'Net Worth Calculation',

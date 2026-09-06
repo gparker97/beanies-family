@@ -12,6 +12,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **beanies no longer asks you to find every device your family has ever used before compacting.** A compacted family file is now saved in a newer format that older versions of beanies cannot open, so an out-of-date device cannot quietly undo the compaction for everyone. Instead, Settings names the people who last opened beanies on an older version, so you can ask them to update, and the confirmation and the finish message say the same thing. beanies can only see when each person last opened it, not every device they own, and it says so.
+- **A device on an older version of beanies is told plainly that the family file was saved by a newer version, and that nothing is lost.** The same sentence appears when signing in, when picking the file, when joining from an invite, and when reconnecting storage; none of them alarms anyone or asks for a password.
+- **Picking a family file that cannot be opened now shows a message in Settings.** It used to do nothing at all.
+- **Restoring the copy beanies saved before compacting now sticks.** Other devices used to put the compacted file straight back within seconds; they now take the restored one.
+
 - **beanies tells you when your family file has grown big enough to be worth compacting**, and says so straight away if a device in your family has already failed to open it — a real failure counting for more than a size guess.
 - **beanies will not compact while someone in your family is on an older version.** It waits until every device that has been used recently has seen a version that can handle a compacted file, and names who it is waiting for.
 - **When the job is done, beanies says whether anything is left to do** — either that your other devices will pick it up on their own, or which person's device is still to catch up. Never a bare "done".

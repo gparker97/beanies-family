@@ -123,3 +123,59 @@ believes the metadata.
 - **Compare on main after loading the remote document.** Main does not hold the
   remote document; loading it there would duplicate the decrypt this feature
   exists to make affordable on a low-memory device.
+
+## Addendum (2026-09-06): a compacted document is a 5.0 file, and the version is derived from the lineage at write time
+
+The guard above protects every device that RUNS it. It cannot protect a
+device on a build that predates it: such a build has no lineage concept,
+CRDT-merges a compacted document with its own pre-compaction history,
+deterministically destroys the compactor's edits, and carries the new lineage
+id forward so that every guarded device then reads the corruption as `same`.
+The first defence was a soak gate (refuse to compact until every recently
+active member had logged in on a guard-honouring build). It was per member,
+could not see a person's other devices, and asked families to enumerate every
+device they own. It is gone.
+
+The structural defence is the file format. A compacted document is written as
+envelope **version 5.0**. The deployed pre-guard build's `parseBeanpodV4`
+throws on any version other than `'4.0'`, before decrypt and before any merge,
+on every path that reads a pod (audited at `c3a6be98`; see
+`docs/plans/2026-09-06-compacted-pod-v5-audit/`). So a pre-guard build cannot
+merge a compacted pod at all. What it can still do is OVERWRITE one (any save
+on a warm-cache stale device; the owner creating a same-named family on a
+stale build), which is loud, reverted by the fleet's `ours-newer` to
+`publish-local` self-heal, and recoverable from the safety copy. The bump
+therefore turns a straggler from "silently corrupts everyone" into "loudly
+reverts until the fleet pushes back"; the deploy sequence remains the primary
+control.
+
+Three consequences, each a rule:
+
+1. **The version is DERIVED from the document, never carried by spread.**
+   `beanpodVersionFor(lineage)` in `fileSync.ts` is the one place a version is
+   chosen, and both writers (`reEncryptEnvelope`, `createBeanpodV4`) call it
+   with the lineage the worker returns beside the payload (`ExportedPayload`).
+   Stamping the envelope once at compaction and letting the spread carry it was
+   the obvious design and lasts exactly one round trip: the `kept-local`
+   termini adopt the REMOTE envelope, version included
+   (`preserveLocalKeyDicts` is `{ ...incoming }`, `envelopeMerge.ts:73`), and
+   republish the LOCAL compacted document under it. Do not put a version rule
+   in `preserveLocalKeyDicts`; the spread stays, the derivation protects.
+2. **The pre-compaction backup pair is 5.0 too** (`compactionBackup`, an
+   intent rather than a version). A stale build's picker lists every pod
+   Drive-wide, and a person reacting to "sync stopped" could otherwise open the
+   safety copy and fork the family onto it.
+3. **A restore is a lineage event.** `guardLineage` now returns its verdict
+   beside the action, because `POLICY` maps `ours-newer x user-file` and
+   `conflict x user-file` both to `adopt` and only the verdict tells a restore
+   from a resolved conflict. On a restore the adopted document is stamped with
+   `nextLineage` inside the existing install branch, so peers read
+   `adopt-remote` and take it rather than republishing over it within one
+   poll. Never on a first-load adopt, never on a resolved conflict, never on the
+   rebase fallback.
+
+A version newer than a build understands is `UnsupportedBeanpodVersionError`,
+a `PayloadLoadError` at `parse` that is never a `CorruptPayloadError` (the class
+the cache self-heal deletes on), surfaced through the one discriminator
+`payloadErrorKind` and its tables, so every site says "update beanies" and none
+pages. The deployed build cannot say that; the family tells them.
