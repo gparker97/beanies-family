@@ -132,8 +132,49 @@ export const MAX_BLOCK_PX = 190;
  */
 const OVER_CAP_SCALE = 0.12;
 
-export function defaultMaxBlock(_availableHeight?: number): number {
-  return MAX_BLOCK_PX;
+/**
+ * Plot height at which the cap reproduces its historical flat value exactly.
+ *
+ * ⚠️ MUST be >= 720. At exactly 720 this formula yields exactly MAX_BLOCK_PX,
+ * which is what keeps `wallTimeGrid.test.ts`'s softness test meaning what it
+ * means: that test lays out at 720px and asserts a 240-minute block is capped,
+ * and at scale 0.8 that block is 192px raw against a 190px cap — a TWO PIXEL
+ * margin. Drop this below 720 and the cap at that height rises above 192, the
+ * block stops being capped, and the test silently changes subject.
+ */
+const CAP_REFERENCE_HEIGHT_PX = 720;
+
+/** The cap's share of the plot — derived so the reference height yields MAX_BLOCK_PX. */
+const CAP_HEIGHT_FRACTION = MAX_BLOCK_PX / CAP_REFERENCE_HEIGHT_PX;
+
+/**
+ * Ceiling. Past this a single block dominates the wall however large the glass —
+ * the eight-hour conference this cap exists for should never own a whole screen.
+ */
+export const MAX_BLOCK_CEILING_PX = 320;
+
+/**
+ * The cap, scaled to the space actually available.
+ *
+ * A flat 190px was right for the tablet it was tuned on and leaves a large,
+ * high-resolution display visibly underused: the day's events stop well short of
+ * the bottom of the glass. Scaling the cap with the plot spends that space.
+ *
+ * ⭐ It responds to the VIEWPORT and never to the CONTENT, which is the whole
+ * reason this is safe. "An hour is the same height on a quiet day and a busy
+ * one" — the invariant the natural scale's docblock exists to protect, and which
+ * a test asserts — is untouched, because at any fixed screen size this returns a
+ * fixed number. A quiet day still looks quiet.
+ *
+ * Floored at MAX_BLOCK_PX, so every device at or below the reference height
+ * renders exactly as it did before this change.
+ */
+export function defaultMaxBlock(availableHeight?: number): number {
+  if (!availableHeight || availableHeight <= 0) return MAX_BLOCK_PX;
+  return Math.min(
+    MAX_BLOCK_CEILING_PX,
+    Math.max(MAX_BLOCK_PX, availableHeight * CAP_HEIGHT_FRACTION)
+  );
 }
 
 /**

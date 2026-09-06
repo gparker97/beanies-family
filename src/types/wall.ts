@@ -76,6 +76,25 @@ export interface WallJobsResult {
   todos: WallJob[];
 }
 
+/**
+ * The job/list bundle every peripheral surface needs, and which always travels
+ * together: all five come from one `useWallJobs()` and are never sourced apart.
+ *
+ * Grouped because spelling them out individually meant a TEN-prop
+ * `WallPeripheralCards` invocation written out once per calendar view — the real
+ * duplication behind those three views, and one that a shared shell alone would
+ * have left standing.
+ */
+export interface WallPeripheralData {
+  todosFor: (memberId: string) => WallJob[];
+  /** Due-now work nobody has claimed — counted and shown like anyone else's. */
+  unassignedTodos: WallJob[];
+  listsFor: (memberId: string) => WallListGroup[];
+  orphanLists: WallListGroup[];
+  /** The wall's person filter, so a card agrees with the view above it. */
+  visibleMemberIds: string[] | null;
+}
+
 export interface WallJobsInput {
   todos: TodoItem[];
   lists: FamilyList[];
