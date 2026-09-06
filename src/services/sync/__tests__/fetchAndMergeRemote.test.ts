@@ -123,6 +123,8 @@ vi.mock('@/utils/beanpodFilename', () => ({
 }));
 
 import * as syncService from '../syncService';
+import { UnsupportedBeanpodVersionError, CorruptPayloadError } from '@/types/sync';
+import { reportError } from '@/utils/errorReporter';
 import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
 import * as docClient from '@/services/automerge/worker/docClient';
 
@@ -776,5 +778,76 @@ describe('the poll path can never choose `user-file` for itself', () => {
     // would let an unattended read pick the destructive context back up.
     expect('noteUserChoseRemoteFile' in syncService).toBe(false);
     expect('consumeUserFileIntent' in syncService).toBe(false);
+  });
+});
+
+describe('a remote file from a NEWER beanies (version 6.0)', () => {
+  const fakeKey = {} as CryptoKey;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+  });
+
+  it('passes the typed error through un-relabelled, reports it at warning with the version, and refuses the save', async () => {
+    // The parser throws the typed class; the wrap must NOT turn it into a
+    // `CorruptPayloadError`, or "update beanies" is routed into the
+    // damaged-data copy and the cache self-heal's class.
+    parseMock.mockImplementation(() => {
+      throw new UnsupportedBeanpodVersionError('6.0', 'fam-1');
+    });
+    let writes = 0;
+    const provider = makeProvider({
+      remoteText: JSON.stringify(buildEnvelope({})),
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {
+        writes++;
+      },
+    });
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope({}));
+
+    const ok = await syncService.save();
+
+    expect(ok).toBe(false);
+    expect(writes).toBe(0);
+    const report = vi
+      .mocked(reportError)
+      .mock.calls.map((c) => c[0])
+      .find((r) => r.surface === 'pod-load-failure');
+    expect(report).toBeDefined();
+    expect(report!.severity).toBe('warning');
+    expect(report!.error).toBeInstanceOf(UnsupportedBeanpodVersionError);
+    expect(report!.error).not.toBeInstanceOf(CorruptPayloadError);
+    expect(report!.context).toMatchObject({ error_code: 'parse', detail: 'version=6.0' });
+  });
+
+  it('still wraps a bare parse throw as a parse-step CorruptPayloadError (a torn read)', async () => {
+    // Anti-vacuity for the wrap: a plain Error must STILL be classified, so the
+    // "refused read became a write" defence is unchanged for torn reads, and
+    // a torn read still counts as an incident.
+    parseMock.mockImplementation(() => {
+      throw new Error('Unexpected end of JSON input');
+    });
+    let writes = 0;
+    const provider = makeProvider({
+      remoteText: '{"version":"4.0", "truncated',
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {
+        writes++;
+      },
+    });
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope({}));
+
+    expect(await syncService.save()).toBe(false);
+    expect(writes).toBe(0);
+    const report = vi
+      .mocked(reportError)
+      .mock.calls.map((c) => c[0])
+      .find((r) => r.surface === 'pod-load-failure');
+    expect(report!.error).toBeInstanceOf(CorruptPayloadError);
+    expect((report!.error as CorruptPayloadError).step).toBe('parse');
+    expect(report!.context).not.toHaveProperty('detail');
   });
 });

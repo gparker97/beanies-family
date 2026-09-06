@@ -143,7 +143,14 @@ export function noteRemoteUnreadable(err: PayloadLoadError): void {
       message: `Remote pod not readable: Automerge ${err.step}`,
       error: err,
       severity: 'warning',
-      context: { action: 'remote-decrypt-failed', error_code: err.step },
+      context: {
+        action: 'remote-decrypt-failed',
+        error_code: err.step,
+        // `version=<x>` for a newer-than-understood file, so a refusal is
+        // distinguishable in CloudWatch from a torn read. In `detail`, never in
+        // `message`, so the dedup bucket stays constant.
+        ...(err.blockDetail ? { detail: err.blockDetail } : {}),
+      },
     });
     return;
   }
@@ -1555,11 +1562,18 @@ async function fetchAndMergeRemote(): Promise<void> {
   try {
     remoteEnvelope = parseBeanpodV4(text);
   } catch (e) {
-    const err = new CorruptPayloadError(
-      e instanceof Error ? e.message : String(e),
-      'parse',
-      currentEnvelope?.familyId ?? null
-    );
+    // A TYPED throw passes through untouched (the idiom `payloadFailure`
+    // already uses): a file from a newer beanies is `UnsupportedBeanpodVersion`
+    // with `needsAppUpdate`, and relabelling it as corruption would route
+    // "update beanies" into the damaged-data copy.
+    const err =
+      e instanceof PayloadLoadError
+        ? e
+        : new CorruptPayloadError(
+            e instanceof Error ? e.message : String(e),
+            'parse',
+            currentEnvelope?.familyId ?? null
+          );
     noteRemoteUnreadable(err);
     throw err;
   }
