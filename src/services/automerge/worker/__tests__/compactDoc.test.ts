@@ -139,7 +139,9 @@ describe('compactDoc', () => {
     const headsBefore = getHeads().heads;
     diffHook.path = 'accounts.a3.bal';
 
-    expect(() => compactDoc()).toThrow(/accounts\.a3\.bal/);
+    // The id is masked — see `maskEntityIds`. The collection and the leaf are
+    // what triage needs; the id in between can be a Google account email.
+    expect(() => compactDoc()).toThrow(/accounts\.<id>\.bal/);
     // The old document is still installed and unchanged.
     expect(getHeads().heads).toEqual(headsBefore);
   });
@@ -148,7 +150,25 @@ describe('compactDoc', () => {
     // The message reaches the firehose, and the firehose is PII-free.
     seedHistory(3);
     diffHook.path = 'accounts.a1.bal';
-    expect(() => compactDoc()).toThrow(/compaction changed the document at accounts\.a1\.bal/);
+    expect(() => compactDoc()).toThrow(/compaction changed the document at accounts\.<id>\.bal/);
+  });
+
+  it('MASKS the entity id, which can be a Google account email', () => {
+    // ⚠️ `driveConnections` is keyed by the account email
+    // (`driveConnectionId`), and this message becomes the error's stack — which
+    // `logEvent` writes outside the allowlisted context and `reportError`
+    // pastes into Slack. The path promise held; the id in it did not.
+    seedHistory(2);
+    diffHook.path = 'driveConnections.someone@example.com.refreshToken';
+    // One call: a second would run against the state the first left behind.
+    let message = '';
+    try {
+      compactDoc();
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain('driveConnections.<id>.refreshToken');
+    expect(message).not.toContain('someone@example.com');
   });
 
   it('classifies an out-of-memory rebuild as a device problem, not damaged data', () => {

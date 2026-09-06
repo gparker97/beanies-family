@@ -253,6 +253,166 @@ describe('every failure loses no more than the block did', () => {
   });
 });
 
+describe('a three-way merge, not a two-way diff', () => {
+  /**
+   * ⚠️ THE COMPACTOR'S CHANGES ARE ALREADY SAVED; THE PEER'S ARE NOT. Reverting
+   * saved data to replay unsaved data, silently, is the worst trade this code
+   * can make — and a two-way diff does exactly that for any field holding an
+   * object or an array.
+   */
+  function scenario(mutatePeer: (d: Doc) => void, mutateRemote: (d: Doc) => void) {
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.accounts as Coll).a1 = {
+        id: 'a1',
+        loan: { rate: 1, term: 20 },
+        tags: ['home'],
+      };
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, mutatePeer as never);
+    let remote = compact(shared);
+    remote = Automerge.change(remote, mutateRemote as never);
+    return { peer, remote, baselineHeads };
+  }
+
+  it('does not revert a sibling field the compactor changed', async () => {
+    // Peer edits `loan.rate`; compactor edits `loan.term`. A two-way diff
+    // replays `{rate, term}` and puts `term` back to 20.
+    const { peer, remote, baselineHeads } = scenario(
+      (d) => {
+        ((d.accounts as Coll).a1!.loan as Record<string, unknown>).rate = 2;
+      },
+      (d) => {
+        ((d.accounts as Coll).a1!.loan as Record<string, unknown>).term = 10;
+      }
+    );
+
+    ap.loadSnapshot(Automerge.save(peer));
+    await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    const loan = out.accounts.a1!.loan as Record<string, unknown>;
+    expect(loan.rate).toBe(2); // the peer's edit carried across
+    expect(loan.term).toBe(10); // the compactor's SAVED edit survived
+  });
+
+  it('keeps the saved value when both wrote an array, and counts it', async () => {
+    // A list has no mergeable op — the union has no splice — so one whole array
+    // wins. It must be the one already in the family file, and the loss must be
+    // countable rather than silent.
+    const { peer, remote, baselineHeads } = scenario(
+      (d) => {
+        (d.accounts as Coll).a1!.tags = ['home', 'peer'];
+      },
+      (d) => {
+        (d.accounts as Coll).a1!.tags = ['home', 'compactor'];
+      }
+    );
+
+    ap.loadSnapshot(Automerge.save(peer));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.a1!.tags).toEqual(['home', 'compactor']);
+    expect(res.conflicts).toBe(1);
+  });
+
+  it('takes the peer value when the compactor left the field alone', async () => {
+    const { peer, remote, baselineHeads } = scenario(
+      (d) => {
+        (d.accounts as Coll).a1!.tags = ['home', 'peer'];
+      },
+      (d) => {
+        (d.accounts as Coll).other = { id: 'other' };
+      }
+    );
+
+    ap.loadSnapshot(Automerge.save(peer));
+    await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.a1!.tags).toEqual(['home', 'peer']);
+  });
+});
+
+describe('the guards that only show up in the edge cases', () => {
+  it('does not honour a peer delete of a field the compactor changed', async () => {
+    // A delete is a write like any other. If the compactor gave the field a new
+    // value after compacting, the peer removing it is a two-way conflict, and
+    // the saved value has to stand for the same reason as everywhere else.
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.accounts as Coll).a1 = { id: 'a1', nickname: 'old' };
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      delete (d.accounts as Coll).a1!.nickname;
+    });
+    let remote = compact(shared);
+    remote = Automerge.change(remote, (d) => {
+      (d.accounts as Coll).a1!.nickname = 'renamed by the compactor';
+    });
+
+    ap.loadSnapshot(Automerge.save(peer));
+    await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.a1!.nickname).toBe('renamed by the compactor');
+  });
+
+  it('refuses an EMPTY baseline rather than treating it as the beginning of time', () => {
+    // ⚠️ `decodeHeadsFingerprint('')` legitimately answers `[]`, and
+    // `hasHeads(doc, [])` is TRUE. Without the guard the composer would diff
+    // from the empty document, call every entity new, and emit a `set` for the
+    // peer's WHOLE document over the compacted target — discarding everything
+    // the compactor did. It failed safe only by accident before, via a
+    // `toPlain` throw on the empty view's absent settings.
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.todos as Coll).t = { id: 't', title: 'x' };
+    });
+    expect(buildRebaseOps(shared, [], compact(shared))).toBeNull();
+  });
+
+  it('survives a document with no settings at all', () => {
+    // A pod created before `settings` shipped has the key ABSENT, and
+    // `JSON.parse(JSON.stringify(undefined))` throws — which used to escape the
+    // composer and cost the peer its entire offline session, not just settings.
+    const noSettings = Automerge.from<Doc>({ familyMembers: {}, todos: {}, accounts: {} });
+    const baselineHeads = Automerge.getHeads(noSettings);
+    let peer = Automerge.load<Doc>(Automerge.save(noSettings));
+    peer = Automerge.change(peer, (d) => {
+      (d.todos as Coll).mine = { id: 'mine', title: 'offline' };
+      // ⚠️ The peer must CHANGE SETTINGS, or the settings path is never reached
+      // and this test passes without exercising the throw at all. My first
+      // version made exactly that mistake.
+      d.settings = { baseCurrency: 'GBP' };
+    });
+
+    const built = buildRebaseOps(peer, baselineHeads, compact(noSettings));
+
+    expect(built).not.toBeNull();
+    expect(built!.count).toBeGreaterThan(0);
+    // Both the todo and the settings survived the absent-singleton path.
+    expect(JSON.stringify(built)).toContain('setSettings');
+  });
+});
+
 describe('the composer cannot corrupt the lineage it lands on', () => {
   it('never emits an op that writes podLineage', async () => {
     // ⚠️ Structural: `MutationOp`'s `collection` is typed `CollectionName`,
@@ -306,6 +466,6 @@ describe('the composer cannot corrupt the lineage it lands on', () => {
   it('reports nothing to replay when the peer is level with its baseline', async () => {
     const shared = base();
     const built = buildRebaseOps(shared, Automerge.getHeads(shared), compact(shared));
-    expect(built).toEqual({ op: null, count: 0 });
+    expect(built).toEqual({ op: null, count: 0, conflicts: 0 });
   });
 });

@@ -22502,8 +22502,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件；如果设备已脱机，但从未保存更改，则必须放弃这些更改。",
-      "hash": "3z6kpu",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备会在下次联机时拾取压缩文件，并且beanies会在离线时携带它们更改的任何内容。",
+      "hash": "ty3o6n",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
@@ -22657,13 +22657,13 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.bringDevicesOnline": {
-      "translation": "在开始之前，请将家人的其他设备上线，以便更新。已离线但从未保存的更改的设备无法进行更改，因此将不得不放弃更改。",
-      "hash": "ri62d1",
+      "translation": "在开始之前，请将您家庭的其他设备联机，以便它们保持最新状态。beanies会传递在离线设备上所做的更改，但如果无法传输，则会要求该设备放弃更改。",
+      "hash": "gc3fvo",
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNote": {
-      "translation": "beanies在其旁边保留当前文件的副本，并要求您也保存一个副本。如需返回任一页面，请使用上方的“加载其他家庭数据文件”。",
-      "hash": "5xuupw",
+      "translation": "beanies会将当前文件的副本保存在您的存储设备中，并要求您也将其保存到此设备中。将保存的文件与上面的“加载另一个家庭数据文件”一起使用；如果您需要帮助，可以使用存储空间中的文件。",
+      "hash": "h081cq",
       "lastUpdated": "2026-09-06"
     },
     "settings.compactSection": {
@@ -22687,8 +22687,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.safety-copy-damaged": {
-      "translation": "保存的复印帽子在它出来的时候没有回来，所以帽子把它拿走了，在改变任何东西之前都停止了。您的家庭文件没有任何变化。请检查您的存储空间连接，然后重试。",
-      "hash": "l3k1jy",
+      "translation": "保存的复印帽子没有像它出去时那样回来，所以帽子在改变任何东西之前都停止了。您的家庭文件没有任何变化。请检查您的存储空间连接，然后重试。",
+      "hash": "qfxdj8",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.backup-too-large": {
