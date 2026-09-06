@@ -3494,7 +3494,39 @@ export const useSyncStore = defineStore('sync', () => {
    */
   const podBlockMessageKey = ref<PodBlockMessageKey | null>(null);
 
+  /**
+   * Leave a mark on this member's own row saying this device could not open the
+   * family file for want of memory, so whoever CAN compact it sees the file read
+   * as due.
+   *
+   * ⚠️ IT LIVES HERE, NOT ON THE FATAL OVERLAY PATH, and the difference is the
+   * whole feature. `surfacePayloadFatal` runs where the app has NO document —
+   * that is its stated invariant — so a write from there hits `requireDoc` and
+   * throws, `mutate` is a USER_ACTION method so `docClient` toasts, and
+   * `wrapAsync` toasts again with the raw engine string. The "silently
+   * swallowed" version put two error toasts and two firehose events on top of a
+   * fatal overlay, on the one device already having the worst day. Here a
+   * session is live and the document exists, so the write can actually land.
+   *
+   * ⚠️ A COLD-BOOT OUT-OF-MEMORY STILL CANNOT SELF-REPORT. There is no document
+   * to write to and nothing to publish it with; that is a real limit of the
+   * mechanism, not an oversight, and the size heuristic is what covers it.
+   */
+  function noteDeviceCannotOpen(): void {
+    const me = useFamilyStore().currentMember;
+    if (!me) return;
+    const today = toISODateString(new Date()).slice(0, 10);
+    if (me.podTooLargeSeenAt === today) return; // already said so today
+    void useFamilyStore()
+      .updateMember(me.id, { podTooLargeSeenAt: today })
+      .catch(() => {
+        // Best effort. The message on screen is what matters; a missed mark
+        // costs a heuristic, and the byte threshold still covers this family.
+      });
+  }
+
   function notePodUnopenable(err: RemoteBlocker): void {
+    if (err instanceof PayloadLoadError && err.deviceCannotOpen) noteDeviceCannotOpen();
     // ⚠️ ARM THE SERVICE LATCH. Every guard reads `syncService`, and none of
     // these callers reach `fetchAndMergeRemote` — they call
     // `docClient.mergeRemoteEnvelope` directly — so without this the breaker was
