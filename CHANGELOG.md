@@ -53,8 +53,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Coming back from a day no longer rewinds the week when you reached the chore board first.**
 - **Tapping a bean's name in the bean-lane view now announces itself as a filter** to a screen reader, and shows which bean is selected.
 
-- **Settings now says who beanies is waiting on before you press anything.** When a family member is on an older version, the compaction section names them and says what to ask them to do. You no longer have to attempt the compaction to find out it will not run, and read a message that named nobody.
-- **The message about waiting for a family member said "someone in your family" when beanies knew exactly who.** The refusal you actually saw first had the names available and threw them away; only the second, much later check used them.
 
 - **A device coming back online after a compaction can no longer overwrite saved family data with its own older copy.** When both sides held the same item but the returning device had no shared starting point for it, every field it held won, fields only the saved copy had were deleted, and beanies counted none of it as a conflict, so it looked like a clean result. The saved version now wins any disagreement, nothing is deleted, and the disagreements are counted.
 - **The note about going back to a saved copy named a button that is not on the screen.** It said "Load Existing Family Data File", which only appears before a family file is set up; the one you actually see is "Load another Family Data File".

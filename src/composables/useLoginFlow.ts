@@ -689,9 +689,9 @@ export function useLoginFlow(opts: {
           // indistinguishable in the funnel.
           emitOutcome(
             false,
-            dec.payloadError instanceof PayloadLoadError && dec.payloadError.deviceCannotOpen
-              ? 'too-large'
-              : 'corrupted'
+            dec.payloadError instanceof PayloadLoadError
+              ? payloadErrorKind(dec.payloadError)
+              : 'corrupt'
           );
           // Report through the SHARED emitter. A hand-rolled copy here was
           // already divergent (no `file_id_tail`) and shared the (surface,
@@ -881,8 +881,15 @@ export function useLoginFlow(opts: {
                 // exists to remove.
                 // Payload-specific: only that family can be "too large for THIS
                 // device". Any other blocker is not, and must not claim to be.
-                const tooLarge =
-                  dec.payloadError instanceof PayloadLoadError && dec.payloadError.deviceCannotOpen;
+                //
+                // ONE discriminator for the funnel, the same one the copy reads.
+                // Three hand-rolled ladders on this surface disagreed about what
+                // to call a needs-update failure; `errorCode` is an untyped
+                // string, so nothing caught the drift.
+                const payloadKind =
+                  dec.payloadError instanceof PayloadLoadError
+                    ? payloadErrorKind(dec.payloadError)
+                    : 'corrupt';
                 // The INLINE key, not the overlay's: `proveError` renders in a
                 // compact slot with no diagnostic blob and no Clear-data button,
                 // so the overlay copy would point at UI that is not on screen.
@@ -902,7 +909,7 @@ export function useLoginFlow(opts: {
                 emitProveOutcome({
                   method: 'password',
                   ok: false,
-                  errorCode: tooLarge ? 'too-large' : 'corrupted',
+                  errorCode: payloadKind,
                   fallbackDepth: pendingProveDepth,
                 });
                 dispatch({ type: 'OPEN_FAILED', reason: 'error' });

@@ -161,6 +161,30 @@ describe('fileSync V4 format', () => {
       expect(e.blockDetail).toBe('version=6.0');
       expect(e.name).toBe('UnsupportedBeanpodVersionError');
     });
+    it('clamps a hostile version string before it can reach telemetry', () => {
+      // ⚠️ `fileVersion` COMES OFF A FILE THIS BUILD DID NOT WRITE and reaches
+      // the allowlisted `detail` key through `blockDetail`. A version is a short
+      // token; anything else is a malformed file trying to put its own content
+      // in our firehose. Clamped at the constructor, so no consumer has to.
+      const hostile = 'x'.repeat(500) + ' <script>';
+      let err: unknown;
+      try {
+        parseBeanpodV4(JSON.stringify({ version: hostile, ...fields }));
+      } catch (e) {
+        err = e;
+      }
+      const e = err as UnsupportedBeanpodVersionError;
+      expect(e.fileVersion).toBe('unrecognised');
+      expect(e.blockDetail).toBe('version=unrecognised');
+      expect(e.message).not.toContain('script');
+      // A real version is untouched.
+      try {
+        parseBeanpodV4(JSON.stringify({ version: '6.0.1', ...fields }));
+      } catch (e2) {
+        expect((e2 as UnsupportedBeanpodVersionError).blockDetail).toBe('version=6.0.1');
+      }
+    });
+
     it('still treats a missing version as not-a-beanpod, not as newer', () => {
       expect(() => parseBeanpodV4(JSON.stringify({ ...fields }))).toThrow('missing version');
     });

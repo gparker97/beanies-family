@@ -22502,7 +22502,7 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开得更快。您添加的所有内容都将保留。Beanies会先保存当前文件的副本，其他设备会在更新后自行切换。",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开得更快。您添加的所有内容都将保留。beanies会先保存当前文件的副本，其他设备会在更新后自行切换。",
       "hash": "4jwhb8",
       "lastUpdated": "2026-09-06"
     },
@@ -22757,7 +22757,7 @@
       "lastUpdated": "2026-09-06"
     },
     "join.error.newerVersion": {
-      "translation": "该家庭文件由较新版本的beanies保存。在此设备上更新Beanies ，然后再次打开邀请链接。此设备上的任何内容都不会丢失。",
+      "translation": "该家庭文件由较新版本的beanies保存。在此设备上更新beanies ，然后再次打开邀请链接。此设备上的任何内容都不会丢失。",
       "hash": "i9zdbs",
       "lastUpdated": "2026-09-06"
     },
@@ -22767,12 +22767,12 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.olderVersion.notice": {
-      "translation": "{list}上次在旧版本上打开的beanies。在紧凑之前，请他们更新Beanies。",
+      "translation": "{list}上次在旧版本上打开的beanies。在紧凑之前，请他们更新beanies。",
       "hash": "a2mhf5",
       "lastUpdated": "2026-09-06"
     },
     "compaction.why.devices": {
-      "translation": "您的其他设备会自行切换到压缩文件。仍然使用较旧版本Bean的设备在更新之前会停止同步，因此值得询问尚未更新的任何人来执行此操作。",
+      "translation": "您的其他设备会自行切换到压缩文件。仍然使用较旧版本的设备在更新之前会停止同步，因此值得询问尚未更新的任何人来执行此操作。",
       "hash": "u6501",
       "lastUpdated": "2026-09-06"
     }
