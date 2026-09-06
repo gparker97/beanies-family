@@ -970,3 +970,28 @@ broken again in the very next pass, twice, so two of them get sharper:
     block as a merge failure and disabled the banner that made it visible at all.
     When you move where something is raised, enumerate every catch between the
     new site and the user; they are part of the change.
+
+## 2026-09-06 — Compacted pods are 5.0: three things the version bump taught
+
+23. **A spread carries the field you forgot to think about.** The obvious
+    design, stamp `version: '5.0'` on the envelope at compaction, was defeated
+    by `{ ...incoming }` in a key-dict merge nobody was looking at: the
+    kept-local termini adopt the remote envelope and republish the local
+    compacted document under its 4.0 label, and the protection lasts one round
+    trip. Two reviewers found it independently. When a fact describes the
+    PAYLOAD, derive it from the payload at write time; do not let it ride on a
+    container that other code spreads.
+24. **When a decision is written as a ladder in two files, check whether they
+    have already drifted before adding a third arm.** `payloadErrorMessageKey`
+    had four answers under a comment saying "THREE"; the boot-overlay ternary
+    had three under a comment claiming it matched. A `parse` failure showed
+    "unreadable" inline and "your data may be damaged, contact support"
+    full-screen for the same error. One discriminator plus `as const satisfies`
+    tables makes the next kind fail the build in every consumer at once.
+25. **A loop over a hand-written list of codes is not an exhaustiveness test.**
+    `podAccess.test`'s "every code" loops iterated an array typed as the union
+    but written by hand, so a code added to the registry and forgotten in the
+    array was checked by nothing, silently. `useJoinFlow.test` had the same
+    shape and caught the omission only because its own list was compared to the
+    registry. Assert the list against `Object.keys(registry)` once, and the
+    loop is honest forever.

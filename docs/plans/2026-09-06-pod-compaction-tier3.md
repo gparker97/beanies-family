@@ -1,5 +1,10 @@
 # Plan: Compaction nobody has to know about — Tier 3, re-derived
 
+> **SUPERSEDED IN PART (2026-09-06).** Stage 4's soak GATE (R3/R4 of this plan)
+> is replaced by `docs/plans/2026-09-06-compacted-pod-v5.md`: compacted pods
+> are written as beanpod 5.0, which a pre-guard build refuses at parse, and the
+> gate becomes a notice that names people. Stages 1 to 3 stand as written.
+
 > Date: 2026-09-06
 > Related issues: #90 (Tier 3). No GitHub issue — direct implementation.
 > Supersedes: `docs/plans/2026-09-05-pod-compaction-tier3.md` (drafted against a

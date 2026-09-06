@@ -12,19 +12,20 @@
 
 export const FLAG_REGISTRY = [
   {
-    // ⚠️ MUST STAY OFF until the whole FLEET is on a guard-honouring build.
-    // All four Tier 3 stages have shipped to `main`; that is not the gate.
-    // The gate is deployment: production is still a build with no lineage
-    // concept, and one device on it defeats the guard for the whole family.
-    // The guard that makes compaction safe (ADR-036) is only landing now, and an
-    // old build honours no guard at all — so a compaction published before the
-    // fleet has updated is CRDT-merged across lineages by every device still on
-    // the previous version, which silently undoes it. It was flipped true by
-    // accident in `0169b49f` and pushed (not deployed, so nobody was exposed).
+    // ⚠️ MUST STAY OFF until the fleet has DRAINED onto a build that reads 5.0.
+    // All four Tier 3 stages have shipped to `main`; that is not the gate. A
+    // compacted pod is written as beanpod 5.0 (ADR-036 addendum), which a
+    // pre-guard build refuses at parse, so a stale device can no longer merge
+    // across lineages and silently corrupt the family. It CAN still overwrite
+    // the pod on a save, which the fleet republishes over and the safety copy
+    // covers; the drain decides how many people the Settings notice names and
+    // how many devices go quiet until they update, not whether data is safe.
+    // Sequence: deploy with this OFF (every pod on Earth stays 4.0), watch the
+    // drain by build, run the on-device acceptance including a deliberately
+    // stale device and a restore, then enable. It was flipped true by accident
+    // in `0169b49f` and pushed (not deployed, so nobody was exposed).
     // ⚠️ A per-browser localStorage override still beats the prod gate (see
-    // `flags.ts`). That is deliberate — it is how the soak gets run at all —
-    // but for THIS flag one device's override starts a family-wide, one-way
-    // migration. Raised to greg 2026-09-06; left as is on purpose.
+    // `flags.ts`). Deliberate: it is how the soak gets run at all.
     id: 'podCompaction',
     label: 'Pod compaction',
     description:
