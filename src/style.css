@@ -89,15 +89,22 @@
   --color-border: #e2e8f0;
 
   /*
-   * ⚠️ `--muted-text` was consumed by ~33 call sites across the wall and never
-   * defined anywhere in the app, so every one of them silently rendered its
-   * #4d5d6c fallback — which measures 2.47:1 on surface-ground and 2.11:1 on
-   * surface-raised after dark, well under the 4.5 floor. Defining it here fixes
-   * all of them at once, including the `:deep()` scoped rules that a per-site
-   * `dark:` utility cannot reach (a (0,3,0) selector outranks a `:where()`
-   * variant, which contributes zero specificity).
+   * ⚠️ `--muted-text` was consumed by ~32 wall call sites and defined nowhere, so
+   * every one silently rendered its inline `#4d5d6c` fallback — fine by day
+   * (6.43:1 on the wall's ground) and unreadable after dark (2.47:1 on
+   * surface-ground, 2.11:1 on raised). Defining it here fixes all of them at
+   * once, including the `:deep()` scoped rules a per-site `dark:` utility cannot
+   * reach: a (0,3,0) selector outranks a `:where()` variant, which contributes
+   * zero specificity.
+   *
+   * ⚠️ The LIGHT value is deliberately the old fallback, not `--color-text-muted`.
+   * Pointing both at the shared token looked tidier and quietly darkened nothing
+   * while LIGHTENING every one of those 32 sites from #4d5d6c to slate-500
+   * (#64748b) — 6.43:1 down to 4.51:1 on the page ground, and under the floor on
+   * WallChoreBoard's tinted column bodies. Fixing dark mode must not cost light
+   * mode; only the dark half needed changing.
    */
-  --muted-text: var(--color-text-muted);
+  --muted-text: #4d5d6c;
 
   /* ── v3 Nook UI design tokens ─────────────────────────────────────────── */
   --sq: 24px;
@@ -147,7 +154,7 @@
   --color-surface: #1e2a36; /* surface-raised */
   --color-text: #f2f5f7; /* ink        13.32 on raised */
   --color-text-muted: #c3ced6; /* ink-soft    9.11 on raised */
-  --muted-text: var(--color-text-muted); /* see the light block for why */
+  --muted-text: var(--color-text-muted); /* ink-soft 9.11 on raised */
   --color-border: #4a5b69; /* line */
   --card-shadow: 0 4px 20px rgb(0 0 0 / 20%);
   --card-hover-shadow: 0 8px 32px rgb(0 0 0 / 30%);

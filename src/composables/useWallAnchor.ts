@@ -2,7 +2,7 @@ import { computed, readonly, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { useToday } from '@/composables/useToday';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { reportError } from '@/utils/errorReporter';
-import { startOfWeekYmd } from '@/utils/date';
+import { isRealYmd, startOfWeekYmd } from '@/utils/date';
 import {
   MAX_ANCHOR_DRIFT_DAYS,
   anchorWeekDays,
@@ -67,15 +67,22 @@ export function useWallAnchor(): WallAnchor {
   const { today } = useToday();
   const settingsStore = useSettingsStore();
   const anchorYmd = ref(today.value);
+  /** What `today` was on the last tick, so the watcher can tell "on today" from "browsing". */
+  let previousToday = today.value;
 
   /**
    * Midnight rollover, and the reason the wall is safe to leave running for weeks.
-   * Mirrors the watcher this replaces in `WallTodayView`. Navigation is
-   * session-only by design — a kitchen wall left on Thursday and still showing
-   * Thursday three days later is a defect, not a feature.
+   *
+   * ⚠️ ONLY when the wall is already showing today. It used to re-anchor
+   * unconditionally, which meant a family looking at next Thursday at 23:59 was
+   * silently pulled back to today at 00:00 — the same "returned to today with no
+   * indication why" this whole change set out to remove from `WallTodayView`.
+   * A wall left off-today overnight is handled by the lock's own idle timeout,
+   * not by ambushing someone who is still reading it.
    */
   watch(today, (ymd) => {
-    anchorYmd.value = ymd;
+    if (anchorYmd.value === previousToday) anchorYmd.value = ymd;
+    previousToday = ymd;
   });
 
   /**
@@ -85,8 +92,23 @@ export function useWallAnchor(): WallAnchor {
    */
   function setAnchor(next: string, reason: string): boolean {
     const safe = clampAnchorYmd(next, today.value);
+    if (safe === next) {
+      anchorYmd.value = safe;
+      return true;
+    }
 
-    if (safe !== next) {
+    // ⚠️ Out of RANGE is not the same as MALFORMED, and conflating them made an
+    // ordinary gesture look like a bug. The week views render up to six days
+    // PAST the anchor, so at the forward edge a real, well-formed day header
+    // names a day beyond the limit. Tapping it used to fire a console.error
+    // accusing the caller of passing something unparseable. A boundary is
+    // silent; only a value that should never have been constructed is loud.
+    if (isRealYmd(next)) {
+      anchorYmd.value = safe;
+      return false;
+    }
+
+    {
       // Developer-facing, deliberately. The anchor has no untrusted input path —
       // no URL, no persistence, every value derived from a rendered day or from
       // `nextAnchorYmd` — so reaching here is a bug in a caller, not bad input
@@ -108,7 +130,7 @@ export function useWallAnchor(): WallAnchor {
     }
 
     anchorYmd.value = safe;
-    return safe === next;
+    return false;
   }
 
   /**
@@ -140,6 +162,20 @@ export function useWallAnchor(): WallAnchor {
    * child pressing `›` at the boundary gets a visibly dead button rather than a
    * screen that appears frozen.
    */
+  /**
+   * The calendar week containing the anchor, as a STABLE array.
+   *
+   * ⚠️ Two computeds, deliberately. `anchorWeekDays` allocates unconditionally
+   * and Vue's change check is `!Object.is`, so returning a fresh array with
+   * identical contents still invalidates every consumer. Six of every seven day
+   * steps stay inside the same week, and each one was re-triggering the today
+   * view's strip — which re-runs seven whole-month recurrence expansions.
+   * Deriving the week START first means the array is rebuilt only when the week
+   * actually changes.
+   */
+  const weekStart = computed(() => startOfWeekYmd(anchorYmd.value, settingsStore.weekStartDay));
+  const weekOfAnchor = computed(() => anchorWeekDays(weekStart.value));
+
   function canStep(unit: WallStepUnit, direction: -1 | 1): boolean {
     const next = nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay);
     return clampAnchorYmd(next, today.value) === next;
@@ -153,9 +189,7 @@ export function useWallAnchor(): WallAnchor {
     // which is right for the week view but wrong for a day picker: a picker
     // built on it re-bases every time someone picks, putting the days before
     // the chosen one out of reach.
-    weekOfAnchor: computed(() =>
-      anchorWeekDays(startOfWeekYmd(anchorYmd.value, settingsStore.weekStartDay))
-    ),
+    weekOfAnchor,
     setAnchor,
     step,
     canStep,
