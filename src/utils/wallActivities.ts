@@ -305,12 +305,20 @@ export function wallSharedAllDay(
  * stranded at the top of a 296px column of white space, which is what it did on
  * the today view the first time this shipped. Only a `band`, which is stacked
  * with the grid and genuinely competes with it for height, can be downgraded.
+ *
+ * `roomForBand` is the ONE height input, and it is the window's height, not a
+ * measured one — see `BAND_MIN_VIEWPORT_HEIGHT_PX`. It cannot feed back for the
+ * same reason the viewport width cannot: collapsing the band does not resize the
+ * window. Without it, six bean lanes on a 1024x768 tablet kept a full band and
+ * left the grid 101px — a whole day drawn in the height of three lines.
  */
 export function wallPeripheralVariant(
   preferred: 'band' | 'rail',
   busiestColumnCount: number,
-  portrait: boolean
+  portrait: boolean,
+  roomForBand = true
 ): 'band' | 'rail' | 'strip' {
   if (preferred === 'rail') return 'rail';
+  if (!roomForBand) return 'strip';
   return busiestColumnCount > (portrait ? 9 : 7) ? 'strip' : preferred;
 }

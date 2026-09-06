@@ -52,11 +52,16 @@ const emit = defineEmits<{
   toggle: [WallJob];
   open: [WallSheetTarget];
   /**
-   * The date header — a day the wall IS drawing — opens the today view on it.
-   * It used to open a sheet over it; the today view is a better day renderer,
-   * which is why that sheet is gone rather than dormant. See `onOpenDay`.
+   * ⚠️ A lane header names a PERSON, not a day, so it must not be wired to the
+   * day-tap rule the days view uses. It briefly was, and all six headers then
+   * did the identical thing: leave the per-person view for the whole family's
+   * day, discarding the very `member.id` the button was drawn for.
+   *
+   * Tapping a bean focuses the wall on that bean — the mechanism the footer
+   * chips already drive — and tapping the focused one again clears the filter.
+   * Reuse rather than invention: the header is about its person, as it looks.
    */
-  openDay: [string];
+  focusMember: [string];
   openChores: [];
 }>();
 
@@ -225,7 +230,7 @@ function subtitleFor(memberId: string) {
           :key="member.id"
           type="button"
           class="min-w-0 px-1.5 py-1"
-          @click="emit('openDay', anchorYmd)"
+          @click="emit('focusMember', member.id)"
         >
           <WallBeanHeader
             :member="member"

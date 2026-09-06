@@ -146,3 +146,26 @@ export function daysLayoutFor(
   const fit = dayColumnsThatFit(viewportPx, rail);
   return { rail, columns: Math.min(MAX_DAY_COLUMNS, Math.max(MIN_DAY_COLUMNS, fit)) };
 }
+
+/**
+ * The shortest screen on which a stacked BAND still leaves the grid a day worth
+ * reading.
+ *
+ * ⚠️ A height rule, and the one place a height rule is safe. Everywhere else the
+ * wall reads the VIEWPORT rather than a measured box, for the reason `railFits`
+ * spells out; the same reasoning applies here twice over, because collapsing the
+ * band GIVES the grid height, which would let it un-collapse. The window's own
+ * height cannot move in response to what the band does, so it cannot oscillate.
+ *
+ * Derived, not guessed. Measured on the wall at two heights, a band and the
+ * chrome above and below it cost the plot ~673px on both (768 → 101px of plot;
+ * 1180 → 501px). Leaving the grid the ~320px below which `layoutTimeGrid` stops
+ * producing a readable day therefore needs 673 + 320 ≈ 993px of window.
+ *
+ * Below it the band downgrades to a `strip`, which costs ~182px less and is what
+ * the days view already falls back to on a busy day.
+ */
+export const BAND_MIN_VIEWPORT_HEIGHT_PX = 1000;
+
+/** The same threshold as a media query, so no call site restates the number. */
+export const BAND_HEIGHT_QUERY = `(min-height: ${BAND_MIN_VIEWPORT_HEIGHT_PX}px)`;

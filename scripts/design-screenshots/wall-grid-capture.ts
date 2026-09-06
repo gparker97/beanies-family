@@ -330,6 +330,32 @@ test.describe('design screenshots', () => {
         await page.screenshot({
           path: `scratch-shots/wall-${view.id}-${size.name}.png`,
         });
+
+        /*
+         * The one geometric fact a reviewer cannot get from the image: a plot
+         * that overflows its flex slot is `overflow-hidden`, so it clips its own
+         * contents tidily WHILE SITTING IN THE WRONG PLACE, and the peripheral
+         * cards paint over the hours it stole. Six bean lanes on a 1024x768
+         * tablet overlapped by 103px and the frame still looked plausible.
+         */
+        const overlap = await page.evaluate(() => {
+          const blocks = [...document.querySelectorAll('.wall-tblock')];
+          const plot = blocks[0]?.closest('.overflow-hidden.rounded-\\[20px\\]');
+          const cards = [...document.querySelectorAll('.wall-card')];
+          if (!plot || !cards.length) return 0;
+          const box = plot.getBoundingClientRect();
+          const cardTop = Math.min(...cards.map((c) => c.getBoundingClientRect().top));
+          // Cards sitting BESIDE the grid (the rail) start above its bottom by
+          // design; only a card stacked BELOW it can be overlapped.
+          if (cardTop <= box.top) return 0;
+          return Math.max(0, Math.round(box.bottom - cardTop));
+        });
+        if (overlap > 2) {
+          throw new Error(
+            `[wall-grid] ${view.id} at ${size.name}: the plot overruns its slot and the ` +
+              `peripheral cards paint over ${overlap}px of the day.`
+          );
+        }
       }
     }
   });
