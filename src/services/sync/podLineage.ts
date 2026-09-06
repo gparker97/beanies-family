@@ -185,7 +185,8 @@ const WHY: Record<LineageVerdict, string> = {
   same: 'same lineage',
   'adopt-remote': 'the remote pod has been compacted and this device has unsaved changes',
   'ours-newer': 'this device holds an unpublished compaction and the remote has moved',
-  conflict: 'two devices compacted this pod at the same time',
+  conflict:
+    'two devices reorganised this pod independently (a concurrent compaction, or two restores)',
 };
 
 /**
@@ -199,6 +200,10 @@ const WHY: Record<LineageVerdict, string> = {
  *   2. syncStore.hydrateFromEnvelope           (background recovery)
  *   3. syncService.fetchAndMergeRemote         (poll + pre-save)
  */
+// ⚠️ THE LINT RULE HAS ONE HOLE: `no-restricted-imports` sees static and
+// namespace imports, not `await import('@/services/sync/podLineage')`. Probed
+// live 2026-09-07. Nothing does that today, and the structural backstop is that
+// both documents exist only in the worker, but do not treat the rule as total.
 export function guardLineage(
   remote: PodLineage | null,
   local: PodLineage | null,

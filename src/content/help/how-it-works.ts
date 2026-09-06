@@ -52,9 +52,9 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         icon: '\u{1F4A1}',
-        title: 'Anything added on an older version before it updates is not kept',
+        title: 'What you added while this device was behind',
         content:
-          'If someone keeps using an out-of-date device after the family file was compacted, what they add on it cannot be brought across once it updates. Updating first is the easy way to avoid that.',
+          'When you update, beanies brings across what you added while this device was out of date. If it cannot do that safely it tells you and keeps your changes until you decide. Updating as soon as you can is still the easiest path.',
       },
       {
         type: 'heading',

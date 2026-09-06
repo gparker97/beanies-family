@@ -18,8 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Restoring the copy beanies saved before compacting now sticks.** Other devices used to put the compacted file straight back within seconds; they now take the restored one.
 
 - **beanies tells you when your family file has grown big enough to be worth compacting**, and says so straight away if a device in your family has already failed to open it — a real failure counting for more than a size guess.
-- **beanies will not compact while someone in your family is on an older version.** It waits until every device that has been used recently has seen a version that can handle a compacted file, and names who it is waiting for.
-- **When the job is done, beanies says whether anything is left to do** — either that your other devices will pick it up on their own, or which person's device is still to catch up. Never a bare "done".
+- **When the job is done, beanies says whether anything is left to do:** either that your other devices will pick it up on their own, or who still needs to update beanies. Never a bare "done".
 - **A device that runs out of memory opening your family file now says how to fix it**, and where: the family file can be compacted from a device that still opens it, and the struggling one will then open it normally. It deliberately offers no button, because compacting needs more memory than opening, so the device that just failed is the one device that cannot do it.
 
 - **Choosing a family file yourself now keeps your unsaved work, instead of discarding it.** Doing nothing already carried those changes across; deliberately picking the file threw them away. The explicit choice was the destructive one, which is backwards.

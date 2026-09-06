@@ -113,3 +113,41 @@ describe('loadDroppedFile and the envelope version', () => {
     expect(syncService.getState().lastError).toMatch(/Invalid JSON/);
   });
 });
+
+describe('a cancelled picker is not a failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+  });
+
+  it('reports `cancelled` with nothing to render, and clears any stale error', async () => {
+    // ⚠️ WITHOUT THIS, EVERY CALLER'S ELSE-ARM FIRES ON ESCAPE. The abort arm
+    // returned a bare `{ success: false }`, indistinguishable from a real
+    // failure, so dismissing the OS picker showed a red error — and if a prior
+    // attempt had left `lastError` set, it rendered that raw exception string.
+    // Seed a stale error the way a previous failed attempt would.
+    await syncService.loadDroppedFile({
+      name: 'x.beanpod',
+      text: async () => 'not json {',
+    } as never);
+    expect(syncService.getState().lastError).toBeTruthy();
+
+    // Drive the File System Access branch, whose abort arm is the one that
+    // changed, and have the OS picker reject the way a dismissal does.
+    const { supportsFileSystemAccess } = await import('../capabilities');
+    vi.mocked(supportsFileSystemAccess).mockReturnValueOnce(true);
+    (globalThis as { window?: unknown }).window ??= globalThis;
+    (globalThis as unknown as { showOpenFilePicker: unknown }).showOpenFilePicker = vi.fn(
+      async () => {
+        const e = new Error('The user aborted a request.');
+        e.name = 'AbortError';
+        throw e;
+      }
+    );
+    const r = await syncService.openAndLoadFile();
+
+    expect(r.cancelled).toBe(true);
+    expect(r.payloadError).toBeUndefined();
+    expect(syncService.getState().lastError).toBeNull();
+  });
+});

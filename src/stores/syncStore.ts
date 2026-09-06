@@ -1227,10 +1227,10 @@ export const useSyncStore = defineStore('sync', () => {
         };
       }
 
-      // `parseBeanpodV4` validates the version itself and throws a BETTER
-      // message ("Unsupported beanpod version: X. Expected 4.0."), so the old
-      // `detectFileVersion` pre-call was a second full JSON.parse of the whole
-      // multi-megabyte file purely to read one field, then thrown away.
+      // `parseBeanpodV4` validates the version itself and throws a TYPED error
+      // for a version this build does not know, so the now-deleted version-sniff
+      // pre-call was a second full JSON.parse of the whole multi-megabyte file
+      // purely to read one field, then thrown away.
       const remoteEnvelope = parseBeanpodV4(text);
 
       // If we already have a family key, the worker decrypts + merges/adopts.
@@ -1489,6 +1489,8 @@ export const useSyncStore = defineStore('sync', () => {
     success: boolean;
     needsPassword?: boolean;
     payloadError?: RemoteBlocker;
+    /** The person dismissed the OS picker: say nothing. */
+    cancelled?: true;
   }> {
     const result = await syncService.openAndLoadFile();
 
@@ -1516,8 +1518,13 @@ export const useSyncStore = defineStore('sync', () => {
       setupAutoSync();
     }
     // The classified failure travels; a bare `{ success: false }` here is how
-    // picking an unreadable file showed the user NOTHING in Settings.
-    return { success: result.success, payloadError: result.payloadError };
+    // picking an unreadable file showed the user NOTHING in Settings. So does
+    // `cancelled`, or an ordinary Escape reads as a failure at every caller.
+    return {
+      success: result.success,
+      payloadError: result.payloadError,
+      ...(result.cancelled ? { cancelled: true as const } : {}),
+    };
   }
 
   /**
@@ -1526,7 +1533,12 @@ export const useSyncStore = defineStore('sync', () => {
   async function loadFromDroppedFile(
     file: File,
     fileHandle?: FileSystemFileHandle
-  ): Promise<{ success: boolean; needsPassword?: boolean; payloadError?: RemoteBlocker }> {
+  ): Promise<{
+    success: boolean;
+    needsPassword?: boolean;
+    payloadError?: RemoteBlocker;
+    cancelled?: true;
+  }> {
     const result = await syncService.loadDroppedFile(file, fileHandle);
 
     if (result.needsPassword && result.envelope) {
@@ -1553,8 +1565,13 @@ export const useSyncStore = defineStore('sync', () => {
       setupAutoSync();
     }
     // The classified failure travels; a bare `{ success: false }` here is how
-    // picking an unreadable file showed the user NOTHING in Settings.
-    return { success: result.success, payloadError: result.payloadError };
+    // picking an unreadable file showed the user NOTHING in Settings. So does
+    // `cancelled`, or an ordinary Escape reads as a failure at every caller.
+    return {
+      success: result.success,
+      payloadError: result.payloadError,
+      ...(result.cancelled ? { cancelled: true as const } : {}),
+    };
   }
 
   /**
@@ -2871,8 +2888,10 @@ export const useSyncStore = defineStore('sync', () => {
     error?: string;
     needsPassword?: boolean;
     payloadError?: RemoteBlocker;
+    cancelled?: true;
   }> {
     const result = await loadFromNewFile();
+    if (result.cancelled) return { success: false, cancelled: true };
     if (result.needsPassword) {
       return { success: false, needsPassword: true, error: 'Encrypted file requires password' };
     }

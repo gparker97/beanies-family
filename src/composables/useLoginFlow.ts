@@ -14,7 +14,8 @@
  */
 
 import { ref, type Ref } from 'vue';
-import { PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
+import { PayloadLoadError, payloadErrorMessageKey, payloadErrorKind } from '@/types/sync';
+import type { PayloadErrorKind } from '@/types/sync';
 import { reportPayloadFailure, surfacePayloadFatal } from '@/utils/payloadFailureSurface';
 import {
   transition,
@@ -96,7 +97,14 @@ export function useLoginFlow(opts: {
   const familyStore = useFamilyStore();
   const familyContextStore = useFamilyContextStore();
   /** Set by `ensureStaged` so its callers can emit an accurate funnel code. */
-  let stagedPayloadFailure: 'too-large' | 'corrupted' | null = null;
+  /**
+   * The payload-failure kind for the login funnel, from the SAME discriminator
+   * the copy reads (`payloadErrorKind`). A hand-rolled
+   * `deviceCannotOpen ? 'too-large' : 'corrupted'` here was a fourth ladder: it
+   * filed every "needs update" and every stale-credential failure as
+   * `corrupted`, so the funnel disagreed with the sentence on screen.
+   */
+  let stagedPayloadFailure: PayloadErrorKind | null = null;
   const syncStore = useSyncStore();
   const { t } = useTranslation();
   const settingsStore = useSettingsStore();
@@ -441,7 +449,7 @@ export function useLoginFlow(opts: {
       // and the user gets a generic open failure with none of the honest copy —
       // on the step that runs BEFORE the prove screen.
       if (e instanceof PayloadLoadError) {
-        stagedPayloadFailure = e.deviceCannotOpen ? 'too-large' : 'corrupted';
+        stagedPayloadFailure = payloadErrorKind(e);
         // INLINE, not the fatal overlay. All three callers run with a screen the
         // user is looking at — `onBiometric` and `onPinSubmit` after they have
         // acted, `runOpening` mid-open — so a `fixed inset-0 z-[300]` panel
