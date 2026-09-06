@@ -54,6 +54,16 @@ function ev(
 }
 const HEIGHT = 480;
 
+/**
+ * A plot too short for the wall to draw the day honestly.
+ *
+ * ⚠️ The fold tests below need this. Folding is now the CONSTRAINED-space
+ * answer: given room, the grid draws the real gap rather than collapsing it, so
+ * at HEIGHT most of these days no longer fold at all — which is the feature, not
+ * a broken test. Running them here is what keeps them about the fold machinery.
+ */
+const CRAMPED = 300;
+
 describe('the ladder is data', () => {
   it('⭐ spends everything else before it changes the height of an hour', () => {
     // Scale is the OUTERMOST axis, so it moves last: a calendar whose hour is a
@@ -74,8 +84,8 @@ describe('the ladder is data', () => {
   });
 
   it('keeps MAX_ATTEMPTS and the arithmetic from drifting apart', () => {
-    expect(MAX_ATTEMPTS).toBe(LADDER.length + ZOOM_STEPS.length);
-    expect(MAX_ATTEMPTS).toBe(123); // 120 rungs + 3 zoom candidates
+    expect(MAX_ATTEMPTS).toBe(LADDER.length + (ZOOM_STEPS.length + 1) * 2);
+    expect(MAX_ATTEMPTS).toBe(136); // 120 rungs + 2 axes × (7 zooms + 1)
   });
 
   it('is frozen, so nothing can mutate the search at runtime', () => {
@@ -117,7 +127,7 @@ describe('the grid reads as a grid', () => {
   });
 
   it('does not draw an hour rule inside a fold', () => {
-    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], HEIGHT);
+    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], CRAMPED);
     const fold = l.folds[0]!;
     for (const tick of l.ticks) {
       const inside = tick.minutes > fold.startMinutes && tick.minutes < fold.resumeMinutes;
@@ -198,12 +208,12 @@ describe('folding', () => {
     // The pixel rule still governs; it is just measured at natural scale now, so
     // a gap has to be genuinely long to earn a fold rather than merely to sit on
     // a day with nothing else in it.
-    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], HEIGHT);
+    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], CRAMPED);
     expect(l.folds).toHaveLength(1);
   });
 
   it('folds a long gap and labels it with the time it resumes', () => {
-    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], HEIGHT);
+    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], CRAMPED);
     expect(l.folds).toHaveLength(1);
     expect(l.folds[0]!.resumeMinutes).toBe(15 * 60 + 20);
     expect(l.folds[0]!.height).toBeGreaterThanOrEqual(MIN_FOLD_PX);
@@ -214,9 +224,17 @@ describe('folding', () => {
     // which OCCUPIES ~90 minutes of axis. Feeding those inflated spans into gap
     // detection closed the gap and the fold silently stopped firing — five empty
     // hours rendered as white space. Wrong answer here is 0 folds.
-    const l = layoutTimeGrid([[ev('08:05', '08:20'), ev('10:00', '11:30')]], HEIGHT);
-    expect(l.folds).toHaveLength(1);
-    expect(l.folds[0]!.resumeMinutes).toBe(600);
+    //
+    // ⚠️ The day is longer than the original fixture on purpose. With a short
+    // day the unfolded axis now always fits, so the folded path — the one this
+    // test is about — is never reached. The late event forces the constraint
+    // that folding exists to answer, without changing the gap under test.
+    const l = layoutTimeGrid(
+      [[ev('08:05', '08:20'), ev('10:00', '11:30'), ev('19:00', '19:30')]],
+      CRAMPED
+    );
+    expect(l.folds.length).toBeGreaterThanOrEqual(1);
+    expect(l.folds.map((f) => f.resumeMinutes)).toContain(600);
   });
 
   it('⭐ the fold threshold is stable — one honest fold, not five', () => {
@@ -470,9 +488,19 @@ describe('the cap', () => {
 
 describe('fitting, and never clipping', () => {
   it('early-exits on the first candidate that fits', () => {
+    // At 480 the full 8-to-8 axis does not fit but the day's own span does, so
+    // this settles on the second candidate: the honest window, unfolded.
     const l = layoutTimeGrid([[ev('09:00', '10:00'), ev('12:00', '13:00')]], HEIGHT);
-    expect(l.attempts).toBe(1);
+    expect(l.attempts).toBe(2);
     expect(l.tier).toBe('gentle');
+    expect(l.folds).toHaveLength(0);
+  });
+
+  it('takes the FULL day when the plot can afford one', () => {
+    const l = layoutTimeGrid([[ev('09:00', '10:00'), ev('12:00', '13:00')]], 720);
+    expect(l.attempts).toBe(1);
+    expect(l.tier).toBe('roomy');
+    expect(l.windowEnd - l.windowStart).toBe(720); // 08:00–20:00
   });
 
   it('fits a twenty-event day without dropping anything', () => {
@@ -704,37 +732,38 @@ describe('PINNED — the vertical layout, before and after the hour zooms', () =
    * that used to render identically at every plot height, which was the whole
    * complaint.
    *
-   *   plot   before              after
-   *    480   [48,36,48] b=272    [48,36,48] b=272   unchanged
-   *    720   [48,36,48] b=272    [48,36,48] b=272   unchanged
-   *   1080   [48,36,48] b=272    [72,54,72] b=403   zoom 1.5
-   *   1440   [48,36,48] b=272    [96,72,96] b=535   zoom 2
+   *   plot   originally          now        tier     fill
+   *    480   [48,36,48] b=272    b=432      gentle   90%   unfolded, tight window
+   *    720   [48,36,48] b=272    b=480      roomy    67%   full 8–8 day
+   *   1080   [48,36,48] b=272    b=720      roomy    67%   hour 72px
+   *   1440   [48,36,48] b=272    b=960      roomy    67%   hour 96px
+   *
+   * The block HEIGHTS are unchanged at 480 and 720 — the hour did not move
+   * there. What changed is how much day is drawn around them.
    */
   const ordinary = [ev('09:00', '10:00'), ev('13:00', '13:45'), ev('17:00', '18:00')];
 
   it.each([
-    [480, 0.8, [48, 36, 48]],
-    [720, 0.8, [48, 36, 48]],
-    [1080, 1.2, [72, 54, 72]],
-    [1440, 1.6, [96, 72, 96]],
-  ])('at %ipx of plot the hour is %f', (height, scale, heights) => {
+    [480, 0.8, [48, 36, 48], 'gentle'],
+    [720, 0.8, [48, 36, 48], 'roomy'],
+    [1080, 1.2, [72, 54, 72], 'roomy'],
+    [1440, 1.6, [96, 72, 96], 'roomy'],
+  ])('at %ipx of plot the hour is %f and the tier is %s', (height, scale, heights, tier) => {
     const l = layoutTimeGrid([ordinary], height);
     expect(l.scale).toBeCloseTo(scale as number, 6);
-    // ⭐ Still `gentle` at every size. The tier says whether the day was
-    // COMPRESSED, and a zoomed fit is not a compromise — it took rung 0.
-    expect(l.tier).toBe('gentle');
+    // Neither `roomy` nor `gentle` is a compromise — both took rung 0. `roomy`
+    // additionally means the whole waking day is drawn, unfolded.
+    expect(l.tier).toBe(tier);
     expect(l.columns[0]!.map((b) => Math.round(b.height))).toEqual(heights);
   });
 
-  it('⭐ the zoom never fires at or below the reference plot', () => {
-    // Every device tested so far renders its vertical layout byte-for-byte as
-    // before, which is what makes this safe to ship without re-testing the small
-    // end. Asserted on the CANDIDATES rather than on the resulting scale: a
-    // short plot may still descend the ladder on a busy day, which is
-    // pre-existing behaviour and nothing to do with this change.
-    for (const height of [220, 380, 480, 520, 720, 899]) {
+  it('⭐ the hour never grows at or below the reference plot', () => {
+    // The guarantee is about the HOUR, and it is narrower than it first looks:
+    // the generous axis DOES change what a 600–720px plot draws, because that is
+    // the whole point. What cannot happen below the reference is a bigger hour —
+    // so a block is never taller than it is today on the devices already tested.
+    for (const height of [220, 380, 480, 520, 720]) {
       expect(zoomCandidates(height)).toEqual([]);
-      // And it never grows past the natural hour, whatever the day.
       expect(layoutTimeGrid([ordinary], height).scale).toBeLessThanOrEqual(0.8);
     }
   });
@@ -747,13 +776,24 @@ describe('PINNED — the vertical layout, before and after the hour zooms', () =
     expect(bottom(tall)).toBeGreaterThan(bottom(short) * 1.9);
   });
 
-  it('⭐ but still does NOT fill it — a quiet day still looks quiet', () => {
-    // The invariant `NATURAL_PX_PER_MIN` exists to protect. Filling the screen
-    // would be content-derived stretching: "two events and one of them half a
-    // wall". 1440 goes from 81% empty to about 63%, and that is the design.
+  it('⭐ fills a tall screen with a real DAY, not with inflated events', () => {
+    /*
+     * The distinction `NATURAL_PX_PER_MIN` exists to protect, restated now that
+     * the axis is generous.
+     *
+     * A 1440px plot is now about two-thirds full — but of a real 8-to-8 day,
+     * drawn honestly, with the gaps between events at their true length. That is
+     * NOT the failure the fixed ceiling was introduced to stop: "a quiet day
+     * STRETCHED to fill the screen: two events and one of them half a wall".
+     *
+     * The thing that must stay bounded is the BLOCK, and it is: a one-hour event
+     * is 96px, not a third of the wall. Assert that, rather than asserting the
+     * screen stays empty — emptiness was never the goal, honesty was.
+     */
     const tall = layoutTimeGrid([ordinary], 1440);
-    const bottom = Math.max(...tall.columns[0]!.map((b) => b.top + b.height));
-    expect(bottom).toBeLessThan(1440 * 0.5);
+    const tallest = Math.max(...tall.columns[0]!.map((b) => b.height));
+    expect(tallest).toBeLessThanOrEqual(MAX_BLOCK_CEILING_PX);
+    expect(tallest).toBeLessThan(1440 * 0.12);
   });
 
   it('⭐ two different days on ONE screen still get the same hour', () => {
@@ -767,12 +807,14 @@ describe('PINNED — the vertical layout, before and after the hour zooms', () =
 
 describe('the zoom — how the wall grows with the glass', () => {
   it('is empty below the reference plot, and steps up above it', () => {
-    for (const height of [0, -1, NaN, 220, 480, 720, 899]) {
+    for (const height of [0, -1, NaN, 220, 480, 720]) {
       expect(zoomCandidates(height)).toEqual([]);
     }
-    expect(zoomCandidates(900)).toEqual([1.25]);
-    expect(zoomCandidates(1080)).toEqual([1.5, 1.25]);
-    expect(zoomCandidates(1440)).toEqual([2, 1.5, 1.25]);
+    // Finer steps than the first cut, which left dead zones: a 850px plot got
+    // no zoom at all and wasted 58% of itself as the screen grew.
+    expect(zoomCandidates(760)).toEqual([1.05]);
+    expect(zoomCandidates(900)).toEqual([1.25, 1.15, 1.05]);
+    expect(zoomCandidates(1440)).toEqual([2, 1.75, 1.5, 1.35, 1.25, 1.15, 1.05]);
   });
 
   it('offers the widest zoom first, and every one of them grows the hour', () => {
@@ -903,6 +945,85 @@ describe('the zoom — how the wall grows with the glass', () => {
         const axisBottom = l.yFor(l.windowEnd);
         expect(Math.max(blockBottom, axisBottom)).toBeLessThanOrEqual(height + 1);
       }
+    }
+  });
+});
+
+describe('the generous axis — how much day gets drawn', () => {
+  const ordinary = [ev('09:00', '10:00'), ev('13:00', '13:45'), ev('17:00', '18:00')];
+
+  it('⭐ draws the whole waking day when the plot can afford one', () => {
+    // greg, on a 1200px wall: "if the space is available, should we just print
+    // the full daily grid rather than collapsing when not needed?"
+    const l = layoutTimeGrid([ordinary], 900);
+    expect(l.windowStart).toBe(8 * 60);
+    expect(l.windowEnd).toBe(20 * 60);
+    expect(l.folds).toHaveLength(0);
+    expect(l.tier).toBe('roomy');
+  });
+
+  it('⭐ a single afternoon appointment gets a day, not a one-hour box', () => {
+    // The case greg called awkward: two grid lines floating in an empty plot.
+    const l = layoutTimeGrid([[ev('14:00', '15:00')]], 720);
+    expect(l.windowEnd - l.windowStart).toBe(720);
+    expect(l.ticks.length).toBeGreaterThan(10);
+  });
+
+  it('⚠️ widens for an early riser rather than clipping them', () => {
+    // The waking window is a FLOOR on how much day is drawn, never a clip.
+    const l = layoutTimeGrid([[ev('06:30', '07:30'), ev('09:00', '10:00')]], 900);
+    expect(l.windowStart).toBe(6 * 60 + 30 - 30); // snapped out to 06:00
+    expect(l.windowEnd).toBe(20 * 60);
+  });
+
+  it('falls back to the day’s own span when the full day will not fit', () => {
+    const l = layoutTimeGrid([ordinary], 480);
+    expect(l.windowStart).toBe(9 * 60);
+    expect(l.windowEnd).toBe(18 * 60);
+    expect(l.folds).toHaveLength(0); // still honest, just tighter
+  });
+
+  it('⭐ falls all the way back to folding, unchanged, when nothing else fits', () => {
+    // The terminal fallback IS today's code. A day this shape on a plot this
+    // short renders exactly as it always did.
+    const l = layoutTimeGrid([[ev('07:30', '08:00'), ev('15:20', '15:50')]], 300);
+    expect(l.folds).toHaveLength(1);
+    expect(l.tier).not.toBe('roomy');
+  });
+
+  it('never draws past the plot, at any axis or zoom', () => {
+    const shapes = [
+      ordinary,
+      [ev('14:00', '15:00')],
+      [ev('06:30', '07:30'), ev('20:30', '22:00')],
+      [ev('08:00', '18:00')],
+    ];
+    for (const day of shapes) {
+      for (const height of [220, 300, 480, 600, 720, 900, 1080, 1440, 2160]) {
+        const l = layoutTimeGrid([day], height);
+        const blocks = l.columns[0]!.length
+          ? Math.max(...l.columns[0]!.map((b) => b.top + b.height))
+          : 0;
+        expect(Math.max(blocks, l.yFor(l.windowEnd))).toBeLessThanOrEqual(height + 1);
+      }
+    }
+  });
+
+  it('⭐ keeps a long block capped and flagged, however generous the axis', () => {
+    // The one thing that must stay bounded whatever else expands.
+    //
+    // ⚠️ The cap is SOFT, so a capped block legitimately sits a little above the
+    // ceiling — that damping is what keeps "a longer event is never drawn
+    // shorter" true. So assert the flag and a sane bound, not the raw ceiling:
+    // an earlier version of this test asserted `<= CEILING` and failed on the
+    // module working as designed.
+    for (const height of [720, 1080, 1440, 2160]) {
+      const l = layoutTimeGrid([[ev('08:00', '18:00')]], height);
+      const block = l.columns[0]![0]!;
+      expect(block.capped).toBe(true);
+      expect(block.height).toBeLessThan(MAX_BLOCK_CEILING_PX * 1.5);
+      // And never a meaningful fraction of the wall, which is the actual worry.
+      expect(block.height).toBeLessThan(height * 0.75);
     }
   });
 });

@@ -285,7 +285,15 @@ export const LADDER: readonly Rung[] = Object.freeze(
  *                         "past this a single block dominates the wall however
  *                         large the glass" — explicitly a claim about the glass
  */
-export const ZOOM_STEPS = [2, 1.5, 1.25] as const;
+export const ZOOM_STEPS = [2, 1.75, 1.5, 1.35, 1.25, 1.15, 1.05] as const;
+
+/**
+ * How much empty time the axis is willing to draw. Widest first.
+ *
+ * `folded` is the historical behaviour and the terminal fallback, so a plot that
+ * can afford neither of the others renders exactly as it does today.
+ */
+export type AxisMode = 'full' | 'events' | 'folded';
 
 /**
  * The zooms this plot can afford, widest first — empty below 900px, which is why
@@ -302,10 +310,27 @@ export function zoomCandidates(availableHeight: number): readonly number[] {
 }
 
 /** Bound on the search. Asserted in a test so it cannot drift from the arithmetic. */
-export const MAX_ATTEMPTS = LADDER.length + ZOOM_STEPS.length;
+/**
+ * Bound on the search. Asserted in a test so it cannot drift from the
+ * arithmetic: the generous pre-pass tries two axes across every zoom candidate
+ * plus zoom 1, then the ladder runs in full.
+ */
+export const MAX_ATTEMPTS = LADDER.length + (ZOOM_STEPS.length + 1) * 2;
 
-/** Window used when there is nothing at all to lay out. */
-const EMPTY_WINDOW = { start: 8 * 60, end: 20 * 60 };
+/**
+ * ⭐ What a day looks like when the wall has room to draw one: waking hours.
+ *
+ * This was `EMPTY_WINDOW`, used only when there was nothing at all to lay out —
+ * which meant the module already held an opinion about the shape of a day and
+ * only applied it to the empty case. It is now the FLOOR on how much day gets
+ * drawn whenever the plot can afford it: a single 2pm dentist appointment
+ * renders on an 8-to-8 axis rather than as a one-hour grid with two rules
+ * floating in an otherwise empty box.
+ *
+ * ⚠️ A floor, never a clip. The real window is the UNION of this and the day's
+ * own events, so a 06:30 swim still appears — the axis becomes 06:30–20:00.
+ */
+const WAKING_WINDOW = { start: 8 * 60, end: 20 * 60 };
 
 // ── Result shapes ─────────────────────────────────────────────────────────
 
@@ -339,7 +364,7 @@ export interface GridFold {
   resumeMinutes: number;
 }
 
-export type GridTier = 'gentle' | 'tightened' | 'floored' | 'overflow';
+export type GridTier = 'roomy' | 'gentle' | 'tightened' | 'floored' | 'overflow';
 
 export interface GridLayout {
   columns: GridBlock[][];
@@ -439,6 +464,12 @@ interface ParsedInput {
   rejected: PlacedOccurrence[];
   windowStart: number;
   windowEnd: number;
+  /**
+   * The generous window: waking hours UNION the day's own events. Drawn when the
+   * plot can afford it — see `AxisMode`.
+   */
+  fullWindowStart: number;
+  fullWindowEnd: number;
   columnCount: number;
 }
 
@@ -484,10 +515,10 @@ function parseColumns(
    */
   const windowStart = items.length
     ? Math.floor(Math.min(...items.map((i) => i.start)) / 60) * 60
-    : EMPTY_WINDOW.start;
+    : WAKING_WINDOW.start;
   const windowEnd = items.length
     ? Math.ceil(Math.max(...items.map((i) => i.end)) / 60) * 60
-    : EMPTY_WINDOW.end;
+    : WAKING_WINDOW.end;
 
   return {
     items,
@@ -498,6 +529,8 @@ function parseColumns(
     windowStart,
     // A window of zero length would divide by zero downstream.
     windowEnd: Math.max(windowEnd, windowStart + 5),
+    fullWindowStart: Math.min(WAKING_WINDOW.start, windowStart),
+    fullWindowEnd: Math.max(WAKING_WINDOW.end, windowEnd),
     columnCount: columns.length,
   };
 }
@@ -737,6 +770,9 @@ interface Attempt {
   yFor: (t: number) => number;
   total: number;
   scale: number;
+  /** The window this attempt actually drew — 'full' widens it. */
+  windowStart: number;
+  windowEnd: number;
 }
 
 /**
@@ -752,16 +788,20 @@ interface Attempt {
  * This is why the change cannot make anything worse: when this returns null the
  * caller runs TODAY's code path, at today's rung 0, against today's budget.
  */
-function tryZoomedFit(
+function tryGenerousFit(
   input: ParsedInput,
   height: number,
   maxBlock: number
-): { attempt: Attempt; attempts: number } | null {
+): { attempt: Attempt; attempts: number; axis: AxisMode } | null {
   let attempts = 0;
-  for (const zoom of zoomCandidates(height)) {
-    const candidate = attempt(input, LADDER[0]!, maxBlock, zoom);
-    attempts++;
-    if (candidate.total <= height + 1) return { attempt: candidate, attempts };
+  // Widest axis first, then widest hour within it. Drawing the whole day beats
+  // drawing a bigger hour over a folded one: the fold is the thing that lies.
+  for (const axis of ['full', 'events'] as const) {
+    for (const zoom of [...zoomCandidates(height), 1]) {
+      const candidate = attempt(input, LADDER[0]!, maxBlock, zoom, axis);
+      attempts++;
+      if (candidate.total <= height + 1) return { attempt: candidate, attempts, axis };
+    }
   }
   return null;
 }
@@ -774,7 +814,31 @@ function tryZoomedFit(
  * name every call site if another is ever added — which is the cheapest possible
  * guard against a second search path forgetting to pass it.
  */
-function attempt(input: ParsedInput, rung: Rung, maxBlock: number, zoom: number): Attempt {
+function attempt(
+  input: ParsedInput,
+  rung: Rung,
+  maxBlock: number,
+  zoom: number,
+  axis: AxisMode = 'folded'
+): Attempt {
+  /*
+   * ⭐ How generous is the axis? Three settings, tried widest-first by the caller.
+   *
+   *   'full'   waking hours ∪ the day's events, nothing folded — a real calendar
+   *   'events' the day's own span, nothing folded — honest, just tighter
+   *   'folded' the day's own span, quiet stretches collapsed — today's behaviour
+   *
+   * greg, testing on a 1200px wall: "we're only printing calendar time grid
+   * lines around existing events when there is plenty of space… if the space is
+   * available, should we just print the full daily grid rather than collapsing
+   * when not needed?" A fold prints a label precisely because it is lying about
+   * how much time passed; given the room, the truth is the better purchase.
+   *
+   * Each is only ACCEPTED if it fits, so a constrained plot falls through to
+   * 'folded' and gets exactly what it gets today.
+   */
+  const windowStart = axis === 'full' ? input.fullWindowStart : input.windowStart;
+  const windowEnd = axis === 'full' ? input.fullWindowEnd : input.windowEnd;
   /*
    * ⭐ The hour and the FOLD BUDGET zoom together; `rung.minBlock` does not.
    * See ZOOM_STEPS' table for every constant and its verdict.
@@ -786,9 +850,17 @@ function attempt(input: ParsedInput, rung: Rung, maxBlock: number, zoom: number)
    * bottom of the family's day with no exception and no telemetry.
    */
   const pxPerMin = rung.scale * zoom;
-  const threshold = foldThresholdMinutes(rung.gapMinutes, pxPerMin, zoom);
-  const folds = findFolds(input.busy, input.windowStart, input.windowEnd, threshold, zoom);
-  const { yFor } = buildScale(input.windowStart, input.windowEnd, folds, pxPerMin);
+  const folds =
+    axis === 'folded'
+      ? findFolds(
+          input.busy,
+          windowStart,
+          windowEnd,
+          foldThresholdMinutes(rung.gapMinutes, pxPerMin, zoom),
+          zoom
+        )
+      : [];
+  const { yFor } = buildScale(windowStart, windowEnd, folds, pxPerMin);
 
   const columns: GridBlock[][] = input.byColumn.map((columnItems, columnIndex) => {
     const placement = input.lanes[columnIndex]!;
@@ -861,7 +933,7 @@ function attempt(input: ParsedInput, rung: Rung, maxBlock: number, zoom: number)
    * does not fit, and the `overflow: hidden` plot swallows the bottom of the
    * family's day with no exception and no telemetry.
    */
-  const gridBottom = buildScale(input.windowStart, input.windowEnd, bands, pxPerMin).total;
+  const gridBottom = buildScale(windowStart, windowEnd, bands, pxPerMin).total;
   const blockBottom = all.length ? Math.max(...all.map((b) => b.top + b.height)) : 0;
   return {
     columns,
@@ -869,6 +941,8 @@ function attempt(input: ParsedInput, rung: Rung, maxBlock: number, zoom: number)
     yFor: shiftedYFor,
     total: Math.max(gridBottom, blockBottom),
     scale: pxPerMin,
+    windowStart,
+    windowEnd,
   };
 }
 
@@ -986,11 +1060,13 @@ export function layoutTimeGrid(
    * keeps the grid's hour on one of six known heights instead of a different one
    * every day.
    */
-  const zoomed = tryZoomedFit(input, height, maxBlock);
-  if (zoomed) return finish(zoomed.attempt, base, input, 0, zoomed.attempts, 'fit');
+  const generous = tryGenerousFit(input, height, maxBlock);
+  if (generous) {
+    return finish(generous.attempt, base, 0, generous.attempts, 'fit', generous.axis);
+  }
 
   // The candidates the pre-pass burned still count against MAX_ATTEMPTS.
-  let attempts = zoomCandidates(height).length;
+  let attempts = (zoomCandidates(height).length + 1) * 2;
   let last: Attempt | null = null;
   let acceptedRung = 0;
 
@@ -1000,22 +1076,22 @@ export function layoutTimeGrid(
     // The +1px tolerance is deliberate: without it a layout landing a hundredth
     // of a pixel over budget walks the entire ladder for nothing.
     if (candidate.total <= height + 1) {
-      return finish(candidate, base, input, rungIndex, attempts, 'fit');
+      return finish(candidate, base, rungIndex, attempts, 'fit');
     }
     last = candidate;
     acceptedRung = rungIndex;
   }
 
-  return finish(squeeze(last!, height), base, input, acceptedRung, attempts, 'squeezed');
+  return finish(squeeze(last!, height), base, acceptedRung, attempts, 'squeezed');
 }
 
 function finish(
   a: Attempt,
   base: Pick<GridLayout, 'windowStart' | 'windowEnd' | 'rejected'>,
-  input: ParsedInput,
   rungIndex: number,
   attempts: number,
-  outcome: 'fit' | 'squeezed'
+  outcome: 'fit' | 'squeezed',
+  axis: AxisMode = 'folded'
 ): GridLayout {
   /*
    * The tier says which compromise this day cost, and it leads with whether the
@@ -1030,12 +1106,24 @@ function finish(
         ? 'floored'
         : rungIndex > 0
           ? 'tightened'
-          : 'gentle';
+          : // ⭐ `roomy` is better than `gentle`, not a different kind of
+            // compromise: the whole day is drawn, unfolded. It is a new TIER
+            // VALUE rather than a new context key, so it reaches the firehose on
+            // the field that already carries the tier and answers the only
+            // question this change has — does a real wall ever have the room?
+            axis === 'full'
+            ? 'roomy'
+            : 'gentle';
   return {
     ...base,
+    // ⚠️ The 'full' axis widens the window, so the layout's own bounds must come
+    // from the accepted attempt rather than from the tight event span in `base`
+    // — the ticks, the now-line and every consumer of `windowEnd` read these.
+    windowStart: a.windowStart,
+    windowEnd: a.windowEnd,
     columns: a.columns,
     folds: a.bands,
-    ticks: buildTicks(input.windowStart, input.windowEnd, a.bands, a.yFor),
+    ticks: buildTicks(a.windowStart, a.windowEnd, a.bands, a.yFor),
     yFor: a.yFor,
     scale: a.scale,
     tier,
