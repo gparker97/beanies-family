@@ -1578,6 +1578,8 @@ async function fetchAndMergeRemote(): Promise<void> {
     action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
     dirty: boolean;
     remoteHeads: string[] | null;
+    replayed?: number;
+    conflicts?: number;
   };
   try {
     merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId, basis);
@@ -1665,10 +1667,24 @@ async function fetchAndMergeRemote(): Promise<void> {
   // derivation losing edits. Two constant messages, so the 50/surface/min
   // limiter buckets them apart from each other and from the blocks.
   logEvent({
-    level: 'info',
+    // ⚠️ A REBASE THAT DROPPED SOMETHING IS NOT ROUTINE. `conflicts` counts
+    // writes the replay could not carry across — the peer's edit to a field the
+    // compactor had also written — so a family that lost something must be
+    // findable without a repro.
+    level: merged.conflicts ? 'warn' : 'info',
     surface: 'pod-lineage',
     message: `poll terminus ${merged.action}`,
-    context: { action: merged.action, family_id: remoteEnvelope.familyId },
+    context: {
+      action: merged.action,
+      family_id: remoteEnvelope.familyId,
+      // ⚠️ ON THE SUCCESS PATH TOO. The only rebase telemetry was a failure
+      // counter, so the RATE the soak has to judge — how often a rebase runs,
+      // and how much it carries — was unmeasurable. Absent for every other
+      // action, so the field itself says whether a rebase happened.
+      ...(merged.action === 'rebased'
+        ? { detail: `replayed=${merged.replayed ?? 0},conflicts=${merged.conflicts ?? 0}` }
+        : {}),
+    },
   });
 
   // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the

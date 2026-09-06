@@ -22502,8 +22502,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备会在下次联机时拾取压缩文件，并且beanies会在离线时携带它们更改的任何内容。",
-      "hash": "ty3o6n",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备下次在线时会拾取压缩文件，并且在离线时， beanies会承载大部分更改内容。如果不能，则告知该设备并保留其更改，直到有人做出决定。",
+      "hash": "medevv",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
@@ -22662,8 +22662,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNote": {
-      "translation": "beanies会将当前文件的副本保存在您的存储设备中，并要求您也将其保存到此设备中。将保存的文件与上面的“加载另一个家庭数据文件”一起使用；如果您需要帮助，可以使用存储空间中的文件。",
-      "hash": "h081cq",
+      "translation": "beanies会将当前文件的副本保存在您的存储设备中，并要求您也将其保存到此设备中。要返回已保存的文件，请使用上面的“加载现有家庭数据文件”。如果您需要帮助，可以随时使用存储空间中的存储空间。",
+      "hash": "3mkias",
       "lastUpdated": "2026-09-06"
     },
     "settings.compactSection": {
@@ -22682,8 +22682,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNoteManual": {
-      "translation": "beanies要求您先保存当前文件的副本。要返回，请使用上面的“加载其他家庭数据文件”。",
-      "hash": "tvcaig",
+      "translation": "beanies要求您先保存当前文件的副本。要返回，请使用上面的“加载现有家庭数据文件”。",
+      "hash": "x9r970",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.safety-copy-damaged": {

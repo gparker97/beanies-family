@@ -21,28 +21,20 @@ const BEANPOD_EXT = '.beanpod';
 /**
  * `family.beanpod` → `family (before compacting).beanpod`.
  *
- * ⚠️ IDEMPOTENT. A family that rolled back onto its own safety copy is now
- * LIVING on a file called `family (before compacting).beanpod`, and compacting
- * again must not produce `family (before compacting) (before compacting).beanpod`
- * — a name that stacks forever and, worse, leaves the family's ACTUAL pod
- * matching `isSafetyCopyName`, so the repair primitives would refuse it.
+ * ⚠️ THE MARKER STACKS, DELIBERATELY, and an earlier version of this comment
+ * claimed the opposite. Stripping an existing marker first looks tidier and is
+ * catastrophic: for a family LIVING on a restored copy it makes the copy name
+ * IDENTICAL to the pod name, and the writer resolves by exact name — so the next
+ * compaction would overwrite the live pod, read it back, match, and report
+ * "safety copy written and verified" with no second file in existence. The
+ * invariant that matters is not idempotency; it is that the result is NEVER the
+ * source's own name.
  */
 export function safetyCopyName(podFileName: string): string {
   const withoutExt = podFileName.endsWith(BEANPOD_EXT)
     ? podFileName.slice(0, -BEANPOD_EXT.length)
     : podFileName;
-  const stripped = withoutExt.endsWith(SAFETY_COPY_INFIX)
-    ? withoutExt.slice(0, -SAFETY_COPY_INFIX.length)
-    : withoutExt;
-  const candidate = `${stripped}${SAFETY_COPY_INFIX}${BEANPOD_EXT}`;
-  // ⚠️ NEVER THE SOURCE'S OWN NAME. Stripping alone stops the marker stacking,
-  // but for a family LIVING on a restored copy it makes the copy name identical
-  // to the pod name — and the writer resolves by exact name, so the next
-  // compaction would overwrite the live pod, read it back, match, and report
-  // "safety copy written and verified". The family would be told they have a
-  // backup they do not have, immediately before the history is destroyed.
-  // Stacking is ugly; a collision is catastrophic.
-  return candidate === podFileName ? `${withoutExt}${SAFETY_COPY_INFIX}${BEANPOD_EXT}` : candidate;
+  return `${withoutExt}${SAFETY_COPY_INFIX}${BEANPOD_EXT}`;
 }
 
 /**

@@ -30,7 +30,7 @@ import { generateUUID } from '@/utils/id';
 import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis } from './protocol';
 import { PayloadLoadError } from '@/types/sync';
-import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
+import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
@@ -725,16 +725,22 @@ function rebaseOntoRemote(
  */
 function maskEntityIds(path: string): string {
   const parts = path.split('.');
-  if (parts.length < 3) return parts.length === 2 ? `${parts[0]}.<id>` : path;
-  // ⚠️ MASK EVERYTHING BETWEEN THE COLLECTION AND THE LEAF, not just the second
-  // segment. Ids are joined into the path with '.', and an EMAIL CONTAINS DOTS
-  // — so masking positionally turned
-  // `driveConnections.someone@example.com.refreshToken` into
-  // `driveConnections.<id>.com.refreshToken`, still leaking part of the
-  // address. Keeping only the first and last segments is total: whatever the id
-  // is made of, it cannot survive. The collection and the field are what triage
-  // needs; the nesting in between is not worth a PII leak into Slack.
-  return `${parts[0]}.<id>.${parts[parts.length - 1]}`;
+  const root = parts[0] ?? '';
+  // ⚠️ SINGLETONS HAVE NO ID SEGMENT. `settings` and `podLineage` are the two
+  // `NON_COLLECTION_KEYS` — maps of FIELDS, not of entities — so segment 2 is a
+  // field name, the single most useful token for triage. Masking it turned
+  // `settings.baseCurrency` into `settings.<id>`, which tells a reader nothing.
+  if ((NON_COLLECTION_KEYS as readonly string[]).includes(root)) return path;
+  // `collection` alone, or `collection.<id>` with the id as the leaf. Masking
+  // the leaf is the whole point: an id can be a Google account email.
+  if (parts.length <= 2) return parts.length === 2 ? `${root}.<id>` : path;
+  // ⚠️ EVERYTHING BETWEEN THE COLLECTION AND THE LEAF. Ids are joined into the
+  // path with '.', and AN EMAIL CONTAINS DOTS — so masking only segment 2 left
+  // `driveConnections.<id>.com.refreshToken`, still leaking the domain, and for
+  // a three-segment path it promoted the TLD into the leaf position. Keeping
+  // the first and last segments is total: whatever the id is made of, it cannot
+  // survive.
+  return `${root}.<id>.${parts[parts.length - 1]}`;
 }
 
 function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
@@ -855,7 +861,10 @@ export async function mergeRemoteEnvelope(
     // unchanged. The rebase is additive safety: it must never lose more than
     // blocking would.
     if (act === 'rebase') {
-      const baseline = basis.kind === 'baseline' ? basis.heads : null;
+      // Both arms that can reach a rebase carry heads — `no-local-document`
+      // never gets here, because it installs before the guard is consulted, and
+      // TypeScript has already narrowed it away by this point.
+      const baseline = basis.heads;
       const rebased = baseline ? rebaseOntoRemote(currentDoc, baseline, remote) : null;
       if (rebased) {
         // Captured from the UNMIGRATED remote, exactly as the branches below
@@ -888,11 +897,13 @@ export async function mergeRemoteEnvelope(
       // "replace what is on this device", so blocking there refuses an
       // instruction they gave — and it is the one path that must never dead
       // end. It adopts instead, exactly as it did before the rebase existed.
-      // ⚠️ SAY WHY. Without this a rebase that could not run is byte-identical
-      // in CloudWatch to a policy block that never attempted one — so "the
-      // rebase machinery is broken" and "the guard correctly refused" look the
-      // same, and the soak that decides whether to enable compaction cannot be
-      // judged. The user-facing error is deliberately unchanged.
+      // ⚠️ SAY WHY, AND ONLY WHEN IT IS TRUE. A rebase that could not run is
+      // otherwise byte-identical in CloudWatch to a policy block that never
+      // attempted one, so "the rebase machinery is broken" and "the guard
+      // correctly refused" look the same — and the soak that decides whether to
+      // enable compaction cannot be judged. Emitted for a genuine failure only:
+      // counting every user-file adopt here would poison the metric with the
+      // routine case. The user-facing error is deliberately unchanged.
       sink.perf('automerge.rebaseUnavailable', 1, {});
       if (lineageCtx !== 'user-file') throw lineageBlockError('adopt-remote');
     }
