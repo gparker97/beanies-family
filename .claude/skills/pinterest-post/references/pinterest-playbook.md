@@ -49,19 +49,26 @@ proliferate.
 
 **Actual boards (keep this in sync with the live account):**
 
-1. **Family Organization and Planning** — the ONLY board on the account as of 2026-08-20.
+1. **Family Organization and Planning** — the original catch-all board.
+2. **Family Meal Planning** — approved by greg 2026-09-05, when the meal-planner post gave
+   the account its first real cluster of meal/recipe pins. Meal planning is a genuinely
+   distinct high-volume search cluster from organization, which is why it earned its own
+   board rather than being folded in. **greg creates the board on Pinterest himself** (there
+   is no API for it) - if it does not exist yet at posting time, that is the blocker, not a
+   pin problem.
 
-On 2026-08-20 greg consolidated everything into this single board (Pinterest has no merge
+On 2026-08-20 greg consolidated everything into a single board (Pinterest has no merge
 button — he bulk-moved pins in, then deleted the emptied boards). The retired/merged-away
 boards were "Family Organization / All-in-one Family App", "Large Family Life", "Family
 Command Center" and "Family Budgeting & Money" — **do NOT recreate any of them**; they no
-longer exist. The Pin Tracker's `Board (s)` options were pruned to match (only this one
-option remains), and all logged pins point at it.
+longer exist. The Pin Tracker's `Board (s)` options were pruned to match. As of 2026-09-05 the
+Tracker carries two options: Family Organization and Planning, and Family Meal Planning.
 
 > **Creating a new board:** greg's rule is keep the list clean — add one ONLY when a
 > genuinely distinct keyword topic clearly benefits, and get his ok first (then add it here
-> AND to the Tracker's options). The strongest future candidate is a real **Family Budgeting
-> & Money** board: "money/budgeting" is a distinct high-intent search cluster from
+> AND to the Tracker's options). The first board to actually earn this
+> was **Family Meal Planning** (2026-09-05). The next strongest candidate is a real
+> **Family Budgeting & Money** board: "money/budgeting" is a distinct high-intent search cluster from
 > "organization", so once there are several money-angle pins it may earn its own board. Never
 > auto-spawn a near-duplicate of the organization board to fit a single pin.
 
