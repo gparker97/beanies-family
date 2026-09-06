@@ -10,13 +10,56 @@ import { deriveMemberKey, unwrapFamilyKey, SALT_LENGTH } from '@/services/crypto
 import { base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
 import { APP_VERSION } from '@/constants/appVersion';
+import type { PodLineage } from '@/types/models';
+import { UnsupportedBeanpodVersionError } from '@/types/sync';
 import type {
   BeanpodFileV4,
+  BeanpodVersion,
   WrappedMemberKey,
   WrappedPasskeyKey,
   InviteKeyPackage,
   RecoveryKeyPackage,
 } from '@/types/syncFileV4';
+
+/** A compacted document is a 5.0 file. Nothing else decides this. */
+const COMPACTED_VERSION: BeanpodVersion = '5.0';
+const LEGACY_VERSION: BeanpodVersion = '4.0';
+
+/**
+ * The versions this build can read. ONE reader: `parseBeanpodV4`. There is no
+ * second version test anywhere in the app for this to drift from.
+ */
+const KNOWN_BEANPOD_VERSIONS: ReadonlySet<string> = new Set<BeanpodVersion>([
+  LEGACY_VERSION,
+  COMPACTED_VERSION,
+]);
+
+/**
+ * The ONE derivation of an envelope's version, from the document it carries.
+ *
+ * ⚠️ DERIVED, NEVER CARRIED. Stamping the version on the envelope once at
+ * compaction and letting the spread carry it lasts exactly one round trip: the
+ * four `kept-local` termini adopt the REMOTE envelope (including its version,
+ * `preserveLocalKeyDicts` spreads `...incoming`) and republish the LOCAL
+ * compacted document under it, so the first self-repair after a compaction
+ * would go out labelled 4.0 and a pre-guard build would merge it. The version
+ * must describe the PAYLOAD, and the payload's lineage lives in the document:
+ * the only writer of `podLineage` is `compactDoc`, so "has a lineage" is
+ * exactly "is compacted".
+ *
+ * `compactionBackup` is the ONE deliberate exception, stated as an INTENT
+ * rather than as a version: the pre-compaction safety pair carries an
+ * un-compacted payload, so the derivation would say 4.0, and a build that
+ * predates the lineage guard could then open it from a picker and fork the
+ * family onto the backup. The writer still does not get to name a version, and
+ * there is no ordering here to get wrong at the next bump.
+ */
+export function beanpodVersionFor(
+  lineage: PodLineage | null,
+  opts?: { compactionBackup?: true }
+): BeanpodVersion {
+  return lineage || opts?.compactionBackup ? COMPACTED_VERSION : LEGACY_VERSION;
+}
 
 /**
  * Create a V4 beanpod file envelope from the current Automerge document.
@@ -28,6 +71,8 @@ export function createBeanpodV4(
   familyId: string,
   familyName: string,
   encryptedPayload: string,
+  /** The lineage of the document `encryptedPayload` carries; decides `version`. */
+  lineage: PodLineage | null,
   wrappedKeys: Record<string, WrappedMemberKey>,
   passkeyWrappedKeys: Record<string, WrappedPasskeyKey> = {},
   inviteKeys: Record<string, InviteKeyPackage> = {},
@@ -37,7 +82,7 @@ export function createBeanpodV4(
   // ADR-032: the worker produces `encryptedPayload` (via docClient.exportEncrypted
   // Payload); main assembles the envelope so wrappedKeys/inviteKeys never leave it.
   const envelope: BeanpodFileV4 = {
-    version: '4.0',
+    version: beanpodVersionFor(lineage),
     familyId,
     familyName,
     keyId: generateUUID(),
@@ -70,8 +115,15 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
 
   const obj = parsed as Record<string, unknown>;
 
-  if (obj.version !== '4.0') {
-    throw new Error(`Unsupported beanpod version: ${obj.version}. Expected 4.0.`);
+  // A string version this build does not know is a file from a NEWER beanies,
+  // not a damaged one: a typed, non-latching, non-corruption error, thrown at
+  // the one validator every reader funnels through so no caller has to
+  // classify it. A missing or non-string version is still simply not a beanpod.
+  if (typeof obj.version === 'string' && !KNOWN_BEANPOD_VERSIONS.has(obj.version)) {
+    throw new UnsupportedBeanpodVersionError(obj.version);
+  }
+  if (typeof obj.version !== 'string') {
+    throw new Error(`Invalid beanpod: missing version`);
   }
 
   if (typeof obj.familyId !== 'string') throw new Error('Invalid beanpod: missing familyId');
@@ -211,12 +263,27 @@ export async function tryUnwrapFamilyKey(
  * Returns the updated envelope as a JSON string.
  * Does NOT modify wrappedKeys/passkeyWrappedKeys/inviteKeys — caller handles those.
  */
-export function reEncryptEnvelope(envelope: BeanpodFileV4, encryptedPayload: string): string {
+export function reEncryptEnvelope(
+  envelope: BeanpodFileV4,
+  encryptedPayload: string,
+  /**
+   * REQUIRED, and a lineage rather than a version string: the writer cannot
+   * pass the wrong version because it does not get to choose one. See
+   * `beanpodVersionFor`.
+   */
+  lineage: PodLineage | null,
+  opts?: { compactionBackup?: true }
+): string {
   // ADR-032: `encryptedPayload` comes from docClient.exportEncryptedPayload().
   // Re-stamp writerVersion so the re-written file reflects the version that re-wrote
   // it (not a stale/absent one) — otherwise the #44 "no old writer remains" check is
   // misinformed by a key-rotation / member-change re-encrypt.
-  const updated: BeanpodFileV4 = { ...envelope, encryptedPayload, writerVersion: APP_VERSION };
+  const updated: BeanpodFileV4 = {
+    ...envelope,
+    version: beanpodVersionFor(lineage, opts),
+    encryptedPayload,
+    writerVersion: APP_VERSION,
+  };
   return JSON.stringify(updated, null, 2);
 }
 

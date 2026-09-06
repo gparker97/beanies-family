@@ -17,6 +17,13 @@ import {
   type CollectionName,
 } from '@/types/automerge';
 import type { PodLineage } from '@/types/models';
+// ⚠️ NOT a bare `crypto.randomUUID()`. It is undefined on a NON-SECURE origin —
+// which is exactly how a tablet is tested (`npm run dev -- --host` on a LAN IP)
+// — and the resulting TypeError matches none of `isAllocationFailure`'s
+// patterns, so `payloadFailure` classifies it as a CorruptPayloadError and the
+// user is told their family data may be damaged. `generateUUID` has the
+// fallback this needs and is what the rest of the app uses.
+import { generateUUID } from '@/utils/id';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
@@ -67,6 +74,23 @@ function toPlain<T>(value: T): T {
  */
 export function docLineage(doc: Doc): PodLineage | null {
   return (doc as { podLineage?: PodLineage | null }).podLineage ?? null;
+}
+
+/**
+ * The next lineage generation after `prev`. THE ONE MINT, and there is no
+ * second: a lineage is a fresh id at the next seq, whoever is asking.
+ *
+ * Three callers, each applying it differently and each right where it is:
+ *  - `compactDoc` stamps it INTO the plain source before `Automerge.from`, so
+ *    the rebuilt document is a single change and the verify runs against the
+ *    stamped bytes;
+ *  - the restore stamp in `mergeRemoteEnvelope` applies it as an
+ *    `Automerge.change` to an already-built document, because rebuilding there
+ *    would destroy the history the restore exists to recover;
+ *  - the env-gated `beanpodProfile` diagnostic, like `compactDoc`.
+ */
+export function nextLineage(prev: PodLineage | null): PodLineage {
+  return { id: generateUUID(), seq: (prev?.seq ?? 0) + 1 };
 }
 
 export function migrateDoc(doc: Doc): Doc {

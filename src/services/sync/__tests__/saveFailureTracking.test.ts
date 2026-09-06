@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { ExportedPayload } from '@/services/automerge/worker/protocol';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
 
@@ -14,7 +15,11 @@ vi.mock('../fileHandleStore', () => ({
   verifyPermission: vi.fn(async () => true),
   getProviderConfig: vi.fn(async () => null),
 }));
-vi.mock('../fileSync', () => ({
+vi.mock('../fileSync', async (importOriginal) => ({
+  // The version DERIVATION is real even where the writers are mocked: a
+  // test-local `'4.0'` here would hide the one regression the derivation
+  // exists to prevent (a compacted pod written as 4.0).
+  beanpodVersionFor: (await importOriginal<typeof import('../fileSync')>()).beanpodVersionFor,
   reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
   parseBeanpodV4: vi.fn(() => ({})),
   detectFileVersion: vi.fn(() => 4),
@@ -143,6 +148,7 @@ describe('syncService — save failure tracking', () => {
       vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
         payload: 'base64-payload==',
         heads: ['h-uploaded'],
+        lineage: null,
       });
       syncService.setProvider(okProvider({ revision: 'ver:9' }));
 
@@ -162,6 +168,7 @@ describe('syncService — save failure tracking', () => {
       vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
         payload: 'base64-payload==',
         heads: ['h-uploaded'],
+        lineage: null,
       });
       const provider = {
         ...okProvider(undefined),
@@ -183,7 +190,7 @@ describe('syncService — save failure tracking', () => {
       // critical "data isn't saving" banner.
       vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
         payload: 'base64-payload==',
-      } as unknown as { payload: string; heads: string[] });
+      } as unknown as ExportedPayload);
       syncService.setProvider(okProvider({ revision: 'ver:9' }));
 
       const result = await syncService.save();

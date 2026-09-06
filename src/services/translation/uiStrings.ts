@@ -4363,6 +4363,19 @@ const STRING_DEFS = {
     beanie:
       "check your files and make sure the copy is really there. nothing is deleted either way; this is the copy you'd go back to if you ever needed it.",
   },
+  // The file was saved by a NEWER beanies. Four registers of one sentence
+  // (sync bar, boot overlay, pod-access, join); the Help Center article is
+  // written once and all four agree with it.
+  'podNewerVersion.inline': {
+    en: 'This family file was saved by a newer version of beanies. Update beanies on this device to open it. Nothing on this device is lost.',
+    beanie:
+      'this pod was saved by a newer version of beanies. update beanies on this bean to open it. nothing on this bean is lost.',
+  },
+  'resumeSetup.podNewerVersion': {
+    en: 'This family file was saved by a newer version of beanies. Update beanies on this device to open it. Nothing on this device is lost.',
+    beanie:
+      'this pod was saved by a newer version of beanies. update beanies on this bean to open it. nothing on this bean is lost.',
+  },
   'compaction.refused.not-owner': {
     en: 'Only the person who set up your family can compact the family file.',
     beanie: 'only the bean who set up your family can compact the family pod.',

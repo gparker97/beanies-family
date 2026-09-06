@@ -209,7 +209,12 @@ vi.mock('@/services/sync/capabilities', () => ({
 }));
 
 // File sync
-vi.mock('@/services/sync/fileSync', () => ({
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  // The version DERIVATION is real even where the writers are mocked: a
+  // test-local `'4.0'` here would hide the one regression the derivation
+  // exists to prevent (a compacted pod written as 4.0).
+  beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
+    .beanpodVersionFor,
   reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
   parseBeanpodV4: vi.fn(() => ({})),
   detectFileVersion: vi.fn(() => 4),

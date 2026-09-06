@@ -18,9 +18,25 @@ import type { CollectionName } from '@/types/automerge';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
+import type { PodLineage } from '@/types/models';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
+
+/**
+ * What `exportEncryptedPayload` hands main. ONE declaration, imported by both
+ * the worker function and the `docClient` wrapper. The two sides used to
+ * hand-write the same literal independently with nothing cross-checking them;
+ * if the client learns `lineage` and the worker forgets to return it, the
+ * destructure yields `undefined`, typed by a lying declaration, and every save
+ * writes 4.0 for a compacted pod. A type here makes that a compile error.
+ */
+export interface ExportedPayload {
+  payload: string;
+  heads: Heads;
+  /** The document's lineage at export; `null` for a never-compacted family. */
+  lineage: PodLineage | null;
+}
 
 // ─── Projection deltas (worker → main, applied before an RPC resolves) ───────
 

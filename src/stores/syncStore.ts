@@ -2280,11 +2280,15 @@ export const useSyncStore = defineStore('sync', () => {
       // Post the key to the worker, then have it encrypt the doc → payload; main
       // assembles the envelope (keys never leave main).
       await docClient.setFamilyKey(fk, familyId);
-      const { payload } = await docClient.exportEncryptedPayload();
+      const { payload, lineage } = await docClient.exportEncryptedPayload();
       const envelopeJson = createBeanpodV4(
         familyId,
         familyName,
         payload,
+        // A create-time document has no lineage, so this derives 4.0; it is
+        // passed rather than assumed so a future reuse over an existing
+        // document cannot write a compacted payload labelled 4.0.
+        lineage,
         wrappedKeys,
         {},
         {},
@@ -2823,15 +2827,24 @@ export const useSyncStore = defineStore('sync', () => {
    * returning: the old shape was unsurfaced (nothing rendered `error.value` on
    * this path), so the export silently did nothing.
    */
-  async function buildExportEnvelope(): Promise<{ json: string; filename: string }> {
+  async function buildExportEnvelope(
+    /**
+     * `compactionBackup` is passed ONLY by the compaction flow: the
+     * pre-compaction safety pair must be a 5.0 file even though its payload is
+     * not yet compacted, or a pre-guard build could open it from a picker and
+     * fork the family onto the backup. Every other export stays derived from
+     * the document. See `beanpodVersionFor`.
+     */
+    opts?: { compactionBackup?: true }
+  ): Promise<{ json: string; filename: string }> {
     if (!familyKey.value || !envelope.value) {
       throw new Error('No family key — cannot export');
     }
     // The worker encrypts the current doc → payload; main assembles the envelope.
-    const { payload } = await docClient.exportEncryptedPayload();
+    const { payload, lineage } = await docClient.exportEncryptedPayload();
     const date = new Date().toISOString().split('T')[0];
     return {
-      json: reEncryptEnvelope(envelope.value, payload),
+      json: reEncryptEnvelope(envelope.value, payload, lineage, opts),
       filename: `my-family-${date}.beanpod`,
     };
   }

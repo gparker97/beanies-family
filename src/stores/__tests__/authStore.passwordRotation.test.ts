@@ -98,7 +98,15 @@ const { unwrapWrappedKeyMock } = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('@/services/sync/fileSync', () => ({
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  // The version DERIVATION is real even where the writers are mocked: a
+
+  // test-local `'4.0'` here would hide the one regression the derivation
+
+  // exists to prevent (a compacted pod written as 4.0).
+
+  beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
+    .beanpodVersionFor,
   unwrapWrappedKey: unwrapWrappedKeyMock,
   // syncService.ts imports a bunch of names from fileSync. Stub them so the
   // module can load (we're not exercising any of these paths).

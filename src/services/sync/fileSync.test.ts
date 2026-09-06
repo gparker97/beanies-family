@@ -10,7 +10,19 @@
  * (`tryUnwrapFamilyKey`). Those are what this file exercises.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createBeanpodV4, parseBeanpodV4, detectFileVersion, tryUnwrapFamilyKey } from './fileSync';
+import {
+  createBeanpodV4,
+  parseBeanpodV4,
+  detectFileVersion,
+  tryUnwrapFamilyKey,
+  reEncryptEnvelope,
+  beanpodVersionFor,
+} from './fileSync';
+import {
+  PayloadLoadError,
+  CorruptPayloadError,
+  UnsupportedBeanpodVersionError,
+} from '@/types/sync';
 import {
   generateFamilyKey,
   deriveMemberKey,
@@ -35,7 +47,7 @@ describe('fileSync V4 format', () => {
   describe('createBeanpodV4 assembles a parseable envelope', () => {
     it('round-trips through parseBeanpodV4 preserving all fields', () => {
       const wrappedKeys = { 'm-1': { wrapped: 'w', salt: 's' } };
-      const json = createBeanpodV4('fam-1', 'Test Family', 'base64-payload==', wrappedKeys);
+      const json = createBeanpodV4('fam-1', 'Test Family', 'base64-payload==', null, wrappedKeys);
       const envelope = parseBeanpodV4(json);
 
       expect(envelope.version).toBe('4.0');
@@ -54,6 +66,7 @@ describe('fileSync V4 format', () => {
         'fam-2',
         'Fam',
         'payload',
+        null,
         { 'm-1': { wrapped: 'w', salt: 's' } },
         { cred1: { wrapped: 'pw', hkdfSalt: 'hs' } },
         { tok1: { wrapped: 'iw', salt: 'is', expiresAt: '2099-01-01' } }
@@ -61,6 +74,96 @@ describe('fileSync V4 format', () => {
       const envelope = parseBeanpodV4(json);
       expect(envelope.passkeyWrappedKeys.cred1!.wrapped).toBe('pw');
       expect(envelope.inviteKeys.tok1!.wrapped).toBe('iw');
+    });
+  });
+
+  // ── the version: derived from the document, accepted at both values ──
+
+  describe('beanpodVersionFor is the ONE place a version is chosen', () => {
+    const lineage = { id: 'L', seq: 1 };
+    it('derives 4.0 for a never-compacted document and 5.0 for a compacted one', () => {
+      expect(beanpodVersionFor(null)).toBe('4.0');
+      expect(beanpodVersionFor(lineage)).toBe('5.0');
+    });
+    it('raises the pre-compaction backup to 5.0, and cannot lower a compacted one', () => {
+      // The one deliberate exception, stated as an intent rather than a
+      // version, so it cannot express a downgrade at the next bump.
+      expect(beanpodVersionFor(null, { compactionBackup: true })).toBe('5.0');
+      expect(beanpodVersionFor(lineage, { compactionBackup: true })).toBe('5.0');
+    });
+  });
+
+  describe('the writers derive the version; they never carry it', () => {
+    const base = {
+      version: '4.0' as const,
+      familyId: 'f',
+      familyName: 'n',
+      keyId: 'k',
+      wrappedKeys: {},
+      passkeyWrappedKeys: {},
+      inviteKeys: {},
+      encryptedPayload: 'x',
+    };
+    it('reEncryptEnvelope writes 5.0 for a compacted document even when the envelope says 4.0', () => {
+      // ⚠️ THE TRAP 1 PIN, at the unit level. The four kept-local termini adopt
+      // the REMOTE envelope (version and all) and republish the LOCAL compacted
+      // document under it. If this reads `envelope.version` the protection
+      // lasts one round trip.
+      const out = JSON.parse(reEncryptEnvelope(base, 'p', { id: 'L', seq: 1 }));
+      expect(out.version).toBe('5.0');
+    });
+    it('reEncryptEnvelope writes 4.0 for a never-compacted document even when the envelope says 5.0', () => {
+      // The restore direction: after a user-file adopt of the pre-compaction
+      // copy the document has no lineage, whatever label the envelope carried.
+      const out = JSON.parse(reEncryptEnvelope({ ...base, version: '5.0' }, 'p', null));
+      expect(out.version).toBe('4.0');
+    });
+    it('createBeanpodV4 writes 4.0 for a lineage-less document and 5.0 for a compacted one', () => {
+      expect(parseBeanpodV4(createBeanpodV4('f', 'n', 'p', null, {})).version).toBe('4.0');
+      expect(parseBeanpodV4(createBeanpodV4('f', 'n', 'p', { id: 'L', seq: 2 }, {})).version).toBe(
+        '5.0'
+      );
+    });
+  });
+
+  describe('parseBeanpodV4 accepts 5.0 and types anything newer', () => {
+    const fields = {
+      familyId: 'f',
+      familyName: 'n',
+      keyId: 'k',
+      wrappedKeys: {},
+      encryptedPayload: 'x',
+    };
+    it('accepts a 5.0 envelope with the same field checks as 4.0', () => {
+      expect(parseBeanpodV4(JSON.stringify({ version: '5.0', ...fields })).version).toBe('5.0');
+      expect(() => parseBeanpodV4(JSON.stringify({ version: '5.0', familyId: 'f' }))).toThrow(
+        'missing familyName'
+      );
+    });
+    it('throws a typed, non-latching, non-corruption error for a version it does not know', () => {
+      // ⚠️ NEVER a CorruptPayloadError: that is the class the worker's cache
+      // self-heal deletes the cache on, and "update beanies" deletes nothing.
+      let err: unknown;
+      try {
+        parseBeanpodV4(JSON.stringify({ version: '6.0', ...fields }));
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(UnsupportedBeanpodVersionError);
+      expect(err).toBeInstanceOf(PayloadLoadError);
+      expect(err).not.toBeInstanceOf(CorruptPayloadError);
+      const e = err as UnsupportedBeanpodVersionError;
+      expect(e.step).toBe('parse');
+      expect(e.latches).toBe(false);
+      expect(e.keyMayBeWrong).toBe(false);
+      expect(e.deviceCannotOpen).toBe(false);
+      expect(e.needsAppUpdate).toBe(true);
+      expect(e.fileVersion).toBe('6.0');
+      expect(e.blockDetail).toBe('version=6.0');
+      expect(e.name).toBe('UnsupportedBeanpodVersionError');
+    });
+    it('still treats a missing version as not-a-beanpod, not as newer', () => {
+      expect(() => parseBeanpodV4(JSON.stringify({ ...fields }))).toThrow('missing version');
     });
   });
 
