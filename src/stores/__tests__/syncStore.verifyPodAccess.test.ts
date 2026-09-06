@@ -559,3 +559,43 @@ describe('syncStore.verifyPodAccess', () => {
     demoRef.value = false; // don't leak demo state into other tests
   });
 });
+
+/**
+ * `rebindPodFile` is the shared repair behind four `POD_ACCESS_ERRORS` codes
+ * and the save-failure banner. It moves the family's REGISTRY POINTER on
+ * success, so what it accepts propagates to every member.
+ */
+describe('syncStore.rebindPodFile — the compaction safety copy', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('REFUSES our own backup, which passes the family-id check by construction', async () => {
+    // ⚠️ THE FORK VECTOR. The safety copy IS this family, so the only content
+    // gate waves it through — and on success `registerCurrentFamily` moves the
+    // pointer, so every other member is healed onto the backup. Reachable by
+    // tapping the row above the right one in a picker. That is the ADR-033
+    // failure this primitive exists to prevent.
+    const store = useSyncStore();
+    store.familyKey = {} as CryptoKey;
+    store.envelope = { familyId: 'family-123' } as never;
+
+    const result = await store.rebindPodFile('file-abc', 'parker (before compacting).beanpod');
+
+    expect(result.ok).toBe(false);
+    // It never even reads the file: the name alone settles it.
+    expect(mockFromExisting).not.toHaveBeenCalled();
+  });
+
+  it('still accepts an ordinary pod file', async () => {
+    const store = useSyncStore();
+    store.familyKey = {} as CryptoKey;
+    store.envelope = { familyId: 'family-123' } as never;
+
+    await store.rebindPodFile('file-abc', 'parker.beanpod');
+
+    // Reached the read — whatever happens after is the existing behaviour.
+    expect(mockFromExisting).toHaveBeenCalled();
+  });
+});

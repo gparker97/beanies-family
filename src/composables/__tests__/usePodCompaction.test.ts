@@ -7,7 +7,8 @@
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { showToast } from '@/composables/useToast';
-import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import { reportError } from '@/utils/errorReporter';
+import { PayloadTooLargeError } from '@/types/sync';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const hooks = vi.hoisted(() => ({
@@ -17,8 +18,8 @@ const hooks = vi.hoisted(() => ({
   backupLanded: true,
   canWrite: true,
   pulled: true,
-  hasAux: true,
-  verifyThrows: null as unknown,
+  hasProvider: true,
+  auxAvailable: true,
 }));
 
 vi.mock('@/composables/useConfirm', () => ({
@@ -50,16 +51,12 @@ vi.mock('@/services/sync/syncService', () => ({
   // The write proof: a revoked file permission or an expired token must be
   // caught BEFORE the lineage is stamped, not at the publish.
   hasPermission: vi.fn(async () => hooks.canWrite),
-  getProvider: () => (hooks.hasAux ? providerStub : null),
+  getProvider: () => (hooks.hasProvider ? providerStub : null),
 }));
 vi.mock('@/services/sync/storageProvider', () => ({
-  getAuxStore: (p: unknown) => (p ? auxStub : null),
+  getAuxStore: (p: unknown) => (p && hooks.auxAvailable ? auxStub : null),
 }));
 vi.mock('@/services/automerge/worker/docClient', () => ({
-  verifyEnvelope: vi.fn(async () => {
-    if (hooks.verifyThrows) throw hooks.verifyThrows;
-    return { ok: true as const };
-  }),
   compactDoc: vi.fn(async () => ({
     beforeBytes: 2_000_000,
     afterBytes: 170_000,
@@ -77,8 +74,9 @@ const buildExportEnvelope = vi.fn(async () => ({
   filename: 'f.beanpod',
 }));
 const auxWrite = vi.fn(async () => {});
-const auxRead = vi.fn(async () => '{"version":"4.0"}');
-const auxStub = { list: vi.fn(), read: auxRead, write: auxWrite, delete: vi.fn() };
+const auxRead = vi.fn<() => Promise<string | null>>(async () => '{"version":"4.0"}');
+const auxDelete = vi.fn(async () => {});
+const auxStub = { list: vi.fn(), read: auxRead, write: auxWrite, delete: auxDelete };
 const providerStub = { getDisplayName: () => 'family.beanpod' };
 const replaceEnvelope = vi.fn();
 // The unconditional pull. `isFullySynced` trusts a change probe that, with no
@@ -108,8 +106,8 @@ beforeEach(() => {
     backupLanded: true,
     canWrite: true,
     pulled: true,
-    hasAux: true,
-    verifyThrows: null,
+    hasProvider: true,
+    auxAvailable: true,
   });
 });
 
@@ -227,8 +225,6 @@ describe('the automatic safety copy', () => {
   it('builds the envelope ONCE and gives the same bytes to both', async () => {
     await usePodCompaction().compact();
 
-    // Two whole-document serialize + AES-GCM passes back to back is exactly the
-    // wrong thing on the low-memory device this feature exists for.
     expect(buildExportEnvelope).toHaveBeenCalledTimes(1);
     expect(deliverPod).toHaveBeenCalledWith(
       { json: '{"version":"4.0"}', filename: 'f.beanpod' },
@@ -236,14 +232,42 @@ describe('the automatic safety copy', () => {
     );
   });
 
-  it('reads it back and OPENS it before destroying anything', async () => {
+  it('compares what came BACK against what went out, not against itself', async () => {
+    // ⚠️ THE HEADLINE GUARANTEE, and it had no test at all: verifying the
+    // in-memory bytes instead of the round trip passed all sixteen. That is the
+    // likeliest refactoring mistake here — it looks like a free allocation
+    // saving — and it silently turns the check into a no-op. Drive returns
+    // DIFFERENT bytes, so a check against `built.json` cannot notice.
+    auxRead.mockResolvedValueOnce('{"version":"4.0","truncated":true}');
+
     await usePodCompaction().compact();
 
-    // "Written" is not "landed", and "landed" is not "opens". Only the third is
-    // the gate that matters for a one-way migration.
     expect(auxRead).toHaveBeenCalledWith('family (before compacting).beanpod');
-    expect(docClient.verifyEnvelope).toHaveBeenCalled();
-    expect(docClient.compactDoc).toHaveBeenCalled();
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('removes a damaged copy rather than leaving it in the picker', async () => {
+    // The copy IS in the folder and it is wrong. Telling the user nothing was
+    // saved would leave a bad file described to them as their rollback point.
+    auxRead.mockResolvedValueOnce('{"version":"4.0","truncated":true}');
+
+    await usePodCompaction().compact();
+
+    expect(auxDelete).toHaveBeenCalledWith('family (before compacting).beanpod');
+    expect(showToast).toHaveBeenCalledWith(
+      'warning',
+      'compaction.refused',
+      'compaction.refused.safety-copy-damaged',
+      expect.anything()
+    );
+  });
+
+  it('REFUSES, changing nothing, when the copy vanished between write and read', async () => {
+    auxRead.mockResolvedValueOnce(null);
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
   });
 
   it('REFUSES, changing nothing, when the copy cannot be written', async () => {
@@ -254,19 +278,26 @@ describe('the automatic safety copy', () => {
     expect(docClient.compactDoc).not.toHaveBeenCalled();
   });
 
-  it('REFUSES, changing nothing, when the copy will not open', async () => {
-    hooks.verifyThrows = new CorruptPayloadError('bad bytes', 'load', 'fam-1');
+  it('reports every safety-copy refusal — none is silent', async () => {
+    // CLAUDE.md makes diagnostics an acceptance criterion. Every one of these
+    // could be deleted with the suite green before this test existed.
+    auxWrite.mockRejectedValueOnce(new Error('drive said no'));
 
     await usePodCompaction().compact();
 
-    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'pod-compaction',
+        context: expect.objectContaining({ error_code: 'safety-copy-write' }),
+      })
+    );
   });
 
-  it('tells an out-of-memory verify apart from a bad copy', async () => {
-    // ⚠️ DIFFERENT SENTENCES. "This device ran out of memory checking the copy"
-    // is not "your backup is corrupt", and only the second means the bytes are
-    // bad. Collapsing them tells a family their one rollback route is ruined.
-    hooks.verifyThrows = new PayloadTooLargeError('oom', 'load', 'fam-1');
+  it('tells an out-of-memory BACKUP apart from a backup that was not saved', async () => {
+    // ⚠️ DIFFERENT SENTENCES. "Your data is too big for this phone" is not
+    // "the backup failed to save, try again and save the file when asked" —
+    // the second tells the user to do something they were never asked to do.
+    buildExportEnvelope.mockRejectedValueOnce(new PayloadTooLargeError('oom', 'load', 'fam-1'));
 
     await usePodCompaction().compact();
 
@@ -274,19 +305,42 @@ describe('the automatic safety copy', () => {
     expect(showToast).toHaveBeenCalledWith(
       'warning',
       'compaction.refused',
-      'compaction.refused.safety-copy-too-large',
+      'compaction.refused.backup-too-large',
       expect.anything()
     );
   });
 
+  it('does not swallow the build failure', async () => {
+    buildExportEnvelope.mockRejectedValueOnce(new Error('nope'));
+
+    await usePodCompaction().compact();
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ error_code: 'backup-build-failed' }),
+      })
+    );
+  });
+
   it('keeps the manual gate when the provider cannot write siblings', async () => {
-    // A local-file family has no aux store. It still gets the export gate, and
-    // the compaction still runs.
-    hooks.hasAux = false;
+    // ⚠️ A LOCAL-FILE FAMILY, not "no provider at all" — which is what the
+    // previous version of this test actually exercised. The provider exists and
+    // works; it simply has no aux store.
+    hooks.auxAvailable = false;
 
     await usePodCompaction().compact();
 
     expect(auxWrite).not.toHaveBeenCalled();
+    expect(docClient.compactDoc).toHaveBeenCalled();
+  });
+
+  it('does not crash when there is no provider at all', async () => {
+    // `getAuxStore(null)` throws in production; the guard is `provider ? … :
+    // null`, and the test double is null-tolerant so it cannot see the crash.
+    hooks.hasProvider = false;
+
+    await usePodCompaction().compact();
+
     expect(docClient.compactDoc).toHaveBeenCalled();
   });
 });

@@ -30,6 +30,25 @@ describe('safety copy naming', () => {
     expect(isSafetyCopyName('before compacting.beanpod')).toBe(false);
   });
 
+  it('is ANCHORED, so a human-named pod is not classified as a backup', () => {
+    // ⚠️ Pod names come from the family name with no sanitisation, and Drive
+    // files can be renamed by hand. A substring test would classify this as a
+    // backup, and the repair primitives would then refuse the only pod the
+    // family has — telling them their own file is not a beanies pod.
+    expect(isSafetyCopyName('parker (before compacting) holiday.beanpod')).toBe(false);
+    expect(isSafetyCopyName('notes about (before compacting).txt')).toBe(false);
+    expect(isSafetyCopyName('parker (before compacting).beanpod')).toBe(true);
+  });
+
+  it('is IDEMPOTENT, so compacting a rolled-back pod does not stack the marker', () => {
+    // A family that restored its own safety copy is now LIVING on that file.
+    // Compacting again must not produce "… (before compacting) (before
+    // compacting).beanpod" — which stacks forever and, worse, leaves the real
+    // pod matching `isSafetyCopyName`.
+    const once = safetyCopyName('parker.beanpod');
+    expect(safetyCopyName(once)).toBe(once);
+  });
+
   it('keeps the marker untranslated and readable as a backup', () => {
     // A localized marker would be unmatchable the moment the reader's language
     // differed from the writer's — a filter that silently does nothing. And the
