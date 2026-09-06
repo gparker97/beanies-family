@@ -4213,9 +4213,9 @@ const STRING_DEFS = {
   // start again" — and because the app cannot hide the Clear-data control in
   // Settings. Do not delete it on the grounds that the button is gone.
   'resumeSetup.podTooLarge': {
-    en: 'This device ran out of memory opening a family file this size. Your file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. The lasting fix is to compact the family file, which the owner can do from Settings on a computer or another device that still opens it — this device will then open it normally. If it keeps happening, send support@beanies.family the details below.',
+    en: 'This device ran out of memory opening a family file this size. Your file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. A computer or a newer device will still open it. If it keeps happening, send support@beanies.family the details below and we can make the file smaller for you.',
     beanie:
-      'this bean ran out of memory opening a family file this size. your file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. the lasting fix is to compact the family file, which the owner can do from settings on a computer or another bean that still opens it - this bean will then open it normally. if it keeps happening, send support@beanies.family the details below.',
+      'this bean ran out of memory opening a family file this size. your file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. a computer or a newer bean will still open it. if it keeps happening, send support@beanies.family the details below and we can make the file smaller for you.',
   },
   // The INLINE variant, for the compact error slots under a password field
   // (LoadPodView, SettingsPage, the join and login flows). The overlay copy
@@ -4223,9 +4223,9 @@ const STRING_DEFS = {
   // button that exist only on the fatal overlay — using it here would reference
   // UI the user cannot see.
   'podTooLarge.inline': {
-    en: 'This device ran out of memory opening your family file. Your file is safe; the problem is this device, not your data. The owner can compact the family file from Settings on a device that still opens it, and this one will then open it normally.',
+    en: 'This device ran out of memory opening your family file. Your file is safe; the problem is this device, not your data. A computer or a newer device will still open it.',
     beanie:
-      'this bean ran out of memory opening your family file. your file is safe; the problem is this bean, not your data. the owner can compact the family file from settings on a bean that still opens it, and this one will then open it normally.',
+      'this bean ran out of memory opening your family file. your file is safe; the problem is this bean, not your data. a computer or a newer bean will still open it.',
   },
   // The corrupt-payload INLINE variant. `loginFlow.recoveryCorruptBody` cannot
   // stand in for it: that string was written for OpenRecoveryPanel, which has a
@@ -4376,20 +4376,21 @@ const STRING_DEFS = {
   'compaction.dueBecauseLarge': {
     en: 'Your family file has grown large enough that older phones and tablets may struggle to open it. Compacting now is a good idea.',
     beanie:
-      'your pod has grown large enough that older phones and tablets may struggle to open it. compacting now is a good idea.',
+      'your family file has grown large enough that older phones and tablets may struggle to open it. compacting now is a good idea.',
   },
   'compaction.dueBecauseFailed': {
     en: 'A device in your family could not open the family file because it ran out of memory. Compacting will fix that for them.',
     beanie:
-      'a bean in your family could not open your pod because it ran out of memory. compacting will fix that for them.',
+      'a bean in your family could not open the family file because it ran out of memory. compacting will fix that for them.',
   },
   'compaction.doneNothingToDo': {
     en: 'Nothing else to do — your other devices will pick this up on their own.',
     beanie: 'nothing else to do - your other beans will pick this up on their own.',
   },
-  'compaction.doneWaitingFor': {
-    en: 'One thing left: {names} will pick this up when they next open beanies.',
-    beanie: 'one thing left: {names} will pick this up when they next open beanies.',
+  'compaction.doneButBehind': {
+    en: 'One thing to watch: {names} are on an older version of beanies. Ask them to update before they use it again, so their changes come across safely.',
+    beanie:
+      'one thing to watch: {names} are on an older version of beanies. ask them to update before they use it again, so their changes come across safely.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',

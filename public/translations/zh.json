@@ -22242,13 +22242,13 @@
       "lastUpdated": "2026-09-04"
     },
     "resumeSetup.podTooLarge": {
-      "translation": "打开此大小的家庭文件时，此设备内存不足。您的文件是安全的：没有任何损坏，也没有任何内容被删除。重新加载值得一试；清除数据无济于事，因为文件本身没有变化。持久的解决方案是压缩家庭文件，所有者可以在计算机或其他仍打开它的设备上的“设置”中执行此操作—然后该设备将正常打开它。如果问题仍然存在，请向support@beanies.family发送以下详细信息。",
-      "hash": "vbzhfz",
+      "translation": "打开此大小的家庭文件时，此设备内存不足。您的文件是安全的：没有任何损坏，也没有任何内容被删除。重新加载值得一试；清除数据无济于事，因为文件本身没有变化。计算机或更新的设备仍将打开它。如果这种情况继续发生，请将以下详细信息发送给support@beanies.family ，我们可以为您缩小文件大小。",
+      "hash": "6wbs47",
       "lastUpdated": "2026-09-06"
     },
     "podTooLarge.inline": {
-      "translation": "打开您的家庭文件时，此设备内存不足。您的文件是安全的；问题在于此设备，而不是您的数据。所有者可以从仍然打开它的设备上的“设置”中压缩家庭文件，然后该文件将正常打开。",
-      "hash": "wlpioi",
+      "translation": "打开您的家庭文件时，此设备内存不足。您的文件是安全的；问题在于此设备，而不是您的数据。计算机或更新的设备仍将打开它。",
+      "hash": "rr7bcd",
       "lastUpdated": "2026-09-06"
     },
     "settings.decryptFailed": {
@@ -22721,9 +22721,9 @@
       "hash": "odhl8r",
       "lastUpdated": "2026-09-06"
     },
-    "compaction.doneWaitingFor": {
-      "translation": "还有一件事： {names}将在下次打开便帽时拾取此信息。",
-      "hash": "vb3ovz",
+    "compaction.doneButBehind": {
+      "translation": "值得注意的一点是： {names}使用的是旧版的Beanies。要求他们在再次使用之前进行更新，以便安全地发现他们的更改。",
+      "hash": "fs9h60",
       "lastUpdated": "2026-09-06"
     }
   }

@@ -32,7 +32,16 @@ vi.mock('@/composables/useConfirm', () => ({
 }));
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  // ⚠️ RETURN A REAL TEMPLATE for the two keys that interpolate names. With the
+  // stub echoing the key, both "names who it is waiting for" tests passed with
+  // the `fillTemplate(...)` call removed — they asserted the key, which the
+  // un-named variant also contains.
+  useTranslation: () => ({
+    t: (k: string) =>
+      k === 'compaction.refused.not-soaked.named' || k === 'compaction.doneButBehind'
+        ? `${k}:{names}`
+        : k,
+  }),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
@@ -49,8 +58,9 @@ vi.mock('@/composables/usePodExport', () => ({
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({ activeFamilyId: 'fam-1' }),
 }));
+const updateMember = vi.fn(async () => null);
 vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: () => ({ members: hooks.members }),
+  useFamilyStore: () => ({ members: hooks.members, updateMember }),
 }));
 vi.mock('@/services/sync/syncService', () => ({
   flushPendingSave: vi.fn(async () => {}),
@@ -357,6 +367,38 @@ describe('the automatic safety copy', () => {
  * The soak gate — the reason compaction cannot run while a family member's
  * device has not yet seen a build that honours the lineage guard.
  */
+describe('after a successful compaction', () => {
+  it('clears the out-of-memory marks it just resolved', async () => {
+    // ⚠️ Nothing else clears them. Without this the due note keeps telling the
+    // owner a device cannot open the file — inviting the same one-way,
+    // history-destroying migration forever, on a file that is now small.
+    hooks.members = [
+      {
+        id: 'm2',
+        name: 'Sam',
+        lastLoginAt: TODAY,
+        lineageEpoch: 1,
+        podTooLargeSeenAt: '2026-03-04',
+      },
+    ];
+
+    await usePodCompaction().compact();
+
+    expect(docClient.compactDoc).toHaveBeenCalled();
+    expect(updateMember).toHaveBeenCalledWith('m2', { podTooLargeSeenAt: undefined });
+  });
+
+  it('does not touch a member who never reported one', async () => {
+    hooks.members = [{ id: 'm2', name: 'Sam', lastLoginAt: TODAY, lineageEpoch: 1 }];
+
+    await usePodCompaction().compact();
+
+    expect(updateMember).not.toHaveBeenCalled();
+  });
+});
+
+const TODAY = new Date().toISOString().slice(0, 10);
+
 describe('the soak gate', () => {
   const stale = [{ id: 'm2', name: 'Sam', lastLoginAt: new Date().toISOString().slice(0, 10) }];
   const current = [
@@ -386,10 +428,12 @@ describe('the soak gate', () => {
     await usePodCompaction().compact();
 
     expect(docClient.compactDoc).not.toHaveBeenCalled();
+    // The NAME, not just the key: a refusal you can act on beats one you can
+    // only be puzzled by, and the generic refusal satisfies the key alone.
     expect(showToast).toHaveBeenCalledWith(
       'warning',
       'compaction.refused',
-      expect.any(String),
+      expect.stringContaining('Sam'),
       expect.anything()
     );
   });
@@ -426,6 +470,7 @@ describe('the soak gate', () => {
 
     expect(compacted).toBe(true);
     const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
-    expect(detail).toContain('compaction.doneWaitingFor');
+    expect(detail).toContain('compaction.doneButBehind');
+    expect(detail).toContain('Sam');
   });
 });
