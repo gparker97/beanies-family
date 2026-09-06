@@ -4307,26 +4307,26 @@ const STRING_DEFS = {
   'compaction.bringDevicesOnline': {
     en: "Before you start, bring your family's other devices online so they are up to date. beanies carries across changes made on a device that was offline, but if it cannot, that device will be asked to give them up.",
     beanie:
-      "before you start, bring your family's other beans online so they are up to date. beanies carries across beans made on a bean that was offline, but if it cannot, that bean will be asked to give them up.",
+      "before you start, bring your family's other devices online so they are up to date. beanies carries across changes made on a device that was offline, but if it cannot, that device will be asked to give them up.",
   },
   // Two variants, because the sibling copy is written only where the storage
   // provider can write one. Promising it to a local-file family would be asking
   // for consent to a one-way migration on a guarantee they were never given.
   'compaction.safetyCopyNote': {
-    en: 'beanies keeps a copy of the current file beside it in your storage, and asks you to save one to this device too. Use the saved one with Load Another Family Data File above; the one in your storage is there if you need support to help you back.',
+    en: 'beanies keeps a copy of the current file beside it in your storage, and asks you to save one to this device too. To go back to the saved one, use Load Existing Family Data File above. The one in your storage is there if you ever need support to help you back.',
     beanie:
-      'beanies keeps a copy of your current pod beside it in your storage, and asks you to save one to this bean too. use the saved one with load another family data file above; the one in your storage is there if you need support to help you back.',
+      'beanies keeps a copy of your current pod beside it in your storage, and asks you to save one to this device too. to go back to the saved one, use load existing family data file above. the one in your storage is there if you ever need support to help you back.',
   },
   'compaction.safetyCopyNoteManual': {
-    en: 'beanies asks you to save a copy of the current file first. To go back to it, use Load Another Family Data File above.',
+    en: 'beanies asks you to save a copy of the current file first. To go back to it, use Load Existing Family Data File above.',
     beanie:
-      'beanies asks you to save a copy of your current pod first. to go back to it, use load another family data file above.',
+      'beanies asks you to save a copy of your current pod first. to go back to it, use load existing family data file above.',
   },
   'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
   'compaction.confirmMessage': {
-    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online, and beanies carries across anything they changed while offline.',
+    en: 'beanies will rebuild your family file without its record of past changes, so it opens faster and works on older tablets. Nothing on this device is lost, and beanies saves a copy of the current file first. Your other devices pick the compacted file up next time they are online, and beanies carries across most of what they changed while offline. Where it cannot, that device is told and keeps its changes until someone decides.',
     beanie:
-      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this bean is lost, and beanies saves a copy of your current pod first. your other beans pick the compacted pod up next time they are online, and beanies carries across anything they changed while offline.',
+      'beanies will rebuild your pod without its record of past changes, so it opens faster and works on older tablets. nothing on this device is lost, and beanies saves a copy of your current pod first. your other devices pick the compacted pod up next time they are online, and beanies carries across most of what they changed while offline. where it cannot, that device is told and keeps its changes until someone decides.',
   },
   'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {

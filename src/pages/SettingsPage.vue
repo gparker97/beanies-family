@@ -608,9 +608,12 @@ const podKeepsSiblingCopy = computed(() => {
   // promising a copy beside the pod that a local provider cannot write — the
   // family consenting to a one-way migration on a guarantee the code had
   // stopped giving. `storageProviderType` changes on every provider swap.
-  void syncStore.storageProviderType;
+  // Read into a value the result actually depends on, rather than `void`-ing
+  // it: a bare expression statement reads as dead code, and a terser build with
+  // `pure_getters` would drop it and silently freeze this computed again.
+  const providerType = syncStore.storageProviderType;
   const provider = syncService.getProvider();
-  return !!provider && !!getAuxStore(provider);
+  return !!providerType && !!provider && !!getAuxStore(provider);
 });
 const isExportingJson = ref(false);
 
@@ -843,7 +846,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         // Never silent: this is a privacy outcome, not a convenience.
         reportError({
           surface: 'pod-compaction',
-          severity: 'warning',
+          // ⚠️ `critical`, not `warning`. A family that ticked "delete the
+          // encrypted .beanpod" and kept a complete, key-openable copy in Drive
+          // is data at risk by any reading — and the farewell screen then tells
+          // them it is gone. `warning` reaches the firehose and pages nobody.
+          severity: 'critical',
           message: 'safety copy survived a family deletion',
           error: e,
           context: { action: 'delete-family', error_code: 'safety-copy-delete-failed' },
@@ -856,7 +863,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           await deleteFile(token, config.driveFileId);
         }
       } catch (e) {
-        console.warn('[deleteFamily] Drive file deletion failed, continuing:', e);
+        // Same class as the safety copy above, and it was console-only while
+        // its neighbour reported. The user is about to be told their data is
+        // gone; if the file survived, someone has to be able to find out.
+        reportError({
+          surface: 'pod-access',
+          severity: 'critical',
+          message: 'the pod file survived a family deletion',
+          error: e,
+          context: { action: 'delete-family', error_code: 'pod-delete-failed' },
+        });
       }
     }
 
