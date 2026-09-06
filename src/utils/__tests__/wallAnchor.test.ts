@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { addDaysYmd } from '@/utils/date';
 import {
   MAX_ANCHOR_DRIFT_DAYS,
   anchorOffsetDays,
@@ -56,9 +57,24 @@ describe('clampAnchorYmd', () => {
     expect(clampAnchorYmd(input, TODAY)).toBe(TODAY);
   });
 
-  it('refuses a date beyond the drift limit in either direction', () => {
-    expect(clampAnchorYmd('2028-01-01', TODAY)).toBe(TODAY);
-    expect(clampAnchorYmd('2024-01-01', TODAY)).toBe(TODAY);
+  it('⭐ clamps a real date beyond the drift limit to the LIMIT, not to today', () => {
+    // It used to land on today, and the week views draw up to six days past the
+    // anchor — so at the forward edge tapping a drawn column header threw the
+    // wall a year backwards and, because the caller only switches view on
+    // success, said nothing about why. The furthest day the wall will go is the
+    // answer the gesture asked for.
+    expect(clampAnchorYmd('2028-01-01', TODAY)).toBe(addDaysYmd(TODAY, MAX_ANCHOR_DRIFT_DAYS));
+    expect(clampAnchorYmd('2024-01-01', TODAY)).toBe(addDaysYmd(TODAY, -MAX_ANCHOR_DRIFT_DAYS));
+    // …and what it clamps to is itself in range, so a second tap is stable.
+    expect(clampAnchorYmd(clampAnchorYmd('2028-01-01', TODAY), TODAY)).toBe(
+      addDaysYmd(TODAY, MAX_ANCHOR_DRIFT_DAYS)
+    );
+  });
+
+  it('still lands on today for input that never named a day', () => {
+    // There is no meaningful "nearest" day to a malformed string.
+    expect(clampAnchorYmd('NaN-NaN-NaN', TODAY)).toBe(TODAY);
+    expect(clampAnchorYmd('not-a-date', TODAY)).toBe(TODAY);
   });
 
   it('accepts a date exactly at the drift limit', () => {

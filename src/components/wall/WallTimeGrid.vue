@@ -179,12 +179,22 @@ watch(
     }
     if (!result) return;
 
-    if (tierGate(`${props.viewId}:${result.tier}`)) {
+    /*
+     * The hour, not just the tier — the change's whole new degree of freedom.
+     *
+     * `scale` now ranges over 0.8..1.6 px/min across 28 zoom/window combinations,
+     * so two walls both reporting `roomy` can be drawing a 48px hour and a 96px
+     * one. Without the number in the event they are indistinguishable, and the
+     * gate keyed on the tier alone stayed silent through a resize that changed
+     * nothing BUT the hour. `count` is already allowlisted.
+     */
+    const hourPx = Math.round(result.scale * 60);
+    if (tierGate(`${props.viewId}:${result.tier}:${hourPx}`)) {
       logEvent({
         level: 'info',
         surface: SURFACE,
         message: 'wall_grid_tier',
-        context: { action: 'layout', kind: props.viewId, stage: result.tier },
+        context: { action: 'layout', kind: props.viewId, stage: result.tier, count: hourPx },
       });
     }
     // Not routed through perfTiming: its TELEMETRY_FLOOR_MS = 250 would drop a
@@ -367,10 +377,19 @@ function openActivity(occurrence: WallOccurrence): void {
         line through the title of the very event it was marking. The fold labels
         go OVER them, because a block nudged down by the height floor may overrun
         a fold and the sentence explaining the fold must stay readable.
+
+        `min-h-0` is as load-bearing as `min-w-0`, and it failed the same way. A
+        column flex item defaults to `min-height: auto`, so the plot refused to
+        shrink below its own content and simply OVERFLOWED its share: on a
+        1024x768 tablet the bean lanes ran 103px past the bottom of their slot,
+        and the peripheral cards — laid out where flexbox actually put them —
+        painted straight over the last two hours of the day. Nothing warned,
+        because the plot is `overflow-hidden`: it clipped its own contents
+        tidily while sitting in the wrong place.
       -->
       <div
         ref="plot"
-        class="dark:bg-surface-raised relative min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
+        class="dark:bg-surface-raised relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
       >
         <template v-if="layout && !failed">
           <!--

@@ -672,6 +672,113 @@ describe('clusterOverlapping / mergeBusy', () => {
     expect(folds).toHaveLength(1);
     expect(folds[0]).toMatchObject({ startMinutes: 10, resumeMinutes: 40 });
   });
+
+  it('⭐ never takes a fold that costs MORE than drawing the gap honestly', () => {
+    // At the tight end of the ladder the hour has shrunk far enough that a 44px
+    // fold band is dearer than the emptiness it announces. A 30-minute gap at
+    // scale 0.35 draws in 10.5px and folds into 44.9px, so the mechanism meant
+    // to relieve a squeezed layout was pushing the search further into it.
+    const busy = mergeBusy([
+      { start: 0, end: 10 },
+      { start: 40, end: 50 },
+    ]);
+    expect(findFolds(busy, 0, 60, 20, 1, 0.35)).toHaveLength(0);
+    // The same gap at a generous hour still folds — 30 x 0.8 = 24px > 0px? No:
+    // it is the LONG gaps that pay, so widen it and the fold comes back.
+    const long = mergeBusy([
+      { start: 0, end: 10 },
+      { start: 600, end: 610 },
+    ]);
+    expect(findFolds(long, 0, 660, 20, 1, 0.35)).toHaveLength(1);
+  });
+
+  it('⚠️ every fold it does return is cheaper than the gap it replaces', () => {
+    // Stated as a property rather than a case, because the economics depend on
+    // three constants (MIN_FOLD_PX, FOLD_PX_PER_MIN, MAX_FOLD_PX) and a zoom.
+    for (const pxPerMin of [0.35, 0.5, 0.8, 1.2, 1.6]) {
+      for (const gap of [30, 45, 60, 90, 150, 240, 600]) {
+        const busy = mergeBusy([
+          { start: 0, end: 10 },
+          { start: 10 + gap, end: 20 + gap },
+        ]);
+        for (const fold of findFolds(busy, 0, 40 + gap, 20, 1, pxPerMin)) {
+          const spanned = fold.resumeMinutes - fold.startMinutes;
+          expect(fold.height).toBeLessThan(spanned * pxPerMin);
+        }
+      }
+    }
+  });
+});
+
+describe('what a taller plot buys', () => {
+  it('⭐ the HOUR is monotonic in plot height — that is the quantity protected', () => {
+    let previous = 0;
+    for (let height = 600; height <= 2000; height += 10) {
+      const layout = layoutTimeGrid([[ev('09:00', '10:00'), ev('17:00', '18:00')]], height);
+      expect(layout.scale).toBeGreaterThanOrEqual(previous - 1e-9);
+      previous = layout.scale;
+    }
+  });
+
+  it('⚠️ the drawn WINDOW is not, and this is the documented trade', () => {
+    // Ten more pixels buy the next zoom step, and the window search restarts at
+    // the narrowest — so more glass can draw less day at a bigger hour. Pinned
+    // as a decision so nobody reports it as a bug: `tryGenerousFit` spends
+    // height on the hour first because a wall is read from across a kitchen.
+    const fixture = [[ev('09:00', '10:00'), ev('13:00', '13:45'), ev('17:00', '18:00')]];
+    const shorter = layoutTimeGrid(fixture, 820);
+    const taller = layoutTimeGrid(fixture, 830);
+    expect(taller.scale).toBeGreaterThan(shorter.scale);
+    expect(taller.windowEnd - taller.windowStart).toBeLessThan(
+      shorter.windowEnd - shorter.windowStart
+    );
+  });
+});
+
+describe('the axis at midnight', () => {
+  it('⭐ never draws a tick at minute 1440, which renders as "00:00"', () => {
+    // The widest window runs 06:00-24:00; `hhmm` wraps 1440 to "00:00", so the
+    // tallest screens printed a label reading as the day starting over directly
+    // under 23:00 — drawn at `y = total`, where a half-line translate puts the
+    // top of it outside an `overflow: hidden` plot.
+    const layout = layoutTimeGrid([[ev('09:00', '10:00')]], 2160);
+    expect(layout.windowEnd).toBe(24 * 60);
+    expect(layout.ticks.map((t) => t.minutes)).not.toContain(24 * 60);
+    // …and the hour before it is still marked, so nothing was lost.
+    expect(layout.ticks.map((t) => t.minutes)).toContain(23 * 60);
+  });
+
+  it('holds for every plot height, not just the one that reaches 18 hours', () => {
+    for (const height of [400, 700, 900, 1200, 1440, 1800, 2160, 3000]) {
+      const layout = layoutTimeGrid([[ev('09:00', '10:00')]], height);
+      for (const tick of layout.ticks) expect(tick.minutes).toBeLessThan(24 * 60);
+    }
+  });
+});
+
+describe('an empty day', () => {
+  it('⭐ draws the SAME hours as a day with one event on it', () => {
+    // The early return this replaces built its own scale and drew the waking
+    // window, so on a 1440px plot a day holding one appointment drew 07:00-21:00
+    // while a clear day beside it drew 08:00-20:00 — the axis top moved by an
+    // hour and back as the family stepped from Tuesday to Wednesday.
+    for (const height of [700, 900, 1200, 1440, 1800]) {
+      const empty = layoutTimeGrid([[]], height);
+      const one = layoutTimeGrid([[ev('14:00', '14:30')]], height);
+      expect(empty.windowStart).toBe(one.windowStart);
+      expect(empty.windowEnd).toBe(one.windowEnd);
+      expect(empty.scale).toBeCloseTo(one.scale, 6);
+    }
+  });
+
+  it('still draws hours rather than an empty rectangle', () => {
+    // The reason the branch existed at all: a clear day must read as "nothing
+    // on", not as "this is broken".
+    const layout = layoutTimeGrid([[]], 900);
+    expect(layout.ticks.length).toBeGreaterThan(6);
+    expect(layout.columns[0]).toEqual([]);
+    expect(layout.folds).toEqual([]);
+  });
 });
 
 describe('defaultMaxBlock', () => {

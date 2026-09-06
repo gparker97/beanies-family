@@ -13,12 +13,12 @@
  * marker on every other view can no longer disagree.
  */
 import { computed } from 'vue';
+import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { fillTemplate } from '@/utils/fillTemplate';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
@@ -178,14 +178,7 @@ const focusLabel = computed(() =>
           READ-side check because no write-side rule can see `today -> jobs ->
           back` coming, which leaves this naming the view you are already in.
         -->
-        <button
-          v-if="canGoBack"
-          type="button"
-          class="font-outfit text-secondary-500 wall-back dark:bg-surface-raised dark:text-ink shrink-0 rounded-2xl bg-white px-4 py-2.5 font-bold shadow-[var(--card-shadow)]"
-          @click="emit('back')"
-        >
-          ‹ {{ fillTemplate(t('wall.jobsBoard.back'), { view: backLabel }) }}
-        </button>
+        <WallBackButton v-if="canGoBack" :back-label="backLabel" @back="emit('back')" />
       </div>
 
       <WallTimeGrid

@@ -17,6 +17,7 @@
  * one), but a list nobody can find is worse than an odd-looking one.
  */
 import { computed, inject } from 'vue';
+import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
@@ -197,13 +198,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-2.5">
     <div class="flex shrink-0 items-center gap-4">
-      <button
-        type="button"
-        class="font-outfit text-secondary-500 wall-back dark:bg-surface-raised dark:text-ink shrink-0 rounded-2xl bg-white px-4 py-2.5 font-bold shadow-[var(--card-shadow)]"
-        @click="emit('back')"
-      >
-        ‹ {{ fillTemplate(t('wall.jobsBoard.back'), { view: backLabel }) }}
-      </button>
+      <WallBackButton :back-label="backLabel" @back="emit('back')" />
       <h2 class="font-outfit text-secondary-500 wall-board-title dark:text-ink font-extrabold">
         {{ t('wall.jobsBoard.title') }}
       </h2>

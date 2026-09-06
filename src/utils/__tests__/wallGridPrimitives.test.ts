@@ -266,4 +266,26 @@ describe('wallPeripheralVariant', () => {
     expect(wallPeripheralVariant('band', 8, true)).toBe('band');
     expect(wallPeripheralVariant('band', 10, true)).toBe('strip');
   });
+
+  it('⭐ collapses a BAND on a short window however quiet the day is', () => {
+    // The 1024x768 defect: six bean lanes, a quiet day, and a full band that
+    // left the grid 101px — a whole day in the height of three lines. The event
+    // count cannot see this; only the window's height can.
+    expect(wallPeripheralVariant('band', 0, false, false)).toBe('strip');
+    expect(wallPeripheralVariant('band', 3, false, false)).toBe('strip');
+    expect(wallPeripheralVariant('band', 3, true, false)).toBe('strip');
+  });
+
+  it('⚠️ a short window still never collapses a RAIL', () => {
+    // A rail is beside the grid, so a short window is not an argument against
+    // it — and stranding it as a strip would waste 296px of width as well.
+    expect(wallPeripheralVariant('rail', 3, false, false)).toBe('rail');
+  });
+
+  it('defaults to having room, so an unmeasured window keeps the preference', () => {
+    // SSR and jsdom have no `matchMedia`; the band is the preference and the
+    // first real match corrects it. A default of `false` would have flashed a
+    // strip onto every wall on mount.
+    expect(wallPeripheralVariant('band', 3, false)).toBe('band');
+  });
 });

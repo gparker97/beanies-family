@@ -109,7 +109,12 @@ const rest = computed(() => props.weekDays.slice(props.dayColumns));
  */
 const eventsByDay = computed(() => {
   const map = new Map<string, ReturnType<typeof wallEvents>>();
-  for (const ymd of [...visible.value, ...rest.value]) {
+  // ⚠️ Iterate `weekDays`, NOT `visible` + `rest`. Those two partition the same
+  // seven days, so the set is identical — but reading them makes this computed
+  // depend on `dayColumns`, and a drag across a 211px column boundary then
+  // re-expands a month of recurrences seven times for a partition that did not
+  // change which days it covers.
+  for (const ymd of props.weekDays) {
     map.set(ymd, wallEvents(activityStore.activitiesForDate(ymd), props.visibleMemberIds));
   }
   return map;
@@ -278,7 +283,7 @@ function colourFor(activity: FamilyActivity) {
               />
             </span>
             <span
-              class="font-outfit text-primary-500 wall-rest-count rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 font-bold"
+              class="font-outfit text-primary-500 dark:text-accent-lift wall-rest-count rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 font-bold"
             >
               {{ eventsFor(ymd).length }}
             </span>
