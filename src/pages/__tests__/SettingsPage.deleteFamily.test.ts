@@ -63,7 +63,14 @@ vi.mock('@/composables/useReauth', () => ({
   requireReauth: vi.fn(async () => true),
   canStepUp: () => false,
 }));
-vi.mock('@/services/sync/fileSync', () => ({ tryUnwrapFamilyKey: vi.fn(async () => {}) }));
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  // The version DERIVATION is real even where the writers are mocked: a
+  // test-local `'4.0'` here would hide the one regression the derivation
+  // exists to prevent (a compacted pod written as 4.0).
+  beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
+    .beanpodVersionFor,
+  tryUnwrapFamilyKey: vi.fn(async () => {}),
+}));
 vi.mock('@/services/indexeddb/database', () => ({ deleteFamilyDatabase: vi.fn(async () => {}) }));
 vi.mock('@/services/sync/fileHandleStore', () => ({ getProviderConfig: vi.fn(async () => null) }));
 vi.mock('@/services/automerge/projection', () => ({

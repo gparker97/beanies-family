@@ -9,7 +9,7 @@ import type { BeanpodFileV4 } from '@/types/syncFileV4';
  */
 describe('fileSync — writerVersion stamp (#44)', () => {
   it('createBeanpodV4 stamps writerVersion = APP_VERSION', () => {
-    const json = createBeanpodV4('fam-1', 'Test', 'ciphertext', {});
+    const json = createBeanpodV4('fam-1', 'Test', 'ciphertext', null, {});
     const parsed = JSON.parse(json) as BeanpodFileV4;
     expect(parsed.writerVersion).toBe(APP_VERSION);
   });
@@ -28,7 +28,7 @@ describe('fileSync — writerVersion stamp (#44)', () => {
     } as unknown as BeanpodFileV4;
     expect(legacy.writerVersion).toBeUndefined();
 
-    const json = reEncryptEnvelope(legacy, 'newCiphertext');
+    const json = reEncryptEnvelope(legacy, 'newCiphertext', null);
     const updated = JSON.parse(json) as BeanpodFileV4;
     expect(updated.writerVersion).toBe(APP_VERSION); // re-stamped, not stale/absent
     expect(updated.encryptedPayload).toBe('newCiphertext');
@@ -47,7 +47,7 @@ describe('fileSync — writerVersion stamp (#44)', () => {
       writerVersion: '0.0.1-ancient',
     } as unknown as BeanpodFileV4;
 
-    const updated = JSON.parse(reEncryptEnvelope(stale, 'x')) as BeanpodFileV4;
+    const updated = JSON.parse(reEncryptEnvelope(stale, 'x', null)) as BeanpodFileV4;
     expect(updated.writerVersion).toBe(APP_VERSION);
   });
 

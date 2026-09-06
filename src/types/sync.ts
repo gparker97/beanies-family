@@ -187,7 +187,8 @@ export type PodBlockMessageKey =
   | 'podLineage.unsyncedInline'
   | 'podLineage.conflictInline'
   | 'podMerge.failedInline'
-  | 'podUnreadable.inline';
+  | 'podUnreadable.inline'
+  | 'podNewerVersion.inline';
 
 /**
  * Anything that may latch `syncService`'s remote-blocked breaker.
@@ -312,6 +313,28 @@ export abstract class PayloadLoadError extends Error implements RemoteBlocker {
   }
 
   /**
+   * Is the file simply NEWER than this build, rather than damaged?
+   * Overridden to `true` by `UnsupportedBeanpodVersionError`. The action is
+   * "update beanies", which is neither an incident nor a data problem. Read by
+   * `payloadErrorKind`, `classifyDriveFailure` and the join mapper; nothing
+   * outside the class itself does an `instanceof` for this.
+   */
+  get needsAppUpdate(): boolean {
+    return false;
+  }
+
+  /**
+   * One queryable fact for the firehose's `detail`, or `undefined`.
+   * Exists so a subclass can carry a discriminating value without any consumer
+   * doing an `instanceof` to read it, and without touching `message` (which
+   * `errorReporter` buckets on, so a per-file value there would defeat the
+   * throttle). `blockCode`'s sibling.
+   */
+  get blockDetail(): string | undefined {
+    return undefined;
+  }
+
+  /**
    * `parse` and `keyMayBeWrong` are recoverable, so they must not latch.
    * `parse` means the JSON or the version was rejected — a torn read, or a pod
    * written by a newer build during a staged rollout. Both fix themselves on
@@ -335,6 +358,39 @@ export class CorruptPayloadError extends PayloadLoadError {
     // so a derived name would arrive as a mangled string and the `instanceof`
     // dispatch on main would silently degrade to a generic DocWorkerError.
     this.name = 'CorruptPayloadError';
+  }
+}
+
+/**
+ * The file was saved by a NEWER beanies than this build understands.
+ *
+ * Thrown by `parseBeanpodV4` on main (it never crosses the worker boundary, so
+ * it needs no codec) when the envelope's `version` is a string outside
+ * `KNOWN_BEANPOD_VERSIONS`. It is a `PayloadLoadError` at `step: 'parse'`, so
+ * it inherits the non-latching, non-credential, non-device answers that step
+ * already has, and it is NEVER a `CorruptPayloadError`: that class is what the
+ * worker's cache self-heal deletes the cache on, and "update beanies" must not
+ * delete anything.
+ *
+ * The compacted-pod format (5.0) exists so that a build predating the lineage
+ * guard fails HERE, at parse, before decrypt and before any merge.
+ */
+export class UnsupportedBeanpodVersionError extends PayloadLoadError {
+  readonly fileVersion: string;
+  constructor(fileVersion: string, familyId: string | null = null) {
+    super(`Unsupported beanpod version: ${fileVersion}`, 'parse', familyId);
+    // ⚠️ LITERAL, never `new.target.name`; see `CorruptPayloadError`.
+    this.name = 'UnsupportedBeanpodVersionError';
+    this.fileVersion = fileVersion;
+  }
+
+  override get needsAppUpdate(): boolean {
+    return true;
+  }
+
+  /** `version=<x>` rides in `detail`, never in `message`. */
+  override get blockDetail(): string {
+    return `version=${this.fileVersion}`;
   }
 }
 
@@ -372,24 +428,58 @@ export class PayloadTooLargeError extends PayloadLoadError {
  * leaving the ORDINARY open path showing a raw Automerge/WASM string under the
  * password field and inviting the user to retype forever.
  */
+/**
+ * ONE discriminator for "what kind of payload failure is this". Every decision
+ * that used to be a hand-written ladder (the inline key here, the boot-overlay
+ * key and the is-it-an-incident test in `payloadFailureSurface.ts`) reads a
+ * table keyed on this instead, so a sixth kind fails the build in three places
+ * rather than taking a silent default. The two ladders had ALREADY drifted
+ * under comments claiming they matched.
+ *
+ * ⚠️ ORDER IS LOAD-BEARING. `UnsupportedBeanpodVersionError` is BOTH
+ * `step === 'parse'` and `needsAppUpdate`, so the update question must be
+ * asked before the parse one or every newer-version file resolves to
+ * `unreadable` and the new copy is dead code. `keyMayBeWrong` stays first
+ * because it is the existing precedence and a `parse` error can never set it
+ * (it is `step === 'decrypt'` by definition).
+ */
+export type PayloadErrorKind =
+  | 'credential-stale' // keyMayBeWrong
+  | 'needs-update' // needsAppUpdate
+  | 'unreadable' // step === 'parse' (a torn read)
+  | 'too-large' // deviceCannotOpen
+  | 'corrupt';
+
+export function payloadErrorKind(err: PayloadLoadError): PayloadErrorKind {
+  if (err.keyMayBeWrong) return 'credential-stale';
+  if (err.needsAppUpdate) return 'needs-update';
+  if (err.step === 'parse') return 'unreadable';
+  return err.deviceCannotOpen ? 'too-large' : 'corrupt';
+}
+
+/**
+ * The inline copy per kind. Row notes carry the reasoning the old ladder held:
+ *  - credential-stale: at the decrypt step a wrong key and a damaged
+ *    ciphertext are the SAME observation (an AES-GCM tag rejection), so the
+ *    honest copy covers both and points at the recoverable half: try your
+ *    password. Saying "damaged, contact support" when a peer rotated the key
+ *    is a lie.
+ *  - needs-update: newer than this build; the action is to update, nothing
+ *    is lost.
+ *  - unreadable: `parse` is NOT damage. A torn read fixes itself on the next
+ *    peer write; "trying again will not help" would stop the one thing that
+ *    does work.
+ */
+export const PAYLOAD_INLINE_KEY = {
+  'credential-stale': 'podCredentialStale.inline',
+  'needs-update': 'podNewerVersion.inline',
+  unreadable: 'podUnreadable.inline',
+  'too-large': 'podTooLarge.inline',
+  corrupt: 'podCorrupted.inline',
+} as const satisfies Record<PayloadErrorKind, PodBlockMessageKey>;
+
 export function payloadErrorMessageKey(err: PayloadLoadError): PodBlockMessageKey {
-  // THREE answers, because there are three situations and the middle one was
-  // being told its data is damaged.
-  //
-  // At the decrypt step a wrong key and a damaged ciphertext are the SAME
-  // observation (an AES-GCM tag rejection) — so the honest copy is the one that
-  // covers both and points at the action that fixes the recoverable half: try
-  // your password. Telling a user their family data may be damaged and to
-  // contact support, when a peer simply rotated the family key, is the same
-  // class of lie this whole change exists to remove.
-  if (err.keyMayBeWrong) return 'podCredentialStale.inline';
-  // `parse` is NOT damage. The file was downloaded but its JSON or its version
-  // was rejected — a torn read, or a pod written by a newer app version. Saying
-  // "your data may be damaged, trying again will not help, contact support" for
-  // either of those is a lie that also stops the user retrying, which is the
-  // one thing that DOES work.
-  if (err.step === 'parse') return 'podUnreadable.inline';
-  return err.deviceCannotOpen ? 'podTooLarge.inline' : 'podCorrupted.inline';
+  return PAYLOAD_INLINE_KEY[payloadErrorKind(err)];
 }
 
 /**

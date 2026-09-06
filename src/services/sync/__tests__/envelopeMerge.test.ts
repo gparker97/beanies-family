@@ -194,3 +194,16 @@ describe('recovery fields (Phase 3)', () => {
     ).toBe(2);
   });
 });
+
+describe('preserveLocalKeyDicts and the envelope version', () => {
+  it('still copies incoming.version by spread, so the DERIVATION is what protects a compacted pod', () => {
+    // ⚠️ DO NOT "FIX" THIS by adding a local-wins or max rule for `version`
+    // here. That is wrong on the adopt/rebase branches and wrong again for the
+    // rollback. The version is derived from the document at write time
+    // (`beanpodVersionFor`); this pin exists so the next reader knows the
+    // spread is expected and the protection lives elsewhere.
+    const incoming = buildEnvelope({ version: '4.0' });
+    const local = buildEnvelope({ version: '5.0' });
+    expect(preserveLocalKeyDicts(incoming, local).version).toBe('4.0');
+  });
+});

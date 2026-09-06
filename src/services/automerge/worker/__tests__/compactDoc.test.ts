@@ -56,6 +56,7 @@ const {
   mutate,
   getHeads,
   exportSnapshot,
+  exportEncryptedPayload,
 } = await import('../applyAndProject');
 
 /** A document with real history: many changes, one entity per change. */
@@ -105,6 +106,24 @@ describe('compactDoc', () => {
     expect(doc.podLineage.id.length).toBeGreaterThan(0);
     // First compaction of a pod that never had one.
     expect(doc.podLineage.seq).toBe(1);
+  });
+
+  it('exports the lineage alongside the payload, null before and stamped after (the boundary pin)', async () => {
+    // ⚠️ MAIN DERIVES THE ENVELOPE VERSION FROM THIS. If the worker stops
+    // returning `lineage`, the client-side destructure yields `undefined`,
+    // `beanpodVersionFor(undefined)` says 4.0, and every save writes a
+    // compacted document labelled 4.0: the one artefact the whole format
+    // change exists to make impossible, with no error anywhere. The shared
+    // `ExportedPayload` type makes dropping the field a compile error; this
+    // pins the VALUE.
+    const { generateFamilyKey } = await import('@/services/crypto/familyKeyService');
+    seedHistory(3);
+    setKey(await generateFamilyKey());
+    expect((await exportEncryptedPayload()).lineage).toBeNull();
+    compactDoc();
+    const after = await exportEncryptedPayload();
+    expect(after.lineage).toEqual({ id: expect.any(String), seq: 1 });
+    expect(after.payload.length).toBeGreaterThan(0);
   });
 
   it('increments the generation on a re-compaction, with a NEW identity', () => {

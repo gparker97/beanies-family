@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4547
+    "translationCount": 4551
   },
   "translations": {
     "app.name": {
@@ -22739,6 +22739,26 @@
     "compaction.waitingOn": {
       "translation": "beanies正在等待{names}才能压缩。要求他们更新Bean ，并在他们使用的每台设备上打开一次。仍然使用旧版本的设备可能会取消整个家庭的压缩，并且beanies只能在有人打开设备上的beanies后才能告诉设备已准备就绪，这就是为什么它会命名人而不是设备的原因。",
       "hash": "kp6j2t",
+      "lastUpdated": "2026-09-06"
+    },
+    "podNewerVersion.inline": {
+      "translation": "此家庭文件由较新版本的beanies保存。更新此设备上的beanies以将其打开。此设备上的任何内容都不会丢失。",
+      "hash": "bbzle2",
+      "lastUpdated": "2026-09-06"
+    },
+    "resumeSetup.podNewerVersion": {
+      "translation": "此家庭文件由较新版本的beanies保存。更新此设备上的beanies以将其打开。此设备上的任何内容都不会丢失。",
+      "hash": "bbzle2",
+      "lastUpdated": "2026-09-06"
+    },
+    "wall.lane.onDay": {
+      "translation": "{count}在{day}",
+      "hash": "ng81gu",
+      "lastUpdated": "2026-09-06"
+    },
+    "wall.jobs.allClear": {
+      "translation": "今天没有家务",
+      "hash": "xwtkne",
       "lastUpdated": "2026-09-06"
     }
   }

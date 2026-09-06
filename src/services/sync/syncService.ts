@@ -21,7 +21,13 @@ import { PodLineageError } from '@/services/sync/podLineage';
 import type { LineageBasis } from '@/services/automerge/worker/protocol';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
-import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
+import {
+  parseBeanpodV4,
+  reEncryptEnvelope,
+  openFilePicker,
+  detectFileVersion,
+  beanpodVersionFor,
+} from './fileSync';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
@@ -316,6 +322,16 @@ let currentProviderFamilyId: string | null = null;
 let currentFamilyKey: CryptoKey | null = null;
 let currentEnvelope: BeanpodFileV4 | null = null;
 let noKeyWarnedOnce = false;
+/**
+ * The last `version=…,seq=…` this device wrote, so `pod-version` is emitted on
+ * TRANSITION only. A family saves constantly; a per-save event would be a large
+ * fraction of the firehose carrying one constant. On transition it answers the
+ * two questions that matter: when did this family become 5.0, and is any device
+ * writing `version=4.0` while a `seq` is present, which `beanpodVersionFor`
+ * makes impossible and which is therefore the alarm for a `lineage` dropped
+ * across the worker boundary.
+ */
+let lastVersionDetail: string | null = null;
 
 // Open-guard baseline (#61): the in-memory marker for the current file. Collapses
 // the old `lastKnownFileTimestamp` into ONE object (C9): `revision` (namespaced,
@@ -1798,8 +1814,25 @@ async function doSave(): Promise<boolean> {
     // the envelope (keys never leave main for the upload path).
     // #65: `exportedHeads` are the heads of EXACTLY these serialized bytes — the
     // only sound Drive-baseline value on the write path.
-    const { payload, heads: exportedHeads } = await docClient.exportEncryptedPayload();
-    const fileContent = reEncryptEnvelope(currentEnvelope, payload);
+    const { payload, heads: exportedHeads, lineage } = await docClient.exportEncryptedPayload();
+    const fileContent = reEncryptEnvelope(currentEnvelope, payload, lineage);
+    // The writer says which version it ACTUALLY chose. Calling the pure
+    // derivation a second time is not a second implementation: the logic has
+    // one home, and a second call cannot disagree with the first.
+    const versionDetail = `version=${beanpodVersionFor(lineage)},seq=${lineage?.seq ?? 'none'}`;
+    if (versionDetail !== lastVersionDetail) {
+      lastVersionDetail = versionDetail;
+      logEvent({
+        level: 'info',
+        surface: 'pod-version',
+        message: 'pod written at version',
+        context: {
+          action: 'wrote',
+          detail: versionDetail,
+          ...(currentEnvelope.familyId ? { family_id: currentEnvelope.familyId } : {}),
+        },
+      });
+    }
 
     // INVARIANT (ADR-032 addendum, 2026-07-15): every save writes the FULL compacted
     // base. Change-log/delta chunks were retired on the strength of this — the base
