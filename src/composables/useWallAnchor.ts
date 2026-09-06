@@ -21,8 +21,12 @@ export interface WallAnchor {
   isAnchoredToToday: ComputedRef<boolean>;
   /** Place the anchor on a specific day (a day tap). `reason` names the caller. */
   setAnchor: (next: string, reason: string) => void;
-  /** Move by one week or one day. See `nextAnchorYmd` for the snapping rule. */
-  step: (unit: WallStepUnit, direction: -1 | 1) => void;
+  /**
+   * Move by one week or one day. See `nextAnchorYmd` for the snapping rule.
+   * Returns false when the step would leave the browsable range, in which case
+   * the anchor does not move.
+   */
+  step: (unit: WallStepUnit, direction: -1 | 1) => boolean;
   /** Return to the rolling default. */
   goToToday: () => void;
 }
@@ -93,11 +97,25 @@ export function useWallAnchor(): WallAnchor {
     anchorYmd.value = safe;
   }
 
-  function step(unit: WallStepUnit, direction: -1 | 1): void {
-    setAnchor(
-      nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay),
-      direction === 1 ? 'next' : 'prev'
-    );
+  /**
+   * Move one period, or refuse to.
+   *
+   * ⚠️ The range limit is a UI boundary, NOT bad input, and conflating the two
+   * was a real defect: 54 presses of `›` reached +372 days, at which point the
+   * clamp teleported the wall home mid-browse with no message and filed a
+   * `bad_anchor` warning accusing the caller of passing something unparseable.
+   * It also reported `count: 0` immediately after a `next`, corrupting the one
+   * signal the signed offset exists to provide.
+   *
+   * So the arrow SATURATES: at the boundary the wall simply does not move, and
+   * nothing is reported. `setAnchor`'s clamp stays for what it was written for —
+   * a value that should never have been constructed at all.
+   */
+  function step(unit: WallStepUnit, direction: -1 | 1): boolean {
+    const next = nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay);
+    if (clampAnchorYmd(next, today.value) !== next) return false;
+    setAnchor(next, direction === 1 ? 'next' : 'prev');
+    return true;
   }
 
   function goToToday(): void {

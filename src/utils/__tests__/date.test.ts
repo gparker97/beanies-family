@@ -484,11 +484,15 @@ describe('startOfWeekYmd', () => {
     expect(startOfWeekYmd('2027-01-01', 1)).toBe('2026-12-28'); // Fri -> Mon in December
   });
 
-  it('returns the input unchanged when it cannot be parsed', () => {
-    // parseLocalDate does not throw — it yields an Invalid Date, which
-    // toDateInputValue would render as the literal string "NaN-NaN-NaN".
-    // Returning the input keeps that garbage from being manufactured here.
+  it('returns the input unchanged when it is not a real date', () => {
+    // ⚠️ An Invalid-Date check alone is NOT enough, and asserting only
+    // `.not.toContain('NaN')` hid that: `new Date(y, m-1, d)` normalises
+    // out-of-range components, so 2026-13-45 quietly became 2027-02-08 — a
+    // plausible-looking wrong week rather than an obvious wrong answer.
     expect(startOfWeekYmd('not-a-date', 1)).toBe('not-a-date');
-    expect(startOfWeekYmd('2026-13-45', 1)).not.toContain('NaN');
+    expect(startOfWeekYmd('', 1)).toBe('');
+    expect(startOfWeekYmd('2026-13-45', 1)).toBe('2026-13-45');
+    expect(startOfWeekYmd('2026-02-30', 1)).toBe('2026-02-30');
+    expect(startOfWeekYmd('0000-00-00', 1)).toBe('0000-00-00');
   });
 });

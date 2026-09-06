@@ -204,16 +204,26 @@ export function weekStartOffset(dayOfWeek: number, weekStartDay: number): number
 /**
  * `YYYY-MM-DD` → the ymd of the first day of its week, per the user's `weekStartDay`.
  *
- * Returns the input unchanged if it cannot be parsed — `parseLocalDate` does not
- * throw (it yields an Invalid Date, which `toDateInputValue` renders as the literal
- * string "NaN-NaN-NaN"), so a silent garbage-in/garbage-out is the failure mode this
- * guard exists to avoid. Callers that must not propagate a bad date validate it
- * themselves; see `clampAnchorYmd` in `wallAnchor.ts`.
+ * Returns the input unchanged if it is not a real date.
+ *
+ * ⚠️ Checking for an Invalid Date is NOT enough, and that mistake shipped here
+ * once. `new Date(y, m - 1, d)` NORMALISES out-of-range components rather than
+ * failing, so `2026-13-45` silently becomes February 2027 and `2026-02-30`
+ * becomes March 2nd — a plausible-looking wrong week rather than an obvious
+ * wrong answer. The round-trip is what catches it. `parseLocalDate` cannot help:
+ * it never throws, and for garbage it yields an Invalid Date whose
+ * `toDateInputValue` is the literal string "NaN-NaN-NaN".
+ *
+ * This matters beyond the wall: this is the shared primitive the five existing
+ * week-start copies are meant to migrate onto, and a date picker can hand it
+ * components a human typed.
  */
 export function startOfWeekYmd(ymd: string, weekStartDay: number): string {
-  const date = parseLocalDate(ymd.slice(0, 10));
-  if (Number.isNaN(date.getTime())) return ymd;
-  return addDaysYmd(ymd, -weekStartOffset(date.getDay(), weekStartDay));
+  const day = ymd.slice(0, 10);
+  const date = parseLocalDate(day);
+  // Round-trip: an overflow date parses fine and comes back as a DIFFERENT day.
+  if (Number.isNaN(date.getTime()) || toDateInputValue(date) !== day) return ymd;
+  return addDaysYmd(day, -weekStartOffset(date.getDay(), weekStartDay));
 }
 
 /**

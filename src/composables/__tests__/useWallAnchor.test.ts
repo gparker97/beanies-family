@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { effectScope, ref } from 'vue';
+import { effectScope, nextTick, ref } from 'vue';
 import { setActivePinia, createPinia } from 'pinia';
 
 // `useToday` is a MODULE SINGLETON captured at import (its `today` ref lives at
@@ -55,18 +55,60 @@ describe('useWallAnchor', () => {
     });
   });
 
-  it('re-anchors to the new day at midnight rollover', () => {
-    withAnchor((anchor) => {
-      anchor.step('week', 1);
+  it('re-anchors to the new day at midnight rollover', async () => {
+    // Not `withAnchor`: the watcher flushes on the microtask queue ('pre'), so a
+    // synchronous assertion inside the scope runs BEFORE it fires. Awaiting
+    // nextTick is what tests the real behaviour instead of a convenient one.
+    const scope = effectScope();
+    try {
+      const anchor = scope.run(() => useWallAnchor())!;
+      // ⚠️ Park the anchor somewhere the new `today` CANNOT coincidentally be.
+      // A previous version of this test stepped one week from an unaligned
+      // Sunday — landing on 2026-09-07 — and then set `today` to 2026-09-07,
+      // so it passed with the watcher deleted. Verified: it did.
+      anchor.setAnchor('2026-09-20', 'day_tap');
+      expect(anchor.anchorYmd.value).toBe('2026-09-20');
       expect(anchor.isAnchoredToToday.value).toBe(false);
 
-      // The wall is left running; `useToday` ticks over at midnight. Without
-      // this watcher a wall would sit on a stale week indefinitely.
+      // The wall is left running; `useToday` ticks over at midnight. Without the
+      // watcher a wall sits on a stale week indefinitely.
       today.value = '2026-09-07';
+      await nextTick();
 
       expect(anchor.anchorYmd.value).toBe('2026-09-07');
       expect(anchor.isAnchoredToToday.value).toBe(true);
+    } finally {
+      scope.stop();
+    }
+  });
+
+  it('saturates at the range limit instead of teleporting home', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    withAnchor((anchor) => {
+      // Walking the arrow to the boundary is an ordinary gesture — 54 presses of
+      // `›` in the days view reaches it. It must not be mistaken for bad input:
+      // the wall used to jump silently back to today mid-browse AND file a
+      // warning accusing the caller of passing something unparseable.
+      let moved = true;
+      let presses = 0;
+      while (moved && presses < 500) {
+        moved = anchor.step('week', 1);
+        presses++;
+      }
+
+      expect(presses).toBeLessThan(500);
+      // Stopped at the edge, still far from today, and still renderable.
+      expect(anchor.isAnchoredToToday.value).toBe(false);
+      expect(anchor.anchorYmd.value).not.toBe('2026-09-06');
+      expect(reportError).not.toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+
+      // And it is not stuck: the other direction still works.
+      expect(anchor.step('week', -1)).toBe(true);
     });
+
+    consoleError.mockRestore();
   });
 
   it('honours the family’s weekStartDay when stepping by week', () => {

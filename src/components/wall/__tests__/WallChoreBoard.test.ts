@@ -53,15 +53,22 @@ function group(listId: string, jobs: WallJob[]): WallListGroup {
   return { list: { id: listId, title: 'Jobs', emoji: '🧹' } as FamilyList, jobs };
 }
 
-/** `listsFor` is the only input that decides who is active — nothing else does. */
-function mountBoard(byMember: Record<string, WallListGroup[]>, orphanLists: WallListGroup[] = []) {
+/**
+ * `listsFor` decides who gets a COLUMN; `todosFor` decides who may be called
+ * clear. They are not the same question — see the "All clear" test below.
+ */
+function mountBoard(
+  byMember: Record<string, WallListGroup[]>,
+  orphanLists: WallListGroup[] = [],
+  todosByMember: Record<string, WallJob[]> = {}
+) {
   return mount(WallChoreBoard, {
     props: {
       peripherals: {
         listsFor: (id: string) => byMember[id] ?? [],
         orphanLists,
         visibleMemberIds: null,
-        todosFor: () => [],
+        todosFor: (id: string) => todosByMember[id] ?? [],
         unassignedTodos: [],
       },
       isPending: () => false,
@@ -136,12 +143,29 @@ describe('WallChoreBoard', () => {
     expect(strip.classes()).toContain('shrink-0');
   });
 
-  it('treats a list whose items are all deduped away as no jobs at all', () => {
-    // buildColumn skips empty groups; such a bean is idle, not a bean with an
-    // empty column.
+  it('treats a list whose items are all deduped away as no chore column', () => {
+    // buildColumn skips empty groups, so there is nothing to put in a column.
     const w = mountBoard({ m1: [group('l1', [])] });
 
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(0);
+    expect(w.find('[data-test="idle-strip"]').text()).toContain('Leo');
+  });
+
+  it('⚠️ never calls a bean clear who still has to-dos outstanding', () => {
+    // `wallJobs` suppresses a list item when a to-do of the same owner and title
+    // is due today, so a bean's whole list can dedupe away to `total === 0` while
+    // the to-dos card beside them shows the work. "All clear" is a claim about a
+    // PERSON, by name, on a kitchen wall — it has to be true of everything they
+    // owe, not just of the chore column.
+    const w = mountBoard({ m1: [group('l1', [])] }, [], { m1: [job('t1', false)] });
+
+    expect(w.find('[data-test="idle-strip"]').text()).not.toContain('Leo');
+    // Milo and Ana genuinely have nothing, so they are still named.
+    expect(w.find('[data-test="idle-strip"]').text()).toContain('Milo');
+  });
+
+  it('does call a bean clear once their to-dos are done', () => {
+    const w = mountBoard({}, [], { m1: [job('t1', true)] });
     expect(w.find('[data-test="idle-strip"]').text()).toContain('Leo');
   });
 

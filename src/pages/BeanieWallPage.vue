@@ -121,16 +121,26 @@ const visibleMemberIds = computed(() =>
 const todayCount = computed(() => activityStore.activitiesForDate(today.value).length);
 const tomorrowCount = computed(() => activityStore.activitiesForDate(tomorrowYmd.value).length);
 
-/** "Week of 31 August · 6 things on today" — the line the mockup puts under the date. */
+/**
+ * "Week of 31 August · 6 things on today" — the line the mockup puts under the date.
+ *
+ * ⚠️ The "week of" half is dropped while browsing. It is built from `today` and
+ * cannot follow the anchor (the header's job is to say what day it actually is),
+ * so off-anchor it sat a few hundred pixels from the navigator asserting a
+ * different week than the navigator's own label. One header, two contradicting
+ * weeks. The count of what is on today stays either way — that is still true.
+ */
 const subtitle = computed(() => {
-  const week = new Date(`${today.value}T00:00:00`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'long',
-  });
   const things = fillTemplate(
     todayCount.value === 1 ? t('wall.header.things.one') : t('wall.header.things.other'),
     { count: todayCount.value }
   );
+  if (!isAnchoredToToday.value) return things;
+
+  const week = new Date(`${today.value}T00:00:00`).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+  });
   return `${fillTemplate(t('wall.header.weekOf'), { date: week })} · ${things}`;
 });
 /**
@@ -150,6 +160,24 @@ const isPortrait = useMediaQuery('(orientation: portrait)');
  */
 const railWide = useMediaQuery(DAYS_RAIL_QUERY, true);
 const daysRail = computed(() => railWide.value && !isPortrait.value);
+
+/**
+ * Whether the threshold is right for the screens families actually own is not
+ * answerable from here, so it goes to the firehose. Once per transition, which
+ * in practice is once per wall session.
+ */
+watch(
+  daysRail,
+  (rail) => {
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'wall_rail_mode',
+      context: { action: 'layout', kind: 'days', stage: rail ? 'rail' : 'band' },
+    });
+  },
+  { immediate: true }
+);
 
 /**
  * The job/list bundle, built once and forwarded whole. Passing its five members
@@ -217,8 +245,9 @@ function logAnchorChange(stage: string) {
 function onStep(direction: -1 | 1) {
   const unit = currentView.value.stepUnit;
   if (!unit) return;
-  anchor.step(unit, direction);
-  logAnchorChange(direction === 1 ? 'next' : 'prev');
+  // A refused step is a no-op at the range boundary, not an event: logging it
+  // would report `count` unchanged after a `next` and muddy the browse signal.
+  if (anchor.step(unit, direction)) logAnchorChange(direction === 1 ? 'next' : 'prev');
 }
 
 function onGoToToday() {
@@ -441,7 +470,16 @@ watch(activeView, () => (sheet.value = null));
           >
             <span aria-hidden="true">‹</span>
           </button>
-          <p class="font-inter wall-nav-label min-w-0 text-center text-[var(--muted-text,#4d5d6c)]">
+          <!--
+            `--muted-text` has no definition anywhere in the app, so the #4d5d6c
+            fallback is what always renders — about 2.5:1 on the dark ground.
+            The dark partner is the thing doing the work here.
+            `whitespace-nowrap` stops the label reflowing and shoving the arrows
+            sideways between presses on a wall-mounted tablet.
+          -->
+          <p
+            class="font-inter wall-nav-label dark:text-ink-soft min-w-0 text-center whitespace-nowrap text-[var(--muted-text,#4d5d6c)]"
+          >
             {{ anchorLabel }}
           </p>
           <button
@@ -456,7 +494,7 @@ watch(activeView, () => (sheet.value = null));
           <button
             v-if="!isAnchoredToToday"
             type="button"
-            class="font-outfit text-primary-500 dark:text-primary-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold"
+            class="font-outfit text-primary-500 dark:text-accent-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold"
             @click="onGoToToday"
           >
             {{ t('date.today') }}
@@ -497,6 +535,7 @@ watch(activeView, () => (sheet.value = null));
         :now="clockNow"
         :peripherals="peripherals"
         :rail="daysRail"
+        :rail-wide="railWide"
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"
         :back-label="backLabel"
