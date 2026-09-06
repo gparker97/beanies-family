@@ -20,7 +20,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
-import { addDaysYmd, dayOfMonth, weekdayShort } from '@/utils/date';
+import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
@@ -28,7 +28,8 @@ import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
-  weekDays: string[];
+  /** The calendar week containing the anchor — the strip's seven chips. */
+  weekOfAnchor: string[];
   todayYmd: string;
   portrait: boolean;
   /** Ticks with the page clock, so "happening now" moves through the day. */
@@ -68,19 +69,19 @@ const { identityFor } = useActivityIdentity();
 const focusYmd = computed(() => props.anchorYmd);
 
 /**
- * The strip is seven days from the REAL today — deliberately not from the anchor.
+ * The CALENDAR week containing the day on screen — supplied by the page.
  *
- * ⚠️ It was briefly `props.weekDays`, and that broke it. `weekDays` is now
- * `anchor..anchor+6`, and the anchor is what a strip tap sets, so the tapped day
- * became chip #1 every time: tapping Thursday relabelled the strip Thu–Wed,
- * putting Mon/Tue/Wed out of reach and leaving `aria-pressed` true only ever for
- * the first cell. A picker whose options move when you pick one is not a picker.
+ * ⚠️ Two wrong answers were tried first, and both broke the picker in opposite
+ * directions. `weekDays` (anchor..anchor+6) re-based on every tap: choosing
+ * Thursday relabelled the strip Thu–Wed and put Mon–Wed out of reach. Pinning it
+ * to today..today+6 fixed that but could not represent its own selection — one
+ * press of `‹` moved the anchor outside the window, leaving all seven chips
+ * unselected with `aria-pressed="false"` and no way back from the strip.
  *
- * Anchored on today the two are identical, which is why it looked right.
+ * A calendar week satisfies both: every day in it shares the same week, so
+ * picking one cannot move the window, and the anchor is always inside it.
  */
-const stripDays = computed(() =>
-  Array.from({ length: 7 }, (_, i) => addDaysYmd(props.todayYmd, i))
-);
+const stripDays = computed(() => props.weekOfAnchor);
 const isToday = computed(() => focusYmd.value === props.todayYmd);
 
 const events = computed(() =>
