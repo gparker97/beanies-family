@@ -13,6 +13,8 @@ import {
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
   monthGridRange,
+  weekStartOffset,
+  startOfWeekYmd,
 } from '../date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -421,4 +423,72 @@ describe('monthGridRange (regression vs CalendarGrid inline math)', () => {
       });
     }
   }
+});
+
+describe('weekStartOffset', () => {
+  // Expectations are written out rather than recomputed. A test that derives its
+  // expectation from the function under test agrees with any implementation,
+  // including a wrong one.
+  const MONDAY_START = [
+    { day: 0, name: 'Sunday', offset: 6 },
+    { day: 1, name: 'Monday', offset: 0 },
+    { day: 2, name: 'Tuesday', offset: 1 },
+    { day: 3, name: 'Wednesday', offset: 2 },
+    { day: 4, name: 'Thursday', offset: 3 },
+    { day: 5, name: 'Friday', offset: 4 },
+    { day: 6, name: 'Saturday', offset: 5 },
+  ];
+
+  const SUNDAY_START = [
+    { day: 0, name: 'Sunday', offset: 0 },
+    { day: 1, name: 'Monday', offset: 1 },
+    { day: 2, name: 'Tuesday', offset: 2 },
+    { day: 3, name: 'Wednesday', offset: 3 },
+    { day: 4, name: 'Thursday', offset: 4 },
+    { day: 5, name: 'Friday', offset: 5 },
+    { day: 6, name: 'Saturday', offset: 6 },
+  ];
+
+  for (const { day, name, offset } of MONDAY_START) {
+    it(`${name} is ${offset} day(s) into a Monday-start week`, () => {
+      expect(weekStartOffset(day, 1)).toBe(offset);
+    });
+  }
+
+  for (const { day, name, offset } of SUNDAY_START) {
+    it(`${name} is ${offset} day(s) into a Sunday-start week`, () => {
+      expect(weekStartOffset(day, 0)).toBe(offset);
+    });
+  }
+});
+
+describe('startOfWeekYmd', () => {
+  // 2026-09-06 is a Sunday; 2026-09-07 a Monday; 2026-09-12 a Saturday.
+  it('walks back to Monday on a Monday-start week', () => {
+    expect(startOfWeekYmd('2026-09-10', 1)).toBe('2026-09-07'); // Thu -> Mon
+    expect(startOfWeekYmd('2026-09-07', 1)).toBe('2026-09-07'); // Mon -> itself
+    expect(startOfWeekYmd('2026-09-06', 1)).toBe('2026-08-31'); // Sun -> previous Mon
+  });
+
+  it('walks back to Sunday on a Sunday-start week', () => {
+    expect(startOfWeekYmd('2026-09-10', 0)).toBe('2026-09-06'); // Thu -> Sun
+    expect(startOfWeekYmd('2026-09-06', 0)).toBe('2026-09-06'); // Sun -> itself
+    expect(startOfWeekYmd('2026-09-12', 0)).toBe('2026-09-06'); // Sat -> Sun
+  });
+
+  it('crosses a month boundary', () => {
+    expect(startOfWeekYmd('2026-10-01', 1)).toBe('2026-09-28'); // Thu -> Mon in September
+  });
+
+  it('crosses a year boundary', () => {
+    expect(startOfWeekYmd('2027-01-01', 1)).toBe('2026-12-28'); // Fri -> Mon in December
+  });
+
+  it('returns the input unchanged when it cannot be parsed', () => {
+    // parseLocalDate does not throw — it yields an Invalid Date, which
+    // toDateInputValue would render as the literal string "NaN-NaN-NaN".
+    // Returning the input keeps that garbage from being manufactured here.
+    expect(startOfWeekYmd('not-a-date', 1)).toBe('not-a-date');
+    expect(startOfWeekYmd('2026-13-45', 1)).not.toContain('NaN');
+  });
 });

@@ -187,6 +187,36 @@ export function addDaysYmd(ymd: string, days: number): string {
 }
 
 /**
+ * Days from `dayOfWeek` back to the first day of its week, per the user's
+ * `weekStartDay` (0=Sun..6=Sat).
+ *
+ * ⚠️ FIVE independent copies of this expression existed as of 2026-09:
+ * `monthGridRange` (below), `monthCells.ts`, `useCalendarNavigation.getWeekStart`,
+ * `BeanieDatePicker.vue` and `CalendarGrid.vue`. They are deliberately NOT migrated
+ * onto this yet — that touches the planner, the month grid and the date picker for
+ * no user-visible outcome, and it is a follow-up with one owner. But no SIXTH copy
+ * may be written: callers that need the week's first day use `startOfWeekYmd`.
+ */
+export function weekStartOffset(dayOfWeek: number, weekStartDay: number): number {
+  return (dayOfWeek - weekStartDay + 7) % 7;
+}
+
+/**
+ * `YYYY-MM-DD` → the ymd of the first day of its week, per the user's `weekStartDay`.
+ *
+ * Returns the input unchanged if it cannot be parsed — `parseLocalDate` does not
+ * throw (it yields an Invalid Date, which `toDateInputValue` renders as the literal
+ * string "NaN-NaN-NaN"), so a silent garbage-in/garbage-out is the failure mode this
+ * guard exists to avoid. Callers that must not propagate a bad date validate it
+ * themselves; see `clampAnchorYmd` in `wallAnchor.ts`.
+ */
+export function startOfWeekYmd(ymd: string, weekStartDay: number): string {
+  const date = parseLocalDate(ymd.slice(0, 10));
+  if (Number.isNaN(date.getTime())) return ymd;
+  return addDaysYmd(ymd, -weekStartOffset(date.getDay(), weekStartDay));
+}
+
+/**
  * The inclusive date span of the rendered month grid for `referenceDate` — the
  * 6-week grid INCLUDING the leading/trailing adjacent-month padding days, NOT the
  * 1st→last of the calendar month. `weekStartDay` is 0=Sun..6=Sat. Single source of
