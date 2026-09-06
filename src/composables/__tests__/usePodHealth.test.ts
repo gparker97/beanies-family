@@ -1,26 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { decodedSizeOf, DUE_BYTES } from '../usePodHealth';
+import { DUE_BYTES } from '../usePodHealth';
 
-describe('decodedSizeOf', () => {
-  it('measures a base64 payload without decoding it', () => {
-    // ⚠️ Decoding a multi-megabyte payload to measure it would allocate the
-    // very thing this tier exists to avoid.
-    const bytes = new Uint8Array(3000).fill(7);
-    const b64 = Buffer.from(bytes).toString('base64');
-    expect(decodedSizeOf(b64)).toBe(3000);
-  });
-
-  it('handles both padding lengths exactly', () => {
-    for (const n of [1, 2, 3, 4, 5, 999, 1000]) {
-      const b64 = Buffer.from(new Uint8Array(n)).toString('base64');
-      expect(decodedSizeOf(b64)).toBe(n);
-    }
-  });
-
-  it('is zero for an absent payload rather than NaN', () => {
-    expect(decodedSizeOf('')).toBe(0);
-  });
-
+/**
+ * The behaviour of `usePodHealth` lives in `usePodHealth.dueSignal.test.ts`.
+ *
+ * This file used to test a local `decodedSizeOf` that measured
+ * `envelope.encryptedPayload` — a field `replaceEnvelope` blanks on every write,
+ * so the thing it measured was always empty and the byte half of the due check
+ * could never fire. Three green tests over a helper nothing called. The size now
+ * comes from `syncService.getLastPersistedBytes()`, and the helper is gone.
+ */
+describe('usePodHealth thresholds', () => {
   it('puts the threshold where an old tablet starts to struggle', () => {
     expect(DUE_BYTES).toBe(1_000_000);
   });
