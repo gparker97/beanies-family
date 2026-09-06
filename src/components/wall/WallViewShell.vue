@@ -16,8 +16,9 @@
  */
 import { computed } from 'vue';
 import WallPeripheralCards from '@/components/wall/WallPeripheralCards.vue';
+import { useMediaQuery } from '@/composables/useMediaQuery';
 import { wallPeripheralVariant } from '@/utils/wallActivities';
-import { RAIL_WIDTH_PX } from '@/components/wall/wallLayout';
+import { BAND_HEIGHT_QUERY, RAIL_WIDTH_PX } from '@/components/wall/wallLayout';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
@@ -48,8 +49,27 @@ const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
 
 const useRail = computed(() => props.rail && !props.portrait);
 
+/**
+ * Is the window tall enough for a stacked band to leave the grid a real day?
+ *
+ * Read here rather than plumbed down from the page: all three views ask the same
+ * question of the same window, and a prop would have to be threaded through each
+ * of them to arrive at the one component that uses it. `useMediaQuery` is
+ * reactive and releases with the scope, so rotating a mounted tablet re-answers
+ * it — the wall's stated requirement for every other layout decision.
+ *
+ * Defaults to `true` under SSR/jsdom, matching the pre-existing behaviour: the
+ * band is the preference, and the first real match corrects it.
+ */
+const roomForBand = useMediaQuery(BAND_HEIGHT_QUERY, true);
+
 const peripheralVariant = computed(() =>
-  wallPeripheralVariant(useRail.value ? 'rail' : 'band', props.busiest, props.portrait)
+  wallPeripheralVariant(
+    useRail.value ? 'rail' : 'band',
+    props.busiest,
+    props.portrait,
+    roomForBand.value
+  )
 );
 </script>
 

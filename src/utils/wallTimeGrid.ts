@@ -277,13 +277,30 @@ export const LADDER: readonly Rung[] = Object.freeze(
  *                         27px of type on any display
  *     NUDGE_PX        3   a visible seam between two stacked blocks
  *     settle()'s     +4   clearance above a fold band. FLAT, and it fires on
- *                         EVERY fold, so a layout's `total` is
- *                         `gridBottom + 4 × folds.length` and the ×z scaling
- *                         property is exact only for a ZERO-FOLD day
+ *                         EVERY fold, so the ×z scaling property is exact only
+ *                         for a ZERO-FOLD day
  *     MIN_FOLDABLE_MINUTES 20  a duration, not a length
  *     MAX_BLOCK_PX / MAX_BLOCK_CEILING_PX / defaultMaxBlock
  *                         "past this a single block dominates the wall however
  *                         large the glass" — explicitly a claim about the glass
+ *
+ * ⚠️ KNOWN, and measured rather than assumed: `attempt`'s `total` is rebuilt by a
+ * fresh `buildScale` that reads each band's height and does NOT see the downward
+ * pushes `settle` applies, so `total` is a slight UNDER-estimate on a day with
+ * folds. Fuzzing 4000 random multi-column days across 16 plot heights puts 175
+ * of them a few pixels past their budget. No event BLOCK ever overflows — block
+ * tops carry the shift — but the last hour rule and a bottom fold's label can be
+ * clipped by the plot's `overflow: hidden`. It predates the zoom work (the count
+ * is byte-identical on 72d02eb4) and correcting it means re-deriving `total`
+ * after `settle`, which moves what the search accepts at every height. Written
+ * down here rather than fixed in a change about the hour.
+ *
+ * ⚠️ ALSO KNOWN: `MAX_BLOCK_CEILING_PX` does not zoom while `pxPerMin` does, so
+ * the DURATION at which the cap binds falls as the glass grows — ~237 minutes at
+ * a 1080px plot, ~200 at 1440. A long block on the biggest walls is damped, and
+ * ends a few pixels above the hour rule it names. That is the cap's documented
+ * distortion arriving earlier, not a new one, and the ceiling is the deliberate
+ * answer to "one block must never own the wall".
  */
 export const ZOOM_STEPS = [2, 1.75, 1.5, 1.35, 1.25, 1.15, 1.05] as const;
 
@@ -331,11 +348,14 @@ export function zoomCandidates(availableHeight: number): readonly number[] {
  * Each is a FLOOR, never a clip — the real window is the union with the day's
  * own events, so an early riser widens it further rather than being cut off.
  */
+/** Minutes in a day. The widest window ENDS here, and no tick is drawn at it. */
+const MINUTES_IN_DAY = 24 * 60;
+
 const DAY_WINDOWS = [
-  { start: 6 * 60, end: 24 * 60 }, // 18h
+  { start: 6 * 60, end: MINUTES_IN_DAY }, // 18h
   { start: 6 * 60, end: 22 * 60 }, // 16h
   { start: 7 * 60, end: 21 * 60 }, // 14h
-  { start: 8 * 60, end: 20 * 60 }, // 12h — the default, and the one an empty day gets
+  { start: 8 * 60, end: 20 * 60 }, // 12h — the narrowest, and the terminal fallback
 ] as const;
 
 /** The default day: what the wall draws when it has room for exactly one. */
@@ -494,12 +514,6 @@ interface ParsedInput {
   rejected: PlacedOccurrence[];
   windowStart: number;
   windowEnd: number;
-  /**
-   * The generous window: waking hours UNION the day's own events. Drawn when the
-   * plot can afford it — see `AxisMode`.
-   */
-  fullWindowStart: number;
-  fullWindowEnd: number;
   columnCount: number;
 }
 
@@ -559,8 +573,6 @@ function parseColumns(
     windowStart,
     // A window of zero length would divide by zero downstream.
     windowEnd: Math.max(windowEnd, windowStart + 5),
-    fullWindowStart: Math.min(WAKING_WINDOW.start, windowStart),
-    fullWindowEnd: Math.max(WAKING_WINDOW.end, windowEnd),
     columnCount: columns.length,
   };
 }
@@ -612,7 +624,24 @@ export function findFolds(
   windowStart: number,
   windowEnd: number,
   thresholdMinutes: number,
-  zoom = 1
+  zoom = 1,
+  /**
+   * ⭐ RULE 3 — a fold must actually SAVE height, or it is not taken.
+   *
+   * `MIN_FOLD_PX` is a floor of 44px, so a fold band has a cost of its own. At
+   * the tight end of the ladder the hour has shrunk far enough that drawing an
+   * empty gap honestly is CHEAPER than announcing it: at scale 0.35 a 30-minute
+   * gap draws in 10.5px and folds into 44.9px — 4.3x worse. Because the two
+   * inner tightening axes descend to a 30-minute gap step, the search was being
+   * pushed toward the squeezed `overflow` tier BY the mechanism meant to relieve
+   * it. A 1024x768 week rendered "Quiet until 07:30" over a 30-minute lull, a
+   * 13px hour and titles clipped inside their own boxes; the same week 50px
+   * taller drew every hour honestly at 25px with no folds at all.
+   *
+   * Defaults to infinity — "never reject on economics" — which is the behaviour
+   * the callers that do not know their scale, and the tests, already pin.
+   */
+  pxPerMin = Number.POSITIVE_INFINITY
 ): GridFold[] {
   const spans: [number, number][] = [];
   let cursor = windowStart;
@@ -621,12 +650,14 @@ export function findFolds(
     cursor = Math.max(cursor, end);
   }
   if (windowEnd - cursor >= thresholdMinutes) spans.push([cursor, windowEnd]);
-  return spans.map(([start, end]) => ({
-    top: 0,
-    height: foldHeightFor(end - start, zoom),
-    startMinutes: start,
-    resumeMinutes: end,
-  }));
+  return spans
+    .filter(([start, end]) => foldHeightFor(end - start, zoom) < (end - start) * pxPerMin)
+    .map(([start, end]) => ({
+      top: 0,
+      height: foldHeightFor(end - start, zoom),
+      startMinutes: start,
+      resumeMinutes: end,
+    }));
 }
 
 /** The piecewise minutes→px mapping: linear outside folds, fixed across them. */
@@ -837,6 +868,14 @@ function tryGenerousFit(
    * The alternative — widest window first — fills a 1440px plot with eighteen
    * hours at the base height rather than twelve at double it, which is more day
    * and less readable. Wrong trade for this screen.
+   *
+   * ⚠️ The PRICE, pinned as a decision rather than left to be discovered: the
+   * drawn window is NOT monotonic in plot height. Ten more pixels can buy the
+   * next zoom step, and the window search then restarts at the narrowest — so a
+   * 820px plot draws 06:00–22:00 at 0.84 while an 830px plot draws 07:00–21:00
+   * at 0.92. Two hours of day traded for a taller hour. That is this rule
+   * working, not failing: the quantity held monotonic is the HOUR, which is what
+   * the family reads across the kitchen. See the pinned test.
    */
   for (const zoom of [...zoomCandidates(height), 1]) {
     const base = attempt(input, LADDER[0]!, maxBlock, zoom, 'full', NARROWEST);
@@ -915,7 +954,8 @@ function attempt(
           windowStart,
           windowEnd,
           foldThresholdMinutes(rung.gapMinutes, pxPerMin, zoom),
-          zoom
+          zoom,
+          pxPerMin
         )
       : [];
   const { yFor } = buildScale(windowStart, windowEnd, folds, pxPerMin);
@@ -1052,6 +1092,16 @@ function buildTicks(
   for (let minutes = Math.ceil(windowStart / 60) * 60; minutes <= windowEnd; minutes += 60) {
     // (windowStart is already on the hour, so this begins at the plot's top edge)
     if (insideFold(minutes)) continue;
+    /*
+     * ⚠️ No tick AT midnight-as-an-end. The widest day window runs to minute
+     * 1440, and the renderer's `hhmm` wraps that to "00:00" — so the tallest
+     * screens drew a label reading as the day starting over, directly under
+     * 23:00, and drew it at `y = total` where `-translate-y-1/2` puts half of it
+     * outside an `overflow: hidden` plot. A day that also STARTS at 00:00 then
+     * carried the same label at both ends of its axis. The last hour of the day
+     * is marked by 23:00; the plot's own bottom edge says where it ends.
+     */
+    if (minutes >= MINUTES_IN_DAY) continue;
     ticks.push({ minutes, y: yFor(minutes) });
   }
   return ticks;
@@ -1086,26 +1136,25 @@ export function layoutTimeGrid(
     rejected: input.rejected,
   };
 
-  if (!input.items.length) {
-    // A day with nothing on still draws its hours: an empty grid reads as "the
-    // day is clear", where an empty rectangle reads as "this is broken".
-    // ⚠️ Load-bearing. Without the zoom an empty day renders at the base hour on
-    // a screen where every other day renders bigger. The widest candidate always
-    // fits here by construction: the empty window is 720 minutes, needing
-    // 720 × 0.8 × z = 576z <= height, and the filter already guarantees 720z.
-    const scale = SCALE_STEPS[0]! * (zoomCandidates(height)[0] ?? 1);
-    const { yFor } = buildScale(input.windowStart, input.windowEnd, [], scale);
-    return {
-      ...base,
-      columns: columns.map(() => []),
-      folds: [],
-      ticks: buildTicks(input.windowStart, input.windowEnd, [], yFor),
-      yFor,
-      scale,
-      tier: 'gentle',
-      attempts: 0,
-    };
-  }
+  /*
+   * ⚠️ An empty day is NOT a special case, and hand-rolling one made it look
+   * like a different wall.
+   *
+   * There used to be an early return here that built its own scale from
+   * `SCALE_STEPS[0]` and drew `input.windowStart..windowEnd` — the waking window
+   * — with a hard-coded `tier: 'gentle'`. Every day WITH an event goes through
+   * `tryGenerousFit`, which widens to one of the standard `DAY_WINDOWS`, so on a
+   * 1440px plot a day holding one appointment drew 07:00–21:00 while a clear day
+   * beside it drew 08:00–20:00. Stepping from a quiet Tuesday to a free
+   * Wednesday moved the axis top by an hour and back, which is precisely the
+   * day-to-day instability `DAY_WINDOWS` was quantized to prevent.
+   *
+   * Nothing below needs the guard: `parseColumns` already substitutes the waking
+   * window when there is nothing to bound, `input.busy` is empty so `findFolds`
+   * returns none, and `settle` over no blocks is a no-op. An empty day now takes
+   * the ordinary path and gets the ordinary answer — the hours of a real day,
+   * with nothing drawn on them.
+   */
 
   /*
    * One pass down the ladder — no inner budget loop any more.

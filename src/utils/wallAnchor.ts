@@ -67,7 +67,24 @@ export function clampAnchorYmd(next: string, todayYmd: string): string {
   if (!isRealYmd(next)) return todayYmd;
 
   const drift = anchorOffsetDays(next, todayYmd);
-  if (Number.isNaN(drift) || Math.abs(drift) > MAX_ANCHOR_DRIFT_DAYS) return todayYmd;
+  if (Number.isNaN(drift)) return todayYmd;
+
+  /*
+   * ⚠️ A real day past the limit clamps to the LIMIT, not to today.
+   *
+   * It used to return `todayYmd`, and the week views render up to six days past
+   * the anchor — so at the forward edge an ordinary tap on a drawn column header
+   * threw the wall a year backwards to today and, because the caller only
+   * switches view on success, did nothing else visible to explain it. Landing on
+   * the furthest day the wall will go is the answer the gesture actually asked
+   * for, and it is one the family can see happen.
+   *
+   * Malformed input still lands on today: there is no meaningful "nearest" day
+   * to a string that never named one.
+   */
+  if (Math.abs(drift) > MAX_ANCHOR_DRIFT_DAYS) {
+    return addDaysYmd(todayYmd, drift > 0 ? MAX_ANCHOR_DRIFT_DAYS : -MAX_ANCHOR_DRIFT_DAYS);
+  }
 
   return next;
 }

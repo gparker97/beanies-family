@@ -86,7 +86,10 @@ describe('daysLayoutFor — the DAYS rule', () => {
       const result = daysLayoutFor(bad, false);
       expect(result.columns).toBe(MIN_DAY_COLUMNS);
       expect(Number.isFinite(result.columns)).toBe(true);
-      if (!Number.isFinite(bad) && bad > 0) continue; // +Infinity legitimately fits seven
+      // ⚠️ +Infinity is not in this list of "nonsense" — every value here is
+      // guarded to MIN_DAY_COLUMNS and no rail, +Infinity included, because
+      // `dayColumnsThatFit` rejects any non-finite content width outright. The
+      // comment that used to sit here claimed the opposite.
       expect(result.rail).toBe(false);
     }
   });

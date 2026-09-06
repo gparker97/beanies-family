@@ -221,19 +221,29 @@ const lanesRail = computed(
  * is inverted in exactly the cases that matter — a large family on a 1300px wall
  * has a lanes BAND while `daysRail` is true.
  */
-watch([() => daysLayout.value.rail, lanesRail, activeView], ([days, lanes, view]) => {
-  if (view !== 'days' && view !== 'lanes') return;
-  logEvent({
-    level: 'info',
-    surface: SURFACE,
-    message: 'wall_rail_mode',
-    context: {
-      action: 'layout',
-      kind: view,
-      stage: (view === 'days' ? days : lanes) ? 'rail' : 'band',
-    },
-  });
-});
+watch(
+  [() => daysLayout.value.rail, () => daysLayout.value.columns, lanesRail, activeView],
+  ([days, columns, lanes, view]) => {
+    if (view !== 'days' && view !== 'lanes') return;
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'wall_rail_mode',
+      context: {
+        action: 'layout',
+        kind: view,
+        stage: (view === 'days' ? days : lanes) ? 'rail' : 'band',
+        // ⚠️ The COLUMN COUNT is the headline behaviour change — a 1280px wall
+        // now draws 3 of 7 days where it drew 7 — and the watcher must depend on
+        // it as well as report it. Keyed on the rail alone, a 1440→1920 resize
+        // that moves 4 columns to 6 changed neither source and filed nothing, so
+        // "my week only shows 3 days" was untriageable. Days only: a lane is a
+        // person, and its count is the family's size, not a layout decision.
+        ...(view === 'days' ? { count: columns } : {}),
+      },
+    });
+  }
+);
 
 /**
  * The job/list bundle, built once and forwarded whole. Passing its five members
@@ -334,6 +344,8 @@ function logAnchorChange(stage: string) {
 function onStep(direction: -1 | 1) {
   const unit = currentView.value.stepUnit;
   if (!unit) return;
+  // A deliberate move supersedes the drill-in's return address; see it there.
+  anchorBeforeDrill.value = null;
   // A refused step still emits — with its OWN stage, so it neither corrupts the
   // browse signal with an unchanged `count` after a `next`, nor goes silent.
   // Silence here is indistinguishable from the family walking away.
@@ -342,6 +354,7 @@ function onStep(direction: -1 | 1) {
 }
 
 function onGoToToday() {
+  anchorBeforeDrill.value = null;
   anchor.goToToday();
   logAnchorChange('today');
 }
@@ -370,9 +383,43 @@ function onGoToToday() {
  * and it is reachable by an ordinary tap at the forward edge of the week.
  */
 function onOpenDay(ymd: string) {
+  const from = anchorYmd.value;
   if (!anchor.setAnchor(ymd, 'day_tap')) return logAnchorChange('range_limit');
+  // Only NOW is the drill-in real, so this is the only place the return address
+  // may be written — see `onGoBack`.
+  anchorBeforeDrill.value = from;
   logAnchorChange('day_tap');
   selectView('today');
+}
+
+/**
+ * Where the week was standing when someone drilled into one of its days.
+ *
+ * ⚠️ Drilling in moves the SHARED anchor, so without this the back control lands
+ * on a different week than the one it was pressed from: leaving Sun 6 via the
+ * '8' header and pressing back rendered 8/9/10, and 6-7 Sep were reachable only
+ * by stepping back to a calendar-week start. The wall has one anchor by design —
+ * the clock, the highlight and the header all read it — so the fix is to
+ * remember the address, not to add a second anchor.
+ *
+ * Any deliberate move in the today view (a step, or Today) clears it: at that
+ * point the family has chosen where they are, and silently undoing that on the
+ * way back would be its own surprise.
+ */
+const anchorBeforeDrill = ref<string | null>(null);
+
+function onGoBack() {
+  const restore = anchorBeforeDrill.value;
+  anchorBeforeDrill.value = null;
+  if (restore && restore !== anchorYmd.value && anchor.setAnchor(restore, 'day_tap')) {
+    logAnchorChange('back_restore');
+  }
+  selectView(lastCalendarView.value);
+}
+
+function onFocusMember(memberId: string) {
+  // The footer chips' own semantics: tapping the focused bean clears the filter.
+  focusedMemberId.value = focusedMemberId.value === memberId ? null : memberId;
 }
 
 function onFocusDay(ymd: string) {
@@ -672,8 +719,9 @@ watch(activeView, () => (sheet.value = null));
         :back-label="backLabel"
         :can-go-back="canGoBack"
         @toggle="onToggle"
-        @back="selectView(lastCalendarView)"
+        @back="onGoBack"
         @open-day="onOpenDay"
+        @focus-member="onFocusMember"
         @focus-day="onFocusDay"
         @step="onStep"
         @open="openSheet"
