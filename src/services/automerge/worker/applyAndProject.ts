@@ -20,15 +20,8 @@
 import * as Automerge from '@automerge/automerge';
 import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
-// ⚠️ NOT a bare `crypto.randomUUID()`. It is undefined on a NON-SECURE origin —
-// which is exactly how a tablet is tested (`npm run dev -- --host` on a LAN IP)
-// — and the resulting TypeError matches none of `isAllocationFailure`'s
-// patterns, so `payloadFailure` classifies it as a CorruptPayloadError and the
-// user is told their family data may be damaged. `generateUUID` has the
-// fallback this needs and is what the rest of the app uses.
-import { generateUUID } from '@/utils/id';
 import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
-import type { LineageBasis } from './protocol';
+import type { LineageBasis, ExportedPayload } from './protocol';
 import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -51,6 +44,7 @@ import {
   frameChanges,
   registerNamedOp,
   payloadFailure,
+  nextLineage,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
@@ -1036,12 +1030,16 @@ export async function verifyEnvelope(envelope: BeanpodFileV4): Promise<{ ok: tru
  * the bytes we uploaded — an over-claim, and precisely the false-skip #65
  * exists to prevent. The caller commits these as the Drive baseline once the
  * write is acked. */
-export async function exportEncryptedPayload(): Promise<{ payload: string; heads: Heads }> {
+export async function exportEncryptedPayload(): Promise<ExportedPayload> {
   const doc = requireDoc('exportEncryptedPayload');
   const key = requireKey('exportEncryptedPayload');
   const heads = headsOf(doc);
+  // Read from the SAME `doc` const the heads come from, so the lineage
+  // describes exactly the bytes being exported. Main derives the envelope
+  // version from it (`beanpodVersionFor`); it is never carried on the envelope.
+  const lineage = docLineage(doc);
   const payload = await time2('automerge.save', () => encryptDocPayload(doc, key));
-  return { payload, heads };
+  return { payload, heads, lineage };
 }
 
 // ─── Change-aware transport (Plan B — incremental delta sync) ────────────────
@@ -1221,10 +1219,7 @@ export function compactDoc(): {
     // rebuilt document is a single change; and it would force the verify below
     // to run against an unstamped copy, so the check would no longer describe
     // the bytes actually installed.
-    const source = {
-      ...plain,
-      podLineage: { id: generateUUID(), seq: (docLineage(before)?.seq ?? 0) + 1 },
-    };
+    const source = { ...plain, podLineage: nextLineage(docLineage(before)) };
     compacted = Automerge.from(source, docInitOpts()) as Doc;
     // Proves the rebuild round-tripped EXACTLY — including the stamp, which is
     // the one field we deliberately changed and therefore the one worth

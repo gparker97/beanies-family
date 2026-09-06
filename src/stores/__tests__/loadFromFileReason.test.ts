@@ -70,7 +70,15 @@ vi.mock('@/services/sync/capabilities', () => ({
   isNative: () => false,
 }));
 
-vi.mock('@/services/sync/fileSync', () => ({
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  // The version DERIVATION is real even where the writers are mocked: a
+
+  // test-local `'4.0'` here would hide the one regression the derivation
+
+  // exists to prevent (a compacted pod written as 4.0).
+
+  beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
+    .beanpodVersionFor,
   exportToFile: vi.fn(async () => {}),
   importFromFile: vi.fn(async () => ({ success: true })),
 }));

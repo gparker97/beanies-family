@@ -52,7 +52,7 @@ import * as Automerge from '@automerge/automerge';
 import { parseBeanpodV4, tryUnwrapFamilyKey, reEncryptEnvelope } from '@/services/sync/fileSync';
 import { decryptPayload, encryptPayload } from '@/services/crypto/familyKeyService';
 import { base64ToBuffer, bufferToBase64 } from '@/utils/encoding';
-import { loadAndVerify } from '@/services/automerge/worker/docOps';
+import { loadAndVerify, nextLineage } from '@/services/automerge/worker/docOps';
 import { PayloadTooLargeError } from '@/types/sync';
 
 const FILE = process.env.BEANPOD_FILE;
@@ -258,11 +258,15 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
     const compactOut = process.env.BEANPOD_COMPACT_OUT;
     if (compactOut) {
       try {
-        const compactedBinary = Automerge.save(Automerge.from(plain));
+        // Stamped the way `compactDoc` stamps: into the source, before
+        // `Automerge.from`, so the artefact is a real 5.0 compacted pod and not
+        // the forbidden shape (a compacted payload labelled 4.0).
+        const lineage = nextLineage(null);
+        const compactedBinary = Automerge.save(Automerge.from({ ...plain, podLineage: lineage }));
         const payload = bufferToBase64(await encryptPayload(familyKey, compactedBinary));
         // Same envelope, same wrapped keys — so the same password opens it and
         // the profile run against it is comparing like with like.
-        writeFileSync(compactOut, reEncryptEnvelope(envelope, payload));
+        writeFileSync(compactOut, reEncryptEnvelope(envelope, payload, lineage));
         process.stdout.write(
           [
             '',

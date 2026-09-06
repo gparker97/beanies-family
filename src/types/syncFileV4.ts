@@ -51,9 +51,20 @@ export interface InviteKeyPackage {
   expiresAt: ISODateString;
 }
 
-/** Beanpod file format v4.0 */
+/**
+ * The envelope version. `'4.0'` is every family until it compacts; `'5.0'` is a
+ * COMPACTED family, and is chosen in exactly one place (`beanpodVersionFor` in
+ * `fileSync.ts`) from the document's lineage. The point of 5.0 is that a build
+ * which predates the lineage guard refuses to parse it, and so cannot merge
+ * across lineages (ADR-036 addendum). The V4 in `BeanpodFileV4` names the KEY
+ * MODEL, which does not change; a 5.0 file is a V4-format envelope carrying a
+ * compacted payload.
+ */
+export type BeanpodVersion = '4.0' | '5.0';
+
+/** Beanpod file format v4.0 (envelope), at either `BeanpodVersion`. */
 export interface BeanpodFileV4 {
-  version: '4.0';
+  version: BeanpodVersion;
   familyId: UUID;
   familyName: string;
 

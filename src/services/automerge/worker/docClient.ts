@@ -54,6 +54,7 @@ import {
   type Heads,
   type CachePersistFailureDetail,
   type LineageBasis,
+  type ExportedPayload,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
@@ -1314,7 +1315,7 @@ function noteRebaseUnavailable(familyId: string | null, outcome: string): void {
 /** Serialize + encrypt the current doc; main assembles the envelope + uploads.
  * `heads` are the heads of exactly the serialized doc (#65) — commit them as the
  * Drive baseline once the write is acked. */
-export function exportEncryptedPayload(): Promise<{ payload: string; heads: Heads }> {
+export function exportEncryptedPayload(): Promise<ExportedPayload> {
   return request('exportEncryptedPayload');
 }
 
