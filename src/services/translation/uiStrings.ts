@@ -4305,9 +4305,9 @@ const STRING_DEFS = {
       'beanies saves a copy of the current file first, so you can go back to it if you ever need to.',
   },
   'compaction.why.devices': {
-    en: 'Your other devices switch to the compacted file on their own. A device still on an older version of beanies shows a message and syncs again once it updates.',
+    en: 'Your other devices switch to the compacted file on their own. A device still on an older version of beanies stops syncing until it is updated, so it is worth asking anyone who has not updated to do it.',
     beanie:
-      'your other devices switch to the compacted file on their own. a device still on an older version of beanies shows a message and syncs again once it updates.',
+      'your other devices switch to the compacted file on their own. a device still on an older version of beanies stops syncing until it is updated, so it is worth asking anyone who has not updated to do it.',
   },
   'compaction.bringDevicesOnline': {
     en: "Before you start, make sure your family's other devices have been online recently, so they are up to date.",
@@ -4332,9 +4332,9 @@ const STRING_DEFS = {
     beanie: 'compact your family file?',
   },
   'compaction.confirmMessage': {
-    en: "beanies will rebuild your family file without its record of past changes, so it opens faster. Everything you've added stays. beanies saves a copy of the current file first, and your other devices switch over on their own.",
+    en: "beanies will rebuild your family file without its record of past changes, so it opens faster. Everything you've added stays. beanies saves a copy of the current file first, and your other devices switch over on their own once they are up to date.",
     beanie:
-      "beanies will rebuild your family file without its record of past changes, so it opens faster. everything you've added stays. beanies saves a copy of the current file first, and your other devices switch over on their own.",
+      "beanies will rebuild your family file without its record of past changes, so it opens faster. everything you've added stays. beanies saves a copy of the current file first, and your other devices switch over on their own once they are up to date.",
   },
   'compaction.confirmCta': { en: 'Compact it', beanie: 'compact it' },
   'compaction.refused': {
@@ -4464,7 +4464,7 @@ const STRING_DEFS = {
     beanie:
       'your backup is on this device and your data is safe. reload beanies and it will finish the job.',
   },
-  'settings.compactPod': { en: 'Compact Family File', beanie: 'compact pod' },
+  'settings.compactPod': { en: 'Compact Family File', beanie: 'compact family file' },
   'settings.compactSection': { en: 'Compact Your Family File', beanie: 'compact your family file' },
   'settings.compactSectionDesc': {
     en: "beanies keeps a record of every change to your family file. Over time that record makes the file bigger and slower to open, especially on older phones and tablets. Compacting removes the record and keeps everything you've added.",

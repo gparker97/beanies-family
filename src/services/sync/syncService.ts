@@ -69,6 +69,13 @@ export interface OpenFileResult {
   fileHandle?: FileSystemFileHandle;
   provider?: StorageProvider;
   /**
+   * The person dismissed the OS picker. NOT a failure: nothing to report, and
+   * nothing to show. Without it a cancel is `{ success: false }` with no
+   * `payloadError`, indistinguishable from a real failure, and every caller's
+   * else-arm shows an error for an ordinary Escape.
+   */
+  cancelled?: true;
+  /**
    * A classified failure the caller can RENDER (`t(payloadError.inlineMessageKey)`),
    * set when the file could be read but not accepted: a version from a newer
    * beanies, a torn file. Callers test this BEFORE the raw `lastError` mirror,
@@ -899,6 +906,11 @@ export function getSessionFileHandle(): FileSystemFileHandle | null {
  * Reset the sync service state.
  */
 export function reset(): void {
+  // ⚠️ THE TRANSITION MEMORY IS PER FAMILY. Left set, a switch to a second
+  // family suppresses its first `pod-version` whenever the derived string
+  // matches, which is the common case (`version=4.0,seq=none`) and also the one
+  // that matters (two families both at 5.0, seq 1).
+  lastVersionDetail = null;
   // A different pod entirely — neither the latch nor an unearned marker may
   // follow. A `pendingMarker` surviving a family switch would let a later
   // rollback null a baseline that was legitimately earned minutes ago, after
@@ -1833,20 +1845,17 @@ async function doSave(): Promise<boolean> {
     // The writer says which version it ACTUALLY chose. Calling the pure
     // derivation a second time is not a second implementation: the logic has
     // one home, and a second call cannot disagree with the first.
-    const versionDetail = `version=${beanpodVersionFor(lineage)},seq=${lineage?.seq ?? 'none'}`;
-    if (versionDetail !== lastVersionDetail) {
-      lastVersionDetail = versionDetail;
-      logEvent({
-        level: 'info',
-        surface: 'pod-version',
-        message: 'pod written at version',
-        context: {
-          action: 'wrote',
-          detail: versionDetail,
-          ...(currentEnvelope.familyId ? { family_id: currentEnvelope.familyId } : {}),
-        },
-      });
-    }
+    // ⚠️ `undefined` AND `null` ARE DIFFERENT ANSWERS HERE, and that difference
+    // IS the alarm. `null` is the worker saying "this document has no lineage"
+    // (a never-compacted family, the overwhelmingly common case). `undefined`
+    // can only mean the field did not arrive at all — the worker stopped
+    // returning it, or a boundary dropped it — and THAT is the silent failure
+    // this event exists to catch, because `beanpodVersionFor(undefined)` then
+    // derives 4.0 for a document that may well be compacted. Deriving both
+    // halves from the same optional (the first cut) made `version=4.0` occur
+    // exactly when `seq=none`, so the stated alarm could never fire.
+    const seqDetail = lineage === undefined ? 'missing' : lineage === null ? 'none' : lineage.seq;
+    const versionDetail = `version=${beanpodVersionFor(lineage ?? null)},seq=${seqDetail}`;
 
     // INVARIANT (ADR-032 addendum, 2026-07-15): every save writes the FULL compacted
     // base. Change-log/delta chunks were retired on the strength of this — the base
@@ -1870,6 +1879,11 @@ async function doSave(): Promise<boolean> {
     // C14b: the write returns its own resulting revision IN the response. Narrow
     // the `WriteAck | void` union explicitly at this ONE site.
     const ack = await providerAtWrite.write(fileContent);
+    // ⚠️ AFTER THE ACK, NOT BEFORE. Emitting beside the derivation logged a
+    // version that had not landed, and committed the transition memo with it —
+    // so a failed first post-compaction save reported a 5.0 write that never
+    // happened AND silenced the one that eventually did.
+    noteWrittenVersion(versionDetail, currentEnvelope.familyId);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
     const ackRevision = ack ? ack.revision : null;
 
@@ -2098,6 +2112,21 @@ export async function loadAndParseV4(): Promise<{
 function openFileFailure(e: unknown): OpenFileResult {
   if (isRemoteBlocker(e)) {
     updateState({ isSyncing: false, lastError: useTranslationStore().t(e.inlineMessageKey) });
+    // ⚠️ THE PICKER SURFACES WERE DARK. Only the poll, the rebind and the
+    // Drive join reached the firehose, so "a person picked a file this build
+    // cannot read" was unmeasurable on the three paths a person actually uses.
+    // `warning`, never a page: updating an app is not an incident.
+    reportError({
+      surface: 'pod-load-failure',
+      message: `Picked file not readable: ${e.blockCode}`,
+      error: e,
+      severity: 'warning',
+      context: {
+        action: 'picked-file-unreadable',
+        error_code: e.blockCode,
+        ...(e.blockDetail ? { detail: e.blockDetail } : {}),
+      },
+    });
     return { success: false, payloadError: e };
   }
   updateState({ isSyncing: false, lastError: (e as Error).message });
@@ -2133,8 +2162,10 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
     return { success: false, needsPassword: true, fileHandle: handle, provider, envelope };
   } catch (e) {
     if ((e as Error).name === 'AbortError') {
-      updateState({ isSyncing: false });
-      return { success: false };
+      // `lastError: null` too: a stale string from a previous attempt is
+      // mirrored into `syncStore.error` and would render behind the cancel.
+      updateState({ isSyncing: false, lastError: null });
+      return { success: false, cancelled: true };
     }
     return openFileFailure(e);
   }
@@ -2270,6 +2301,27 @@ export async function saveNow(): Promise<boolean> {
  * later. Cancelling and asking are the SAME call on purpose — two calls can
  * disagree if a save is armed between them.
  */
+/**
+ * Report the version this device ACTUALLY wrote, on transition only.
+ *
+ * The plan's central invariant has no other signal: a compacted document
+ * written as 4.0 looks healthy to the whole fleet, because a guarded peer
+ * parses it, reads `adopt-remote` and adopts. Transition-gated because a family
+ * saves constantly and a per-save event would be a large fraction of the
+ * firehose carrying one constant; `seq=missing` is the alarm (see the
+ * derivation site).
+ */
+function noteWrittenVersion(detail: string, familyId: string | null | undefined): void {
+  if (detail === lastVersionDetail) return;
+  lastVersionDetail = detail;
+  logEvent({
+    level: 'info',
+    surface: 'pod-version',
+    message: 'pod written at version',
+    context: { action: 'wrote', detail, ...(familyId ? { family_id: familyId } : {}) },
+  });
+}
+
 export function cancelPendingSave(): boolean {
   if (!saveDebounceTimer) return false;
   clearTimeout(saveDebounceTimer);

@@ -832,6 +832,15 @@ describe('a restore is a lineage event', () => {
     );
     expect(['adopted', 'rebased']).toContain(res.action);
     expect(lineageOf()).toEqual({ id: 'L-1', seq: 1 });
+    // ⚠️ THIS COVERS THE `user-file` REBASE FALLBACK TOO, and deliberately has
+    // no sibling test. When the replay cannot run, `user-file` does not block:
+    // it falls through to the wholesale adopt, landing in the SAME install
+    // branch as a restore. But `stampNewGeneration` is keyed on the VERDICT
+    // (`ours-newer`), which both this case and the fallback share as
+    // `adopt-remote`, not on which branch set `installWholesale`. So the two
+    // paths cannot diverge on minting, and forcing the fallback here means
+    // corrupting the baseline heads, which makes Automerge reject the handle
+    // for reasons unrelated to what is being asserted.
   });
 
   it('mints NOTHING when a human resolves a CONFLICT by choosing one of two compactions', async () => {

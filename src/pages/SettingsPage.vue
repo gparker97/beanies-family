@@ -519,7 +519,11 @@ function handleLoadFromFileClick() {
 
 async function handleLoadFromFileConfirmed() {
   showLoadFileConfirm.value = false;
+  importError.value = null;
   const result = await syncStore.loadFromNewFile();
+
+  // Dismissing the OS picker is not a failure and must say nothing.
+  if (result.cancelled) return;
 
   if (result.needsPassword) {
     showDecryptFileModal.value = true;
@@ -536,7 +540,9 @@ async function handleLoadFromFileConfirmed() {
     // person picked a file and nothing happened at all.
     importError.value = t(result.payloadError.inlineMessageKey);
   } else {
-    importError.value = syncStore.error || t('settings.importFailed');
+    // ⚠️ NEVER `syncStore.error` HERE. It mirrors the service's raw `lastError`,
+    // which on this path is an untranslated exception string.
+    importError.value = t('settings.importFailed');
   }
 }
 
@@ -636,6 +642,7 @@ async function handleManualImport() {
   importError.value = null;
   importSuccess.value = false;
   const result = await syncStore.manualImport();
+  if (result.cancelled) return;
   if (result.success) {
     importSuccess.value = true;
     setTimeout(() => {

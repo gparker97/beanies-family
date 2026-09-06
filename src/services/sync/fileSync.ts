@@ -47,6 +47,13 @@ const KNOWN_BEANPOD_VERSIONS: ReadonlySet<string> = new Set<BeanpodVersion>([
  * the only writer of `podLineage` is `compactDoc`, so "has a lineage" is
  * exactly "is compacted".
  *
+ * ⚠️ A POD COMPACTED BY THE RETIRED TIER-2 CODE DERIVES 4.0. That code kept the
+ * lineage on the ENVELOPE, and the reader for it was deliberately removed
+ * (ADR-036), so `docLineage` sees nothing and a history-less payload is written
+ * as 4.0: the forbidden artefact. The population is one dev family, which has
+ * been reset. If another turns up, compact it once on a current build; that
+ * stamps the document and the derivation is right from then on.
+ *
  * `compactionBackup` is the ONE deliberate exception, stated as an INTENT
  * rather than as a version: the pre-compaction safety pair carries an
  * un-compacted payload, so the derivation would say 4.0, and a build that

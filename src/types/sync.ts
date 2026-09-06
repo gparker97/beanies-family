@@ -225,6 +225,12 @@ export interface RemoteBlocker extends Error {
    * "contact support", with nothing to re-arm it.
    */
   readonly latches: boolean;
+  /**
+   * One queryable fact for the firehose's `detail`, or `undefined`. Optional so
+   * an existing blocker answers nothing and a new one can carry a
+   * discriminating value without any consumer doing an `instanceof` to read it.
+   */
+  readonly blockDetail?: string;
 }
 
 /**
@@ -375,13 +381,24 @@ export class CorruptPayloadError extends PayloadLoadError {
  * The compacted-pod format (5.0) exists so that a build predating the lineage
  * guard fails HERE, at parse, before decrypt and before any merge.
  */
+// ⚠️ NO WORKER CODEC, DELIBERATELY. This is thrown on MAIN, by
+// `parseBeanpodV4`, and no worker file imports `fileSync` (verified), so it
+// never crosses the boundary. If a worker path ever does parse an envelope, add
+// it to `protocol.ts`'s `ERROR_REGISTRY` first: without a codec it arrives on
+// main as a generic `DocWorkerError`, loses `isRemoteBlocker`, and every
+// "update beanies" surface silently degrades to the damaged-data copy.
 export class UnsupportedBeanpodVersionError extends PayloadLoadError {
   readonly fileVersion: string;
   constructor(fileVersion: string, familyId: string | null = null) {
-    super(`Unsupported beanpod version: ${fileVersion}`, 'parse', familyId);
+    // ⚠️ CLAMPED AT THE SOURCE. `fileVersion` comes straight off a file this
+    // build did not write, and it reaches the firehose through `blockDetail`.
+    // A version is a short token; anything else is a malformed file trying to
+    // put its own content in our telemetry.
+    const safe = /^[\w.+-]{1,16}$/.test(fileVersion) ? fileVersion : 'unrecognised';
+    super(`Unsupported beanpod version: ${safe}`, 'parse', familyId);
     // ⚠️ LITERAL, never `new.target.name`; see `CorruptPayloadError`.
     this.name = 'UnsupportedBeanpodVersionError';
-    this.fileVersion = fileVersion;
+    this.fileVersion = safe;
   }
 
   override get needsAppUpdate(): boolean {
