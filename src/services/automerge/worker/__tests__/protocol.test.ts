@@ -7,6 +7,7 @@ import {
   isRpcResponse,
   isWorkerSignal,
 } from '../protocol';
+import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
 
 describe('protocol — error transport', () => {
   it('round-trips CorruptPayloadError preserving class + step + familyId', () => {
@@ -24,6 +25,26 @@ describe('protocol — error transport', () => {
     expect((rebuilt as CorruptPayloadError).step).toBe('materialize');
     expect((rebuilt as CorruptPayloadError).familyId).toBe('fam-123');
     expect(rebuilt.message).toBe('materialize blew up');
+  });
+
+  it('carries the rebase-unavailable flag across the worker boundary', () => {
+    // The guard throws in the WORKER, and the ONE place that can tell a broken
+    // rebase from a correct refusal reads this flag on MAIN. If the codec drops
+    // it, the block still surfaces correctly to the user and the soak silently
+    // loses its deciding signal — a failure with no symptom.
+    const wire = serializeError(lineageBlockError('adopt-remote', { rebaseUnavailable: true }));
+    const rebuilt = reconstructError(wire);
+    expect(rebuilt).toBeInstanceOf(PodLineageError);
+    expect((rebuilt as PodLineageError).verdict).toBe('adopt-remote');
+    expect((rebuilt as PodLineageError).rebaseUnavailable).toBe(true);
+  });
+
+  it('leaves the flag unset for an ordinary lineage block', () => {
+    // Anti-vacuity: a codec that hardcoded `true` would pass the test above and
+    // report every correct refusal as broken machinery.
+    const rebuilt = reconstructError(serializeError(lineageBlockError('adopt-remote')));
+    expect((rebuilt as PodLineageError).rebaseUnavailable).toBeUndefined();
+    expect((rebuilt as PodLineageError).verdict).toBe('adopt-remote');
   });
 
   it('round-trips PayloadTooLargeError as its OWN class, never as corruption', () => {

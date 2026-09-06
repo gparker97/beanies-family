@@ -69,3 +69,29 @@ describe('syncService — persisted byte-size tracking', () => {
     expect(syncService.getLastPersistedBytes()).toBeNull();
   });
 });
+
+/**
+ * `cancelPendingSave` returns whether it actually cancelled something, and
+ * `reloadAllStores` uses that return to put the publish back afterwards. If the
+ * return ever stops tracking the timer, every store-side test still passes
+ * (they mock this module) while the real app silently drops publishes again —
+ * which is the bug, four times over. So the contract is pinned here, against
+ * the real implementation.
+ */
+describe('syncService — cancelPendingSave reports what it cancelled', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    syncService = await import('../syncService');
+  }, 30000);
+
+  it('reports false when nothing was armed', () => {
+    expect(syncService.cancelPendingSave()).toBe(false);
+  });
+
+  it('reports true for an armed save, then false once it is gone', () => {
+    syncService.triggerDebouncedSave();
+    expect(syncService.cancelPendingSave()).toBe(true);
+    // Idempotent: a second cancel has nothing left to take.
+    expect(syncService.cancelPendingSave()).toBe(false);
+  });
+});

@@ -96,6 +96,11 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   clearCache: vi.fn(async () => {}),
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
+  // Both termini log through this one function now (it carries `replayed`/
+  // `conflicts` and picks the level). A manual factory that omits it makes
+  // every merge throw 'No export is defined' INSIDE the try that classifies
+  // decrypt failures, so the suite fails as "the merge never ran".
+  logMergeTerminus: vi.fn(),
 }));
 vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   getDefaultGlobalSettings: () => ({
@@ -524,8 +529,17 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     mockProviderRead.mockResolvedValue(envelopeJsonFor('fam-resume-1', 'LaFleur'));
   });
 
-  /** Unlock a family key, then run the merge path with a given merge outcome. */
-  async function mergeWith(outcome: { dirty: boolean; changed: boolean }) {
+  /**
+   * Unlock a family key, then run the merge path with a given merge outcome.
+   *
+   * `opts.pending` makes `cancelPendingSave()` report that it actually cancelled
+   * something, which is how `reloadAllStores` learns there was a publish to put
+   * back. Default false, so every existing test keeps the behaviour it asserts.
+   */
+  async function mergeWith(
+    outcome: { dirty: boolean; changed: boolean },
+    opts: { pending?: boolean } = {}
+  ) {
     const syncStore = useSyncStore();
     vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
       familyKey: {} as CryptoKey,
@@ -553,6 +567,7 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     const syncService = await import('@/services/sync/syncService');
     vi.mocked(syncService.triggerDebouncedSave).mockClear();
     vi.mocked(syncService.cancelPendingSave).mockClear();
+    vi.mocked(syncService.cancelPendingSave).mockReturnValue(opts.pending === true);
     // Clear this too: `completeAutoLoad` above already drove it to 1, so a bare
     // `toHaveBeenCalled()` afterwards would be satisfied by the SETUP and the
     // anti-vacuity guard would itself be vacuous (an unconditional `return` at the
@@ -633,6 +648,27 @@ describe('syncStore — open-cycle gates on the merge path', () => {
     // A no-op write still costs a full saveDoc + encrypt + whole-file upload, and
     // two clients doing it on one file is what produced the 2026-08-12 save-storm.
     expect(syncService.triggerDebouncedSave).not.toHaveBeenCalled();
+  });
+
+  it('puts back a publish the reload cancelled, even when the merge was quiet', async () => {
+    // ⚠️ THE FOURTH INSTANCE OF ONE BUG, CLOSED IN THE OWNING LAYER.
+    // `reloadAllStores` cancels the pending save so the projection gets a quiet
+    // window. That cancel is not a decision that the save was unwanted, but
+    // three separate branches learned it the hard way: a kept-local publish, an
+    // adopt whose migration emitted a real change, and the dedup's deletions
+    // were each armed and then silently dropped, and each was fixed by adding
+    // one more re-arm at one more call site. Stage 3's rebase then arrived and
+    // was broken in exactly the same way, with a peer's rescued offline work
+    // stranded on one device. The cancel now reports what it took and the
+    // reload puts it back, which covers branches not yet written.
+    //
+    // `dirty:false` deliberately: the merge itself arms NOTHING, so the only
+    // thing that can call `triggerDebouncedSave` is the restore. `changed:true`
+    // because that is what makes the reload (and therefore the cancel) run at
+    // all. Paired with the `dirty:false` test above, where nothing was pending
+    // and nothing is armed.
+    const { syncService } = await mergeWith({ dirty: false, changed: true }, { pending: true });
+    expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
   });
 
   it('DOES re-upload when the converged doc still carries local changes (dirty:true)', async () => {

@@ -972,12 +972,10 @@ export const useSyncStore = defineStore('sync', () => {
       // just armed. The caller must be able to tell the two apart.
       return KEPT_LOCAL;
     }
-    logEvent({
-      level: 'info',
-      surface: 'pod-lineage',
-      message: `remote ${merged.action}`,
-      context: { action: merged.action, family_id: familyId },
-    });
+    // Shared with the poll terminus: same level rule, same `replayed`/
+    // `conflicts`. This is the path an offline peer takes when it comes back,
+    // so it is the one a rebase soak reads.
+    docClient.logMergeTerminus('open terminus', merged, familyId);
     // Clean up duplicate recurring transactions from the CRDT merge.
     await deduplicateRecurringTransactions();
     // Re-upload the converged doc only if local carried unsynced changes.
@@ -1628,28 +1626,16 @@ export const useSyncStore = defineStore('sync', () => {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
-      /** Did the open keep OUR document because its lineage is newer? See below. */
-      let keptLocal = false;
       // Post the just-unwrapped key + the stable actor so it can decrypt + merge.
       await docClient.setFamilyKey(fk, famId ?? '');
 
       // Adopt the payload (+ recover any unsynced cache) to prevent data loss.
       if (famId) {
-        // ⚠️ HONOUR THE SENTINEL. `KEPT_LOCAL` means the helper already armed a
-        // publish for a document whose lineage is NEWER than the file's — and
-        // the `reloadAllStores()` further down this function calls
-        // `cancelPendingSave()`, which drops that publish before its 2s debounce
-        // fires. `loadFromFile`'s own kept-local branch returns early for
-        // exactly this reason; these two paths discarded the return value, so
-        // TypeScript could not see it. Re-arm rather than skip the reload: the
-        // stores still need the projection this open produced.
-        keptLocal =
-          (await replaceDocWithCacheRecovery(
-            pending.envelope,
-            famId,
-            fk,
-            !!opts.userChoseThisFile
-          )) === KEPT_LOCAL;
+        // The helper may arm a publish (kept-local, an adopt whose migration
+        // emitted a change, or a rebase that replayed offline work). The
+        // `reloadAllStores()` below cancels it and puts it back — see the
+        // comment on that cancel. Nothing to track here.
+        await replaceDocWithCacheRecovery(pending.envelope, famId, fk, !!opts.userChoseThisFile);
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -1771,12 +1757,9 @@ export const useSyncStore = defineStore('sync', () => {
         });
       }
 
-      // Reload all stores
+      // Reload all stores. It restores any publish the merge armed, so a
+      // document this device alone holds still reaches Drive.
       await reloadAllStores();
-      // `reloadAllStores` calls `syncService.cancelPendingSave()`, so the publish
-      // the kept-local branch armed is gone by here. Re-arm it: this device holds
-      // the only copy of the newer lineage and nothing else will push it.
-      if (keptLocal) syncService.triggerDebouncedSave();
 
       // Arm auto-sync
       setupAutoSync();
@@ -2477,26 +2460,19 @@ export const useSyncStore = defineStore('sync', () => {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
-      /** Did the open keep OUR document because its lineage is newer? See below. */
-      let keptLocal = false;
       // Post the key + the stable actor so it can decrypt + merge/adopt.
       await docClient.setFamilyKey(fk, famId ?? '');
       if (famId) {
-        // ⚠️ HONOUR THE SENTINEL. `KEPT_LOCAL` means the helper already armed a
-        // publish for a document whose lineage is NEWER than the file's — and
-        // the `reloadAllStores()` further down this function calls
-        // `cancelPendingSave()`, which drops that publish before its 2s debounce
-        // fires. `loadFromFile`'s own kept-local branch returns early for
-        // exactly this reason; these two paths discarded the return value, so
-        // TypeScript could not see it. Re-arm rather than skip the reload: the
-        // stores still need the projection this open produced.
-        keptLocal =
-          // ⚠️ NEVER `user-file` HERE, and deliberately no parameter to pass
-          // one. This is the passkey / biometric / trusted-device / PIN path:
-          // the human proved WHO THEY ARE. Nobody showed them a dialog about
-          // replacing their data, so this path may not reach the context that
-          // discards it.
-          (await replaceDocWithCacheRecovery(pending.envelope, famId, fk)) === KEPT_LOCAL;
+        // The helper may arm a publish (kept-local, an adopt whose migration
+        // emitted a change, or a rebase that replayed offline work). The
+        // `reloadAllStores()` below cancels it and puts it back — see the
+        // comment on that cancel. Nothing to track here.
+        // ⚠️ NEVER `user-file` HERE, and deliberately no parameter to pass
+        // one. This is the passkey / biometric / trusted-device / PIN path:
+        // the human proved WHO THEY ARE. Nobody showed them a dialog about
+        // replacing their data, so this path may not reach the context that
+        // discards it.
+        await replaceDocWithCacheRecovery(pending.envelope, famId, fk);
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -2614,9 +2590,6 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       await reloadAllStores();
-      // See the twin in `decryptPendingFile`: the reload cancels the kept-local
-      // publish, so re-arm it.
-      if (keptLocal) syncService.triggerDebouncedSave();
       setupAutoSync();
 
       // A real pod was decrypted (the invite/join cached-key path) — establish
@@ -2895,7 +2868,19 @@ export const useSyncStore = defineStore('sync', () => {
     // breaker there and let the poller straight back on.
     bumpOpenCycle('storeReload'); // no-op outside an open window
     isReloading = true;
-    syncService.cancelPendingSave();
+    // ⚠️ CANCEL, BUT REMEMBER. The cancel buys a quiet window for the
+    // projection; it is not a decision that the pending publish was unwanted.
+    // Three separate bugs came from conflating those: a kept-local publish, an
+    // adopt whose migration emitted a real change, and the dedup's own
+    // deletions were each armed by a merge and then silently dropped here, and
+    // each was fixed by adding one more re-arm at one more call site — which
+    // left the NEXT branch (the rebase, Stage 3) broken in the same way, its
+    // rescued offline work sitting on one device with nothing to push it.
+    // Restoring the intent here covers every branch, including ones not yet
+    // written. A caller that genuinely means to abandon a save cancels BEFORE
+    // calling this (`useRemoteFileOverLocalDocument`, `reloadIfFileChanged`),
+    // so there is nothing left for this to find.
+    const publishWasArmed = syncService.cancelPendingSave();
 
     const highlightStore = useSyncHighlightStore();
     if (isCrossDeviceReload) {
@@ -2985,6 +2970,9 @@ export const useSyncStore = defineStore('sync', () => {
     } finally {
       await nextTick();
       isReloading = false;
+      // Put back what the cancel above took. After `isReloading` clears, so the
+      // save it arms is not itself suppressed by the guard.
+      if (publishWasArmed) syncService.triggerDebouncedSave();
     }
 
     if (isCrossDeviceReload) {

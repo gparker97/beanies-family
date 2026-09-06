@@ -73,6 +73,14 @@ export type LineageContext = 'clean' | 'dirty' | 'user-file';
 /** Thrown by `guardLineage` when the two documents must not be combined. */
 export class PodLineageError extends Error implements RemoteBlocker {
   readonly verdict: LineageVerdict;
+  /**
+   * Diagnostic only, and deliberately NOT part of `blockCode` or any message:
+   * the user sees the same block either way. It records that the policy asked
+   * for a rebase and the rebase could not run, which is the one thing a soak
+   * needs to distinguish broken machinery from a correct refusal. Set by
+   * `lineageBlockError`, carried across the worker boundary by the codec below.
+   */
+  rebaseUnavailable?: boolean;
   constructor(verdict: LineageVerdict, message: string) {
     super(message);
     // ⚠️ LITERAL, never `new.target.name`. The worker error registry keys on
@@ -198,6 +206,19 @@ export function guardLineage(
  * the user must not be able to tell the two apart: both mean "these two
  * documents cannot be combined here, and your work is still yours".
  */
-export function lineageBlockError(verdict: LineageVerdict): PodLineageError {
-  return new PodLineageError(verdict, `Pod lineage blocked: ${WHY[verdict]}`);
+export function lineageBlockError(
+  verdict: LineageVerdict,
+  /**
+   * The policy said `rebase` and the rebase could not run, so the block is a
+   * FALLBACK rather than the policy's own answer. The two are byte-identical to
+   * the user and were byte-identical in CloudWatch too, which made the soak
+   * unjudgeable: "the rebase machinery is broken" and "the guard correctly
+   * refused" looked the same. Carried on the error so the ONE main-thread
+   * chokepoint (`docClient.mergeRemoteEnvelope`) can tell them apart.
+   */
+  opts?: { rebaseUnavailable?: boolean }
+): PodLineageError {
+  const err = new PodLineageError(verdict, `Pod lineage blocked: ${WHY[verdict]}`);
+  if (opts?.rebaseUnavailable) err.rebaseUnavailable = true;
+  return err;
 }

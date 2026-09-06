@@ -253,9 +253,14 @@ const payloadCodec = (Ctor: PayloadErrorCtor): ErrorCodec => ({
  * `payloadCodec`.
  */
 const lineageCodec: ErrorCodec = {
-  serialize: (err) => (err instanceof PodLineageError ? { verdict: err.verdict } : undefined),
+  serialize: (err) =>
+    err instanceof PodLineageError
+      ? { verdict: err.verdict, rebaseUnavailable: err.rebaseUnavailable }
+      : undefined,
   reconstruct: (message, data) =>
-    new PodLineageError((data?.verdict as LineageVerdict) ?? 'conflict', message),
+    Object.assign(new PodLineageError((data?.verdict as LineageVerdict) ?? 'conflict', message), {
+      rebaseUnavailable: data?.rebaseUnavailable === true ? true : undefined,
+    }),
 };
 
 const ERROR_REGISTRY: Record<string, ErrorCodec> = {
