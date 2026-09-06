@@ -311,11 +311,42 @@ export function zoomCandidates(availableHeight: number): readonly number[] {
 
 /** Bound on the search. Asserted in a test so it cannot drift from the arithmetic. */
 /**
+ * ⭐ Standard days, widest first. The grid draws the widest one that fits.
+ *
+ * greg: "if vertical space still exists on the screen, is there any reason to
+ * stop printing time grid lines… if the space is there, we can use it."
+ *
+ * ⚠️ QUANTIZED, and that is the whole design. Extending the window to exactly
+ * fill whatever plot it is given would make the grid a different shape every
+ * day: Monday 07:00–20:00, Tuesday 08:00–21:00, purely because the events
+ * differ. That is the same defect the quantized scale exists to prevent — see
+ * SCALE_STEPS, "a calendar whose grid changes size day to day cannot be read at
+ * a glance". Four possible shapes means the wall looks like itself every
+ * morning.
+ *
+ * It stops at midnight on purpose. Past that the grid is drawing hours no family
+ * uses, and four rows of 2am are noise rather than information; honest empty
+ * space at the foot of the plot is the better answer.
+ *
+ * Each is a FLOOR, never a clip — the real window is the union with the day's
+ * own events, so an early riser widens it further rather than being cut off.
+ */
+const DAY_WINDOWS = [
+  { start: 6 * 60, end: 24 * 60 }, // 18h
+  { start: 6 * 60, end: 22 * 60 }, // 16h
+  { start: 7 * 60, end: 21 * 60 }, // 14h
+  { start: 8 * 60, end: 20 * 60 }, // 12h — the default, and the one an empty day gets
+] as const;
+
+/** The default day: what the wall draws when it has room for exactly one. */
+const WAKING_WINDOW = DAY_WINDOWS[DAY_WINDOWS.length - 1]!;
+
+/**
  * Bound on the search. Asserted in a test so it cannot drift from the
  * arithmetic: the generous pre-pass tries two axes across every zoom candidate
  * plus zoom 1, then the ladder runs in full.
  */
-export const MAX_ATTEMPTS = LADDER.length + (ZOOM_STEPS.length + 1) * 2;
+export const MAX_ATTEMPTS = LADDER.length + (ZOOM_STEPS.length + 1) * (DAY_WINDOWS.length + 1);
 
 /**
  * ⭐ What a day looks like when the wall has room to draw one: waking hours.
@@ -330,7 +361,6 @@ export const MAX_ATTEMPTS = LADDER.length + (ZOOM_STEPS.length + 1) * 2;
  * ⚠️ A floor, never a clip. The real window is the UNION of this and the day's
  * own events, so a 06:30 swim still appears — the axis becomes 06:30–20:00.
  */
-const WAKING_WINDOW = { start: 8 * 60, end: 20 * 60 };
 
 // ── Result shapes ─────────────────────────────────────────────────────────
 
@@ -794,14 +824,39 @@ function tryGenerousFit(
   maxBlock: number
 ): { attempt: Attempt; attempts: number; axis: AxisMode } | null {
   let attempts = 0;
-  // Widest axis first, then widest hour within it. Drawing the whole day beats
-  // drawing a bigger hour over a folded one: the fold is the thing that lies.
-  for (const axis of ['full', 'events'] as const) {
-    for (const zoom of [...zoomCandidates(height), 1]) {
-      const candidate = attempt(input, LADDER[0]!, maxBlock, zoom, axis);
+  const NARROWEST = DAY_WINDOWS.length - 1;
+
+  /*
+   * ⭐ The HOUR first, then the HOURS.
+   *
+   * Both spend the same pixels, and they compete. Legibility wins: a wall is
+   * read from across a kitchen, so a taller hour is worth more than an extra row
+   * of 6am. So take the biggest hour that fits an ordinary 12-hour day, and only
+   * then widen the day as far as it will go AT THAT HOUR.
+   *
+   * The alternative — widest window first — fills a 1440px plot with eighteen
+   * hours at the base height rather than twelve at double it, which is more day
+   * and less readable. Wrong trade for this screen.
+   */
+  for (const zoom of [...zoomCandidates(height), 1]) {
+    const base = attempt(input, LADDER[0]!, maxBlock, zoom, 'full', NARROWEST);
+    attempts++;
+    if (base.total > height + 1) continue;
+
+    for (let wider = 0; wider < NARROWEST; wider++) {
+      const candidate = attempt(input, LADDER[0]!, maxBlock, zoom, 'full', wider);
       attempts++;
-      if (candidate.total <= height + 1) return { attempt: candidate, attempts, axis };
+      if (candidate.total <= height + 1) return { attempt: candidate, attempts, axis: 'full' };
     }
+    return { attempt: base, attempts, axis: 'full' };
+  }
+
+  // No standard day fits at any hour — fall back to the day's own span, still
+  // unfolded, which is the last honest option before collapsing quiet time.
+  for (const zoom of [...zoomCandidates(height), 1]) {
+    const candidate = attempt(input, LADDER[0]!, maxBlock, zoom, 'events');
+    attempts++;
+    if (candidate.total <= height + 1) return { attempt: candidate, attempts, axis: 'events' };
   }
   return null;
 }
@@ -819,7 +874,9 @@ function attempt(
   rung: Rung,
   maxBlock: number,
   zoom: number,
-  axis: AxisMode = 'folded'
+  axis: AxisMode = 'folded',
+  /** Which of DAY_WINDOWS to draw, when `axis` is 'full'. Widest is 0. */
+  dayWindow = DAY_WINDOWS.length - 1
 ): Attempt {
   /*
    * ⭐ How generous is the axis? Three settings, tried widest-first by the caller.
@@ -837,8 +894,9 @@ function attempt(
    * Each is only ACCEPTED if it fits, so a constrained plot falls through to
    * 'folded' and gets exactly what it gets today.
    */
-  const windowStart = axis === 'full' ? input.fullWindowStart : input.windowStart;
-  const windowEnd = axis === 'full' ? input.fullWindowEnd : input.windowEnd;
+  const day = DAY_WINDOWS[dayWindow]!;
+  const windowStart = axis === 'full' ? Math.min(day.start, input.windowStart) : input.windowStart;
+  const windowEnd = axis === 'full' ? Math.max(day.end, input.windowEnd) : input.windowEnd;
   /*
    * ⭐ The hour and the FOLD BUDGET zoom together; `rung.minBlock` does not.
    * See ZOOM_STEPS' table for every constant and its verdict.
@@ -1066,7 +1124,7 @@ export function layoutTimeGrid(
   }
 
   // The candidates the pre-pass burned still count against MAX_ATTEMPTS.
-  let attempts = (zoomCandidates(height).length + 1) * 2;
+  let attempts = (zoomCandidates(height).length + 1) * (DAY_WINDOWS.length + 1);
   let last: Attempt | null = null;
   let acceptedRung = 0;
 
