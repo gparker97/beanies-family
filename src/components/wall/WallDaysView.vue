@@ -44,7 +44,17 @@ const props = defineProps<{
   visibleMemberIds: string[] | null;
 }>();
 const emit = defineEmits<{
-  openDay: [string];
+  /**
+   * A day tap RE-ANCHORS the week to start at that day — the today view's
+   * convention, applied here. A week starting Saturday, with Thursday tapped,
+   * redraws starting Thursday: the tapped day is used AS-IS, never snapped to
+   * its calendar week. Week stepping snaps; a tap is a direct placement.
+   *
+   * `openDay` is deliberately NOT declared: this view can render the day itself,
+   * so covering it with a sheet would be the lesser answer. The sheet is still
+   * reachable from the lanes view's header and from any individual event.
+   */
+  focusDay: [string];
   open: [WallSheetTarget];
   openChores: [];
 }>();
@@ -98,6 +108,14 @@ const allDaySpans = computed(() => {
   return wallDayAllDay(result, visible.value, (activity, ymd) => ({ activity, date: ymd }));
 });
 
+/**
+ * The now-line belongs to the real today, not to whatever week is on screen.
+ * Without this the wall drew a red line through an arbitrary column of next
+ * week. `dim-past` needs no equivalent: the grid already gates dimming per
+ * column on `column.isToday`.
+ */
+const showsToday = computed(() => props.weekDays.includes(props.todayYmd));
+
 /** Content-derived, never layout-derived — see `wallPeripheralVariant`. */
 const busiest = computed(() => Math.max(0, ...visible.value.map((ymd) => eventsFor(ymd).length)));
 const peripheralVariant = computed(() =>
@@ -130,7 +148,7 @@ function colourFor(activity: FamilyActivity) {
             ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
             : 'text-secondary-500 dark:text-ink'
         "
-        @click="emit('openDay', ymd)"
+        @click="emit('focusDay', ymd)"
       >
         <span class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70">
           {{ weekdayShort(ymd) }}
@@ -146,7 +164,7 @@ function colourFor(activity: FamilyActivity) {
       :all-day-spans="allDaySpans"
       :now="now"
       :dim-past="true"
-      :show-now="true"
+      :show-now="showsToday"
       :axis-width="AXIS_WIDTH_PX"
       view-id="days"
       @open="emit('open', $event)"
@@ -163,7 +181,7 @@ function colourFor(activity: FamilyActivity) {
         :key="ymd"
         type="button"
         class="dark:bg-surface-raised flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-left shadow-[var(--card-shadow)]"
-        @click="emit('openDay', ymd)"
+        @click="emit('focusDay', ymd)"
       >
         <span
           class="font-outfit text-secondary-500 wall-rest-day dark:text-ink font-bold uppercase"
