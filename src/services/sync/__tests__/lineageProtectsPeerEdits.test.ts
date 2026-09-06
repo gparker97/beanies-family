@@ -110,7 +110,7 @@ describe('the guard refuses that merge', () => {
     // replay falls back to it — but it is no longer the first answer.
     expect(lineageAction('adopt-remote', 'dirty')).toBe('rebase');
     // And `guardLineage` hands the caller that action rather than throwing.
-    expect(guardLineage({ id: 'new', seq: 1 }, null, 'dirty')).toBe('rebase');
+    expect(guardLineage({ id: 'new', seq: 1 }, null, 'dirty').action).toBe('rebase');
   });
 
   it('still REFUSES outright when no machine can choose', () => {
@@ -129,7 +129,7 @@ describe('the guard refuses that merge', () => {
   it('but ADOPTS when the peer provably has nothing to lose', () => {
     // Adoption is not the dangerous half — merging is. A clean peer replaces
     // its document wholesale, which is how a compaction propagates at all.
-    expect(guardLineage({ id: 'new', seq: 1 }, null, 'clean')).toBe('adopt');
+    expect(guardLineage({ id: 'new', seq: 1 }, null, 'clean').action).toBe('adopt');
   });
 
   it('and an ADOPT loses nothing, because there was nothing to lose', () => {

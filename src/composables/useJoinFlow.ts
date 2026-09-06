@@ -64,6 +64,7 @@ export type JoinErrorCode =
   | 'FILE_DECRYPT_FAILED'
   | 'FILE_TOO_LARGE'
   | 'FILE_CORRUPT'
+  | 'FILE_NEWER_VERSION'
   | 'FILE_FAMILY_MISMATCH'
   | 'INVITE_TOKEN_EXPIRED'
   | 'INVITE_TOKEN_INVALID'
@@ -83,6 +84,26 @@ export type JoinErrorCode =
  * one payload surface where they were unrecoverable — while both siblings
  * forward the real thing.
  */
+/**
+ * The join code for a blocker, or null when the blocker is not the join flow's
+ * to name (a lineage block carries its own copy; a decrypt-step failure is the
+ * rotated-key signature a fresh link genuinely fixes).
+ *
+ * The `instanceof` and the `keyMayBeWrong` guard live HERE, not at the call
+ * sites: `doPickAndLoad` receives a `RemoteBlocker` that may be a
+ * `PodLineageError`, so a second site narrowing for itself is a second copy of
+ * this decision. Exported for its test only.
+ */
+export function joinCodeForBlocker(blocker: RemoteBlocker | undefined): JoinErrorCode | null {
+  const payload = blocker instanceof PayloadLoadError ? blocker : null;
+  if (!payload || payload.keyMayBeWrong) return null;
+  return payload.needsAppUpdate
+    ? 'FILE_NEWER_VERSION'
+    : payload.deviceCannotOpen
+      ? 'FILE_TOO_LARGE'
+      : 'FILE_CORRUPT';
+}
+
 function asJoinDecryptError(result: {
   error?: string;
   // Any blocker: a lineage block reaches the join path too, and must not be
@@ -95,16 +116,14 @@ function asJoinDecryptError(result: {
   // merge block, and neither is a decrypt problem: they carry their own copy
   // and must not be tagged `FILE_CORRUPT` (which tells a joiner the family's
   // data is damaged and pages Slack).
-  const payload = result.payloadError instanceof PayloadLoadError ? result.payloadError : null;
-  if (payload && !payload.keyMayBeWrong) {
-    // `keyMayBeWrong` gates this deliberately. A `CorruptPayloadError` at the
-    // decrypt step is the ROTATED-KEY signature (a member was removed, or the
-    // Drive envelope is a newer re-encrypted copy), and for that
-    // `FILE_DECRYPT_FAILED` is right: a fresh invite link genuinely fixes it.
-    // Tagging it `FILE_CORRUPT` would tell the joiner their family's data is
-    // damaged, offer no recovery button at all, and page Slack every attempt.
-    err.joinCode = payload.deviceCannotOpen ? 'FILE_TOO_LARGE' : 'FILE_CORRUPT';
-  }
+  // `keyMayBeWrong` gates this inside the mapper. A `CorruptPayloadError` at
+  // the decrypt step is the ROTATED-KEY signature (a member was removed, or the
+  // Drive envelope is a newer re-encrypted copy), and for that
+  // `FILE_DECRYPT_FAILED` is right: a fresh invite link genuinely fixes it.
+  // Tagging it `FILE_CORRUPT` would tell the joiner their family's data is
+  // damaged, offer no recovery button at all, and page Slack every attempt.
+  const code = joinCodeForBlocker(result.payloadError);
+  if (code) err.joinCode = code;
   return err;
 }
 
@@ -197,6 +216,12 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.fileCorrupt',
     recoveries: [],
     severity: 'critical',
+  },
+  /** The family file was saved by a newer beanies. Update, then reopen the link. */
+  FILE_NEWER_VERSION: {
+    messageKey: 'join.error.newerVersion',
+    recoveries: [],
+    severity: 'warning',
   },
   FILE_FAMILY_MISMATCH: {
     messageKey: 'join.error.familyMismatch',
@@ -525,8 +550,19 @@ export function useJoinFlow() {
     // silently failed for non-English Drive messages, dead-ending the iOS join.
     if (result.status === 404 || result.status === 403) return 'needs-pick';
 
-    // Some other error — surface it.
+    // A classified blocker (a file from a newer beanies, a torn or oversized
+    // one) gets its own code through the ONE mapper; `FILE_READ_FAILED` is the
+    // fallback for everything else.
     const storeError = (syncStore.error as string | null) ?? '';
+    const blockerCode = joinCodeForBlocker(result.payloadError);
+    if (blockerCode) {
+      recordError(blockerCode, {
+        error: storeError || result.payloadError?.inlineMessageKey || blockerCode,
+        hintEmail: inviteEmailHint.value,
+        actualEmail: getGoogleAccountEmail(),
+      });
+      return 'error';
+    }
     recordError('FILE_READ_FAILED', {
       error: storeError || 'Unknown file-load error',
       hintEmail: inviteEmailHint.value,

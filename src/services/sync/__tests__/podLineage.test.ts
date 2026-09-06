@@ -97,9 +97,22 @@ describe('lineageAction — the policy table', () => {
 
 describe('guardLineage', () => {
   it('returns the action for every non-blocking case', () => {
-    expect(guardLineage(null, null, 'clean')).toBe('merge');
-    expect(guardLineage(L('a', 1), null, 'clean')).toBe('adopt');
-    expect(guardLineage(null, L('a', 1), 'clean')).toBe('publish-local');
+    expect(guardLineage(null, null, 'clean').action).toBe('merge');
+    expect(guardLineage(L('a', 1), null, 'clean').action).toBe('adopt');
+    expect(guardLineage(null, L('a', 1), 'clean').action).toBe('publish-local');
+  });
+
+  it('returns the VERDICT beside the action, so the caller never recomputes it', () => {
+    // `POLICY` maps `ours-newer x user-file` and `conflict x user-file` both
+    // to `adopt`; only the verdict tells a restore from a resolved conflict.
+    expect(guardLineage(null, L('a', 1), 'user-file')).toEqual({
+      action: 'adopt',
+      verdict: 'ours-newer',
+    });
+    expect(guardLineage(L('a', 1), L('b', 1), 'user-file')).toEqual({
+      action: 'adopt',
+      verdict: 'conflict',
+    });
   });
 
   it('THROWS a typed error carrying the verdict', () => {

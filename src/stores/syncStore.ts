@@ -4420,6 +4420,7 @@ export const useSyncStore = defineStore('sync', () => {
      *  branch on 404/403 without substring-matching a localized message
      *  (2026-06-19, finding 7). */
     status?: number;
+    payloadError?: RemoteBlocker;
   }> {
     // Defensive: clear any banner state left over from a prior session.
     // Sign-out should have done this via resetState(), but if we're here we
@@ -4483,7 +4484,11 @@ export const useSyncStore = defineStore('sync', () => {
       storageProviderType.value = 'google_drive';
       return { success: false, needsPassword: true };
     } catch (e) {
-      error.value = (e as Error).message;
+      // A blocker carries its own copy; the raw exception string is for logs.
+      const blocker = isRemoteBlocker(e) ? e : undefined;
+      error.value = blocker
+        ? useTranslationStore().t(blocker.inlineMessageKey)
+        : (e as Error).message;
       // Classify a missing/inaccessible file structurally (not by message text):
       // loadFromGoogleDrive bypasses syncService.load(), so `error.value` holds
       // the RAW Drive message WITHOUT the `DriveApiError:404:` prefix that
@@ -4492,7 +4497,7 @@ export const useSyncStore = defineStore('sync', () => {
       // `reason` to fall back to the file picker when the known file is gone.
       const status = e instanceof DriveApiError ? e.status : undefined;
       const reason: 'not-found' | 'error' = status === 404 ? 'not-found' : 'error';
-      return { success: false, reason, status };
+      return { success: false, reason, status, payloadError: blocker };
     } finally {
       // Only restore to idle if WE set it — otherwise a caller that wrapped
       // us in their own critical section (e.g. a future orchestrator) keeps
@@ -4809,7 +4814,8 @@ export const useSyncStore = defineStore('sync', () => {
       // family is loaded and visible but still not saving anywhere it should.
       reportError({
         surface: 'pod-access',
-        severity: 'critical',
+        // From the table, not hardcoded: "please update beanies" must not page.
+        severity: POD_ACCESS_SEVERITY[code],
         message: 'rebind to the family pod file failed',
         error: e,
         context: {
