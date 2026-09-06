@@ -99,7 +99,6 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   parseBeanpodV4: vi.fn(() => fakeEnvelope),
   tryUnwrapFamilyKey: vi.fn(),
   reEncryptEnvelope: vi.fn(),
-  detectFileVersion: vi.fn(() => '4.0'),
   exportToFile: vi.fn(async () => {}),
   importFromFile: vi.fn(async () => ({ success: true })),
 }));

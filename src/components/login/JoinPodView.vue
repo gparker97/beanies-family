@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RemoteBlocker } from '@/types/sync';
 /* global FileSystemFileHandle */
 import { ref, computed, onMounted, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -183,7 +184,11 @@ async function handleDroppedFile(file: File, fileHandle?: FileSystemFileHandle):
   }
 }
 
-function handleLocalLoadResult(result: { success: boolean; needsPassword?: boolean }): void {
+function handleLocalLoadResult(result: {
+  success: boolean;
+  needsPassword?: boolean;
+  payloadError?: RemoteBlocker;
+}): void {
   if (result.success) {
     // No invite token → ask the user for the file password.
     showDecryptModal.value = true;
@@ -191,6 +196,11 @@ function handleLocalLoadResult(result: { success: boolean; needsPassword?: boole
   }
   if (result.needsPassword) {
     showDecryptModal.value = true;
+    return;
+  }
+  if (result.payloadError) {
+    // BEFORE the `syncStore.error` arm, which mirrors a raw exception string.
+    localFormError.value = t(result.payloadError.inlineMessageKey);
     return;
   }
   if (syncStore.error) {

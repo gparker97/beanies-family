@@ -31,14 +31,12 @@ vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
     fromExisting: (...args: unknown[]) => mockFromExisting(...(args as [])),
   },
 }));
-const mockDetectFileVersion = vi.fn();
 vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   // The version DERIVATION is real even where the writers are mocked: a
   // test-local `'4.0'` here would hide the one regression the derivation
   // exists to prevent (a compacted pod written as 4.0).
   beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
     .beanpodVersionFor,
-  detectFileVersion: (...args: unknown[]) => mockDetectFileVersion(...(args as [])),
 }));
 
 import {
@@ -214,7 +212,6 @@ describe('resolveExistingBeanpod — adopt-existing classification (2026-06-19)'
 
   it('confirms (adopt-existing) when the owned file is a real V4 envelope', async () => {
     mockProbeRead.mockResolvedValue('{"version":"4.0","familyId":"fam"}');
-    mockDetectFileVersion.mockReturnValue('4.0');
     const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
     expect(r).toEqual({ kind: 'adopt-existing', fileId: 'f1' });
   });
@@ -241,4 +238,38 @@ describe('adoptDriveStub', () => {
     expect(syncService.setProvider).toHaveBeenCalled();
     expect(persist).toHaveBeenCalledWith('fam-1');
   });
+});
+
+describe('isStubBeanpod is structural: any populated file is adopt-existing, whatever its version', () => {
+  // ⚠️ THE PROBE USED TO END IN A VERSION SNIFF (`!== '4.0'`), so a compacted
+  // 5.0 pod, on a build that did not know 5.0, read as an EMPTY PLACEHOLDER
+  // and was overwritten with a brand-new family, with no confirm.
+  const populated = (version: string) =>
+    JSON.stringify({
+      version,
+      familyId: 'fam',
+      familyName: 'n',
+      keyId: 'k',
+      wrappedKeys: {},
+      encryptedPayload: 'x',
+    });
+  for (const v of ['4.0', '5.0', '6.0']) {
+    it(`treats a ${v} envelope as populated (confirm-gated adopt-existing)`, async () => {
+      mockProbeRead.mockResolvedValue(populated(v));
+      const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
+      expect(r).toEqual({ kind: 'adopt-existing', fileId: 'f1' });
+    });
+  }
+  for (const [label, text] of [
+    ['empty', ''],
+    ['whitespace', '  \n'],
+    ['the createNew placeholder', '{}'],
+    ['null', null],
+  ] as const) {
+    it(`treats ${label} as the stub`, async () => {
+      mockProbeRead.mockResolvedValue(text as string);
+      const r = await resolveExistingBeanpod({ fileId: 'f1', ownedByCurrentAccount: true });
+      expect(r).toEqual({ kind: 'adopt-stub', fileId: 'f1' });
+    });
+  }
 });

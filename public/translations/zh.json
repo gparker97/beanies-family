@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4551
+    "translationCount": 4553
   },
   "translations": {
     "app.name": {
@@ -22759,6 +22759,16 @@
     "wall.jobs.allClear": {
       "translation": "今天没有家务",
       "hash": "xwtkne",
+      "lastUpdated": "2026-09-06"
+    },
+    "settings.importFailed": {
+      "translation": "文件无法导入。",
+      "hash": "xz0u7w",
+      "lastUpdated": "2026-09-06"
+    },
+    "settings.importNeedsPassword": {
+      "translation": "该文件已加密。输入密码以导入。",
+      "hash": "qos7al",
       "lastUpdated": "2026-09-06"
     }
   }

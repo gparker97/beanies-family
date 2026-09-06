@@ -34,7 +34,6 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
     .beanpodVersionFor,
   parseBeanpodV4: parseMock,
   reEncryptEnvelope: reEncryptMock,
-  detectFileVersion: vi.fn(() => '4.0'),
   tryUnwrapFamilyKey: vi.fn(),
   createBeanpodV4: vi.fn(),
   unwrapWrappedKey: vi.fn(),

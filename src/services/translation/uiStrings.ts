@@ -4376,6 +4376,14 @@ const STRING_DEFS = {
     beanie:
       'this pod was saved by a newer version of beanies. update beanies on this bean to open it. nothing on this bean is lost.',
   },
+  'settings.importFailed': {
+    en: 'That file could not be imported.',
+    beanie: 'that file could not be imported.',
+  },
+  'settings.importNeedsPassword': {
+    en: 'That file is encrypted. Enter its password to import it.',
+    beanie: 'that file is locked. enter its password to import it.',
+  },
   'compaction.refused.not-owner': {
     en: 'Only the person who set up your family can compact the family file.',
     beanie: 'only the bean who set up your family can compact the family pod.',

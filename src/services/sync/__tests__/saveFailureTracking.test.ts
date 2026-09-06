@@ -22,7 +22,6 @@ vi.mock('../fileSync', async (importOriginal) => ({
   beanpodVersionFor: (await importOriginal<typeof import('../fileSync')>()).beanpodVersionFor,
   reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
   parseBeanpodV4: vi.fn(() => ({})),
-  detectFileVersion: vi.fn(() => 4),
   openFilePicker: vi.fn(async () => null),
 }));
 vi.mock('@/services/indexeddb/database', () => ({

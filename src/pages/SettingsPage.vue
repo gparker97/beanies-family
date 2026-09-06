@@ -533,6 +533,12 @@ async function handleLoadFromFileConfirmed() {
     setTimeout(() => {
       importSuccess.value = false;
     }, 3000);
+  } else if (result.payloadError) {
+    // A file from a newer beanies, or a torn one. This arm did not exist: the
+    // person picked a file and nothing happened at all.
+    importError.value = t(result.payloadError.inlineMessageKey);
+  } else {
+    importError.value = syncStore.error || t('settings.importFailed');
   }
 }
 
@@ -637,7 +643,13 @@ async function handleManualImport() {
       importSuccess.value = false;
     }, 3000);
   } else {
-    importError.value = result.error ?? 'Import failed';
+    // The store's `error` is a developer string for logs; the page renders a
+    // key, with the classified failure first.
+    importError.value = result.payloadError
+      ? t(result.payloadError.inlineMessageKey)
+      : result.needsPassword
+        ? t('settings.importNeedsPassword')
+        : t('settings.importFailed');
   }
 }
 
