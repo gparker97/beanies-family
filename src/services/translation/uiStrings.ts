@@ -4327,7 +4327,10 @@ const STRING_DEFS = {
     beanie:
       'beanies asks you to save a copy of the current file first. to go back to it, use load another family data file above.',
   },
-  'compaction.confirmTitle': { en: 'Compact your family file?', beanie: 'compact your pod?' },
+  'compaction.confirmTitle': {
+    en: 'Compact your family file?',
+    beanie: 'compact your family file?',
+  },
   'compaction.confirmMessage': {
     en: "beanies will rebuild your family file without its record of past changes, so it opens faster. Everything you've added stays. beanies saves a copy of the current file first, and your other devices switch over on their own.",
     beanie:
@@ -4439,7 +4442,10 @@ const STRING_DEFS = {
     beanie:
       'beanies cannot write to your family file at the moment, so it has not changed anything. reconnect your storage, or grant access to the file again, then try tidying it once more.',
   },
-  'compaction.done': { en: 'Your family file is compacted', beanie: 'your pod is compacted' },
+  'compaction.done': {
+    en: 'Your family file is compacted',
+    beanie: 'your family file is compacted',
+  },
   'compaction.failed': {
     en: "beanies couldn't compact your family file",
     beanie: "beanies couldn't compact your family file",
@@ -4459,7 +4465,7 @@ const STRING_DEFS = {
       'your backup is on this device and your data is safe. reload beanies and it will finish the job.',
   },
   'settings.compactPod': { en: 'Compact Family File', beanie: 'compact pod' },
-  'settings.compactSection': { en: 'Compact Your Family File', beanie: 'compact your pod' },
+  'settings.compactSection': { en: 'Compact Your Family File', beanie: 'compact your family file' },
   'settings.compactSectionDesc': {
     en: "beanies keeps a record of every change to your family file. Over time that record makes the file bigger and slower to open, especially on older phones and tablets. Compacting removes the record and keeps everything you've added.",
     beanie:
