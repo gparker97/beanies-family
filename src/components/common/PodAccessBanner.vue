@@ -112,7 +112,7 @@ function recoveryLabel(action: string): string {
         v-for="action in view?.recoveries ?? []"
         :key="action"
         :disabled="busy"
-        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:opacity-50"
+        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
         @click="runRecovery(action)"
       >
         {{ recoveryLabel(action) }}

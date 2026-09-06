@@ -65,7 +65,8 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import { type PayloadLoadError } from '@/types/sync';
-import { surfacePayloadFatal } from '@/utils/payloadFailureSurface';
+import { surfacePayloadFatal, surfaceLineageFatal } from '@/utils/payloadFailureSurface';
+import { PodLineageError } from '@/services/sync/podLineage';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -371,15 +372,34 @@ async function handleAutoLoadSubmit() {
         phase.value = 'auto-load';
         return;
       case 'lineage-blocked':
-        // ⚠️ THIS SURFACE CANNOT FALL BACK ON THE BANNER. `LineageBanner` lives
-        // inside App.vue's `showLayout` branch, and `shouldShowAppLayout` is
-        // false while `needsPodSetup` is true — which is exactly this screen. So
-        // a missing case here is not "a slightly worse message", it is the
-        // password form coming back with NOTHING on it: "the data just didn't
-        // sync", the precise symptom the whole banner exists to eliminate, at
-        // the one surface where the user is actively waiting.
-        formError.value = t(result.error.inlineMessageKey);
-        phase.value = 'auto-load';
+        // ⚠️ THE OVERLAY, like its two neighbours above — not `formError`.
+        //
+        // This surface cannot fall back on the banner: `LineageBanner` lives
+        // inside App.vue's `showLayout` branch and `shouldShowAppLayout` is false
+        // while `needsPodSetup` is true, which is exactly this screen. A missing
+        // case here was the password form coming back with NOTHING on it.
+        //
+        // But `inlineMessageKey` is the SYNC-BAR copy, and it prescribes two
+        // things that do not exist here — "export from Settings" and "choose Use
+        // the family file" both need the app shell. `surfaceLineageFatal` renders
+        // `resumeSetup.podLineageBlocked`, whose own comment says it is "the
+        // overlay variant, for a lineage block raised at OPEN where there is no
+        // sync bar on screen", and it carries the copyable diagnostic and the
+        // telemetry too. Writing a message that names unreachable actions is the
+        // same defect this whole review round kept finding.
+        // `error` is typed `RemoteBlocker`; only `PodLineageError` reaches this
+        // arm (the producer routes every non-`PayloadLoadError` blocker here, and
+        // `RemoteMergeError` is raised only inside `fetchAndMergeRemote`, which
+        // this path never calls). Narrowed rather than cast, so a future blocker
+        // class degrades to the honest generic message instead of a wrong one.
+        if (result.error instanceof PodLineageError) {
+          surfaceLineageFatal(result.error, {
+            familyId: useFamilyContextStore().activeFamilyId ?? null,
+          });
+        } else {
+          formError.value = t(result.error.inlineMessageKey);
+          phase.value = 'auto-load';
+        }
         return;
     }
     // ⚠️ EXHAUSTIVENESS. Every arm above `return`s and the function is

@@ -4372,9 +4372,9 @@ const STRING_DEFS = {
   },
   'podLineage.useFileConfirmAction': { en: 'Use the family file', beanie: 'use the family file' },
   'podLineage.useFileFailed': {
-    en: 'beanies could not open the family file just now. Nothing on this device has changed. Check your connection and try again.',
+    en: 'beanies could not finish opening the family file. Check your connection and try again.',
     beanie:
-      'beanies could not open the family file just now. nothing on this bean has changed. check your connection and try again.',
+      'beanies could not finish opening the family file. check your connection and try again.',
   },
   'podLineage.unsyncedInline': {
     en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Export them from Settings if you want to keep them, then choose Use the family file.',
@@ -4399,9 +4399,9 @@ const STRING_DEFS = {
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.
   'resumeSetup.podLineageBlocked': {
-    en: 'Your family file was reorganised on another device and this one cannot safely combine the two. Nothing has been lost. Sign in, then choose Use the family file on the message at the top of the screen.',
+    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Nothing has been lost, but the two cannot be combined here and reloading will not change that. Please contact support@beanies.family before making more changes on this device.',
     beanie:
-      'your family file was reorganised on another bean and this one cannot safely combine the two. nothing has been lost. sign in, then choose use the family file on the message at the top of the screen.',
+      'your family file was reorganised on another bean, and this one still has beans that were never saved to it. nothing has been lost, but the two cannot be combined here and reloading will not change that. please contact support@beanies.family before making more beans on this bean.',
   },
   'podCredentialStale.inline': {
     en: "Your family's data could not be unlocked. Your saved key may be out of date, so try your password. If that does not work, contact support@beanies.family.",

@@ -880,7 +880,9 @@ export const useSyncStore = defineStore('sync', () => {
     remoteEnvelope: BeanpodFileV4,
     familyId: string,
     /** The live family key. Threaded, never read off the ref — see the helper. */
-    key: CryptoKey
+    key: CryptoKey,
+    /** The human pressed "Use the family file" and confirmed. See the basis below. */
+    chosenByUser = false
   ): Promise<readonly string[] | null | typeof KEPT_LOCAL> {
     // Load THIS family's cache as the worker's doc, then CRDT-merge the remote in.
     // Merge is commutative, so cache∪remote == the old replace(remote)+merge(cache).
@@ -943,13 +945,15 @@ export const useSyncStore = defineStore('sync', () => {
     // All this site owes the worker is the one fact only IT knows: what Drive
     // held at our last durable baseline. `loadedFromCache` false means we have
     // no document of THIS family, which is a different question entirely.
-    // The same one-shot the poll terminus reads (see
-    // `syncService.noteUserChoseRemoteFile`). Consulted here too because the
-    // ROLLBACK and the "use the family file" recovery both re-open through this
-    // path, not through the poll — and `user-file` is the only context that
-    // never blocks, which is the entire point of both flows. Consumed either
-    // way, so one decision cannot govern two reads.
-    const chosenByUser = syncService.consumeUserFileIntent();
+    // ⚠️ AN ARGUMENT, NOT MODULE STATE. `user-file` never blocks and makes
+    // `adopt` — wholesale replacement of this device's document — unconditional,
+    // so it must travel with the ONE call a human authorised and expire with it.
+    // It was briefly a module-level one-shot: a recovery that failed before
+    // reaching a terminus (offline, a 404, an OOM rethrow — all of which return
+    // above the consume) left the flag armed, and the next ordinary debounced
+    // save spent it and discarded the document with no banner, no confirmation
+    // and no toast. A parameter cannot go stale and cannot be stolen by a
+    // concurrent read.
     const basis: LineageBasis = !loadedFromCache
       ? { kind: 'no-local-document' }
       : chosenByUser
@@ -1110,12 +1114,24 @@ export const useSyncStore = defineStore('sync', () => {
    * For V4 files: parses envelope, tries to unlock with cached FK or password.
    * @param options.merge - If true, CRDT merge remote doc with local doc.
    */
-  async function loadFromFile(options: { merge?: boolean } = {}): Promise<{
+  async function loadFromFile(
+    options: {
+      merge?: boolean;
+      /**
+       * The human chose THESE bytes over this device's document, having been
+       * shown what is discarded. Two effects, both scoped to this one call:
+       * the remote-blocked latch is bypassed (it is the thing being resolved),
+       * and the lineage basis becomes `user-file`, which never blocks.
+       */
+      userChoseThisFile?: boolean;
+    } = {}
+  ): Promise<{
     success: boolean;
     needsPassword?: boolean;
     reason?: 'auth' | 'not-found' | 'error';
   }> {
     const merging = !!options.merge;
+    const chosenByUser = !!options.userChoseThisFile;
 
     // Latched: this device has already established it cannot read the remote,
     // and every retry re-downloads megabytes to fail identically. This is the
@@ -1131,7 +1147,9 @@ export const useSyncStore = defineStore('sync', () => {
     // branch — landing instead on the generic overlay whose CTA is Clear Data,
     // which deletes the one copy of the edits this latch exists to protect.
     const blocked = remoteUnreadable();
-    if (blocked) throw blocked;
+    // ⚠️ The user's explicit choice is what RESOLVES this latch, so it must not
+    // be refused by it. Scoped to this call: nothing else bypasses the breaker.
+    if (blocked && !chosenByUser) throw blocked;
 
     // The single read chokepoint for the login flow (single-family auto-select +
     // FamilyPicker). On the post-consent redirect return the Google token may still
@@ -1291,7 +1309,12 @@ export const useSyncStore = defineStore('sync', () => {
             // Replace: adopt remote (+ recover any unsynced cache) to prevent loss.
             const famId = useFamilyContextStore().activeFamilyId;
             if (famId) {
-              const recovered = await replaceDocWithCacheRecovery(remoteEnvelope, famId, liveKey);
+              const recovered = await replaceDocWithCacheRecovery(
+                remoteEnvelope,
+                famId,
+                liveKey,
+                chosenByUser
+              );
               if (recovered === KEPT_LOCAL) {
                 // We hold the newer lineage. The helper adopted the remote's key
                 // dicts and armed the publish; everything below would undo that —
@@ -1385,6 +1408,18 @@ export const useSyncStore = defineStore('sync', () => {
             if (dirty || dupsRemoved > 0 || envelopeGainedLocalKeys) {
               syncService.triggerDebouncedSave();
             }
+          } else if (dirty || envelopeGainedLocalKeys) {
+            // ⚠️ THE REPLACE BRANCH NEEDS THIS TOO — the third instance of one
+            // bug. `replaceDocWithCacheRecovery` arms a publish when the merge
+            // left us ahead of Drive (an adopt whose `migrateDoc` emitted a real
+            // change is the common case), and `reloadAllStores()` twenty lines
+            // above calls `cancelPendingSave()` and drops it. The re-arm below
+            // it was written inside `if (merging)`, which is false on EVERY
+            // cold open, so the delta never reached Drive and #65 reported
+            // `unpushed-local-changes` on every open forever with nothing ever
+            // repairing it. The same shape was fixed at the two cold-boot
+            // decrypt paths; this is the one that was left.
+            syncService.triggerDebouncedSave();
           }
 
           // The text `syncService.load()` handed us has now been MERGED, so the
@@ -3509,56 +3544,66 @@ export const useSyncStore = defineStore('sync', () => {
       message: 'user chose the remote pod file over the local document',
       context: { action: 'user-file-recovery' },
     });
-    // ⚠️ CANCEL THE PENDING SAVE FIRST. Clearing the latch below re-enables
-    // `doSave`, and a debounced save armed while the block was up would then run
-    // its own `fetchAndMergeRemote` CONCURRENTLY with the re-open — two merges
-    // racing over one document, where the loser's `initAndLoadCache` reinstalls
-    // the cached document over the freshly adopted one and the store then merges
-    // against a stale baseline. Nothing needs that save: the whole point of this
-    // action is that we are giving up the local document.
+    // ⚠️ CANCEL THE PENDING SAVE FIRST. A save armed while the block was up
+    // would otherwise run its own `fetchAndMergeRemote` concurrently with this
+    // read — two merges racing over one document. Nothing needs that save: the
+    // whole point of this action is that we are giving up the local document.
     syncService.cancelPendingSave();
-    // Then: unlatch (every read refuses while it holds), declare the intent (the
-    // open terminus consumes it), re-open.
-    syncService.retryAfterRemoteBlock();
-    clearPodUnopenable();
-    syncService.noteUserChoseRemoteFile();
+    // ⚠️ AND `isReloading`, so the OTHER readers stand off. `reloadIfFileChanged`
+    // (the 10s poll and the stale-tab wake) and `backgroundSyncFromFile` both
+    // gate on it; a plain `loadFromFile()` does not set it, so a poll landing
+    // inside this multi-megabyte read used to proceed in parallel.
+    isReloading = true;
+    // ⚠️ THE LATCH IS NOT CLEARED UP FRONT. It used to be, so that
+    // `loadFromFile` would not refuse — and every failure path then returned
+    // with the banner already gone. The bypass now travels as an argument on
+    // this one call, so the latch stays armed until something actually
+    // succeeds, and a failure leaves the user exactly where they were.
     try {
-      const result = await loadFromFile();
+      const result = await loadFromFile({ userChoseThisFile: true });
       if (!result.success) {
         recoveryFailed(result.reason ?? 'unknown');
         return false;
       }
-      // ⚠️ RESTART THE POLLER. `notePodUnopenable` stopped it when the block
-      // latched, and nothing on the success path starts it again:
-      // `clearPodUnopenable` only clears flags, and `setupAutoSync` early-returns
-      // on an established session. Without this the recovery half-applies —
-      // document adopted, stores reloaded, latch clear, and the device silently
-      // stops seeing peer changes until the next tab wake.
-      startFilePolling();
+      // Only now: the read landed, so the state it described is gone.
+      syncService.retryAfterRemoteBlock();
+      clearPodUnopenable();
       return true;
     } catch (e) {
-      // ⚠️ `loadFromFile` THROWS BY DESIGN on a remote blocker, and
-      // `replaceDocWithCacheRecovery` rethrows an out-of-memory failure — on the
-      // very device cohort this tier exists for, where this adopt is the largest
-      // allocation in the app. The latch was cleared two lines above, so without
-      // this catch the banner is gone, no toast fires, nothing is reported, and
-      // every save silently refuses for the rest of the session. That is the
-      // silent failure this file forbids, and `PodAccessBanner` carries the same
-      // catch for the same reason.
+      // ⚠️ CATCH, not just `finally`. `loadFromFile` THROWS by design on a
+      // remote blocker and rethrows an out-of-memory failure — on the very
+      // device cohort this tier exists for, where this adopt is the largest
+      // allocation in the app. Without this the failure reaches nobody.
       recoveryFailed(e instanceof Error ? e.name : 'unknown', e);
-      // Put the warning back. The service latch may have re-armed underneath us
-      // (a blocker re-throws through `noteRemoteBlocked`), and the mirror is how
-      // the banner returns so the user can try again or export.
-      mirrorServiceLatch();
       return false;
+    } finally {
+      isReloading = false;
+      // ⚠️ RESTART THE POLLER ON EVERY EXIT, not just the happy one.
+      // `notePodUnopenable` stopped it when the block latched, and nothing else
+      // starts it again: `clearPodUnopenable` only clears flags and
+      // `setupAutoSync` early-returns on an established session. Restoring it
+      // only on success left a failed recovery with the poller dead for the rest
+      // of the session — the same half-apply this function already fixed once.
+      resumeFilePolling();
+      // And reconcile the banner with the authoritative latch. On failure the
+      // latch never moved, so this simply puts the warning back on screen.
+      mirrorServiceLatch();
     }
   }
 
-  /** One report for both failure shapes, so they can never diverge. */
+  /**
+   * One report for both failure shapes, so they can never diverge.
+   *
+   * ⚠️ SEVERITY BY CODE. `critical` pages `#beanies-errors`, and a plain
+   * offline failure — whose own toast says "check your connection and try
+   * again" — must not. Only a failure that leaves the family unable to act
+   * earns the page.
+   */
   function recoveryFailed(code: string, error?: unknown): void {
+    const transient = code === 'auth' || code === 'error' || code === 'not-found';
     reportError({
       surface: 'pod-lineage',
-      severity: 'critical',
+      severity: transient ? 'warning' : 'critical',
       message: 'adopting the remote pod file after a lineage block failed',
       error,
       context: { action: 'user-file-recovery-failed', error_code: code },

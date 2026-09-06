@@ -22492,8 +22492,8 @@
       "lastUpdated": "2026-09-05"
     },
     "resumeSetup.podLineageBlocked": {
-      "translation": "您的家庭文件已在另一台设备上重组，此设备无法安全地将两者结合起来。没有任何东西丢失。登录，然后选择屏幕顶部消息中的使用家庭文件。",
-      "hash": "pf7u98",
+      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有从未保存的更改。什么都没有丢失，但两者不能在这里结合，重新加载不会改变这一点。在此设备上进行更多更改之前，请联系support@beanies.family。",
+      "hash": "33zq05",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmTitle": {
@@ -22617,8 +22617,8 @@
       "lastUpdated": "2026-09-06"
     },
     "podLineage.useFileFailed": {
-      "translation": "beanies刚才无法打开家庭文件。此设备上的任何内容均未更改。请检查您的网络连接，然后重试。",
-      "hash": "6c8ab3",
+      "translation": "beanies无法完成打开家庭文件。请检查您的网络连接，然后重试。",
+      "hash": "2wd7yk",
       "lastUpdated": "2026-09-06"
     },
     "podUnreadable.inline": {

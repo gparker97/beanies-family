@@ -759,41 +759,6 @@ export function getProviderFamilyId(): string | null {
 /**
  * Set the storage provider directly (used by Google Drive flow)
  */
-/**
- * ⚠️ ONE-SHOT, AND ONE PRODUCER. Set ONLY by
- * `syncStore.useRemoteFileOverLocalDocument` — the lineage banner's action,
- * behind a danger confirmation that names what is discarded — and consumed by
- * the next real read. It turns "the human chose these bytes, having been told
- * the cost" into the `user-file` lineage context, whose whole job is to never
- * block. Module state rather than a parameter because the two ends can be
- * separated by a poll tick, not by a call. Cleared on `reset()` so it cannot
- * survive a family switch.
- *
- * ⚠️ DO NOT ARM THIS FROM AN ACCESS REPAIR. `rebindPodFile` armed it for one
- * day and that was a data-loss bug: it is the shared recovery for four
- * `POD_ACCESS_ERRORS` codes plus the save-failure banner, none of which asks
- * the human a lineage question, and `user-file` makes `adopt` (total
- * replacement of the local document) unconditional — including for `conflict`,
- * the verdict the banner deliberately refuses to offer a choice on.
- */
-let userChoseRemoteFile = false;
-
-export function noteUserChoseRemoteFile(): void {
-  userChoseRemoteFile = true;
-}
-
-/**
- * Read AND clear the intent. One-shot by construction rather than by
- * convention: two termini consult it (this module's poll/pre-save merge and the
- * store's open path), and a flag that only one of them cleared would apply a
- * single user decision to every subsequent read.
- */
-export function consumeUserFileIntent(): boolean {
-  const chose = userChoseRemoteFile;
-  userChoseRemoteFile = false;
-  return chose;
-}
-
 export function setProvider(provider: StorageProvider): void {
   // A different (or re-bound) file may well be readable. This is what makes
   // `rebindPodFile` — the supported repair for an unreadable pod — actually
@@ -917,10 +882,6 @@ export function reset(): void {
   // which every poll, save and open does a full multi-megabyte read forever.
   clearRemoteUnreadable();
   pendingMarker = null;
-  // Same reasoning: a pending "the user chose this file" intent belongs to the
-  // pod it was raised against, and applying it to a different family's first
-  // read would adopt a remote the guard should have weighed on its merits.
-  userChoseRemoteFile = false;
   cancelPendingSave();
   stopPolling();
   currentProvider = null;
@@ -1596,28 +1557,18 @@ async function fetchAndMergeRemote(): Promise<void> {
   // ⚠️ HEADS, not the fingerprint: `remoteBaseline.ts` is type-imported by the
   // worker and must stay value-free, so main decodes and the worker compares.
   //
-  // ⚠️ `user-file` — the human pressed "Use the family file" on the lineage
-  // banner and confirmed the loss. Consumed here as well as on the open
-  // terminus so ONE decision can never govern two reads.
-  //
-  // A merge that throws spends the intent. That is deliberate but it is not
-  // free: the next attempt compares as `ours-newer` → `publish-local`, not as a
-  // block, so a transient RPC failure quietly turns the user's choice back into
-  // "keep ours". The recovery action therefore reports its own failure and the
-  // banner comes back, which is what makes the spend safe — see
-  // `useRemoteFileOverLocalDocument`.
-  const chosenByUser = consumeUserFileIntent();
-  const basis: LineageBasis = chosenByUser
-    ? { kind: 'user-file' }
-    : { kind: 'baseline', heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null) };
-  if (chosenByUser) {
-    logEvent({
-      level: 'info',
-      surface: 'pod-lineage',
-      message: 'merging a pod file the user chose explicitly',
-      context: { action: 'user-file', family_id: remoteEnvelope.familyId },
-    });
-  }
+  // ⚠️ NEVER `user-file` HERE. This is the unattended poll/pre-save path, and
+  // `user-file` never blocks — it makes `adopt` (wholesale replacement of the
+  // local document) unconditional. The one decision that earns it is a human
+  // pressing "Use the family file" and confirming the loss, and that travels as
+  // a PARAMETER on the call it belongs to, not as module state a later,
+  // unattended read could pick up. It used to be a one-shot flag: a recovery
+  // that failed before reaching a terminus left it armed, and the next ordinary
+  // save spent it and discarded the document with no banner and no confirmation.
+  const basis: LineageBasis = {
+    kind: 'baseline',
+    heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null),
+  };
 
   // The worker decrypts, runs the LINEAGE GUARD (the only place both documents
   // exist), then merges or adopts, and returns which it did. `adopted` returns

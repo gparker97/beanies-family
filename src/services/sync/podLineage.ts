@@ -47,16 +47,26 @@ export type LineageAction = 'merge' | 'adopt' | 'rebase' | 'publish-local' | 'bl
  *
  * ⚠️ `user-file` HAS EXACTLY ONE PRODUCER, and adding a second is a data-loss
  * change. It is `syncStore.useRemoteFileOverLocalDocument` — the lineage
- * banner's action, behind a `confirm({variant:'danger'})` that names what is
- * let go. It was briefly also armed by `rebindPodFile`, which is WRONG:
+ * banner's action, behind a `confirm({variant:'danger'})` that names what is let
+ * go — and the choice travels as an ARGUMENT on that one call, never as module
+ * state. It was briefly armed by `rebindPodFile` as well, which is WRONG:
  * `rebindPodFile` is the generic access repair for PERMISSION_DENIED,
- * FILE_NOT_FOUND, CANONICAL_MISMATCH and NO_HOME (plus the save-failure
- * banner), and in none of those is the human answering a lineage question.
- * `user-file` never blocks and `adopt` destroys the local document, so a
- * canonical-mismatch repair would silently discard work that lived only in the
- * private copy — and `conflict` × `user-file` = `adopt` is precisely the choice
- * the banner refuses to offer. `podAccess.ts` states the rule: verification may
- * REPORT a problem, never RESOLVE one.
+ * FILE_NOT_FOUND, CANONICAL_MISMATCH and NO_HOME (plus the save-failure banner),
+ * and in none of those is the human answering a lineage question. `user-file`
+ * never blocks and `adopt` destroys the local document, so a canonical-mismatch
+ * repair would silently discard work that lived only in the private copy — and
+ * `conflict` × `user-file` = `adopt` is precisely the choice the banner refuses
+ * to offer. `podAccess.ts` states the rule: verification may REPORT a problem,
+ * never RESOLVE one.
+ *
+ * ⚠️ SO TWO CELLS OF THIS COLUMN ARE CURRENTLY UNREACHABLE, and that is a known
+ * gap, not an oversight. Only `adopt-remote` × `user-file` is produced. Nothing
+ * reaches `ours-newer` × `user-file`, which means THE ROLLBACK IS NOT WIRED:
+ * re-pointing at a pre-compaction `.beanpod` compares `ours-newer` →
+ * `publish-local`, so this device republishes its compacted document over the
+ * file the family just chose, with no block and therefore no banner to recover
+ * from. Wiring it needs a surface that asks the human first — Stage 2's job,
+ * alongside the rebase. Do NOT close the gap by arming an access repair.
  */
 export type LineageContext = 'clean' | 'dirty' | 'user-file';
 

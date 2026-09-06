@@ -233,6 +233,30 @@ describe('LineageBanner', () => {
     );
   });
 
+  it('disables BOTH actions while an adopt runs, and says it is working', async () => {
+    // Deleting `:disabled="busy"` or the busy label left the suite green. The
+    // export button matters as much as the discard one: navigating away
+    // mid-adopt is how a half-applied recovery gets its second half skipped.
+    blockAdoptRemote();
+    let release: (v: boolean) => void = () => {};
+    holder.store.useRemoteFileOverLocalDocument.mockReturnValue(
+      new Promise<boolean>((r) => {
+        release = r;
+      })
+    );
+    const w = mount(LineageBanner);
+    await w.findAll('button')[1].trigger('click');
+    await vi.waitFor(() => expect(holder.store.useRemoteFileOverLocalDocument).toHaveBeenCalled());
+    await w.vm.$nextTick();
+
+    const buttons = w.findAll('button');
+    expect(buttons[0].attributes('disabled')).toBeDefined();
+    expect(buttons[1].attributes('disabled')).toBeDefined();
+    expect(buttons[1].attributes('aria-busy')).toBe('true');
+    expect(buttons[1].text()).toBe('podLineage.useFileBusy');
+    release(true);
+  });
+
   it('is mounted in the app shell beside the other banners', async () => {
     // The ONE grep left, and deliberately so: "is this component in the tree at
     // all?" is a wiring question with no runtime surface a unit test can reach.
