@@ -806,9 +806,11 @@ describe('syncStore — the lineage banner recovery', () => {
     syncStore.familyKey = {} as CryptoKey;
 
     await syncStore.loadFromFile({ userChoseThisFile: true });
-    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2]).toEqual({
-      kind: 'user-file',
-    });
+    const basis = vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]?.[2];
+    expect(basis).toMatchObject({ kind: 'user-file' });
+    // The heads are what make a rebase possible; without them this basis
+    // silently degrades to the destructive adopt it replaced.
+    expect((basis as { heads?: unknown }).heads).not.toBeUndefined();
 
     vi.mocked(docClient.mergeRemoteEnvelope).mockClear();
     await syncStore.loadFromFile();
@@ -887,7 +889,12 @@ describe('syncStore — restoring from a backup file', () => {
 
     await syncStore.decryptPendingFile('right-pw', { userChoseThisFile: true });
 
-    expect(basisOfFirstMerge()).toEqual({ kind: 'user-file' });
+    // ⚠️ IT MUST CARRY THE HEADS. `user-file` without them made the whole
+    // "an explicit choice should not be the destructive one" change a no-op:
+    // the worker needs a baseline to rebase, so it fell through to a wholesale
+    // adopt and discarded exactly the work the change was written to save.
+    expect(basisOfFirstMerge()).toMatchObject({ kind: 'user-file' });
+    expect((basisOfFirstMerge() as { heads?: unknown }).heads).not.toBeUndefined();
   });
 
   it('does NOT claim an explicit choice when the caller says nothing', async () => {

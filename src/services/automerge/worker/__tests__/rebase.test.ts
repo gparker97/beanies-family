@@ -41,7 +41,7 @@ const buildRebaseOps = buildRebaseOpsRaw as unknown as (
   local: Automerge.Doc<Doc>,
   heads: string[],
   target: Automerge.Doc<Doc>
-) => { op: unknown; count: number } | null;
+) => { op: unknown; count: number; conflicts: number } | null;
 
 type Doc = Record<string, unknown>;
 type Coll = Record<string, Record<string, unknown>>;
@@ -182,6 +182,57 @@ describe('the peer keeps its offline work', () => {
     };
     expect(out.podLineage.id).toBe('L-NEW');
     expect(out.todos.mine?.title).toBe('offline');
+  });
+});
+
+describe('an explicit choice keeps the work too', () => {
+  /**
+   * ⚠️ THIS BRANCH HAD ZERO WORKER-LEVEL COVERAGE, and that is how a fix that
+   * changed nothing shipped. The POLICY cell was moved to `rebase`, but the
+   * `user-file` basis carried NO HEADS, so the rebase was structurally
+   * unreachable and every explicit choice fell through to a wholesale adopt —
+   * the exact behaviour the change was written to replace. The table asserted
+   * one thing and the worker did another, and only a test at THIS level can
+   * tell the two apart.
+   */
+  it('rebases a user-chosen file instead of discarding the offline work', async () => {
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.todos as Coll).shared = { id: 'shared', title: 'from before' };
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      (d.todos as Coll).mine = { id: 'mine', title: 'made while offline' };
+    });
+
+    ap.loadSnapshot(Automerge.save(peer));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(compact(shared), key), 'fam', {
+      kind: 'user-file',
+      heads: baselineHeads,
+    });
+
+    expect(res.action).toBe('rebased');
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { todos: Coll };
+    expect(out.todos.mine?.title).toBe('made while offline');
+  });
+
+  it('still adopts when the rebase cannot run, because the human said replace', async () => {
+    // The one path that must never dead end: they already confirmed "replace
+    // what is on this device", so a block would refuse an instruction they gave.
+    const shared = base();
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      (d.todos as Coll).mine = { id: 'mine', title: 'offline' };
+    });
+
+    ap.loadSnapshot(Automerge.save(peer));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(compact(shared), key), 'fam', {
+      kind: 'user-file',
+      heads: null, // we cannot prove what Drive held
+    });
+
+    expect(res.action).toBe('adopted');
   });
 });
 
@@ -410,6 +461,188 @@ describe('the guards that only show up in the edge cases', () => {
     expect(built!.count).toBeGreaterThan(0);
     // Both the todo and the settings survived the absent-singleton path.
     expect(JSON.stringify(built)).toContain('setSettings');
+  });
+});
+
+describe('an entity delete is a write like any other', () => {
+  /**
+   * ⚠️ THE FIELD RULE WAS APPLIED ONE LEVEL TOO LOW. Everything below went
+   * wrong in BOTH directions and was counted in neither: a peer deleting an
+   * account the compactor had renamed destroyed that saved rename, and a peer
+   * editing an account the compactor had deleted brought it back.
+   */
+  function withAccount(mutatePeer: (d: Doc) => void, mutateRemote: (d: Doc) => void) {
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.accounts as Coll).a1 = { id: 'a1', name: 'original' };
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, mutatePeer as never);
+    let remote = compact(shared);
+    remote = Automerge.change(remote, mutateRemote as never);
+    return { peer, remote, baselineHeads };
+  }
+
+  it('does not delete an entity the compactor changed after compacting', async () => {
+    const { peer, remote, baselineHeads } = withAccount(
+      (d) => {
+        delete (d.accounts as Coll).a1;
+      },
+      (d) => {
+        (d.accounts as Coll).a1!.name = 'renamed by the compactor';
+      }
+    );
+
+    ap.loadSnapshot(Automerge.save(peer));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.a1?.name).toBe('renamed by the compactor');
+    expect(res.conflicts).toBe(1);
+  });
+
+  it('honours a delete the compactor did not contest', async () => {
+    const { peer, remote, baselineHeads } = withAccount(
+      (d) => {
+        delete (d.accounts as Coll).a1;
+      },
+      (d) => {
+        (d.accounts as Coll).other = { id: 'other' };
+      }
+    );
+
+    ap.loadSnapshot(Automerge.save(peer));
+    await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.a1).toBeUndefined();
+  });
+
+  it('does not resurrect an entity the compactor deleted', async () => {
+    const { peer, remote, baselineHeads } = withAccount(
+      (d) => {
+        (d.accounts as Coll).a1!.name = 'edited offline';
+      },
+      (d) => {
+        delete (d.accounts as Coll).a1;
+      }
+    );
+
+    ap.loadSnapshot(Automerge.save(peer));
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.a1).toBeUndefined();
+    expect(res.conflicts).toBe(1);
+  });
+
+  it('carries a genuinely new entity across', async () => {
+    const shared = base();
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      (d.accounts as Coll).fresh = { id: 'fresh', name: 'made offline' };
+    });
+
+    ap.loadSnapshot(Automerge.save(peer));
+    await ap.mergeRemoteEnvelope(await envelopeFor(compact(shared), key), 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+
+    const out = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { accounts: Coll };
+    expect(out.accounts.fresh?.name).toBe('made offline');
+  });
+});
+
+describe('the conflict count means what it says', () => {
+  function fields(mutatePeer: (d: Doc) => void, mutateRemote: (d: Doc) => void) {
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.accounts as Coll).a1 = { id: 'a1', nickname: 'old', tags: ['x'] };
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, mutatePeer as never);
+    let remote = compact(shared);
+    remote = Automerge.change(remote, mutateRemote as never);
+    return buildRebaseOps(peer, baselineHeads, remote);
+  }
+
+  it('does not count agreement as a conflict', () => {
+    // ⚠️ Two devices writing the SAME value lost nothing. Counting it made
+    // `conflicts` measure "fields where the two sides agreed".
+    const built = fields(
+      (d) => {
+        (d.accounts as Coll).a1!.nickname = 'same';
+      },
+      (d) => {
+        (d.accounts as Coll).a1!.nickname = 'same';
+      }
+    );
+    expect(built?.conflicts).toBe(0);
+  });
+
+  it('counts a peer delete that lost to a compactor write', () => {
+    const built = fields(
+      (d) => {
+        delete (d.accounts as Coll).a1!.nickname;
+      },
+      (d) => {
+        (d.accounts as Coll).a1!.nickname = 'kept';
+      }
+    );
+    expect(built?.conflicts).toBe(1);
+  });
+
+  it('replays a peer field-delete the compactor did not contest', () => {
+    // The POSITIVE half of the delete rule, which had no test anywhere — so a
+    // regression that silently stopped replaying peer deletes would ship green.
+    const built = fields(
+      (d) => {
+        delete (d.accounts as Coll).a1!.nickname;
+      },
+      (d) => {
+        (d.accounts as Coll).other = { id: 'other' };
+      }
+    );
+    expect(JSON.stringify(built)).toContain('deleteKeys');
+    expect(JSON.stringify(built)).toContain('nickname');
+  });
+
+  it('emits nothing when a nested conflict is all there is', () => {
+    // A conflicts-only recursion used to write the sub-object back to exactly
+    // what the target held — inflating the replayed count and moving the heads,
+    // which flips `dirty` into a full pod re-encrypt and upload for nothing.
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.accounts as Coll).a1 = { id: 'a1', loan: { schedule: [1] } };
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      ((d.accounts as Coll).a1!.loan as Record<string, unknown>).schedule = [2];
+    });
+    let remote = compact(shared);
+    remote = Automerge.change(remote, (d) => {
+      ((d.accounts as Coll).a1!.loan as Record<string, unknown>).schedule = [3];
+    });
+
+    const built = buildRebaseOps(peer, baselineHeads, remote);
+
+    expect(built?.op).toBeNull();
+    expect(built?.count).toBe(0);
+    expect(built?.conflicts).toBe(1);
   });
 });
 

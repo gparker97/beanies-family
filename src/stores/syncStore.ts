@@ -958,7 +958,9 @@ export const useSyncStore = defineStore('sync', () => {
     const basis: LineageBasis = !loadedFromCache
       ? { kind: 'no-local-document' }
       : chosenByUser
-        ? { kind: 'user-file' }
+        ? // The SAME heads the baseline arm would carry. `user-file` changes
+          // what the guard is allowed to do, not what this device knows.
+          { kind: 'user-file', heads: baselineHeads }
         : { kind: 'baseline', heads: baselineHeads };
     const merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId, basis);
     if (merged.action === 'kept-local') {

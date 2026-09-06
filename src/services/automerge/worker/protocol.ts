@@ -57,7 +57,15 @@ export type ProjectionDelta =
  */
 export type LineageBasis =
   | { kind: 'no-local-document' }
-  | { kind: 'user-file' }
+  /**
+   * ⚠️ `user-file` CARRIES HEADS TOO, and omitting them made the whole
+   * "an explicit choice should not be the destructive one" fix a no-op. The
+   * worker needs a baseline to REBASE; with no heads on this arm the rebase was
+   * structurally unreachable and every user-file open fell through to a
+   * wholesale adopt — exactly the behaviour the policy change was meant to
+   * replace. The producer had the heads in hand and threw them away.
+   */
+  | { kind: 'user-file'; heads: string[] | null }
   | { kind: 'baseline'; heads: string[] | null };
 
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─

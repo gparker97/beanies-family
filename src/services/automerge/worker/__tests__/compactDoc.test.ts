@@ -153,6 +153,23 @@ describe('compactDoc', () => {
     expect(() => compactDoc()).toThrow(/compaction changed the document at accounts\.<id>\.bal/);
   });
 
+  it('KEEPS the field name on a singleton, which has no id to mask', () => {
+    // ⚠️ `settings` and `podLineage` are maps of FIELDS, not of entities, so
+    // segment 2 is a field name — never an id, never PII, and the single most
+    // useful token for triage. Masking it turned `settings.baseCurrency` into
+    // `settings.<id>`, and `podLineage.seq` into a message that cannot tell
+    // `id` from `seq` about the one field compaction deliberately writes.
+    seedHistory(2);
+    diffHook.path = 'settings.baseCurrency';
+    let message = '';
+    try {
+      compactDoc();
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain('settings.baseCurrency');
+  });
+
   it('MASKS the entity id, which can be a Google account email', () => {
     // ⚠️ `driveConnections` is keyed by the account email
     // (`driveConnectionId`), and this message becomes the error's stack — which

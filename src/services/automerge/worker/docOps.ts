@@ -733,7 +733,7 @@ export function buildRebaseOps(
   if (!scan) return null;
 
   const ops: MutationOp[] = [];
-  /** Fields both sides wrote that no machine can merge. The saved value stays. */
+  /** Writes that could not be carried across. The saved value stayed. */
   let conflicts = 0;
   for (const [collection, ids] of scan.touched) {
     const localColl = (local[collection] ?? {}) as AnyRecord;
@@ -741,31 +741,47 @@ export function buildRebaseOps(
     const targetColl = (target[collection] ?? {}) as AnyRecord;
     for (const id of ids) {
       const now = localColl[id];
+      const wasPresent = beforeColl[id] !== undefined;
+      const inTarget = targetColl[id] !== undefined;
+
+      // ⚠️ AN ENTITY DELETE IS A WRITE LIKE ANY OTHER, and applying the
+      // three-way rule only to FIELDS left this whole level unguarded — in both
+      // directions, and uncounted. A peer deleting an account the compactor had
+      // just renamed destroyed that saved rename; a peer editing an account the
+      // compactor had deleted resurrected it. Same inversion the field rule
+      // exists to prevent, one level up.
       if (now === undefined) {
-        // The peer deleted it. Deleting something the compacted document does
-        // not have is a no-op, so this is safe either way.
+        if (!inTarget) continue; // already gone there — nothing to say
+        if (!same(beforeColl[id], targetColl[id])) {
+          conflicts++; // the compactor wrote it after compacting; its copy stays
+          continue;
+        }
         ops.push({ op: 'delete', collection, id });
         continue;
       }
-      const wasPresent = beforeColl[id] !== undefined;
-      const inTarget = targetColl[id] !== undefined;
-      // ⚠️ `toPlain` ON EVERY PAYLOAD. Values read out of an Automerge document
-      // are frozen and structurally shared with it, and assigning one into a
-      // DIFFERENT document's draft is not a supported operation. Every other op
-      // payload in this file does the same.
-      //
-      // Defensive, and honestly so: on Automerge 3.4 a read outside a `change`
-      // callback yields a frozen plain object rather than a proxy, so removing
-      // this passes every test. It is kept because the contract — not the
-      // current implementation — is what the op crossing a `postMessage`
-      // boundary depends on, and because a payload that is a live view of
-      // another document is a bug waiting for a version bump.
-      if (!wasPresent || !inTarget) {
+
+      if (!inTarget) {
+        // The peer created it, or the compactor deleted it. Creating is safe;
+        // resurrecting a deletion is not — the delete is already saved for the
+        // whole family, and one device's edit must not undo it silently.
+        if (wasPresent) {
+          conflicts++;
+          continue;
+        }
         ops.push({ op: 'set', collection, id, entity: toPlain(now) });
         continue;
       }
-      const patch = threeWayFields(beforeColl[id], now, targetColl[id]);
-      if (!patch) continue; // nothing actually moved
+
+      // ⚠️ PRESENT IN THE TARGET MEANS MERGE, whatever the baseline says. The
+      // first cut short-circuited on `!wasPresent` and wrote the peer's WHOLE
+      // entity — so an entity the peer received from a third device, and the
+      // compactor then edited, was reverted to the peer's older copy. With no
+      // baseline for it we cannot attribute changes, so the conservative
+      // reading applies: carry only fields the target does not have, and treat
+      // the rest as conflicts rather than reverting saved data.
+      const baselineFor = wasPresent ? beforeColl[id] : targetColl[id];
+      const patch = threeWayFields(baselineFor, now, targetColl[id]);
+      if (!patch) continue;
       conflicts += patch.conflicts;
       if (!Object.keys(patch.set).length && !patch.deleteKeys.length) continue;
       ops.push({
@@ -774,9 +790,8 @@ export function buildRebaseOps(
         id,
         patch: patch.set,
         ...(patch.deleteKeys.length ? { deleteKeys: patch.deleteKeys } : {}),
-        // The entity is present in the target by the check above, and this all
-        // runs synchronously against a local document, so it cannot vanish in
-        // between. `skip` is belt-and-braces rather than a live case.
+        // Present in the target by the check above, and this runs synchronously
+        // against a local document, so it cannot vanish in between.
         onMissing: 'skip',
       });
     }
@@ -830,7 +845,8 @@ export function buildRebaseOps(
 function threeWayFields(
   before: unknown,
   now: unknown,
-  target: unknown
+  target: unknown,
+  depth = 0
 ): { set: Record<string, unknown>; deleteKeys: string[]; conflicts: number } | null {
   const a = (toPlain(before) ?? {}) as AnyRecord;
   const b = (toPlain(now) ?? {}) as AnyRecord;
@@ -841,17 +857,40 @@ function threeWayFields(
 
   for (const key of Object.keys(b)) {
     if (same(a[key], b[key])) continue; // the peer did not change it
+    // ⚠️ AGREEMENT IS NOT A CONFLICT. Without this, two devices that wrote the
+    // SAME value both counted as unmergeable — so `conflicts` measured "fields
+    // where the two sides agreed", not "work that was lost". The realistic
+    // trigger is a peer whose session reached Drive but whose baseline commit
+    // did not land: every field it wrote would have read as a conflict.
+    if (same(b[key], t[key])) continue;
     if (same(a[key], t[key])) {
       set[key] = b[key]; // the compactor did not change it — the peer's wins
       continue;
     }
-    if (isPlainObject(a[key]) && isPlainObject(b[key]) && isPlainObject(t[key])) {
-      const inner = threeWayFields(a[key], b[key], t[key]);
+    // ⚠️ A DEPTH CAP. The plan says "one level"; unbounded recursion on the
+    // low-memory device this tier exists to spare is not what it asked for, and
+    // a pathologically nested value should degrade to a conflict rather than a
+    // deep walk.
+    if (
+      depth < MAX_MERGE_DEPTH &&
+      isPlainObject(a[key]) &&
+      isPlainObject(b[key]) &&
+      isPlainObject(t[key])
+    ) {
+      const inner = threeWayFields(a[key], b[key], t[key], depth + 1);
       if (inner) {
-        const merged = { ...(t[key] as AnyRecord), ...inner.set };
-        for (const k of inner.deleteKeys) delete merged[k];
-        set[key] = merged;
         conflicts += inner.conflicts;
+        // ⚠️ ONLY WRITE IF SOMETHING ACTUALLY MOVED. A conflicts-only recursion
+        // used to assign `{...target[key]}` — writing the sub-object back to
+        // exactly what it already held. That is a no-op that inflates the
+        // replayed count, mints a fresh Automerge object identity, and moves the
+        // heads, which flips `dirty` into a full pod re-encrypt and upload for
+        // nothing.
+        if (Object.keys(inner.set).length || inner.deleteKeys.length) {
+          const merged = { ...(t[key] as AnyRecord), ...inner.set };
+          for (const k of inner.deleteKeys) delete merged[k];
+          set[key] = merged;
+        }
       }
       continue;
     }
@@ -859,14 +898,21 @@ function threeWayFields(
   }
 
   for (const key of Object.keys(a)) {
-    // Only honour the peer's delete if the compactor left the field alone.
-    if (!(key in b) && same(a[key], t[key])) deleteKeys.push(key);
+    if (key in b) continue;
+    // The peer deleted it. Honour that only if the compactor left it alone —
+    // and COUNT the case where it did not, or a delete that lost to a saved
+    // write is invisible in exactly the way the field rule exists to expose.
+    if (same(a[key], t[key])) deleteKeys.push(key);
+    else conflicts++;
   }
 
   return Object.keys(set).length || deleteKeys.length || conflicts
     ? { set, deleteKeys, conflicts }
     : null;
 }
+
+/** How deep the merge walks before treating a nested value as unmergeable. */
+const MAX_MERGE_DEPTH = 2;
 
 /** JSON-equality. The document model is pure JSON, so this is exact. */
 function same(x: unknown, y: unknown): boolean {

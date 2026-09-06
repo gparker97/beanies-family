@@ -1194,6 +1194,9 @@ export async function mergeRemoteEnvelope(
   opts?: RequestOpts
 ): Promise<{
   action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+  /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
+  replayed?: number;
+  conflicts?: number;
   heads: Heads;
   dirty: boolean;
   changed: boolean;
@@ -1201,6 +1204,9 @@ export async function mergeRemoteEnvelope(
 }> {
   const res = await request<{
     action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+    /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
+    replayed?: number;
+    conflicts?: number;
     heads: Heads;
     dirty: boolean;
     changed: boolean;
