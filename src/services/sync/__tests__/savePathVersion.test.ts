@@ -292,6 +292,56 @@ describe('the pod-version event after the review', () => {
   );
 });
 
+describe('a sign-out landing inside the write', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    exportHook.lineage = null;
+    exportHook.mergeAction = 'merged';
+  });
+
+  it(
+    'reports the family it wrote for, and does not turn a landed write into a failure',
+    async () => {
+      // ⚠️ `currentEnvelope` IS MODULE STATE THAT `reset()` NULLS, and the write
+      // takes seconds. Reading `currentEnvelope.familyId` after the ack made a
+      // sign-out mid-write a TypeError on the SUCCESS path, which `doSave`'s catch
+      // then reported as a failed save for a write that had actually landed, with
+      // no baseline committed. The id is captured before the write instead.
+      exportHook.lineage = COMPACTED;
+      const svc = await freshService();
+      let release!: () => void;
+      let writeStarted!: () => void;
+      const started = new Promise<void>((r) => {
+        writeStarted = r;
+      });
+      const slow = provider(envelope(), () => {}) as unknown as { write: unknown };
+      slow.write = vi.fn(() => {
+        writeStarted();
+        return new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      });
+      svc.setProvider(slow as never);
+      svc.setFamilyKey(fakeKey, envelope());
+
+      const saving = svc.save();
+      // Wait until the upload is genuinely in flight: `doSave` runs its pre-save
+      // merge first, so signing out before that would be a different test.
+      await started;
+      svc.reset();
+      release();
+      await expect(saving).resolves.not.toThrow();
+
+      const ev = vi
+        .mocked(logEvent)
+        .mock.calls.map((c) => c[0])
+        .find((e) => e.surface === 'pod-version');
+      expect(ev?.context).toMatchObject({ family_id: 'fam-1', detail: 'version=5.0,seq=1' });
+    },
+    RESET_MODULES_TIMEOUT_MS
+  );
+});
+
 describe('the pod-version transition event', () => {
   beforeEach(() => {
     vi.clearAllMocks();
