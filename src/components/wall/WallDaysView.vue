@@ -61,16 +61,22 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   /**
-   * A day tap RE-ANCHORS the week to start at that day — the today view's
-   * convention, applied here. A week starting Saturday, with Thursday tapped,
-   * redraws starting Thursday: the tapped day is used AS-IS, never snapped to
-   * its calendar week. Week stepping snaps; a tap is a direct placement.
-   *
-   * `openDay` is deliberately NOT declared: this view can render the day itself,
-   * so covering it with a sheet would be the lesser answer. The sheet is still
-   * reachable from the lanes view's header and from any individual event.
+   * A day the wall is NOT already drawing in full — a chip in the strip below —
+   * RE-ANCHORS the week to start at that day. The tapped day is used AS-IS,
+   * never snapped to its calendar week: a week starting Saturday, with Thursday
+   * tapped, redraws starting Thursday. Week STEPPING snaps; a tap is a direct
+   * placement.
    */
   focusDay: [string];
+  /**
+   * A day the wall IS already drawing — a column header — opens the today view
+   * anchored on it. The day is on screen, so the useful next step is depth.
+   *
+   * The rule belongs to the AFFORDANCE, not to this view, and is stated once on
+   * `onOpenDay` in the page — which is why the registry no longer carries a
+   * per-view version of it that could go stale again.
+   */
+  openDay: [string];
   /** A step arrow was pressed. The page owns the anchor, so it owns the move. */
   step: [-1 | 1];
   open: [WallSheetTarget];
@@ -221,7 +227,7 @@ function colourFor(activity: FamilyActivity) {
                 ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
                 : 'text-secondary-500 dark:text-ink'
             "
-            @click="emit('focusDay', ymd)"
+            @click="emit('openDay', ymd)"
           >
             <span
               class="font-outfit wall-dow block font-bold tracking-[0.11em] uppercase opacity-70"

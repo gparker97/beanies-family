@@ -20,7 +20,12 @@ import WallTickBurst from '@/components/wall/WallTickBurst.vue';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallStatusStamp from '@/components/wall/WallStatusStamp.vue';
 import WallViewSwitcher from '@/components/wall/WallViewSwitcher.vue';
-import { DEFAULT_WALL_VIEW, wallViewById } from '@/components/wall/wallViews';
+import {
+  DEFAULT_WALL_VIEW,
+  canGoBackFrom,
+  wallViewById,
+  wallViewTransition,
+} from '@/components/wall/wallViews';
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useMediaQuery } from '@/composables/useMediaQuery';
@@ -251,8 +256,29 @@ const peripherals = computed<WallPeripheralData>(() => ({
 const clockNow = ref(new Date());
 const clockTimer = setInterval(() => (clockNow.value = new Date()), 20_000);
 const currentView = computed(() => wallViewById(activeView.value));
-/** Names the jobs board's back button after the view it returns to. */
+/** Names the back control after the view it returns to. */
 const backLabel = computed(() => t(wallViewById(lastCalendarView.value).labelKey).toLowerCase());
+
+/**
+ * Is there a DIFFERENT view to go back to?
+ *
+ * ⚠️ Read-side, and it has to be. `selectView` cannot maintain the invariant on
+ * its own: the jobs board's own back call runs while `activeView` is `'jobs'`,
+ * which skips the write, so `today -> jobs -> back` lands in `today` with
+ * `lastCalendarView` still `'today'` — a control reading "‹ today" and pointing
+ * at itself. The write-side guard closes the re-tap path; only guarding the READ
+ * closes both.
+ *
+ * It also means the control shows only when it would do something, without
+ * tracking how you arrived — which would have needed new state.
+ *
+ * The jobs board is unaffected: `lastCalendarView` is never written while
+ * `activeView` is `'jobs'`, so it can never hold `'jobs'`, so this is always
+ * true there.
+ */
+const canGoBack = computed(() =>
+  canGoBackFrom({ active: activeView.value, back: lastCalendarView.value })
+);
 
 /**
  * The navigator's label — what period the wall is currently looking at.
@@ -325,6 +351,30 @@ function onGoToToday() {
  * week. A week that starts Saturday, with Thursday tapped, redraws starting
  * Thursday. Week *stepping* snaps; a tap is a direct placement.
  */
+/**
+ * A day the wall is ALREADY drawing opens the today view on it.
+ *
+ * One rule, stated once, and it belongs to the AFFORDANCE rather than to a view:
+ * a day drawn as a strip chip or a pip is NOT on screen in full, so the useful
+ * step is to bring it there (`onFocusDay`); a day drawn as a column or date
+ * header IS on screen, so the useful step is depth. Phrased that way it is true
+ * in the days view and the lanes view at once, which is why the registry no
+ * longer carries a per-view version of it.
+ *
+ * The today view is a better day renderer than the sheet this replaces — which
+ * is why that sheet goes rather than sitting dormant.
+ *
+ * ⚠️ Switch only on success. `setAnchor` refuses past the range limit AND still
+ * clamps, so switching on a refusal would open the today view on a DIFFERENT day
+ * than the one tapped — a silent wrong answer. No toast: a boundary is silent,
+ * and it is reachable by an ordinary tap at the forward edge of the week.
+ */
+function onOpenDay(ymd: string) {
+  if (!anchor.setAnchor(ymd, 'day_tap')) return logAnchorChange('range_limit');
+  logAnchorChange('day_tap');
+  selectView('today');
+}
+
 function onFocusDay(ymd: string) {
   // ⚠️ `setAnchor` can refuse. A day header at the forward edge of the range can
   // name a day beyond it, and reporting that tap as a move would file a `count`
@@ -335,8 +385,11 @@ function onFocusDay(ymd: string) {
 }
 
 function selectView(id: WallViewId) {
-  if (activeView.value !== 'jobs') lastCalendarView.value = activeView.value;
-  activeView.value = id;
+  // The transition rule is pure and lives in the registry, with the two ways a
+  // back control can end up naming itself written down beside it.
+  const next = wallViewTransition({ active: activeView.value, back: lastCalendarView.value }, id);
+  lastCalendarView.value = next.back;
+  activeView.value = next.active;
   logEvent({
     level: 'info',
     surface: SURFACE,
@@ -617,9 +670,10 @@ watch(activeView, () => (sheet.value = null));
         :is-pending="jobs.isPending"
         :visible-member-ids="visibleMemberIds"
         :back-label="backLabel"
+        :can-go-back="canGoBack"
         @toggle="onToggle"
         @back="selectView(lastCalendarView)"
-        @open-day="openSheet({ kind: 'day', ymd: $event })"
+        @open-day="onOpenDay"
         @focus-day="onFocusDay"
         @step="onStep"
         @open="openSheet"

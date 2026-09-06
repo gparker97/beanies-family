@@ -51,6 +51,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggle: [WallJob];
   open: [WallSheetTarget];
+  /**
+   * The date header — a day the wall IS drawing — opens the today view on it.
+   * It used to open a sheet over it; the today view is a better day renderer,
+   * which is why that sheet is gone rather than dormant. See `onOpenDay`.
+   */
   openDay: [string];
   openChores: [];
 }>();
