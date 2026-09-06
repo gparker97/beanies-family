@@ -1046,7 +1046,21 @@ export const useSyncStore = defineStore('sync', () => {
     // a named error beats posting `undefined` as a CryptoKey, which surfaces
     // later as an unrelated decrypt failure on a path the user cannot act on.
     const key = familyKey.value;
-    if (!key) throw new Error('hydrateFromEnvelope: no family key');
+    if (!key) {
+      // ⚠️ REPORT BEFORE THROWING. Both callers gate on `familyKey.value`, so
+      // this is unreachable today — but a plain `Error` is not a `RemoteBlocker`,
+      // so if it ever did fire it would fall past their `isRemoteBlocker` arms
+      // into the "family key doesn't work, try the cached one" fallback and route
+      // the user to a credential re-prompt for a state no credential fixes, with
+      // nothing in the firehose. Unreachable is not the same as silent.
+      reportError({
+        surface: 'pod-lineage',
+        severity: 'error',
+        message: 'hydrateFromEnvelope reached without a family key',
+        context: { action: 'hydrate-no-key', family_id: env.familyId },
+      });
+      throw new Error('hydrateFromEnvelope: no family key');
+    }
     await docClient.setFamilyKey(key, env.familyId);
     // ⚠️ THE GUARD RUNS IN THE WORKER (see terminus 1). This path has a LIVE
     // document and no baseline it can prove, so the honest basis is `baseline`
@@ -1315,7 +1329,14 @@ export const useSyncStore = defineStore('sync', () => {
           // writes that may not be on the fetched envelope yet) — see the
           // envelope-replacement invariant near the top of this file.
           const merged = replaceEnvelope(remoteEnvelope);
-          syncService.setFamilyKey(familyKey.value!, merged);
+          // `liveKey`, not `familyKey.value!` — this is the terminus of the
+          // NORMAL branch, reached after a multi-megabyte network read, and the
+          // ref can genuinely have gone null in that window (a sign-out nulls it
+          // AFTER `syncService.reset()`, so the assertion handed `setFamilyKey`
+          // an undefined key, posted it to the worker, and re-seeded the
+          // departed family's envelope over the one `reset()` had just cleared).
+          // The other two branches were converted; this one was missed.
+          syncService.setFamilyKey(liveKey, merged);
 
           // Terminus 1 (#61 C10): the worker's doc now provably contains the remote
           // state `syncService.load()` sampled BEFORE the download, so commit that
@@ -1546,12 +1567,22 @@ export const useSyncStore = defineStore('sync', () => {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      /** Did the open keep OUR document because its lineage is newer? See below. */
+      let keptLocal = false;
       // Post the just-unwrapped key + the stable actor so it can decrypt + merge.
       await docClient.setFamilyKey(fk, famId ?? '');
 
       // Adopt the payload (+ recover any unsynced cache) to prevent data loss.
       if (famId) {
-        await replaceDocWithCacheRecovery(pending.envelope, famId, fk);
+        // ⚠️ HONOUR THE SENTINEL. `KEPT_LOCAL` means the helper already armed a
+        // publish for a document whose lineage is NEWER than the file's — and
+        // the `reloadAllStores()` further down this function calls
+        // `cancelPendingSave()`, which drops that publish before its 2s debounce
+        // fires. `loadFromFile`'s own kept-local branch returns early for
+        // exactly this reason; these two paths discarded the return value, so
+        // TypeScript could not see it. Re-arm rather than skip the reload: the
+        // stores still need the projection this open produced.
+        keptLocal = (await replaceDocWithCacheRecovery(pending.envelope, famId, fk)) === KEPT_LOCAL;
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -1675,6 +1706,10 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Reload all stores
       await reloadAllStores();
+      // `reloadAllStores` calls `syncService.cancelPendingSave()`, so the publish
+      // the kept-local branch armed is gone by here. Re-arm it: this device holds
+      // the only copy of the newer lineage and nothing else will push it.
+      if (keptLocal) syncService.triggerDebouncedSave();
 
       // Arm auto-sync
       setupAutoSync();
@@ -2375,10 +2410,20 @@ export const useSyncStore = defineStore('sync', () => {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      /** Did the open keep OUR document because its lineage is newer? See below. */
+      let keptLocal = false;
       // Post the key + the stable actor so it can decrypt + merge/adopt.
       await docClient.setFamilyKey(fk, famId ?? '');
       if (famId) {
-        await replaceDocWithCacheRecovery(pending.envelope, famId, fk);
+        // ⚠️ HONOUR THE SENTINEL. `KEPT_LOCAL` means the helper already armed a
+        // publish for a document whose lineage is NEWER than the file's — and
+        // the `reloadAllStores()` further down this function calls
+        // `cancelPendingSave()`, which drops that publish before its 2s debounce
+        // fires. `loadFromFile`'s own kept-local branch returns early for
+        // exactly this reason; these two paths discarded the return value, so
+        // TypeScript could not see it. Re-arm rather than skip the reload: the
+        // stores still need the projection this open produced.
+        keptLocal = (await replaceDocWithCacheRecovery(pending.envelope, famId, fk)) === KEPT_LOCAL;
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -2496,6 +2541,9 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       await reloadAllStores();
+      // See the twin in `decryptPendingFile`: the reload cancels the kept-local
+      // publish, so re-arm it.
+      if (keptLocal) syncService.triggerDebouncedSave();
       setupAutoSync();
 
       // A real pod was decrypted (the invite/join cached-key path) — establish
@@ -3461,23 +3509,60 @@ export const useSyncStore = defineStore('sync', () => {
       message: 'user chose the remote pod file over the local document',
       context: { action: 'user-file-recovery' },
     });
-    // Order matters: unlatch first (every read refuses while it holds), declare
-    // the intent second (the open terminus consumes it), re-open last.
+    // ⚠️ CANCEL THE PENDING SAVE FIRST. Clearing the latch below re-enables
+    // `doSave`, and a debounced save armed while the block was up would then run
+    // its own `fetchAndMergeRemote` CONCURRENTLY with the re-open — two merges
+    // racing over one document, where the loser's `initAndLoadCache` reinstalls
+    // the cached document over the freshly adopted one and the store then merges
+    // against a stale baseline. Nothing needs that save: the whole point of this
+    // action is that we are giving up the local document.
+    syncService.cancelPendingSave();
+    // Then: unlatch (every read refuses while it holds), declare the intent (the
+    // open terminus consumes it), re-open.
     syncService.retryAfterRemoteBlock();
     clearPodUnopenable();
     syncService.noteUserChoseRemoteFile();
-    const result = await loadFromFile();
-    if (!result.success) {
-      // Never silent: the latch is now clear, so without this the banner would
-      // simply vanish and the user would believe it worked.
-      reportError({
-        surface: 'pod-lineage',
-        severity: 'critical',
-        message: 'adopting the remote pod file after a lineage block failed',
-        context: { action: 'user-file-recovery-failed', error_code: result.reason ?? 'unknown' },
-      });
+    try {
+      const result = await loadFromFile();
+      if (!result.success) {
+        recoveryFailed(result.reason ?? 'unknown');
+        return false;
+      }
+      // ⚠️ RESTART THE POLLER. `notePodUnopenable` stopped it when the block
+      // latched, and nothing on the success path starts it again:
+      // `clearPodUnopenable` only clears flags, and `setupAutoSync` early-returns
+      // on an established session. Without this the recovery half-applies —
+      // document adopted, stores reloaded, latch clear, and the device silently
+      // stops seeing peer changes until the next tab wake.
+      startFilePolling();
+      return true;
+    } catch (e) {
+      // ⚠️ `loadFromFile` THROWS BY DESIGN on a remote blocker, and
+      // `replaceDocWithCacheRecovery` rethrows an out-of-memory failure — on the
+      // very device cohort this tier exists for, where this adopt is the largest
+      // allocation in the app. The latch was cleared two lines above, so without
+      // this catch the banner is gone, no toast fires, nothing is reported, and
+      // every save silently refuses for the rest of the session. That is the
+      // silent failure this file forbids, and `PodAccessBanner` carries the same
+      // catch for the same reason.
+      recoveryFailed(e instanceof Error ? e.name : 'unknown', e);
+      // Put the warning back. The service latch may have re-armed underneath us
+      // (a blocker re-throws through `noteRemoteBlocked`), and the mirror is how
+      // the banner returns so the user can try again or export.
+      mirrorServiceLatch();
+      return false;
     }
-    return result.success;
+  }
+
+  /** One report for both failure shapes, so they can never diverge. */
+  function recoveryFailed(code: string, error?: unknown): void {
+    reportError({
+      surface: 'pod-lineage',
+      severity: 'critical',
+      message: 'adopting the remote pod file after a lineage block failed',
+      error,
+      context: { action: 'user-file-recovery-failed', error_code: code },
+    });
   }
 
   function clearPodUnopenable(): void {
@@ -4525,15 +4610,6 @@ export const useSyncStore = defineStore('sync', () => {
         await provider.persist(ctx.activeFamilyId);
       }
 
-      // ⚠️ DECLARE THE INTENT BEFORE THE SWAP. A rebind is the ONE flow in
-      // which a human points the app at a specific pod file, and it is
-      // therefore the rollback route out of a compaction: pick the
-      // pre-compaction `.beanpod`, and the guard must not refuse it. This
-      // function merges nothing itself — the ordinary poll does — so the choice
-      // has to be recorded for that read to find, or it arrives as a plain
-      // baseline compare and publishes the compacted document back over the
-      // file the user just chose.
-      syncService.noteUserChoseRemoteFile();
       // Swap the provider so subsequent saves/polls use the new fileId.
       // `replaceEnvelope` is the uniform entry point even though this is a
       // recovery rebind where local-only entries from `envelope.value`

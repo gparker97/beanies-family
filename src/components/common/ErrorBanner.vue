@@ -70,7 +70,15 @@ const props = withDefaults(defineProps<Props>(), { severity: 'critical' });
               :class="{
                 'text-red-100': props.severity === 'critical',
                 'text-amber-100': props.severity === 'warning',
-                'text-white/90': props.severity === 'notice',
+                // ⚠️ A SOLID TINT, never `text-white/90`. An opacity modifier on
+                // text a person reads is categorically out (it composited to
+                // 2.96:1 on Heritage Orange), and both siblings above already
+                // use a solid class. NOTE for whoever measures this next: even
+                // pure white on `primary-500` is only 3.32:1 — the GROUND is too
+                // light for AA body text, and no ink fixes that. Darkening the
+                // notice ground to `primary-700` would give 5.81:1; that is a
+                // brand change across all four banners, not a local one.
+                'text-primary-50': props.severity === 'notice',
               }"
             >
               <slot name="message" />

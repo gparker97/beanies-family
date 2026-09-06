@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4526
+    "translationCount": 4528
   },
   "translations": {
     "app.name": {
@@ -22492,9 +22492,9 @@
       "lastUpdated": "2026-09-05"
     },
     "resumeSetup.podLineageBlocked": {
-      "translation": "您的家庭文件已在另一台设备上重组，此设备无法安全地将两者结合起来。没有任何东西丢失。如果此设备具有从未保存的更改，请先从“设置”中导出它们；否则，重新加载和beanies将拾取重组后的副本。",
-      "hash": "xlvoe3",
-      "lastUpdated": "2026-09-05"
+      "translation": "您的家庭文件已在另一台设备上重组，此设备无法安全地将两者结合起来。没有任何东西丢失。登录，然后选择屏幕顶部消息中的使用家庭文件。",
+      "hash": "pf7u98",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.confirmTitle": {
       "translation": "精简您的家庭文件？",
@@ -22607,8 +22607,8 @@
       "lastUpdated": "2026-09-06"
     },
     "podLineage.useFileConfirmMessage": {
-      "translation": "此设备将获取重组的家庭文件。此处所做的任何更改从未保存到它将被放弃。如果您想保留它们，请先导出它们。",
-      "hash": "y2scqa",
+      "translation": "此设备将接受重组的家庭文件，此处所做的从未保存的更改将被永久放弃。如果您希望查看副本，请先导出它们，但请注意，稍后无法重新添加副本。",
+      "hash": "71op3",
       "lastUpdated": "2026-09-06"
     },
     "podLineage.useFileConfirmAction": {
@@ -22634,6 +22634,16 @@
     "wall.status.needsAttention": {
       "translation": "您的家庭文件需要处理",
       "hash": "qu4axm",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileBusy": {
+      "translation": "开洞",
+      "hash": "79l2qa",
+      "lastUpdated": "2026-09-06"
+    },
+    "podLineage.useFileDone": {
+      "translation": "此设备现在位于重组后的家庭文件中。",
+      "hash": "qhg4op",
       "lastUpdated": "2026-09-06"
     }
   }
