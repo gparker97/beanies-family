@@ -125,6 +125,7 @@ import {
   PayloadTooLargeError,
   payloadErrorMessageKey,
   type RemoteBlocker,
+  type PodBlockMessageKey,
 } from '@/types/sync';
 
 /**
@@ -877,8 +878,10 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function replaceDocWithCacheRecovery(
     remoteEnvelope: BeanpodFileV4,
-    familyId: string
-  ): Promise<readonly string[] | null> {
+    familyId: string,
+    /** The live family key. Threaded, never read off the ref — see the helper. */
+    key: CryptoKey
+  ): Promise<readonly string[] | null | typeof KEPT_LOCAL> {
     // Load THIS family's cache as the worker's doc, then CRDT-merge the remote in.
     // Merge is commutative, so cache∪remote == the old replace(remote)+merge(cache).
     //
@@ -916,8 +919,10 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       // An out-of-memory failure must NOT fall through to the adopt-remote path
       // below. `initAndLoadCache` deliberately KEPT the cache in that case; the
-      // fall-through then calls `dropDoc()` + `mergeRemoteEnvelope`, whose
-      // full-adopt branch leaves `lastPersistedHeads` null, so the next persist
+      // fall-through then sends `mergeRemoteEnvelope` a `no-local-document`
+      // basis, whose full-adopt branch leaves `lastPersistedHeads` null (it used
+      // to be a separate `dropDoc()` RPC; the intent now travels IN the request
+      // so a respawn cannot lose it), so the next persist
       // writes a fresh BASE — which clears every increment the preserve branch
       // just protected. Any mutation not yet on Drive would be gone, silently,
       // on the one device that change exists to protect. Re-downloading the
@@ -938,13 +943,27 @@ export const useSyncStore = defineStore('sync', () => {
     // All this site owes the worker is the one fact only IT knows: what Drive
     // held at our last durable baseline. `loadedFromCache` false means we have
     // no document of THIS family, which is a different question entirely.
-    const basis: LineageBasis = loadedFromCache
-      ? { kind: 'baseline', heads: baselineHeads }
-      : { kind: 'no-local-document' };
+    // The same one-shot the poll terminus reads (see
+    // `syncService.noteUserChoseRemoteFile`). Consulted here too because the
+    // ROLLBACK and the "use the family file" recovery both re-open through this
+    // path, not through the poll — and `user-file` is the only context that
+    // never blocks, which is the entire point of both flows. Consumed either
+    // way, so one decision cannot govern two reads.
+    const chosenByUser = syncService.consumeUserFileIntent();
+    const basis: LineageBasis = !loadedFromCache
+      ? { kind: 'no-local-document' }
+      : chosenByUser
+        ? { kind: 'user-file' }
+        : { kind: 'baseline', heads: baselineHeads };
     const merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId, basis);
     if (merged.action === 'kept-local') {
-      keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope);
-      return null; // commit NO baseline — see the helper
+      keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope, key);
+      // ⚠️ A DISTINCT SENTINEL, not `null`. `null` means "we merged but cannot
+      // prove what Drive holds", and the caller reacts to it by committing a
+      // baseline, learning the marker and reloading the stores — all three of
+      // which are wrong here, and the reload CANCELS the publish this helper
+      // just armed. The caller must be able to tell the two apart.
+      return KEPT_LOCAL;
     }
     logEvent({
       level: 'info',
@@ -960,6 +979,16 @@ export const useSyncStore = defineStore('sync', () => {
     // worker double degrades to "unknown => read", never to a false skip.
     return merged.remoteHeads ?? null;
   }
+
+  /**
+   * Terminus 1 kept OUR document — distinct from "merged, heads unknown".
+   *
+   * A sentinel rather than a boolean out-param because the function's return is
+   * already `readonly string[] | null` and `null` is load-bearing (it means
+   * "cannot prove what Drive holds"). Conflating the two made the caller commit
+   * a baseline for bytes it deliberately did not take.
+   */
+  const KEPT_LOCAL = Symbol('kept-local');
 
   /**
    * `kept-local`: our document is the NEWER lineage, so the worker touched
@@ -978,9 +1007,29 @@ export const useSyncStore = defineStore('sync', () => {
    * document provably does not contain is a false skip — the class #65 exists
    * to prevent.
    */
-  function keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope: BeanpodFileV4): void {
+  function keepLocalDocumentAndAdoptEnvelopeKeys(
+    remoteEnvelope: BeanpodFileV4,
+    // ⚠️ A PARAMETER, NOT `familyKey.value!`. Two of the three callers are
+    // COLD-BOOT decrypt paths (`decryptPendingFile`,
+    // `decryptPendingFileWithKey`) that post the just-unwrapped key to the
+    // WORKER and only assign the store ref afterwards — so the ref was
+    // provably null exactly where this helper runs, and the `!` handed
+    // `syncService.setFamilyKey` an undefined key. The publish it arms then
+    // cannot encrypt, and the one document holding the newer lineage never
+    // reaches Drive. Every caller has the real key in hand; make it say so.
+    key: CryptoKey
+  ): void {
     const keptEnv = replaceEnvelope(remoteEnvelope);
-    syncService.setFamilyKey(familyKey.value!, keptEnv);
+    syncService.setFamilyKey(key, keptEnv);
+    // Observability: `kept-local` is the rarest terminus in the whole guard and
+    // the only one that publishes ACROSS a lineage boundary, so a silent one is
+    // indistinguishable from a merge that quietly went the other way.
+    logEvent({
+      level: 'info',
+      surface: 'pod-lineage',
+      message: 'kept local document, adopted remote envelope keys',
+      context: { action: 'kept-local', family_id: remoteEnvelope.familyId },
+    });
     syncService.triggerDebouncedSave();
   }
 
@@ -992,7 +1041,13 @@ export const useSyncStore = defineStore('sync', () => {
    * file. The caller does its own setupAutoSync/return.
    */
   async function hydrateFromEnvelope(env: BeanpodFileV4): Promise<void> {
-    await docClient.setFamilyKey(familyKey.value!, env.familyId);
+    // Captured once, before the first await, and CHECKED — the three `!`s that
+    // stood here asserted a ref that two callers reach without it. Failing with
+    // a named error beats posting `undefined` as a CryptoKey, which surfaces
+    // later as an unrelated decrypt failure on a path the user cannot act on.
+    const key = familyKey.value;
+    if (!key) throw new Error('hydrateFromEnvelope: no family key');
+    await docClient.setFamilyKey(key, env.familyId);
     // ⚠️ THE GUARD RUNS IN THE WORKER (see terminus 1). This path has a LIVE
     // document and no baseline it can prove, so the honest basis is `baseline`
     // with unknown heads — which the worker reads as `dirty`. A newer remote
@@ -1004,12 +1059,12 @@ export const useSyncStore = defineStore('sync', () => {
       heads: null,
     });
     if (merged.action === 'kept-local') {
-      keepLocalDocumentAndAdoptEnvelopeKeys(env);
+      keepLocalDocumentAndAdoptEnvelopeKeys(env, key);
       pendingEncryptedFile.value = null;
       return;
     }
     const adopted = replaceEnvelope(env);
-    syncService.setFamilyKey(familyKey.value!, adopted);
+    syncService.setFamilyKey(key, adopted);
     pendingEncryptedFile.value = null;
     await reloadAllStores();
     const dupsRemoved = await deduplicateRecurringTransactions();
@@ -1146,7 +1201,11 @@ export const useSyncStore = defineStore('sync', () => {
       const remoteEnvelope = parseBeanpodV4(text);
 
       // If we already have a family key, the worker decrypts + merges/adopts.
-      if (familyKey.value) {
+      // Captured ONCE, here, where the ref is provably non-null: everything
+      // below is `await`-separated, and a ref read after an await narrows to
+      // nothing and can genuinely have changed (a family switch, a sign-out).
+      const liveKey = familyKey.value;
+      if (liveKey) {
         try {
           // FAIL-SAFE DEFAULTS. This block is shared by the merge AND replace
           // branches, and the replace branch goes through
@@ -1198,7 +1257,7 @@ export const useSyncStore = defineStore('sync', () => {
             );
             if (mergeResult.action === 'kept-local') {
               // Our unpublished compaction stands; the next save carries it up.
-              keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope);
+              keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope, liveKey);
               return { success: true }; // commit NO baseline — see the helper
             }
             // `?? true` is deliberate, not defensive noise: an absent field means
@@ -1218,7 +1277,17 @@ export const useSyncStore = defineStore('sync', () => {
             // Replace: adopt remote (+ recover any unsynced cache) to prevent loss.
             const famId = useFamilyContextStore().activeFamilyId;
             if (famId) {
-              driveHeads = await replaceDocWithCacheRecovery(remoteEnvelope, famId);
+              const recovered = await replaceDocWithCacheRecovery(remoteEnvelope, famId, liveKey);
+              if (recovered === KEPT_LOCAL) {
+                // We hold the newer lineage. The helper adopted the remote's key
+                // dicts and armed the publish; everything below would undo that —
+                // `commitRemoteBaseline` nulls a good fingerprint (so
+                // `isFullySynced` can never be true again), `reloadAllStores`
+                // calls `cancelPendingSave`, and `confirmRemoteMerged` certifies
+                // a baseline this document provably does not contain.
+                return { success: true };
+              }
+              driveHeads = recovered;
             } else {
               // No cache to recover — adopt the remote wholesale.
               // This branch adopts Drive's document verbatim (nothing local survived
@@ -1445,8 +1514,16 @@ export const useSyncStore = defineStore('sync', () => {
      * Carries the ERROR, not a flag per class: consumers branch on
      * `instanceof` (`CorruptPayloadError` = bad bytes, `PayloadTooLargeError` =
      * this device ran out of memory), so a future sibling needs no new field.
+     *
+     * ⚠️ `RemoteBlocker`, not `PayloadLoadError`. The lineage guard now throws
+     * in the worker, so a `PodLineageError` reaches this path too — and when
+     * this field was payload-only, a lineage block arrived with it UNSET, which
+     * `LoadPodView` reads as a stale credential and answers by deleting the
+     * device's cached family key. Every blocker answers `inlineMessageKey`;
+     * only the payload family answers `keyMayBeWrong`, so that question stays
+     * behind an `instanceof`.
      */
-    payloadError?: PayloadLoadError;
+    payloadError?: RemoteBlocker;
   }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) {
@@ -1474,7 +1551,7 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Adopt the payload (+ recover any unsynced cache) to prevent data loss.
       if (famId) {
-        await replaceDocWithCacheRecovery(pending.envelope, famId);
+        await replaceDocWithCacheRecovery(pending.envelope, famId, fk);
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -1605,7 +1682,10 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: true, memberIds, viaRecoveryPassphrase };
     } catch (e) {
       const errorMessage = (e as Error).message;
-      if (e instanceof PayloadLoadError) {
+      // ⚠️ ANY BLOCKER. The lineage guard throws in the WORKER now, so a
+      // `PodLineageError` reaches this password path too; without this arm it
+      // latched nothing, surfaced nothing, and reported nothing.
+      if (isRemoteBlocker(e)) {
         // ⚠️ DO NOT null `pendingEncryptedFile` here to release the payload.
         // It looks like an easy memory win and it breaks the UI that is on
         // screen at that exact moment: `LoadPodView` keeps its decrypt modal
@@ -1615,6 +1695,7 @@ export const useSyncStore = defineStore('sync', () => {
         // user needs them, and a retry renders the untranslated
         // 'No pending encrypted file'. The envelope is released normally when
         // the flow ends.
+        notePodUnopenable(e);
         return { success: false, error: errorMessage, payloadError: e };
       }
       if (errorMessage.includes('Incorrect password')) {
@@ -1645,6 +1726,11 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  // ⚠️ Deliberately PAYLOAD-ONLY, unlike the remote paths. This decrypts THIS
+  // device's local cache; there is no remote document to compare a lineage
+  // against, so a `PodLineageError` cannot arise here and widening the type
+  // would push a case its callers (App.vue's cache-corrupt self-heal) cannot
+  // meaningfully answer.
   async function loadFromPersistenceCache(
     keyB64: string,
     activeFamilyId: string,
@@ -2281,7 +2367,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function decryptPendingFileWithKey(
     fk: CryptoKey
-  ): Promise<{ success: boolean; error?: string; payloadError?: PayloadLoadError }> {
+  ): Promise<{ success: boolean; error?: string; payloadError?: RemoteBlocker }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) return { success: false, error: 'No pending file' };
 
@@ -2292,7 +2378,7 @@ export const useSyncStore = defineStore('sync', () => {
       // Post the key + the stable actor so it can decrypt + merge/adopt.
       await docClient.setFamilyKey(fk, famId ?? '');
       if (famId) {
-        await replaceDocWithCacheRecovery(pending.envelope, famId);
+        await replaceDocWithCacheRecovery(pending.envelope, famId, fk);
       } else {
         // ⚠️ `no-local-document`: no `familyId`, so nothing of this family is
         // installed and the lineage question is moot. Never `user-file` — that
@@ -2423,7 +2509,16 @@ export const useSyncStore = defineStore('sync', () => {
       // join. Without it every one of those reads an out-of-memory failure as a
       // bad credential — and `LoadPodView.tryAutoDecrypt` responds by DELETING
       // the device's cached family key, which was perfectly valid.
-      if (e instanceof PayloadLoadError) {
+      // ⚠️ ANY BLOCKER, not only a payload one. The lineage guard now throws in
+      // the WORKER, so a `PodLineageError` arrives here on the PIN /
+      // trusted-device / password cold-open path. Without this arm it latched
+      // nothing (so the 10s poller kept re-downloading the whole pod), reached
+      // no surface (so `LineageBanner` never rendered), reported nothing to
+      // CloudWatch, and — worst — returned WITHOUT `payloadError`, which
+      // `LoadPodView.tryAutoDecrypt` reads as a stale credential and responds to
+      // by DELETING this device's perfectly good cached family key.
+      if (isRemoteBlocker(e)) {
+        notePodUnopenable(e);
         return { success: false, error: (e as Error).message, payloadError: e };
       }
       return { success: false, error: (e as Error).message };
@@ -2782,7 +2877,7 @@ export const useSyncStore = defineStore('sync', () => {
    * Returns true if decryption succeeded.
    */
   async function tryDecryptWithCachedKey(): Promise<
-    boolean | { success: false; payloadError: PayloadLoadError }
+    boolean | { success: false; payloadError: RemoteBlocker }
   > {
     const familyCtx = useFamilyContextStore();
     const settingsStore = useSettingsStore();
@@ -3272,6 +3367,12 @@ export const useSyncStore = defineStore('sync', () => {
    * fail identically, and reports once (the too-large half is already reported
    * by `docClient.surface()`; `reportPayloadFailure` knows that).
    */
+  /**
+   * Which inline message the current block chose — the banner's only sound way
+   * to distinguish the two lineage verdicts. Null whenever nothing is blocked.
+   */
+  const podBlockMessageKey = ref<PodBlockMessageKey | null>(null);
+
   function notePodUnopenable(err: RemoteBlocker): void {
     // ⚠️ ARM THE SERVICE LATCH. Every guard reads `syncService`, and none of
     // these callers reach `fetchAndMergeRemote` — they call
@@ -3296,6 +3397,11 @@ export const useSyncStore = defineStore('sync', () => {
     // has to answer this rather than inherit someone else's copy.
     backgroundSyncError.value = useTranslationStore().t(err.inlineMessageKey);
     backgroundSyncErrorKind.value = err instanceof PodLineageError ? 'lineage' : 'decrypt';
+    // The KEY, not the rendered string. The banner has to tell an `adopt-remote`
+    // block (recoverable by the user) from a `conflict` (not recoverable, and the
+    // copy says so), and string-comparing translated prose would break the moment
+    // anyone edits a word or switches language.
+    podBlockMessageKey.value = err.inlineMessageKey;
     // NOTE on repeats: the message is constant per class, so a second failure
     // assigns an identical string and `BackgroundSyncBar`'s watcher does not
     // re-fire. That is acceptable ONLY because a repeat cannot happen while the
@@ -3319,11 +3425,59 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function mirrorServiceLatch(): void {
     const blocker = syncService.isRemoteBlocked();
-    if (!blocker || podUnopenable.value) return;
+    if (!blocker) return;
+    // ⚠️ THE CLASSIFICATION IS REFRESHED EVEN WHEN ALREADY LATCHED. Returning
+    // early on `podUnopenable` left the kind and the message key describing
+    // whichever blocker latched FIRST — so a decrypt failure followed by a
+    // lineage block kept `'decrypt'`, and the lineage banner (which is the one
+    // that asks the user to act) never rendered at all. Still one-way: nothing
+    // here clears anything, so `clearPodUnopenable` remains the only exit.
     podUnopenable.value = true;
     backgroundSyncError.value = useTranslationStore().t(blocker.inlineMessageKey);
     backgroundSyncErrorKind.value = blocker instanceof PodLineageError ? 'lineage' : 'decrypt';
+    podBlockMessageKey.value = blocker.inlineMessageKey;
     stopFilePolling();
+  }
+
+  /**
+   * The lineage banner's second action: "use the family file".
+   *
+   * ⚠️ THIS EXISTS BECAUSE THE BANNER'S ADVICE WAS UNACTIONABLE. It told the
+   * user to export their changes and reload — but a reload re-opens the SAME
+   * cached document against the SAME baseline, so the guard blocks again,
+   * forever. Saving cannot resolve it either: `doSave` refuses on any remote
+   * blocker, by design. Discarding this device's unsynced document was the only
+   * exit and there was no way to ask for it.
+   *
+   * Destructive, so the CALLER confirms (the banner does). Everything this
+   * device holds that never reached the family file is dropped in favour of the
+   * reorganised copy — which is precisely what the user is choosing when they
+   * press it, after exporting.
+   */
+  async function useRemoteFileOverLocalDocument(): Promise<boolean> {
+    logEvent({
+      level: 'warn',
+      surface: 'pod-lineage',
+      message: 'user chose the remote pod file over the local document',
+      context: { action: 'user-file-recovery' },
+    });
+    // Order matters: unlatch first (every read refuses while it holds), declare
+    // the intent second (the open terminus consumes it), re-open last.
+    syncService.retryAfterRemoteBlock();
+    clearPodUnopenable();
+    syncService.noteUserChoseRemoteFile();
+    const result = await loadFromFile();
+    if (!result.success) {
+      // Never silent: the latch is now clear, so without this the banner would
+      // simply vanish and the user would believe it worked.
+      reportError({
+        surface: 'pod-lineage',
+        severity: 'critical',
+        message: 'adopting the remote pod file after a lineage block failed',
+        context: { action: 'user-file-recovery-failed', error_code: result.reason ?? 'unknown' },
+      });
+    }
+    return result.success;
   }
 
   function clearPodUnopenable(): void {
@@ -3340,6 +3494,7 @@ export const useSyncStore = defineStore('sync', () => {
       backgroundSyncError.value = null;
       backgroundSyncErrorKind.value = null;
     }
+    podBlockMessageKey.value = null;
   }
 
   function startFilePolling(): void {
@@ -4278,8 +4433,15 @@ export const useSyncStore = defineStore('sync', () => {
 
       // THE live payload-failure path — `decryptPendingFile` catches and
       // RETURNS, so the catch below is only a contract-drift backstop.
-      if (decryptResult.payloadError) {
+      if (decryptResult.payloadError instanceof PayloadLoadError) {
         return payloadFailureResult(decryptResult.payloadError);
+      }
+      if (decryptResult.payloadError) {
+        // A lineage or merge block: NOT a payload failure, so it must not be
+        // shaped as `too-large`/`corrupt` (which would tell the user their data
+        // may be damaged). It is already latched and surfaced by the store; here
+        // it is simply a failed auto-load.
+        return { kind: 'lineage-blocked', error: decryptResult.payloadError };
       }
 
       if (!decryptResult.success) {
@@ -4363,6 +4525,15 @@ export const useSyncStore = defineStore('sync', () => {
         await provider.persist(ctx.activeFamilyId);
       }
 
+      // ⚠️ DECLARE THE INTENT BEFORE THE SWAP. A rebind is the ONE flow in
+      // which a human points the app at a specific pod file, and it is
+      // therefore the rollback route out of a compaction: pick the
+      // pre-compaction `.beanpod`, and the guard must not refuse it. This
+      // function merges nothing itself — the ordinary poll does — so the choice
+      // has to be recorded for that read to find, or it arrives as a plain
+      // baseline compare and publishes the compacted document back over the
+      // file the user just chose.
+      syncService.noteUserChoseRemoteFile();
       // Swap the provider so subsequent saves/polls use the new fileId.
       // `replaceEnvelope` is the uniform entry point even though this is a
       // recovery rebind where local-only entries from `envelope.value`
@@ -4997,6 +5168,8 @@ export const useSyncStore = defineStore('sync', () => {
     replaceEnvelope,
     podUnopenable,
     clearPodUnopenable,
+    podBlockMessageKey,
+    useRemoteFileOverLocalDocument,
     reloadIfFileChanged,
     handleGoogleReconnected,
     pauseFilePolling,

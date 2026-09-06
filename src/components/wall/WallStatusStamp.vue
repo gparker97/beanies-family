@@ -45,8 +45,20 @@ const blocked = computed(
     syncStore.driveFileNotFound ||
     !!syncStore.podAccessError ||
     syncStore.cachePersistFailed ||
-    syncStore.backgroundSyncErrorKind === 'lineage'
+    // ⚠️ `podUnopenable`, not `backgroundSyncErrorKind === 'lineage'`. The
+    // narrower test covered the lineage block and MISSED every payload one — a
+    // pod that cannot be decrypted or is too large for the device latched the
+    // poller off while this stamp went on showing a green dot and "Saved 4
+    // minutes ago". This ref is set by the same two functions for every blocker
+    // class, so a new one is covered the day it is written.
+    syncStore.podUnopenable
 );
+
+/**
+ * A lineage block reached the file and DECLINED it. Saying "can't reach" there
+ * points the family at their network for a problem no network will ever fix.
+ */
+const isLineage = computed(() => syncStore.backgroundSyncErrorKind === 'lineage');
 
 /**
  * `formatRelativeTime` reads a non-reactive `Date.now()`, so with `lastSync` as
@@ -70,7 +82,8 @@ const relative = computed(() => {
 const label = computed(() => {
   // A broken pod outranks everything: it is the one state where what is on
   // screen may be arbitrarily old and no amount of waiting will fix it.
-  if (blocked.value) return t('wall.status.blocked');
+  if (blocked.value)
+    return isLineage.value ? t('wall.status.needsAttention') : t('wall.status.blocked');
   if (!isOnline.value) return t('wall.status.offline');
   if (presentation.value.attention || !syncStore.lastSync) {
     return fillTemplate(t('wall.status.stale'), { when: relative.value || '—' });

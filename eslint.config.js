@@ -361,16 +361,29 @@ export default [
   //
   // ⚠️ `importNames`, never the module: both files legitimately import
   // `PodLineageError` from it to classify a block that the WORKER raised.
+  //
+  // ⚠️ `patterns` + a WHOLE-APP `files` glob, not `paths` on two files. `paths`
+  // matches the literal specifier only, so `./podLineage` from `syncService.ts`
+  // and `../sync/podLineage` from anywhere else both walked straight past it —
+  // and the two-entry `files` list left every composable, component and service
+  // outside the rule's reach anyway. The guard's legitimate home is the WORKER
+  // and nowhere else, so the rule's scope is "everything except the worker".
   {
-    files: ['src/stores/**/*.ts', 'src/services/sync/syncService.ts'],
-    ignores: ['**/__tests__/**'],
+    files: ['src/**/*.ts', 'src/**/*.vue'],
+    ignores: [
+      '**/__tests__/**',
+      // The one legitimate caller: the guard runs where both documents exist.
+      'src/services/automerge/worker/**',
+      // The module itself, and the ADR-036 policy it owns.
+      'src/services/sync/podLineage.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
+          patterns: [
             {
-              name: '@/services/sync/podLineage',
+              group: ['**/podLineage', '**/podLineage.ts'],
               importNames: ['guardLineage', 'compareLineage', 'lineageAction'],
               message:
                 'The lineage guard runs in the worker (applyAndProject.mergeRemoteEnvelope) — the only place BOTH documents exist. Pass a LineageBasis instead of comparing envelopes here; see ADR-036.',

@@ -67,10 +67,39 @@ believes the metadata.
 
 - **Backwards compatible by construction.** No field on either side compares
   equal, which is the whole fleet today: `same` → `merge`, unchanged behaviour.
-- **The envelope's old value is inert.** `reEncryptEnvelope` spreads it through
-  untouched and nothing reads it, so a pod already stamped reads as
-  never-compacted on every device — which is correct, and un-sticks the one test
-  family that had a stamped envelope over an unstamped document.
+- **The envelope's old value is read ONCE, for the remote side only, and then
+  extinguishes itself.** ⚠️ An earlier draft of this ADR said the value was
+  inert and that a stamped pod reading as never-compacted was "correct". That
+  was wrong, and it was the most dangerous sentence in the document: files
+  compacted by the Tier-2 code recorded their lineage ONLY there, so after this
+  change they read as never-compacted, compare `same` against a peer still on
+  the pre-compaction history, and CRDT-merge across lineages — the exact failure
+  this ADR exists to prevent, reintroduced by the fix.
+  `docOps.legacyEnvelopeLineage` therefore reads the retired field, and only for
+  the REMOTE side. That is sound where the LIVE envelope stamp was not: the
+  drift argument is about our own envelope copy being maintained on three tracks
+  beside our document, and there is no drift between `podLineage` and
+  `encryptedPayload` in a file that has just been fetched — they are bytes out
+  of one blob. `mergeRemoteEnvelope` writes the value into the document as it
+  adopts, the next publish carries it into the file, and the reader has nothing
+  left to do for that family. Nothing writes the envelope field; there is no
+  setter. Delete the reader and its call site once no pre-Stage-1 compacted file
+  survives.
+- **The local side deliberately has NO equivalent fallback**, which leaves one
+  ambiguous pairing: an unstamped local document against a legacy-stamped
+  remote. We cannot tell whether we already hold that compacted document or are
+  still on the pre-compaction history — and we do not need to. Both readings
+  resolve to `adopt-remote`, whose policy is safe either way (adopt when clean,
+  block when dirty), and the adopt stamps the document, so the ambiguity lasts
+  exactly one sync per device.
+- **`user-file` needs a producer, or the policy table lies.** The column exists
+  so the guard cannot refuse the pre-compaction `.beanpod` a family re-points at
+  — the only rollback route there is. `rebindPodFile` merges nothing itself, so
+  the choice is recorded as a one-shot (`syncService.noteUserChoseRemoteFile` /
+  `consumeUserFileIntent`) that the next real read consumes. Without it the
+  rollback arrived as a plain baseline compare, resolved `ours-newer`, and
+  published the compacted document straight back over the file the human had
+  just chosen: the table promised a recovery the code did the opposite of.
 - **The worker gains a runtime dependency on `podLineage.ts`.** Acceptable: it
   already imported it for the error codec, and that module is pure.
 - **`remoteBaseline.ts` must stay value-free from the worker's point of view.**

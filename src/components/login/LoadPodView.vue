@@ -230,12 +230,18 @@ async function tryAutoDecrypt(): Promise<boolean> {
         // single derivation (see `PayloadLoadError`): true only for a
         // corrupt-class failure at the decrypt step, because that is the only
         // shape where the AES-GCM tag was actually checked and rejected.
-        if (!result.payloadError.keyMayBeWrong) {
+        // ⚠️ `instanceof` HERE, deliberately. Only the payload family can
+        // answer "could the key be wrong" — a lineage or merge block has
+        // nothing to do with the credential, so it must take the keep-the-key
+        // branch rather than falling through to `clearCachedFamilyKey`.
+        const keyMayBeWrong =
+          result.payloadError instanceof PayloadLoadError && result.payloadError.keyMayBeWrong;
+        if (!keyMayBeWrong) {
           // The key is provably fine (or was never checked, because the device
           // ran out of memory). Deleting it would cost trusted-device auto-open
           // permanently for a problem it has nothing to do with.
           payloadExplanationShown.value = true;
-          formError.value = t(payloadErrorMessageKey(result.payloadError));
+          formError.value = t(result.payloadError.inlineMessageKey);
           podUnopenableHere.value = true;
           return false;
         }
@@ -567,10 +573,12 @@ async function handleKitRedeem() {
       // was the pod that would not fit in memory.
       if (dec.payloadError) {
         payloadExplanationShown.value = true;
-        if (!dec.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
+        // Payload-specific question; every other blocker latches.
+        if (!(dec.payloadError instanceof PayloadLoadError && dec.payloadError.keyMayBeWrong))
+          podUnopenableHere.value = true;
       }
       formError.value = dec.payloadError
-        ? t(payloadErrorMessageKey(dec.payloadError))
+        ? t(dec.payloadError.inlineMessageKey)
         : t('password.decryptionError');
       return;
     }
@@ -640,13 +648,16 @@ async function handleDecrypt() {
       // raw Automerge/WASM string ("error inflating document chunk ops: out of
       // memory") was rendered untranslated under the password field.
       payloadExplanationShown.value = true;
-      formError.value = t(payloadErrorMessageKey(result.payloadError));
+      formError.value = t(result.payloadError.inlineMessageKey);
       // Only latch when a credential CANNOT be the cause. A stale wrap (a peer
       // rotated the family key) unwraps with the old key and then fails the
       // AES-GCM tag — `keyMayBeWrong` — and latching that would early-return
       // `handlePendingPassword` forever, so the password and kit forms never
       // reopen for the rest of the session.
-      if (!result.payloadError.keyMayBeWrong) podUnopenableHere.value = true;
+      // `keyMayBeWrong` is payload-specific; a lineage or merge block is never a
+      // credential problem, so it latches rather than re-prompting.
+      if (!(result.payloadError instanceof PayloadLoadError && result.payloadError.keyMayBeWrong))
+        podUnopenableHere.value = true;
     } else {
       formError.value = result.error ?? t('password.decryptionError');
     }
