@@ -11,6 +11,8 @@ import { refreshRosterCache } from '@/services/auth/rosterCache';
 import { computeInitials } from '@/utils/memberInitials';
 import { isBlankMemberColor } from '@/constants/memberColors';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { REQUIRED_EPOCH } from '@/services/pod/podSoak';
+import { APP_VERSION } from '@/constants/appVersion';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
@@ -477,7 +479,7 @@ export const useFamilyStore = defineStore('family', () => {
     input: UpdateFamilyMemberInput
   ): Promise<FamilyMember | null> {
     const result = await wrapAsync(isLoading, error, async () => {
-      const updated = await familyRepo.updateFamilyMember(id, input);
+      const updated = await familyRepo.updateFamilyMember(id, withLoginStamps(id, input));
       if (updated) {
         // Immutable update: assign a new array so downstream computeds re-evaluate
         members.value = members.value.map((m) => (m.id === id ? updated : m));
@@ -485,6 +487,28 @@ export const useFamilyStore = defineStore('family', () => {
       return updated;
     });
     return result ?? null;
+  }
+
+  /**
+   * Fold the compaction soak markers into any patch that records a login.
+   *
+   * ⚠️ HERE, NOT AT THE CALL SITES. `authStore` writes `lastLoginAt` from SEVEN
+   * places; adding two fields at seven sites is seven chances to forget and
+   * seven places to keep in step. Doing it in the one function they all funnel
+   * through means the markers cannot drift from the timestamp they describe.
+   *
+   * ⚠️ AND ONLY WHEN THE VALUE CHANGES. `lastLoginAt` is only ever in a patch on
+   * a genuine login or resume, so this cannot fire on a background write — but
+   * writing an identical value would still emit an Automerge change, and this
+   * feature exists to stop history growing for no reason.
+   */
+  function withLoginStamps(id: string, input: UpdateFamilyMemberInput): UpdateFamilyMemberInput {
+    if (!('lastLoginAt' in input)) return input;
+    const current = members.value.find((m) => m.id === id);
+    const next: UpdateFamilyMemberInput = { ...input };
+    if (current?.lineageEpoch !== REQUIRED_EPOCH) next.lineageEpoch = REQUIRED_EPOCH;
+    if (current?.appVersion !== APP_VERSION) next.appVersion = APP_VERSION;
+    return next;
   }
 
   async function deleteMember(id: string): Promise<boolean> {

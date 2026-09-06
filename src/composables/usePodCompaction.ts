@@ -25,6 +25,9 @@
  */
 import { ref } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { evaluateSoak } from '@/services/pod/podSoak';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePodExport } from '@/composables/usePodExport';
@@ -40,6 +43,7 @@ import { PayloadLoadError } from '@/types/sync';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
 type RefusalCode =
+  | 'not-soaked'
   | 'not-synced'
   | 'backup-not-delivered'
   | 'no-envelope'
@@ -76,10 +80,28 @@ export function usePodCompaction() {
     });
   }
 
+  /**
+   * The soak reading, from the CURRENT member projection.
+   *
+   * ⚠️ ONE PURE FUNCTION, CALLED TWICE, AND NEVER A SECOND IMPLEMENTATION. The
+   * gate and the completion message both ask "who has not caught up"; two
+   * copies of that question is how a gate and a message end up contradicting
+   * each other in front of a user.
+   */
+  function soak() {
+    return evaluateSoak(useFamilyStore().members);
+  }
+
   async function compact(): Promise<void> {
     if (busy.value) return;
     busy.value = true;
     try {
+      // 0. ⚠️ PURE GATES BEFORE THE CONFIRM, so the app never asks a question it
+      //    is going to refuse to honour. This reading is provisional — the
+      //    projection is only current after the pull at step 2b — so it exists
+      //    to fail FAST, and step 2d is the authoritative one.
+      if (!soak().ok) return refuse('not-soaked');
+
       // 1. Warn, in the user's own words, before anything moves.
       if (
         !(await confirm({
@@ -121,6 +143,34 @@ export function usePodCompaction() {
       // 2c. Now push whatever the merge revealed, and prove we are level.
       //     Still cheapest-proof-first: `syncNow` exports, encrypts, base64s and
       //     uploads the whole pod, so an already-level device skips it.
+      // 2d. ⚠️ THE AUTHORITATIVE SOAK READING, and this is not belt-and-braces.
+      //     The check's input is the `familyMembers` projection, and the pull
+      //     above is what makes that current — a member who signed in on an old
+      //     build ten minutes ago on another device is simply not in our copy
+      //     until it lands. Step 0 fails fast; this one decides.
+      const soaked = soak();
+      if (!soaked.ok) {
+        showToast(
+          'warning',
+          t('compaction.refused'),
+          fillTemplate(t('compaction.refused.not-soaked.named'), {
+            names: soaked.behind.join(', '),
+          }),
+          { surface: 'pod-compaction' }
+        );
+        logEvent({
+          level: 'warn',
+          surface: 'pod-compaction',
+          message: 'compaction refused',
+          context: {
+            action: 'refused',
+            error_code: 'not-soaked',
+            detail: `behind=${soaked.behind.length}`,
+          },
+        });
+        return;
+      }
+
       if (!(await syncService.isFullySynced())) {
         if (!(await syncStore.syncNow(false))) return refuse('not-synced');
         if (!(await syncService.isFullySynced())) return refuse('not-synced');
@@ -316,10 +366,20 @@ export function usePodCompaction() {
           family_id: familyContext.activeFamilyId ?? undefined,
         },
       });
+      // ⚠️ NEVER A BARE "DONE". The goal is zero follow-up — a clean peer adopts
+      // on its next sync, a peer with unsynced work rebases — but a completion
+      // that is SILENT about a device which cannot converge withholds
+      // information it holds, which is the same defect as the transient toast
+      // the lineage banner replaced. Read from the SAME pure function as the
+      // gate, so the two can never disagree.
+      const after = soak();
+      const size = `${Math.round(stats.beforeBytes / 1024)}KB → ${Math.round(stats.afterBytes / 1024)}KB`;
       showToast(
         'success',
         t('compaction.done'),
-        `${Math.round(stats.beforeBytes / 1024)}KB → ${Math.round(stats.afterBytes / 1024)}KB`,
+        after.ok
+          ? `${size}. ${t('compaction.doneNothingToDo')}`
+          : `${size}. ${fillTemplate(t('compaction.doneWaitingFor'), { names: after.behind.join(', ') })}`,
         { surface: 'pod-compaction' }
       );
     } catch (e) {
