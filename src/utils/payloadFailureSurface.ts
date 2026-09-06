@@ -22,7 +22,9 @@
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
-import { PayloadLoadError, payloadErrorDetail } from '@/types/sync';
+import { PayloadLoadError, payloadErrorDetail, payloadErrorKind } from '@/types/sync';
+import type { PayloadErrorKind } from '@/types/sync';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { PodLineageError } from '@/services/sync/podLineage';
 
 /** Where the failure was caught. Rides in `action`, so it stays queryable. */
@@ -45,6 +47,49 @@ export type PayloadFailureSource =
  * so a corrupt pod on the default sign-in route reached CloudWatch with zero
  * events.
  */
+/**
+ * The boot-overlay copy per kind. Keyed on `payloadErrorKind`, like the inline
+ * table in `sync.ts`, so a sixth kind fails the build here rather than taking
+ * a silent default.
+ *
+ * ⚠️ `unreadable` maps to `podCorrupted` DELIBERATELY, for now: a torn read is
+ * shown full-screen as "your data may be damaged, contact support", which it
+ * is not. Fixing that copy is a separate, user-visible change and is filed as
+ * a follow-up; making the mismatch VISIBLE in a table rather than buried in a
+ * ladder is this table's job.
+ */
+const PAYLOAD_OVERLAY_KEY = {
+  'credential-stale': 'resumeSetup.podCredentialStale',
+  'needs-update': 'resumeSetup.podNewerVersion',
+  unreadable: 'resumeSetup.podCorrupted',
+  'too-large': 'resumeSetup.podTooLarge',
+  corrupt: 'resumeSetup.podCorrupted',
+} as const satisfies Record<PayloadErrorKind, UIStringKey>;
+
+/**
+ * Which kinds page a human. Row reasoning, carried from the two early returns
+ * this replaced:
+ *  - too-large: `docClient.surface()` is the single emitter for the
+ *    device-cannot-open class and has already fired; a second report lands on
+ *    a different surface the dedup cannot collapse and double-counts the rate.
+ *    Callers that REPLACED an existing emit with this one must keep their own
+ *    event for that case, or it goes dark on their path.
+ *  - credential-stale: at the decrypt step a stale key and damaged bytes are
+ *    indistinguishable, and the stale-key half is routine (a peer rotated the
+ *    family key); paging at `critical` on every sign-in would train the alert
+ *    to be ignored.
+ *  - needs-update: "update beanies" is neither an incident nor a data problem.
+ */
+const PAYLOAD_IS_INCIDENT = {
+  'credential-stale': false,
+  'needs-update': false,
+  unreadable: true,
+  'too-large': false,
+  corrupt: true,
+} as const satisfies Record<PayloadErrorKind, boolean>;
+
+export { PAYLOAD_OVERLAY_KEY, PAYLOAD_IS_INCIDENT };
+
 export function reportPayloadFailure(
   err: PayloadLoadError,
   ctx: { fileId?: string | null; familyId?: string | null; source: PayloadFailureSource }
@@ -56,12 +101,9 @@ export function reportPayloadFailure(
   //
   // ⚠️ Callers that REPLACED an existing emit with this one must keep their own
   // event for the too-large case, or that class goes dark on their path.
-  if (err.deviceCannotOpen) return;
-  // Nor for a case a credential fixes. At the decrypt step a stale key and
-  // damaged bytes are indistinguishable, and the stale-key half is routine (a
-  // peer rotated the family key) — paging a human at `critical` for it, on
-  // every sign-in attempt, is noise that would train the alert to be ignored.
-  if (err.keyMayBeWrong) return;
+  // ONE guard over ONE discriminator, in place of two early returns that a
+  // third class then had to remember to extend. See `PAYLOAD_IS_INCIDENT`.
+  if (!PAYLOAD_IS_INCIDENT[payloadErrorKind(err)]) return;
   reportError({
     surface: 'pod-load-failure',
     // Constant per (step, source) — the byte count rides in `perf_doc_bytes`,
@@ -113,16 +155,13 @@ export function surfacePayloadFatal(
   // and clearing is the one action that destroys the local copy; for corrupt
   // the message says trying again will not help and points at support, so an
   // adjacent "clear your data and start fresh" button contradicts it.
-  // THREE-way, matching `payloadErrorMessageKey`. A two-way ternary here meant
-  // the same error object produced "try your password" inline and "your data may
-  // be damaged, contact support" full-screen — and the full-screen one is what a
-  // fresh install restoring from a .beanpod sees, which is precisely the
-  // population whose saved key is most likely to be stale.
-  const overlayKey = err.keyMayBeWrong
-    ? 'resumeSetup.podCredentialStale'
-    : err.deviceCannotOpen
-      ? 'resumeSetup.podTooLarge'
-      : 'resumeSetup.podCorrupted';
+  // A TABLE over the same discriminator `payloadErrorMessageKey` reads, so the
+  // inline and full-screen copy cannot drift apart again. A hand-written
+  // ternary here had ALREADY drifted from the inline ladder (three arms
+  // against four) under a comment claiming they matched; a two-way one before
+  // that produced "try your password" inline and "your data may be damaged,
+  // contact support" full-screen for the same error.
+  const overlayKey = PAYLOAD_OVERLAY_KEY[payloadErrorKind(err)];
   useFatalErrorStore().setFatal(
     useTranslationStore().t(overlayKey),
     // The envelope's family id reaches the user through this blob. It is
