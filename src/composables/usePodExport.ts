@@ -30,10 +30,11 @@ export function usePodExport() {
    * ONCE. Two whole-document serialize + AES-GCM passes back to back is exactly
    * the wrong thing on the low-memory device this feature exists for.
    *
-   * ⚠️ RETURNS A BOOLEAN, and `exportEncryptedPod` must keep doing so.
-   * `usePodCompaction` gates on `if (!(await exportEncryptedPod(...)))`; an
-   * object is always truthy, TypeScript reports nothing for `if (!obj)`, and the
-   * backup gate on a one-way, history-destroying migration would silently pass.
+   * ⚠️ RETURNS A BOOLEAN, AND MUST KEEP DOING SO. `usePodCompaction` gates a
+   * one-way, history-destroying migration on `if (!(await deliverPod(...)))`.
+   * An object return is always truthy, TypeScript reports NOTHING for
+   * `if (!obj)`, and that gate would silently pass. The same rule binds
+   * `exportEncryptedPod` below, which delegates here.
    */
   async function deliverPod(
     built: { json: string; filename: string },

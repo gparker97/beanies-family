@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **beanies now keeps a copy of your family file beside it before compacting.** It sits in the same folder as the family file, named after it, so you can find it months later without having kept track of a download. beanies reads the copy back and checks it opens before it changes anything, and stops if it does not.
+- **beanies now keeps a copy of your family file beside it before compacting.** It sits in the same folder as the family file, named after it, so you can find it months later without having kept track of a download. beanies reads the copy back and checks it arrived intact before changing anything, and removes it and stops if it did not. Deleting your family removes the copy too.
 
 ### Changed
 

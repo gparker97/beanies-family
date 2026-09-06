@@ -25,6 +25,9 @@ import { CALENDAR_SYNC_OPEN, REMINDERS_OPEN } from '@/constants/settingsDeepLink
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import * as syncService from '@/services/sync/syncService';
+import { getAuxStore } from '@/services/sync/storageProvider';
+import { safetyCopyName } from '@/constants/compaction';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import BaseCombobox from '@/components/ui/BaseCombobox.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -590,6 +593,18 @@ function formatLastSync(timestamp: string | null): string {
 // bindings keep reading the same name.
 const { isExporting: isExportingBeanpod, exportEncryptedPod, confirmBackupLanded } = usePodExport();
 const { busy: isCompacting, compact: compactPod } = usePodCompaction();
+/**
+ * Does this family's storage keep the automatic copy beside the pod?
+ *
+ * Only a provider with a full aux store can (Drive today); a local-file or
+ * native family gets the manual export gate alone. The note has to say which,
+ * or a family consents to a one-way migration on a guarantee the code did not
+ * give them.
+ */
+const podKeepsSiblingCopy = computed(() => {
+  const provider = syncService.getProvider();
+  return !!provider && !!getAuxStore(provider);
+});
 const isExportingJson = ref(false);
 
 async function handleManualExport() {
@@ -816,6 +831,19 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         }
       } catch (e) {
         console.warn('[deleteFamily] Drive file deletion failed, continuing:', e);
+      }
+      // ⚠️ AND THE COMPACTION SAFETY COPY. The checkbox says "the encrypted
+      // .beanpod file", singular, and after any compaction there are TWO — both
+      // complete, both openable with the family key. Deleting one and leaving
+      // the other means a family who asked for their data to be gone still has
+      // all of it sitting in Drive. Best-effort and separate from the pod's own
+      // deletion, so a failure here cannot strand the rest of the teardown.
+      try {
+        const provider = syncService.getProvider();
+        const aux = provider ? getAuxStore(provider) : null;
+        if (aux && provider) await aux.delete(safetyCopyName(provider.getDisplayName()));
+      } catch (e) {
+        console.warn('[deleteFamily] safety copy deletion failed, continuing:', e);
       }
     }
 
@@ -1941,20 +1969,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         <div
           class="dark:border-accent-lift/40 dark:bg-accent-lift/10 mb-3 flex gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3"
         >
-          <svg
+          <BeanieIcon
+            name="exclamation-circle"
             class="text-primary-500 dark:text-accent-lift mt-0.5 h-4 w-4 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            viewBox="0 0 24 24"
             aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"
-            />
-          </svg>
+          />
           <p class="dark:text-ink-soft text-xs leading-relaxed text-orange-900">
             {{ t('compaction.bringDevicesOnline') }}
           </p>
@@ -1970,7 +1989,9 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           {{ t('settings.compactPod') }}
         </BaseButton>
         <p class="dark:text-ink-faint mt-2 text-xs text-gray-500">
-          {{ t('compaction.safetyCopyNote') }}
+          {{
+            t(podKeepsSiblingCopy ? 'compaction.safetyCopyNote' : 'compaction.safetyCopyNoteManual')
+          }}
         </p>
       </div>
 

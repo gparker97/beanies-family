@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4536
+    "translationCount": 4538
   },
   "translations": {
     "app.name": {
@@ -22502,8 +22502,8 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmMessage": {
-      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。您的beans都不会更改， beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件；已离线但从未保存更改的设备会询问您该怎么做。",
-      "hash": "iagbvw",
+      "translation": "beanies将重建您的家庭文件，而不会记录过去的更改，因此它打开速度更快，适用于较旧的平板电脑。此设备上的任何内容都不会丢失， Beanies会先保存当前文件的副本。您的其他设备下次联机时会拾取压缩文件；如果设备已脱机，但从未保存更改，则必须放弃这些更改。",
+      "hash": "3z6kpu",
       "lastUpdated": "2026-09-06"
     },
     "compaction.confirmCta": {
@@ -22512,9 +22512,9 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused": {
-      "translation": "beanies没有精简您的文件",
-      "hash": "a2s25r",
-      "lastUpdated": "2026-09-05"
+      "translation": "beanies没有压缩您的家庭文件",
+      "hash": "orh9ub",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.refused.not-synced": {
       "translation": "某些更改尚未到达云端。请等待同步完成，然后重试。",
@@ -22532,14 +22532,14 @@
       "lastUpdated": "2026-09-05"
     },
     "compaction.done": {
-      "translation": "您的家庭文件更薄",
-      "hash": "hclh0c",
-      "lastUpdated": "2026-09-05"
+      "translation": "您的家庭文件已压缩",
+      "hash": "xlj9b3",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.failed": {
-      "translation": "beanies无法精简您的文件",
-      "hash": "ba490x",
-      "lastUpdated": "2026-09-05"
+      "translation": "beanies无法压缩您的家庭文件",
+      "hash": "d0kb57",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.failedHelp": {
       "translation": "没有任何变化，您的数据是安全的。如果这种情况持续发生，请向support@beanies.family发送详细信息。",
@@ -22547,9 +22547,9 @@
       "lastUpdated": "2026-09-05"
     },
     "compaction.publishFailed": {
-      "translation": "较薄的文件未保存到云端",
-      "hash": "w7vde8",
-      "lastUpdated": "2026-09-05"
+      "translation": "压缩文件未保存到云端",
+      "hash": "7n2rsb",
+      "lastUpdated": "2026-09-06"
     },
     "compaction.publishFailedHelp": {
       "translation": "您的备份位于此设备上，您的数据是安全的。重新加载豆子，它将完成工作。",
@@ -22657,13 +22657,13 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.bringDevicesOnline": {
-      "translation": "在开始之前，请将家人的其他设备上线，以便更新。已离线但从未保存更改的设备将询问您在返回时该怎么做。",
-      "hash": "oem3j6",
+      "translation": "在开始之前，请将家人的其他设备上线，以便更新。已离线但从未保存的更改的设备无法进行更改，因此将不得不放弃更改。",
+      "hash": "ri62d1",
       "lastUpdated": "2026-09-06"
     },
     "compaction.safetyCopyNote": {
-      "translation": "beanies首先在其旁边保存当前文件的副本，因此您可以返回。",
-      "hash": "ekujqb",
+      "translation": "beanies在其旁边保留当前文件的副本，并要求您也保存一个副本。如需返回任一页面，请使用上方的“加载其他家庭数据文件”。",
+      "hash": "5xuupw",
       "lastUpdated": "2026-09-06"
     },
     "settings.compactSection": {
@@ -22681,9 +22681,19 @@
       "hash": "8nymn5",
       "lastUpdated": "2026-09-06"
     },
-    "compaction.refused.safety-copy-too-large": {
-      "translation": "此设备在检查保存的复制beanies时内存不足，因此在更改任何内容之前停止。副本本身就没问题。请在具有更多内存的设备上重试。",
-      "hash": "md5m1v",
+    "compaction.safetyCopyNoteManual": {
+      "translation": "beanies要求您先保存当前文件的副本。要返回，请使用上面的“加载其他家庭数据文件”。",
+      "hash": "tvcaig",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.safety-copy-damaged": {
+      "translation": "保存的复印帽子在它出来的时候没有回来，所以帽子把它拿走了，在改变任何东西之前都停止了。您的家庭文件没有任何变化。请检查您的存储空间连接，然后重试。",
+      "hash": "l3k1jy",
+      "lastUpdated": "2026-09-06"
+    },
+    "compaction.refused.backup-too-large": {
+      "translation": "此设备内存不足，无法进行备份，因此beanies在更改任何内容之前停止。没有任何变化。请在具有更多内存的设备上重试。",
+      "hash": "80fmnh",
       "lastUpdated": "2026-09-06"
     }
   }
