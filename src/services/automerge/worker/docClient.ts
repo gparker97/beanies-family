@@ -1193,14 +1193,14 @@ export async function mergeRemoteEnvelope(
   basis: LineageBasis,
   opts?: RequestOpts
 ): Promise<{
-  action: 'merged' | 'adopted' | 'kept-local';
+  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
   heads: Heads;
   dirty: boolean;
   changed: boolean;
   remoteHeads: Heads;
 }> {
   const res = await request<{
-    action: 'merged' | 'adopted' | 'kept-local';
+    action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
     heads: Heads;
     dirty: boolean;
     changed: boolean;

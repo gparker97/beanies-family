@@ -34,6 +34,8 @@ import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
+  buildRebaseOps,
+  applyMutation as applyMutationOp,
   migrateDoc,
   loadDoc,
   saveDoc,
@@ -677,6 +679,37 @@ export function noteRemoteBaseline(payload: string): void {
  * closes a real window: answered on main before the RPC, a mutation landing in
  * between yields a stale `clean` and therefore a wrong ADOPT that discards it.
  */
+/**
+ * Replay the peer's unsynced work onto the remote's lineage — or answer `null`.
+ *
+ * ⚠️ EVERY FAILURE ANSWERS `null`, and the caller then raises the same block the
+ * policy would have. Five things can go wrong — no baseline heads, a baseline
+ * this history does not contain, a `view`/`diff` that throws, a composer that
+ * cannot express the change, an `applyMutation` that throws — and none of them
+ * may leave a half-rebased document behind. That is why this returns a NEW
+ * document rather than mutating: the caller's single assignment is the only
+ * write, so "untouched on failure" is structural rather than a restore step.
+ */
+function rebaseOntoRemote(
+  local: Doc,
+  baselineHeads: Heads,
+  remote: Doc
+): { doc: Doc; replayed: number } | null {
+  try {
+    const target = migrateDoc(remote);
+    const ops = buildRebaseOps(local, baselineHeads, target);
+    if (!ops) return null; // cannot compose → the caller blocks
+    // Nothing to replay: the peer is level with its baseline, so the remote can
+    // simply be adopted. Blocking here would strand a device that has lost
+    // nothing — and `migrateDoc` alone can move heads without any user edit.
+    if (!ops.op) return { doc: target, replayed: 0 };
+    return { doc: applyMutationOp(target, ops.op).doc, replayed: ops.count };
+  } catch (e) {
+    console.warn('[applyAndProject] rebase unavailable — falling back to the block:', e);
+    return null;
+  }
+}
+
 function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
   if (basis.kind === 'user-file') return 'user-file';
   // `no-local-document` never reaches here: the caller installs wholesale
@@ -694,7 +727,7 @@ export async function mergeRemoteEnvelope(
   id: string | null,
   basis: LineageBasis
 ): Promise<{
-  action: 'merged' | 'adopted' | 'kept-local';
+  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
   heads: Heads;
   dirty: boolean;
   changed: boolean;
@@ -779,12 +812,44 @@ export async function mergeRemoteEnvelope(
         remoteHeads: headsOf(remote),
       };
     }
-    // ⚠️ EXHAUSTIVE. `guardLineage` returns `Exclude<LineageAction,'block'>`,
-    // and `'rebase'` is ALREADY in that union — Stage 3 flips one POLICY cell to
-    // it, in a different file, with no compile error and no failing test here.
-    // Falling through to `mergeDocs` would be the cross-lineage merge in which
-    // the OLD lineage wins deterministically. Refuse until Stage 3 implements it.
-    if (act === 'rebase') throw lineageBlockError('adopt-remote');
+    // ⚠️ THE REBASE COMPOSES AND APPLIES BEFORE IT INSTALLS. ONE ASSIGNMENT.
+    //
+    // Not "adopt, then mutate". Writing `currentDoc = migrateDoc(remote)` and
+    // THEN replaying onto it means an `applyMutation` throw leaves the worker
+    // holding the adopted-but-un-rebased document, with the peer's unsynced work
+    // silently gone and no restore possible to express. Every failure below
+    // therefore leaves `currentDoc` untouched by construction rather than by a
+    // restore step, and falls back to the SAME block the policy would have
+    // raised — so the termini, the latch, the banner and the telemetry are all
+    // unchanged. The rebase is additive safety: it must never lose more than
+    // blocking would.
+    if (act === 'rebase') {
+      const baseline = basis.kind === 'baseline' ? basis.heads : null;
+      const rebased = baseline ? rebaseOntoRemote(currentDoc, baseline, remote) : null;
+      if (!rebased) throw lineageBlockError('adopt-remote');
+      sink.perf('automerge.rebase', rebased.replayed, {});
+      // Captured from the UNMIGRATED remote, exactly as the branches below do:
+      // it describes the bytes on Drive, so the replay cannot taint it.
+      const driveHeads = headsOf(remote);
+      currentDoc = rebased.doc;
+      resetDocCursors();
+      const heads = headsOf(currentDoc);
+      schedulePersist();
+      scheduleSnapshotPersist();
+      const doc = currentDoc;
+      time('automerge.pushProjection', () => pushProjection(doc), {
+        perf_entity_count: countEntities(doc),
+      });
+      return {
+        action: 'rebased',
+        heads,
+        // The replay moved us past the bytes Drive holds, so the caller's
+        // existing `if (dirty)` publishes the peer's work onto the new lineage.
+        dirty: !headsEqual(driveHeads, heads),
+        changed: true,
+        remoteHeads: driveHeads,
+      };
+    }
     installWholesale = act === 'adopt';
   }
 
