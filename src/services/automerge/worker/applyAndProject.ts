@@ -22,6 +22,7 @@ import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
 import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis, ExportedPayload } from './protocol';
+import type { PodLineage } from '@/types/models';
 import { PayloadLoadError } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -833,11 +834,31 @@ export async function mergeRemoteEnvelope(
   let installWholesale = !currentDoc || basis.kind === 'no-local-document';
   /** The policy asked for a rebase and it could not run. Diagnostic only. */
   let rebaseUnavailable = false;
+  /**
+   * ⚠️ A RESTORE IS A LINEAGE EVENT. Set ONLY inside the guarded block, when
+   * the verdict was `ours-newer` under `user-file`: a human chose a file whose
+   * lineage is OLDER than the document this device held (the pre-compaction
+   * safety copy). Adopting it as-is leaves this device on the old lineage, and
+   * every peer still holding the newer one reads `ours-newer`, republishes,
+   * and undoes the restore within one poll. So the adopted document is stamped
+   * with a NEW generation (`nextLineage` of what we held), and peers read
+   * `adopt-remote` instead: the propagation the guard was built for.
+   *
+   * Never a property of the install branch itself, which also serves the
+   * first-load adopt: a fresh device minting on its first sync would churn the
+   * whole fleet. Never on `conflict x user-file` (a human resolved a concurrent
+   * compaction; adopting the chosen id IS the resolution), and never on the
+   * `user-file` rebase fallback (`adopt-remote`, a NEWER file: nothing to mint).
+   */
+  let stampNewGeneration = false;
+  let priorLineage: PodLineage | null = null;
   if (currentDoc && basis.kind !== 'no-local-document') {
     const lineageCtx = lineageContextFor(basis, currentDoc);
+    priorLineage = docLineage(currentDoc);
     // Throws `PodLineageError` on a block; every caller between here and the
     // user dispatches on `isRemoteBlocker` FIRST, before any wrapping.
-    const act = guardLineage(docLineage(remote), docLineage(currentDoc), lineageCtx);
+    const { action: act, verdict } = guardLineage(docLineage(remote), priorLineage, lineageCtx);
+    stampNewGeneration = act === 'adopt' && verdict === 'ours-newer' && lineageCtx === 'user-file';
     if (act === 'publish-local') {
       // Our document is the newer lineage. Touch NOTHING — not the document,
       // not the cursors, not the cache. The caller keeps its own document and
@@ -947,7 +968,16 @@ export async function mergeRemoteEnvelope(
     // fully built: nothing between the decrypt and this line can leave the
     // worker document-less, and `resetDocCursors()` below is the drop's other
     // half. A retry re-runs the whole operation from the decrypt.
-    currentDoc = migrateDoc(remote);
+    // Compose fully, then install ONCE. The stamp is an `Automerge.change` on
+    // the migrated remote, deliberately unlike `compactDoc`'s stamp-into-source:
+    // rebuilding here would destroy the history the restore exists to recover.
+    // A throw inside the change leaves the old document installed.
+    const adopted = migrateDoc(remote);
+    currentDoc = stampNewGeneration
+      ? Automerge.change(adopted, (d) => {
+          (d as { podLineage?: PodLineage | null }).podLineage = nextLineage(priorLineage);
+        })
+      : adopted;
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();

@@ -24,6 +24,8 @@
  * large dependency graph; only the modules this action touches get behaviour).
  */
 import { setActivePinia, createPinia, type Pinia } from 'pinia';
+import { UnsupportedBeanpodVersionError } from '@/types/sync';
+import { parseBeanpodV4 } from '@/services/sync/fileSync';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Settings, GlobalSettings } from '@/types/models';
 
@@ -593,6 +595,28 @@ describe('syncStore.rebindPodFile — the compaction safety copy', () => {
     expect(result.ok).toBe(false);
     // It never even reads the file: the name alone settles it.
     expect(mockFromExisting).not.toHaveBeenCalled();
+  });
+
+  it('reports a NEWER-version file at warning with its own code, never critical', async () => {
+    // The report's severity comes from `POD_ACCESS_SEVERITY`, not a literal:
+    // "please update beanies" must not page Slack. `classifyDriveFailure`
+    // reads the typed error through the base-class member, first.
+    const store = useSyncStore();
+    store.familyKey = {} as CryptoKey;
+    store.envelope = { familyId: 'family-123' } as never;
+    mockFromExisting.mockReturnValueOnce({ read: async () => '{"version":"6.0"}' });
+    vi.mocked(parseBeanpodV4).mockImplementationOnce(() => {
+      throw new UnsupportedBeanpodVersionError('6.0', 'family-123');
+    });
+
+    const result = await store.rebindPodFile('file-abc', 'parker.beanpod');
+
+    expect(result.ok).toBe(false);
+    const report = mockReportError.mock.calls
+      .map((c) => c[0] as { surface: string; severity: string; context: { error_code: string } })
+      .find((r) => r.surface === 'pod-access');
+    expect(report?.severity).toBe('warning');
+    expect(report?.context.error_code).toBe('FILE_NEWER_VERSION');
   });
 
   it('still accepts an ordinary pod file', async () => {

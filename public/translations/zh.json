@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-06",
-    "translationCount": 4553
+    "translationCount": 4555
   },
   "translations": {
     "app.name": {
@@ -22769,6 +22769,16 @@
     "settings.importNeedsPassword": {
       "translation": "该文件已加密。输入密码以导入。",
       "hash": "qos7al",
+      "lastUpdated": "2026-09-06"
+    },
+    "podAccess.error.newerVersion": {
+      "translation": "该家庭文件由较新版本的beanies保存。更新此设备上的beanies以将其打开。此设备上的任何内容都不会丢失。",
+      "hash": "1tf4m7",
+      "lastUpdated": "2026-09-06"
+    },
+    "join.error.newerVersion": {
+      "translation": "该家庭文件由较新版本的beanies保存。在此设备上更新Beanies ，然后再次打开邀请链接。此设备上的任何内容都不会丢失。",
+      "hash": "i9zdbs",
       "lastUpdated": "2026-09-06"
     }
   }

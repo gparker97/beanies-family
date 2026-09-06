@@ -203,11 +203,15 @@ export function guardLineage(
   remote: PodLineage | null,
   local: PodLineage | null,
   ctx: LineageContext
-): Exclude<LineageAction, 'block'> {
+): { action: Exclude<LineageAction, 'block'>; verdict: LineageVerdict } {
   const verdict = compareLineage(remote, local);
   const action = lineageAction(verdict, ctx);
   if (action === 'block') throw lineageBlockError(verdict);
-  return action;
+  // BOTH halves, because the one caller needs both and must not recompute
+  // either: `POLICY` maps `ours-newer x user-file` AND `conflict x user-file`
+  // to `adopt`, and only the first is a RESTORE that must mint a new lineage
+  // generation so the fleet adopts it rather than reverting it.
+  return { action, verdict };
 }
 
 /**
