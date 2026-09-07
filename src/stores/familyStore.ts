@@ -804,6 +804,26 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  /**
+   * Name who this session is BEFORE the roster that would vouch for them exists.
+   *
+   * ⚠️ WHY NOT `setCurrentMember`. That one checks the id against `members`, and
+   * the whole point of this call is that we are about to load a DIFFERENT
+   * family's roster — so `members` still holds the previous family's rows (or
+   * none), the guard cannot pass, and the assignment silently does nothing. That
+   * silence is what left a cross-family load rendering with every permission
+   * false: no sidebar, no Family Data section, until a page refresh.
+   *
+   * The check is not skipped, it is DEFERRED to the moment it can actually be
+   * made: `loadMembers` re-validates `currentMemberId` against the roster it
+   * loads, and an id that is not in it takes the ordinary rejection path. So the
+   * caller must have EARNED the claim — today's only caller passes the single
+   * member whose wrapped key the entered password just opened.
+   */
+  function preselectSessionMember(id: string) {
+    currentMemberId.value = id;
+  }
+
   function resetState() {
     members.value = [];
     currentMemberId.value = null;
@@ -836,6 +856,7 @@ export const useFamilyStore = defineStore('family', () => {
     deleteMember,
     transferOwnership,
     setCurrentMember,
+    preselectSessionMember,
     resetState,
   };
 });
