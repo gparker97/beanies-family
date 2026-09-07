@@ -74,12 +74,15 @@ vi.mock('@/services/google/googleAuth', () => ({
 }));
 
 const providerType = vi.hoisted(() => ({ value: 'google_drive' as string | null }));
+/** Which family the INSTALLED provider belongs to — not necessarily this one. */
+const providerFamilyId = vi.hoisted(() => ({ value: 'fam-1' as string | null }));
 vi.mock('@/services/sync/syncService', async () => {
   const defaults = await import('@/services/sync/__mocks__/syncService');
   return {
     ...defaults,
     onStateChange: vi.fn(() => () => {}),
     getProviderType: vi.fn(() => providerType.value),
+    getProviderFamilyId: vi.fn(() => providerFamilyId.value),
     setProvider: setProviderMock,
     setFamilyKey: vi.fn(),
   };
@@ -155,6 +158,7 @@ describe('restore keeps the family on its existing pod', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     providerType.value = 'google_drive';
+    providerFamilyId.value = 'fam-1';
   });
 
   it('does NOT re-home on the LOCAL branch when the family already has a pod', async () => {
@@ -211,6 +215,26 @@ describe('restore keeps the family on its existing pod', () => {
 
     await sync.decryptPendingFile('pw', { userChoseThisFile: true });
 
+    expect(persistMock).toHaveBeenCalledTimes(1);
+    expect(setProviderMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('RE-HOMES when the bound pod belongs to a DIFFERENT family', async () => {
+    // ⚠️ THE CROSS-FAMILY CORRUPTION. `keepCurrentPod` asks to keep "the current
+    // pod", but by the time this runs the family-identity block has already
+    // switched us to the PICKED file's family — so the provider still bound is
+    // the previous family's. Honouring the flag would leave family B's document
+    // pointed at family A's file, and the next save would write B's data over
+    // A's. The Drive list shows every `.beanpod` in the account, so a sibling
+    // family's pod is one tap away.
+    const sync = useSyncStore();
+    sync.isConfigured = true;
+    providerFamilyId.value = 'fam-OTHER'; // the pod we are bound to is not ours
+    sync.pendingEncryptedFile = { envelope: ENVELOPE, provider: localProvider() };
+
+    await sync.decryptPendingFile('pw', { userChoseThisFile: true, keepCurrentPod: true });
+
+    // Bound to the picked file rather than left pointing at another family's pod.
     expect(persistMock).toHaveBeenCalledTimes(1);
     expect(setProviderMock).toHaveBeenCalledTimes(1);
   });

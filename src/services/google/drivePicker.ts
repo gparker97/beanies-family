@@ -10,6 +10,34 @@ const PICKER_SCRIPT_URL = 'https://apis.google.com/js/api.js';
 
 let scriptPromise: Promise<void> | null = null;
 
+/**
+ * Close and dispose a built Picker.
+ *
+ * ⚠️ `setVisible(true)` HAD NO COUNTERPART ANYWHERE IN THIS FILE, and that is
+ * how a configuration problem became a browser restart. When Google rejects the
+ * developer key the Picker renders its OWN modal — "There was an error! The API
+ * developer key is invalid." — which carries no close control. With nothing
+ * disposing the Picker, that dialog covers the app permanently: no Escape, no
+ * backdrop click, no way back. Observed in the field on 2026-09-07, where the
+ * only way out was to restart the browser.
+ *
+ * So every exit from every picker in this file goes through here — a pick, a
+ * cancel, a timeout, an iframe failure, a throw. `dispose()` is missing from
+ * some versions of the typings, so it is optional and `setVisible(false)` is the
+ * floor. Wrapped, because a teardown that throws must never replace the real
+ * result the caller is waiting on.
+ */
+type BuiltPicker = { setVisible: (visible: boolean) => void; dispose?: () => void };
+
+function disposePicker(picker: BuiltPicker | null): void {
+  try {
+    picker?.setVisible(false);
+    picker?.dispose?.();
+  } catch (e) {
+    console.warn('[drivePicker] picker teardown failed', e);
+  }
+}
+
 /** Load the Google API script (idempotent). */
 function loadPickerScript(): Promise<void> {
   if (scriptPromise) return scriptPromise;
@@ -79,6 +107,7 @@ export async function pickBeanpodFolder(
   await loadPickerLibrary();
 
   return new Promise((resolve, reject) => {
+    let built: BuiltPicker | null = null;
     try {
       const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
@@ -132,17 +161,23 @@ export async function pickBeanpodFolder(
         .setCallback((data: google.picker.PickerResponse) => {
           if (data.action === google.picker.Action.PICKED && data.docs?.[0]) {
             const picked = data.docs[0];
+            disposePicker(built);
             resolve({ folderId: picked.id, folderName: picked.name });
           } else if (data.action === google.picker.Action.CANCEL) {
             console.debug('[drivePicker] folder pick cancelled');
+            disposePicker(built);
             resolve(null);
           }
         })
         .build();
 
+      // Recorded BEFORE `setVisible`, so a synchronous throw inside it still
+      // leaves the catch below something to close.
+      built = picker as unknown as BuiltPicker;
       picker.setVisible(true);
     } catch (e) {
       console.error('[drivePicker] folder picker failed to open', e);
+      disposePicker(built);
       reject(e);
     }
   });
@@ -223,11 +258,15 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
     // symptom path.
     let hasLoaded = false;
     let settled = false;
+    /** Set once `build()` returns, so `settle` can always tear the UI down. */
+    let built: BuiltPicker | null = null;
 
     const settle = (result: PickBeanpodFileResult): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutHandle);
+      // EVERY exit, not just a clean pick — see `disposePicker`.
+      disposePicker(built);
       resolve(result);
     };
 
@@ -303,6 +342,9 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
         })
         .build();
 
+      // Recorded BEFORE `setVisible`, so a synchronous throw inside it still
+      // leaves `settle`'s teardown something to close.
+      built = picker as unknown as BuiltPicker;
       picker.setVisible(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

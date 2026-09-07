@@ -32,7 +32,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
-import { PayloadLoadError, isRemoteBlocker, LocalDocUnreadableError } from '@/types/sync';
+import { PayloadLoadError, isRemoteBlocker } from '@/types/sync';
 // Type + `instanceof` only — never `guardLineage`, which the eslint rule
 // correctly bans outside the worker. Reading a flag off a thrown error is
 // not making a lineage decision.
@@ -170,23 +170,10 @@ let needsRehydrate = false;
 // by the reset-invariant test.
 let rehydrating = false;
 /**
- * The last automatic re-hydrate FAILED, so this client holds no document.
- *
- * ⚠️ IT IS A LATCH, SO IT NEEDS A LIFETIME. Cleared by `setCurrentFamily` —
- * which every `currentFamilyId` assignment and `reset()` go through — because a
- * family switch or a sign-out makes a previous family's rehydrate failure
- * irrelevant, and a flag that survived those would refuse every merge for the
- * rest of the session on a device that is now perfectly healthy. Also listed in
- * `__resetDocClientForTesting`, or it leaks between cases.
- */
-let rehydrateFailed = false;
-
-/**
  * The ONE writer of `currentFamilyId`, so the flags that describe "the document
  * we hold for that family" cannot fall out of step with it.
  */
 function setCurrentFamily(familyId: string | null): void {
-  if (familyId !== currentFamilyId) rehydrateFailed = false;
   currentFamilyId = familyId;
 }
 
@@ -387,16 +374,6 @@ async function enterInlineMode(): Promise<void> {
  */
 function reportRehydrateFailure(where: 'respawn' | 'inline', e: unknown): void {
   console.error(`[docClient] re-hydrate after ${where} failed`, e);
-  // ⚠️ THE SECOND ROUTE INTO THE WHOLESALE INSTALL, and it needed its own
-  // guard. `applyAndProject.ts:898` installs the remote wholesale when
-  // `!currentDoc` OR the basis says `no-local-document`. `syncStore` now
-  // classifies the first case, but a rehydrate that FAILS leaves this client
-  // holding no document at all — and the merge that gets auto-retried after the
-  // worker teardown then satisfies `!currentDoc` and installs, with no lineage
-  // guard and nothing lineage-related logged. Latching here and refusing in
-  // `mergeRemoteEnvelope` covers every caller, including ones not yet written,
-  // without re-deriving anything from worker state a respawn can change.
-  rehydrateFailed = true;
   reportError({
     surface: 'doc-worker-recovery',
     message: `doc-worker re-hydrate after ${where} failed — the client holds no document`,
@@ -1142,9 +1119,6 @@ export async function initAndLoadCache(
   familyId: string
 ): Promise<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }> {
   setCurrentFamily(familyId);
-  // A fresh load attempt supersedes any earlier rehydrate failure for THIS
-  // family; if this attempt also fails, `reportRehydrateFailure` re-arms it.
-  rehydrateFailed = false;
   const res = await request<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }>(
     'initAndLoadCache',
     { familyId }
@@ -1278,35 +1252,20 @@ export async function mergeRemoteEnvelope(
   changed: boolean;
   remoteHeads: Heads;
 }> {
-  // ⚠️ THE BACKSTOP FOR THE SECOND WHOLESALE-INSTALL ROUTE, at the one
-  // main-thread wrapper every merge already passes through — so it covers
-  // `fetchAndMergeRemote`, all four termini and any caller not yet written.
+  // ⚠️ NO PRE-CHECK HERE ANY MORE, AND ITS REMOVAL IS THE FIX.
   //
-  // When the last auto-rehydrate failed this client holds NO document, and the
-  // worker's `!currentDoc` arm (`applyAndProject.ts:898`) would read that as
-  // "nothing to lose" and install the remote wholesale, skipping the lineage
-  // guard entirely. It is not nothing to lose: the rehydrate failed, so we do
-  // not KNOW what this device held, and the fail-safe direction is to refuse.
+  // A `rehydrateFailed` latch used to be tested at this point. It could not
+  // work: this runs BEFORE `request()` → `ensureReady()` → `spawn()`, and
+  // `spawn()` is where the rehydrate happens and where the latch would be set —
+  // so on the very sequence it was written for (worker dies, respawn's rehydrate
+  // fails, merge proceeds) the flag was still false when it was read. The
+  // retryable re-issue went through `requestCore` and skipped this wrapper
+  // entirely, and a rehydrate that RESOLVED empty never set it at all.
   //
-  // It cannot fire on a genuinely empty device — the rehydrator only runs when
-  // `needsRehydrate && currentFamilyId`, i.e. only when a document was expected.
-  if (rehydrateFailed) {
-    logEvent({
-      level: 'warn',
-      surface: 'pod-lineage',
-      message: "merge refused — this device's copy could not be read",
-      context: {
-        action: 'local-unreadable-refused',
-        error_code: 'rehydrate',
-        detail: 'rehydrate',
-      },
-    });
-    console.warn(
-      '[docClient] Refusing mergeRemoteEnvelope: the last re-hydrate failed, so this ' +
-        'client holds no document and cannot prove what it had. Reload the page.'
-    );
-    throw new LocalDocUnreadableError('RehydrateFailed');
-  }
+  // The worker now REFUSES a merge it was not told to install wholesale when it
+  // holds no document (`applyAndProject.mergeRemoteEnvelope`). That is the one
+  // place the fact is actually known, it is checked at the moment of the merge
+  // rather than before it, and it covers all three docless routes instead of one.
   let res;
   try {
     res = await request<{
@@ -1573,7 +1532,6 @@ export function __resetDocClientForTesting(): void {
   currentFamilyId = null;
   needsRehydrate = false;
   rehydrating = false;
-  rehydrateFailed = false;
   inlineExecutor = null;
   rehydrator = null;
   cachePersistFailedHandler = null;
