@@ -304,7 +304,7 @@ describe('the automatic safety copy', () => {
     // one-way, family-wide operation did NOT happen; a toast that dismisses
     // itself is the wrong carrier for that.
     expect(c.progressPhase.value).toBe('failed');
-    expect(c.progressErrorKey.value).toBe('compaction.refused.safety-copy-damaged');
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.refused.safety-copy-damaged');
   });
 
   it('REFUSES, changing nothing, when the copy vanished between write and read', async () => {
@@ -348,7 +348,7 @@ describe('the automatic safety copy', () => {
     await c.compact();
 
     expect(docClient.compactDoc).not.toHaveBeenCalled();
-    expect(c.progressErrorKey.value).toBe('compaction.refused.backup-too-large');
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.refused.backup-too-large');
   });
 
   it('does not swallow the build failure', async () => {
@@ -403,7 +403,7 @@ describe('the owner gate', () => {
     // then be refused.
     expect(confirm).not.toHaveBeenCalled();
     expect(flushPendingSave).not.toHaveBeenCalled();
-    expect(c.progressErrorKey.value).toBe('compaction.refused.not-owner');
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.refused.not-owner');
     // ⚠️ AND THE MODAL NEVER OPENED. A refusal decided BEFORE the confirm must
     // not flash a progress surface at someone who was never asked a question.
     expect(c.progressOpen.value).toBe(false);

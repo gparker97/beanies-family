@@ -18,7 +18,7 @@ import {
 } from '../podAccess';
 import { DriveApiError, DriveFileNotFoundError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
-import { UnsupportedBeanpodVersionError } from '@/types/sync';
+import { UnsupportedBeanpodVersionError, CorruptPayloadError } from '@/types/sync';
 
 const ALL_CODES: PodAccessErrorCode[] = [
   'OFFLINE',
@@ -29,6 +29,7 @@ const ALL_CODES: PodAccessErrorCode[] = [
   'CANONICAL_MISMATCH',
   'NO_HOME',
   'FILE_NEWER_VERSION',
+  'FILE_OLDER_VERSION',
 ];
 
 function setOnline(value: boolean): void {
@@ -175,5 +176,33 @@ describe('classifyDriveFailure and a file from a newer beanies', () => {
   it('still reads a plain offline failure as OFFLINE', () => {
     setOnline(false);
     expect(classifyDriveFailure(new Error('fetch failed'))).toBe('OFFLINE');
+  });
+});
+
+describe('classifyDriveFailure — the version arms', () => {
+  it('still names a NEWER file, above the offline check', () => {
+    expect(classifyDriveFailure(new UnsupportedBeanpodVersionError('9.0'))).toBe(
+      'FILE_NEWER_VERSION'
+    );
+  });
+
+  /**
+   * ⚠️ IT USED TO BE A RETRYABLE WARNING. `needsAppUpdate` is false for a file
+   * from the past, so it fell past the version arm, past the network and auth
+   * arms, and landed on `VERIFY_UNAVAILABLE` — endless retry on a file no retry
+   * can open. It now has its own code, with no recovery button, because no
+   * button in the app can fix it.
+   */
+  it('names an OLDER file rather than offering an endless retry', () => {
+    expect(classifyDriveFailure(new UnsupportedBeanpodVersionError('3.0'))).toBe(
+      'FILE_OLDER_VERSION'
+    );
+  });
+
+  it('does NOT claim a version problem for a corrupt or too-large file', () => {
+    // Those are answered by the arms below, not by the version table.
+    expect(classifyDriveFailure(new CorruptPayloadError('bad', 'materialize', null))).toBe(
+      'VERIFY_UNAVAILABLE'
+    );
   });
 });

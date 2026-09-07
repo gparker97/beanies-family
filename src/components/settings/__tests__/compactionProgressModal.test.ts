@@ -34,7 +34,7 @@ function mountModal(props: Record<string, unknown>) {
       step: 0,
       phase: 'running',
       stats: null,
-      errorKey: null,
+      failure: null,
       behind: [],
       ...props,
     },
@@ -104,7 +104,11 @@ describe('CompactionProgressModal', () => {
     const w = mountModal({
       phase: 'failed',
       step: 1,
-      errorKey: 'compaction.refused.safety-copy-damaged',
+      failure: {
+        titleKey: 'compactionProgress.failedTitle',
+        subtitleKey: 'compactionProgress.failedSubtitle',
+        helpKey: 'compaction.refused.safety-copy-damaged',
+      },
     });
     expect(w.text()).toContain('compaction.refused.safety-copy-damaged');
     // It must say the file was not changed — the reassurance is the point.
@@ -116,7 +120,35 @@ describe('CompactionProgressModal', () => {
   });
 
   it('keeps the step list on a failure, so the person can see WHICH step stopped', () => {
-    const w = mountModal({ phase: 'failed', step: 2, errorKey: 'compaction.failedHelp' });
+    const w = mountModal({
+      phase: 'failed',
+      step: 2,
+      failure: {
+        titleKey: 'compactionProgress.failedTitle',
+        subtitleKey: 'compactionProgress.failedSubtitle',
+        helpKey: 'compaction.failedHelp',
+      },
+    });
     expect(w.text()).toContain('compactionProgress.step2');
+  });
+
+  it('does NOT claim the file is unchanged when the PUBLISH is what failed', async () => {
+    // ⚠️ THE FALSE SENTENCE WAS THE SUBTITLE. At a publish failure the document
+    // IS compacted, IS on a new lineage and IS persisted to cache — only the
+    // cloud copy is stale. "Your family file has not been changed" is flatly
+    // false there, and it is the sentence that would stop someone re-publishing.
+    const w = mountModal({
+      phase: 'failed',
+      step: 3,
+      failure: {
+        titleKey: 'compactionProgress.failedTitle',
+        subtitleKey: 'compaction.publishFailed',
+        helpKey: 'compaction.publishFailedHelp',
+      },
+    });
+    const text = w.text();
+    expect(text).toContain('compaction.publishFailed');
+    expect(text).toContain('compaction.publishFailedHelp');
+    expect(text).not.toContain('compactionProgress.failedSubtitle');
   });
 });

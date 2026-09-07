@@ -90,15 +90,38 @@ export function usePodCompaction() {
   const progressPhase = ref<'running' | 'done' | 'failed'>('running');
   /** Set only on success. `null` while running and on every failure. */
   const progressStats = ref<{ beforeBytes: number; afterBytes: number } | null>(null);
-  /** A refusal or failure message key, resolved by the modal. */
-  const progressErrorKey = ref<UIStringKey | null>(null);
+  /**
+   * All three pieces of a failure's copy, set together or not at all.
+   *
+   * ⚠️ ONE OBJECT, BECAUSE THE FALSE SENTENCE WAS THE SUBTITLE. The modal used a
+   * fixed title AND a fixed subtitle, with only the help line variable — so a
+   * publish failure rendered "Your family file has not been changed", which at
+   * that point is flatly false: the document IS compacted, IS on a new lineage
+   * and IS persisted to cache; only the cloud copy is stale. That sentence is
+   * the one that would stop someone re-publishing.
+   *
+   * A separate `titleKey` ref beside the help key would have left the same class
+   * of drift open (and would have fixed the wrong line). With a single object
+   * there is no pair to keep in step: setting one piece without the others is
+   * not expressible.
+   */
+  const progressFailure = ref<{
+    titleKey: UIStringKey;
+    subtitleKey: UIStringKey;
+    helpKey: UIStringKey;
+  } | null>(null);
 
   function refuse(code: RefusalCode, detail?: string): void {
     // ⚠️ NO TOAST. A refusal explains why a one-way, family-wide operation did
     // NOT happen; it belongs on the surface the person is looking at, with a
     // button they press, not in a corner for four seconds.
     progressPhase.value = 'failed';
-    progressErrorKey.value = `compaction.refused.${code}` as UIStringKey;
+    progressFailure.value = {
+      titleKey: 'compactionProgress.failedTitle',
+      // True for every refusal: they are all decided BEFORE anything is written.
+      subtitleKey: 'compactionProgress.failedSubtitle',
+      helpKey: `compaction.refused.${code}` as UIStringKey,
+    };
     logEvent({
       level: 'warn',
       surface: 'pod-compaction',
@@ -158,7 +181,7 @@ export function usePodCompaction() {
       progressOpen.value = true;
       progressPhase.value = 'running';
       progressStats.value = null;
-      progressErrorKey.value = null;
+      progressFailure.value = null;
       progressStep.value = 0; // checking everyone is up to date
 
       // 2. Prove we are current and clean. A compaction publishes a document
@@ -393,7 +416,15 @@ export function usePodCompaction() {
         // file has not been updated — the one state where the person MUST read
         // and act on what happened. It stays on screen until they dismiss it.
         progressPhase.value = 'failed';
-        progressErrorKey.value = 'compaction.publishFailedHelp';
+        // ⚠️ NOT THE GENERIC FAILURE COPY. Nothing here is unchanged, so
+        // `failedSubtitle` would be a lie at the one moment the person most
+        // needs to act. `compaction.publishFailed` says exactly what happened
+        // and was already written — it had simply never been wired to anything.
+        progressFailure.value = {
+          titleKey: 'compactionProgress.failedTitle',
+          subtitleKey: 'compaction.publishFailed',
+          helpKey: 'compaction.publishFailedHelp',
+        };
         return;
       }
 
@@ -441,7 +472,13 @@ export function usePodCompaction() {
         context: { action: 'failed', error_code: 'rebuild-failed' },
       });
       progressPhase.value = 'failed';
-      progressErrorKey.value = 'compaction.failedHelp';
+      progressFailure.value = {
+        titleKey: 'compactionProgress.failedTitle',
+        // This branch is reached only BEFORE anything is published, so the
+        // reassurance is true here.
+        subtitleKey: 'compactionProgress.failedSubtitle',
+        helpKey: 'compaction.failedHelp',
+      };
     } finally {
       busy.value = false;
     }
@@ -459,7 +496,7 @@ export function usePodCompaction() {
     progressStep,
     progressPhase,
     progressStats,
-    progressErrorKey,
+    progressFailure,
     dismissProgress,
     /** Names the completion panel asks the family to go and update. */
     olderVersionNames,

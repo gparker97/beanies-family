@@ -18,7 +18,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
+import {
+  PayloadLoadError,
+  payloadErrorKind,
+  type PayloadErrorKind,
+  type RemoteBlocker,
+} from '@/types/sync';
 import { lookupFamily } from '@/services/registry/registryService';
 import { features } from '@/config/features';
 import {
@@ -65,6 +70,11 @@ export type JoinErrorCode =
   | 'FILE_TOO_LARGE'
   | 'FILE_CORRUPT'
   | 'FILE_NEWER_VERSION'
+  // The file predates the oldest format this build reads. Same shape as the
+  // newer case — nothing in the app can fix it — but the opposite sentence.
+  // It used to resolve to `FILE_CORRUPT`, which tells a joiner the family's data
+  // is DAMAGED and pages Slack, over a file that is merely old.
+  | 'FILE_OLDER_VERSION'
   | 'FILE_FAMILY_MISMATCH'
   | 'INVITE_TOKEN_EXPIRED'
   | 'INVITE_TOKEN_INVALID'
@@ -96,13 +106,31 @@ export type JoinErrorCode =
  */
 export function joinCodeForBlocker(blocker: RemoteBlocker | undefined): JoinErrorCode | null {
   const payload = blocker instanceof PayloadLoadError ? blocker : null;
-  if (!payload || payload.keyMayBeWrong) return null;
-  return payload.needsAppUpdate
-    ? 'FILE_NEWER_VERSION'
-    : payload.deviceCannotOpen
-      ? 'FILE_TOO_LARGE'
-      : 'FILE_CORRUPT';
+  if (!payload) return null;
+  // ⚠️ THROUGH `payloadErrorKind`, NOT A LADDER OF GETTERS. Reading
+  // `needsAppUpdate` / `deviceCannotOpen` directly was correct until a file from
+  // the PAST became its own case: `needsAppUpdate` is false for it, so it fell
+  // all the way through to `FILE_CORRUPT` — the code that tells a joiner the
+  // family's data is DAMAGED and pages Slack for it, over a file that is merely
+  // old. The resolver already answers this exhaustively; a mapping table means a
+  // seventh kind fails the build here instead of taking the last `else`.
+  return JOIN_CODE_FOR_KIND[payloadErrorKind(payload)];
 }
+
+/**
+ * ⚠️ `null` IS AN ANSWER HERE. `credential-stale` is the rotated-key signature a
+ * fresh invite link genuinely fixes, so the join flow must NOT name it as a file
+ * problem — that is the `keyMayBeWrong` guard this table absorbed, kept as data
+ * rather than as an early return the next editor has to notice.
+ */
+const JOIN_CODE_FOR_KIND = {
+  'credential-stale': null,
+  'needs-update': 'FILE_NEWER_VERSION',
+  'too-old': 'FILE_OLDER_VERSION',
+  'too-large': 'FILE_TOO_LARGE',
+  unreadable: 'FILE_CORRUPT',
+  corrupt: 'FILE_CORRUPT',
+} as const satisfies Record<PayloadErrorKind, JoinErrorCode | null>;
 
 function asJoinDecryptError(result: {
   error?: string;
@@ -220,6 +248,12 @@ export const JOIN_ERRORS = {
   /** The family file was saved by a newer beanies. Update, then reopen the link. */
   FILE_NEWER_VERSION: {
     messageKey: 'join.error.newerVersion',
+    recoveries: [],
+    severity: 'warning',
+  },
+  /** The family file predates the oldest format this build reads. */
+  FILE_OLDER_VERSION: {
+    messageKey: 'podOlderVersion.inline',
     recoveries: [],
     severity: 'warning',
   },

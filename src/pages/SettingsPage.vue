@@ -630,17 +630,28 @@ async function runLoadFromFile(source: 'google_drive' | 'local') {
   // ONE `confirm()` call, replacing two hand-rolled yellow slabs bound to one
   // shared ref. `ConfirmModal` is globally mounted and already supports the
   // caution tone this needs.
+  // ⚠️ ONE PREDICATE, THREE CONSEQUENCES. `hasPod` chooses the title, the body
+  // AND `keepCurrentPod` (below), so the sentence a person agrees to and the
+  // thing that then happens are one decision, read in one place. The title used
+  // to be hard-coded, so a FIRST load was headed "Restore your family's data
+  // from a file" above a body saying the picked file BECOMES your data file.
   const ok = await confirm({
-    title: 'settings.switchDataFile',
+    title: hasPod.value ? 'settings.switchDataFile' : 'settings.useAsDataFileTitle',
     message: hasPod.value ? 'settings.switchFileConfirmation' : 'settings.loadFileConfirmation',
     confirmLabel: 'settings.yesLoadFile',
-    // ⚠️ RED ONLY WHEN SOMETHING IS ACTUALLY DESTROYED. A first load REPLACES
-    // whatever is on this device, so it earns `danger`. A restore into an
-    // existing family is a union — nothing is deleted (see
-    // `settings.switchFileConfirmation`) — and the CIG reserves Alert Red for
-    // destructive confirmations. Painting a non-destructive action red teaches
-    // people to click through red.
-    variant: hasPod.value ? 'info' : 'danger',
+    // ⚠️ `danger` IN EVERY ARM, and the conditional version was the bug. The
+    // restore arm was painted `info` on the strength of "Nothing is deleted" —
+    // but choosing a file yourself is the `user-file` lineage context, and the
+    // policy table maps BOTH `ours-newer` and `conflict` under it to `adopt`:
+    // wholesale replacement of this device's document.
+    //
+    // And it cannot be made conditional correctly, which is why it is not.
+    // NOTHING available at confirm time knows which policy arm the load will
+    // take — the verdict comes from comparing lineages inside a file that has
+    // not been decrypted yet. A variant that is only sometimes honest is worse
+    // than one that is always cautious, and every arm of this flow replaces or
+    // rewrites the device's document.
+    variant: 'danger',
   });
   if (!ok) return;
   await handleLoadFromFileConfirmed(source);
@@ -895,23 +906,21 @@ const {
   progressStep: compactionStep,
   progressPhase: compactionPhase,
   progressStats: compactionStats,
-  progressErrorKey: compactionErrorKey,
+  progressFailure: compactionFailure,
   dismissProgress: dismissCompactionProgress,
-  olderVersionNames: compactionBehindNames,
+  /**
+   * The people the completion panel asks the family to go and update.
+   *
+   * ⚠️ THE ARRAY, NOT THE JOINED STRING. This was `olderVersionNames` — the
+   * comma-joined sentence the old toast interpolated — split back apart on
+   * `','`, which turned a member called "Nana, Mum's side" into two people. The
+   * unsplit array is right here; `usePodHealth` builds the string FROM it.
+   *
+   * ⚠️ The alias is required, not cosmetic: `olderVersion` is also destructured
+   * from `usePodHealth()` a few lines below.
+   */
+  olderVersion: compactionBehind,
 } = usePodCompaction();
-
-/**
- * The people the completion panel asks the family to go and update.
- *
- * `olderVersionNames` is the joined string the old toast interpolated; the modal
- * lists them one per line with an instruction each, so it needs them separated.
- */
-const compactionBehind = computed(() =>
-  compactionBehindNames.value
-    .split(',')
-    .map((n) => n.trim())
-    .filter(Boolean)
-);
 const { canCompactPod, compactionIsDue, someoneCannotOpenIt, olderVersion, olderVersionNotice } =
   usePodHealth();
 /**
@@ -2633,7 +2642,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       :step="compactionStep"
       :phase="compactionPhase"
       :stats="compactionStats"
-      :error-key="compactionErrorKey"
+      :failure="compactionFailure"
       :behind="compactionBehind"
       @close="dismissCompactionProgress"
     />
