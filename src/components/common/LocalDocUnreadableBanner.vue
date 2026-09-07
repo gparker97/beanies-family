@@ -26,67 +26,21 @@
  * being deleted. The discard itself goes through `confirm({ variant: 'danger' })`
  * inside the store action, exactly as `LineageBanner` does.
  */
-import { computed, ref, watch } from 'vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
+import BannerActionButton from '@/components/common/BannerActionButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { confirm } from '@/composables/useConfirm';
-import { showToast } from '@/composables/useToast';
-import { useSyncStore } from '@/stores/syncStore';
+import { useBlockerBanner } from '@/composables/useBlockerBanner';
 
 const { t } = useTranslation();
-const syncStore = useSyncStore();
 
-const dismissed = ref(false);
-const busy = ref(false);
-const blocked = computed(
-  () => syncStore.podUnopenable && syncStore.backgroundSyncErrorKind === 'local-unreadable'
-);
-
-// A NEW block after a dismissal must speak again — the user dismissed the last
-// one, not every one. `clearPodUnopenable` is the only thing that clears the
-// latch, so this re-arms exactly when the state genuinely resolved.
-watch(blocked, (isBlocked) => {
-  if (!isBlocked) dismissed.value = false;
+// Same behaviour as `LineageBanner`, different confirm copy — which is precisely
+// what `useBlockerBanner` is parameterised on. The two components stay separate;
+// see this file's header and the composable's.
+const { blocked, dismissed, busy, useTheFamilyFile } = useBlockerBanner({
+  kind: 'local-unreadable',
+  confirmTitleKey: 'podLocalUnreadable.useFileConfirmTitle',
+  confirmMessageKey: 'podLocalUnreadable.useFileConfirmMessage',
 });
-
-/**
- * The one exit that does not need another tab closed.
- *
- * ⚠️ IT WORKS ONLY BECAUSE THE REFUSAL SKIPS `chosenByUser`. This calls
- * `useRemoteFileOverLocalDocument`, which re-enters the same load path that
- * raised the block — with `userChoseThisFile: true`. Without that skip in
- * `replaceDocWithCacheRecovery` the one button offered to resolve the block
- * would re-raise it, forever. Same policy as `user-file` everywhere else: a
- * human who has been shown "this will replace what is on this device" and said
- * yes is never blocked.
- */
-async function useTheFamilyFile(): Promise<void> {
-  // Claim `busy` BEFORE the await, so the confirmation dialog's whole lifetime
-  // is guarded rather than just the work after it (see `LineageBanner`).
-  if (busy.value) return;
-  busy.value = true;
-  try {
-    const ok = await confirm({
-      title: 'podLocalUnreadable.useFileConfirmTitle',
-      message: 'podLocalUnreadable.useFileConfirmMessage',
-      confirmLabel: 'podLineage.useFileConfirmAction',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    const adopted = await syncStore.useRemoteFileOverLocalDocument();
-    showToast(
-      adopted ? 'success' : 'error',
-      t(adopted ? 'podLineage.useFileDone' : 'podLineage.useFileFailed')
-    );
-  } catch {
-    // CATCH, not just `finally`: the latch is cleared before the download, so
-    // the banner has already gone and a silent throw would leave the user
-    // believing it worked.
-    showToast('error', t('podLineage.useFileFailed'));
-  } finally {
-    busy.value = false;
-  }
-}
 </script>
 
 <template>
@@ -94,22 +48,12 @@ async function useTheFamilyFile(): Promise<void> {
     <template #title>{{ t('podLocalUnreadable.title') }}</template>
     <template #message>{{ t('podLocalUnreadable.inline') }}</template>
     <template #actions>
-      <button
-        type="button"
-        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
-        :disabled="busy"
-        :aria-busy="busy"
-        @click="useTheFamilyFile"
-      >
+      <BannerActionButton :busy="busy" @click="useTheFamilyFile">
         {{ busy ? t('podLineage.useFileBusy') : t('podLineage.useFileCta') }}
-      </button>
-      <button
-        type="button"
-        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/10"
-        @click="dismissed = true"
-      >
+      </BannerActionButton>
+      <BannerActionButton subtle @click="dismissed = true">
         {{ t('action.dismiss') }}
-      </button>
+      </BannerActionButton>
     </template>
   </ErrorBanner>
 </template>

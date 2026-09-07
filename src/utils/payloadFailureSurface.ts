@@ -283,7 +283,16 @@ const BLOCKER_OVERLAY_KEY = {
   'podCredentialStale.inline': 'resumeSetup.podCredentialStale',
   'podLineage.unsyncedInline': 'resumeSetup.podLineageBlocked',
   'podLineage.conflictInline': 'resumeSetup.podLineageBlocked',
-  'podMerge.failedInline': 'resumeSetup.podLineageBlocked',
+  // ⚠️ NOT `podLineageBlocked`, AND THE BANNER TABLE IS WHY. `syncStore`'s
+  // `BLOCKER_BANNER_KIND` maps this key to `decrypt` rather than `lineage`, with
+  // a long justification: `RemoteMergeError.latches` returns `isActorCollision`,
+  // so the ONLY merge error that ever reaches a surface is an Automerge
+  // `duplicate seq N found for actor …` — an actor-plumbing bug, not a
+  // compaction. This table told that same user, full-screen, the story the
+  // banner table refuses to tell them: that their family file was reorganised on
+  // another device. Two tables, two key spaces, one contradiction. The generic
+  // "could not open" copy is the honest one here.
+  'podMerge.failedInline': 'resumeSetup.podCorrupted',
   'podUnreadable.inline': 'resumeSetup.podCorrupted',
   'podNewerVersion.inline': 'resumeSetup.podNewerVersion',
   'podOlderVersion.inline': 'resumeSetup.podOlderVersion',

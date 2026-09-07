@@ -331,6 +331,14 @@ watch(
 
       <!-- Progress bar -->
       <div class="mb-4">
+        <!-- ⚠️ THIS BAR IS THE AUTHORITATIVE ONE. `CompactionProgressModal`
+             carries a near-copy that has drifted on three attributes: track tint
+             (`0.05` here vs `0.06` there), transition (`duration-600` vs
+             `duration-500`), and `progress-shimmer`, which only this file has.
+             Bring that file to this one if they are ever unified — which is
+             deliberately NOT done yet: 14 other components carry a track+fill
+             with different semantics, so extracting a shared `ProgressBar` for
+             two of them is the worse half of that refactor. -->
         <div
           class="dark:bg-surface-overlay h-1.5 overflow-hidden rounded-full bg-[rgba(44,62,80,0.05)]"
         >

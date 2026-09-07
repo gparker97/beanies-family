@@ -47,3 +47,26 @@ export function getOrdinalSuffix(n: number): string {
 }
 
 export type TranslateFn = (key: UIStringKey) => string;
+
+/**
+ * A byte count, for a person.
+ *
+ * ⚠️ THE ZERO CONTRACT IS THE BEHAVIOURAL DECISION IN THIS FUNCTION, so it is
+ * stated rather than left to the arithmetic. `0` renders as `"0 KB"`: a
+ * compaction that saved nothing must not report "1 KB smaller", which is what
+ * the sub-KB floor produced. A non-zero value below a kilobyte still floors to
+ * `"1 KB"`, because a 400-byte saving rendering as nothing is the opposite
+ * mistake.
+ *
+ * One decimal for MB, none for KB — a family file is rarely under a megabyte.
+ *
+ * This is the app's only user-facing byte formatter. `perfTiming.ts` and
+ * `syncStore`'s registry signal both carry diagnostic KB integers that are never
+ * read by a person, and are deliberately left alone.
+ */
+export function formatBytes(bytes: number): string {
+  const mb = bytes / 1_048_576;
+  if (mb >= 0.1) return `${mb.toFixed(1)} MB`;
+  if (bytes <= 0) return '0 KB';
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
