@@ -39,4 +39,18 @@ describe('joinCodeForBlocker', () => {
   it('returns null when there is no blocker at all', () => {
     expect(joinCodeForBlocker(undefined)).toBeNull();
   });
+
+  /**
+   * ⚠️ THE ARM THAT TOLD A JOINER THEIR FAMILY'S DATA WAS DAMAGED. An OLDER file
+   * has `needsAppUpdate === false` (updating cannot fix a file from the past), so
+   * the old getter-ladder fell all the way through to `FILE_CORRUPT` — the code
+   * whose copy says the file is damaged and whose severity PAGES Slack, over a
+   * file that is merely old. Routing through `payloadErrorKind` gives it its own
+   * answer, and makes a seventh kind fail the build here.
+   */
+  it('maps an OLDER-version file to FILE_OLDER_VERSION, never FILE_CORRUPT', () => {
+    expect(joinCodeForBlocker(new UnsupportedBeanpodVersionError('3.0'))).toBe(
+      'FILE_OLDER_VERSION'
+    );
+  });
 });

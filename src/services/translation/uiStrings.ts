@@ -1379,6 +1379,7 @@ const STRING_DEFS = {
   // Common actions
   'action.add': { en: 'Add', beanie: 'add' },
   'action.edit': { en: 'Edit', beanie: 'edit' },
+  'action.copy': { en: 'Copy', beanie: 'copy' },
   'action.delete': { en: 'Delete', beanie: 'delete' },
   'action.save': { en: 'Save', beanie: 'save' },
   'action.saveAndClose': { en: 'Save & Close', beanie: 'save & close' },
@@ -3432,6 +3433,15 @@ const STRING_DEFS = {
     en: "Restore your family's data from a file",
     beanie: "restore your family's beans from a file",
   },
+  // ⚠️ THE TITLE FOLLOWS THE SAME `hasPod` PREDICATE AS THE BODY. With one
+  // hard-coded title, a FIRST load was headed "Restore your family's data from a
+  // file" above a body saying the picked file BECOMES your data file — two
+  // different operations described in one dialog. One predicate, three
+  // consequences (title, body, `keepCurrentPod`), read in one place.
+  'settings.useAsDataFileTitle': {
+    en: 'Use this file as your family data file',
+    beanie: 'use this file as your family data file',
+  },
   'settings.browse': { en: 'Browse...', beanie: 'browse...' },
   // ⚠️ TWO BUTTONS, NOT ONE THAT GUESSES. A single "Browse" that chose the
   // source itself walked a Drive family into Google's consent screen with no way
@@ -3494,10 +3504,16 @@ const STRING_DEFS = {
   // then merging, is the worst kind of wrong — they accept it believing an undo
   // they are not getting. The copy now describes the union, and says the one
   // thing that IS unconditionally true: nothing is lost.
+  // ⚠️ IT NO LONGER SAYS "NOTHING IS DELETED", BECAUSE THAT WAS NOT TRUE.
+  // Choosing a file yourself is the `user-file` lineage context, and the policy
+  // table maps BOTH `ours-newer` and `conflict` under it to `adopt` — wholesale
+  // replacement of this device's document, in exactly the flow this dialog
+  // exists for. The union is what happens on the common arm; it is not a
+  // guarantee, so the sentence promises the file will win where they disagree.
   'settings.switchFileConfirmation': {
-    en: "beanies will bring the contents of the selected file into your family's data. Anything in the file that is missing here is added back; anything added since is kept. Your family stays on the same data file, and your other devices pick the change up on their own. Nothing is deleted. Continue?",
+    en: "beanies will bring the contents of the selected file into your family's data. Anything in the file that is missing here is added back, and anything added since is kept where the two agree. Where they disagree, the file you chose wins, so changes made since it was saved can be replaced. Your family stays on the same data file, and your other devices pick the change up on their own. Continue?",
     beanie:
-      "beanies will bring the contents of the selected file into your family's data. anything in the file that is missing here is added back; anything added since is kept. your family stays on the same data file, and your other devices pick the change up on their own. nothing is deleted. continue?",
+      "beanies will bring the contents of the selected file into your family's beans. anything in the file that is missing here is added back, and anything added since is kept where the two agree. where they disagree, the file you chose wins, so changes made since it was saved can be replaced. your family stays on the same data file, and your other devices pick the change up on their own. continue?",
   },
   'settings.dataLoadedSuccess': {
     en: 'Data loaded successfully!',
@@ -4575,10 +4591,6 @@ const STRING_DEFS = {
     en: 'A device in your family could not open the family file. Compacting will fix that.',
     beanie: 'a device in your family could not open the family file. compacting will fix that.',
   },
-  'compaction.doneNothingToDo': {
-    en: 'Nothing else to do. Your other devices will pick this up on their own.',
-    beanie: 'nothing else to do. your other devices will pick this up on their own.',
-  },
   'compaction.doneOlderVersion': {
     en: 'Done. {list} will need to update beanies before it syncs again.',
     beanie: 'done. {list} will need to update beanies before it syncs again.',
@@ -4599,14 +4611,6 @@ const STRING_DEFS = {
     en: 'beanies cannot write to your family file at the moment, so it has not changed anything. Reconnect your storage, or grant access to the file again, then try tidying it once more.',
     beanie:
       'beanies cannot write to your family file at the moment, so it has not changed anything. reconnect your storage, or grant access to the file again, then try tidying it once more.',
-  },
-  'compaction.done': {
-    en: 'Your family file is compacted',
-    beanie: 'your family file is compacted',
-  },
-  'compaction.failed': {
-    en: "beanies couldn't compact your family file",
-    beanie: "beanies couldn't compact your family file",
   },
   'compaction.failedHelp': {
     en: 'Nothing has changed and your data is safe. If it keeps happening, send support@beanies.family the details.',
@@ -6030,6 +6034,33 @@ const STRING_DEFS = {
   'lists.new.templatesLabel': { en: 'Start from a Template', beanie: 'start from a template' },
   'lists.new.blank': { en: 'Start Blank List', beanie: 'start a blank list' },
   'lists.new.blankTitle': { en: 'My List', beanie: 'my list' },
+
+  // Copy a list to one or several beans (#91).
+  'lists.copy.title': { en: 'Copy List', beanie: 'copy list' },
+  'lists.copy.nameLabel': { en: 'Name the Copies', beanie: 'name the copies' },
+  'lists.copy.namePlaceholder': { en: "{bean}'s list", beanie: "{bean}'s list" },
+  'lists.copy.titleDefault': { en: "{bean}'s {list}", beanie: "{bean}'s {list}" },
+  'lists.copy.nameHint': {
+    en: '{bean} becomes each bean’s name. Remove it to give every copy the same name.',
+    beanie: '{bean} becomes each bean’s name. remove it to give every copy the same name.',
+  },
+  'lists.copy.beansLabel': { en: 'Make a Copy For', beanie: 'make a copy for' },
+  'lists.copy.notLinked': {
+    en: 'Copies aren’t linked, so changes made later won’t carry across.',
+    beanie: 'copies aren’t linked, so changes made later won’t carry across.',
+  },
+  'lists.copy.createOne': { en: 'Create Copy', beanie: 'create copy' },
+  'lists.copy.createOther': { en: 'Create {count} Copies', beanie: 'create {count} copies' },
+  'lists.copy.doneOne': { en: 'Copied.', beanie: 'copied.' },
+  'lists.copy.doneOther': { en: '{count} copies made.', beanie: '{count} copies made.' },
+  'lists.copy.sourceGone': {
+    en: 'That list is no longer here, so there was nothing to copy.',
+    beanie: 'that list is no longer here, so there was nothing to copy.',
+  },
+  'lists.detail.deleteFailed': {
+    en: 'That list couldn’t be deleted. Try again.',
+    beanie: 'that list couldn’t be deleted. try again.',
+  },
   // Templates (name + desc × 6)
   'lists.template.grocery.name': { en: 'Grocery list', beanie: 'grocery list' },
   'lists.template.grocery.desc': { en: 'Weekly · auto-resets', beanie: 'weekly · auto-resets' },

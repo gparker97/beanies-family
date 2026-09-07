@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-07",
-    "translationCount": 4589
+    "translationCount": 4587
   },
   "translations": {
     "app.name": {
@@ -2162,8 +2162,8 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.switchFileConfirmation": {
-      "translation": "beanies会将所选文件的内容带入您家庭的数据中。此处缺少的文件中的任何内容都将被重新添加；此后添加的任何内容都将保留。您的家人会保持在同一个数据文件中，其他设备会自行接收更改。未删除任何内容。是否继续？",
-      "hash": "9qyi8j",
+      "translation": "beanies会将所选文件的内容带入您家庭的数据中。此处缺少的文件中的任何内容都会被重新添加；两者一致的部分，此后添加的内容都会保留。两者不一致时，以您选择的文件为准，因此该文件保存之后所做的更改可能会被覆盖。您的家庭仍使用同一个数据文件，其他设备会自行接收更改。是否继续？",
+      "hash": "qmu3fz",
       "lastUpdated": "2026-09-07"
     },
     "settings.dataLoadedSuccess": {
@@ -22531,16 +22531,6 @@
       "hash": "f0chr6",
       "lastUpdated": "2026-09-05"
     },
-    "compaction.done": {
-      "translation": "您的家庭文件已压缩",
-      "hash": "xlj9b3",
-      "lastUpdated": "2026-09-06"
-    },
-    "compaction.failed": {
-      "translation": "beanies无法压缩您的家庭文件",
-      "hash": "d0kb57",
-      "lastUpdated": "2026-09-06"
-    },
     "compaction.failedHelp": {
       "translation": "没有任何变化，您的数据是安全的。如果这种情况持续发生，请向support@beanies.family发送详细信息。",
       "hash": "s6c287",
@@ -22704,11 +22694,6 @@
     "compaction.dueBecauseFailed": {
       "translation": "您家庭中的设备无法打开家庭文件。压实可以解决这个问题。",
       "hash": "9t8tb3",
-      "lastUpdated": "2026-09-06"
-    },
-    "compaction.doneNothingToDo": {
-      "translation": "没有其他事情可做。您的其他设备将自行接收此信息。",
-      "hash": "tfzlk9",
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.not-owner": {
@@ -22949,6 +22934,11 @@
     "resumeSetup.podOlderVersion": {
       "translation": "此家庭文件由旧版本的beanies保存，无法再打开。您的家庭数据没有任何问题。如果这是您唯一的副本，请联系support@beanies.family。",
       "hash": "45s4yn",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.useAsDataFileTitle": {
+      "translation": "将此文件用作您的家庭数据文件",
+      "hash": "l369xs",
       "lastUpdated": "2026-09-07"
     }
   }

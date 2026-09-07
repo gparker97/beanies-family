@@ -29,7 +29,7 @@
 
 import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
-import { PayloadLoadError } from '@/types/sync';
+import { PayloadLoadError, payloadErrorKind, type PayloadErrorKind } from '@/types/sync';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 
 export type PodAccessErrorCode =
@@ -43,7 +43,13 @@ export type PodAccessErrorCode =
   // The file was saved by a NEWER beanies. `recoveries: []` is deliberate and
   // has precedent (`JOIN_ERRORS.NO_UNCLAIMED_MEMBERS`): no button in the app
   // can update the app.
-  | 'FILE_NEWER_VERSION';
+  | 'FILE_NEWER_VERSION'
+  // The file was saved by a beanies OLDER than the oldest format this build
+  // reads. Same shape as the newer case — no button in the app can fix it — but
+  // the opposite sentence: telling someone to update would send them looking for
+  // a fix that does not exist. It reached `VERIFY_UNAVAILABLE` before, which is
+  // a RETRYABLE warning, i.e. endless retry on a file no retry can open.
+  | 'FILE_OLDER_VERSION';
 
 /** The four recovery actions. Every one restores access to the ORIGINAL file. */
 export type PodRecoveryAction =
@@ -104,6 +110,11 @@ export const POD_ACCESS_ERRORS = {
     recoveries: [],
     severity: 'warning',
   },
+  FILE_OLDER_VERSION: {
+    messageKey: 'podOlderVersion.inline',
+    recoveries: [],
+    severity: 'warning',
+  },
 } as const satisfies Record<PodAccessErrorCode, PodAccessEntry>;
 
 /**
@@ -124,7 +135,26 @@ export const POD_ACCESS_SEVERITY: Record<PodAccessErrorCode, 'warning' | 'critic
   NO_HOME: 'critical',
   // "Please update beanies" is not an incident and must not page.
   FILE_NEWER_VERSION: 'warning',
+  FILE_OLDER_VERSION: 'warning',
 };
+
+/**
+ * Which payload kinds this classifier answers for itself, and which fall through
+ * to the network/auth arms below.
+ *
+ * `null` is a deliberate answer, not an omission: a corrupt or too-large file is
+ * NOT a version problem, and a stale credential is a `CONSENT_EXPIRED` question
+ * the arms below are better placed to answer. Exhaustive over `PayloadErrorKind`,
+ * so a seventh kind fails the build rather than silently taking `null`.
+ */
+const VERSION_CODE_FOR_KIND = {
+  'needs-update': 'FILE_NEWER_VERSION',
+  'too-old': 'FILE_OLDER_VERSION',
+  'credential-stale': null,
+  unreadable: null,
+  'too-large': null,
+  corrupt: null,
+} as const satisfies Record<PayloadErrorKind, PodAccessErrorCode | null>;
 
 /**
  * Classify a thrown Drive/auth failure.
@@ -142,7 +172,17 @@ export function classifyDriveFailure(e: unknown): PodAccessErrorCode {
   // classification must outrank ambient network state, or a connection blip
   // mid-read turns "update beanies" into "you are offline". Read through the
   // base-class member, never an `instanceof` of the subclass.
-  if (e instanceof PayloadLoadError && e.needsAppUpdate) return 'FILE_NEWER_VERSION';
+  // ⚠️ THROUGH `payloadErrorKind`, NOT A SECOND `instanceof` LADDER. Reading
+  // `needsAppUpdate` directly was correct until a file from the PAST became its
+  // own case: `needsAppUpdate` is false for it, so it fell past this line, past
+  // the arms below, and landed on `VERIFY_UNAVAILABLE` — a retryable warning,
+  // i.e. endless retry on a file no retry can open. `payloadErrorKind` already
+  // answers this question exhaustively, and routing through it means a seventh
+  // kind fails the BUILD here instead of taking a silent default.
+  if (e instanceof PayloadLoadError) {
+    const versionCode = VERSION_CODE_FOR_KIND[payloadErrorKind(e)];
+    if (versionCode) return versionCode;
+  }
   // `typeof` guard so this module stays importable outside a DOM (worker/SSR/unit).
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'OFFLINE';
   if (e instanceof TokenExpiredError) return 'CONSENT_EXPIRED';
