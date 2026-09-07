@@ -1,0 +1,551 @@
+<title>Recipe Share Flow</title>
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ── Tokens ──────────────────────────────────────────────────────────────
+     Light = the CIG five-colour palette plus the cookbook's warm paper
+     (#fbf3e3), which RecipeDetailPage already uses for its hero. Dark = the
+     semantic scale from packages/brand/theme.css, including `surface-paper`
+     (#2a2119), the warm dark the scrapbook/cookbook surfaces already use.
+     Every token is declared on bare :root first so the un-stamped
+     (system-default) state resolves a full palette. */
+  :root {
+    --board: #eef1f4;
+    --ground: #ffffff;
+    --raised: #f8f9fa;
+    --paper: #fbf3e3;
+    --paper-edge: rgb(230 126 34 / 12%);
+    --ink: #2c3e50;
+    --ink-soft: #55677a;
+    --ink-faint: #7d8b99;
+    --line: rgba(44, 62, 80, 0.1);
+    --accent: #f15d22;
+    --accent-warm: #e67e22;
+    --accent-wash: rgba(241, 93, 34, 0.08);
+    --silk-wash: rgba(174, 214, 241, 0.28);
+    --slate-wash: rgba(44, 62, 80, 0.05);
+    --danger: #c0392b;
+    --shadow: 0 18px 46px rgba(44, 62, 80, 0.13);
+    --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+    --modal-border: transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --board: #0e151c;
+      --ground: #1e2a36;
+      --raised: #26343f;
+      --paper: #2a2119;
+      --paper-edge: rgb(240 160 90 / 16%);
+      --ink: #f2f5f7;
+      --ink-soft: #c3ced6;
+      --ink-faint: #9aa9b4;
+      --line: rgba(255, 255, 255, 0.1);
+      --accent: #ff8b5e;
+      --accent-warm: #f0a05a;
+      --accent-wash: rgba(255, 139, 94, 0.13);
+      --silk-wash: rgba(143, 199, 232, 0.15);
+      --slate-wash: rgba(255, 255, 255, 0.05);
+      --danger: #ff8484;
+      --shadow: none;
+      --card-shadow: none;
+      --modal-border: rgba(255, 255, 255, 0.09);
+    }
+  }
+  :root[data-theme='dark'] {
+    --board: #0e151c;
+    --ground: #1e2a36;
+    --raised: #26343f;
+    --paper: #2a2119;
+    --paper-edge: rgb(240 160 90 / 16%);
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: rgba(255, 255, 255, 0.1);
+    --accent: #ff8b5e;
+    --accent-warm: #f0a05a;
+    --accent-wash: rgba(255, 139, 94, 0.13);
+    --silk-wash: rgba(143, 199, 232, 0.15);
+    --slate-wash: rgba(255, 255, 255, 0.05);
+    --danger: #ff8484;
+    --shadow: none;
+    --card-shadow: none;
+    --modal-border: rgba(255, 255, 255, 0.09);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--board); color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    padding: 36px 24px 80px; line-height: 1.55;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  header.page {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .eyebrow {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 6px;
+  }
+  h1 {
+    font-family: Outfit, system-ui, sans-serif; font-size: 27px; font-weight: 700;
+    margin: 0 0 7px; text-wrap: balance; color: var(--ink);
+  }
+  .standfirst { margin: 0; max-width: 68ch; font-size: 14.5px; color: var(--ink-soft); }
+  .theme-btn {
+    font: inherit; font-size: 13px; font-weight: 500; padding: 9px 15px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--ground);
+    color: var(--ink); cursor: pointer; flex: 0 0 auto;
+  }
+  .theme-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  h2.sec {
+    font-family: Outfit, system-ui, sans-serif; font-size: 19px; font-weight: 700;
+    margin: 46px 0 4px; color: var(--ink);
+  }
+  h2.sec .num {
+    display: inline-block; min-width: 26px; height: 26px; line-height: 26px;
+    text-align: center; border-radius: 9px; background: var(--accent-wash);
+    color: var(--accent); font-size: 13px; font-weight: 700; margin-right: 9px;
+  }
+  .sec-note { margin: 0 0 22px; font-size: 14px; color: var(--ink-soft); max-width: 74ch; }
+  .stage {
+    display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap;
+    background: var(--slate-wash); border: 1px solid var(--line);
+    border-radius: 24px; padding: 26px;
+  }
+  .stage-col { display: flex; flex-direction: column; gap: 10px; }
+  .stage-label {
+    font-family: Outfit, system-ui, sans-serif; font-size: 11.5px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+  }
+
+  /* ── The cookbook hero (matches RecipeDetailPage) ──────────────────────── */
+  .hero {
+    background: var(--paper); border: 1px solid var(--paper-edge);
+    border-radius: 24px; padding: 20px; width: 560px; max-width: 100%;
+  }
+  .dish {
+    font-family: Outfit, system-ui, sans-serif; font-size: 26px; font-weight: 800;
+    color: var(--ink); margin: 0; line-height: 1.15;
+  }
+  .sub {
+    font-family: Caveat, cursive; font-size: 21px; color: var(--accent-warm);
+    margin: 2px 0 0;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 0;
+    font-size: 12px; color: var(--ink-soft);
+  }
+  .meta b { font-family: Outfit, system-ui, sans-serif; color: var(--ink); font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .btn {
+    font-family: Outfit, system-ui, sans-serif; font-size: 13.5px; font-weight: 600;
+    border-radius: 16px; padding: 9px 16px; border: 0; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-quiet { background: rgba(255, 255, 255, 0.8); color: var(--ink); }
+  :root[data-theme='dark'] .btn-quiet { background: rgba(38, 52, 63, 0.8); color: var(--ink); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .btn-quiet { background: rgba(38, 52, 63, 0.8); color: var(--ink); }
+  }
+  .btn-cook { background: linear-gradient(90deg, #f15d22, #e88b4a); color: #fff; }
+  .btn-primary {
+    background: linear-gradient(135deg, #f15d22, #e67e22); color: #fff;
+    width: 100%; justify-content: center; padding: 13px 18px; border-radius: 16px;
+    font-size: 14.5px; font-weight: 700;
+  }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn-share { background: var(--accent-wash); color: var(--accent); }
+
+  /* ── Modal shell ───────────────────────────────────────────────────────── */
+  .modal {
+    background: var(--ground); border-radius: 24px; box-shadow: var(--shadow);
+    border: 1px solid var(--modal-border); overflow: hidden; width: 420px; max-width: 100%;
+  }
+  .m-head {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .icon-box {
+    width: 44px; height: 44px; border-radius: 14px; background: var(--accent-wash);
+    display: flex; align-items: center; justify-content: center; font-size: 20px; flex: 0 0 auto;
+  }
+  .m-title {
+    font-family: Outfit, system-ui, sans-serif; font-size: 17px; font-weight: 700;
+    color: var(--ink); margin: 0;
+  }
+  .m-sub { font-size: 12.5px; color: var(--ink-faint); margin: 1px 0 0; }
+  .m-body { background: var(--raised); padding: 18px 20px; }
+  .lbl {
+    display: block; font-family: Outfit, system-ui, sans-serif; font-size: 11.5px;
+    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 9px;
+  }
+
+  /* ── Channel grid (ShareChannelGrid) ───────────────────────────────────── */
+  .chan { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .ch {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 11px 4px; border-radius: 14px; background: var(--ground);
+    border: 1px solid var(--line); cursor: pointer; font: inherit;
+  }
+  .ch:hover { border-color: var(--accent); }
+  .ch:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .ch .g { font-size: 19px; }
+  .ch .n {
+    font-family: Outfit, system-ui, sans-serif; font-size: 10.5px; font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  /* ── Message preview ───────────────────────────────────────────────────── */
+  .preview {
+    margin-top: 16px; background: var(--ground); border: 1px solid var(--line);
+    border-radius: 14px; padding: 13px 14px; font-size: 12.5px; color: var(--ink-soft);
+    white-space: pre-wrap; line-height: 1.5; max-height: 190px; overflow-y: auto;
+  }
+  .preview .link { color: var(--accent); word-break: break-all; }
+  .note {
+    display: flex; gap: 8px; margin-top: 13px; padding: 10px 12px; border-radius: 12px;
+    background: var(--silk-wash); font-size: 12px; color: var(--ink-soft);
+  }
+
+  /* ── Receiving surface ─────────────────────────────────────────────────── */
+  .phone {
+    width: 340px; border-radius: 24px; overflow: hidden; background: var(--board);
+    border: 1px solid var(--line); box-shadow: var(--shadow);
+  }
+  .from-bar {
+    display: flex; align-items: center; gap: 9px; padding: 12px 15px;
+    background: var(--accent-wash); border-bottom: 1px solid var(--paper-edge);
+  }
+  .from-bar .who {
+    font-family: Outfit, system-ui, sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--ink);
+  }
+  .from-bar .lede { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; }
+  .recv-body { padding: 15px; }
+  .recv-hero {
+    background: var(--paper); border: 1px solid var(--paper-edge); border-radius: 18px;
+    padding: 15px; margin-bottom: 13px;
+  }
+  .card {
+    background: var(--ground); border-radius: 16px; padding: 13px 14px;
+    box-shadow: var(--card-shadow); margin-bottom: 11px; border: 1px solid var(--line);
+  }
+  .card h4 {
+    font-family: Outfit, system-ui, sans-serif; font-size: 13px; font-weight: 700;
+    margin: 0 0 8px; color: var(--ink);
+  }
+  .card li, .card p.step {
+    font-size: 12.5px; color: var(--ink-soft); line-height: 1.55; margin: 0 0 5px;
+  }
+  .card ul { margin: 0; padding-left: 15px; }
+  .sticky-cta {
+    position: sticky; bottom: 0; padding: 13px 15px;
+    background: var(--ground); border-top: 1px solid var(--line);
+  }
+  .cta-sub {
+    text-align: center; font-size: 11.5px; color: var(--ink-faint); margin: 8px 0 0;
+  }
+  .cta-sub a { color: var(--accent); text-decoration: underline; }
+
+  .verdict {
+    margin-top: 46px; background: var(--ground); border: 1px solid var(--line);
+    border-radius: 24px; padding: 26px 28px; box-shadow: var(--card-shadow);
+  }
+  .verdict h3 {
+    font-family: Outfit, system-ui, sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 14px;
+  }
+  .verdict table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .verdict th {
+    text-align: left; font-family: Outfit, system-ui, sans-serif; font-size: 11.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+    font-weight: 600; padding: 0 14px 10px 0; border-bottom: 1px solid var(--line);
+  }
+  .verdict td {
+    padding: 12px 14px 12px 0; vertical-align: top; color: var(--ink-soft);
+    border-bottom: 1px solid var(--line);
+  }
+  .verdict tr:last-child td { border-bottom: 0; }
+  .verdict td strong { color: var(--ink); font-weight: 600; }
+  .pick {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    background: var(--accent-wash); color: var(--accent);
+    font-family: Outfit, system-ui, sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  @media (max-width: 640px) {
+    body { padding: 26px 15px 60px; }
+    .stage { padding: 18px; gap: 20px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div>
+      <p class="eyebrow">beanies.family · Cookbook · #92</p>
+      <h1>Send a recipe to anyone, and let them keep it</h1>
+      <p class="standfirst">
+        One message carries the recipe as readable text and a link. The link opens the
+        sharer&rsquo;s own version of the recipe, already parsed, with one action to keep it.
+        Recipe data rides in the URL fragment, so it never reaches a server. Colours,
+        type and shapes are the CIG&rsquo;s; the warm paper is the cookbook&rsquo;s own
+        <code>#fbf3e3</code> / <code>surface-paper</code>.
+      </p>
+    </div>
+    <button class="theme-btn" id="tt" type="button">Switch theme</button>
+  </header>
+
+  <!-- 1 — entry point -->
+  <h2 class="sec"><span class="num">1</span>Where sharing starts</h2>
+  <p class="sec-note">
+    Share joins the existing action row on the recipe hero, beside Edit and &ldquo;I cooked
+    this&rdquo;. It is quiet rather than a third gradient button: on this page the gradient is
+    reserved for the one action that records something.
+  </p>
+  <div class="stage">
+    <div class="stage-col">
+      <span class="stage-label">Recipe hero &middot; action row</span>
+      <div class="hero">
+        <p class="dish">Lemon Drizzle Cake</p>
+        <p class="sub">the one that never lasts a day</p>
+        <div class="meta">
+          <span>Prep <b>20 mins</b></span>
+          <span>Cook <b>45 mins</b></span>
+          <span>Serves <b>8</b></span>
+          <span><b>9</b> ingredients</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-quiet" type="button">&#9998; Edit</button>
+          <button class="btn btn-share" type="button">&#128228; Share</button>
+          <button class="btn btn-cook" type="button">&#127859; I cooked this</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 — the share sheet -->
+  <h2 class="sec"><span class="num">2</span>The share sheet</h2>
+  <p class="sec-note">
+    Reuses <code>ShareChannelGrid</code>, which already renders exactly this row of channels
+    for invites. What is new is the message preview: the user can see the whole thing before
+    it leaves, which matters when the message contains their recipe.
+  </p>
+  <div class="stage">
+    <div class="stage-col">
+      <span class="stage-label">Share modal</span>
+      <div class="modal">
+        <div class="m-head">
+          <div class="icon-box">&#128228;</div>
+          <div>
+            <p class="m-title">Share This Recipe</p>
+            <p class="m-sub">Lemon Drizzle Cake</p>
+          </div>
+        </div>
+        <div class="m-body">
+          <span class="lbl">Send with</span>
+          <div class="chan">
+            <button class="ch" type="button"><span class="g">&#128172;</span><span class="n">WhatsApp</span></button>
+            <button class="ch" type="button"><span class="g">&#9992;</span><span class="n">Telegram</span></button>
+            <button class="ch" type="button"><span class="g">&#128241;</span><span class="n">Messages</span></button>
+            <button class="ch" type="button"><span class="g">&#9993;</span><span class="n">Email</span></button>
+          </div>
+          <div style="height: 8px"></div>
+          <div class="chan">
+            <button class="ch" type="button"><span class="g">&#128100;</span><span class="n">Messenger</span></button>
+            <button class="ch" type="button"><span class="g">&#128172;</span><span class="n">WeChat</span></button>
+            <button class="ch" type="button"><span class="g">&#128203;</span><span class="n">Copy</span></button>
+            <button class="ch" type="button"><span class="g">&#8942;</span><span class="n">More</span></button>
+          </div>
+
+          <div style="height: 16px"></div>
+          <span class="lbl">They&rsquo;ll get</span>
+          <div class="preview">🍋 <b>Lemon Drizzle Cake</b>
+<i>the one that never lasts a day</i>
+
+Prep 20 mins · Cook 45 mins · Serves 8
+
+<b>You&rsquo;ll need</b>
+· 225g unsalted butter, softened
+· 225g caster sugar
+· 4 large eggs
+… and 6 more
+
+<b>How</b>
+1. Heat the oven to 180C fan.
+2. Beat the butter and sugar until pale.
+…
+
+Sent from my beanies cookbook 🌱
+Open it here to keep your own copy:
+<span class="link">app.beanies.family/recipe#eyJuIjoiTGVtb24gRHJpenpsZS…</span></div>
+
+          <div class="note">
+            <span aria-hidden="true">&#128274;</span>
+            <span>The recipe travels inside the link, not through our servers. Anyone with
+              the link can read it.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stage-col" style="max-width: 300px">
+      <span class="stage-label">Why the text as well</span>
+      <p style="font-size: 13.5px; color: var(--ink-soft); margin: 0">
+        Most people who receive this will never tap the link, and a bare URL in a group chat
+        is spam. With the recipe written out, the message is a gift whether or not anyone
+        installs anything &mdash; and the link becomes the quiet offer underneath it rather
+        than the whole point.
+      </p>
+    </div>
+  </div>
+
+  <!-- 3 — the receiving surface -->
+  <h2 class="sec"><span class="num">3</span>What the receiver opens</h2>
+  <p class="sec-note">
+    The conversion moment, and the one screen worth getting exactly right. Two directions
+    below. Both render the real recipe from the link with no account and no session; they
+    differ in where the invitation sits.
+  </p>
+  <div class="stage">
+    <div class="stage-col">
+      <span class="stage-label">A &middot; Recipe first, sticky offer</span>
+      <div class="phone">
+        <div class="from-bar">
+          <span aria-hidden="true" style="font-size: 17px">&#127793;</span>
+          <div>
+            <div class="who">Someone shared a recipe with you</div>
+            <div class="lede">sent from their beanies cookbook</div>
+          </div>
+        </div>
+        <div class="recv-body">
+          <div class="recv-hero">
+            <p class="dish" style="font-size: 21px">Lemon Drizzle Cake</p>
+            <p class="sub" style="font-size: 18px">the one that never lasts a day</p>
+            <div class="meta">
+              <span>Prep <b>20 mins</b></span><span>Cook <b>45 mins</b></span><span>Serves <b>8</b></span>
+            </div>
+          </div>
+          <div class="card">
+            <h4>&#127807; Ingredients</h4>
+            <ul>
+              <li>225g unsalted butter, softened</li>
+              <li>225g caster sugar</li>
+              <li>4 large eggs</li>
+              <li>225g self-raising flour</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>&#129379; Method</h4>
+            <p class="step">1. Heat the oven to 180C fan.</p>
+            <p class="step">2. Beat the butter and sugar until pale.</p>
+            <p class="step">3. Add the eggs one at a time.</p>
+          </div>
+        </div>
+        <div class="sticky-cta">
+          <button class="btn btn-primary" type="button">Keep This Recipe</button>
+          <p class="cta-sub">Free, and your cookbook stays yours. <a href="#">What is beanies?</a></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-col">
+      <span class="stage-label">B &middot; Offer card above the recipe</span>
+      <div class="phone">
+        <div class="recv-body" style="padding-bottom: 0">
+          <div
+            style="
+              background: linear-gradient(135deg, #f15d22, #e67e22);
+              border-radius: 18px; padding: 16px; color: #fff; margin-bottom: 13px;
+            "
+          >
+            <p style="font-family: Outfit, sans-serif; font-weight: 700; margin: 0 0 4px; font-size: 15px">
+              &#127793; A recipe was sent to you
+            </p>
+            <p style="margin: 0 0 12px; font-size: 12.5px; opacity: 0.95">
+              Keep it in your own cookbook, alongside everything else your family cooks.
+            </p>
+            <button
+              class="btn"
+              type="button"
+              style="background: #fff; color: #f15d22; width: 100%; justify-content: center"
+            >
+              Keep This Recipe
+            </button>
+          </div>
+          <div class="recv-hero">
+            <p class="dish" style="font-size: 21px">Lemon Drizzle Cake</p>
+            <p class="sub" style="font-size: 18px">the one that never lasts a day</p>
+          </div>
+          <div class="card">
+            <h4>&#127807; Ingredients</h4>
+            <ul>
+              <li>225g unsalted butter, softened</li>
+              <li>225g caster sugar</li>
+              <li>4 large eggs</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>&#129379; Method</h4>
+            <p class="step">1. Heat the oven to 180C fan.</p>
+            <p class="step">2. Beat the butter and sugar until pale.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <h3>Choosing the receiving surface</h3>
+    <table>
+      <thead>
+        <tr><th style="width: 14%">&nbsp;</th><th style="width: 43%">A &middot; Recipe first</th><th>B &middot; Offer card on top</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>First impression</strong></td>
+          <td>The dish. A slim line says where it came from, then the recipe starts.</td>
+          <td>A marketing card. The recipe begins below the fold on a phone.</td>
+        </tr>
+        <tr>
+          <td><strong>If they never sign up</strong></td>
+          <td>They still got exactly what their friend meant to send.</td>
+          <td>They got an advert with a recipe attached.</td>
+        </tr>
+        <tr>
+          <td><strong>Conversion</strong></td>
+          <td>The sticky bar is visible the whole way down, so the offer is always one tap away without ever being in the way.</td>
+          <td>Higher up-front prominence, at the cost of reading like a landing page.</td>
+        </tr>
+        <tr>
+          <td><strong>Verdict</strong></td>
+          <td>
+            <span class="pick">Chosen</span> It is what greg asked for in the issue &mdash;
+            &ldquo;the recipe first and the invitation second, never a sign-in wall in front
+            of the content&rdquo; &mdash; and it is the version a person would actually want
+            to be sent. The sticky bar gives up nothing: the offer is permanently on screen.
+          </td>
+          <td>
+            Rejected. It converts the favour into an ad, which is the fastest way to make
+            people stop sharing.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var order = ['light', 'dark', null];
+    var i = 0;
+    document.getElementById('tt').addEventListener('click', function () {
+      i = (i + 1) % order.length;
+      if (order[i]) document.documentElement.setAttribute('data-theme', order[i]);
+      else document.documentElement.removeAttribute('data-theme');
+      this.textContent = order[i] ? 'Theme: ' + order[i] : 'Theme: system';
+    });
+  })();
+</script>
