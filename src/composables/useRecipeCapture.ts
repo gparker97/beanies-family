@@ -564,7 +564,12 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
      * the source FILE stays owned by whichever capture instance produced it. That asymmetry
      * is forced by their lifetimes — the file never leaves its instance, the candidates are
      * delivered INTO the form as a prefill by either instance — and it is what makes a double
-     * attach structurally impossible: exactly one expression in the codebase passes this.
+     * attach structurally impossible.
+     *
+     * TWO expressions in the codebase pass this, and they cannot collide: `RecipeFormModal`
+     * on the save path, and `useRecipeRefetch.take` (#93) on the re-fetch path. The re-fetch
+     * offers a photo ONLY when the recipe has none yet, and a recipe being re-fetched is by
+     * definition already saved, so the two never run for the same recipe in the same moment.
      */
     dishImage: DishImagePrefill | null = null
   ): Promise<void> {

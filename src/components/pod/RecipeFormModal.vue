@@ -22,6 +22,7 @@ import InferredHint from '@/components/ui/InferredHint.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import type { DishImagePrefill } from '@/types/magicPayload';
 import { diffPayload } from '@/utils/diffPayload';
+import { recipeComparable } from '@/utils/recipeComparable';
 import type { RecipeTimeField } from '@/constants/recipeTimeFields';
 import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -372,30 +373,6 @@ function orUndefined(v: string): string | undefined {
   return v.trim() || undefined;
 }
 
-/**
- * The saved recipe as a payload, for diffing against. Captured from props rather than
- * rebuilt from the refs, so it reflects what is STORED, not what is on screen.
- */
-function baselinePayload(r: Recipe) {
-  return {
-    name: r.name,
-    subtitle: r.subtitle,
-    prepTime: r.prepTime,
-    cookTime: r.cookTime,
-    servings: r.servings,
-    sourceUrl: r.sourceUrl,
-    ingredients: r.ingredients ?? [],
-    steps: r.steps ?? [],
-    notes: r.notes,
-    // Site 3 of 4. `mealSlots` is canonicalised on BOTH sides because `diffPayload`'s array
-    // equality is by INDEX — ['dinner','lunch'] and ['lunch','dinner'] would otherwise read as
-    // a change and make a no-op save write.
-    course: r.course,
-    mealSlots: sortSlots(r.mealSlots ?? []),
-    tags: Array.isArray(r.tags) ? r.tags : [],
-  };
-}
-
 function buildPayload() {
   return {
     name: name.value.trim(),
@@ -441,7 +418,7 @@ const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
     const stored = recipesStore.recipes.find((r) => r.id === id);
     return recipesStore.updateRecipe(
       id,
-      stored ? diffPayload(baselinePayload(stored), payload) : payload
+      stored ? diffPayload(recipeComparable(stored), payload) : payload
     );
   },
 });
