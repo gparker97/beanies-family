@@ -120,6 +120,17 @@ describe('the two agreements the routing decision depends on', () => {
       throw new DOMException('QuotaExceededError');
     });
     expect(consumeKeptRecipe()).toEqual({ name: 'Cake', ingredients: ['flour'], steps: ['bake'] });
+    // ...and it is STILL consumed exactly once. The entry survives in storage because the
+    // delete threw, so without the session guard the add form would re-open pre-filled on
+    // every cookbook visit for the rest of the TTL.
+    expect(consumeKeptRecipe()).toBeNull();
     spy.mockRestore();
+  });
+
+  it('lets a SECOND recipe be kept in the same session', () => {
+    stashKeptRecipe({ name: 'First', ingredients: [], steps: [] });
+    expect(consumeKeptRecipe()?.name).toBe('First');
+    stashKeptRecipe({ name: 'Second', ingredients: [], steps: [] });
+    expect(consumeKeptRecipe()?.name).toBe('Second');
   });
 });

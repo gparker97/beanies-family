@@ -205,7 +205,12 @@ async function replaceOrSurface(target: string, callerTag: string): Promise<void
         surface: 'login.podlessRescue.replaceCancelled',
         message: `router.replace('${target}') was cancelled by a guard (caller=${callerTag}, type=${result.type})`,
         severity: 'warning',
-        context: { route_path: route.fullPath },
+        // ⚠️ `path`, NEVER `fullPath`. `fullPath` is path + query + HASH, and THIS route
+        // carries a secret in its hash: `recoveryKit.kitDeepLink` builds
+        // `/welcome#beanies-kit=<code>`, which is the code that unwraps the family key, and
+        // `/welcome` IS this page. The strip at `readKitFromHash` runs LATER than the
+        // podless self-rescue that reaches this report, so the fragment is still present.
+        context: { route_path: route.path },
       });
     }
   } catch (e) {
@@ -219,7 +224,8 @@ async function replaceOrSurface(target: string, callerTag: string): Promise<void
       message: `router.replace('${target}') threw during podless self-rescue (caller=${callerTag})`,
       error: e,
       severity: 'warning',
-      context: { route_path: route.fullPath },
+      // `path`, never `fullPath` — the recovery-kit code rides this route's hash. See above.
+      context: { route_path: route.path },
     });
     activeView.value = 'welcome';
   } finally {
