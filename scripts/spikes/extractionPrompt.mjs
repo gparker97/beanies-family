@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-09-04.1';
+export const PROMPT_VERSION = '2026-09-07.1';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -244,6 +244,8 @@ export const RECIPE_JSON_SHAPE = {
   prepTime: 'string — preparation time as written (e.g. "20 minutes"), or ""',
   cookTime: 'string — cooking time as written (e.g. "1 hour 10 minutes"), or ""',
   servings: 'string — yield as written (e.g. "Serves 4", "12 muffins"), or ""',
+  inferredTimes:
+    'array of strings — any of "prepTime", "cookTime", "servings" whose value you worked out from general culinary knowledge rather than reading it in the source. Omit a field you actually read. Empty array if you read them all, or filled none.',
   ingredients:
     'array — one object per ingredient: { text: string (the full line, quantity included, e.g. "250g plain flour"), inferred: boolean }. Empty array if none.',
   steps:
@@ -275,6 +277,7 @@ export function buildRecipeExtractionMessages(source, _todayIso) {
     'You extract ONE structured recipe from the provided source — images of a cookbook page, a screenshot, a photographed recipe card, or the text of a web page or video transcript.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     'Never output a quantity, temperature or time that is not actually supported by the source. An empty field is ALWAYS better than a guessed one.',
+    'ONE EXCEPTION, for "prepTime", "cookTime" and "servings" ONLY: if the source does not state one, you MAY supply a reasonable value from general culinary knowledge — but you MUST then list that field name in "inferredTimes". This exception NEVER applies to ingredient quantities or step timings.',
     'Set inferred=true on any ingredient or step whose quantity or timing was NOT stated in the source and which you filled in from general culinary knowledge. Do not smooth over ambiguity: "a shake of salt" is {"text":"salt, to taste","inferred":false}, never {"text":"1 tsp salt","inferred":false}.',
     "Write the recipe in your own words as a clean structured list. Do not reproduce the source's narration or prose verbatim.",
     'Set isRecipe=false if the source is not a recipe. Do not invent one.',
@@ -353,6 +356,7 @@ export function buildShareExtractionMessages(source, todayIso) {
       '. Field meanings: ' +
       JSON.stringify(RECIPE_JSON_SHAPE) +
       '.',
+    'When kind="recipe", ONE EXCEPTION to the rule above, for "prepTime", "cookTime" and "servings" ONLY: if the source does not state one, you MAY supply a reasonable value from general culinary knowledge — but you MUST then list that field name in "inferredTimes". This exception NEVER applies to ingredient quantities or step timings.',
   ].join('\n');
 
   return [

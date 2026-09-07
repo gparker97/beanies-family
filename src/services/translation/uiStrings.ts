@@ -10611,6 +10611,39 @@ const STRING_DEFS = {
   },
   'cookbook.showAll': { en: 'Show all recipes', beanie: 'show all recipes' },
 
+  // ─── Recipe re-fetch + inferred times (#93) ────────────────────────────────
+  // ⚠️ ONE SHORT WORD. The three time fields sit in an `sm:grid-cols-3` row, so a sentence
+  // here balloons the row on tablet. The ingredient/step hints above have a full column.
+  'recipeExtract.inferred.times': { en: 'Estimated', beanie: 'estimated' },
+
+  'recipes.refetch.action': { en: 'Read again', beanie: 'read again' },
+  'recipes.refetch.title': { en: 'Read the source again', beanie: 'read the source again' },
+  'recipes.refetch.subtitle': {
+    en: "Here's what the page says now, beside what you have.",
+    beanie: 'here’s what the page says now, beside what you have.',
+  },
+  'recipes.refetch.yours': { en: 'Yours', beanie: 'yours' },
+  'recipes.refetch.theirs': { en: 'From the site', beanie: 'from the site' },
+  'recipes.refetch.wasEmpty': { en: 'nothing yet', beanie: 'nothing yet' },
+  'recipes.refetch.photo': {
+    en: 'A dish photo, which this recipe does not have yet',
+    beanie: 'a dish photo, which this recipe does not have yet',
+  },
+  'recipes.refetch.nothingSaved': {
+    en: 'Nothing has been saved yet — your recipe is untouched until you take these.',
+    beanie: 'nothing has been saved yet — your recipe is untouched until you take these.',
+  },
+  'recipes.refetch.keepMine': { en: 'Keep Mine', beanie: 'keep mine' },
+  'recipes.refetch.take': { en: 'Take These Changes', beanie: 'take these changes' },
+  'recipes.refetch.noChange': {
+    en: 'Nothing new — this is still what the page says',
+    beanie: 'nothing new — this is still what the page says',
+  },
+  'recipes.refetch.cooldown': {
+    en: 'Just read that one. Try again after {resetsAt}.',
+    beanie: 'just read that one. try again after {resetsAt}.',
+  },
+
   // ─── Recipe share (#92) ────────────────────────────────────────────────────
   // The message a friend actually reads in WhatsApp. `{value}` / `{count}` are
   // filled with `fillTemplate`, never String#replace (a `$&` in a recipe name

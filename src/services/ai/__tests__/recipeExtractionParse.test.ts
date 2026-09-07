@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseRecipeExtractionResult, MODEL_FIELD_MAX, MODEL_LIST_MAX } from '../extractionPrompt';
+import {
+  parseRecipeExtractionResult,
+  MODEL_FIELD_MAX,
+  MODEL_LIST_MAX,
+  RECIPE_JSON_SHAPE,
+} from '../extractionPrompt';
+import { RECIPE_TIME_FIELDS } from '@/constants/recipeTimeFields';
 
 const VALID = {
   isRecipe: true,
@@ -88,5 +94,41 @@ describe('parseRecipeExtractionResult', () => {
     // accident. Dish photos come from the page's own markup via content-fetch.
     const r = parseRecipeExtractionResult({ ...VALID, imageUrl: 'javascript:' + 'alert(1)' });
     expect(r).not.toHaveProperty('imageUrl');
+  });
+});
+
+describe('inferredTimes (#93)', () => {
+  it('parses the list raw, with no enum knowledge — the mapper owns validation', () => {
+    // A bogus name survives the PARSER on purpose. `recipeExtractionToPrefill` filters it and
+    // warns; a parser-side filter would be a layering violation and a silent drop.
+    const r = parseRecipeExtractionResult({ ...VALID, inferredTimes: ['prepTime', 'nonsense'] });
+    expect(r.inferredTimes).toEqual(['prepTime', 'nonsense']);
+  });
+
+  it('defaults to empty when the key is absent, so an older client loses nothing', () => {
+    expect(parseRecipeExtractionResult(VALID).inferredTimes).toEqual([]);
+  });
+
+  it('is not required — a reply without it still parses in full', () => {
+    // Deliberately NOT in RECIPE_REQUIRED_KEYS: an off-day model that omits it must not cost
+    // the user the entire recipe over an advisory field.
+    const r = parseRecipeExtractionResult(VALID);
+    expect(r.name).toBe('Lemon Drizzle Cake');
+  });
+});
+
+describe('the shipped prompt names exactly the inferable fields', () => {
+  // The `inferredTimes` description in RECIPE_JSON_SHAPE spells the three names out in prose,
+  // and the .mjs copies cannot import the constant. Without this, RECIPE_TIME_FIELDS is simply
+  // a fourth copy of the list, free to drift from what the model is actually told.
+  it('mentions every RECIPE_TIME_FIELD and nothing else', () => {
+    const description = RECIPE_JSON_SHAPE.inferredTimes;
+    for (const field of RECIPE_TIME_FIELDS) {
+      expect(description).toContain(`"${field}"`);
+    }
+    // Every quoted field name in the description is a legal one.
+    const quoted = [...description.matchAll(/"([a-zA-Z]+)"/g)].map((m) => m[1]);
+    expect(quoted.length).toBeGreaterThan(0);
+    for (const name of quoted) expect(RECIPE_TIME_FIELDS).toContain(name);
   });
 });

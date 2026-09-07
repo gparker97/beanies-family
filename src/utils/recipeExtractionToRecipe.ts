@@ -14,6 +14,8 @@ import type { RecipeExtractionResult, RecipeFieldConfidence } from '@/services/a
 import type { JsonLdRecipe } from '@/services/ai/recipeFetchService';
 import { isRecipeCourse } from '@/constants/recipeCourses';
 import { isMealSlot, sortSlots } from '@/constants/mealSlots';
+import { isRecipeTimeField, RECIPE_TIME_FIELDS } from '@/constants/recipeTimeFields';
+import type { RecipeTimeField } from '@/constants/recipeTimeFields';
 import type { DishImagePrefill } from '@/types/magicPayload';
 
 /** What the form is opened with. One object, because it always travels as a unit. */
@@ -32,6 +34,15 @@ export interface RecipePrefill {
   inferredIngredients: string[];
   /** Step texts the model filled in itself. */
   inferredSteps: string[];
+  /**
+   * Which of `prepTime`/`cookTime`/`servings` the model worked out rather than read (#93).
+   *
+   * REQUIRED, not optional, for the same reason as `taxonomyRejected`: it makes the compiler
+   * force an answer at every construction site. In particular it is what puts the JSON-LD
+   * path's guarantee — nothing on that rung was guessed — in the code rather than in a
+   * comment somebody has to remember.
+   */
+  inferredTimes: RecipeTimeField[];
   /**
    * The candidate dish photos and the fact that a source page existed, or null when there was
    * no page at all (a document, a photo, or a hand-typed recipe).
@@ -106,6 +117,26 @@ export function validatedTaxonomy(result: RecipeExtractionResult): {
   return { ...(course ? { course } : {}), ...(mealSlots ? { mealSlots } : {}), rejected };
 }
 
+/**
+ * Validate the model's `inferredTimes` answer (#93).
+ *
+ * Same rule as the taxonomy above and stated in the same place: the parser hands back raw
+ * strings, the MAPPER decides what is real. A model that answers `"prep"` or `"yield"` gets
+ * its answer dropped and a developer gets told which three names are legal — never a silent
+ * drop, and never a coercion.
+ */
+export function validatedInferredTimes(raw: readonly string[]): RecipeTimeField[] {
+  const valid = raw.filter(isRecipeTimeField);
+  if (raw.length > valid.length) {
+    console.warn(
+      '[recipe-extract] model named unknown field(s) in inferredTimes; dropping them. ' +
+        `The only inferable fields are ${RECIPE_TIME_FIELDS.join(', ')}.`,
+      { got: raw }
+    );
+  }
+  return valid;
+}
+
 export function recipeExtractionToPrefill(result: RecipeExtractionResult): RecipePrefill | null {
   if (!result.isRecipe) return null;
 
@@ -143,6 +174,7 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
     taxonomyRejected: taxonomy.rejected,
     inferredIngredients: result.ingredients.filter((l) => l.inferred).map((l) => l.text),
     inferredSteps: result.steps.filter((l) => l.inferred).map((l) => l.text),
+    inferredTimes: validatedInferredTimes(result.inferredTimes),
     // NO IMAGE CONCERN ON THIS PATH ANY MORE (#86). The model never had a real URL to give:
     // `htmlToText` strips every tag before it sees the page, so anything it returned here was
     // necessarily invented — which is precisely why the old same-registrable-domain screen
@@ -180,6 +212,10 @@ export function jsonLdToPrefill(recipe: JsonLdRecipe, sourceUrl: string): Recipe
     // offered, so nothing was rejected.
     taxonomyRejected: [],
     inferredSteps: [],
+    // Empty for the same reason as the two lists above: the times on this rung were PARSED
+    // out of the publisher's own structured data, not worked out. Marking one inferred would
+    // be a lie, and the model is never invoked here to make one.
+    inferredTimes: [],
     // The JSON-LD `image` now arrives as candidate #1 from the server's ladder rather than
     // being re-derived here, so this mapper carries no image concern on either path.
     dishImage: null,

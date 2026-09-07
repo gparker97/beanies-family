@@ -230,6 +230,8 @@ export function sharedRecipeToPrefill(fields: SharedRecipeFields): RecipePrefill
     fields,
     inferredIngredients: [],
     inferredSteps: [],
+    // Empty for the same reason: the times came from a person's own cookbook, not a model.
+    inferredTimes: [],
     // `null` means "there was no page", which is exactly right: nothing was fetched.
     dishImage: null,
     taxonomyRejected: [],
