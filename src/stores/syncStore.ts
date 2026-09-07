@@ -2029,6 +2029,11 @@ export const useSyncStore = defineStore('sync', () => {
         viaRecoveryPassphrase,
       } = await tryUnwrapFamilyKey(pending.envelope, password);
 
+      // Captured before the adoption below switches the active family — the same
+      // reason `SettingsPage` captures it before calling us. Afterwards there is
+      // nothing left to compare against.
+      const familyIdBeforeAdoption = useFamilyContextStore().activeFamilyId;
+
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
@@ -2134,6 +2139,27 @@ export const useSyncStore = defineStore('sync', () => {
           severity: 'warning',
           context: { action: 'cache_after_decrypt_failed' },
         });
+      }
+
+      // ⚠️ IDENTITY BEFORE ROSTER. `reloadAllStores()` → `familyStore.loadMembers`
+      // resolves who you are against the roster it just loaded, and on a
+      // cross-family load the answer it finds is the PREVIOUS family's member:
+      // present, authenticated, and absent from this pod. `resolveSessionMember`
+      // correctly refuses to fall through to the owner (that IS the escalation it
+      // exists to stop) and rejects the session — so the app rendered with every
+      // permission false, no sidebar and no Family Data section, until the caller
+      // signed in a tick later and a reload re-derived it.
+      //
+      // Binding it HERE, before the roster loads, means the rejection never fires
+      // rather than firing and being repaired. `memberIds` is the answer to "who
+      // are you here" and it is EARNED: it lists the members whose wrapped key
+      // this password just opened. Its own contract is to be trusted only when
+      // there is exactly one — more than one and we cannot say which person this
+      // is, so we bind nobody and let the caller ask.
+      const adoptedFamilyId = familyCtx.activeFamilyId;
+      if (adoptedFamilyId !== familyIdBeforeAdoption && memberIds?.length === 1) {
+        const { useFamilyStore } = await import('@/stores/familyStore');
+        useFamilyStore().preselectSessionMember(memberIds[0]!);
       }
 
       // Reload all stores. It restores any publish the merge armed, so a

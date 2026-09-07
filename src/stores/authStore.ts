@@ -2238,13 +2238,17 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function revokeUnattendedReopen(hintFamilyId?: string): Promise<void> {
     try {
-      const { useFamilyContextStore } = await import('@/stores/familyContextStore');
       // `hintFamilyId` is captured from the session BEFORE it is torn down. Without it
       // this ran after `finalizeSession()` had already nulled `currentUser`, and at boot
       // `activeFamilyId` is null too — so `clearCachedFamilyKey(undefined)` took its
       // clear-ALL branch and wiped trusted auto-open for every unrelated family on the
       // device (#80 review). Narrow to the rejected session's own pod where we can.
-      const familyId = hintFamilyId ?? useFamilyContextStore().activeFamilyId ?? undefined;
+      // ⚠️ NO `activeFamilyId` FALLBACK HERE ANY MORE. This function runs after at
+      // least one await, so any state it reads describes a later moment than the
+      // rejection — see `invalidateSession`, which now resolves the hint while it
+      // still holds the truth. An absent hint means it was genuinely
+      // unidentifiable AT REJECTION TIME, which is what the branch below is for.
+      const familyId = hintFamilyId;
       if (!familyId) {
         // Still unidentifiable. Clearing everything is the fail-closed choice — an
         // over-broad revoke costs a re-prove, an under-broad one leaves the rejected
@@ -2276,7 +2280,17 @@ export const useAuthStore = defineStore('auth', () => {
     sessionRejected.value = true;
     // Capture before `finalizeSession()` nulls it — the revoke below needs to know WHICH
     // pod is being invalidated, and afterwards nothing does.
-    const rejectedFamilyId = currentUser.value?.familyId;
+    //
+    // ⚠️ THE FALLBACK IS RESOLVED HERE, SYNCHRONOUSLY, AND THAT IS THE POINT.
+    // `revokeUnattendedReopen` is fire-and-forget and awaits a dynamic import
+    // before it reads anything, so resolving `activeFamilyId` inside it read the
+    // state of a LATER moment. On a cross-family load — the one flow that rejects
+    // a session and then immediately establishes a new one — that meant a null
+    // hint resolving to the family the person had just signed into, or falling
+    // through to the clear-ALL branch and revoking trusted auto-open for every
+    // family on the device. Reading it now pins the answer to the rejection.
+    const rejectedFamilyId =
+      currentUser.value?.familyId ?? useFamilyContextStore().activeFamilyId ?? undefined;
     if (!INTEGRITY_REJECTIONS.has(kind)) {
       logEvent({
         level: 'warn',

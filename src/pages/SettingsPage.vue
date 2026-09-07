@@ -808,17 +808,22 @@ async function handleDecryptFile(password: string) {
     if (switchedFamily && unambiguousMemberId) {
       const signedIn = await authStore.signIn(unambiguousMemberId, password);
       if (!signedIn.success) {
-        // Do not leave the half-state on screen. The data IS loaded and safe;
-        // what failed is establishing who you are in the family it belongs to.
+        // ⚠️ THE MODAL CLOSES, AND THE PENDING FILE IS ALREADY GONE. This used to
+        // `return` into a still-open, still-submittable password form over a
+        // CONSUMED `pendingEncryptedFile` — so a retry rendered the untranslated
+        // "No pending encrypted file" ON TOP of the one instruction that told the
+        // person what to do, and closing the modal erased it instead. The load
+        // SUCCEEDED; only the session did not, and that is a sign-in, not a
+        // decrypt. Say it where it survives.
         console.warn('[SettingsPage] loaded another family but could not bind a member', signedIn);
-        encryptionError.value = t('settings.loadedOtherFamilyNeedsSignIn');
+        finishDecryptWith(t('settings.loadedOtherFamilyNeedsSignIn'));
         return;
       }
     } else if (switchedFamily) {
       // More than one member shares this password (or none was reported), so we
       // cannot say who you are without asking — and guessing would hand someone
       // another member's permissions. Say so rather than render a crippled app.
-      encryptionError.value = t('settings.loadedOtherFamilyNeedsSignIn');
+      finishDecryptWith(t('settings.loadedOtherFamilyNeedsSignIn'));
       return;
     }
     showDecryptFileModal.value = false;
@@ -839,6 +844,23 @@ async function handleDecryptFile(password: string) {
       result.error === 'Incorrect password' ? 'password.decryptionError' : 'settings.decryptFailed'
     );
   }
+}
+
+/**
+ * The file loaded; the SESSION did not settle. Close the decrypt modal and put
+ * the message where the person is still looking.
+ *
+ * ⚠️ ONE WRITER for both switched-family exits. They used to `return` with an
+ * error string into a modal that stays open over a `pendingEncryptedFile` the
+ * decrypt already consumed, so the two ways out of that screen were "retry and
+ * get told there is no pending file" and "close and lose the instruction". The
+ * data is loaded and safe either way — the only outstanding action is a sign-in.
+ */
+function finishDecryptWith(message: string) {
+  showDecryptFileModal.value = false;
+  syncStore.clearPendingEncryptedFile();
+  encryptionError.value = null;
+  importError.value = message;
 }
 
 function handleDecryptModalClose() {
