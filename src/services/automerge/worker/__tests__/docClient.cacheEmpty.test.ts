@@ -15,6 +15,8 @@
  * family's document destroys it with no guard, no rebase and no banner.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { LocalDocUnreadableError } from '@/types/sync';
 import { serializeError, type RpcRequest } from '../protocol';
 
@@ -199,11 +201,17 @@ describe('what main records about the cache', () => {
 
 describe('the inline realm', () => {
   /**
-   * ⚠️ "The fix only works in worker mode" is exactly the gap 6773 green tests
-   * would not show. Inline shares a realm with `applyAndProject`, the worker
-   * never dies, and the re-issue is a plain second dispatch.
+   * ⚠️ WHAT THIS PROVES, AND WHAT IT DOES NOT. The correction lives in
+   * `docClient.mergeRemoteEnvelope`'s catch, ABOVE `request()`, so it is
+   * realm-agnostic by construction — this drives the inline DISPATCH path and
+   * proves the substitution and its bound survive it. It does NOT execute the
+   * real `applyAndProject.mergeRemoteEnvelope` refusal (the executor here raises
+   * the same error the worker would); that half is covered by the worker-mode
+   * cases above and by `applyAndProject`'s own suite. Saying so is the point:
+   * "the fix only works in worker mode" is exactly the gap a green suite hides,
+   * and a comment that overclaimed would hide it just as well.
    */
-  it('behaves identically with the worker forced off', async () => {
+  it('substitutes and bounds identically with the worker forced off', async () => {
     const calls: LineageBasis[] = [];
     setInlineExecutor(async (method, args) => {
       if (method === 'initAndLoadCache') {
@@ -224,5 +232,24 @@ describe('the inline realm', () => {
 
     expect(res.action).toBe('merged');
     expect(calls.map((b) => b.kind)).toEqual(['baseline', 'no-local-document']);
+  });
+
+  it('is read in exactly ONE place, so a second reader has to argue for itself', () => {
+    // ⚠️ THE INVARIANT THE WHOLE DESIGN RESTS ON. `cacheProvenEmptyFor` is main's
+    // record of what it was TOLD, not a mirror of the worker's `currentDoc` — and
+    // the moment a second site reads it as though it were one, main starts
+    // asserting absence instead of corroborating it, which is how a resident
+    // document gets destroyed with no guard and no banner.
+    const src = fs.readFileSync(path.resolve(__dirname, '../docClient.ts'), 'utf8');
+    const reads = src
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.includes('cacheProvenEmptyFor'))
+      // Comments, the declaration, and the writes are not reads.
+      .filter((l) => !l.startsWith('*') && !l.startsWith('//') && !l.startsWith('/*'))
+      .filter((l) => !l.startsWith('let cacheProvenEmptyFor'))
+      .filter((l) => !/cacheProvenEmptyFor\s*=[^=]/.test(l));
+    expect(reads).toHaveLength(1);
+    expect(reads[0]).toContain('=== familyId');
   });
 });

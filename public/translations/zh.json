@@ -15562,9 +15562,9 @@
       "lastUpdated": "2026-06-10"
     },
     "calendarSync.disconnect.message": {
-      "translation": "beanies将删除它添加到此日历中的活动。戴着帽子，活动安全无虞。",
+      "translation": "beanies 将删除它添加到此日历中的活动。您的活动在 beanies 中依然安全。",
       "hash": "2p8myp",
-      "lastUpdated": "2026-06-10"
+      "lastUpdated": "2026-09-07"
     },
     "calendarSync.disconnect.confirm": {
       "translation": "断开连接",
@@ -18732,9 +18732,9 @@
       "lastUpdated": "2026-07-21"
     },
     "createWelcome.step3Body": {
-      "translation": "准备好后，您可以添加伴侣或小帽子。",
+      "translation": "准备好后，您可以添加伴侣或小 beanies。",
       "hash": "7qi044",
-      "lastUpdated": "2026-07-21"
+      "lastUpdated": "2026-09-07"
     },
     "createWelcome.safeText": {
       "translation": "您的数据在您的设备上加密，并存储在只有您可以打开的文件中—我们永远不会看到它。",
@@ -21922,9 +21922,9 @@
       "lastUpdated": "2026-09-01"
     },
     "celebration.listComplete": {
-      "translation": "全部完成！帽子在欢呼！",
+      "translation": "整个清单都完成了！beanies 在为您欢呼！",
       "hash": "46e9ya",
-      "lastUpdated": "2026-09-01"
+      "lastUpdated": "2026-09-07"
     },
     "reauth.description": {
       "translation": "在继续操作之前，请确认您的身份。",
@@ -22542,9 +22542,9 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.publishFailedHelp": {
-      "translation": "您的备份位于此设备上，您的数据是安全的。重新加载豆子，它将完成工作。",
+      "translation": "您的备份保存在此设备上，您的数据是安全的。重新加载 beanies，它会完成剩下的工作。",
       "hash": "igqa52",
-      "lastUpdated": "2026-09-05"
+      "lastUpdated": "2026-09-07"
     },
     "settings.compactPod": {
       "translation": "压缩系列文件",
@@ -22677,9 +22677,9 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.refused.safety-copy-damaged": {
-      "translation": "保存的复印帽子没有像它出去时那样回来，所以帽子在改变任何东西之前都停止了。您的家庭文件没有任何变化。请检查您的存储空间连接，然后重试。",
+      "translation": "beanies 保存的副本读回时与写出时不一致，因此 beanies 在做任何更改之前就停止了。您的家庭文件没有任何变化。请检查您的存储连接，然后重试。",
       "hash": "qfxdj8",
-      "lastUpdated": "2026-09-06"
+      "lastUpdated": "2026-09-07"
     },
     "compaction.refused.backup-too-large": {
       "translation": "此设备内存不足，无法进行备份，因此beanies在更改任何内容之前停止。没有任何变化。请在具有更多内存的设备上重试。",

@@ -185,34 +185,29 @@ export type RefreshOutcome =
   | 'skipped-in-flight';
 
 /**
- * Which banner a blocker belongs to.
- *
- * ⚠️ A TABLE OVER `inlineMessageKey`, NOT AN `instanceof` TERNARY, and it is
- * MODULE-LEVEL so it can be tested directly rather than through the store.
- *
- * It has exactly two callers by design — `notePodUnopenable` and
- * `mirrorServiceLatch`. Those two carried independent copies of
- * `err instanceof PodLineageError ? 'lineage' : 'decrypt'`, and because the 10s
- * poll's `.finally()` runs the second one immediately after the first, a new
- * blocker class added to only one of them was overwritten within the same tick:
- * a refusal whose banner never rendered, on the exact path the block travels.
- * `useRemoteFileOverLocalDocument`'s `finally` clobbers it the same way, so a
- * FAILED recovery also lost its banner.
- *
- * Keying on `inlineMessageKey` makes it a closed union, so a new blocker class
- * cannot compile until it says which banner it belongs to.
- */
-/**
  * Does a cache-init failure leave something of OURS to protect?
  *
- * ⚠️ EXACTLY ONE CELL OF THIS MATRIX MOVED versus the `instanceof` test it
- * replaced, and saying which one is the cheapest way to stop a reader
- * over-reading the change. An open-stage failure with NO document resident and
- * NO ready cache — the cold boot behind a second tab — now ADOPTS instead of
- * refusing. Every other cell keeps its previous verdict: an open-stage failure
- * over a resident document still refuses (that is the case the refusal was
- * written for), a load-stage failure over a live cache DB still refuses, a
- * `PayloadLoadError` still adopts, an unknown still refuses.
+ * ⚠️ TWO CELLS OF THIS MATRIX MOVED versus the `instanceof` test this replaced,
+ * and naming them exactly is the cheapest way to stop a reader over-reading the
+ * change. It is worth saying that an earlier version of this comment claimed
+ * ONE, and the claim was false — the second cell was a data-loss path a review
+ * caught and the suite did not. Both movements are toward the same answer the
+ * `PayloadLoadError` arm has always given:
+ *
+ *   1. An OPEN-stage failure with no document resident — the cold boot behind a
+ *      second tab — now ADOPTS. It used to refuse, latch, and raise a
+ *      full-screen overlay whose only action reproduced the timeout.
+ *   2. A LOAD-stage failure where the reseed PROVED the cache empty (it deleted
+ *      the database) now ADOPTS. This device holds nothing, and refusing told
+ *      the person their unsaved work was still here over a document that had
+ *      been dropped and a cache that had been wiped — the same false sentence
+ *      that already justified the `PayloadLoadError` arm.
+ *
+ * The cell that must NEVER move, and briefly did: a LOAD-stage failure whose
+ * reseed was BLOCKED. `clearCache` closes the handle before deleting, so a
+ * delete blocked by another tab leaves every `inc:*` row on disk. That still
+ * refuses. So do an open-stage failure over a resident document, and an
+ * unclassified failure.
  */
 const CACHE_INIT_LOSS: Record<CacheInitLoss, boolean> = {
   'something-to-lose': true, // refuse, latch, offer the family file
@@ -239,7 +234,25 @@ function CACHE_INIT_LOSS_REFUSES(e: unknown): boolean {
   return true;
 }
 
-export const BLOCKER_BANNER_KIND = {
+export /**
+ * Which banner a blocker belongs to.
+ *
+ * ⚠️ A TABLE OVER `inlineMessageKey`, NOT AN `instanceof` TERNARY, and it is
+ * MODULE-LEVEL so it can be tested directly rather than through the store.
+ *
+ * It has exactly two callers by design — `notePodUnopenable` and
+ * `mirrorServiceLatch`. Those two carried independent copies of
+ * `err instanceof PodLineageError ? 'lineage' : 'decrypt'`, and because the 10s
+ * poll's `.finally()` runs the second one immediately after the first, a new
+ * blocker class added to only one of them was overwritten within the same tick:
+ * a refusal whose banner never rendered, on the exact path the block travels.
+ * `useRemoteFileOverLocalDocument`'s `finally` clobbers it the same way, so a
+ * FAILED recovery also lost its banner.
+ *
+ * Keying on `inlineMessageKey` makes it a closed union, so a new blocker class
+ * cannot compile until it says which banner it belongs to.
+ */
+const BLOCKER_BANNER_KIND = {
   'podTooLarge.inline': 'decrypt',
   'podCorrupted.inline': 'decrypt',
   'podCredentialStale.inline': 'decrypt',
@@ -2157,7 +2170,18 @@ export const useSyncStore = defineStore('sync', () => {
       // there is exactly one — more than one and we cannot say which person this
       // is, so we bind nobody and let the caller ask.
       const adoptedFamilyId = familyCtx.activeFamilyId;
-      if (adoptedFamilyId !== familyIdBeforeAdoption && memberIds?.length === 1) {
+      // ⚠️ A GENUINE SWITCH, NOT A FIRST LOAD. `familyIdBeforeAdoption` is null
+      // on every cold-boot path — `LoadPodView`, the join flow, the login flow,
+      // all of which reach this same function — so testing only "the id changed"
+      // fired the bind for a device that had no previous family at all. Those
+      // paths own identity through their own sign-in, and one of them
+      // (`LoadPodView`) continues to a person picker when that sign-in FAILS,
+      // which would have left this bind naming the member the sign-in just
+      // refused. Only a switch AWAY from a family we were already in has a stale
+      // binding to get ahead of.
+      const switchedAwayFromAFamily =
+        familyIdBeforeAdoption !== null && adoptedFamilyId !== familyIdBeforeAdoption;
+      if (switchedAwayFromAFamily && memberIds?.length === 1) {
         const { useFamilyStore } = await import('@/stores/familyStore');
         useFamilyStore().preselectSessionMember(memberIds[0]!);
       }

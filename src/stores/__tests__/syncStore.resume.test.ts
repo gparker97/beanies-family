@@ -1175,10 +1175,15 @@ describe('syncStore — restoring from a backup file', () => {
 /**
  * The full classification matrix, in one place.
  *
- * ⚠️ EXACTLY ONE CELL MOVED versus the `!(e instanceof PayloadLoadError)` test
- * this replaced, and that is the claim this table exists to keep honest. Main
- * classifies from a verdict the WORKER computed; it never measures residency
- * itself, because it cannot see either `currentDoc` or the cache handle.
+ * ⚠️ TWO CELLS MOVED versus the `!(e instanceof PayloadLoadError)` test this
+ * replaced, and this table exists to keep that claim honest — an earlier version
+ * of it asserted ONE, which was false, and the extra movement was a data-loss
+ * path that a review caught and a green suite did not.
+ *
+ * Main classifies from a verdict the WORKER computed; it never measures anything
+ * itself, because it can see neither `currentDoc` nor the state of the cache.
+ * That is why the interesting cases below are distinguished only by `loss` —
+ * from here they are indistinguishable, which is the entire point.
  */
 describe('syncStore — the cache-init classification matrix', () => {
   beforeEach(() => {
@@ -1239,16 +1244,24 @@ describe('syncStore — the cache-init classification matrix', () => {
       refuses: true,
     },
     {
-      // ⚠️ THE LOAD STAGE IS NOT AUTOMATICALLY SAFE TO ADOPT OVER. It is only
-      // reached because the OPEN succeeded, so a writeable cache DB may still
-      // hold `inc:*` rows nobody has read — and a wholesale install leaves
-      // `lastPersistedHeads` null, so the next persist deletes every one.
-      name: 'load stage over a live cache DB — refuses',
+      // ⚠️ THE CELL THAT MUST NEVER MOVE, AND BRIEFLY DID. The worker reports
+      // `something-to-lose` at the load stage when its reseed could NOT delete
+      // the cache — blocked by another tab, which after a two-session soak is
+      // the normal state. `clearCache` closes the handle before deleting, so the
+      // rows are still on disk with nothing holding them open. A wholesale
+      // install leaves `lastPersistedHeads` null and the next persist deletes
+      // every one of them.
+      name: 'load stage whose reseed was BLOCKED — refuses',
       error: new CacheInitError('load', 'something-to-lose', 'InvalidStateError'),
       refuses: true,
     },
     {
-      name: 'load stage with neither a doc nor a cache — adopts',
+      // ⚠️ THE SECOND CELL THAT MOVED, and it moved toward the answer the
+      // `PayloadLoadError` arm below has always given. The reseed PROVED the
+      // cache empty by deleting the database, and `dropDoc()` ran before it — so
+      // refusing would tell the person their unsaved work is still here over a
+      // document that is gone and a cache that was wiped.
+      name: 'load stage whose reseed PROVED the cache empty — adopts',
       error: new CacheInitError('load', 'nothing-to-lose', 'InvalidStateError'),
       refuses: false,
     },

@@ -196,6 +196,9 @@ describe('offlineQueue', () => {
       // queue holding unsaved family data. The work must survive for a later
       // retry AND the outcome must be distinguishable from a no-op.
       offlineQueue.setFlushProvider({ write: vi.fn() } as any);
+      // ⚠️ THIS HANDLER DOES NOT RE-QUEUE, and that is what makes it a decline
+      // rather than an offline retry. A lineage block or a refused merge leaves
+      // the pending content exactly as it was.
       offlineQueue.setResaveHandler(vi.fn().mockResolvedValue(false));
       offlineQueue.enqueueOfflineSave('{"data":"blocked"}');
 
@@ -273,6 +276,40 @@ describe('offlineQueue', () => {
       expect(vi.mocked(reportError)).toHaveBeenCalled();
       // Second consecutive failure crosses FLUSH_FAILURE_PAGE_THRESHOLD.
       expect(severities).toContain('critical');
+      expect(offlineQueue.hasPendingSave()).toBe(true);
+    });
+
+    it('does NOT page when the save was simply still OFFLINE', async () => {
+      // ⚠️ THE FALSE ALARM THE SPLIT EXISTS FOR, and it is the COMMON case. An
+      // offline save resolves `false` too — the provider catches the network
+      // error, calls `enqueueOfflineSave` again and returns `{queued:true}` — so
+      // folding it into 'declined' paged `#beanies-errors` with a `critical` for
+      // every offline user who backgrounded and returned twice. Detected without
+      // guessing at `navigator.onLine`: the save re-queued during our own flush,
+      // so the pending content is no longer what we started with.
+      const { reportError } = await import('@/utils/errorReporter');
+      vi.mocked(reportError).mockClear();
+
+      offlineQueue.setFlushProvider({ write: vi.fn() } as unknown as Parameters<
+        typeof offlineQueue.setFlushProvider
+      >[0]);
+      // ⚠️ THE SAME BYTES BACK, deliberately — that is what a real re-queue does
+      // (the provider re-enqueues the serialized document it just tried to
+      // write). A content comparison reads identical bytes as "nothing was
+      // queued"; only a tick survives it.
+      offlineQueue.setResaveHandler(async () => {
+        offlineQueue.enqueueOfflineSave('{"data":"original"}');
+        return false;
+      });
+      offlineQueue.enqueueOfflineSave('{"data":"original"}');
+
+      window.dispatchEvent(new Event('online'));
+      await new Promise((r) => setTimeout(r, 0));
+      window.dispatchEvent(new Event('online'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(vi.mocked(reportError)).not.toHaveBeenCalled();
+      // And the work is still held, which is the whole point of not reporting.
       expect(offlineQueue.hasPendingSave()).toBe(true);
     });
 
