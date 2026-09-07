@@ -239,6 +239,14 @@ export interface RecipeExtractionResult extends AttestedResult {
    */
   course: string;
   mealSlots: string[];
+  /**
+   * Which of `prepTime`/`cookTime`/`servings` the model worked out rather than read (#93).
+   *
+   * RAW strings for the same reason as `mealSlots` — the mapper owns the enum. Non-optional,
+   * `[]` when absent, which reads as "all three were read from the source": the honest
+   * default for an older cached client or a model that ignored the field.
+   */
+  inferredTimes: string[];
   /*
    * NO `imageUrl` (#86). The model was asked for one and could never supply a real one:
    * `htmlToText` strips every tag before the model sees the page, so anything it returned was

@@ -18,9 +18,11 @@ import FormSection from '@/components/ui/FormSection.vue';
 import RecipeSourceStrip from './RecipeSourceStrip.vue';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import InferredHint from '@/components/ui/InferredHint.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import type { DishImagePrefill } from '@/types/magicPayload';
 import { diffPayload } from '@/utils/diffPayload';
+import type { RecipeTimeField } from '@/constants/recipeTimeFields';
 import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
@@ -138,21 +140,53 @@ const dishImage = ref<DishImagePrefill | null>(null);
 const willAttachPhoto = computed(() => (dishImage.value?.candidates.length ?? 0) > 0);
 
 /**
- * The model-inferred lists, from WHICHEVER route delivered the prefill.
+ * What the reader filled in itself, from WHICHEVER route delivered the prefill.
  *
  * These were computed off `props.prefill`, which only the host page sets — so a capture
  * started from this form's own shortcut band filled the fields but never rendered the
  * "beanies filled this in, check it" hints, presenting an inferred quantity as if it had
  * been read verbatim. Two visually identical entry points, different disclosure. Same trap
  * `willAttachPhoto` hit; these were left behind when that one was fixed.
+ *
+ * ONE ref holding all three lists, not one ref per list. The bug above WAS "one of these was
+ * left behind", and a third concept would have made six declarations for one idea. Assigned
+ * in a single statement inside `applyPrefill`, so a reset can never be partial.
+ *
+ * Initialised, never a bare `ref<T>()` — a bare one defaults to `undefined` and would push
+ * `?.` into every template site, which is the opposite of what this collapse is for.
  */
-const localInferredIngredients = ref<string[]>([]);
-const localInferredSteps = ref<string[]>([]);
+const EMPTY_INFERRED: { ingredients: string[]; steps: string[]; times: RecipeTimeField[] } = {
+  ingredients: [],
+  steps: [],
+  times: [],
+};
+const inferred = ref({ ...EMPTY_INFERRED });
+
+/** The ingredients / steps hint, or `''` when the reader filled none of them in. */
+function inferredListHint(key: 'ingredients' | 'steps'): string {
+  const lines = inferred.value[key];
+  return lines.length ? `${t(`recipeExtract.inferred.${key}`)} ${lines.join(', ')}` : '';
+}
+
+/** One short word beside a time the reader worked out rather than read. */
+function inferredTimeHint(field: RecipeTimeField): string {
+  return inferred.value.times.includes(field) ? t('recipeExtract.inferred.times') : '';
+}
 
 function applyPrefill(prefill: RecipePrefill | null): void {
   dishImage.value = prefill?.dishImage ?? null;
-  localInferredIngredients.value = prefill?.inferredIngredients ?? [];
-  localInferredSteps.value = prefill?.inferredSteps ?? [];
+  // ONE statement — the reset cannot be partial.
+  // `?? []` on each, as the code this replaced had: the prefill crosses a component
+  // boundary and `applyPrefill` is also reached from a test seam typed `unknown`, so the
+  // three lists are defended rather than assumed. Missing reads as "nothing was inferred",
+  // which is the safe direction — it under-claims rather than flagging a value we read.
+  inferred.value = prefill
+    ? {
+        ingredients: prefill.inferredIngredients ?? [],
+        steps: prefill.inferredSteps ?? [],
+        times: prefill.inferredTimes ?? [],
+      }
+    : { ...EMPTY_INFERRED };
   const f = prefill?.fields;
   name.value = f?.name ?? '';
   subtitle.value = f?.subtitle ?? '';
@@ -186,15 +220,6 @@ function applyPrefill(prefill: RecipePrefill | null): void {
   if (f?.mealSlots?.length) mealSlots.value = sortSlots(f.mealSlots);
   // `tags` deliberately untouched on a merge — see above.
 }
-
-/**
- * Which lines the reader filled in itself. Derived from the PROP, never a `wasPrefilled`
- * ref — a ref would need clearing on close and would eventually be missed on one path.
- */
-// applyPrefill is the one funnel both routes pass through, so read from what it recorded
-// rather than from the prop only one of them sets.
-const inferredIngredients = computed(() => localInferredIngredients.value);
-const inferredSteps = computed(() => localInferredSteps.value);
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.recipe,
@@ -591,15 +616,20 @@ const LIST_TEXTAREA_CLASS =
           <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
         </FormFieldGroup>
 
+        <!-- ⚠️ These three sit in a 3-column grid on tablet and up, so their inferred hint is
+             ONE SHORT WORD, not a sentence — a sentence balloons the row. -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
             <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
+            <InferredHint :text="inferredTimeHint('prepTime')" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('recipes.field.cookTime')" optional>
             <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
+            <InferredHint :text="inferredTimeHint('cookTime')" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('recipes.field.servings')" optional>
             <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
+            <InferredHint :text="inferredTimeHint('servings')" />
           </FormFieldGroup>
         </div>
 
@@ -638,14 +668,7 @@ const LIST_TEXTAREA_CLASS =
             :class="LIST_TEXTAREA_CLASS"
             :placeholder="t('recipes.placeholder.ingredients').replace(/\\n/g, '\n')"
           />
-          <!-- Heritage Orange, never Alert Red: this is a routine "worth a look", not an
-             error. Same idiom as ActivityModal's low-confidence hint. -->
-          <p
-            v-if="inferredIngredients.length"
-            class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs"
-          >
-            {{ t('recipeExtract.inferred.ingredients') }} {{ inferredIngredients.join(', ') }}
-          </p>
+          <InferredHint :text="inferredListHint('ingredients')" />
         </FormFieldGroup>
 
         <FormFieldGroup :label="t('recipes.field.steps')" optional>
@@ -655,12 +678,7 @@ const LIST_TEXTAREA_CLASS =
             :class="LIST_TEXTAREA_CLASS"
             :placeholder="t('recipes.placeholder.steps').replace(/\\n/g, '\n')"
           />
-          <p
-            v-if="inferredSteps.length"
-            class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs"
-          >
-            {{ t('recipeExtract.inferred.steps') }} {{ inferredSteps.join(', ') }}
-          </p>
+          <InferredHint :text="inferredListHint('steps')" />
         </FormFieldGroup>
       </FormSection>
 

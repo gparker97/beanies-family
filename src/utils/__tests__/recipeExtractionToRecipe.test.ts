@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { jsonLdToPrefill, recipeExtractionToPrefill } from '@/utils/recipeExtractionToRecipe';
 import type { RecipeExtractionResult } from '@/services/ai/types';
 
@@ -21,6 +21,7 @@ function result(over: Partial<RecipeExtractionResult> = {}): RecipeExtractionRes
     notes: 'Keeps 3 days in a tin.',
     course: '',
     mealSlots: [],
+    inferredTimes: [],
     confidence: { name: 0.9, ingredients: 0.8, steps: 0.7 },
     ...over,
   };
@@ -145,5 +146,44 @@ describe('jsonLdToPrefill also carries no image', () => {
   it('still records the source URL, which the form shows and stores', () => {
     const p = jsonLdToPrefill(RECIPE, 'https://nanabakes.example/r');
     expect(p.fields.sourceUrl).toBe('https://nanabakes.example/r');
+  });
+});
+
+describe('inferredTimes (#93)', () => {
+  it('carries the three legal field names through', () => {
+    const p = recipeExtractionToPrefill(result({ inferredTimes: ['prepTime', 'servings'] }));
+    expect(p?.inferredTimes).toEqual(['prepTime', 'servings']);
+  });
+
+  it('drops an unrecognised field name LOUDLY rather than coercing it', () => {
+    // "prep" is a near-miss, and a near-miss is exactly what must not be mapped: the whole
+    // point of the flag is that the user is told which values to check.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const p = recipeExtractionToPrefill(result({ inferredTimes: ['prep', 'cookTime', 'yield'] }));
+    expect(p?.inferredTimes).toEqual(['cookTime']);
+    expect(warn).toHaveBeenCalledOnce();
+    // The warning has to name the legal set, or it tells a developer nothing actionable.
+    expect(String(warn.mock.calls[0][0])).toContain('prepTime, cookTime, servings');
+    warn.mockRestore();
+  });
+
+  it('is empty on the JSON-LD rung — nothing there was guessed', () => {
+    // Every time field is populated on purpose: the guarantee is that a POPULATED JSON-LD
+    // time is still never marked inferred, which an empty fixture could not show.
+    const p = jsonLdToPrefill(
+      {
+        name: 'Toast',
+        subtitle: '',
+        prepTime: '2 mins',
+        cookTime: '3 mins',
+        servings: 'Serves 1',
+        ingredients: ['bread'],
+        steps: ['toast it'],
+        imageUrl: '',
+      },
+      'https://example.com/toast'
+    );
+    expect(p.fields.prepTime).toBe('2 mins');
+    expect(p.inferredTimes).toEqual([]);
   });
 });

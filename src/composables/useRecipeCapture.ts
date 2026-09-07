@@ -227,8 +227,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           fields: { name: source.title, ingredients: [], steps: [] },
           inferredIngredients: [],
           inferredSteps: [],
-          // No model output on this rung, so nothing was offered and nothing was rejected.
+          // No model output on this rung, so nothing was offered and nothing was rejected —
+          // and nothing was inferred, because nothing was read.
           taxonomyRejected: [],
+          inferredTimes: [],
           dishImage: null,
           confidence: { name: 1, ingredients: 0, steps: 0 },
         };
