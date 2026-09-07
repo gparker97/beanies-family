@@ -35,8 +35,11 @@ export function bootstrapDocClient(): void {
       .then(() => undefined)
   );
 
-  // docWorker kill-switch — off (prod default) forces the inline path; on
-  // (dev default) spawns the real worker lazily on first use.
+  // docWorker kill-switch. `COMMITTED_FLAGS.docWorker` is TRUE, so prod runs the
+  // real worker and inline is the spawn-failure fallback — not the other way
+  // round, as this comment claimed until 2026-09-07. The distinction matters:
+  // the inline path has no RPC deadline at all, so it is the branch where an
+  // unbounded await hangs hardest.
   if (!isFlagEnabled('docWorker')) docClient.forceInlineMode();
 
   // Backgrounding cache flush — narrows the ≤debounce last-edit-loss window. On

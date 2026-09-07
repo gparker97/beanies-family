@@ -27,6 +27,7 @@ import {
   setWorkerFactory,
   setRehydrator,
   __resetDocClientForTesting,
+  __RETRYABLE_METHODS_FOR_TESTING,
   getHeads,
   mutate,
   fireAndForgetMutate,
@@ -804,6 +805,23 @@ describe('docClient — worker-death recovery on RPC timeout', () => {
   });
 });
 
+describe('docClient — the retry that ran the same load three times', () => {
+  it('does NOT auto-retry initAndLoadCache, because the respawn already re-ran it', async () => {
+    // ⚠️ THREE RUNS, SIX MINUTES. `initAndLoadCache` was both a retryable method
+    // AND the rehydrator, so one 120s timeout became: the original call, the
+    // respawn's rehydrate, then the explicit retry. On the alive-but-busy branch
+    // it was worse than redundant, queueing a second whole-doc rebuild behind
+    // the first on a single-threaded worker.
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('initAndLoadCache')).toBe(false);
+    // The siblings that ARE safe to re-issue must stay.
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('getHeads')).toBe(true);
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('loadProjectionSnapshot')).toBe(true);
+    // And nothing that mutates ever joins them.
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('mutate')).toBe(false);
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('initDoc')).toBe(false);
+  });
+});
+
 describe('docClient — A1 recovery-rehydrate re-entrancy', () => {
   beforeEach(() => {
     __resetDocClientForTesting();
@@ -903,7 +921,15 @@ describe('docClient — A1 recovery-rehydrate re-entrancy', () => {
 
       // TWO recoveries reported ⇒ the flag was reset after the throw (else death #2's
       // timeout would have reject-self'd without recovering).
-      expect(reportError).toHaveBeenCalledTimes(2);
+      //
+      // ⚠️ COUNT THE RECOVERIES, not every report. The throwing rehydrator this
+      // test installs is itself reported now (`action: 'rehydrate-failed'`), and
+      // a bare call count silently conflated the two: it read as "three
+      // recoveries" the moment that failure stopped being console-only.
+      const recoveries = vi
+        .mocked(reportError)
+        .mock.calls.filter((c) => c[0].context?.action !== 'rehydrate-failed');
+      expect(recoveries).toHaveLength(2);
     } finally {
       setRehydrator(null);
       vi.useRealTimers();
