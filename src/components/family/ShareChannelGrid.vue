@@ -2,21 +2,45 @@
 import { ref, computed } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useClipboard } from '@/composables/useClipboard';
+import { useShareText } from '@/composables/useShareText';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
+import { fillTemplate } from '@/utils/fillTemplate';
 
+/**
+ * The channel row: WhatsApp, Telegram, SMS, Messenger, WeChat, Email, copy, and
+ * optionally the OS share sheet.
+ *
+ * ⚠️ ZERO INVITE VOCABULARY (#92). This used to build the invite message itself from
+ * `familyName` + `memberName`. It now takes a finished `body`, so an invite and a recipe are
+ * the same component parameterised by a message, with the two message builders sitting side
+ * by side in `utils/` (`inviteShareText.ts`, `recipeShareText.ts`). The alternative —
+ * additive optional overrides — buys one round of zero-diff and leaves a permanent component
+ * in which `familyName` is dead whenever `body` is supplied, with no type able to say so.
+ *
+ * ⚠️ The `data-testid`s still say `invite-`. That is deliberate: `invite-copy-link` and
+ * `invite-channel-*` are asserted in `e2e/specs/invite-join.spec.ts` and this component's own
+ * suite. "Zero invite vocabulary" stops at the DOM — a cosmetic rename turns E2E red for no
+ * user-visible gain.
+ */
 const props = defineProps<{
-  /** The invite URL to copy / share via channels. */
+  /** The URL channels deep-link to, and the URL shown in the copy row. */
   link: string;
-  /** Family name for substitution in the share message body. */
-  familyName: string;
-  /** Inviter member name for substitution in the share message body. */
-  memberName: string;
+  /** The finished message. Built by the caller — this component never templates one. */
+  body: string;
+  /** The `mailto:` subject line. */
+  emailSubject: string;
   /**
-   * Hide the trailing "🔒 Link expires in 24 hours" line.
-   * Set true when the consumer renders its own footer (e.g. the wizard).
+   * What the copy row puts on the clipboard. Defaults to `link`.
+   *
+   * This is the Discord path: Discord publishes no share-intent URL, so pasting is the only
+   * route to it, and a recipe share passes the WHOLE message here rather than a bare URL.
    */
-  hideExpiryNote?: boolean;
+  copyText?: string;
+  /** Show a "More" tile that opens the OS share sheet. Default false. */
+  showSystemShare?: boolean;
+  /** kebab-case telemetry surface of the caller, for the system-share fallback path. */
+  surface: string;
 }>();
 
 const emit = defineEmits<{
@@ -26,35 +50,31 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const { copied, copy } = useClipboard();
+const { share: shareViaSystem } = useShareText();
 const wechatHint = ref(false);
 
-const shareBody = computed(() =>
-  t('share.messageBody')
-    .replace('{member}', props.memberName)
-    .replace('{family}', props.familyName)
-    .replace('{link}', props.link)
-);
-
-const emailSubject = computed(() => t('share.emailSubject').replace('{family}', props.familyName));
+/** What the copy row writes. Falls back to the bare link. */
+const clipboardText = computed(() => props.copyText ?? props.link);
 
 const channels = computed(() => [
   {
     id: 'whatsapp',
     label: 'WhatsApp',
     color: '#25D366',
-    url: `https://wa.me/?text=${encodeURIComponent(shareBody.value)}`,
+    url: `https://wa.me/?text=${encodeURIComponent(props.body)}`,
   },
   {
     id: 'telegram',
     label: 'Telegram',
     color: '#26A5E4',
-    url: `https://t.me/share/url?url=${encodeURIComponent(props.link)}&text=${encodeURIComponent(shareBody.value.replace(props.link, '').trim())}`,
+    // Telegram takes the URL separately, so the body is sent without its own copy of it.
+    url: `https://t.me/share/url?url=${encodeURIComponent(props.link)}&text=${encodeURIComponent(props.body.replaceAll(props.link, '').trim())}`,
   },
   {
     id: 'sms',
     label: 'SMS',
     color: '#34C759',
-    url: `sms:?body=${encodeURIComponent(shareBody.value)}`,
+    url: `sms:?body=${encodeURIComponent(props.body)}`,
   },
   {
     id: 'messenger',
@@ -72,18 +92,24 @@ const channels = computed(() => [
     id: 'email',
     label: 'Email',
     color: '#6B7280',
-    url: `mailto:?subject=${encodeURIComponent(emailSubject.value)}&body=${encodeURIComponent(shareBody.value)}`,
+    url: `mailto:?subject=${encodeURIComponent(props.emailSubject)}&body=${encodeURIComponent(props.body)}`,
   },
 ]);
 
 async function handleCopy() {
-  const ok = await copy(props.link);
+  const ok = await copy(clipboardText.value);
   if (!ok) {
     console.error('[ShareChannelGrid] clipboard write failed');
     showToast('error', t('inviteWizard.error.couldntCopy'), undefined, { silent: true });
     return;
   }
   emit('shared', 'copy');
+}
+
+/** The OS share sheet. `useShareText` owns its own failure toast and cancel detection. */
+async function handleSystemShare() {
+  const ok = await shareViaSystem(t('share.title'), props.body, props.surface);
+  if (ok) emit('shared', 'system');
 }
 
 function handleChannel(channel: (typeof channels.value)[0]) {
@@ -123,7 +149,7 @@ function handleChannel(channel: (typeof channels.value)[0]) {
     });
     showToast(
       'error',
-      t('inviteWizard.error.channelOpenFailed').replace('{channel}', channel.label),
+      fillTemplate(t('inviteWizard.error.channelOpenFailed'), { channel: channel.label }),
       undefined,
       { silent: true }
     );
@@ -150,7 +176,7 @@ function handleChannel(channel: (typeof channels.value)[0]) {
       </div>
       <div class="min-w-0 flex-1">
         <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
-          {{ t('share.copyLink') }}
+          {{ copyText ? t('share.copy') : t('share.copyLink') }}
         </p>
         <p class="dark:text-ink-faint truncate text-xs text-gray-400">
           {{ link }}
@@ -273,6 +299,25 @@ function handleChannel(channel: (typeof channels.value)[0]) {
           {{ ch.label }}
         </span>
       </button>
+
+      <!-- OS share sheet — reaches every app the phone knows about, incl. Discord,
+           which publishes no share-intent URL of its own. -->
+      <button
+        v-if="showSystemShare"
+        type="button"
+        class="group dark:hover:bg-surface-hover/50 flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all hover:bg-gray-50 active:scale-95"
+        data-testid="invite-channel-system"
+        @click="handleSystemShare"
+      >
+        <div
+          class="dark:bg-surface-hover flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 shadow-sm transition-transform group-hover:scale-110"
+        >
+          <BeanieIcon name="share" size="md" class="dark:text-ink-soft text-gray-500" />
+        </div>
+        <span class="dark:text-ink-soft text-xs font-medium text-gray-600">
+          {{ t('share.more') }}
+        </span>
+      </button>
     </div>
 
     <!-- WeChat hint -->
@@ -292,9 +337,9 @@ function handleChannel(channel: (typeof channels.value)[0]) {
       </div>
     </Transition>
 
-    <!-- Expiry note (consumer can hide via prop if it renders its own footer) -->
-    <p v-if="!hideExpiryNote" class="dark:text-ink-faint text-center text-xs text-gray-400">
-      🔒 {{ t('family.linkExpiry') }}
-    </p>
+    <!-- Caller-owned footer. The invite's "link expires in 24 hours" line lives at the
+         invite call site, not here — it is invite vocabulary, and a recipe link never
+         expires. -->
+    <slot name="footer" />
   </div>
 </template>

@@ -1341,18 +1341,6 @@ const STRING_DEFS = {
     en: 'Something went wrong preparing your meal plan. Please try again.',
     beanie: 'something went wrong preparing your meal plan. please try again.',
   },
-  'mealPlanner.share.copied': {
-    en: 'Plan copied to clipboard',
-    beanie: 'plan copied to clipboard',
-  },
-  'mealPlanner.share.copyFailed': {
-    en: "Couldn't copy the plan",
-    beanie: "couldn't copy the plan",
-  },
-  'mealPlanner.share.copyFailedHelp': {
-    en: 'Copy is not available here — try selecting the text manually.',
-    beanie: 'copy is not available here — try selecting the text manually.',
-  },
   'mealPlanner.briefing.owner': { en: "You're cooking: {meal}", beanie: "you're cooking: {meal}" },
   'mealPlanner.briefing.forChild': {
     en: '{name} is cooking: {meal}',
@@ -10622,6 +10610,121 @@ const STRING_DEFS = {
     beanie: 'no {course} recipes in here yet.',
   },
   'cookbook.showAll': { en: 'Show all recipes', beanie: 'show all recipes' },
+
+  // ─── Recipe share (#92) ────────────────────────────────────────────────────
+  // The message a friend actually reads in WhatsApp. `{value}` / `{count}` are
+  // filled with `fillTemplate`, never String#replace (a `$&` in a recipe name
+  // garbles a plain replace). Built in `utils/recipeShareText.ts`.
+  'recipeShare.text.prep': { en: 'Prep {value}', beanie: 'prep {value}' },
+  'recipeShare.text.cook': { en: 'Cook {value}', beanie: 'cook {value}' },
+  'recipeShare.text.ingredients': { en: "You'll need", beanie: 'you’ll need' },
+  'recipeShare.text.method': { en: 'How', beanie: 'how' },
+  'recipeShare.text.andMore': { en: '… and {count} more', beanie: '… and {count} more' },
+  'recipeShare.text.restInLink': {
+    en: '… the rest of the method is in the link',
+    beanie: '… the rest of the method is in the link',
+  },
+  'recipeShare.text.signoff': {
+    en: 'Sent from my beanies cookbook 🌱',
+    beanie: 'sent from my beanies cookbook 🌱',
+  },
+  'recipeShare.text.openIt': {
+    en: 'Open it here to keep your own copy:',
+    beanie: 'open it here to keep your own copy:',
+  },
+
+  // The share sheet on a recipe.
+  'recipeShare.action': { en: 'Share', beanie: 'share' },
+  'recipeShare.modal.title': { en: 'Share This Recipe', beanie: 'share this recipe' },
+  'recipeShare.modal.previewLabel': { en: "They'll get", beanie: 'they’ll get' },
+  'recipeShare.modal.privacyNote': {
+    en: 'The recipe travels inside the link, not through our servers. Anyone with the link can read it.',
+    beanie:
+      'the recipe travels inside the link, not through our servers. anyone with the link can read it.',
+  },
+  'recipeShare.modal.emailSubject': {
+    en: 'A recipe from my beanies cookbook: {name}',
+    beanie: 'a recipe from my beanies cookbook: {name}',
+  },
+  'recipeShare.modal.oversizeTitle': {
+    en: 'This one is too big for a link',
+    beanie: 'this one is too big for a link',
+  },
+  'recipeShare.modal.oversizeBody': {
+    en: 'This recipe is longer than a link can carry, so it goes as text only. Copy it and paste it wherever you like.',
+    beanie:
+      'this recipe is longer than a link can carry, so it goes as text only. copy it and paste it wherever you like.',
+  },
+  'recipeShare.modal.longNote': {
+    en: 'A little long for Discord — it may arrive as two messages.',
+    beanie: 'a little long for discord — it may arrive as two messages.',
+  },
+
+  // The page a receiver opens. Recipe first, invitation second.
+  'recipeShare.received.title': { en: 'A shared recipe', beanie: 'a shared recipe' },
+  'recipeShare.received.eyebrow': {
+    en: 'Someone shared a recipe with you',
+    beanie: 'someone shared a recipe with you',
+  },
+  'recipeShare.received.from': {
+    en: 'sent from their beanies cookbook',
+    beanie: 'sent from their beanies cookbook',
+  },
+  'recipeShare.received.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
+  'recipeShare.received.method': { en: 'Method', beanie: 'method' },
+  'recipeShare.received.notes': { en: 'Notes', beanie: 'notes' },
+  'recipeShare.received.source': { en: 'Original recipe', beanie: 'original recipe' },
+  'recipeShare.received.keep': { en: 'Keep This Recipe', beanie: 'keep this recipe' },
+  'recipeShare.received.keepHint': {
+    en: 'Free, and your cookbook stays yours.',
+    beanie: 'free, and your cookbook stays yours.',
+  },
+  'recipeShare.received.what': { en: 'What is beanies?', beanie: 'what is beanies?' },
+  // Stated BEFORE sign-up, because the iOS Drive hop can clear the stash and
+  // nothing left afterwards could detect it. See `utils/recipeKeepStash.ts`.
+  'recipeShare.received.keepAcrossSignup': {
+    en: "If the recipe isn't waiting for you once you're in, open this link again from your chat and tap Keep.",
+    beanie:
+      'if the recipe isn’t waiting for you once you’re in, open this link again from your chat and tap keep.',
+  },
+  'recipeShare.received.keepFailed': {
+    en: "We couldn't hold on to that recipe",
+    beanie: 'we couldn’t hold on to that recipe',
+  },
+  'recipeShare.received.keepFailedHelp': {
+    en: 'Open the link again from your chat and tap Keep.',
+    beanie: 'open the link again from your chat and tap keep.',
+  },
+  // ONE dead-end for every decode failure. Naming which check refused would be
+  // an oracle for anyone probing the format.
+  'recipeShare.received.deadEndTitle': {
+    en: "This link didn't bring a recipe",
+    beanie: 'this link didn’t bring a recipe',
+  },
+  'recipeShare.received.deadEndBody': {
+    en: 'It may have been cut short on its way here. Ask whoever sent it to share it again.',
+    beanie: 'it may have been cut short on its way here. ask whoever sent it to share it again.',
+  },
+  'recipeShare.received.staleTitle': {
+    en: 'This link needs a newer beanies',
+    beanie: 'this link needs a newer beanies',
+  },
+  'recipeShare.received.staleBody': {
+    en: 'Refresh the page and open the link again.',
+    beanie: 'refresh the page and open the link again.',
+  },
+  'recipeShare.received.explore': { en: 'See what beanies is', beanie: 'see what beanies is' },
+
+  // Neutral share strings (#92). `useShareText` is channel-agnostic, so its copy
+  // lives here rather than under one feature's namespace.
+  'share.copy': { en: 'Copy', beanie: 'copy' },
+  'share.more': { en: 'More', beanie: 'more' },
+  'share.copied': { en: 'Copied to your clipboard', beanie: 'copied to your clipboard' },
+  'share.copyFailed': { en: "Couldn't copy", beanie: 'couldn’t copy' },
+  'share.copyFailedHelp': {
+    en: 'Your browser blocked the clipboard. Select the text and copy it by hand instead.',
+    beanie: 'your browser blocked the clipboard. select the text and copy it by hand instead.',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**
