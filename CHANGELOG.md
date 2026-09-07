@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **A change made offline is no longer lost when another device reorganises the family file at the same time.** When the connection came back, beanies uploaded the copy of your family data it had made _before_ going offline, straight over whatever the family file held by then. If the file had been reorganised meanwhile, that upload undid the reorganisation, the other device put it back, and the work done offline was quietly dropped in between. beanies now saves the way it always does when the connection returns: it reads the family file first, combines it with what is on the device, and writes the result.
+- **beanies no longer says your work is saved while it is still waiting for a connection.** A save that could not reach Google Drive was queued and then reported as done, so "Last Saved" updated for something that had never left the device.
+
 - **Restoring your family's data from a file now lets you say where the file is.** It guessed, and on a family stored in Google Drive it went straight to Google every time, with no way to say the file was on this device. There are now two buttons, and the one you press is the one that runs.
 - **Choosing a file from Google Drive no longer disconnects your Google account on the way.** Asking to restore quietly gave up the connection the family was already using, and reconnected as if you were signing in for the first time.
 - **The Google file chooser is gone from this screen, replaced by the one beanies already uses when you sign in.** It lists your family files and nothing else, opens straight away, and closes when you tell it to. The old one could put up an error of its own that covered the app with no way to dismiss it.

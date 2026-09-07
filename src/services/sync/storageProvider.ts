@@ -17,6 +17,21 @@ export interface RemoteMarker {
 /** The ack a `write()` returns (#61): the revision the file is at after our write. */
 export interface WriteAck {
   revision: string | null;
+  /**
+   * The bytes did NOT reach the backend — they were queued for when the
+   * connection returns.
+   *
+   * ⚠️ IT EXISTS BECAUSE A QUEUED WRITE USED TO LOOK LIKE A SUCCESSFUL ONE.
+   * `GoogleDriveProvider.write` catches a network failure, enqueues, and
+   * returns — so `doSave` ran on to `recordSaveSuccess()` and the save-complete
+   * callbacks stamped a fresh "Last Saved" for a write that never left the
+   * device. An offline user was told their work was safe on Drive while it sat
+   * in a session-storage queue.
+   *
+   * A caller that sees this must NOT record a save success, and must not treat
+   * anything downstream (a revision, a baseline) as established.
+   */
+  queued?: true;
 }
 
 export interface StorageProvider {

@@ -64,8 +64,27 @@ function ingestApiKey(): string {
 export function enqueueLogEvent(record: LogRecord, flush = false): void {
   if (!ingestUrl()) {
     if (!warnedNoUrl) {
-      console.warn('[telemetry] VITE_BEANIES_LOG_INGEST_URL not set — diagnostic logging disabled');
+      console.warn(
+        '[telemetry] VITE_BEANIES_LOG_INGEST_URL not set — events are NOT shipped. ' +
+          (import.meta.env?.DEV
+            ? 'Echoing them to this console instead (dev only).'
+            : 'Diagnostic logging disabled.')
+      );
       warnedNoUrl = true;
+    }
+    // ⚠️ ECHO IN DEV, RATHER THAN DROP. Without an ingest URL every `logEvent`
+    // was silently discarded — including the merge-terminus, lineage and
+    // cache-classification events written specifically to make sync failures
+    // diagnosable. So the one environment where you can actually reproduce a
+    // sync bug was the one environment where the diagnostics did not exist, and
+    // a real field investigation stalled on exactly that. Dev-only: the check is
+    // compiled out of the production bundle.
+    if (import.meta.env?.DEV) {
+      const { level, surface, message, context } = record;
+      const line = `[telemetry:${level}] ${surface} — ${message}`;
+      // `warn`/`error` only, per the repo's no-console rule.
+      if (level === 'error') console.error(line, context ?? {});
+      else console.warn(line, context ?? {});
     }
     return;
   }

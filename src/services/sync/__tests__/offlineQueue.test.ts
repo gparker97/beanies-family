@@ -59,6 +59,30 @@ vi.mock('@/utils/errorReporter', () => ({
 // Must reset modules between tests to clear module-level state
 let offlineQueue: typeof import('../offlineQueue');
 
+/**
+ * Install a flush target for the TRIGGER tests below.
+ *
+ * ⚠️ THE QUEUE NO LONGER WRITES THE BYTES IT HOLDS. It asks the sync service to
+ * RE-SAVE, which reads the remote, merges it and consults the lineage guard —
+ * because replaying a payload serialized before the device went offline is what
+ * let an offline peer silently revert a compaction for the whole family.
+ *
+ * These tests are about WHEN a flush runs (online, visible, token-acquired,
+ * retry, de-duplication), not about what gets written, so the handler stands in
+ * for the save and reports through the same spy. It forwards the queued content
+ * only so the existing `toHaveBeenCalledWith(...)` assertions keep saying which
+ * flush they observed.
+ */
+function installFlushTarget(write: ReturnType<typeof vi.fn<(c: unknown) => unknown>>): void {
+  offlineQueue.setFlushProvider({ write } as unknown as Parameters<
+    typeof offlineQueue.setFlushProvider
+  >[0]);
+  offlineQueue.setResaveHandler(async () => {
+    await write(sessionStorage.getItem('beanies_offline_queue'));
+    return true;
+  });
+}
+
 describe('offlineQueue', () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -121,35 +145,72 @@ describe('offlineQueue', () => {
       expect(result).toBe(false);
     });
 
-    it('writes queued content via provider and clears queue', async () => {
+    it('RE-SAVES rather than replaying the queued bytes, and clears the queue', async () => {
+      // ⚠️ THE BEHAVIOUR THIS TEST USED TO PIN WAS THE BUG. It asserted
+      // `write(queuedContent)` — a blind write of a payload serialized before
+      // the device went offline, straight over whatever the family's file holds
+      // now. That is how an offline peer silently reverted a compaction for the
+      // whole family: it wrote around every guard, because all of them live in
+      // the save path. The queue owns the FACT of unsaved work, not the bytes.
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       const mockProvider = { write: mockWrite } as any;
+      const resave = vi.fn().mockResolvedValue(true);
       offlineQueue.setFlushProvider(mockProvider);
+      offlineQueue.setResaveHandler(resave);
 
       offlineQueue.enqueueOfflineSave('{"data":"flushed"}');
 
       const result = await offlineQueue.flushQueue();
 
       expect(result).toBe(true);
-      expect(mockWrite).toHaveBeenCalledWith('{"data":"flushed"}');
+      expect(resave).toHaveBeenCalledTimes(1);
+      // The stale bytes are never written.
+      expect(mockWrite).not.toHaveBeenCalled();
       expect(offlineQueue.hasPendingSave()).toBe(false);
       expect(sessionStorage.getItem('beanies_offline_queue')).toBeNull();
     });
 
-    it('throws underlying write error and keeps queue on flush failure', async () => {
-      const mockWrite = vi.fn().mockRejectedValue(new Error('Network error'));
-      const mockProvider = { write: mockWrite } as any;
-      offlineQueue.setFlushProvider(mockProvider);
+    it('REFUSES to flush with no resave handler, rather than falling back to the old write', async () => {
+      // A missing handler must not become a licence to replay stale bytes "just
+      // this once" — that reintroduces the bug on exactly the paths nobody
+      // watches. The work stays queued for the next trigger.
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      // ⚠️ PROVIDER ONLY, DELIBERATELY NO HANDLER — that is what this pins.
+      offlineQueue.setFlushProvider({ write: mockWrite } as unknown as Parameters<
+        typeof offlineQueue.setFlushProvider
+      >[0]);
+      offlineQueue.enqueueOfflineSave('{"data":"stale"}');
+
+      await expect(offlineQueue.flushQueue()).rejects.toThrow('no resave handler');
+
+      expect(mockWrite).not.toHaveBeenCalled();
+      expect(offlineQueue.hasPendingSave()).toBe(true);
+      expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"stale"}');
+    });
+
+    it('keeps the queue when the save DECLINES (a lineage block, say)', async () => {
+      // `false` means "declined, already reported" — the work must survive for
+      // a later retry rather than being dropped here.
+      offlineQueue.setFlushProvider({ write: vi.fn() } as any);
+      offlineQueue.setResaveHandler(vi.fn().mockResolvedValue(false));
+      offlineQueue.enqueueOfflineSave('{"data":"blocked"}');
+
+      expect(await offlineQueue.flushQueue()).toBe(false);
+      expect(offlineQueue.hasPendingSave()).toBe(true);
+    });
+
+    it('propagates the underlying error and keeps queue on flush failure', async () => {
+      const resave = vi.fn().mockRejectedValue(new Error('Network error'));
+      offlineQueue.setFlushProvider({ write: vi.fn() } as any);
+      offlineQueue.setResaveHandler(resave);
 
       offlineQueue.enqueueOfflineSave('{"data":"retry"}');
 
-      // flushQueue now propagates the underlying write error so the
-      // offline-queue-flush surface can include the real cause in Slack
-      // (rather than the opaque "flush returned false" placeholder).
+      // flushQueue propagates the underlying error so the offline-queue-flush
+      // surface can include the real cause in Slack.
       await expect(offlineQueue.flushQueue()).rejects.toThrow('Network error');
 
       expect(offlineQueue.hasPendingSave()).toBe(true);
-      // Content should still be in sessionStorage for retry
       expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"retry"}');
     });
   });
@@ -161,7 +222,7 @@ describe('offlineQueue', () => {
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
 
       // Allow the async flushQueue to complete
       await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"auto"}'));
@@ -174,7 +235,7 @@ describe('offlineQueue', () => {
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
 
       const mockWrite = vi.fn();
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
 
       expect(mockWrite).not.toHaveBeenCalled();
 
@@ -188,7 +249,7 @@ describe('offlineQueue', () => {
       vi.useFakeTimers();
 
       const mockWrite = vi.fn().mockRejectedValue(new Error('fail'));
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"retry"}');
 
       // Simulate online event
@@ -214,7 +275,7 @@ describe('offlineQueue', () => {
       vi.useFakeTimers();
 
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"ok"}');
 
       window.dispatchEvent(new Event('online'));
@@ -234,7 +295,7 @@ describe('offlineQueue', () => {
       vi.useFakeTimers();
 
       const mockWrite = vi.fn().mockRejectedValue(new Error('fail'));
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"cancel"}');
 
       window.dispatchEvent(new Event('online'));
@@ -264,7 +325,7 @@ describe('offlineQueue', () => {
   describe('tokenAcquired flush hook', () => {
     it('flushes queue when onTokenAcquired callback fires', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"auth-recovery"}');
 
       // setFlushProvider auto-flushed (online), so clear the call history
@@ -282,7 +343,7 @@ describe('offlineQueue', () => {
 
     it('does not flush after clearQueue removes the subscription', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"will-clear"}');
 
       // Subscription registered via startListening above. Clear it.
@@ -313,7 +374,7 @@ describe('offlineQueue', () => {
       // setFlushProvider auto-flushes if onLine; navigate around that by
       // forcing onLine=false during this attach window, then restore.
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       vi.mocked(reportError).mockClear();
@@ -337,7 +398,7 @@ describe('offlineQueue', () => {
       const underlying = new Error('TokenExpiredError: Drive write failed');
       const mockWrite = vi.fn().mockRejectedValue(underlying);
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       vi.mocked(reportError).mockClear();
@@ -373,7 +434,7 @@ describe('offlineQueue', () => {
       const mockWrite = vi.fn().mockImplementation(async () => {
         order.push('write');
       });
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"gated"}');
       await Promise.resolve();
       mockWrite.mockClear();
@@ -393,7 +454,7 @@ describe('offlineQueue', () => {
 
     it('does NOT gate a `token-acquired` flush (it would deadlock recovery)', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"recovered"}');
       await Promise.resolve();
       mockWrite.mockClear();
@@ -412,7 +473,7 @@ describe('offlineQueue', () => {
         () => new Promise<void>((resolve) => (releaseGate = () => resolve()))
       );
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"once"}');
       await Promise.resolve();
       mockWrite.mockClear();
@@ -432,7 +493,7 @@ describe('offlineQueue', () => {
   describe('visibilitychange flush hook', () => {
     it('flushes queue when tab becomes visible', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"visible-recovery"}');
 
       // Drain auto-flush.
@@ -449,7 +510,7 @@ describe('offlineQueue', () => {
 
     it('does not flush when tab becomes hidden', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"stay-queued"}');
 
       await Promise.resolve();
@@ -466,7 +527,7 @@ describe('offlineQueue', () => {
 
     it('clearQueue removes the visibility listener', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       offlineQueue.enqueueOfflineSave('{"data":"will-clear"}');
 
       await Promise.resolve();
@@ -492,13 +553,23 @@ describe('offlineQueue', () => {
 
       expect(freshQueue.hasPendingSave()).toBe(true);
 
-      // Verify we can flush the restored content
+      // Verify the restored intent can be flushed. It re-SAVES; the restored
+      // bytes are never written (they describe a document from before the
+      // reload — see `flushQueue`). What survives a reload is the FACT that this
+      // device has unsaved work, which is what the queue is for.
+      const resave = vi.fn().mockResolvedValue(true);
       const mockWrite = vi.fn().mockResolvedValue(undefined);
-      freshQueue.setFlushProvider({ write: mockWrite } as any);
-      const result = await freshQueue.flushQueue();
+      // Handler BEFORE provider: `setFlushProvider` auto-flushes when something
+      // is pending, so registering it second races that flush against the
+      // explicit one below.
+      freshQueue.setResaveHandler(resave);
+      freshQueue.setFlushProvider({ write: mockWrite } as unknown as Parameters<
+        typeof freshQueue.setFlushProvider
+      >[0]);
+      await vi.waitFor(() => expect(resave).toHaveBeenCalled());
 
-      expect(result).toBe(true);
-      expect(mockWrite).toHaveBeenCalledWith('{"data":"restored"}');
+      expect(freshQueue.hasPendingSave()).toBe(false);
+      expect(mockWrite).not.toHaveBeenCalled();
 
       freshQueue.clearQueue();
     });
@@ -536,7 +607,7 @@ describe('offlineQueue', () => {
       // consuming our coalescing window.
       offlineQueue.enqueueOfflineSave('{"data":"cold-start"}');
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       vi.mocked(reportError).mockClear();
@@ -572,7 +643,7 @@ describe('offlineQueue', () => {
 
       offlineQueue.enqueueOfflineSave('{"data":"cold-start-fail"}');
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       vi.mocked(reportError).mockClear();
@@ -613,7 +684,7 @@ describe('offlineQueue', () => {
       vi.mocked(reportError).mockClear();
 
       const mockWrite = vi.fn().mockRejectedValue(new Error('Network down'));
-      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      installFlushTarget(mockWrite);
 
       await vi.waitFor(() => {
         expect(reportError).toHaveBeenCalledWith(
@@ -636,7 +707,7 @@ describe('offlineQueue', () => {
         offlineQueue.enqueueOfflineSave('{"data":"auth-blocked"}');
         const tokenErr = new TokenExpiredError();
         const mockWrite = vi.fn().mockRejectedValue(tokenErr);
-        offlineQueue.setFlushProvider({ write: mockWrite } as any);
+        installFlushTarget(mockWrite);
 
         // Visibility-triggered flush
         Object.defineProperty(document, 'hidden', { value: false, configurable: true });
@@ -661,7 +732,7 @@ describe('offlineQueue', () => {
 
         offlineQueue.enqueueOfflineSave('{"data":"drive-404"}');
         const mockWrite = vi.fn().mockRejectedValue(new Error('Drive 404 — file not found'));
-        offlineQueue.setFlushProvider({ write: mockWrite } as any);
+        installFlushTarget(mockWrite);
 
         Object.defineProperty(document, 'hidden', { value: false, configurable: true });
         document.dispatchEvent(new Event('visibilitychange'));
