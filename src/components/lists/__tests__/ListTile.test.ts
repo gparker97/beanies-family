@@ -51,8 +51,33 @@ describe('ListTile', () => {
     expect(wrapper.text()).toContain('Field-trip pack');
     expect(wrapper.text()).toContain('cat:kids');
     expect(wrapper.text()).toContain('2/3'); // 2 of 3 items done
-    await wrapper.trigger('click');
+    // The root is an <article> now, not a <button> — a button root could not legally
+    // contain the copy/delete buttons. The stretched overlay is the open affordance.
+    await wrapper.get('[data-testid="list-tile-open"]').trigger('click');
     expect(wrapper.emitted('open')?.[0]).toEqual(['l-1']);
+  });
+
+  it('emits copy and delete from the tile actions without opening the list', async () => {
+    const wrapper = mount(ListTile, { props: { list: list() } });
+    const buttons = wrapper.findAll('button');
+    // [copy, delete, open-overlay] — the overlay is last in the DOM on purpose.
+    await buttons[0].trigger('click');
+    await buttons[1].trigger('click');
+
+    expect(wrapper.emitted('copy')?.[0]).toEqual(['l-1']);
+    expect(wrapper.emitted('delete')?.[0]).toEqual(['l-1']);
+    // The whole point of `@click.stop`: an action must never also open the drawer.
+    expect(wrapper.emitted('open')).toBeUndefined();
+  });
+
+  it('gives the open overlay an inset focus ring, which the clipped root would hide', () => {
+    // `ring-inset` is load-bearing: the root is `overflow-hidden`, so an outward ring
+    // on an `inset-0` child is clipped to nothing and the primary action loses its
+    // only focus indicator.
+    const wrapper = mount(ListTile, { props: { list: list() } });
+    const cls = wrapper.get('[data-testid="list-tile-open"]').classes();
+    expect(cls).toContain('focus-visible:ring-inset');
+    expect(cls).toContain('focus-visible:ring-2');
   });
 
   it('shows a recurring status pill describing the reset cadence', () => {
