@@ -515,6 +515,41 @@ describe('syncStore.completeAutoLoad', () => {
     expect(blocked.error.latches).toBe(true);
   });
 
+  it('a CORRUPT cache still adopts, because the worker already cleared it', async () => {
+    // ⚠️ THE LINE BETWEEN "YOUR WORK IS SAFE" AND A PERMANENT DAMAGED-DATA
+    // SCREEN. A `PayloadLoadError` from `initAndLoadCache` means the worker ran
+    // `reseedCacheAfterCorruption` first: it dropped the document and cleared
+    // the whole cache DB, precisely so a fresh Drive load can re-seed it. So
+    // this device genuinely holds nothing, and refusing here would both lie
+    // ("anything you have not saved yet is still here") and dead-end the
+    // self-heal that `App.vue:718-723` mandates — a recoverable hiccup becomes
+    // a permanent "your data may be damaged" overlay while the pod is fine.
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(
+      new CorruptPayloadError('cached base failed to load', 'load', 'fam-resume-1')
+    );
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'adopted' as const,
+      heads: [],
+      dirty: false,
+      changed: true,
+      remoteHeads: [],
+    });
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    const result = await syncStore.completeAutoLoad('right-pw');
+
+    expect(result.kind).not.toBe('lineage-blocked');
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]![2]).toEqual({
+      kind: 'no-local-document',
+    });
+  });
+
   it('a genuine cache MISS still adopts wholesale, so an empty device is never stuck', async () => {
     // ⚠️ THE COUNTER-PRESSURE, and it is why the refusal keys on the ERROR and
     // not merely on `!loaded`. A device whose cache truly holds nothing must
