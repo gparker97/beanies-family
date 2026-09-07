@@ -892,6 +892,12 @@ async function handleRpcTimeout(
   // classification below), tear the worker down (idempotent), report once with
   // the renamed A9 keys carrying the REAL method, then retry-or-reject.
   const drainedMethods = [...pending.values()].map((p) => p.method);
+  // ⚠️ DEFERRED, 2026-09-07 (plan A9): this probe cannot tell "wedged" from
+  // "executing synchronous WASM", so a large-but-progressing load can be
+  // declared dead and terminated mid-flight. The honest fix is a progress
+  // signal posted from the worker around `loadCachedDoc`, which is a change to
+  // the worker protocol and did not belong in a lockout hotfix. The cache-open
+  // deadline removed the unbounded wait; this remains real.
   recoverDeadWorker(`rpc-timeout:${method}`); // drains siblings (quiet) + tears down → next request re-spawns
   reportError({
     surface: 'doc-worker-recovery',
@@ -1459,9 +1465,18 @@ export async function reset(): Promise<void> {
  */
 export async function clearCache(familyId: string): Promise<void> {
   const result = (await request('clearCache', { familyId })) as CacheClearResult | undefined;
-  // ⚠️ `=== false`, NOT `!result?.deleted`. The inline dispatch path and any
-  // older worker bundle answer `{}`, and a bare falsy test would firehose a
-  // false "the cache survived sign-out" on every inline sign-out.
+  // ⚠️ `=== false`, NOT `!result?.deleted`. An older worker bundle answers `{}`,
+  // and a bare falsy test would firehose a false "the cache survived sign-out"
+  // for it. (The inline path is NOT such a case: `inlineExecutor` runs the same
+  // `dispatch`, so inline and worker both carry a real `{ deleted }`.)
+  //
+  // ⚠️ IT CAN STILL OVER-REPORT, in one narrow window. If an abandoned open
+  // from an earlier timeout has not yet arrived to be closed, it is one of the
+  // connections blocking this delete — so we assert the cache survived, and a
+  // tick later the late-close lets the queued delete through and it did not.
+  // Over-reporting is the safe direction for a privacy claim, and the only way
+  // to be sure would be to await `onsuccess`, which is the wait that can never
+  // settle.
   if (result?.deleted === false) {
     logEvent({
       level: 'warn',

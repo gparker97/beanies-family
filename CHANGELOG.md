@@ -17,6 +17,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **beanies could get stuck on the sign-in spinner and never come back.** If the app was open in another tab, clearing a damaged local copy of your family file could leave beanies waiting on it forever, so signing in span for minutes and then failed. It now gives up on the local copy quickly and loads your family from Drive instead, which is what it was always supposed to do.
+- **Picking a family file that beanies cannot open now tells you so, where you are looking.** The message existed but had nowhere to appear, so it surfaced in the sync-error box instead, beside a "Force Save" button, over a family that was still perfectly fine. That read as though the file had loaded when it never had.
+- **A family file saved by a newer beanies is now recognised as one however the version was written.** Some files were reported as damaged instead.
 - **In Chinese, several "Not now" buttons said "Buy Now".** The install prompt, the passkey prompt, the community nudge and the trust prompt all offered to sell you something when you declined them. They now say "later".
 - **Chinese text now writes the app's name in lowercase**, the way it is written everywhere else.
 

@@ -72,6 +72,7 @@ vi.mock('@/services/familyContext', () => ({
 // CorruptPayloadError that is thrown by the worker's loadAndVerify (the old
 // main-thread fileSync.decryptBeanpodPayload copy was deleted 2026-08-13)
 // now surfaces from docClient.mergeRemoteEnvelope (worker decrypt + materialize).
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/services/automerge/worker/docClient', () => ({
   setFamilyKey: vi.fn(async () => {}),
   persistEnvelope: vi.fn(async () => {}),
@@ -234,6 +235,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { CorruptPayloadError } from '@/types/sync';
 import { tryUnwrapFamilyKey as mockedTryUnwrapFamilyKey } from '@/services/sync/fileSync';
+import { logEvent } from '@/services/telemetry/logEvent';
 import * as docClient from '@/services/automerge/worker/docClient';
 
 const envelopeJsonFor = (familyId: string, familyName: string): string =>
@@ -470,6 +472,69 @@ describe('syncStore.completeAutoLoad', () => {
       kind: 'no-local-document',
     });
     expect(docClient.dropDoc).not.toHaveBeenCalled();
+  });
+
+  it('a cache that will NOT OPEN degrades to the remote instead of hanging', async () => {
+    // ⚠️ THE DEGRADE THE LOCKOUT FIX ROUTES INTO, and it must stay the existing,
+    // tested path rather than a new mechanism. `initAndLoadCache` now REJECTS
+    // where it used to await forever, so this asserts the rejection is caught,
+    // the load completes from the remote, and the basis is `no-local-document`
+    // — the cross-family-safe answer, because a failed cache read means we hold
+    // no document of this family at all.
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(
+      new Error('cache open timed out after 10000ms: beanies-automerge-fam-resume-1 is queued')
+    );
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'adopted' as const,
+      heads: [],
+      dirty: false,
+      changed: true,
+      remoteHeads: [],
+    });
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    const result = await syncStore.completeAutoLoad('right-pw');
+
+    // The promise RESOLVES. Before the bound above it, this was the hang.
+    expect(result.kind).not.toBe('corrupted');
+    expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]![2]).toEqual({
+      kind: 'no-local-document',
+    });
+  });
+
+  it('counts the wholesale adopt, so a fleet-wide cache failure is not invisible', async () => {
+    // The FAILURE was already reported by the worker layer. What nothing counted
+    // was the DECISION that followed it: silently abandoning this device's
+    // document. Emitted on both arms, because a rate needs a denominator.
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(new Error('nope'));
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
+      action: 'adopted' as const,
+      heads: [],
+      dirty: false,
+      changed: true,
+      remoteHeads: [],
+    });
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    await syncStore.completeAutoLoad('right-pw');
+
+    expect(vi.mocked(logEvent).mock.calls.map((c) => c[0])).toContainEqual(
+      expect.objectContaining({
+        surface: 'pod-open-degrade',
+        level: 'warn',
+        context: expect.objectContaining({ action: 'cache-recovery', error_code: 'Error' }),
+      })
+    );
   });
 
   it('cross-family safety: a cache HIT merges into THIS family cached doc WITHOUT dropping it', async () => {

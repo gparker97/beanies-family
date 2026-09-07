@@ -563,7 +563,18 @@ export async function initAndLoadCache(
   // family's doc would commit it (the currentDoc===doc guard passes; it is this
   // family's own doc, so C11 cannot catch it).
   pendingRemoteBaseline = null;
-  await cache.initPersistenceDB(id);
+  try {
+    await cache.initPersistenceDB(id);
+  } catch (e) {
+    // ⚠️ THE SAME HOLE `reseedCacheAfterCorruption` GUARDS, on the opening call.
+    // Now that this can reject rather than hang, a device whose cache never
+    // opens loads fine from the remote and then persists NOTHING for the rest
+    // of the session, because `persistOnce` early-returns on `isCacheReady()`.
+    // The caller's degrade path is the right answer; going quiet about it is
+    // not. Raise, then rethrow so nothing downstream changes.
+    raiseCachePersistFailure('open', e instanceof Error ? e.name : 'UnknownError');
+    throw e;
+  }
   const key = requireKey('initAndLoadCache');
   let loaded: { doc: Doc; recovered: boolean } | null;
   try {
