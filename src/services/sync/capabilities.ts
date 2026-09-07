@@ -157,38 +157,3 @@ export function getSyncCapabilityMessage(): string {
 
   return 'Your browser supports manual export/import only. For automatic sync, use Chrome or Edge.';
 }
-
-/**
- * Which "pick a family data file" affordance a surface should open.
- *
- * ⚠️ THE TWO SURFACES ASK DIFFERENT QUESTIONS, and that is why this takes a
- * parameter instead of being one shared rule.
- *
- *  - `LoadPodView` (sign-in) asks *"which picker can this platform run?"* — it
- *    has no family yet, so there is no provider to respect. It calls this with
- *    no argument and gets today's platform-first answer, unchanged.
- *  - Settings' "load another data file" asks *"where does THIS FAMILY's data
- *    live?"* — and answering it platform-first is the bug: on Chromium desktop
- *    the local File System Access picker wins, and it cannot see Google Drive at
- *    all. So a Drive family was shown a picker that could not show it the
- *    pre-compaction safety copy the compaction note tells it to use, and picking
- *    a local file then re-homed the whole family off Drive.
- *
- * ⚠️ NO "IS THE PICKER AVAILABLE?" PREDICATE HERE, deliberately. It would never
- * be false in development, so it would be a guard nobody had ever seen fail.
- * A missing API key surfaces at runtime through `describePickFailure`'s `config`
- * arm, which offers the local picker as the way out.
- */
-export type PodFileSourceArm = 'drive-picker' | 'fsa-local' | 'os-sheet';
-
-export function podFileSourceArm(opts?: {
-  preferProvider?: 'google_drive' | 'local' | null;
-}): PodFileSourceArm {
-  // Provider first, when the caller named one. A Drive family picks from Drive
-  // on every platform that can run the Picker — except native, where the Picker
-  // is unreliable inside the iOS WebView (see `LoadPodView`), so the OS sheet
-  // stays the answer there.
-  if (opts?.preferProvider === 'google_drive' && !isNative()) return 'drive-picker';
-  if (isNative()) return 'os-sheet';
-  return supportsFileSystemAccess() ? 'fsa-local' : 'drive-picker';
-}

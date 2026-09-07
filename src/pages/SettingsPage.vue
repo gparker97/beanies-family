@@ -584,7 +584,30 @@ const canRestoreFromDrive = computed(
  * @param source Where the user said the file is. NEVER inferred: a guess sent a
  *   Drive family into Google's consent screen with no way back to a local file.
  */
+/**
+ * Guards the whole restore flow, dialog included.
+ *
+ * ⚠️ THE DELETED `showLoadFileConfirm` REF WAS THE IMPLICIT RE-ENTRANCY GUARD.
+ * It was set on click and cleared on confirm, so the confirm button vanished
+ * and only one destructive flow could run. With a `confirm()` promise there is
+ * nothing on screen to disable: a second click opens a second dialog, and
+ * `useConfirm`'s module-level singleton holds ONE `resolve`, so the second call
+ * overwrites the first and that click is swallowed for good. Two accepted
+ * dialogs then race two loads onto one `pendingEncryptedFile`.
+ */
+const restoreBusy = ref(false);
+
 async function handleLoadFromFileClick(source: 'google_drive' | 'local') {
+  if (restoreBusy.value) return;
+  restoreBusy.value = true;
+  try {
+    await runLoadFromFile(source);
+  } finally {
+    restoreBusy.value = false;
+  }
+}
+
+async function runLoadFromFile(source: 'google_drive' | 'local') {
   // ⚠️ REFUSE BEFORE READING ANYTHING. Replacing the family's data while we
   // cannot see which file is the family's would either strand every peer on the
   // old pod or point the family at a backup. Both are worse than not starting.
@@ -704,20 +727,11 @@ async function handleDriveRestoreSelected(payload: {
 async function handleLoadFromFileConfirmed(source: 'google_drive' | 'local' = 'local') {
   importError.value = null;
 
-  // ⚠️ PROVIDER FIRST, NOT PLATFORM FIRST, AND ONLY WHEN THERE IS A PROVIDER.
-  // A Drive family must pick from Drive, or the safety copy that
-  // `compaction.safetyCopyNote` tells the user to use is simply invisible on
-  // Chromium desktop: the local File System Access picker cannot see Drive at
-  // all. `LoadPodView` keeps its platform-first rule; the two surfaces answer
-  // different questions.
-  //
-  // ⚠️ THE `hasPod` + `=== 'google_drive'` GUARD IS LOAD-BEARING, not belt and
-  // braces. Asking `podFileSourceArm` with a null preference falls through to
-  // the PLATFORM rule, which answers `drive-picker` in any browser without the
-  // File System Access API — so a FIRST LOAD, where this family has no provider
-  // at all and the user simply wants to open a file from their device, would
-  // have been sent to the Google Picker. That is a surface this change was never
-  // asked to touch, and `SettingsPage.importError.test.ts` caught it.
+  // ⚠️ THE SOURCE IS THE USER'S, NEVER INFERRED. An earlier cut derived it from
+  // the provider and the platform, which sent a Drive family into Google's
+  // consent screen with no way to say the file was on this device — and, when
+  // the family had no provider at all, sent a FIRST LOAD to the Google Picker,
+  // a surface this change was never asked to touch. Two buttons, one argument.
   if (source === 'google_drive') {
     await openDriveRestorePicker();
     return;
@@ -2011,7 +2025,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   v-if="canRestoreFromDrive"
                   variant="secondary"
                   size="sm"
-                  :loading="syncStore.isSyncing"
+                  :loading="syncStore.isSyncing || restoreBusy"
+                  :disabled="restoreBusy"
                   @click="handleLoadFromFileClick('google_drive')"
                 >
                   {{ t('settings.browseDrive') }}
@@ -2019,7 +2034,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                 <BaseButton
                   variant="secondary"
                   size="sm"
-                  :loading="syncStore.isSyncing"
+                  :loading="syncStore.isSyncing || restoreBusy"
+                  :disabled="restoreBusy"
                   @click="handleLoadFromFileClick('local')"
                 >
                   {{ canRestoreFromDrive ? t('settings.browseDevice') : t('settings.browse') }}
@@ -2511,38 +2527,26 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     />
 
     <!-- ── Decrypt File Password Modal ─────────────────────────────────── -->
+    <!-- ⚠️ `:external-error` IS THE FIX FOR A MESSAGE NOBODY COULD SEE. The
+         failure was written to `encryptionError`, which renders as a
+         `fixed bottom-4` toast with NO z-index — so while this modal is open
+         (z-50 and up) the message was painted UNDERNEATH it. A person picked a
+         file, waited, watched the button re-enable and was told nothing. Same
+         defect as the refusal fixed in 564b0662: the render site existed and
+         was unreachable. `PasswordModal` already had `externalError`, which
+         renders inside the dialog the person is looking at; it was never
+         wired. -->
     <PasswordModal
       :open="showDecryptFileModal"
       :title="t('password.enterPassword')"
       :description="t('password.enterPasswordDescription')"
       :confirm-label="t('password.decryptAndLoad')"
+      :external-error="encryptionError"
       @close="handleDecryptModalClose"
       @confirm="handleDecryptFile"
     />
 
     <!-- ── Transfer Ownership ──────────────────────────────────────────── -->
     <TransferOwnershipModal :open="showTransferOwnership" @close="showTransferOwnership = false" />
-
-    <!-- ── Encryption error toast ──────────────────────────────────────── -->
-    <div
-      v-if="encryptionError"
-      class="fixed right-4 bottom-4 max-w-sm rounded-lg border border-red-200 bg-red-50 p-4 shadow-lg dark:border-red-800 dark:bg-red-900/90"
-    >
-      <div class="flex items-start gap-3">
-        <BeanieIcon name="exclamation-circle" size="md" class="mt-0.5 flex-shrink-0 text-red-500" />
-        <div>
-          <p class="dark:text-danger-lift text-sm font-medium text-red-800">
-            {{ t('password.encryptionError') }}
-          </p>
-          <p class="dark:text-danger-lift mt-1 text-sm text-red-600">{{ encryptionError }}</p>
-        </div>
-        <button
-          class="dark:hover:text-danger-lift text-red-400 hover:text-red-600"
-          @click="encryptionError = null"
-        >
-          <BeanieIcon name="close" size="sm" />
-        </button>
-      </div>
-    </div>
   </div>
 </template>

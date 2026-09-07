@@ -1266,9 +1266,16 @@ export function commitRemoteBaseline(driveHeads: readonly string[] | null): void
     // `revision` stays null in the row, so `shouldSkipOpenRead`'s
     // `revision === null` gate still refuses to skip a read. The row carries the
     // heads and nothing else, which is precisely what the rebase needs.
-    if (fpOnly !== null) {
-      docClient.noteRemoteBaseline(encodeBaselinePayload(null, fpOnly));
-    }
+    // ⚠️ WRITTEN UNCONDITIONALLY, INCLUDING WHEN `fpOnly` IS NULL. Guarding on
+    // non-null looked harmless and was fail-UNSAFE: a later commit that cannot
+    // prove what the remote holds correctly nulls the in-memory fingerprint,
+    // but a guarded write would leave the PREVIOUS fingerprint on disk. After a
+    // reload `seedRemoteBaseline` reinstates that stale value, the open terminus
+    // then claims a baseline this device explicitly could not prove, and the
+    // lineage verdict is computed against an older remote — the exact false
+    // claim the symmetric in-memory null above exists to prevent. Writing the
+    // null keeps the durable row and the in-memory one saying the same thing.
+    docClient.noteRemoteBaseline(encodeBaselinePayload(null, fpOnly));
     return;
   }
   // #65: `driveHeads` MUST be the heads of the content DRIVE HOLDS at `revision`

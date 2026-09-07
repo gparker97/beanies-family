@@ -210,8 +210,15 @@ export function decodeBaselinePayload(payload: string): DecodedBaseline | null {
     // falling through to the arm below would treat it as an unrecognised shape,
     // return "no baseline", AND `console.error` on every single open. Writing
     // the row would then be worse than not writing it.
-    if (r == null && typeof h === 'string' && h !== '') {
-      return { revision: null, headsFp: h };
+    if (r == null && 'h' in (parsed as object)) {
+      // ⚠️ A NULL `h` IS A REAL, MEANINGFUL ROW, not a malformed one: it records
+      // "we committed a baseline and could NOT prove what the remote held".
+      // Decoding it as `headsFp: null` makes the guard read `dirty`, which is
+      // the fail-safe direction. Rejecting it (by requiring a non-empty string)
+      // would drop it to "no baseline at all" AND `console.error` on every
+      // single open, which is how a correct write turns into log noise plus a
+      // silently more permissive verdict.
+      return { revision: null, headsFp: typeof h === 'string' && h !== '' ? h : null };
     }
     if (typeof r === 'string' && r !== '') {
       return { revision: r, headsFp: typeof h === 'string' ? h : null };

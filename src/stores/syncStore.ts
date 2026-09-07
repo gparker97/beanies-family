@@ -224,7 +224,15 @@ export const BLOCKER_BANNER_KIND = {
 } as const satisfies Record<PodBlockMessageKey, NonNullable<BackgroundSyncErrorKind>>;
 
 export function blockerErrorKind(err: RemoteBlocker): NonNullable<BackgroundSyncErrorKind> {
-  return BLOCKER_BANNER_KIND[err.inlineMessageKey];
+  // ⚠️ A RUNTIME FALLBACK, EVEN THOUGH THE TABLE IS COMPILE-TIME EXHAUSTIVE.
+  // `isRemoteBlocker` is deliberately DUCK-TYPED (`types/sync.ts` explains why:
+  // a structural check picks up a new blocker class at every site at once), so
+  // a value can satisfy it with an `inlineMessageKey` outside the union — an
+  // error rebuilt from the wire by an older bundle, say. The lookup then yields
+  // `undefined`, `clearPodUnopenable`'s `BLOCKER_KINDS.has(undefined)` can never
+  // clear it, and the bar latches on a kind nothing recognises. `decrypt` is the
+  // honest default: it is the generic "could not open your family data" banner.
+  return BLOCKER_BANNER_KIND[err.inlineMessageKey] ?? 'decrypt';
 }
 
 /**
@@ -467,6 +475,25 @@ export const useSyncStore = defineStore('sync', () => {
   // runs on every load path including `retry`, so an unguarded check would turn a
   // retry loop into a registry request loop.
   let checkedCanonicalFor: string | null = null;
+
+  /**
+   * Re-arm the canonical-pod check.
+   *
+   * ⚠️ THE LATCH HAS TO BE CLEARED BY THE EVENTS THAT INVALIDATE IT, and it was
+   * cleared only by `resetState`. The check runs at most once per family per
+   * session (an unguarded one turns a retry loop into a registry request loop —
+   * `verifyPodAccess` runs on every load path including `retry`), so anything
+   * that MOVES the family's pod leaves the guard latched on a stale answer for
+   * the rest of the session. A storage migration is exactly that: after "Move
+   * to Google Drive" the one check that catches a device writing to a copy
+   * instead of the family's real file was silently disabled.
+   *
+   * A named function rather than four raw assignments to a module-level string,
+   * because that is how a latch quietly stops being cleared.
+   */
+  function invalidateCanonicalCheck(): void {
+    checkedCanonicalFor = null;
+  }
   let configHealTotalFailureReported = false;
   let configHealTokenUnsub: (() => void) | null = null;
 
@@ -1049,10 +1076,15 @@ export const useSyncStore = defineStore('sync', () => {
           driveAccountEmail: pending.driveAccountEmail,
         });
       }
+      // ⚠️ `driveAccountEmail` MAY BE ABSENT, and `fromExisting` has a fallback
+      // this hand-rolled call was skipping — it resolves the signed-in account
+      // when none is passed. Without it a restore could persist a provider
+      // config with no account email, which is what the Drive-account row in
+      // Settings and the token-reconciliation path both read.
       const provider = GoogleDriveProvider.fromExisting(
         pending.driveFileId,
         pending.driveFileName,
-        pending.driveAccountEmail
+        pending.driveAccountEmail ?? undefined
       );
       syncService.setProvider(provider);
     }
@@ -1101,6 +1133,13 @@ export const useSyncStore = defineStore('sync', () => {
     let baselineHeads: string[] | null = null;
     /** The failure class, when the cache could not be read. See the event below. */
     let cacheErrorName: string | null = null;
+    /**
+     * The read failed AND this device's document is still in memory — so there
+     * is something to lose and the merge must refuse. False for the corrupt /
+     * stale-key classes, where the worker has already dropped the document and
+     * cleared the cache, and adopting the remote is the repair.
+     */
+    let cacheReadFailedWithDocIntact = false;
     try {
       const cacheResult = await docClient.initAndLoadCache(familyId);
       loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
@@ -1125,6 +1164,22 @@ export const useSyncStore = defineStore('sync', () => {
       // message.
       if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
       cacheErrorName = e instanceof Error ? e.name : 'UnknownError';
+      // ⚠️ ONLY THE CLASSES WHERE THE DOCUMENT ACTUALLY SURVIVES MAY REFUSE.
+      //
+      // A `PayloadLoadError` here means the worker already ran
+      // `reseedCacheAfterCorruption`: it DROPPED the document and CLEARED the
+      // whole cache DB before rethrowing, precisely so a fresh Drive load can
+      // re-seed it. For that class this device genuinely holds nothing, so
+      // `no-local-document` is the honest answer — and refusing instead would
+      // (a) tell the user "anything you have not saved yet is still here" when
+      // it demonstrably is not, and (b) dead-end the self-heal that App.vue's
+      // own comment mandates, turning a recoverable hiccup into a permanent
+      // "your data may be damaged" screen while the pod on Drive is fine.
+      //
+      // Everything else — a blocked IndexedDB delete, the cache-open deadline,
+      // an RPC timeout — leaves the resident document untouched. Those are the
+      // ones with something to lose, and those are the ones that refuse.
+      cacheReadFailedWithDocIntact = !(e instanceof PayloadLoadError);
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
 
@@ -1182,7 +1237,7 @@ export const useSyncStore = defineStore('sync', () => {
     // anywhere else (`podLineage.ts:161-178`), and the banner's own recovery
     // action re-enters here — refusing would make the one button offered to
     // resolve the block re-raise it. Same policy, not a new exception.
-    if (!loadedFromCache && cacheErrorName && !chosenByUser) {
+    if (!loadedFromCache && cacheReadFailedWithDocIntact && !chosenByUser) {
       logEvent({
         level: 'warn',
         surface: 'pod-lineage',
@@ -1193,7 +1248,7 @@ export const useSyncStore = defineStore('sync', () => {
         `[syncStore] Refusing to adopt the remote: this device's cache could not be read (${cacheErrorName}). ` +
           'The local document may hold unsaved work. Close other beanies tabs and reload.'
       );
-      throw new LocalDocUnreadableError(cacheErrorName);
+      throw new LocalDocUnreadableError(cacheErrorName ?? 'UnknownError');
     }
 
     // ⚠️ THE LINEAGE GUARD NOW LIVES IN THE WORKER — see
@@ -4109,7 +4164,7 @@ export const useSyncStore = defineStore('sync', () => {
     configHealAttempts = 0;
     configHealInFlight = false;
     verifyInFlight = false;
-    checkedCanonicalFor = null;
+    invalidateCanonicalCheck();
     podAccessError.value = null;
     configHealTotalFailureReported = false;
     reconnecting.value = false;
@@ -4268,6 +4323,16 @@ export const useSyncStore = defineStore('sync', () => {
       if (!provider) return;
       const providerType = syncService.getProviderType();
       if (!providerType) return;
+      // ⚠️ THE LATCH IS SET AFTER THE PROVIDER GATE BUT BEFORE THE DRIVE ONE,
+      // and that ordering is deliberate. The Drive-only early return used to sit
+      // ABOVE this line, so a local family returned without latching. Moving the
+      // gate below it (to make room for the provider-mismatch diagnostic) would
+      // have latched for local families too — and since `checkedCanonicalFor` is
+      // cleared only by `resetState` and the two invalidation points, a family
+      // that later ran "Move to Google Drive" would have the canonical check
+      // silently disabled for the rest of the session, on exactly the surface
+      // that catches a device writing to a copy. The diagnostic below runs for
+      // every provider; the latch is what it costs, so it is taken here, once.
       checkedCanonicalFor = familyId;
 
       const lookup = await registry.lookupFamilyResult(familyId);
@@ -4656,6 +4721,9 @@ export const useSyncStore = defineStore('sync', () => {
   async function migrateStorage(target: StorageProviderType): Promise<MigrateStorageResult> {
     if (isMigratingStorage.value) return { outcome: 'cancelled' };
     isMigratingStorage.value = true;
+    // The family's pod is about to move, so the once-per-session canonical
+    // answer is about to be wrong. See `invalidateCanonicalCheck`.
+    invalidateCanonicalCheck();
 
     const from = storageProviderType.value;
     let needsRollback = false;
@@ -4736,11 +4804,26 @@ export const useSyncStore = defineStore('sync', () => {
     // know the user has a fresh interactive token in hand — there's no
     // legitimate "session expired" state to display until something else
     // sets it again.
-    showGoogleReconnect.value = false;
-    showSaveFailureBanner.value = false;
-    saveFailureLevel.value = 'none';
-    lastSaveError.value = null;
-    error.value = null;
+    //
+    // ⚠️ ONLY WHEN THERE IS NO SESSION YET. That reasoning holds for the
+    // sign-in and join callers this was written for, and is false for the one
+    // added later: a RESTORE runs over a live session, and this wiped a
+    // save-failure banner — and its reconnect / re-pick actions — before
+    // reading a single byte. The natural response to "your saves are failing"
+    // is to go and restore a backup, so the very users most likely to be
+    // looking at that banner were the ones who lost it, and it stayed invisible
+    // for the rest of the session whether the restore worked or not.
+    //
+    // `isConfigured` is the discriminator: a family already open has state on
+    // screen that belongs to it, and clearing state this function did not set
+    // is not this function's business.
+    if (!isConfigured.value) {
+      showGoogleReconnect.value = false;
+      showSaveFailureBanner.value = false;
+      saveFailureLevel.value = 'none';
+      lastSaveError.value = null;
+      error.value = null;
+    }
 
     // Mark this as a critical load so the router beforeEach guard, the
     // beforeunload handler, and the SetupProgressModal can react. Setting
@@ -4764,7 +4847,12 @@ export const useSyncStore = defineStore('sync', () => {
       const provider = GoogleDriveProvider.fromExisting(fileId, driveFileName);
       const text = await provider.read();
       if (!text) {
-        error.value = 'File is empty';
+        // ⚠️ NO RAW ENGLISH INTO `error`. It is mirrored into the pod's own
+        // amber slab, so on the Settings restore path this painted an
+        // untranslated developer string beside the translated `importError` —
+        // two different messages for one failure. The caller classifies and
+        // speaks; this reports the reason.
+        console.warn('[syncStore.loadFromGoogleDrive] picked file is empty');
         return { success: false, reason: 'error' };
       }
 

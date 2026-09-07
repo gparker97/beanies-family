@@ -55,10 +55,22 @@ const blocked = computed(
 );
 
 /**
- * A lineage block reached the file and DECLINED it. Saying "can't reach" there
- * points the family at their network for a problem no network will ever fix.
+ * A blocker reached the file (or this device's own copy) and DECLINED it.
+ * Saying "can't reach" there points the family at their network for a problem
+ * no network will ever fix.
+ *
+ * ⚠️ NOT JUST `'lineage'` ANY MORE. This was a binary test, so a
+ * `local-unreadable` block — beanies could not open THIS device's copy —
+ * rendered "Can't reach your family file" on a wall that shows none of App.vue's
+ * banners (`noChrome`), which is the exact network-blaming copy the comment
+ * above forbids. Anything that is a refusal rather than a connectivity failure
+ * belongs on this side of the branch.
  */
-const isLineage = computed(() => syncStore.backgroundSyncErrorKind === 'lineage');
+const isLineage = computed(
+  () =>
+    syncStore.backgroundSyncErrorKind === 'lineage' ||
+    syncStore.backgroundSyncErrorKind === 'local-unreadable'
+);
 
 /**
  * `formatRelativeTime` reads a non-reactive `Date.now()`, so with `lastSync` as
