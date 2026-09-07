@@ -6,7 +6,6 @@
  * thing in the app that deliberately produces a document no peer can merge with.
  */
 import { setActivePinia, createPinia } from 'pinia';
-import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import { flushPendingSave } from '@/services/sync/syncService';
 import { reportError } from '@/utils/errorReporter';
@@ -297,15 +296,15 @@ describe('the automatic safety copy', () => {
     // saved would leave a bad file described to them as their rollback point.
     auxRead.mockResolvedValueOnce('{"version":"4.0","truncated":true}');
 
-    await usePodCompaction().compact();
+    const c = usePodCompaction();
+    await c.compact();
 
     expect(auxDelete).toHaveBeenCalledWith('family (before compacting).beanpod');
-    expect(showToast).toHaveBeenCalledWith(
-      'warning',
-      'compaction.refused',
-      'compaction.refused.safety-copy-damaged',
-      expect.anything()
-    );
+    // ⚠️ THE REFUSAL IS ON THE SURFACE, NOT IN A CORNER. It explains why a
+    // one-way, family-wide operation did NOT happen; a toast that dismisses
+    // itself is the wrong carrier for that.
+    expect(c.progressPhase.value).toBe('failed');
+    expect(c.progressErrorKey.value).toBe('compaction.refused.safety-copy-damaged');
   });
 
   it('REFUSES, changing nothing, when the copy vanished between write and read', async () => {
@@ -345,15 +344,11 @@ describe('the automatic safety copy', () => {
     // the second tells the user to do something they were never asked to do.
     buildExportEnvelope.mockRejectedValueOnce(new PayloadTooLargeError('oom', 'load', 'fam-1'));
 
-    await usePodCompaction().compact();
+    const c = usePodCompaction();
+    await c.compact();
 
     expect(docClient.compactDoc).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(
-      'warning',
-      'compaction.refused',
-      'compaction.refused.backup-too-large',
-      expect.anything()
-    );
+    expect(c.progressErrorKey.value).toBe('compaction.refused.backup-too-large');
   });
 
   it('does not swallow the build failure', async () => {
@@ -400,19 +395,18 @@ describe('the owner gate', () => {
     // device's copy has to check for itself.
     hooks.isOwner = false;
 
-    await usePodCompaction().compact();
+    const c = usePodCompaction();
+    await c.compact();
 
     expect(docClient.compactDoc).not.toHaveBeenCalled();
     // Before the confirm, so a non-owner is never asked a question that would
     // then be refused.
     expect(confirm).not.toHaveBeenCalled();
     expect(flushPendingSave).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(
-      'warning',
-      'compaction.refused',
-      'compaction.refused.not-owner',
-      expect.anything()
-    );
+    expect(c.progressErrorKey.value).toBe('compaction.refused.not-owner');
+    // ⚠️ AND THE MODAL NEVER OPENED. A refusal decided BEFORE the confirm must
+    // not flash a progress surface at someone who was never asked a question.
+    expect(c.progressOpen.value).toBe(false);
   });
 });
 
@@ -482,19 +476,35 @@ describe('who is on an older version is a notice, never a gate', () => {
     expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: undefined }));
   });
 
-  it('says plainly that nothing is left to do when everyone is current', async () => {
+  it('reports the sizes on completion, so the family can see it was worth doing', async () => {
+    // These were computed and then spent on four seconds of toast. They are the
+    // only evidence the family gets that anything actually improved.
     hooks.behind = [];
-    await usePodCompaction().compact();
+    const c = usePodCompaction();
+    await c.compact();
     compactedOk();
-    const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
-    expect(detail).toContain('compaction.doneNothingToDo');
+
+    expect(c.progressPhase.value).toBe('done');
+    expect(c.progressStats.value?.beforeBytes).toBeGreaterThan(0);
+    expect(c.progressStats.value?.afterBytes).toBeGreaterThan(0);
+    expect(c.progressOpen.value).toBe(true);
   });
 
-  it('NAMES who last opened beanies on an older version in the completion toast', async () => {
+  it('NAMES who is still on an older version, and KEEPS IT ON SCREEN', async () => {
+    // ⚠️ THE MOST ACTIONABLE SENTENCE BEANIES EVER SAYS. Under 5.0 these people
+    // are cut off until they update — their build refuses the file at parse —
+    // so "go and open Sam's device" must not appear for four seconds and then
+    // be taken away. It holds until the person dismisses it themselves.
     hooks.behind = ['Sam'];
-    await usePodCompaction().compact();
+    const c = usePodCompaction();
+    await c.compact();
     compactedOk();
-    const detail = vi.mocked(showToast).mock.calls.at(-1)?.[2] ?? '';
-    expect(detail).toContain('compaction.doneOlderVersion:Sam');
+
+    expect(c.progressPhase.value).toBe('done');
+    expect(c.olderVersionNames.value).toContain('Sam');
+    expect(c.progressOpen.value).toBe(true);
+
+    c.dismissProgress();
+    expect(c.progressOpen.value).toBe(false);
   });
 });

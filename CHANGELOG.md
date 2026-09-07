@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-07
 
+### Added
+
+- **Tidying up your family file now shows what it is doing, and what to do next.** It used to run silently (the backup, the tidying and the sharing all happened with nothing on screen) and then tell you the result in a message that disappeared after a few seconds. There is now a progress screen with each step, the size before and after, and, when someone in the family is still on an older version of beanies, their name and what they need to do. It stays until you close it.
+
 ### Fixed
 
 - **A change made offline is no longer lost when another device reorganises the family file at the same time.** When the connection came back, beanies uploaded the copy of your family data it had made _before_ going offline, straight over whatever the family file held by then. If the file had been reorganised meanwhile, that upload undid the reorganisation, the other device put it back, and the work done offline was quietly dropped in between. beanies now saves the way it always does when the connection returns: it reads the family file first, combines it with what is on the device, and writes the result.
