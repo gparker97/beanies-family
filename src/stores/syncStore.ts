@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia';
-import { PodLineageError } from '@/services/sync/podLineage';
 import type { LineageBasis } from '@/services/automerge/worker/protocol';
 import { decodeBaselinePayload, decodeHeadsFingerprint } from '@/services/sync/remoteBaseline';
 import { ref, computed, shallowRef, nextTick, watch } from 'vue';
@@ -127,6 +126,7 @@ import {
   payloadErrorMessageKey,
   type RemoteBlocker,
   type PodBlockMessageKey,
+  LocalDocUnreadableError,
 } from '@/types/sync';
 
 /**
@@ -153,6 +153,12 @@ export type BackgroundSyncErrorKind =
   | 'decrypt'
   /** The remote must not be MERGED with this device's document. See `podLineage`. */
   | 'lineage'
+  /**
+   * THIS DEVICE'S OWN copy could not be read, so the remote was not adopted.
+   * Distinct from `decrypt` (the remote failed) and from `lineage` (both
+   * documents opened fine but their histories cannot be combined).
+   */
+  | 'local-unreadable'
   | 'network'
   | null;
 
@@ -175,6 +181,50 @@ export type RefreshOutcome =
   /** This device already established it cannot open the pod. See `podUnopenable`. */
   | 'skipped-unopenable'
   | 'skipped-in-flight';
+
+/**
+ * Which banner a blocker belongs to.
+ *
+ * ⚠️ A TABLE OVER `inlineMessageKey`, NOT AN `instanceof` TERNARY, and it is
+ * MODULE-LEVEL so it can be tested directly rather than through the store.
+ *
+ * It has exactly two callers by design — `notePodUnopenable` and
+ * `mirrorServiceLatch`. Those two carried independent copies of
+ * `err instanceof PodLineageError ? 'lineage' : 'decrypt'`, and because the 10s
+ * poll's `.finally()` runs the second one immediately after the first, a new
+ * blocker class added to only one of them was overwritten within the same tick:
+ * a refusal whose banner never rendered, on the exact path the block travels.
+ * `useRemoteFileOverLocalDocument`'s `finally` clobbers it the same way, so a
+ * FAILED recovery also lost its banner.
+ *
+ * Keying on `inlineMessageKey` makes it a closed union, so a new blocker class
+ * cannot compile until it says which banner it belongs to.
+ */
+export const BLOCKER_BANNER_KIND = {
+  'podTooLarge.inline': 'decrypt',
+  'podCorrupted.inline': 'decrypt',
+  'podCredentialStale.inline': 'decrypt',
+  'podUnreadable.inline': 'decrypt',
+  'podNewerVersion.inline': 'decrypt',
+  'podLineage.unsyncedInline': 'lineage',
+  'podLineage.conflictInline': 'lineage',
+  'podMerge.failedInline': 'lineage',
+  'podLocalUnreadable.inline': 'local-unreadable',
+} as const satisfies Record<PodBlockMessageKey, NonNullable<BackgroundSyncErrorKind>>;
+
+export function blockerErrorKind(err: RemoteBlocker): NonNullable<BackgroundSyncErrorKind> {
+  return BLOCKER_BANNER_KIND[err.inlineMessageKey];
+}
+
+/**
+ * The kinds a BLOCKER can produce — derived from the table, so
+ * `clearPodUnopenable` cannot fall behind it. `auth-transient` and `network` are
+ * deliberately absent: they are owned by other paths, and clearing them there
+ * would swallow a message that function knows nothing about.
+ */
+export const BLOCKER_KINDS: ReadonlySet<NonNullable<BackgroundSyncErrorKind>> = new Set(
+  Object.values(BLOCKER_BANNER_KIND)
+);
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -877,6 +927,112 @@ export const useSyncStore = defineStore('sync', () => {
    * `null` would not be "conservative" — it would clobber the durable fingerprint
    * (the commit is last-write-wins, C10b) and permanently disable #61's skip.
    */
+  /**
+   * The `pod-open-degrade` message, one constant per arm.
+   *
+   * ⚠️ CONSTANTS, and a table rather than a ternary. The message is the
+   * (surface, message) dedup bucket key in `logEvent`, so it must not carry
+   * per-pod detail — and it must not lie about what happened, because a
+   * CloudWatch reader filters on it. The `unreadable` arm no longer adopts
+   * anything; saying "adopting remote wholesale" there described the bug rather
+   * than the fix.
+   */
+  const CACHE_ARM_MESSAGE = {
+    hit: 'cache hit — merging',
+    miss: 'cache empty — adopting remote wholesale',
+    unreadable: 'cache unreadable — refusing the merge',
+  } as const satisfies Record<'hit' | 'miss' | 'unreadable', string>;
+
+  /**
+   * Bind the just-decrypted file's provider to this family — or deliberately
+   * DON'T, when the caller is restoring a backup into the family's existing pod.
+   *
+   * ⚠️ EXTRACTED FROM TWO BYTE-IDENTICAL COPIES (`decryptPendingFile` and
+   * `decryptPendingFileWithKey`). The behaviour half of this change is one
+   * boolean, and it had to be applied in both places or the guard would hold on
+   * one login route and not the other.
+   *
+   * ⚠️ `keepCurrentPod` SUPPRESSES BOTH BRANCHES, and the Drive branch is the
+   * one that is easy to miss. Restoring a pre-compaction safety copy FROM DRIVE
+   * would otherwise `storeProviderConfig` the family onto the **safety copy's**
+   * fileId and move the registry pointer behind it — the exact ADR-033 fork that
+   * `rebindPodFile`'s `isSafetyCopyName` refusal exists to prevent, reached by a
+   * different door. Suppressing only the local branch would have shipped a
+   * Chromium/Firefox restore that forks the family onto its own backup.
+   */
+  async function installPendingProvider(
+    pending: NonNullable<typeof pendingEncryptedFile.value>,
+    activeFamilyId: string | null,
+    keepCurrentPod: boolean
+  ): Promise<void> {
+    // ⚠️ THE FLAG IS ONLY HONOURED WHEN THERE IS A POD TO KEEP. The Settings
+    // handlers that pass it are shared by the CONFIGURED slab (restore — a pod
+    // exists) and the UNCONFIGURED one (first load — there is none). Honouring
+    // it unconditionally would open the document with nowhere to save it: a
+    // fresh, silent config-loss bug introduced by the fix for a data-loss bug.
+    // The caller computes the same predicate for its confirmation copy, so the
+    // words and the behaviour cannot disagree; this is the enforcement that
+    // stops a FUTURE caller reintroducing it.
+    const hasPod = isConfigured.value && !!syncService.getProviderType();
+    if (keepCurrentPod && !hasPod) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-access',
+        message: 'restore asked to keep the current pod, but this family has none — re-homing',
+        context: { action: 'restore-kept-pod-ignored' },
+      });
+      console.warn(
+        '[syncStore] installPendingProvider: keepCurrentPod was set but no provider is bound. ' +
+          'Binding the picked file instead, or this family would have nowhere to save.'
+      );
+    }
+    if (keepCurrentPod && hasPod) {
+      // The document was replaced; the POD was not. The family keeps its
+      // provider, its fileId, its Drive binding and its registry pointer, and
+      // peers converge through the lineage generation the restore stamped —
+      // rather than being abandoned on a file this device just walked away from.
+      logEvent({
+        level: 'info',
+        surface: 'pod-access',
+        message: 'restore kept the family on its existing pod',
+        context: {
+          action: 'restore-kept-pod',
+          provider_type: syncService.getProviderType() ?? undefined,
+        },
+      });
+      return;
+    }
+
+    // If loaded from Google Drive, persist the config
+    if (pending.driveFileId && pending.driveFileName) {
+      const { storeProviderConfig, clearFileHandleForFamily } =
+        await import('@/services/sync/fileHandleStore');
+      if (activeFamilyId) {
+        await clearFileHandleForFamily(activeFamilyId);
+        await storeProviderConfig(activeFamilyId, {
+          type: 'google_drive',
+          driveFileId: pending.driveFileId,
+          driveFileName: pending.driveFileName,
+          driveAccountEmail: pending.driveAccountEmail,
+        });
+      }
+      const provider = GoogleDriveProvider.fromExisting(
+        pending.driveFileId,
+        pending.driveFileName,
+        pending.driveAccountEmail
+      );
+      syncService.setProvider(provider);
+    }
+
+    // If file was opened with a provider (local file picker), persist it
+    if (pending.provider) {
+      if (activeFamilyId) {
+        await pending.provider.persist(activeFamilyId);
+      }
+      syncService.setProvider(pending.provider);
+    }
+  }
+
   async function replaceDocWithCacheRecovery(
     remoteEnvelope: BeanpodFileV4,
     familyId: string,
@@ -946,17 +1102,66 @@ export const useSyncStore = defineStore('sync', () => {
     // wholesale. Emitted on BOTH arms deliberately, because a rate needs a
     // denominator; a warn that only fires on failure cannot tell you whether
     // this is one unlucky tablet or the whole fleet.
+    // ⚠️ THREE CONSTANT MESSAGES, ONE PER ARM — and the split is load-bearing,
+    // not cosmetic. The message string is the (surface, message) dedup/limiter
+    // bucket key, and after the refusal below the error arm no longer adopts
+    // anything. Leaving one message for both non-hit arms would make the single
+    // event that is supposed to make this decision filterable read as data loss
+    // forever, on the exact arm where data is now being PROTECTED.
+    //
+    // Emitted on all three arms deliberately: a rate needs a denominator, and a
+    // warn that only fires on failure cannot tell you whether this is one
+    // unlucky tablet or the whole fleet.
+    const cacheArm: 'hit' | 'miss' | 'unreadable' = loadedFromCache
+      ? 'hit'
+      : cacheErrorName
+        ? 'unreadable'
+        : 'miss';
     logEvent({
       level: loadedFromCache ? 'info' : 'warn',
       surface: 'pod-open-degrade',
-      message: loadedFromCache
-        ? 'cache hit — merging'
-        : 'cache unavailable — adopting remote wholesale',
+      message: CACHE_ARM_MESSAGE[cacheArm],
       context: {
         action: 'cache-recovery',
         error_code: loadedFromCache ? 'hit' : (cacheErrorName ?? 'miss'),
       },
     });
+
+    // ⚠️ A FAILED READ IS NOT AN EMPTY DEVICE, and conflating the two is what
+    // silently destroyed a peer's unsynced work.
+    //
+    // `{ kind: 'no-local-document' }` is an INSTRUCTION to the worker: install
+    // the remote wholesale, without consulting the lineage guard
+    // (`applyAndProject.ts:898`, `:919`). That is right for a device that
+    // genuinely holds nothing — `applyAndProject.ts:855-859` explains why, and
+    // a device whose cache truly missed must still be able to adopt a compacted
+    // pod or it is stuck forever. It is catastrophically wrong for a device
+    // whose document EXISTS but sat behind a blocked IndexedDB handle: that
+    // device still has its unsaved work in memory, and it would be replaced with
+    // no guard, no rebase, no banner and nothing in the firehose.
+    //
+    // Since `cd7d3dd7` bounded the cache open at 10s and dropped its retry, this
+    // arm went from a rare hang to a routine ten-second overwrite — an IndexedDB
+    // delete is blocked whenever another connection is open, i.e. whenever a
+    // second tab exists.
+    //
+    // ⚠️ SKIPPED WHEN THE USER CHOSE THIS FILE. `user-file` never blocks
+    // anywhere else (`podLineage.ts:161-178`), and the banner's own recovery
+    // action re-enters here — refusing would make the one button offered to
+    // resolve the block re-raise it. Same policy, not a new exception.
+    if (!loadedFromCache && cacheErrorName && !chosenByUser) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-lineage',
+        message: "merge refused — this device's copy could not be read",
+        context: { action: 'local-unreadable-refused', error_code: cacheErrorName },
+      });
+      console.warn(
+        `[syncStore] Refusing to adopt the remote: this device's cache could not be read (${cacheErrorName}). ` +
+          'The local document may hold unsaved work. Close other beanies tabs and reload.'
+      );
+      throw new LocalDocUnreadableError(cacheErrorName);
+    }
 
     // ⚠️ THE LINEAGE GUARD NOW LIVES IN THE WORKER — see
     // `applyAndProject.mergeRemoteEnvelope`. It has to, because it is the only
@@ -1315,6 +1520,16 @@ export const useSyncStore = defineStore('sync', () => {
               keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope, liveKey);
               return { success: true }; // commit NO baseline — see the helper
             }
+            // ⚠️ THE POLL TERMINUS WAS SILENT, and it is the path a reconnecting
+            // peer actually takes. Until now the app had exactly TWO
+            // `logMergeTerminus` call sites — the open terminus and the save-path
+            // one — so an `adopted` or `rebased` outcome HERE reached CloudWatch
+            // as nothing at all. That is why a peer that silently dropped its
+            // offline work produced no telemetry: the event that would have named
+            // it was never emitted on this branch. Same level rule and the same
+            // `replayed`/`conflicts` fields as the other two, so one filter reads
+            // all three.
+            docClient.logMergeTerminus('poll terminus', mergeResult, remoteEnvelope.familyId);
             // `?? true` is deliberate, not defensive noise: an absent field means
             // we do not KNOW the outcome, and both unknowns must resolve to the
             // safe direction — re-project rather than show stale data, re-upload
@@ -1625,7 +1840,22 @@ export const useSyncStore = defineStore('sync', () => {
      * as the module-level one-shot before it; storing it on a ref merely made
      * the lifetime longer.
      */
-    opts: { userChoseThisFile?: boolean } = {}
+    opts: {
+      userChoseThisFile?: boolean;
+      /**
+       * RESTORE, not move: replace the DOCUMENT from the picked file but leave
+       * the family on its existing pod (provider, fileId, Drive binding,
+       * registry pointer). Passed only from Settings' confirmed load-file
+       * dialog, and only when this family actually HAS a pod — see
+       * `installPendingProvider`, which enforces the same predicate.
+       *
+       * ⚠️ DELIBERATELY ABSENT FROM `decryptPendingFileWithKey`. That is the
+       * passkey / biometric / trusted-device / PIN path, none of whose callers
+       * is a restore surface; it has no `opts` bag on purpose (see its own
+       * comment) and this must not become the reason to give it one.
+       */
+      keepCurrentPod?: boolean;
+    } = {}
   ): Promise<{
     success: boolean;
     error?: string;
@@ -1729,34 +1959,7 @@ export const useSyncStore = defineStore('sync', () => {
         await initializeAuth(activeFamilyId);
       }
 
-      // If loaded from Google Drive, persist the config
-      if (pending.driveFileId && pending.driveFileName) {
-        const { storeProviderConfig, clearFileHandleForFamily } =
-          await import('@/services/sync/fileHandleStore');
-        if (activeFamilyId) {
-          await clearFileHandleForFamily(activeFamilyId);
-          await storeProviderConfig(activeFamilyId, {
-            type: 'google_drive',
-            driveFileId: pending.driveFileId,
-            driveFileName: pending.driveFileName,
-            driveAccountEmail: pending.driveAccountEmail,
-          });
-        }
-        const provider = GoogleDriveProvider.fromExisting(
-          pending.driveFileId,
-          pending.driveFileName,
-          pending.driveAccountEmail
-        );
-        syncService.setProvider(provider);
-      }
-
-      // If file was opened with a provider (local file picker), persist it
-      if (pending.provider) {
-        if (activeFamilyId) {
-          await pending.provider.persist(activeFamilyId);
-        }
-        syncService.setProvider(pending.provider);
-      }
+      await installPendingProvider(pending, activeFamilyId, opts.keepCurrentPod === true);
 
       // Clear pending
       pendingEncryptedFile.value = null;
@@ -2567,34 +2770,7 @@ export const useSyncStore = defineStore('sync', () => {
         await initializeAuth(activeFamilyId);
       }
 
-      // If loaded from Google Drive, persist the config
-      if (pending.driveFileId && pending.driveFileName) {
-        const { storeProviderConfig, clearFileHandleForFamily } =
-          await import('@/services/sync/fileHandleStore');
-        if (activeFamilyId) {
-          await clearFileHandleForFamily(activeFamilyId);
-          await storeProviderConfig(activeFamilyId, {
-            type: 'google_drive',
-            driveFileId: pending.driveFileId,
-            driveFileName: pending.driveFileName,
-            driveAccountEmail: pending.driveAccountEmail,
-          });
-        }
-        const provider = GoogleDriveProvider.fromExisting(
-          pending.driveFileId,
-          pending.driveFileName,
-          pending.driveAccountEmail
-        );
-        syncService.setProvider(provider);
-      }
-
-      // If file was opened with a provider (local file picker), persist it
-      if (pending.provider) {
-        if (activeFamilyId) {
-          await pending.provider.persist(activeFamilyId);
-        }
-        syncService.setProvider(pending.provider);
-      }
+      await installPendingProvider(pending, activeFamilyId, false);
 
       // Clear pending
       pendingEncryptedFile.value = null;
@@ -3583,6 +3759,34 @@ export const useSyncStore = defineStore('sync', () => {
       });
   }
 
+  /**
+   * THE ONE WRITER of the three refs that describe a blocker on the sync bar.
+   *
+   * ⚠️ IT IS ONE FUNCTION BECAUSE IT WAS TWO, AND THE TWO DRIFTED. Both
+   * `notePodUnopenable` and `mirrorServiceLatch` assigned these three refs from
+   * their own copy of `err instanceof PodLineageError ? 'lineage' : 'decrypt'`,
+   * and the 10-second poll's `.finally()` calls the second immediately after the
+   * first. So a new blocker class taught to only one of them was overwritten
+   * within the same tick: `podUnopenable` stayed true, the kind reverted to
+   * `'decrypt'`, and that class's banner could never render on the exact path
+   * its block travels. `useRemoteFileOverLocalDocument`'s `finally` re-mirrors
+   * too, so a FAILED recovery lost its banner the same way.
+   *
+   * With one writer the duplication cannot come back by being edited in one
+   * place, which is a stronger guarantee than a test that both places agree.
+   */
+  function describeBlockerOnBar(err: RemoteBlocker): void {
+    // `.inlineMessageKey` is the `RemoteBlocker` member, so a new blocker class
+    // has to answer this rather than inherit someone else's copy.
+    backgroundSyncError.value = useTranslationStore().t(err.inlineMessageKey);
+    backgroundSyncErrorKind.value = blockerErrorKind(err);
+    // The KEY, not the rendered string. The banner has to tell an `adopt-remote`
+    // block (recoverable by the user) from a `conflict` (not recoverable, and the
+    // copy says so), and string-comparing translated prose would break the moment
+    // anyone edits a word or switches language.
+    podBlockMessageKey.value = err.inlineMessageKey;
+  }
+
   function notePodUnopenable(err: RemoteBlocker): void {
     if (err instanceof PayloadLoadError && err.deviceCannotOpen) noteDeviceCannotOpen();
     // ⚠️ ARM THE SERVICE LATCH. Every guard reads `syncService`, and none of
@@ -3604,15 +3808,7 @@ export const useSyncStore = defineStore('sync', () => {
     podUnopenable.value = !!syncService.isRemoteBlocked();
     if (!podUnopenable.value) return; // recoverable: leave polling and the bar alone
     stopFilePolling();
-    // `.inlineMessageKey` is the `RemoteBlocker` member, so a new blocker class
-    // has to answer this rather than inherit someone else's copy.
-    backgroundSyncError.value = useTranslationStore().t(err.inlineMessageKey);
-    backgroundSyncErrorKind.value = err instanceof PodLineageError ? 'lineage' : 'decrypt';
-    // The KEY, not the rendered string. The banner has to tell an `adopt-remote`
-    // block (recoverable by the user) from a `conflict` (not recoverable, and the
-    // copy says so), and string-comparing translated prose would break the moment
-    // anyone edits a word or switches language.
-    podBlockMessageKey.value = err.inlineMessageKey;
+    describeBlockerOnBar(err);
     // NOTE on repeats: the message is constant per class, so a second failure
     // assigns an identical string and `BackgroundSyncBar`'s watcher does not
     // re-fire. That is acceptable ONLY because a repeat cannot happen while the
@@ -3644,9 +3840,7 @@ export const useSyncStore = defineStore('sync', () => {
     // that asks the user to act) never rendered at all. Still one-way: nothing
     // here clears anything, so `clearPodUnopenable` remains the only exit.
     podUnopenable.value = true;
-    backgroundSyncError.value = useTranslationStore().t(blocker.inlineMessageKey);
-    backgroundSyncErrorKind.value = blocker instanceof PodLineageError ? 'lineage' : 'decrypt';
-    podBlockMessageKey.value = blocker.inlineMessageKey;
+    describeBlockerOnBar(blocker);
     stopFilePolling();
   }
 
@@ -3742,13 +3936,19 @@ export const useSyncStore = defineStore('sync', () => {
     podUnopenable.value = false;
     // Null the message too, so the NEXT failure re-fires the bar's watcher
     // instead of assigning an identical string to itself.
-    // 'lineage' as well as 'decrypt': without it the bar's message never clears
-    // after a lineage block resolves, and the next genuine failure assigns an
-    // identical string so the watcher does not re-fire.
-    if (
-      backgroundSyncErrorKind.value === 'decrypt' ||
-      backgroundSyncErrorKind.value === 'lineage'
-    ) {
+    //
+    // ⚠️ EVERY BLOCKER KIND, DERIVED FROM THE TABLE — never a hand-written list.
+    // This was `'decrypt' || 'lineage'`, and `'lineage'` had to be added after
+    // the bar's message was found never to clear after a lineage block. A third
+    // blocker kind added to `BackgroundSyncErrorKind` without being added here
+    // repeats that bug exactly: `podUnopenable` goes false so the banner
+    // disappears and any test asserting "the banner is gone" passes, while the
+    // stale kind and an identical message string survive and the watcher stays
+    // silent on the next genuine failure. The two non-blocker kinds
+    // (`auth-transient`, `network`) are owned by other code paths and must be
+    // left alone, so the set is derived rather than listed.
+    const kind = backgroundSyncErrorKind.value;
+    if (kind !== null && BLOCKER_KINDS.has(kind)) {
       backgroundSyncError.value = null;
       backgroundSyncErrorKind.value = null;
     }
@@ -4032,12 +4232,47 @@ export const useSyncStore = defineStore('sync', () => {
       const familyId = ctx.activeFamilyId;
       if (!familyId || checkedCanonicalFor === familyId) return;
       const provider = syncService.getProvider();
-      if (!provider || syncService.getProviderType() !== 'google_drive') return;
+      if (!provider) return;
+      const providerType = syncService.getProviderType();
+      if (!providerType) return;
       checkedCanonicalFor = familyId;
 
       const lookup = await registry.lookupFamilyResult(familyId);
       if (lookup.status !== 'found') return; // absent or unavailable → raise nothing
       const entry = lookup.entry;
+
+      // ⚠️ DIAGNOSTIC ONLY, AND DELIBERATELY NOT A BANNER. The registry says the
+      // family lives on one kind of storage and this device is on another —
+      // which is exactly the stranding that used to happen when loading a file
+      // silently re-homed a Drive family to a local one. `keepCurrentPod` should
+      // now make it unreachable; this is how we would find out if it is not.
+      //
+      // It cannot become a `CANONICAL_MISMATCH` banner, because that banner's
+      // recovery is `switchToCanonical` → `rebindPodFile(fileId)`, and a local
+      // pointer has no fileId to rebind to. Offering a button that cannot work
+      // is worse than saying nothing to the user and everything to the firehose.
+      if (entry.provider && entry.provider !== providerType) {
+        logEvent({
+          level: 'warn',
+          surface: 'pod-access',
+          message: 'registry provider disagrees with this device',
+          context: {
+            action: 'canonical-provider-mismatch',
+            error_code: entry.provider,
+            provider_type: providerType,
+          },
+        });
+      }
+
+      // ⚠️ THE FILEID COMPARISON IS DRIVE-ONLY BY CONSTRUCTION, not by choice.
+      // `RegistryEntry.fileId` is a Google Drive file id and
+      // `StorageProvider.getFileId()` is null for a local provider, so on a
+      // local family the two are always equal and the check below can never
+      // fire. Comparing `displayPath` instead would false-positive on every
+      // device whose local path differs — which is most of them — and then offer
+      // a recovery that cannot act. So the banner path stays Drive-only, and the
+      // provider mismatch above is what covers everything else.
+      if (providerType !== 'google_drive') return;
       if (entry.provider !== 'google_drive' || !entry.fileId) return;
       if (entry.fileId === provider.getFileId()) return;
 

@@ -30,7 +30,11 @@ import { storeUrlFor } from '@/services/appUpdate/storeUrl';
 import { PayloadLoadError, payloadErrorDetail, payloadErrorKind } from '@/types/sync';
 import type { PayloadErrorKind } from '@/types/sync';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { PodLineageError } from '@/services/sync/podLineage';
+// VALUE import, not type-only: `surfaceBlockerFatal` dispatches on it. Safe —
+// `podLineage.ts` imports only TYPES from `@/types/sync` and nothing from here,
+// so there is no cycle.
+import { PodLineageError } from '@/services/sync/podLineage';
+import type { PodBlockMessageKey, RemoteBlocker } from '@/types/sync';
 
 /** Where the failure was caught. Rides in `action`, so it stays queryable. */
 export type PayloadFailureSource =
@@ -248,6 +252,100 @@ export function surfaceLineageFatal(err: PodLineageError, ctx: { familyId: strin
     // Clearing local data is exactly the wrong move here: the local document may
     // hold the only copy of work that has not been saved, which is the whole
     // reason the guard refused rather than merging.
+    { clearDataHelps: false }
+  );
+}
+
+/**
+ * The full-screen copy for a blocker that is NOT one of the two specific
+ * classes below. Keyed on `inlineMessageKey` because that IS a closed union;
+ * `blockCode` is typed `string`, so a table over it could never be exhaustive.
+ *
+ * ⚠️ IT MAPS TO *OVERLAY* KEYS, NEVER TO THE INLINE KEY ITSELF. The inline
+ * ladder and the full-screen copy are deliberately different strings resolved
+ * through a table — reusing the inline string as full-screen copy is the
+ * shipped drift bug recorded above `PAYLOAD_OVERLAY_KEY`. It is also why a
+ * blocker cannot simply render `t(err.inlineMessageKey)` on a surface whose
+ * buttons it does not know about.
+ *
+ * Because it is `satisfies Record<PodBlockMessageKey, …>`, a NEW blocker key
+ * fails the build here until someone writes its overlay copy. That is what
+ * makes "a refusal always has a render site" a compiler guarantee rather than a
+ * review habit — this repo has now shipped that same defect three times.
+ */
+const BLOCKER_OVERLAY_KEY = {
+  'podTooLarge.inline': 'resumeSetup.podTooLarge',
+  'podCorrupted.inline': 'resumeSetup.podCorrupted',
+  'podCredentialStale.inline': 'resumeSetup.podCredentialStale',
+  'podLineage.unsyncedInline': 'resumeSetup.podLineageBlocked',
+  'podLineage.conflictInline': 'resumeSetup.podLineageBlocked',
+  'podMerge.failedInline': 'resumeSetup.podLineageBlocked',
+  'podUnreadable.inline': 'resumeSetup.podCorrupted',
+  'podNewerVersion.inline': 'resumeSetup.podNewerVersion',
+  // ⚠️ ITS OWN COPY, and it names only actions that EXIST on a pre-shell
+  // screen — close other tabs, reload. The inline copy points at "use the
+  // family file" and Settings, neither of which is on the resume surface.
+  'podLocalUnreadable.inline': 'resumeSetup.podLocalUnreadable',
+} as const satisfies Record<PodBlockMessageKey, UIStringKey>;
+
+export { BLOCKER_OVERLAY_KEY };
+
+/**
+ * ONE dispatch from any `RemoteBlocker` to the fatal overlay.
+ *
+ * ⚠️ WHY THIS EXISTS. The routing was `instanceof`, class by class, at THREE
+ * separate call sites (`App.vue` twice, `ResumePodSetup.vue` once). A new
+ * blocker class had to be added to all three by hand, and a forgotten one is a
+ * refusal with no render site — the defect `564b0662` fixed, and the defect
+ * three review passes of this plan each re-introduced by a different door.
+ *
+ * This is a DISPATCHER, not a generalisation: the two specific functions keep
+ * their bodies and their narrowing, exactly as the comment above
+ * `surfaceLineageFatal` requires. All that moves is the `instanceof` chain,
+ * from three files into one.
+ */
+export function surfaceBlockerFatal(
+  err: RemoteBlocker,
+  ctx: { fileId: string | null; familyId: string | null; source: PayloadFailureSource }
+): void {
+  if (err instanceof PayloadLoadError) {
+    surfacePayloadFatal(err, ctx);
+    return;
+  }
+  if (err instanceof PodLineageError) {
+    surfaceLineageFatal(err, { familyId: ctx.familyId });
+    return;
+  }
+  // Every other blocker: report on the surface its own code names, then raise
+  // the overlay with the copy the table guarantees exists.
+  reportError({
+    surface: 'pod-load-failure',
+    // Constant per class so the (surface, message) dedup bucket works.
+    message: `Pod blocked at open: ${err.blockCode}`,
+    error: err,
+    // Not `critical`: a refusal that PROTECTED the user's data is the system
+    // working. The firehose still carries every occurrence.
+    severity: 'error',
+    context: {
+      action: 'blocked-at-open',
+      error_code: err.blockCode,
+      ...(err.blockDetail ? { detail: err.blockDetail } : {}),
+      ...(ctx.familyId ? { family_id: ctx.familyId } : {}),
+    },
+  });
+  // `inlineMessageKey` is a closed union and the table is exhaustive over it.
+
+  const overlayKey = BLOCKER_OVERLAY_KEY[err.inlineMessageKey];
+  useFatalErrorStore().setFatal(
+    useTranslationStore().t(overlayKey),
+    JSON.stringify(
+      { familyId: ctx.familyId, blockCode: err.blockCode, message: err.message },
+      null,
+      2
+    ),
+    // Clearing local data is exactly the wrong move for this whole class: the
+    // local document may hold the only copy of work that was never saved, which
+    // is precisely why the blocker refused instead of merging.
     { clearDataHelps: false }
   );
 }

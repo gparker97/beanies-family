@@ -3399,6 +3399,12 @@ const STRING_DEFS = {
     en: 'Re-establishing the connection to your family data file. Your data is safe.',
     beanie: 're-establishing the connection to your family data file. your data is safe.',
   },
+  // ⚠️ TWO STRINGS, ONE DIALOG. This is the FIRST-LOAD case (no data file yet):
+  // the picked file BECOMES the family's data file, so saying "your family
+  // keeps using the same storage" here would be false — there is none yet.
+  // `settings.switchFileConfirmation` below is the restore case. Both are
+  // selected by the same `hasPod` predicate that decides `keepCurrentPod`, so
+  // the words and the behaviour cannot disagree.
   'settings.loadFileConfirmation': {
     en: 'This will replace all local data with the contents of the selected file and set it as your data file. Continue?',
     beanie:
@@ -3420,15 +3426,45 @@ const STRING_DEFS = {
     en: 'Load another Family Data File',
     beanie: 'load another family data file',
   },
+  // Reworded away from "switch" (B7): this restores your family's data FROM a
+  // file; it does not move the family onto it.
   'settings.switchDataFile': {
-    en: 'Switch to a different data file',
-    beanie: 'switch to a different data file',
+    en: "Restore your family's data from a file",
+    beanie: "restore your family's beans from a file",
   },
   'settings.browse': { en: 'Browse...', beanie: 'browse...' },
-  'settings.switchFileConfirmation': {
-    en: 'This will replace all local data with the contents of the selected file and switch to that file. Continue?',
+  // ⚠️ NEVER THE RAW REASON. These replace rendering `picked.message`, which for
+  // a `config` failure put the literal text "VITE_GOOGLE_API_KEY is not
+  // configured" in front of a family. Each says what the person can do next.
+  'settings.drivePickerUnavailable': {
+    en: 'beanies could not open Google Drive to pick a file. You can still choose a file saved on this device.',
     beanie:
-      'this will replace all local data with the contents of the selected file and switch to that file. continue?',
+      'beanies could not open google drive to pick a file. you can still choose a file saved on this bean.',
+  },
+  'settings.drivePickerAuth': {
+    en: 'beanies needs you to reconnect your Google account before it can open Google Drive.',
+    beanie: 'beanies needs you to reconnect your google account before it can open google drive.',
+  },
+  'settings.drivePickerFailed': {
+    en: 'beanies could not open the Google file picker. Try again in a moment, or choose a file saved on this device.',
+    beanie:
+      'beanies could not open the google file picker. try again in a moment, or choose a file saved on this bean.',
+  },
+  'settings.restoreFileNotFound': {
+    en: 'That file is no longer in your Google Drive. If it was the copy beanies saved before reorganising, it may have been removed.',
+    beanie:
+      'that file is no longer in your google drive. if it was the copy beanies saved before reorganising, it may have been removed.',
+  },
+  // ⚠️ IT NO LONGER PROMISES TO "SWITCH TO THAT FILE", because it no longer
+  // does. Loading a file now REPLACES YOUR FAMILY'S DATA and leaves the family
+  // on the data file it already has — which is what makes it a restore rather
+  // than a move, and what stops every other device being abandoned on the old
+  // file. Moving the family between storage is a different control
+  // ("Move to Google Drive" / "Move to a local file").
+  'settings.switchFileConfirmation': {
+    en: "This replaces your family's data everywhere with the contents of the selected file. Your family keeps using the same data file, and your other devices will pick up the change on their own. Continue?",
+    beanie:
+      "this replaces your family's beans everywhere with the contents of the selected file. your family keeps using the same data file, and your other beans will pick up the change on their own. continue?",
   },
   'settings.dataLoadedSuccess': {
     en: 'Data loaded successfully!',
@@ -4554,6 +4590,43 @@ const STRING_DEFS = {
     en: 'beanies could not read your family file this time. It may have been part-way through saving on another device, or it may have been written by a newer version of beanies. Nothing has been changed. Try again in a moment, and update beanies on this device if the message keeps coming back.',
     beanie:
       'beanies could not read your family file this time. it may have been part-way through saving on another bean, or written by a newer version of beanies. nothing has been changed. try again in a moment, and update beanies on this device if it keeps happening.',
+  },
+  // ⚠️ THIS DEVICE'S OWN COPY, not the family file. Deliberately distinct from
+  // `podUnreadable.inline` above, which is about the DOWNLOADED file and tells
+  // the user to update beanies — advice that would be simply wrong here.
+  // The reassurance comes first because it is the thing that is true and the
+  // thing the user most needs: nothing has been replaced, their work is still
+  // here. The two exits are named in order of likelihood.
+  'podLocalUnreadable.inline': {
+    en: 'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. Anything you have not saved yet is still here. This usually means beanies is open in another tab or window. Close the others and reload this page. If the message stays, choose "Use the family file" below (changes made only on this device will be let go), or export your data from Settings and contact support@beanies.family.',
+    beanie:
+      'beanies could not open this bean\'s own copy of your family beans, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies is open in another tab or window. close the others and reload this page. if the message stays, choose "use the family file" below (beans made only on this device will be let go), or export your beans from settings and contact support@beanies.family.',
+  },
+  // The banner heading for the above. Short — the sentence does the work.
+  'podLocalUnreadable.title': {
+    en: "This device's copy could not be opened",
+    beanie: "this bean's copy could not be opened",
+  },
+  // The confirm before discarding this device's copy. It must be explicit that
+  // the cost is unknown: we could not read the local copy, so we cannot say
+  // what is in it — which is exactly why this is a `danger` confirm.
+  'podLocalUnreadable.useFileConfirmTitle': {
+    en: 'Use the family file instead?',
+    beanie: 'use the family file instead?',
+  },
+  'podLocalUnreadable.useFileConfirmMessage': {
+    en: "beanies will load your family file and let go of this device's own copy. Because that copy could not be opened, there is no way to tell whether it held anything that was never saved. Everything already saved to your family file is safe. If you would rather not risk it, close any other beanies tabs and reload this page first.",
+    beanie:
+      "beanies will load your family file and let go of this bean's own copy. because that copy could not be opened, there is no way to tell whether it held any beans that were never saved. everything already saved to your family file is safe. if you would rather not risk it, close any other beanies tabs and reload this page first.",
+  },
+  // ⚠️ THE OVERLAY VARIANT, and it names ONLY actions that exist before the app
+  // shell is up. The inline copy points at "Use the family file" and Settings;
+  // neither is on the sign-in or resume screen, so repeating it there would put
+  // instructions on screen for buttons the user cannot see.
+  'resumeSetup.podLocalUnreadable': {
+    en: "beanies could not open this device's own copy of your family data. Nothing has been changed and nothing has been lost. This usually means beanies is already open in another tab or window, so close the others and reload this page. If it keeps happening, contact support@beanies.family.",
+    beanie:
+      "beanies could not open this bean's own copy of your family beans. nothing has been changed and nothing has been lost. this usually means beanies is already open in another tab or window, so close the others and reload this page. if it keeps happening, contact support@beanies.family.",
   },
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.
@@ -6345,9 +6418,9 @@ const STRING_DEFS = {
     beanie: 'beans, beans, good for your heart!',
   },
   'nook.motto21': {
-    en: 'In America, first you get the beans, then you get the money, and then you get the women',
+    en: 'In America, first you get the money, then you get the power, and then you get the beanies',
     beanie:
-      'in america, first you get the beans, then you get the money, and then you get the women',
+      'in america, first you get the money, then you get the power, and then you get the beanies',
   },
   'nook.motto22': {
     en: "Don't count your beans before they sprout!",

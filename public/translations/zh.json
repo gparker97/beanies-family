@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-06",
-    "translationCount": 4559
+    "lastUpdated": "2026-09-07",
+    "translationCount": 4568
   },
   "translations": {
     "app.name": {
@@ -2152,9 +2152,9 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.switchDataFile": {
-      "translation": "切换到其他数据文件",
-      "hash": "cpbhe5",
-      "lastUpdated": "2026-03-03"
+      "translation": "从文件还原家庭数据",
+      "hash": "a9zlao",
+      "lastUpdated": "2026-09-07"
     },
     "settings.browse": {
       "translation": "浏览...",
@@ -2162,9 +2162,9 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.switchFileConfirmation": {
-      "translation": "这将用所选文件的内容替换所有本地数据并切换到该文件。是否继续？",
-      "hash": "88ccd",
-      "lastUpdated": "2026-02-24"
+      "translation": "这将用所选文件的内容替换任何地方的家庭数据。您的家人继续使用相同的数据文件，您的其他设备将自行接收更改。是否继续？",
+      "hash": "xw4gvn",
+      "lastUpdated": "2026-09-07"
     },
     "settings.dataLoadedSuccess": {
       "translation": "载入成功",
@@ -6077,9 +6077,9 @@
       "lastUpdated": "2026-03-08"
     },
     "nook.motto21": {
-      "translation": "在美国，首先你得到豆子，然后你得到钱，然后你得到女人",
-      "hash": "3oy14p",
-      "lastUpdated": "2026-05-16"
+      "translation": "在美国，首先你得到钱，然后你得到权力，然后你得到豆子",
+      "hash": "i7r7v2",
+      "lastUpdated": "2026-09-07"
     },
     "nook.motto22": {
       "translation": "在豆子发芽之前不要数它们！",
@@ -22800,6 +22800,51 @@
       "translation": "更新beanies",
       "hash": "871gy8",
       "lastUpdated": "2026-09-06"
+    },
+    "settings.drivePickerUnavailable": {
+      "translation": "beanies无法打开Google云端硬盘来挑选文件。您仍然可以选择保存在此设备上的文件。",
+      "hash": "rygpm",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.drivePickerAuth": {
+      "translation": "beanies需要您重新连接您的Google帐户，然后才能打开Google云端硬盘。",
+      "hash": "6lcqeh",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.drivePickerFailed": {
+      "translation": "beanies无法打开Google文件选取器。请稍后重试，或选择保存在此设备上的文件。",
+      "hash": "59a0en",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.restoreFileNotFound": {
+      "translation": "该文件已不在您的Google云端硬盘中。如果它是 beanies 在重组前保存的副本，则可能已被删除。",
+      "hash": "bbudja",
+      "lastUpdated": "2026-09-07"
+    },
+    "podLocalUnreadable.inline": {
+      "translation": "beanies无法打开此设备自己的家庭数据副本，因此尚未替换为家庭文件。您尚未保存的任何内容仍在此处。这通常意味着在另一个选项卡或窗口中打开了beanies。关闭其他页面并重新加载此页面。如果消息保持不变，请选择下面的“使用家庭文件” （仅在此设备上进行的更改将被放弃） ，或从“设置”中导出您的数据并联系support@beanies.family。",
+      "hash": "vkj0ky",
+      "lastUpdated": "2026-09-07"
+    },
+    "podLocalUnreadable.title": {
+      "translation": "无法打开此设备的副本",
+      "hash": "g3p14l",
+      "lastUpdated": "2026-09-07"
+    },
+    "podLocalUnreadable.useFileConfirmTitle": {
+      "translation": "要改用家庭文件吗？",
+      "hash": "aqiicz",
+      "lastUpdated": "2026-09-07"
+    },
+    "podLocalUnreadable.useFileConfirmMessage": {
+      "translation": "beanies将加载您的家庭文件并放弃此设备自己的副本。由于该副本无法打开，因此无法判断它是否保存了从未保存过的任何内容。已保存到家庭文件的所有内容都是安全的。如果您不想冒险，请关闭任何其他beanies选项卡并先重新加载此页面。",
+      "hash": "3zxgtf",
+      "lastUpdated": "2026-09-07"
+    },
+    "resumeSetup.podLocalUnreadable": {
+      "translation": "beanies无法打开此设备自己的家庭数据副本。什么都没有改变，什么都没有丢失。这通常意味着beanies已在其他选项卡或窗口中打开，因此请关闭其他选项卡或窗口并重新加载此页面。如果问题仍然存在，请联系support@beanies.family。",
+      "hash": "8eeok4",
+      "lastUpdated": "2026-09-07"
     }
   }
 }
