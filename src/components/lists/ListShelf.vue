@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import ListTile from './ListTile.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import type { FamilyList } from '@/types/models';
@@ -8,7 +9,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 // Presentational shelf — title + optional all-or-nothing collapse (the
 // `TodoSection` pattern, driven by `v-model:collapsed`) + a responsive grid of
 // tiles. No store access; props in, `open` out.
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string;
     emoji?: string;
@@ -29,9 +30,20 @@ withDefaults(
 
 const { t } = useTranslation();
 
+/**
+ * Bands, or the flat list as one unlabelled band. Normalising here is what keeps the
+ * `ListTile` binding to a single site — `Band` requires a string `label`, so the
+ * placeholder uses `''`, which the heading's `v-if` reads as "no heading".
+ */
+const groups = computed<Band<FamilyList>[]>(
+  () => props.bands ?? [{ key: '__all__', label: '', isLabelKey: false, items: props.lists }]
+);
+
 defineEmits<{
   'update:collapsed': [value: boolean];
   open: [id: string];
+  copy: [id: string];
+  delete: [id: string];
 }>();
 </script>
 
@@ -53,24 +65,23 @@ defineEmits<{
     </p>
 
     <template v-if="!collapsible || !collapsed">
-      <template v-if="bands">
-        <div v-for="band in bands" :key="band.key" class="mb-4 last:mb-0">
-          <p class="mb-2 text-xs text-[var(--color-text-muted)]">
-            {{ band.isLabelKey ? t(band.label as UIStringKey) : band.label }}
-            ({{ band.items.length }})
-          </p>
-          <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <ListTile
-              v-for="list in band.items"
-              :key="list.id"
-              :list="list"
-              @open="$emit('open', $event)"
-            />
-          </div>
+      <!-- ONE tile binding. The flat case is normalised into a single unlabelled band
+           (see `groups`) so three forwarded events do not become six bindings. -->
+      <div v-for="group in groups" :key="group.key" class="mb-4 last:mb-0">
+        <p v-if="group.label" class="mb-2 text-xs text-[var(--color-text-muted)]">
+          {{ group.isLabelKey ? t(group.label as UIStringKey) : group.label }}
+          ({{ group.items.length }})
+        </p>
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <ListTile
+            v-for="list in group.items"
+            :key="list.id"
+            :list="list"
+            @open="$emit('open', $event)"
+            @copy="$emit('copy', $event)"
+            @delete="$emit('delete', $event)"
+          />
         </div>
-      </template>
-      <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ListTile v-for="list in lists" :key="list.id" :list="list" @open="$emit('open', $event)" />
       </div>
     </template>
   </div>

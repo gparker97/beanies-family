@@ -10,10 +10,11 @@ import { formatDateShort } from '@/utils/date';
 import { resolveListRule } from '@/services/recurrence/adapters';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import type { FamilyList } from '@/types/models';
 
 const props = defineProps<{ list: FamilyList }>();
-const emit = defineEmits<{ open: [id: string] }>();
+const emit = defineEmits<{ open: [id: string]; copy: [id: string]; delete: [id: string] }>();
 
 const { t } = useTranslation();
 const { describe } = useRecurrenceLabel();
@@ -62,10 +63,8 @@ const statusPill = computed<Pill | null>(() => {
 </script>
 
 <template>
-  <button
-    type="button"
-    class="group dark:bg-surface-raised dark:border-line-strong flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-    @click="emit('open', list.id)"
+  <article
+    class="group dark:bg-surface-raised dark:border-line-strong relative flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
   >
     <!-- Tinted strip: emoji + owner + faint watermark -->
     <div
@@ -73,7 +72,17 @@ const statusPill = computed<Pill | null>(() => {
       :style="{ backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)` }"
     >
       <span class="z-[1] text-xl drop-shadow-sm" aria-hidden="true">{{ list.emoji }}</span>
-      <MemberChip :member-id="list.ownerId" size="dot" />
+      <!-- z-20 clears the z-10 open-overlay below; the strip is `relative` with
+           `z-auto`, so it creates no stacking context and these compare directly. -->
+      <ActionButtons
+        size="lg"
+        :show-edit="false"
+        show-copy
+        class="relative z-20"
+        @click.stop
+        @copy="emit('copy', list.id)"
+        @delete="emit('delete', list.id)"
+      />
       <span
         class="pointer-events-none absolute -right-1 -bottom-3 text-4xl opacity-[0.07]"
         aria-hidden="true"
@@ -86,9 +95,13 @@ const statusPill = computed<Pill | null>(() => {
       <p class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{ list.title }}</p>
 
       <div class="flex flex-wrap items-center justify-between gap-1.5">
-        <span class="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+        <!-- Owner joins the LEFT group. Adding it as a third child of the
+             `justify-between` row turns a stable two-column layout into a
+             three-way wrapping one at the ~160px 2-across mobile width. -->
+        <span class="flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
           <span class="h-2 w-2 flex-shrink-0 rounded-full" :style="{ backgroundColor: accent }" />
-          {{ categoryLabel(list.category) }}
+          <span class="truncate">{{ categoryLabel(list.category) }}</span>
+          <MemberChip :member-id="list.ownerId" size="dot" />
         </span>
         <span
           v-if="statusPill"
@@ -118,5 +131,19 @@ const statusPill = computed<Pill | null>(() => {
         <span class="text-xs font-medium text-[var(--color-text-muted)]">{{ progressLabel }}</span>
       </div>
     </div>
-  </button>
+
+    <!-- The "open this list" affordance. Last in the DOM so that if the z tokens are
+         ever removed this degrades loudly (overlay eats the buttons) rather than
+         silently (strip eats the overlay).
+         `ring-inset` is REQUIRED, not cosmetic: the root has `overflow-hidden`, and an
+         outward-painting ring on an `inset-0` child is clipped to nothing, leaving the
+         primary action with no visible focus indicator. -->
+    <button
+      type="button"
+      data-testid="list-tile-open"
+      class="focus-visible:ring-primary-500 absolute inset-0 z-10 rounded-2xl focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+      :aria-label="list.title"
+      @click="emit('open', list.id)"
+    />
+  </article>
 </template>

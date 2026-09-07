@@ -8,7 +8,6 @@ import { useListStore } from '@/stores/listStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useActivityStore } from '@/stores/activityStore';
-import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getListCategory } from '@/constants/listCategories';
@@ -18,6 +17,7 @@ import { formatDateShort, extractDatePart } from '@/utils/date';
 import { resolveListRule, listShadowFromCadence } from '@/services/recurrence/adapters';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import { confirmAndDeleteList } from '@/composables/useListDeletion';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
@@ -334,15 +334,12 @@ function unlinkActivity(): void {
 async function handleDelete(): Promise<void> {
   const l = list.value;
   if (!l) return;
-  const ok = await showConfirm({
-    title: 'lists.detail.deleteConfirm.title',
-    message: 'lists.detail.deleteConfirm.message',
-    variant: 'danger',
-  });
-  if (!ok) return;
-  await listStore.deleteList(l.id);
-  emit('deleted', l.id);
-  emit('close');
+  // Shared with the shelf tile. Closing only on `true` is the fix as well as the
+  // dedup: this used to emit `deleted` + `close` even when the delete failed.
+  if (await confirmAndDeleteList(l.id)) {
+    emit('deleted', l.id);
+    emit('close');
+  }
 }
 </script>
 

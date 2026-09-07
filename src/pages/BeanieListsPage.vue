@@ -17,6 +17,8 @@ import ListCycleModal from '@/components/lists/ListCycleModal.vue';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import NewListSheet from '@/components/lists/NewListSheet.vue';
+import ListCopyModal from '@/components/lists/ListCopyModal.vue';
+import { confirmAndDeleteList } from '@/composables/useListDeletion';
 import type { FamilyList, ListCategory } from '@/types/models';
 
 const { t, currentLanguage } = useTranslation();
@@ -35,6 +37,9 @@ const showNew = ref(false);
 const completedCollapsed = ref(true);
 const historyCollapsed = ref(true);
 const selectedCycleId = ref<string | null>(null);
+/** ONE ref drives the copy modal — `:open` is derived, so there is no second boolean
+ *  to keep in sync with it. */
+const copySourceId = ref<string | null>(null);
 
 // Open a list deep-linked via ?view=<id> (e.g. from a notification).
 watch(
@@ -165,6 +170,8 @@ function closeDetail(): void {
         :lists="shelf.lists"
         :label-class="shelf.key === 'due' ? 'text-[var(--color-primary-500)]' : ''"
         @open="openList"
+        @copy="copySourceId = $event"
+        @delete="confirmAndDeleteList($event)"
       />
 
       <!-- Repeating list history (collapsible) -->
@@ -187,6 +194,8 @@ function closeDetail(): void {
         label-class="text-green-600 dark:text-success-lift"
         collapsible
         @open="openList"
+        @copy="copySourceId = $event"
+        @delete="confirmAndDeleteList($event)"
       />
     </template>
 
@@ -194,5 +203,8 @@ function closeDetail(): void {
     <ListCycleModal :cycle-id="selectedCycleId" @close="selectedCycleId = null" />
     <NewListSheet :open="showNew" @close="showNew = false" @created="onCreated" />
     <ListDetailModal :list-id="selectedListId" @close="closeDetail" />
+    <!-- Mounted unconditionally, never `v-if`-gated: `useFormModal`'s reset is a
+         non-immediate watch, so a modal that mounts already-open never resets. -->
+    <ListCopyModal :open="!!copySourceId" :source-id="copySourceId" @close="copySourceId = null" />
   </div>
 </template>

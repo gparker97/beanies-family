@@ -10,8 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-07
 
+### Added
+
+- **A list can now be copied, to one bean or to several at once.** Families keeping the same chores for each child had to type the list out again for every one of them. Copy is on the list itself, next to delete; pick the beans who need their own version and beanies makes one list each, with everything unticked and named after them. The copies are ordinary lists from the moment they exist, and beanies says so on the screen: they are not linked, so a change to one later will not reach the others.
+
 ### Fixed
 
+- **A list that fails to delete no longer closes as though it worked.** Deleting a list that had already gone from another device shut the panel and said nothing.
 - **beanies no longer locks you out when it cannot open its own copy of your data.** With a second beanies tab open, the first one could not get at the stored copy on this device, decided your unsaved work was at risk, and put up a full-screen message whose only button reloaded into the same problem. On a device that has nothing to protect, beanies now just loads your family file and carries on. Where there genuinely is something to protect, it still stops, and the way out is now reachable.
 - **A device whose stored copy came back empty no longer stops syncing for the rest of the session.**
 - **Opening a family file that belongs to a different family no longer leaves beanies in a half-finished state.** The data loaded, but the sidebar and the family settings disappeared, as though you had no permission to be there, until you refreshed the page. beanies now works out who you are in that family and signs you in properly, or tells you to sign out and back in when it cannot.
