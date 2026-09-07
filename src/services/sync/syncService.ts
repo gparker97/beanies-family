@@ -1225,6 +1225,17 @@ export function seedRemoteBaseline(row: { payload: string; checkedAt: string } |
  * called, never from comparing revisions.
  */
 export function commitRemoteBaseline(driveHeads: readonly string[] | null): void {
+  // ⚠️ THE IN-MEMORY VALUE IS THE RIGHT KEY, AND A REVIEW ROUND SAID OTHERWISE.
+  // The objection: a Drive family whose in-memory baseline has been nulled takes
+  // the revision-less arm and writes `revision: null` over a durable row that
+  // had one. True, and it is the FAIL-SAFE direction — `shouldSkipOpenRead`
+  // gates on `revision !== null`, so the cost is one extra Drive read after a
+  // reload, never a false skip. The proposed remedy (key it on whether the
+  // PROVIDER can produce a revision) does not help: if the in-memory baseline is
+  // null we do not KNOW the revision, so the branch would either write null
+  // anyway or skip the write — and skipping is exactly the bug the long comment
+  // below records fixing, which cost local-file families the rebase path
+  // entirely. There is no third answer. Keep the key, keep the cost, say so.
   const revision = remoteBaseline?.revision ?? null;
   if (revision === null) {
     // ⚠️ NO REVISION IS NOT NO BASELINE. Only `GoogleDriveProvider` implements
@@ -1737,7 +1748,10 @@ async function fetchAndMergeRemote(): Promise<void> {
   // RESIDENT, which is the one fact that would expose a wrong `clean`
   // derivation losing edits. Two constant messages, so the 50/surface/min
   // limiter buckets them apart from each other and from the blocks.
-  docClient.logMergeTerminus('poll terminus', merged, remoteEnvelope.familyId);
+  // ⚠️ ITS OWN LABEL. `where` is the (surface, message) bucket key for the
+  // 50/surface/min limiter, so sharing 'poll terminus' with `syncStore`'s site
+  // put the two in one bucket — which defeats the point of having a third.
+  docClient.logMergeTerminus('background poll terminus', merged, remoteEnvelope.familyId);
 
   // Learn the marker we sampled BEFORE this read (C13/C10). If a peer wrote in the
   // gap between the probe and the read, this records the OLDER revision → the next
@@ -1914,14 +1928,6 @@ async function doSave(): Promise<boolean> {
     // so a failed first post-compaction save reported a 5.0 write that never
     // happened AND silenced the one that eventually did.
     //
-    // ⚠️ AND THE FAMILY ID IS THE ONE CAPTURED BEFORE THE WRITE (`familyIdAtWrite`).
-    // `currentEnvelope` is module state that `reset()` nulls, the write takes
-    // seconds, and a sign-out landing inside it would make this a TypeError on
-    // the SUCCESS path — reported by `doSave`'s catch as a failed save for a
-    // write that actually landed, with no baseline committed. Same hazard C1
-    // guards for the provider eleven lines below.
-    noteWrittenVersion(versionDetail, familyIdAtWrite);
-    recordPersistedBytes(fileContent); // capture size for the registry usage signal
     // ⚠️ A QUEUED WRITE IS NOT A SAVE. The provider catches a network failure,
     // enqueues the bytes and returns — so without this the function ran on to
     // `recordSaveSuccess()` and stamped a fresh "Last Saved" for a write that
@@ -1940,6 +1946,24 @@ async function doSave(): Promise<boolean> {
       });
       return false;
     }
+    // ⚠️ BELOW THE QUEUE GATE, AND THAT ORDERING IS THE FIX. Both of these
+    // describe a write that LANDED, and both were being run for writes that
+    // merely went into the offline queue. `noteWrittenVersion` is a ONE-SHOT
+    // memo — it early-returns on a repeated `detail` — so a queued write spent
+    // the version transition, and the real save that followed on reconnect
+    // emitted nothing: the single event that says "this family is now writing
+    // 5.0 files" was consumed by a write that never left the device. And
+    // `recordPersistedBytes` reported bytes to the registry usage signal for a
+    // file nobody received.
+    //
+    // The family id is still the one captured BEFORE the write
+    // (`familyIdAtWrite`): `currentEnvelope` is module state that `reset()`
+    // nulls, the write takes seconds, and a sign-out landing inside it would
+    // make this a TypeError on the SUCCESS path — reported by `doSave`'s catch
+    // as a failed save for a write that actually landed, with no baseline
+    // committed. Same hazard C1 guards for the provider below.
+    noteWrittenVersion(versionDetail, familyIdAtWrite);
+    recordPersistedBytes(fileContent); // capture size for the registry usage signal
     const ackRevision = ack ? ack.revision : null;
 
     if (currentProvider !== providerAtWrite) {

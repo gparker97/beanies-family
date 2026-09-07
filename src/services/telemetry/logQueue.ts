@@ -42,6 +42,23 @@ let flushInFlight: Promise<void> | null = null;
 let droppedTotal = 0;
 let warnedNoUrl = false;
 
+/**
+ * Echo events to the console instead of dropping them, in dev only.
+ *
+ * ⚠️ ONE CONST, ONE TEST-DETECTION IDIOM, IN ONE PLACE. `import.meta.env.VITEST`
+ * appears exactly HERE in `src/` and nowhere else — it is the seam that becomes
+ * a pattern the moment it is copied. It is used rather than `MODE === 'test'`
+ * because Vitest sets it and it cannot be confused with a production build run
+ * under `--mode test`; without it, 6773 tests each print their own telemetry.
+ *
+ * The `typeof import.meta` guard is kept: this module is imported by the worker
+ * as well as the main bundle, and the file already guards it twice for the
+ * ingest config. Removing a defence to save a branch is not a trade worth making
+ * for a dev-only console line.
+ */
+const ECHO_TO_CONSOLE =
+  typeof import.meta !== 'undefined' && !!import.meta.env?.DEV && !import.meta.env?.VITEST;
+
 // ─── Config (read at call time, never at import) ─────────────────────────────
 
 function ingestUrl(): string | null {
@@ -79,12 +96,20 @@ export function enqueueLogEvent(record: LogRecord, flush = false): void {
     // sync bug was the one environment where the diagnostics did not exist, and
     // a real field investigation stalled on exactly that. Dev-only: the check is
     // compiled out of the production bundle.
-    if (import.meta.env?.DEV) {
-      const { level, surface, message, context } = record;
+    if (ECHO_TO_CONSOLE) {
+      // ⚠️ `LogRecord` IS FLAT — there is no `context` property. It is built by
+      // spreading `enrichAndRedact`'s output over the base fields, so the
+      // diagnostic data sits at the TOP level under an index signature. The
+      // first version of this destructured `record.context`, which is always
+      // `undefined`, so every echoed event printed `{}` — the fix for invisible
+      // diagnostics was itself invisible.
+      const { level, surface, message, timestamp, stack, ...ctx } = record;
+      void timestamp;
+      void stack;
       const line = `[telemetry:${level}] ${surface} — ${message}`;
       // `warn`/`error` only, per the repo's no-console rule.
-      if (level === 'error') console.error(line, context ?? {});
-      else console.warn(line, context ?? {});
+      if (level === 'error') console.error(line, ctx);
+      else console.warn(line, ctx);
     }
     return;
   }

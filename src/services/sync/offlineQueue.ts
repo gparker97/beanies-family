@@ -35,6 +35,7 @@ import {
 } from '@/services/google/googleAuth';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
+import { assertNever } from '@/utils/assertNever';
 
 const SESSION_STORAGE_KEY = 'beanies_offline_queue';
 
@@ -99,18 +100,28 @@ export function hasPendingSave(): boolean {
 }
 
 /**
+ * What a flush attempt actually did.
+ *
+ * ⚠️ THREE OUTCOMES, NOT A BOOLEAN, AND THAT IS THE FIX. `flushQueue` returned
+ * `false` for two unrelated things — "there was nothing to flush" and "the save
+ * path declined and the work is still stuck here" — and `tryFlush` reset the
+ * failure streak on ANY resolution. So a permanently declining resave never
+ * advanced `consecutiveFlushFailures`, `reportFlushFailure` never ran, and
+ * `#beanies-errors` never paged for a queue holding unsaved family data. The two
+ * falses have to be separable, and the consumer has to be exhaustive so a fourth
+ * outcome fails the BUILD rather than landing silently in the reset arm.
+ */
+export type FlushOutcome = 'flushed' | 'nothing-to-flush' | 'declined';
+
+/**
  * Flush the queued save.
  *
- * Returns `true` if the flush completed and the queue is now clear.
- * Returns `false` only when there is nothing to flush (no pending content
- * or no provider attached) — a no-op, not a failure.
- *
- * Throws the underlying error if the provider's `write()` rejects. Callers
- * are responsible for catching, classifying, and reporting. The queue is
- * left intact on failure for the next recovery trigger to retry.
+ * Throws the underlying error if the resave rejects. Callers are responsible
+ * for catching, classifying, and reporting. The queue is left intact on both
+ * `'declined'` and a throw, for the next recovery trigger to retry.
  */
-export async function flushQueue(): Promise<boolean> {
-  if (!pendingContent || !flushProvider) return false;
+export async function flushQueue(): Promise<FlushOutcome> {
+  if (!pendingContent || !flushProvider) return 'nothing-to-flush';
 
   // ⚠️ RE-SAVE, NEVER REPLAY THE BYTES. This used to be
   // `await flushProvider.write(pendingContent)` — a blind write of a payload
@@ -158,7 +169,7 @@ export async function flushQueue(): Promise<boolean> {
     // failure). It has already classified and reported; the queue stays so the
     // next trigger retries rather than the work being dropped here.
     console.warn('[offlineQueue] Resave declined — keeping the queued work for a later retry');
-    return false;
+    return 'declined';
   }
   // Only clear if nothing NEWER was queued while we were saving.
   if (pendingContent === content) {
@@ -166,7 +177,7 @@ export async function flushQueue(): Promise<boolean> {
     clearFromSession();
   }
   console.log('[offlineQueue] Queued work re-saved through the normal save path');
-  return true;
+  return 'flushed';
 }
 
 /**
@@ -304,8 +315,26 @@ function tryFlush(reason: FlushReason): void {
   const gate = AUTH_GATED_REASONS.has(reason) ? whenRedirectAuthSettled() : Promise.resolve();
 
   const p = gate.then(flushQueue).then(
-    () => {
-      consecutiveFlushFailures = 0; // queue drained — streak resets
+    (outcome) => {
+      switch (outcome) {
+        case 'flushed':
+          consecutiveFlushFailures = 0; // queue drained — streak resets
+          return;
+        case 'nothing-to-flush':
+          // A sign-out landed inside the auth gate. Reporting this as a failure
+          // would manufacture a page for a queue that is legitimately empty.
+          return;
+        case 'declined':
+          // ⚠️ THE ARM THAT WAS MISSING. The save path refused (a lineage block,
+          // a refused merge, an auth failure) and the work is STILL on this
+          // device. It resolved rather than threw, so the old code read it as
+          // success and zeroed the streak — the queue could stay stuck forever
+          // without ever paging.
+          reportFlushFailure(reason, new Error('resave declined — queued work still pending'));
+          return;
+        default:
+          return assertNever(outcome, 'offlineQueue.tryFlush');
+      }
     },
     (e) => reportFlushFailure(reason, e)
   );

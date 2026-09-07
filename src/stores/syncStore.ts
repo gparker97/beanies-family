@@ -2712,7 +2712,22 @@ export const useSyncStore = defineStore('sync', () => {
         throw new Error('createNewFile: syncService has no provider configured');
       }
       step = 'write';
-      await provider.write(envelopeJson);
+      const createAck = await provider.write(envelopeJson);
+      // ⚠️ A QUEUED WRITE IS NOT A WRITE, AND THIS STEP MUST STOP HERE. The
+      // provider catches a network failure, enqueues the bytes and RESOLVES —
+      // so `createNewFile` ran on to record persisted bytes for a file nobody
+      // received and then to `verifyJustWritten`, which read back nothing and
+      // failed as `'verify'`. Creating a family offline was therefore reported
+      // to the person as "the file we wrote back does not read correctly",
+      // which reads as data corruption; the truth is "you are offline".
+      //
+      // `'write'` is an existing `CreatePodFailureReason`, and `step` is already
+      // set to it — no new union member and no new copy.
+      if (createAck?.queued === true) {
+        throw new Error(
+          'createNewFile: the pod write was queued offline and never left the device'
+        );
+      }
       // Capture size for the registry usage signal. This create write bypasses
       // syncService.doSave, so record it here — before step 'register' below —
       // so the create-path registration carries a real beanpodSizeKb, not null.
@@ -4400,6 +4415,22 @@ export const useSyncStore = defineStore('sync', () => {
       // silently disabled for the rest of the session, on exactly the surface
       // that catches a device writing to a copy. The diagnostic below runs for
       // every provider; the latch is what it costs, so it is taken here, once.
+      //
+      // ⚠️ AND WHAT IT COSTS, IN FULL, BESIDE THE LATCH IT COSTS IT FOR. The
+      // diagnostic IS the registry lookup, so keeping the signal means one small
+      // uncached GET per family per session on EVERY provider — local-file and
+      // native families included, which previously made none. That is the price
+      // of the only signal that would catch a re-homed family, and it is paid
+      // knowingly. If it ever has to go, the alternative is folding the provider
+      // check into the registry write a local family already performs; moving
+      // this gate back above the latch is NOT the alternative — that is the hole
+      // described above.
+      //
+      // ⚠️ THE OFFLINE GATE IS ABOVE THE LATCH, DELIBERATELY. Below it, a device
+      // that happens to be offline at this moment latches as "checked" and the
+      // lookup never runs again for the rest of the session — losing the signal
+      // on precisely the devices most likely to have drifted.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
       checkedCanonicalFor = familyId;
 
       const lookup = await registry.lookupFamilyResult(familyId);
