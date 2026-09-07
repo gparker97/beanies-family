@@ -30,7 +30,7 @@ const { start, isProcessing, diff, isOpen, take, dismiss } = useRecipeRefetch();
 <template>
   <button
     type="button"
-    class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white disabled:opacity-60"
+    class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white disabled:opacity-60"
     :disabled="isProcessing"
     data-testid="recipe-refetch"
     @click="start(props.recipe)"

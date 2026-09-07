@@ -202,7 +202,20 @@ export function useRecipeRefetch() {
     // cloud check, runs the candidate ladder, logs `image_resolved`/`image_none`. The
     // argument is passed, never re-read from a ref — see `attachAfterSave`'s own warning.
     if (current.photo && prefill?.dishImage) {
-      void capture.attachAfterSave(recipe.id, prefill.dishImage);
+      // Unawaited on purpose — the attach is slow and the modal should close now. But NOT
+      // bare `void`: `attachAfterSave`'s dish branch has no `catch` of its own, and this
+      // modal is dismissed in the same tick, so a throw would become an unhandled rejection
+      // with nothing on screen to show it. Warn-not-rollback: the taken text is saved
+      // either way, and a missing photo is not worth undoing it.
+      capture.attachAfterSave(recipe.id, prefill.dishImage).catch((e: unknown) => {
+        logEvent({
+          level: 'warn',
+          surface: SURFACE,
+          message: 'refetch photo could not be attached',
+          context: { action: 'apply_failed', detail: 'photo' },
+        });
+        console.warn('[recipe-refetch] dish photo attach failed after a taken re-fetch', e);
+      });
     }
 
     logEvent({
