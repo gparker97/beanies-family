@@ -50,7 +50,7 @@ import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { preserveLocalKeyDicts, withoutPayload } from './envelopeMerge';
-import { setFlushProvider } from './offlineQueue';
+import { setFlushProvider, setResaveHandler } from './offlineQueue';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -813,6 +813,11 @@ export function setProvider(provider: StorageProvider): void {
   // that build a provider WITHOUT calling setProvider never become a flush
   // target and can't write stale queued bytes into a file they only inspected.
   setFlushProvider(provider);
+  // ⚠️ REGISTERED TOGETHER WITH THE PROVIDER, ALWAYS. The queue no longer holds
+  // bytes to write; resuming means re-running THIS save, which reads the
+  // remote, merges it and consults the lineage guard. A flush target without a
+  // resave handler cannot write anything, by design — see `flushQueue`.
+  setResaveHandler(save);
   startPollingIfApplicable(provider);
   updateState({
     isConfigured: true,
@@ -1341,6 +1346,7 @@ export async function initialize(): Promise<boolean> {
         // init path sets currentProvider directly instead of via setProvider,
         // so it must register explicitly.
         setFlushProvider(currentProvider);
+        setResaveHandler(save);
         startPollingIfApplicable(currentProvider);
         updateState({
           isInitialized: true,
@@ -1909,6 +1915,24 @@ async function doSave(): Promise<boolean> {
     // guards for the provider eleven lines below.
     noteWrittenVersion(versionDetail, familyIdAtWrite);
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
+    // ⚠️ A QUEUED WRITE IS NOT A SAVE. The provider catches a network failure,
+    // enqueues the bytes and returns — so without this the function ran on to
+    // `recordSaveSuccess()` and stamped a fresh "Last Saved" for a write that
+    // never left the device. An offline user was told their work was on Drive.
+    //
+    // Return `false` (a save that did not land) rather than throwing: the queue
+    // holds the intent, the reconnect re-runs this save through the normal path,
+    // and there is nothing here for a person to act on yet.
+    if (ack?.queued === true) {
+      updateState({ isSyncing: false });
+      logEvent({
+        level: 'info',
+        surface: 'pod-save',
+        message: 'save queued offline — not recorded as saved',
+        context: { action: 'save-queued', provider_type: providerTypeForDiag },
+      });
+      return false;
+    }
     const ackRevision = ack ? ack.revision : null;
 
     if (currentProvider !== providerAtWrite) {

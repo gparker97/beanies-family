@@ -241,7 +241,9 @@ export class GoogleDriveProvider implements StorageProvider {
           context: { http_status: e.status, action: 'queue-offline' },
         });
         enqueueOfflineSave(content);
-        return;
+        // NOT a success: say so, or the caller stamps "Last Saved" for bytes
+        // that never left this device. See `WriteAck.queued`.
+        return { revision: null, queued: true };
       }
 
       // Network error — queue for offline flush. Uses the shared classifier so
@@ -250,7 +252,9 @@ export class GoogleDriveProvider implements StorageProvider {
       // instead of queued (2026-06-19, finding 6).
       if (isNetworkError(e)) {
         enqueueOfflineSave(content);
-        return;
+        // NOT a success: say so, or the caller stamps "Last Saved" for bytes
+        // that never left this device. See `WriteAck.queued`.
+        return { revision: null, queued: true };
       }
 
       throw e;
