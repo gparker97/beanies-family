@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle, FileSystemHandle */
 import { ref, computed, onMounted, watch } from 'vue';
-import { payloadErrorMessageKey, PayloadLoadError } from '@/types/sync';
+import { payloadErrorMessageKey, PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -516,6 +516,22 @@ async function loadSavedFileViaPicker() {
   });
 }
 
+/**
+ * The failure tail shared by the picked-file and dropped-file loads.
+ *
+ * ⚠️ `payloadError` FIRST, and since 2026-09-07 that ordering is the only thing
+ * that speaks at all for a file from a newer beanies. `openFileFailure` no
+ * longer mirrors a blocker into the pod's `lastError`, so `syncStore.error` is
+ * empty for exactly the files that most need a sentence. The drop path had no
+ * `payloadError` arm and would have fallen through to the generic
+ * "could not load" copy.
+ */
+function applyFileLoadFailure(result: { payloadError?: RemoteBlocker }): void {
+  formError.value = result.payloadError
+    ? t(result.payloadError.inlineMessageKey)
+    : syncStore.error || t('auth.fileLoadFailed');
+}
+
 async function handleLoadFile() {
   formError.value = null;
   resetPodUnopenable(); // a different file may well open
@@ -529,14 +545,8 @@ async function handleLoadFile() {
       await finishLoaded();
     } else if (result.needsPassword) {
       await handlePendingPassword(syncStore.fileName, { tryAuto: false });
-    } else if (result.payloadError) {
-      // BEFORE the `syncStore.error` arm: that ref mirrors the service's raw
-      // `lastError` and would otherwise win with an exception string.
-      formError.value = t(result.payloadError.inlineMessageKey);
-    } else if (syncStore.error) {
-      formError.value = syncStore.error;
     } else {
-      formError.value = t('auth.fileLoadFailed');
+      applyFileLoadFailure(result);
     }
   } catch {
     formError.value = syncStore.error || t('auth.fileLoadFailed');
@@ -740,10 +750,8 @@ async function handleDrop(e: DragEvent) {
       await finishLoaded();
     } else if (result.needsPassword) {
       await handlePendingPassword(file.name, { tryAuto: false });
-    } else if (syncStore.error) {
-      formError.value = syncStore.error;
     } else {
-      formError.value = t('auth.fileLoadFailed');
+      applyFileLoadFailure(result);
     }
   } catch {
     formError.value = syncStore.error || t('auth.fileLoadFailed');

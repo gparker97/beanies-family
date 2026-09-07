@@ -100,18 +100,47 @@ describe('loadDroppedFile and the envelope version', () => {
     }
   });
 
-  it('carries a NEWER file out as a typed payloadError, with the same sentence in lastError', async () => {
-    // Two channels reach the user: the result's `payloadError` (rendered via
-    // `inlineMessageKey`) and `syncStore.error`, which mirrors `lastError`.
-    // They must carry the same translated sentence, or whichever arm a page
-    // tests first wins with a different message.
+  it("carries a NEWER file out as a payloadError and leaves the POD's channel alone", async () => {
+    // ⚠️ THE TWO CHANNELS MUST NOW DISAGREE, and this test used to pin the
+    // opposite. `lastError` is the POD's error channel: it is mirrored into
+    // `syncStore.error` and rendered by the sync-failure slab, which carries
+    // Reconnect Drive and Force Save. Putting a refused PICK there, over a
+    // family that is still open and unchanged, offered to force-save your way
+    // out of a file that was never loaded — and it is exactly what made a
+    // refusal read as a successful load.
+    //
+    // The contract that replaces it: `payloadError` is the sole channel for a
+    // blocker, so every reader must test it BEFORE `syncStore.error`.
     const r = await syncService.loadDroppedFile(fileOf(envelope('6.0')));
     expect(r.success).toBe(false);
     expect(r.needsPassword).toBeUndefined();
     expect(r.payloadError).toBeInstanceOf(UnsupportedBeanpodVersionError);
     expect(r.payloadError?.inlineMessageKey).toBe('podNewerVersion.inline');
-    expect(syncService.getState().lastError).toBe('T(podNewerVersion.inline)');
+    expect(syncService.getState().lastError).toBeNull();
     expect(r).not.toHaveProperty('rawText');
+  });
+
+  it('treats a version written as a JSON NUMBER as a newer file, not a broken one', async () => {
+    // ⚠️ HOW A HAND-EDITED FILE ACTUALLY LOOKS. Typing `"version": 6.0` into an
+    // exported beanpod produces a JSON number, and the guard used to demand a
+    // string before it would even consider the known set — so this fell through
+    // to a generic "missing version", with worse copy and nothing in CloudWatch.
+    const raw = JSON.parse(envelope('4.0')) as Record<string, unknown>;
+    raw.version = 6.0;
+    const r = await syncService.loadDroppedFile(fileOf(JSON.stringify(raw)));
+    expect(r.payloadError).toBeInstanceOf(UnsupportedBeanpodVersionError);
+    expect(r.payloadError?.inlineMessageKey).toBe('podNewerVersion.inline');
+    // `String(6.0)` is `'6'`: a JSON `6.0` and a `6` are the same value once
+    // parsed. Unavoidable, and pinned so nobody later "fixes" it into a lie.
+    expect((r.payloadError as UnsupportedBeanpodVersionError).blockDetail).toBe('version=6');
+  });
+
+  it('still calls a file with NO version simply not a beanpod', async () => {
+    const raw = JSON.parse(envelope('4.0')) as Record<string, unknown>;
+    delete raw.version;
+    const r = await syncService.loadDroppedFile(fileOf(JSON.stringify(raw)));
+    expect(r.payloadError).toBeUndefined();
+    expect(syncService.getState().lastError).toMatch(/missing version/);
   });
 
   it('still reports a non-beanpod file through lastError, with no payloadError', async () => {
