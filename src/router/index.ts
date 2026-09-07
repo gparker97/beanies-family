@@ -346,6 +346,25 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false, hideQuickAdd: true, noChrome: true },
   },
   {
+    // A recipe someone was sent (#92). The whole recipe rides in the URL FRAGMENT, which a
+    // browser never transmits, so this page needs no account, no pod and no network — it
+    // decodes what is already in the address bar. `requiresAuth: false` is the entire point:
+    // the recipient is by definition not a beanies user yet.
+    //
+    // The name is also in `PUBLIC_ENTRY_ROUTE_NAMES` (`utils/appChrome.ts`). Both are
+    // required: this flag stops the router guard bouncing them, that list stops App.vue's
+    // boot redirect doing the same thing a moment later.
+    path: '/recipe',
+    name: 'SharedRecipe',
+    component: () => import('@/pages/SharedRecipePage.vue'),
+    meta: {
+      titleKey: 'recipeShare.received.title',
+      requiresAuth: false,
+      hideQuickAdd: true,
+      noChrome: true,
+    },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),

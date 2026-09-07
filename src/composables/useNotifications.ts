@@ -11,7 +11,7 @@
  */
 import { watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { isPodlessExpectedRoute } from '@/utils/appChrome';
+import { isPublicEntryRoute } from '@/utils/appChrome';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -133,7 +133,7 @@ export function useNotifications(): void {
       // over the setup screen (the 2026-06-20 report). The seed-as-read above
       // still runs, so nothing pops once the user lands in /nook. Uses the SAME
       // predicate App.vue uses for podless routing (no duplicated route logic).
-      if (!isPodlessExpectedRoute(router.currentRoute.value)) {
+      if (!isPublicEntryRoute(router.currentRoute.value)) {
         store.openToLatestAutoOpen();
         // #45: lowest-priority auto-interruption — runs AFTER openToLatestAutoOpen so
         // the what's-new drawer claims the session's single slot first. Self-gated on

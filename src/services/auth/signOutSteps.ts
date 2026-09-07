@@ -45,7 +45,8 @@ export type SignOutStepName =
   | 'reclaimAllPasskeys'
   | 'untrustDevice'
   | 'reArmTrustPrompt'
-  | 'sweepHandoffFiles';
+  | 'sweepHandoffFiles'
+  | 'clearKeptRecipe';
 
 /** Tier 2, trusted device: silent-reconnect sign-out — tokens, caches, wraps all kept. */
 export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
@@ -92,6 +93,11 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'reclaimAllPasskeys',
   'removeRosterAll',
   'sweepHandoffFiles',
+  // A recipe kept from a share link but never reviewed (#92). Tier 3 only: it is
+  // already bounded by a 60-minute TTL and deleted on first read, so the lower tiers
+  // need nothing, and adding it here alone keeps the strict-superset property intact
+  // with no new documented exception.
+  'clearKeptRecipe',
 ];
 
 export type SignOutStepImpls = Record<SignOutStepName, () => Promise<void> | void>;

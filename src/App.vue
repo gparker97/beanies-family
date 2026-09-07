@@ -51,11 +51,7 @@ import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
 import { beginOpen, setOpenPath, endOpen } from '@/services/telemetry/openCycle';
 import type { OpenToken } from '@/services/telemetry/openCycle';
-import {
-  shouldShowAppLayout,
-  isPodlessExpectedRoute,
-  isNavigationCancelled,
-} from '@/utils/appChrome';
+import { shouldShowAppLayout, isPublicEntryRoute, isNavigationCancelled } from '@/utils/appChrome';
 import { isPodlessRecoveryQuery, RESUME_SETUP_PATH } from '@/components/login/resumePaths';
 import {
   hardReload,
@@ -1215,17 +1211,11 @@ onMounted(async () => {
     if (authStore.needsAuth) {
       // E2E auto-auth: restore from sessionStorage (dev mode only)
       if (!authStore.restoreE2EAuth()) {
-        const authPages: Array<string | undefined> = [
-          'Welcome',
-          'Login',
-          'JoinFamily',
-          'CreateFamily',
-          'OpenFromDrive',
-          // Dev-only ADR-032 worker spike — a standalone measurement page with no
-          // auth/pod; exempt from the onboarding redirect (dev builds only).
-          'DevWorkerSpike',
-        ];
-        if (!authPages.includes(route.name as string)) {
+        // The list lives in `appChrome.ts` and is shared with the podless branch below
+        // and `useNotifications` — this used to be an inline copy, and the copy had
+        // already drifted (it was missing `ShareTarget`, so a signed-out document share
+        // was bounced here and leaked into Cache Storage permanently).
+        if (!isPublicEntryRoute(route)) {
           initBreadcrumbs.push('auth: redirecting to /welcome (not authenticated)');
           router.replace('/welcome');
         }
@@ -1252,11 +1242,11 @@ onMounted(async () => {
       // every signup, masking a remount race.)
       // Suppress on routes where a podless session is EXPECTED (the onboarding
       // entry points, incl. the `Welcome` recovery screen) — keyed on route name
-      // via `isPodlessExpectedRoute`, NOT `meta.noChrome` (which also covers
+      // via `isPublicEntryRoute`, NOT `meta.noChrome` (which also covers
       // NotFound/PlausibleExclude, where a podless session IS anomalous and
       // should still alert).
       const onRecoveryQuery = isPodlessRecoveryQuery(route.query.resume);
-      if (!isPodlessExpectedRoute(route)) {
+      if (!isPublicEntryRoute(route)) {
         reportError({
           surface: 'app.onboardingZombieState',
           message:
