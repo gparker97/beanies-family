@@ -4,6 +4,63 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A capability can exist one layer below where you looked
+
+**Date:** 2026-09-07
+**Context:** Planning the Beanie List copy, I read `listRepository.ts` — fifteen lines of
+thin re-exports over `createAutomergeRepository` — and concluded there was no batch or
+transaction API. A whole partial-failure design followed from that: a `{ created, failed }`
+return type, a `copy_partial` telemetry event, a "modal stays open on partial success"
+branch, and a loop of `create` calls that would have fired one error toast, one whole-shelf
+re-render and one analytics event per bean.
+
+`{ op: 'batch'; ops }` is declared in `worker/protocol.ts:127`, and `worker/docOps.ts:676-679`
+documents it outright: "A `batch` (and a single op) is exactly ONE `Automerge.change` →
+atomic: a mid-batch throw commits nothing." `listCycleRepository.ts` had been using it in
+three places the entire time.
+
+**The mistake:** treating the file that _names_ an operation as the file that _defines its
+limits_. A thin adapter tells you what has been wrapped so far, never what the layer beneath
+can do.
+
+**Rule:** before concluding a capability is absent, read the layer that actually implements
+it — the protocol, the worker, the client — not just the module you were going to call. And
+check whether a sibling repository already does the thing you are about to declare
+impossible; `grep -rn "op: 'batch'" src/` would have settled this in one command.
+
+**Corollary, from the same feature:** a verify that runs _after_ a commit must never be
+worded as "nothing happened". `createLists` checks the projection once `mutate` has resolved,
+so its failure means the rows very likely exist and are merely invisible. The first cut
+reported and toasted "nothing was created (the batch is atomic)", which invites exactly the
+retry that produces a second set. Word a post-commit check for what it actually proves.
+
+---
+
+## Look for the existing convention before inventing an affordance
+
+**Date:** 2026-09-07
+**Context:** For the list-copy entry point I proposed "Copy this list…" and "Delete list"
+rows at the foot of the detail drawer, and drew them into a mockup. Greg replied that the
+drawer already had a delete icon and a close button, and asked why the icons were not simply
+top-right of the card — "this also follows the convention for the family member listing".
+`BeanCard.vue:256-281` had carried exactly that cluster all along.
+
+Two things came out of following it. It was not cosmetic: `ListTile`'s root had to stop being
+a `<button>`, because a button may not contain interactive descendants, which in turn forced
+the stretched-overlay pattern to keep the tile keyboard-operable (`BeanCard`'s own
+`<article @click>` is not, so the convention could only be half-copied). And it exposed that
+a scope item I had written — "remove the redundant action rows from the bottom of
+`ListDetailModal`" — described rows that existed nowhere but in my own superseded mockup. I
+had invented an affordance, then written a plan to remove it.
+
+**Rule:** for any new UI affordance, first grep for a component that already solves the same
+shape (`ActionButtons.vue` and `BeanCard.vue` here) and adopt it. When a mockup and the
+codebase disagree about what exists, the codebase is right — re-read the file before writing
+the scope item, and never carry a mockup's invention into a plan as though it were current
+behaviour.
+
+---
+
 ## A guard that has never been seen to fail is not yet a guard
 
 **Date:** 2026-09-07
