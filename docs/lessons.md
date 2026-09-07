@@ -1107,3 +1107,37 @@ broken again in the very next pass, twice, so two of them get sharper:
     had no test at all before it. But diff the SCRIPT with the same care as the
     template, and read every line the move deletes as a question: what was this
     doing that nothing else does now?
+
+## 2026-09-07 (2) — Three symptoms, none of them what they looked like
+
+30. **"It warned me and then did it anyway" is usually two bugs, and neither is
+    the guard.** A refused file appeared to load. The guard had actually held on
+    all 17 read paths; what failed was that the refusal's only render site sat
+    inside a `v-else` whose `v-if` tested a predicate that `return true`s
+    unconditionally, so the branch was dead on every platform — and the sentence
+    surfaced instead in a _different_ error channel that renders **Force Save**
+    over a family that was still open. **Before believing a report that a guard
+    was bypassed, check whether the thing on screen is the thing that failed.**
+    I told greg to hold the release on the strength of his description, and the
+    premise was wrong.
+31. **A predicate that cannot return false is a trap with a long fuse.**
+    `canAutoSync()` was `return true` under a comment saying so. Someone later
+    wrote a `v-else` against it, and an error slab went unrenderable for months
+    with nothing failing anywhere. If a function's answer is a constant, delete
+    it or make the constant obvious at every call site; the moment it looks like
+    a question, someone will branch on it.
+32. **`resolve()` on `onblocked` is a lie that compounds.** IndexedDB fires
+    `blocked` on a delete when another connection is open. Resolving it as
+    success left the delete QUEUED, and the very next line re-opened the same
+    database — which then waited behind a delete that could not finish. The open
+    fires no event at all while it waits (`blocked` only fires for a version
+    change), so nothing settled and nothing reported. **When an API tells you it
+    could not do the thing, do not report that as having done it**, and never
+    pair it with an immediate retry of the operation it blocks.
+33. **A timeout that cannot cancel needs an owner for the work it abandoned.**
+    The first draft of the fix wrapped the open in `withTimeout` and stopped
+    there. But `withTimeout` only stops _waiting_: the open stays queued, and if
+    it later succeeds nobody holds or closes the handle — an orphan connection
+    that blocks every future delete on that name, which is a worse and more
+    permanent failure than the hang. A review pass caught it. **Whenever you race
+    a promise you cannot cancel, decide what happens to the loser.**

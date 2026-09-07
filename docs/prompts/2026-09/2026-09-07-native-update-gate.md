@@ -86,3 +86,57 @@ The load-bearing consequence: nothing we deploy, mistype or forget can lock a fa
 
 **Honest about what it does not do:** it helps nobody who is stale today. They are on
 0.16, which contains none of this code. It is insurance for the next format change.
+
+---
+
+## Follow-on: the acceptance drills, and what they found
+
+Greg ran the compaction acceptance steps and reported three things. All three
+turned out to be different from what they looked like, and none was the beanpod
+version guard.
+
+### Prompts
+
+> ok i've performed steps 1, 2, and 4 all on my test family and i've already confirmed
+> step 5 in an earlier test [...] i did not test step 3 as i'm not sure what you mean by
+> 'corrupt the safety copy before compaction completes' [...] as long as you confirm the
+> code/guard looks correct i'm ok to push this wihtout explicit testing.
+>
+> however for step 2, i believe there is an issue with the design for loading another data
+> file [...] it switches the family to local file. Further, session B remained on the google
+> drive (compacted) file and did not also switch to local file after the import.
+>
+> Note that during step 4, when trying to import a new family file, i received a message
+> that the file version was newer, but it did not prevent me from loading the file. [...] in
+> addition, when trying to load the newer file from the welcome gate, the sign in spinner
+> appears to be spinning indefinitely.
+
+> i've tried to load the dev family again from google drive from the welcome gate [...] After
+> the spinning ran for ~60s or longer, I got this error: rpc-timeout:initAndLoadCache
+
+> go ahead to fully plan and implement these fixes. at the moment i'm locked out of the dev
+> family as even if i try to open the local file, the spinner spins forever.
+
+> once the review is done, let's /end-session once more [...] the main goal and next steps of
+> the next session would be to run testing on compaction against the updates just implemented,
+> and once all confirmed, run a couple more small feature (i.e. copy changes, the ability to
+> duplicate a list, share recipes, etc), and then run a full deploy including both apps to the
+> store.
+
+### Outcome
+
+**Step 3 confirmed by reading, not by testing**, at greg's request and with evidence: every
+safety-copy failure is `return refuse(...)` and `compactDoc()` is not reached until after all
+of them; the check is a real round trip (write, read back, byte-compare against what went
+out, not against the in-memory copy); a mismatch deletes the bad copy before refusing; nine
+`expect(docClient.compactDoc).not.toHaveBeenCalled()` assertions cover the refusal paths.
+
+**The lockout** was two lines live in prod since ADR-032, not this cycle's work. Fixed in
+`cd7d3dd7`; see `docs/STATUS.md` and the plan.
+
+**The "guard bypass" was not one.** I said it might be before the trace came back, and the
+trace disproved it: all 17 beanpod read routes call `parseBeanpodV4` and abort. The failure
+was a message with no reachable render site, next to a Force Save button.
+
+**The Drive restore issue is real and unfixed**, with its own investigation report. It makes
+the compaction rollback route strand a Chromium desktop user, and it needs its own plan.
