@@ -50,7 +50,13 @@ import {
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
-import type { MutationOp, ProjectionDelta, Heads, CachePersistFailureDetail } from './protocol';
+import type {
+  MutationOp,
+  ProjectionDelta,
+  Heads,
+  CachePersistFailureDetail,
+  CacheClearResult,
+} from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type PerfCtx = Record<string, number>;
@@ -280,6 +286,56 @@ function markPersistOk(): void {
 }
 
 /**
+ * The ONE writer of the durability signal.
+ *
+ * ⚠️ IT EXISTS SO `markPersistOk()` CAN EVER CLEAR THE BANNER. That function
+ * sends the clearing edge only `if (cachePersistFailed)`, the worker-local flag.
+ * A producer that called `sink.cachePersistFailed(true, …)` directly would raise
+ * the banner on main, whose own setter is edge-triggered on ITS copy, while
+ * leaving the worker unable to ever send the edge back: a durability banner
+ * stuck on for the rest of the session, after a recovery that actually worked.
+ * Both producers go through here, so the flag and the banner cannot disagree.
+ */
+function raiseCachePersistFailure(
+  kind: CachePersistFailureDetail['kind'],
+  errorName: string
+): void {
+  cachePersistFailed = true;
+  sink.cachePersistFailed(true, { kind, errorName });
+}
+
+/**
+ * Re-seed a clean cache DB after a corrupt-cache clear.
+ *
+ * ⚠️ NEVER THROWS. Its only caller is inside a `catch` whose job is to rethrow
+ * the ORIGINAL classification (App.vue's cache-corrupt self-heal dispatches on
+ * that class), so every failure here is reported through the durability signal
+ * rather than raised. Do not "improve" this by letting it propagate.
+ *
+ * ⚠️ AND IT IS WHY THE HANG IS GONE. Re-opening a database whose delete is
+ * queued behind another connection is a promise that never settles: the open
+ * waits for a delete that waits for a connection nobody here controls. When the
+ * delete did not land, the only safe thing is not to ask.
+ */
+async function reseedCacheAfterCorruption(id: string): Promise<void> {
+  const result = await cache.clearCache(id).catch(() => null);
+  // `?.` deliberately. A null (it threw) and a `{ deleted: false }` (it was
+  // blocked) both mean "do not re-open", and an `undefined` from a stale mock or
+  // an older bundle must degrade to the same safe answer rather than throwing a
+  // TypeError over the error the caller still has to classify.
+  if (!result?.deleted) {
+    raiseCachePersistFailure('open', 'DeleteBlocked');
+    return;
+  }
+  try {
+    await cache.initPersistenceDB(id);
+  } catch (openErr) {
+    console.error('[applyAndProject] cache re-open after clear failed', openErr);
+    raiseCachePersistFailure('open', openErr instanceof Error ? openErr.name : 'UnknownError');
+  }
+}
+
+/**
  * Commit the open-guard baseline (#61) captured at the start of a persist, once
  * the doc write it accompanies has succeeded. Called immediately before each
  * `markPersistOk()` (C4c: doc write → baseline → markPersistOk).
@@ -386,9 +442,7 @@ async function persistOnce(): Promise<void> {
     // `lastPersistedHeads` is NOT advanced on failure → the delta is re-captured
     // next tick. The console.error is the worker's only local channel (it can't
     // reach logEvent/reportError) — keep it; the signal carries triage detail.
-    cachePersistFailed = true;
-    const errorName = e instanceof Error ? e.name : 'UnknownError';
-    sink.cachePersistFailed(true, { kind: writeKind, errorName });
+    raiseCachePersistFailure(writeKind, e instanceof Error ? e.name : 'UnknownError');
     console.error('[applyAndProject] cache persist failed', e);
   }
 }
@@ -549,8 +603,7 @@ export async function initAndLoadCache(
       // `clearCache` deletes the whole DB — base AND snapshot rows — which is
       // why the cursors above had to go: only one of this function's three
       // callers recovers with `dropDoc()`; the other two just log.
-      await cache.clearCache(id).catch(() => {});
-      await cache.initPersistenceDB(id);
+      await reseedCacheAfterCorruption(id); // never throws; see its contract
     }
     throw e; // whole DB cleared → baseline row gone with it (C16 self-healing)
   }
@@ -1165,9 +1218,9 @@ export function reset(): void {
 }
 
 /** Sign-out / family-switch: drop the doc AND close-then-delete the cache DB. */
-export async function clearCache(id: string): Promise<void> {
+export async function clearCache(id: string): Promise<CacheClearResult> {
   reset();
-  await cache.clearCache(id);
+  return cache.clearCache(id);
 }
 
 // ─── E2E snapshot (DEV-only — plaintext doc bytes) ───────────────────────────
@@ -1413,8 +1466,7 @@ export async function dispatch(
       reset();
       return {};
     case 'clearCache':
-      await clearCache(a.familyId as string);
-      return {};
+      return { result: await clearCache(a.familyId as string) };
     case 'ping':
       // Liveness probe — confirms the worker's message loop is alive. Touches no
       // doc/key state, so it answers even before unlock (docClient.checkWorkerLiveness).

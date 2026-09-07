@@ -55,6 +55,7 @@ import {
   type CachePersistFailureDetail,
   type LineageBasis,
   type ExportedPayload,
+  type CacheClearResult,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
@@ -351,9 +352,28 @@ async function enterInlineMode(): Promise<void> {
     try {
       await rehydrator(currentFamilyId);
     } catch (e) {
-      console.error('[docClient] inline re-hydrate failed', e);
+      reportRehydrateFailure('inline', e);
     }
   }
+}
+
+/**
+ * A rehydrate that failed, reported once from both places it can happen.
+ *
+ * ⚠️ THIS IS THE PATH THE CACHE HANG TRAVELS. A rehydrate that waits out the
+ * heavy ceiling and then dies leaves the client holding NO document, and the two
+ * call sites used to record that in `console.error` alone: nothing in CloudWatch,
+ * on the one failure where you most need to know the device ended up empty.
+ */
+function reportRehydrateFailure(where: 'respawn' | 'inline', e: unknown): void {
+  console.error(`[docClient] re-hydrate after ${where} failed`, e);
+  reportError({
+    surface: 'doc-worker-recovery',
+    message: `doc-worker re-hydrate after ${where} failed — the client holds no document`,
+    severity: 'warning', // telemetry + console only; the next request re-drives it
+    error: e,
+    context: { action: 'rehydrate-failed', recovery_method: where },
+  });
 }
 
 async function spawn(): Promise<'worker' | 'inline'> {
@@ -403,7 +423,7 @@ async function spawn(): Promise<'worker' | 'inline'> {
     try {
       await rehydrator(currentFamilyId);
     } catch (e) {
-      console.error('[docClient] re-hydrate after respawn failed', e);
+      reportRehydrateFailure('respawn', e);
     } finally {
       rehydrating = false;
     }
@@ -506,7 +526,17 @@ function assertEnvelopeHasPayload(method: string, args: unknown): void {
 // corruption. Kept SEPARATE from HEAVY_METHODS/JSON_SAFE_METHODS — retry-safety,
 // timeout tier, and clone-safety are orthogonal and change for independent reasons.
 const RETRYABLE_METHODS = new Set([
-  'initAndLoadCache',
+  // ⚠️ `initAndLoadCache` IS DELIBERATELY ABSENT, and removing it was a fix.
+  // It is the one method the retry buys nothing for on EITHER branch of
+  // `handleRpcTimeout`. On the teardown branch the respawn's rehydrator IS
+  // `initAndLoadCache` (`bootstrap.ts`), awaited inside `spawn()` before the
+  // retry is even dispatched, so the retry is a literal duplicate of the work
+  // `ensureReady()` just did. On the alive-but-busy branch the worker is
+  // mid-WASM on a serial FIFO, so re-issuing a whole-doc rebuild queues a
+  // second full load behind the first, competing for the one thread. Together
+  // they turned one failed open into three runs and roughly six minutes of
+  // spinner. Per this allowlist's own reasoning, removing a method is the safe
+  // direction: the cost is a missed auto-heal, and there is no auto-heal here.
   'loadProjectionSnapshot',
   'openCache',
   'getHeads',
@@ -1418,11 +1448,35 @@ export async function reset(): Promise<void> {
   // projection readable across a family-switch (cross-session data bleed).
   resetProjection();
 }
-/** Close + delete the encrypted cache DB (sign-out / family-switch). */
+/**
+ * Close + delete the encrypted cache DB (sign-out / family-switch).
+ *
+ * ⚠️ STAYS `Promise<void>` ON PURPOSE. The blocked-delete outcome is read and
+ * reported HERE rather than handed upward, which keeps `deleteFamilyDatabase`
+ * and the whole sign-out path in `authStore` out of this change entirely.
+ * Sign-out is the highest-consequence caller in the chain and the one you least
+ * want to churn for a diagnostic.
+ */
 export async function clearCache(familyId: string): Promise<void> {
-  await request('clearCache', { familyId });
+  const result = (await request('clearCache', { familyId })) as CacheClearResult | undefined;
+  // ⚠️ `=== false`, NOT `!result?.deleted`. The inline dispatch path and any
+  // older worker bundle answer `{}`, and a bare falsy test would firehose a
+  // false "the cache survived sign-out" on every inline sign-out.
+  if (result?.deleted === false) {
+    logEvent({
+      level: 'warn',
+      surface: 'cache-persist',
+      message: 'cache delete was blocked',
+      // A stated privacy invariant, not a nicety: the encrypted cache is still
+      // on disk after a sign-out that told the person it was gone.
+      context: { action: 'clear-cache', error_code: 'delete-blocked' },
+    });
+  }
   resetProjection();
 }
+
+/** Test-only: the retry allowlist, so its membership is assertable. */
+export const __RETRYABLE_METHODS_FOR_TESTING: ReadonlySet<string> = RETRYABLE_METHODS;
 
 /** Test-only: tear down all client state between cases. */
 export function __resetDocClientForTesting(): void {

@@ -156,8 +156,11 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'perf_doc_bytes',
   'perf_entity_count',
   // Local-durability cache-persist failure (surface `cache-persist`, see
-  // services/sync/syncService.ts). PII-free: which write failed (base/increment) +
-  // the IDB error class name. Added 2026-07-13 (#50). MIRROR in the Lambda allowlist
+  // services/sync/syncService.ts). PII-free: which cache operation failed
+  // (base/increment/open) +
+  // the IDB error class name, or a fixed sentinel where the failure has no `Error`
+  // (`open` + `DeleteBlocked`: the cache DB could not be opened, so nothing will
+  // persist this session). Added 2026-07-13 (#50). MIRROR in the Lambda allowlist
   // + its pinned test.
   'cache_persist_kind',
   'cache_persist_error',

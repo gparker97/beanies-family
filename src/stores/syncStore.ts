@@ -910,6 +910,8 @@ export const useSyncStore = defineStore('sync', () => {
      * held", which the worker reads as `dirty` — the fail-safe direction.
      */
     let baselineHeads: string[] | null = null;
+    /** The failure class, when the cache could not be read. See the event below. */
+    let cacheErrorName: string | null = null;
     try {
       const cacheResult = await docClient.initAndLoadCache(familyId);
       loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
@@ -933,8 +935,28 @@ export const useSyncStore = defineStore('sync', () => {
       // room is futile anyway, so surface it and let the caller show the honest
       // message.
       if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
+      cacheErrorName = e instanceof Error ? e.name : 'UnknownError';
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
+
+    // ⚠️ THE OUTCOME, WHICH NOTHING COUNTED. The FAILURE is already reported —
+    // `surface()` firehoses any non-blocker worker rejection, and the RPC
+    // teardown reports separately. What was invisible is what we then DID about
+    // it: silently abandoning this device's document and adopting the remote
+    // wholesale. Emitted on BOTH arms deliberately, because a rate needs a
+    // denominator; a warn that only fires on failure cannot tell you whether
+    // this is one unlucky tablet or the whole fleet.
+    logEvent({
+      level: loadedFromCache ? 'info' : 'warn',
+      surface: 'pod-open-degrade',
+      message: loadedFromCache
+        ? 'cache hit — merging'
+        : 'cache unavailable — adopting remote wholesale',
+      context: {
+        action: 'cache-recovery',
+        error_code: loadedFromCache ? 'hit' : (cacheErrorName ?? 'miss'),
+      },
+    });
 
     // ⚠️ THE LINEAGE GUARD NOW LIVES IN THE WORKER — see
     // `applyAndProject.mergeRemoteEnvelope`. It has to, because it is the only

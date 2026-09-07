@@ -26,7 +26,11 @@ vi.mock('../cache', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../cache')>();
   return {
     ...actual,
-    clearCache: vi.fn(async () => {}),
+    // ⚠️ MUST answer the real shape. `reseedCacheAfterCorruption` reads
+    // `result?.deleted` to decide whether re-opening is safe; a mock resolving
+    // `undefined` used to make the helper skip the re-open silently, which is the
+    // safe direction but not what these tests are describing.
+    clearCache: vi.fn(async () => ({ deleted: true })),
     initPersistenceDB: vi.fn(async () => {}),
     loadCachedDoc: vi.fn(async () => {
       if (loadHook.err) throw loadHook.err;
@@ -41,6 +45,8 @@ const { configure, setKey, initAndLoadCache, __resetApplyAndProjectForTesting } 
 
 const FAMILY_ID = 'fam-oom';
 
+const cachePersistFailed = vi.fn();
+
 beforeEach(async () => {
   vi.clearAllMocks();
   loadHook.err = null;
@@ -48,7 +54,7 @@ beforeEach(async () => {
   configure({
     pushChunk: () => {},
     perf: () => {},
-    cachePersistFailed: () => {},
+    cachePersistFailed,
   });
   setKey(await generateFamilyKey());
 });
@@ -85,5 +91,60 @@ describe('initAndLoadCache — cache preservation', () => {
     const oom = new PayloadTooLargeError('oom', 'materialize', FAMILY_ID, 42);
     loadHook.err = oom;
     await expect(initAndLoadCache(FAMILY_ID)).rejects.toBe(oom);
+  });
+});
+
+describe('initAndLoadCache — when the clear is BLOCKED', () => {
+  beforeEach(() => {
+    vi.mocked(cache.clearCache).mockResolvedValue({ deleted: false });
+    loadHook.err = new CorruptPayloadError('bad bytes', 'load', FAMILY_ID);
+  });
+
+  it('does NOT re-open the database, which is the hang', async () => {
+    // ⚠️ THE LOCKOUT, IN ONE ASSERTION. A delete that was blocked is a delete
+    // still QUEUED, and an open of the same name then waits behind a delete that
+    // waits for a connection this code does not control. Nothing settles, and
+    // the sign-in spinner runs until the RPC ceiling kills the worker.
+    await expect(initAndLoadCache(FAMILY_ID)).rejects.toBeInstanceOf(CorruptPayloadError);
+    // ONCE, for the opening call at the top of `initAndLoadCache`. The second
+    // call, the re-seed after the clear, is the one that never returns.
+    expect(cache.initPersistenceDB).toHaveBeenCalledTimes(1);
+  });
+
+  it('still re-throws the ORIGINAL classification', async () => {
+    // The caller's self-heal dispatches on the error class. A failure inside the
+    // recovery must never replace it.
+    await expect(initAndLoadCache(FAMILY_ID)).rejects.toBeInstanceOf(CorruptPayloadError);
+  });
+
+  it('raises the durability signal, so skipping the re-open is not silent', async () => {
+    // Without an open DB, `persistOnce` early-returns for the rest of the
+    // session and nothing is written anywhere. Trading a hang for an invisible
+    // durability loss would not be a fix.
+    await expect(initAndLoadCache(FAMILY_ID)).rejects.toBeInstanceOf(CorruptPayloadError);
+    expect(cachePersistFailed).toHaveBeenCalledWith(true, {
+      kind: 'open',
+      errorName: 'DeleteBlocked',
+    });
+  });
+
+  it('raises it for a failed re-open too, not only a blocked delete', async () => {
+    vi.mocked(cache.clearCache).mockResolvedValue({ deleted: true });
+    // The FIRST call is the ordinary open at the top; the re-seed is the second.
+    vi.mocked(cache.initPersistenceDB)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('cache open timed out after 10000ms'));
+    await expect(initAndLoadCache(FAMILY_ID)).rejects.toBeInstanceOf(CorruptPayloadError);
+    expect(cachePersistFailed).toHaveBeenCalledWith(true, { kind: 'open', errorName: 'Error' });
+  });
+
+  it('survives a cache mock that answers the OLD shape, rather than throwing over the error', async () => {
+    // A stale mock or an older worker bundle answers `undefined`. That must
+    // degrade to "do not re-open" — the safe direction — never to a TypeError
+    // raised out of a helper documented as never throwing, on top of the error
+    // the caller still has to classify.
+    vi.mocked(cache.clearCache).mockResolvedValue(undefined as never);
+    await expect(initAndLoadCache(FAMILY_ID)).rejects.toBeInstanceOf(CorruptPayloadError);
+    expect(cache.initPersistenceDB).toHaveBeenCalledTimes(1); // the opening call only
   });
 });
