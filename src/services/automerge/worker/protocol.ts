@@ -15,7 +15,7 @@
  *     generic `DocWorkerError`.
  */
 import type { CollectionName } from '@/types/automerge';
-import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError, LocalDocUnreadableError } from '@/types/sync';
 import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
 import type { PodLineage } from '@/types/models';
@@ -318,6 +318,20 @@ const ERROR_REGISTRY: Record<string, ErrorCodec> = {
     reconstruct: (message) => new WorkerCrashError(message),
   },
   PodLineageError: lineageCodec,
+  // ⚠️ REQUIRED NOW THAT THE REFUSAL IS THROWN IN THE WORKER. Without an entry
+  // here the class arrives on main as a generic `DocWorkerError`, `blockCode`
+  // and `inlineMessageKey` are gone, `isRemoteBlocker` returns false, and every
+  // latch, banner and save-refusal that dispatches on it silently stops seeing
+  // it — the refusal would protect the document and then say nothing, which is
+  // the exact failure this whole change set exists to eliminate.
+  //
+  // Its constructor takes the failure class, and the message is rebuilt from it,
+  // so `cause` is what has to survive the wire.
+  LocalDocUnreadableError: {
+    serialize: (err) => (err instanceof LocalDocUnreadableError ? { cause: err.cause } : undefined),
+    reconstruct: (_message, data) =>
+      new LocalDocUnreadableError(typeof data?.cause === 'string' ? data.cause : 'unknown'),
+  },
 };
 
 /** Convert any thrown value into a wire-safe `SerializedError`. Never throws. */

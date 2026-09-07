@@ -208,7 +208,18 @@ export const BLOCKER_BANNER_KIND = {
   'podNewerVersion.inline': 'decrypt',
   'podLineage.unsyncedInline': 'lineage',
   'podLineage.conflictInline': 'lineage',
-  'podMerge.failedInline': 'lineage',
+  // ⚠️ `decrypt`, NOT `lineage`, AND THE DISTINCTION IS NOT COSMETIC. The
+  // expression this table replaced was `err instanceof PodLineageError ?
+  // 'lineage' : 'decrypt'`, so `RemoteMergeError` mapped here to `decrypt`;
+  // filing it under `lineage` on the way into a table silently changed
+  // behaviour. `RemoteMergeError.latches` returns `isActorCollision`, so the
+  // ONLY merge error that ever raises a banner is an Automerge
+  // `duplicate seq N found for actor …` — an actor-plumbing bug, not a
+  // compaction. `LineageBanner` would have told that user their family file was
+  // "reorganised on another device" and offered "Use the family file", whose
+  // confirm DISCARDS this device's document. A false story plus data
+  // destruction as the remedy.
+  'podMerge.failedInline': 'decrypt',
   'podLocalUnreadable.inline': 'local-unreadable',
 } as const satisfies Record<PodBlockMessageKey, NonNullable<BackgroundSyncErrorKind>>;
 
@@ -965,25 +976,47 @@ export const useSyncStore = defineStore('sync', () => {
     activeFamilyId: string | null,
     keepCurrentPod: boolean
   ): Promise<void> {
-    // ⚠️ THE FLAG IS ONLY HONOURED WHEN THERE IS A POD TO KEEP. The Settings
-    // handlers that pass it are shared by the CONFIGURED slab (restore — a pod
-    // exists) and the UNCONFIGURED one (first load — there is none). Honouring
-    // it unconditionally would open the document with nowhere to save it: a
-    // fresh, silent config-loss bug introduced by the fix for a data-loss bug.
-    // The caller computes the same predicate for its confirmation copy, so the
-    // words and the behaviour cannot disagree; this is the enforcement that
-    // stops a FUTURE caller reintroducing it.
-    const hasPod = isConfigured.value && !!syncService.getProviderType();
+    // ⚠️ THE FLAG IS ONLY HONOURED WHEN THERE IS A POD TO KEEP, AND ONLY WHEN THE
+    // PICKED FILE BELONGS TO THE FAMILY THAT OWNS IT.
+    //
+    // Two ways to get this wrong, in opposite directions:
+    //
+    //  1. Honour it with NO pod. The Settings handlers are shared with the
+    //     unconfigured "load existing data file" slab, where nothing is bound
+    //     yet — skipping the install there opens the document with nowhere to
+    //     save it.
+    //
+    //  2. Honour it for a file from a DIFFERENT family. This is the dangerous
+    //     one and it is easy to miss, because the predicate looks local but is
+    //     not: the provider it asks about belongs to whatever family was active
+    //     a moment ago, while the family-identity block above has already
+    //     switched us to the picked file's family. So "keep the current pod"
+    //     would mean "keep family A's pod" while holding family B's document,
+    //     and the next save writes B's data over A's file. The Drive list shows
+    //     every `.beanpod` in the account, so picking a sibling family's pod is
+    //     one tap away, not a contrived case.
+    //
+    // Hence the family check: the flag survives only if the pod we would be
+    // keeping is this document's own.
+    const providerFamilyId = syncService.getProviderFamilyId();
+    const sameFamily = !!activeFamilyId && providerFamilyId === activeFamilyId;
+    const hasPod = isConfigured.value && !!syncService.getProviderType() && sameFamily;
     if (keepCurrentPod && !hasPod) {
       logEvent({
         level: 'warn',
         surface: 'pod-access',
-        message: 'restore asked to keep the current pod, but this family has none — re-homing',
-        context: { action: 'restore-kept-pod-ignored' },
+        message: 'restore could not keep the current pod — re-homing',
+        context: {
+          action: 'restore-kept-pod-ignored',
+          error_code: sameFamily ? 'no-pod' : 'other-family',
+        },
       });
       console.warn(
-        '[syncStore] installPendingProvider: keepCurrentPod was set but no provider is bound. ' +
-          'Binding the picked file instead, or this family would have nowhere to save.'
+        '[syncStore] installPendingProvider: refusing to keep the current pod. ' +
+          `configured=${isConfigured.value} providerType=${syncService.getProviderType()} ` +
+          `providerFamily=${providerFamilyId} activeFamily=${activeFamilyId}. ` +
+          'Binding the picked file instead — keeping a pod that belongs to another family ' +
+          "would write this family's data over it."
       );
     }
     if (keepCurrentPod && hasPod) {
