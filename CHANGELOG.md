@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-07
 
+### Fixed
+
+- **Opening a family file that belongs to a different family no longer leaves beanies in a half-finished state.** The data loaded, but the sidebar and the family settings disappeared, as though you had no permission to be there, until you refreshed the page. beanies now works out who you are in that family and signs you in properly, or tells you to sign out and back in when it cannot.
+- **A family file that is too OLD to open now says so, instead of asking you to update beanies.** Every file beanies could not read was described as being saved by a newer version, so the suggested fix for an old file was an app update that could never help.
+
 ### Added
 
 - **Tidying up your family file now shows what it is doing, and what to do next.** It used to run silently (the backup, the tidying and the sharing all happened with nothing on screen) and then tell you the result in a message that disappeared after a few seconds. There is now a progress screen with each step, the size before and after, and, when someone in the family is still on an older version of beanies, their name and what they need to do. It stays until you close it.

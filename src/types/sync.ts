@@ -212,7 +212,9 @@ export type PodBlockMessageKey =
    * user's unsaved work is still here. Reusing the other key would give exactly
    * the wrong advice.
    */
-  | 'podLocalUnreadable.inline';
+  | 'podLocalUnreadable.inline'
+  /** The file predates the oldest format this build reads. Updating won't help. */
+  | 'podOlderVersion.inline';
 
 /**
  * Anything that may latch `syncService`'s remote-blocked breaker.
@@ -411,8 +413,25 @@ export class CorruptPayloadError extends PayloadLoadError {
 // it to `protocol.ts`'s `ERROR_REGISTRY` first: without a codec it arrives on
 // main as a generic `DocWorkerError`, loses `isRemoteBlocker`, and every
 // "update beanies" surface silently degrades to the damaged-data copy.
+/**
+ * The oldest `<major>.<minor>` this build can read. Anything numerically below
+ * it is a file from the PAST, which no app update can open.
+ */
+const OLDEST_KNOWN_BEANPOD_VERSION = 4.0;
+
 export class UnsupportedBeanpodVersionError extends PayloadLoadError {
   readonly fileVersion: string;
+  /**
+   * Is the file from the FUTURE or the PAST?
+   *
+   * ⚠️ THE COPY WAS BACKWARDS FOR HALF THE CASES. Every unknown version resolved
+   * to `needs-update` — "this file was saved by a newer beanies, please update"
+   * — which is exactly wrong for an OLDER file, where updating changes nothing
+   * and the real answer is that the file predates a format this build still
+   * reads. Sending someone to the App Store to fix a file from 2024 is a wasted
+   * trip and a confusing one.
+   */
+  readonly direction: 'older' | 'newer';
   constructor(fileVersion: string, familyId: string | null = null) {
     // ⚠️ CLAMPED AT THE SOURCE. `fileVersion` comes straight off a file this
     // build did not write, and it reaches the firehose through `blockDetail`.
@@ -423,10 +442,17 @@ export class UnsupportedBeanpodVersionError extends PayloadLoadError {
     // ⚠️ LITERAL, never `new.target.name`; see `CorruptPayloadError`.
     this.name = 'UnsupportedBeanpodVersionError';
     this.fileVersion = safe;
+    // A leading numeric compare is enough: versions are `<major>.<minor>` and
+    // the question is only "before the oldest we read, or after the newest".
+    // Anything unparseable is treated as NEWER, which is the fail-safe answer —
+    // it offers an update rather than telling someone their file is too old.
+    const n = Number.parseFloat(safe);
+    this.direction = Number.isFinite(n) && n < OLDEST_KNOWN_BEANPOD_VERSION ? 'older' : 'newer';
   }
 
+  /** Only a file from the FUTURE can be fixed by updating the app. */
   override get needsAppUpdate(): boolean {
-    return true;
+    return this.direction === 'newer';
   }
 
   /** `version=<x>` rides in `detail`, never in `message`. */
@@ -487,12 +513,23 @@ export class PayloadTooLargeError extends PayloadLoadError {
 export type PayloadErrorKind =
   | 'credential-stale' // keyMayBeWrong
   | 'needs-update' // needsAppUpdate
+  | 'too-old' // a version below the oldest format this build reads
   | 'unreadable' // step === 'parse' (a torn read)
   | 'too-large' // deviceCannotOpen
   | 'corrupt';
 
 export function payloadErrorKind(err: PayloadLoadError): PayloadErrorKind {
   if (err.keyMayBeWrong) return 'credential-stale';
+  // ⚠️ BEFORE `needsAppUpdate`, and it is a DISTINCT KIND rather than a subclass
+  // override of `inlineMessageKey` — the divergence pin in
+  // `payloadErrorKind.test.ts` exists to forbid exactly that, because an
+  // override makes the resolver and the getter disagree for the same error.
+  // A file from the PAST cannot be fixed by updating: `needsAppUpdate` is
+  // already false for it, so without its own arm it would fall through to
+  // `unreadable` ("a torn read fixes itself"), which is another wrong answer.
+  if (err instanceof UnsupportedBeanpodVersionError && err.direction === 'older') {
+    return 'too-old';
+  }
   if (err.needsAppUpdate) return 'needs-update';
   if (err.step === 'parse') return 'unreadable';
   return err.deviceCannotOpen ? 'too-large' : 'corrupt';
@@ -514,6 +551,9 @@ export function payloadErrorKind(err: PayloadLoadError): PayloadErrorKind {
 export const PAYLOAD_INLINE_KEY = {
   'credential-stale': 'podCredentialStale.inline',
   'needs-update': 'podNewerVersion.inline',
+  //  - too-old: older than the oldest format this build reads. Updating cannot
+  //    help, so saying "please update" would send someone on a wasted trip.
+  'too-old': 'podOlderVersion.inline',
   unreadable: 'podUnreadable.inline',
   'too-large': 'podTooLarge.inline',
   corrupt: 'podCorrupted.inline',

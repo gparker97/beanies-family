@@ -89,6 +89,7 @@ import { track } from '@/services/analytics/plausible';
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
@@ -766,6 +767,9 @@ async function handleLoadFromFileConfirmed(source: 'google_drive' | 'local' = 'l
 async function handleDecryptFile(password: string) {
   isProcessingEncryption.value = true;
   encryptionError.value = null;
+  // Captured BEFORE the decrypt: the adoption below switches the active family,
+  // so afterwards there is nothing left to compare against.
+  const familyIdBeforeDecrypt = familyContextStore.activeFamilyId;
 
   // ⚠️ THE ONE CONFIRMED SITE. Both buttons that reach here go through
   // `handleLoadFromFileClick` → a dialog that says "This will replace all local
@@ -785,6 +789,38 @@ async function handleDecryptFile(password: string) {
   isProcessingEncryption.value = false;
 
   if (result.success) {
+    // ⚠️ A FILE FROM ANOTHER FAMILY IS A FAMILY SWITCH, AND THE SESSION HAS TO
+    // FOLLOW IT. `decryptPendingFile` adopts the file's family (createFamilyWithId
+    // / switchFamily), but `switchFamily` only activates the record — it does not
+    // re-bind WHO you are in that family. So `familyStore.currentMember` stayed
+    // null while the new roster loaded, and `usePermissions` treats an absent
+    // `currentMember` over a LOADED roster as a rejection (deliberately — #80):
+    // `isOwner` false, `canManagePod` false, and the app rendered with no sidebar
+    // and no Family Data section, as if the person had no rights at all. A reload
+    // fixed it because the binding is re-derived on boot.
+    //
+    // `memberIds` is exactly the answer to "who are you here": the members whose
+    // wrapped key this password opened. Its contract says to auto-sign-in ONLY
+    // when there is one, which is what `LoadPodView` does; this path ignored it.
+    const switchedFamily = familyContextStore.activeFamilyId !== familyIdBeforeDecrypt;
+    const unambiguousMemberId =
+      result.memberIds && result.memberIds.length === 1 ? result.memberIds[0] : null;
+    if (switchedFamily && unambiguousMemberId) {
+      const signedIn = await authStore.signIn(unambiguousMemberId, password);
+      if (!signedIn.success) {
+        // Do not leave the half-state on screen. The data IS loaded and safe;
+        // what failed is establishing who you are in the family it belongs to.
+        console.warn('[SettingsPage] loaded another family but could not bind a member', signedIn);
+        encryptionError.value = t('settings.loadedOtherFamilyNeedsSignIn');
+        return;
+      }
+    } else if (switchedFamily) {
+      // More than one member shares this password (or none was reported), so we
+      // cannot say who you are without asking — and guessing would hand someone
+      // another member's permissions. Say so rather than render a crippled app.
+      encryptionError.value = t('settings.loadedOtherFamilyNeedsSignIn');
+      return;
+    }
     showDecryptFileModal.value = false;
     importSuccess.value = true;
     setTimeout(() => {
@@ -1034,7 +1070,6 @@ function handleDeleteFamilyClick() {
 }
 
 async function handleDeleteFamilyPasswordConfirm(password: string) {
-  const familyContextStore = useFamilyContextStore();
   const familyId = familyContextStore.activeFamilyId;
   if (!familyId) return;
 

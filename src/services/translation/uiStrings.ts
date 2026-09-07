@@ -3441,6 +3441,14 @@ const STRING_DEFS = {
   // evicted), so beanies cannot see which file is the family's — and replacing
   // the data from here would either strand every other device or point the
   // family at a backup.
+  // ⚠️ THE FILE LOADED FINE; WHAT FAILED IS ESTABLISHING WHO YOU ARE. Saying
+  // "could not load" would be false and would send someone looking for a data
+  // problem that does not exist.
+  'settings.loadedOtherFamilyNeedsSignIn': {
+    en: 'That file belongs to a different family, and beanies could not work out which member you are in it. Your data is safe. Sign out and sign back in to open that family.',
+    beanie:
+      'that file belongs to a different family, and beanies could not work out which member you are in it. your beans are safe. sign out and sign back in to open that family.',
+  },
   'settings.restoreNeedsConnection': {
     en: "beanies is not connected to your family's storage right now, so it cannot safely replace your data. Reconnect your storage above, then try again.",
     beanie:
@@ -4708,6 +4716,20 @@ const STRING_DEFS = {
   // shell is up. The inline copy points at "Use the family file" and Settings;
   // neither is on the sign-in or resume screen, so repeating it there would put
   // instructions on screen for buttons the user cannot see.
+  // ⚠️ AN OLD FILE, NOT A NEW ONE. Its sibling `podNewerVersion.inline` tells the
+  // user to update beanies, which is the right answer for a file from the future
+  // and a wasted trip for one from the past. Naming the version is the point:
+  // "could not be opened" sent people looking for damage that is not there.
+  'podOlderVersion.inline': {
+    en: 'This family file was saved by a much older version of beanies and can no longer be opened. Nothing is wrong with your current family data. If this is the only copy you have, contact support@beanies.family and we will help.',
+    beanie:
+      'this family file was saved by a much older version of beanies and can no longer be opened. nothing is wrong with your current family data. if this is the only copy you have, contact support@beanies.family and we will help.',
+  },
+  'resumeSetup.podOlderVersion': {
+    en: 'This family file was saved by a much older version of beanies and can no longer be opened. Nothing is wrong with your family data. Contact support@beanies.family if this is the only copy you have.',
+    beanie:
+      'this family file was saved by a much older version of beanies and can no longer be opened. nothing is wrong with your family beans. contact support@beanies.family if this is the only copy you have.',
+  },
   'resumeSetup.podLocalUnreadable': {
     en: "beanies could not open this device's own copy of your family data. Nothing has been changed and nothing has been lost. This usually means beanies is already open in another tab or window, so close the others and reload this page. If it keeps happening, contact support@beanies.family.",
     beanie:

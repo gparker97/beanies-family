@@ -206,6 +206,7 @@ export const BLOCKER_BANNER_KIND = {
   'podCredentialStale.inline': 'decrypt',
   'podUnreadable.inline': 'decrypt',
   'podNewerVersion.inline': 'decrypt',
+  'podOlderVersion.inline': 'decrypt',
   'podLineage.unsyncedInline': 'lineage',
   'podLineage.conflictInline': 'lineage',
   // ⚠️ `decrypt`, NOT `lineage`, AND THE DISTINCTION IS NOT COSMETIC. The
