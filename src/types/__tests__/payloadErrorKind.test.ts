@@ -19,6 +19,10 @@ import {
 const ALL_KINDS: readonly PayloadErrorKind[] = [
   'credential-stale',
   'needs-update',
+  // A file from the PAST. Distinct from `needs-update` because updating cannot
+  // open it, and distinct from `unreadable` because it is not a torn read that
+  // fixes itself — the file simply predates a format this build reads.
+  'too-old',
   'unreadable',
   'too-large',
   'corrupt',
@@ -54,6 +58,19 @@ describe('payloadErrorKind', () => {
     expect(
       Object.getOwnPropertyDescriptor(UnsupportedBeanpodVersionError.prototype, 'inlineMessageKey')
     ).toBeUndefined();
+  });
+
+  it('sends an OLD file to its own copy, through the resolver and the getter alike', () => {
+    // ⚠️ A KIND, NOT A SUBCLASS OVERRIDE. An `inlineMessageKey` override on
+    // `UnsupportedBeanpodVersionError` makes the resolver and the getter
+    // disagree for the same error, which is what the divergence pin above
+    // forbids — and it was the first thing tried here.
+    const err: PayloadLoadError = new UnsupportedBeanpodVersionError('3.0');
+    expect(payloadErrorKind(err)).toBe('too-old');
+    expect(payloadErrorMessageKey(err)).toBe('podOlderVersion.inline');
+    expect(err.inlineMessageKey).toBe(payloadErrorMessageKey(err));
+    // And it must NOT be told to update: nothing this build installs can read it.
+    expect(err.needsAppUpdate).toBe(false);
   });
 
   it('has an inline key for every kind (table exhaustiveness)', () => {

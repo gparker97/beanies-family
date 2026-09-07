@@ -210,3 +210,39 @@ describe('a cancelled picker is not a failure', () => {
     expect(syncService.getState().lastError).toBeNull();
   });
 });
+
+describe('an OLD file is not a NEW file, and must not be told to update', () => {
+  /**
+   * ⚠️ THE COPY WAS BACKWARDS FOR HALF THE CASES. Every unknown version resolved
+   * to `needsAppUpdate` — "saved by a newer beanies, please update" — which is
+   * exactly wrong for a file from the PAST: updating changes nothing, the file
+   * predates a format this build reads, and the person is sent to the App Store
+   * for a trip that cannot help. greg hit this with an older pod and got only a
+   * generic "could not be opened".
+   */
+  it('classifies a version below the floor as older, and does NOT offer an update', () => {
+    const err = new UnsupportedBeanpodVersionError('3.0', 'fam-1');
+    expect(err.direction).toBe('older');
+    expect(err.needsAppUpdate).toBe(false);
+    expect(err.inlineMessageKey).toBe('podOlderVersion.inline');
+  });
+
+  it('still offers an update for a version from the future', () => {
+    const err = new UnsupportedBeanpodVersionError('6.0', 'fam-1');
+    expect(err.direction).toBe('newer');
+    expect(err.needsAppUpdate).toBe(true);
+    expect(err.inlineMessageKey).toBe('podNewerVersion.inline');
+  });
+
+  it('treats an unparseable version as NEWER, the fail-safe direction', () => {
+    // Offering an update is a wasted trip; telling someone their file is too
+    // old when it might not be is a reason to stop trying. Prefer the former.
+    const err = new UnsupportedBeanpodVersionError('banana', 'fam-1');
+    expect(err.direction).toBe('newer');
+  });
+
+  it('keeps the version out of the message and in `detail`', () => {
+    const err = new UnsupportedBeanpodVersionError('3.0', 'fam-1');
+    expect(err.blockDetail).toBe('version=3.0');
+  });
+});

@@ -44,6 +44,7 @@ import {
 const ALL_KINDS: readonly PayloadErrorKind[] = [
   'credential-stale',
   'needs-update',
+  'too-old',
   'unreadable',
   'too-large',
   'corrupt',
@@ -55,6 +56,10 @@ function errorFor(kind: PayloadErrorKind) {
   switch (kind) {
     case 'needs-update':
       return new UnsupportedBeanpodVersionError('6.0', 'fam-1');
+    // A file from the PAST — the same class, the other direction. It must NOT
+    // get the store link: updating cannot open it.
+    case 'too-old':
+      return new UnsupportedBeanpodVersionError('3.0', 'fam-1');
     case 'too-large':
       return new PayloadTooLargeError('oom', 'load', 'fam-1', 1);
     case 'credential-stale':
