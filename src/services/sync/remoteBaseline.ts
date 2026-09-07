@@ -173,6 +173,20 @@ export function encodeBaselinePayload(revision: string | null, headsFp: string |
 }
 
 /**
+ * The heads fingerprint a stored row carries, or null.
+ *
+ * ⚠️ ONE READER FOR BOTH ARMS, because they disagreed. The revision-less arm
+ * required a NON-EMPTY string; the revision arm accepted any string. So
+ * `encodeBaselinePayload(null, '')` did not round-trip — and `''` is not a
+ * hypothetical: `decodeHeadsFingerprint('')` deliberately answers `[]`, because
+ * "a document with no heads" is a real, empty answer rather than a missing one.
+ * Two arms reading the same field two ways is the drift; one helper is the fix.
+ */
+function headsFpOf(h: unknown): string | null {
+  return typeof h === 'string' ? h : null;
+}
+
+/**
  * Decode the baseline row payload (#65). PURE, and NEVER throws.
  *
  * Three cases, all degrading toward a read:
@@ -218,10 +232,10 @@ export function decodeBaselinePayload(payload: string): DecodedBaseline | null {
       // would drop it to "no baseline at all" AND `console.error` on every
       // single open, which is how a correct write turns into log noise plus a
       // silently more permissive verdict.
-      return { revision: null, headsFp: typeof h === 'string' && h !== '' ? h : null };
+      return { revision: null, headsFp: headsFpOf(h) };
     }
     if (typeof r === 'string' && r !== '') {
-      return { revision: r, headsFp: typeof h === 'string' ? h : null };
+      return { revision: r, headsFp: headsFpOf(h) };
     }
   }
   // Parsed, but not a shape we recognise. Do not guess — no baseline => read.
