@@ -33,23 +33,27 @@
  * is being deleted. Red is for destructive confirmations — which is why the
  * discard itself goes through `confirm({ variant: 'danger' })`.
  */
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
+import BannerActionButton from '@/components/common/BannerActionButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { confirm } from '@/composables/useConfirm';
-import { showToast } from '@/composables/useToast';
+import { useBlockerBanner } from '@/composables/useBlockerBanner';
 import { useSyncStore } from '@/stores/syncStore';
 
 const { t } = useTranslation();
 const router = useRouter();
 const syncStore = useSyncStore();
 
-const dismissed = ref(false);
-const busy = ref(false);
-const blocked = computed(
-  () => syncStore.podUnopenable && syncStore.backgroundSyncErrorKind === 'lineage'
-);
+// The banner state and the adopt action, shared verbatim with
+// `LocalDocUnreadableBanner` — see `useBlockerBanner`'s header for why the
+// BEHAVIOUR is shared while the two components stay separate.
+const { blocked, dismissed, busy, useTheFamilyFile } = useBlockerBanner({
+  kind: 'lineage',
+  confirmTitleKey: 'podLineage.useFileConfirmTitle',
+  confirmMessageKey: 'podLineage.useFileConfirmMessage',
+});
+
 /** Two devices compacted at once. Nothing the user can safely choose between. */
 const isConflict = computed(() => syncStore.podBlockMessageKey === 'podLineage.conflictInline');
 const title = computed(() =>
@@ -59,50 +63,8 @@ const message = computed(() =>
   isConflict.value ? t('podLineage.conflictInline') : t('podLineage.bannerMessage')
 );
 
-// A NEW block after a dismissal must speak again — the user dismissed the last
-// one, not every one. `clearPodUnopenable` is the only thing that clears the
-// latch, so this re-arms exactly when the state genuinely resolved.
-watch(blocked, (isBlocked) => {
-  if (!isBlocked) dismissed.value = false;
-});
-
 function goToExport(): void {
   router.push({ path: '/settings', query: { open: 'family-data' } });
-}
-
-async function useTheFamilyFile(): Promise<void> {
-  // ⚠️ CLAIM `busy` BEFORE THE AWAIT, not after the confirm resolves. Setting it
-  // later leaves the whole length of the confirmation dialog unguarded: the
-  // button is not disabled yet (`:disabled="busy"`) and the flag is still false,
-  // so two clicks open two dialogs and run two adopts. Claiming it here makes
-  // the guard and the disabled attribute cover the same window.
-  if (busy.value) return;
-  busy.value = true;
-  try {
-    const ok = await confirm({
-      title: 'podLineage.useFileConfirmTitle',
-      message: 'podLineage.useFileConfirmMessage',
-      confirmLabel: 'podLineage.useFileConfirmAction',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    // The store reports its own failure to the firehose; the toast is what the
-    // person in front of the screen needs, because the banner has already gone.
-    const adopted = await syncStore.useRemoteFileOverLocalDocument();
-    showToast(
-      adopted ? 'success' : 'error',
-      t(adopted ? 'podLineage.useFileDone' : 'podLineage.useFileFailed')
-    );
-  } catch {
-    // ⚠️ CATCH, not just `finally`. The store already reports and re-mirrors the
-    // latch, but if anything escapes it the banner has ALREADY been removed (the
-    // latch was cleared before the download), so a bare `finally` would leave the
-    // user believing it worked. `PodAccessBanner` carries the same last-resort
-    // guard for the same reason.
-    showToast('error', t('podLineage.useFileFailed'));
-  } finally {
-    busy.value = false;
-  }
 }
 </script>
 
@@ -111,32 +73,15 @@ async function useTheFamilyFile(): Promise<void> {
     <template #title>{{ title }}</template>
     <template #message>{{ message }}</template>
     <template #actions>
-      <button
-        v-if="!isConflict"
-        type="button"
-        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
-        :disabled="busy"
-        @click="goToExport"
-      >
+      <BannerActionButton v-if="!isConflict" :busy="busy" @click="goToExport">
         {{ t('podLineage.bannerCta') }}
-      </button>
-      <button
-        v-if="!isConflict"
-        type="button"
-        class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
-        :disabled="busy"
-        :aria-busy="busy"
-        @click="useTheFamilyFile"
-      >
+      </BannerActionButton>
+      <BannerActionButton v-if="!isConflict" :busy="busy" @click="useTheFamilyFile">
         {{ busy ? t('podLineage.useFileBusy') : t('podLineage.useFileCta') }}
-      </button>
-      <button
-        type="button"
-        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/10"
-        @click="dismissed = true"
-      >
+      </BannerActionButton>
+      <BannerActionButton subtle @click="dismissed = true">
         {{ t('action.dismiss') }}
-      </button>
+      </BannerActionButton>
     </template>
   </ErrorBanner>
 </template>

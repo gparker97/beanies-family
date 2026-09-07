@@ -30,12 +30,21 @@ let scriptPromise: Promise<void> | null = null;
 type BuiltPicker = { setVisible: (visible: boolean) => void; dispose?: () => void };
 
 function disposePicker(picker: BuiltPicker | null): void {
-  try {
-    picker?.setVisible(false);
-    picker?.dispose?.();
-  } catch (e) {
-    console.warn('[drivePicker] picker teardown failed', e);
-  }
+  // ⚠️ TWO GUARDED CALLS, NOT ONE `try` AROUND BOTH. `dispose()` is the one that
+  // actually releases the iframe; with a single block, a throwing
+  // `setVisible(false)` skipped it and leaked the picker — and the whole reason
+  // this function exists is a Google dialog that once had to be waited out.
+  // A tiny local helper rather than two copy-pasted blocks.
+  const attempt = (label: string, fn: () => void): void => {
+    try {
+      fn();
+    } catch (e) {
+      console.warn(`[drivePicker] picker teardown failed at ${label}`, e);
+    }
+  };
+  if (!picker) return;
+  attempt('setVisible', () => picker.setVisible(false));
+  attempt('dispose', () => picker.dispose?.());
 }
 
 /** Load the Google API script (idempotent). */

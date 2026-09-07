@@ -32,6 +32,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { formatBytes } from '@/utils/format';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const props = defineProps<{
@@ -76,13 +77,6 @@ const percent = computed(() => {
   if (props.phase === 'done') return 100;
   return Math.max(0, Math.min(100, Math.round((props.step / STEPS.length) * 100)));
 });
-
-/** One decimal for MB, none for KB — a family file is rarely under a megabyte. */
-function formatBytes(bytes: number): string {
-  const mb = bytes / 1_048_576;
-  if (mb >= 0.1) return `${mb.toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
 
 const savedLine = computed(() => {
   if (!props.stats) return '';
@@ -154,6 +148,19 @@ const subtitleKey = computed<UIStringKey>(() => {
       <!-- Progress + steps: while running, and on a failure so the person can
            see WHICH step stopped. -->
       <template v-if="phase !== 'done'">
+        <!-- ⚠️ DRIFTED BAR, RECORDED RATHER THAN UNIFIED. `SetupProgressModal` and
+           `CompactionProgressModal` both draw a track + gradient fill, and the
+           two have already diverged on three attributes: track tint
+           (`rgba(44,62,80,0.05)` there vs `0.06` here), transition
+           (`duration-600` vs `duration-500`), and the `progress-shimmer` class
+           which only `SetupProgressModal` carries. THAT FILE IS AUTHORITATIVE;
+           bring this one to it when they are unified.
+
+           NOT unified now, deliberately: 14 other components in `src/components/`
+           carry a track+fill with different semantics (goal progress, budget,
+           list cycles), so extracting a shared `ProgressBar` for two of them is
+           the worse half of that refactor. The step LISTS are genuinely
+           different and must NOT be merged. -->
         <div class="mb-4">
           <div
             class="dark:bg-surface-overlay h-1.5 overflow-hidden rounded-full bg-[rgba(44,62,80,0.06)]"
@@ -197,7 +204,7 @@ const subtitleKey = computed<UIStringKey>(() => {
         class="dark:bg-success-lift/10 mb-4 rounded-2xl bg-[rgba(39,174,96,0.09)] p-4 text-center"
       >
         <p class="font-outfit flex items-baseline justify-center gap-2">
-          <span class="dark:text-ink-faint text-lg font-semibold text-gray-400 line-through">{{
+          <span class="dark:text-ink-faint text-lg font-semibold text-gray-500 line-through">{{
             formatBytes(stats.beforeBytes)
           }}</span>
           <span class="dark:text-success-lift text-base text-[#27AE60]" aria-hidden="true">→</span>
@@ -226,7 +233,7 @@ const subtitleKey = computed<UIStringKey>(() => {
             </p>
           </li>
         </ul>
-        <p class="dark:text-ink-faint mt-3 text-xs text-gray-400">
+        <p class="dark:text-ink-faint mt-3 text-xs text-gray-500">
           {{ t('compactionProgress.todoFoot') }}
         </p>
       </div>
