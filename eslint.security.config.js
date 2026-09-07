@@ -44,11 +44,46 @@ export default [
       'security/detect-pseudoRandomBytes': 'error',
 
       // Secrets detection - prevent hardcoded secrets
+      //
+      // ⚠️ THE DELIMITERS ARE THE FALSE-POSITIVE FIX, NOT THE TOLERANCE. This rule reads
+      // comments as well as code, and a backtick-quoted identifier is exactly the shape it
+      // mistakes for a credential: `COMMITTED_FLAGS.docWorker` measured 4.21 and
+      // `BLOCKER_OVERLAY_KEY['podLocalUnreadable.inline']` 4.28, both a hair over the 4.2
+      // line, and both merely prose describing our own code. They failed the gate for four
+      // days.
+      //
+      // Splitting on the punctuation that WRAPS a quoted identifier turns each of those
+      // into short words that no longer clear the bar, and it generalises: the next comment
+      // quoting a SCREAMING_SNAKE constant needs no edit here. Raising `tolerance` would buy
+      // the same green by lowering the bar for every real secret in the repo, and an
+      // `ignoreContent` denylist would need a new entry every time somebody writes a
+      // comment, which is the same hand-patching in a different file.
+      //
+      // It does not weaken detection of a real credential: API keys, bearer tokens and
+      // base64 payloads contain no backtick or bracket, so nothing that matters is split.
+      //
+      // ⚠️ ADD A DELIMITER ONLY AFTER RUNNING `npm run security:lint`, because splitting is
+      // not monotonic — a NARROWER token can score HIGHER, so a delimiter that fixes one
+      // false positive invents others somewhere else. Both obvious additions were tried and
+      // rejected on measurement, not taste:
+      //   `.`  isolates the last segment of a dotted i18n key, so `'x.deleteFamilyExport-
+      //        CheckMsg'` (safe as a whole) became the bare identifier at 4.24 and failed in
+      //        two files.
+      //   `'`  strips the quotes off every string literal, and two identical quote characters
+      //        were all that held several literals under the line: `hotel|airbnb|campground|
+      //        family_friends` surfaced at 4.25 the moment they went.
+      // Between them they took the run from 2 errors to 6.
+      //
+      // ⚠️ EACH DELIMITER IS A REGEX, NOT A LITERAL. The plugin compiles this list with
+      // `new RegExp` (`compileListOfPatterns` in its `utils.js`), so an unescaped `[` fails
+      // to compile at all — ESLint then dies with "Failed to compiled the regexp" naming the
+      // FIRST file it linted, which reads like a broken fixture rather than a broken config.
+      // The four original delimiters hid this because none of them is a metacharacter.
       'no-secrets/no-secrets': [
         'error',
         {
           tolerance: 4.2,
-          additionalDelimiters: [',', ';', ':', '='],
+          additionalDelimiters: [',', ';', ':', '=', '`', '\\[', '\\]'],
         },
       ],
 
