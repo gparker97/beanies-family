@@ -43,6 +43,7 @@ import { isNative } from '@/services/sync/capabilities';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
+import CompactionProgressModal from '@/components/settings/CompactionProgressModal.vue';
 import { usePodHealth } from '@/composables/usePodHealth';
 import { showToast } from '@/composables/useToast';
 import { requireReauth, canStepUp } from '@/composables/useReauth';
@@ -829,7 +830,30 @@ function formatLastSync(timestamp: string | null): string {
 // The busy flag now lives with the export logic; aliased so the two template
 // bindings keep reading the same name.
 const { isExporting: isExportingBeanpod, exportEncryptedPod, confirmBackupLanded } = usePodExport();
-const { busy: isCompacting, compact: compactPod } = usePodCompaction();
+const {
+  busy: isCompacting,
+  compact: compactPod,
+  progressOpen: compactionProgressOpen,
+  progressStep: compactionStep,
+  progressPhase: compactionPhase,
+  progressStats: compactionStats,
+  progressErrorKey: compactionErrorKey,
+  dismissProgress: dismissCompactionProgress,
+  olderVersionNames: compactionBehindNames,
+} = usePodCompaction();
+
+/**
+ * The people the completion panel asks the family to go and update.
+ *
+ * `olderVersionNames` is the joined string the old toast interpolated; the modal
+ * lists them one per line with an instruction each, so it needs them separated.
+ */
+const compactionBehind = computed(() =>
+  compactionBehindNames.value
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean)
+);
 const { canCompactPod, compactionIsDue, someoneCannotOpenIt, olderVersion, olderVersionNotice } =
   usePodHealth();
 /**
@@ -2544,6 +2568,17 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       :external-error="encryptionError"
       @close="handleDecryptModalClose"
       @confirm="handleDecryptFile"
+    />
+
+    <!-- ── Compaction progress ─────────────────────────────────────────── -->
+    <CompactionProgressModal
+      :open="compactionProgressOpen"
+      :step="compactionStep"
+      :phase="compactionPhase"
+      :stats="compactionStats"
+      :error-key="compactionErrorKey"
+      :behind="compactionBehind"
+      @close="dismissCompactionProgress"
     />
 
     <!-- ── Transfer Ownership ──────────────────────────────────────────── -->

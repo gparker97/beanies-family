@@ -24,14 +24,12 @@
  * around the only steps where state has moved.
  */
 import { ref } from 'vue';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { fillTemplate } from '@/utils/fillTemplate';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { useTranslation } from '@/composables/useTranslation';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodHealth } from '@/composables/usePodHealth';
-import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import * as syncService from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
@@ -69,15 +67,38 @@ type RefusalCode =
 export function usePodCompaction() {
   const syncStore = useSyncStore();
   const familyContext = useFamilyContextStore();
-  const { t } = useTranslation();
   const { deliverPod, confirmBackupLanded } = usePodExport();
   const { canCompactPod, olderVersion, olderVersionNames, olderVersionNotice } = usePodHealth();
   const busy = ref(false);
 
+  /**
+   * Progress state for `CompactionProgressModal`.
+   *
+   * ⚠️ IT LIVES HERE, NOT IN THE COMPONENT. The whole run — the gates, the pull,
+   * the backup, the rebuild, the publish — is orchestrated in this composable,
+   * so the component that shows it must READ state rather than re-derive it from
+   * timers. That is the MVO split, and it is also what keeps the steps honest:
+   * a step advances only where the code actually advances.
+   *
+   * Until now the whole run was silent and the outcome arrived as a toast that
+   * dismissed itself — including the one moment beanies knows exactly who is cut
+   * off until they update, which is the thing a family most needs to act on.
+   */
+  const progressOpen = ref(false);
+  /** -1 before the first step; 0-3 while running; 4 when every step is done. */
+  const progressStep = ref(-1);
+  const progressPhase = ref<'running' | 'done' | 'failed'>('running');
+  /** Set only on success. `null` while running and on every failure. */
+  const progressStats = ref<{ beforeBytes: number; afterBytes: number } | null>(null);
+  /** A refusal or failure message key, resolved by the modal. */
+  const progressErrorKey = ref<UIStringKey | null>(null);
+
   function refuse(code: RefusalCode, detail?: string): void {
-    showToast('warning', t('compaction.refused'), t(`compaction.refused.${code}`), {
-      surface: 'pod-compaction',
-    });
+    // ⚠️ NO TOAST. A refusal explains why a one-way, family-wide operation did
+    // NOT happen; it belongs on the surface the person is looking at, with a
+    // button they press, not in a corner for four seconds.
+    progressPhase.value = 'failed';
+    progressErrorKey.value = `compaction.refused.${code}` as UIStringKey;
     logEvent({
       level: 'warn',
       surface: 'pod-compaction',
@@ -131,6 +152,15 @@ export function usePodCompaction() {
         return;
       }
 
+      // Everything above is a question. From here the run actually starts, so
+      // this is where the progress surface opens — never before the confirm, or
+      // a cancelled dialog would flash a progress modal.
+      progressOpen.value = true;
+      progressPhase.value = 'running';
+      progressStats.value = null;
+      progressErrorKey.value = null;
+      progressStep.value = 0; // checking everyone is up to date
+
       // 2. Prove we are current and clean. A compaction publishes a document
       //    that no peer can merge with, so publishing one that is missing a
       //    peer's edits would strand them permanently.
@@ -177,6 +207,7 @@ export function usePodCompaction() {
       // ⚠️ `built` IS RELEASED BEFORE `compactDoc`, at the end of this block.
       // It is a ~4MB string and `compactDoc` needs three copies of the document
       // resident; holding it across that call raises the peak for no reason.
+      progressStep.value = 1; // saving a copy beside your family file
       let built: { json: string; filename: string } | null = null;
       try {
         // `compactionBackup`: the pre-compaction pair (this export and the
@@ -318,6 +349,7 @@ export function usePodCompaction() {
       // next step needs the room. See the note where it is built.
       built = null;
 
+      progressStep.value = 2; // tidying up the history
       // 4. Rebuild + verify, in the worker. Throws (keeping the old document)
       //    on any difference; nothing has moved yet if it does.
       const stats = await docClient.compactDoc();
@@ -332,6 +364,7 @@ export function usePodCompaction() {
         },
       });
 
+      progressStep.value = 3; // sharing it with your family
       // 5-6. The only window where state has moved. See the ordering note above.
       try {
         // ⚠️ NO ENVELOPE STAMP. `compactDoc` already wrote the new lineage
@@ -355,9 +388,12 @@ export function usePodCompaction() {
           severity: 'critical',
           context: { action: 'failed', error_code: 'write-failed' },
         });
-        showToast('error', t('compaction.publishFailed'), t('compaction.publishFailedHelp'), {
-          surface: 'pod-compaction',
-        });
+        // ⚠️ THE MOST IMPORTANT FAILURE IN THE WHOLE FLOW, and it was a toast.
+        // The lineage is stamped and the document is compacted, but the family's
+        // file has not been updated — the one state where the person MUST read
+        // and act on what happened. It stays on screen until they dismiss it.
+        progressPhase.value = 'failed';
+        progressErrorKey.value = 'compaction.publishFailedHelp';
         return;
       }
 
@@ -384,19 +420,17 @@ export function usePodCompaction() {
       // forever, on a file that is now small.
       void clearTooLargeMarks();
 
-      const size = `${Math.round(stats.beforeBytes / 1024)}KB → ${Math.round(stats.afterBytes / 1024)}KB`;
-      showToast(
-        'success',
-        t('compaction.done'),
-        olderVersion.value.length === 0
-          ? `${size}. ${t('compaction.doneNothingToDo')}`
-          : // Under 5.0 a person on an older build does NOT merge across
-            // lineages: their build refuses the file at parse and stops syncing
-            // until it updates, and what they add before then is not kept. Say
-            // that, and name them, through the ONE joiner.
-            `${size}. ${fillTemplate(t('compaction.doneOlderVersion'), { list: olderVersionNames.value })}`,
-        { surface: 'pod-compaction' }
-      );
+      // ⚠️ THE SIZES AND THE NAMES GO TO THE MODAL, NOT A TOAST. Both were
+      // already computed and both were spent on four seconds of corner. The
+      // sizes are the only evidence the family gets that this was worth doing;
+      // the names are the one moment beanies knows exactly who is cut off until
+      // they update, and under 5.0 that is not cosmetic — their build refuses
+      // the file at parse and stops syncing, and what they add before updating
+      // is not kept. A message that dismisses itself is the wrong carrier for
+      // "go and open Sophia's iPad".
+      progressStats.value = { beforeBytes: stats.beforeBytes, afterBytes: stats.afterBytes };
+      progressStep.value = 4;
+      progressPhase.value = 'done';
     } catch (e) {
       // Steps 1-4 change nothing, so anything landing here left the pod alone.
       reportError({
@@ -406,13 +440,29 @@ export function usePodCompaction() {
         severity: 'error',
         context: { action: 'failed', error_code: 'rebuild-failed' },
       });
-      showToast('error', t('compaction.failed'), t('compaction.failedHelp'), {
-        surface: 'pod-compaction',
-      });
+      progressPhase.value = 'failed';
+      progressErrorKey.value = 'compaction.failedHelp';
     } finally {
       busy.value = false;
     }
   }
 
-  return { busy, compact };
+  /** The person pressed Done. Nothing else closes it — see the modal. */
+  function dismissProgress(): void {
+    progressOpen.value = false;
+  }
+
+  return {
+    busy,
+    compact,
+    progressOpen,
+    progressStep,
+    progressPhase,
+    progressStats,
+    progressErrorKey,
+    dismissProgress,
+    /** Names the completion panel asks the family to go and update. */
+    olderVersionNames,
+    olderVersion,
+  };
 }

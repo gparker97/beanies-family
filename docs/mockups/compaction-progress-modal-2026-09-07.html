@@ -1,462 +1,612 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Compaction progress modal — mockup</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --orange: #f15d22;
-        --terracotta: #e67e22;
-        --slate: #2c3e50;
-        --cloud: #f8f9fa;
-        --silk: #aed6f1;
-        --green: #27ae60;
-        --ground: #fff;
-        --raised: #fff;
-        --ink: #2c3e50;
-        --ink-soft: #5b6b7a;
-        --ink-faint: #8b98a5;
-        --line: rgba(44, 62, 80, 0.08);
-        --page: #eef1f4;
-      }
-      body.dark {
-        --ground: #151e27;
-        --raised: #1e2a36;
-        --ink: #f2f5f7;
-        --ink-soft: #c3ced6;
-        --ink-faint: #9aa9b4;
-        --line: rgba(255, 255, 255, 0.09);
-        --orange: #ff8b5e;
-        --terracotta: #f0a35e;
-        --green: #52c98a;
-        --page: #0e151c;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        background: var(--page);
-        font-family: Inter, system-ui, sans-serif;
-        color: var(--ink);
-        padding: 28px 20px 60px;
-        transition: background 0.2s;
-      }
-      h1 {
-        font-family: Outfit, sans-serif;
-        font-size: 20px;
-        margin: 0 0 4px;
-      }
-      .sub {
-        color: var(--ink-faint);
-        font-size: 13px;
-        margin: 0 0 22px;
-      }
-      .toolbar {
-        margin-bottom: 26px;
-      }
-      button.toggle {
-        font: inherit;
-        font-size: 13px;
-        padding: 7px 14px;
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        background: var(--raised);
-        color: var(--ink);
-        cursor: pointer;
-      }
-      .row {
-        display: flex;
-        gap: 26px;
-        flex-wrap: wrap;
-        align-items: flex-start;
-      }
-      .frame {
-        flex: 0 0 auto;
-      }
-      .frame > .cap {
-        font-size: 12px;
-        color: var(--ink-faint);
-        margin-bottom: 8px;
-        font-weight: 600;
-      }
-      .modal {
-        background: var(--ground);
-        border-radius: 22px;
-        padding: 26px 22px;
-        box-shadow: 0 18px 50px rgba(44, 62, 80, 0.16);
-      }
-      body.dark .modal {
-        box-shadow: none;
-        border: 1px solid var(--line);
-      }
-      .w-desktop {
-        width: 400px;
-      }
-      .w-phone {
-        width: 330px;
-      }
-      .beanie {
-        width: 74px;
-        height: 74px;
-        border-radius: 50%;
-        margin: 0 auto 16px;
-        background: radial-gradient(circle at 34% 32%, var(--terracotta), var(--orange));
-        position: relative;
-      }
-      .beanie::after {
-        content: '🫘';
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        font-size: 32px;
-      }
-      h2.title {
-        font-family: Outfit, sans-serif;
-        font-size: 19px;
-        font-weight: 700;
-        text-align: center;
-        margin: 0 0 4px;
-        color: var(--ink);
-      }
-      p.lede {
-        text-align: center;
-        font-size: 13px;
-        color: var(--ink-faint);
-        margin: 0 0 20px;
-      }
-      .bar {
-        height: 6px;
-        border-radius: 999px;
-        background: var(--line);
-        overflow: hidden;
-      }
-      .bar > i {
-        display: block;
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(90deg, var(--orange), var(--terracotta));
-      }
-      .pct {
-        font-family: Outfit, sans-serif;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--orange);
-        text-align: right;
-        margin: 6px 0 18px;
-      }
-      ul.steps {
-        list-style: none;
-        margin: 0 0 20px;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      ul.steps li {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 11px 14px;
-        border-radius: 16px;
-        font-size: 14px;
-        color: var(--ink-soft);
-      }
-      li.active {
-        background: color-mix(in srgb, var(--orange) 10%, transparent);
-        color: var(--ink);
-        font-weight: 600;
-      }
-      li.done {
-        color: var(--ink-soft);
-      }
-      li .glyph {
-        width: 22px;
-        text-align: center;
-        font-size: 16px;
-        flex: 0 0 22px;
-      }
-      li.done .glyph {
-        color: var(--green);
-      }
-      .spin {
-        display: inline-block;
-        width: 15px;
-        height: 15px;
-        border-radius: 50%;
-        border: 2px solid color-mix(in srgb, var(--orange) 28%, transparent);
-        border-top-color: var(--orange);
-        animation: sp 0.8s linear infinite;
-      }
-      @keyframes sp {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-      .result {
-        border-radius: 18px;
-        padding: 16px;
-        text-align: center;
-        background: color-mix(in srgb, var(--green) 10%, transparent);
-        margin-bottom: 18px;
-      }
-      .sizes {
-        font-family: Outfit, sans-serif;
-        font-size: 25px;
-        font-weight: 700;
-        color: var(--ink);
-        display: flex;
-        align-items: baseline;
-        justify-content: center;
-        gap: 9px;
-      }
-      .sizes .from {
-        color: var(--ink-faint);
-        text-decoration: line-through;
-        font-size: 18px;
-        font-weight: 600;
-      }
-      .sizes .arrow {
-        color: var(--green);
-        font-size: 17px;
-      }
-      .saved {
-        font-size: 12.5px;
-        color: var(--ink-soft);
-        margin-top: 5px;
-      }
-      .note {
-        font-size: 13px;
-        line-height: 1.5;
-        color: var(--ink-soft);
-        text-align: center;
-        margin: 0 0 18px;
-      }
-      .todo {
-        background: color-mix(in srgb, var(--orange) 9%, transparent);
-        border-radius: 16px;
-        padding: 14px 16px;
-        margin-bottom: 18px;
-        text-align: left;
-      }
-      .todo-h {
-        font-family: Outfit, sans-serif;
-        font-weight: 700;
-        font-size: 14px;
-        margin: 0 0 10px;
-        color: var(--ink);
-      }
-      .todo ul {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .todo li {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      .todo .who {
-        font-weight: 600;
-        font-size: 13.5px;
-        color: var(--ink);
-      }
-      .todo .what {
-        font-size: 13px;
-        line-height: 1.5;
-        color: var(--ink-soft);
-      }
-      .todo-f {
-        font-size: 12.5px;
-        color: var(--ink-faint);
-        margin: 11px 0 0;
-      }
-      .note.warn {
-        background: color-mix(in srgb, var(--orange) 10%, transparent);
-        border-radius: 14px;
-        padding: 12px 14px;
-        text-align: left;
-        color: var(--ink);
-      }
-      .btn {
-        display: block;
-        width: 100%;
-        font: inherit;
-        font-weight: 600;
-        font-size: 15px;
-        padding: 13px;
-        border-radius: 14px;
-        border: 0;
-        cursor: pointer;
-        background: var(--orange);
-        color: #fff;
-      }
-      body.dark .btn {
-        color: #1b1005;
-      }
-      .btn.ghost {
-        background: transparent;
-        color: var(--ink-soft);
-        border: 1px solid var(--line);
-        margin-top: 8px;
-      }
-      .annot {
-        max-width: 780px;
-        margin: 34px 0 0;
-        font-size: 13.5px;
-        line-height: 1.65;
-        color: var(--ink-soft);
-      }
-      .annot h3 {
-        font-family: Outfit, sans-serif;
-        color: var(--ink);
-        font-size: 15px;
-        margin: 20px 0 6px;
-      }
-      .annot code {
-        background: var(--line);
-        padding: 1px 5px;
-        border-radius: 5px;
-        font-size: 12.5px;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Compaction progress — mockup</h1>
-    <p class="sub">
-      Reuses the create-pod <code>SetupProgressModal</code> convention. Three states, two widths,
-      both themes.
-    </p>
-    <div class="toolbar">
-      <button class="toggle" onclick="document.body.classList.toggle('dark')">
-        Toggle light / dark
-      </button>
+<title>Compaction Progress</title>
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ── Tokens ──────────────────────────────────────────────────────────────
+     Values are the project's own: Heritage Orange, Deep Slate, Cloud White
+     from the CIG; the dark scale from packages/brand/theme.css. Every token
+     is declared here first, so the un-stamped (system-default) state resolves
+     a complete palette before any media query or [data-theme] block runs. */
+  :root {
+    --board: #eef1f4;
+    --ground: #ffffff;
+    --raised: #f8f9fa;
+    --ink: #2c3e50;
+    --ink-soft: #55677a;
+    --ink-faint: #7d8b99;
+    --line: rgba(44, 62, 80, 0.1);
+    --accent: #f15d22;
+    --accent-warm: #e67e22;
+    --accent-wash: rgba(241, 93, 34, 0.09);
+    --good: #1e8449;
+    --good-wash: rgba(39, 174, 96, 0.11);
+    --shadow: 0 18px 46px rgba(44, 62, 80, 0.14);
+    --modal-border: transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --board: #0e151c;
+      --ground: #1e2a36;
+      --raised: #26343f;
+      --ink: #f2f5f7;
+      --ink-soft: #c3ced6;
+      --ink-faint: #9aa9b4;
+      --line: rgba(255, 255, 255, 0.1);
+      --accent: #ff8b5e;
+      --accent-warm: #f0a35e;
+      --accent-wash: rgba(255, 139, 94, 0.13);
+      --good: #52c98a;
+      --good-wash: rgba(82, 201, 138, 0.14);
+      --shadow: none;
+      --modal-border: rgba(255, 255, 255, 0.09);
+    }
+  }
+  :root[data-theme='dark'] {
+    --board: #0e151c;
+    --ground: #1e2a36;
+    --raised: #26343f;
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: rgba(255, 255, 255, 0.1);
+    --accent: #ff8b5e;
+    --accent-warm: #f0a35e;
+    --accent-wash: rgba(255, 139, 94, 0.13);
+    --good: #52c98a;
+    --good-wash: rgba(82, 201, 138, 0.14);
+    --shadow: none;
+    --modal-border: rgba(255, 255, 255, 0.09);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--board);
+    color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    padding: 36px 24px 72px;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  header.page {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 34px;
+  }
+  .eyebrow {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 27px;
+    font-weight: 700;
+    margin: 0 0 7px;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+  .standfirst {
+    margin: 0;
+    max-width: 60ch;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+  }
+  .theme-btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 15px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--ground);
+    color: var(--ink);
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .theme-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .theme-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ── The three states ─────────────────────────────────────────────────── */
+  .states {
+    display: flex;
+    gap: 30px;
+    align-items: start;
+    flex-wrap: wrap;
+  }
+  .state {
+    flex: 0 0 auto;
+  }
+  .state > .cap {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 11px;
+  }
+  .cap .n {
+    font-family: Outfit, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .cap .txt {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink-faint);
+  }
+
+  .modal {
+    background: var(--ground);
+    border: 1px solid var(--modal-border);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 26px 22px 22px;
+  }
+  .w-lg {
+    width: 392px;
+  }
+  .w-sm {
+    width: 336px;
+  }
+
+  .mark {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    background: radial-gradient(circle at 34% 30%, var(--accent-warm), var(--accent));
+    display: grid;
+    place-items: center;
+    font-size: 30px;
+  }
+  h2 {
+    font-family: Outfit, sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 5px;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+  .lede {
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-faint);
+    margin: 0 0 20px;
+  }
+
+  .bar {
+    height: 6px;
+    border-radius: 99px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+  }
+  .pct {
+    font-family: Outfit, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: right;
+    margin: 7px 0 17px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  ul.steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  ul.steps li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    border-radius: 15px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  ul.steps li.now {
+    background: var(--accent-wash);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .glyph {
+    flex: 0 0 20px;
+    width: 20px;
+    text-align: center;
+    font-size: 15px;
+    line-height: 1;
+  }
+  li.was .glyph {
+    color: var(--good);
+    font-weight: 700;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-wash);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: none;
+    }
+  }
+
+  /* Result — the one lifted object on the page. */
+  .result {
+    background: var(--good-wash);
+    border-radius: 18px;
+    padding: 16px 14px;
+    text-align: center;
+    margin-bottom: 17px;
+  }
+  .sizes {
+    font-family: Outfit, sans-serif;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sizes .before {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-decoration: line-through;
+  }
+  .sizes .to {
+    font-size: 16px;
+    color: var(--good);
+  }
+  .sizes .after {
+    font-size: 27px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .sizes-sub {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .plain {
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
+    margin: 0 0 17px;
+  }
+
+  /* Must-read panel. Heritage Orange, never Alert Red: nothing is broken. */
+  .todo {
+    background: var(--accent-wash);
+    border-radius: 16px;
+    padding: 15px 16px;
+    margin-bottom: 17px;
+  }
+  .todo h3 {
+    font-family: Outfit, sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    margin: 0 0 11px;
+    color: var(--ink);
+  }
+  .todo ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .todo li {
+    display: grid;
+    gap: 2px;
+  }
+  .who {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .what {
+    font-size: 12.8px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .todo .foot {
+    font-size: 12.3px;
+    color: var(--ink-faint);
+    margin: 12px 0 0;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    font: inherit;
+    font-family: Outfit, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 13px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  :root[data-theme='dark'] .btn {
+    color: #1b1005;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .btn {
+      color: #1b1005;
+    }
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  /* ── Notes ───────────────────────────────────────────────────────────── */
+  .notes {
+    margin-top: 46px;
+    display: grid;
+    gap: 26px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    align-items: start;
+  }
+  .note {
+    background: var(--ground);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 19px 20px;
+  }
+  .note h4 {
+    font-family: Outfit, sans-serif;
+    font-size: 14.5px;
+    font-weight: 700;
+    margin: 0 0 9px;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .note p {
+    margin: 0 0 10px;
+    font-size: 13.3px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+  .note p:last-child {
+    margin-bottom: 0;
+  }
+  .note ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13.3px;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.2px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: var(--ink);
+  }
+  strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div>
+      <p class="eyebrow">beanies.family · Settings → Family Data</p>
+      <h1>Compaction progress</h1>
+      <p class="standfirst">
+        Replaces the silent run and the self-dismissing toast. Reuses the create-pod
+        <code>SetupProgressModal</code> convention: real steps, a result worth reading, and a close
+        button the person presses themselves.
+      </p>
     </div>
+    <button class="theme-btn" id="themeBtn" type="button">Toggle theme</button>
+  </header>
 
-    <div class="row">
-      <!-- ── 1. In progress ── -->
-      <div class="frame">
-        <div class="cap">1 · In progress — desktop 400px</div>
-        <div class="modal w-desktop">
-          <div class="beanie"></div>
-          <h2 class="title">Tidying up your family file</h2>
-          <p class="lede">This takes a moment. Please keep beanies open.</p>
-          <div class="bar"><i style="width: 60%"></i></div>
-          <div class="pct">60%</div>
-          <ul class="steps">
-            <li class="done"><span class="glyph">✓</span> Checked everyone is up to date</li>
-            <li class="done"><span class="glyph">✓</span> Saved a copy beside your family file</li>
-            <li class="active">
-              <span class="glyph"><span class="spin"></span></span> Tidying up the history…
-            </li>
-            <li><span class="glyph">📤</span> Sharing it with your family</li>
-          </ul>
-        </div>
+  <div class="states">
+    <!-- 1 -->
+    <section class="state">
+      <div class="cap"><span class="n">01</span><span class="txt">While it runs · 392px</span></div>
+      <div class="modal w-lg">
+        <div class="mark">🫘</div>
+        <h2>Tidying up your family file</h2>
+        <p class="lede">This takes a moment. Please keep beanies open.</p>
+        <div class="bar"><i style="width: 62%"></i></div>
+        <p class="pct">62%</p>
+        <ul class="steps">
+          <li class="was"><span class="glyph">✓</span>Checked everyone is up to date</li>
+          <li class="was"><span class="glyph">✓</span>Saved a copy beside your family file</li>
+          <li class="now">
+            <span class="glyph"><span class="spinner"></span></span>Tidying up the history…
+          </li>
+          <li><span class="glyph">📤</span>Sharing it with your family</li>
+        </ul>
       </div>
+    </section>
 
-      <!-- ── 2. Success ── -->
-      <div class="frame">
-        <div class="cap">2 · Done — desktop 400px</div>
-        <div class="modal w-desktop">
-          <div class="beanie"></div>
-          <h2 class="title">All tidied up!</h2>
-          <p class="lede">Your family file is smaller and quicker to open.</p>
-          <div class="result">
-            <div class="sizes">
-              <span class="from">2.1 MB</span><span class="arrow">→</span><span>0.2 MB</span>
-            </div>
-            <div class="saved">1.9 MB smaller · 91% less to download</div>
-          </div>
-          <p class="note">
-            Your other devices will pick this up on their own the next time they open beanies.
+    <!-- 2 -->
+    <section class="state">
+      <div class="cap"><span class="n">02</span><span class="txt">Done · 392px</span></div>
+      <div class="modal w-lg">
+        <div class="mark">🫘</div>
+        <h2>All tidied up!</h2>
+        <p class="lede">Your family file is smaller and quicker to open.</p>
+        <div class="result">
+          <p class="sizes">
+            <span class="before">2.1 MB</span><span class="to">→</span
+            ><span class="after">0.2 MB</span>
           </p>
-          <button class="btn">Done</button>
+          <p class="sizes-sub">1.9 MB smaller · 91% less to download</p>
         </div>
+        <p class="plain">
+          Your other devices pick this up on their own the next time they open beanies.
+        </p>
+        <button class="btn" type="button">Done</button>
       </div>
+    </section>
 
-      <!-- ── 3. Success, someone behind ── -->
-      <div class="frame">
-        <div class="cap">3 · Done, someone needs to update — phone 330px</div>
-        <div class="modal w-phone">
-          <div class="beanie"></div>
-          <h2 class="title">All tidied up!</h2>
-          <p class="lede">Your family file is smaller and quicker to open.</p>
-          <div class="result">
-            <div class="sizes">
-              <span class="from">2.1 MB</span><span class="arrow">→</span><span>0.2 MB</span>
-            </div>
-            <div class="saved">1.9 MB smaller · 91% less to download</div>
-          </div>
-          <div class="todo">
-            <p class="todo-h">Two things still to do</p>
-            <ul>
-              <li>
-                <span class="who">Sophia</span>
-                <span class="what"
-                  >Open beanies on her device and update it. Until she does, she will keep seeing
-                  the older copy of your family data.</span
-                >
-              </li>
-              <li>
-                <span class="who">Joey</span>
-                <span class="what"
-                  >Same on his iPad — open beanies and let it update.</span
-                >
-              </li>
-            </ul>
-            <p class="todo-f">
-              Everyone else picks this up on their own. Nothing is lost either way.
-            </p>
-          </div>
-          <button class="btn">Done</button>
-        </div>
+    <!-- 3 -->
+    <section class="state">
+      <div class="cap">
+        <span class="n">03</span><span class="txt">Done, with things to do · 336px</span>
       </div>
+      <div class="modal w-sm">
+        <div class="mark">🫘</div>
+        <h2>All tidied up!</h2>
+        <p class="lede">Your family file is smaller and quicker to open.</p>
+        <div class="result">
+          <p class="sizes">
+            <span class="before">2.1 MB</span><span class="to">→</span
+            ><span class="after">0.2 MB</span>
+          </p>
+          <p class="sizes-sub">1.9 MB smaller · 91% less to download</p>
+        </div>
+        <div class="todo">
+          <h3>Two things still to do</h3>
+          <ul>
+            <li>
+              <span class="who">Sophia</span>
+              <span class="what"
+                >Open beanies on her device and let it update. Until then she keeps seeing the older
+                copy of your family data.</span
+              >
+            </li>
+            <li>
+              <span class="who">Joey</span>
+              <span class="what">Same on his iPad — open beanies and let it update.</span>
+            </li>
+          </ul>
+          <p class="foot">Everyone else catches up on their own. Nothing is lost either way.</p>
+        </div>
+        <button class="btn" type="button">Done</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h4>What changes</h4>
+      <p>
+        Today the backup, the compaction and the publish all happen with no indicator at all, and the
+        outcome arrives as a toast that dismisses itself after a few seconds.
+      </p>
+      <p>
+        The size figures already exist — <code>stats.beforeBytes</code> and
+        <code>stats.afterBytes</code> are computed and put straight into that toast. They deserve
+        better than four seconds.
+      </p>
     </div>
 
-    <div class="annot">
-      <h3>What this changes</h3>
-      Today the whole run is silent — backup, compaction and publish all happen with no indicator —
-      and the outcome arrives as a toast that dismisses itself. The size figures are already computed
-      (<code>stats.beforeBytes</code> / <code>stats.afterBytes</code>) and already put into that
-      toast; they just deserve better than four seconds.
-
-      <h3>Deliberate choices, so they are not re-litigated</h3>
-      • <strong>Four steps, not five.</strong> They map to the real phases of
-      <code>usePodCompaction.compact()</code> — the pre-flight gates, the safety copy, the compaction
-      itself, the publish. A step that does not correspond to something that can actually fail is
-      decoration.<br />
-      • <strong>The modal is not closable while it runs</strong> (<code>:closable="false"</code>,
-      same as setup). A compaction that is interrupted half way is exactly the state the safety copy
-      exists for; better not to invite it.<br />
-      • <strong>"Done" is a real button, not a timer.</strong> This is the one moment the family
-      learns who is cut off until they update, and a toast that vanishes is how that got missed.<br />
-      • <strong>Heritage Orange for the "someone is behind" note, never Alert Red.</strong> Nothing
-      is broken and nothing is lost; those people simply have not updated yet.<br />
-      • <strong>No confetti.</strong> Setup earns a celebration; routine maintenance does not, and
-      the fanfare would fire on a screen the user opened to fix a problem.
-
-      <h3>The modal is the place for things the family must ACT on</h3>
-      This is the argument for a modal over a toast, and it is greg's: the end of a compaction is the
-      one moment beanies knows exactly who is cut off and why. A toast that dismisses itself after
-      four seconds is the worst possible carrier for "go and open Sophia's iPad". So the panel names
-      each person, says what they must do, and says what happens if they do not — and the user
-      dismisses it themselves. The same slot carries any other must-read outcome, which is why it is
-      a list rather than a sentence.
-
-      <h3>Failure states</h3>
-      Not drawn here, because they already exist and are correct: a refusal
-      (<code>compaction.refused.*</code>) and a publish failure
-      (<code>compaction.publishFailed</code>) keep their current copy. They would render in the same
-      modal in place of the result block, with the failed step marked and the same "Done" button.
+    <div class="note">
+      <h4>The modal is for what the family must act on</h4>
+      <p>
+        This is the argument for a modal over a toast. The end of a compaction is the one moment
+        beanies knows exactly who is cut off and why — so the panel names each person, says what they
+        must do, and says what happens if they don't.
+      </p>
+      <p>
+        A list rather than a sentence, so the same slot carries any other must-read outcome later.
+      </p>
     </div>
-  </body>
-</html>
+
+    <div class="note">
+      <h4>Decisions, so they aren't relitigated</h4>
+      <ul>
+        <li>
+          <strong>Four steps</strong>, matching the real phases of <code>compact()</code> — gates,
+          safety copy, compaction, publish. A step that can't fail is decoration.
+        </li>
+        <li>
+          <strong>Not closable while running.</strong> An interrupted compaction is exactly what the
+          safety copy exists for; better not to invite one.
+        </li>
+        <li><strong>"Done" is a button, not a timer.</strong></li>
+        <li>
+          <strong>Heritage Orange, never Alert Red.</strong> Nothing is broken and nothing is lost.
+        </li>
+        <li>
+          <strong>No confetti.</strong> Setup earns a celebration; maintenance doesn't, and the
+          fanfare would fire on a screen opened to fix a problem.
+        </li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>Failure states aren't drawn</h4>
+      <p>
+        They already exist and are already right: a refusal (<code>compaction.refused.*</code>) and a
+        publish failure (<code>compaction.publishFailed</code>) keep their current copy.
+      </p>
+      <p>
+        Both would render in this same modal in place of the result block, with the failed step
+        marked and the same Done button.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Explicit stamp so the toggle wins over the OS in both directions.
+  (function () {
+    var btn = document.getElementById('themeBtn');
+    btn.addEventListener('click', function () {
+      var root = document.documentElement;
+      var now = root.getAttribute('data-theme');
+      if (!now) {
+        var darkOS = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        now = darkOS ? 'dark' : 'light';
+      }
+      root.setAttribute('data-theme', now === 'dark' ? 'light' : 'dark');
+    });
+  })();
+</script>

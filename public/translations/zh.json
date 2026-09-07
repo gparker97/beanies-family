@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-07",
-    "translationCount": 4571
+    "translationCount": 4586
   },
   "translations": {
     "app.name": {
@@ -22859,6 +22859,81 @@
     "settings.restoreNeedsConnection": {
       "translation": "beanies目前未连接到您家人的存储空间，因此无法安全地替换您的数据。请重新连接上面的存储空间，然后重试。",
       "hash": "9ony91",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.title": {
+      "translation": "整理您的家庭档案",
+      "hash": "r5btu0",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.subtitle": {
+      "translation": "这需要一点时间。请让 beanies 保持打开。",
+      "hash": "yjxidd",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.step0": {
+      "translation": "检查每个人都是最新的",
+      "hash": "daxvaj",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.step1": {
+      "translation": "在家庭文件旁边保存副本",
+      "hash": "tgr40b",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.step2": {
+      "translation": "整理历史",
+      "hash": "f9zeiw",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.step3": {
+      "translation": "与家人分享",
+      "hash": "3ca454",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.doneTitle": {
+      "translation": "都收拾好了！",
+      "hash": "lkvqji",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.doneSubtitle": {
+      "translation": "您的家庭文件更小，打开速度更快。",
+      "hash": "d9dy1n",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.saved": {
+      "translation": "缩小了 {amount} · 下载量减少 {percent}%",
+      "hash": "btc14n",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.doneNothingToDo": {
+      "translation": "您的其他设备下次打开 beanies 时会自行获取此更改。",
+      "hash": "brizif",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.todoTitle": {
+      "translation": "尚待完成",
+      "hash": "bbn1rs",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.todoItem": {
+      "translation": "在他们的设备上打开beanies ，让它更新。在此之前，他们会一直看到您的家庭数据的旧副本，他们添加的任何内容都不会被保留。",
+      "hash": "z39izb",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.todoFoot": {
+      "translation": "其他人自己赶上来。无论哪种方式都不会丢失任何东西。",
+      "hash": "6mp5sk",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.failedTitle": {
+      "translation": "未完成",
+      "hash": "o03b9i",
+      "lastUpdated": "2026-09-07"
+    },
+    "compactionProgress.failedSubtitle": {
+      "translation": "您的家庭文件尚未更改。",
+      "hash": "e9bllm",
       "lastUpdated": "2026-09-07"
     }
   }
