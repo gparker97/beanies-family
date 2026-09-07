@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-07",
-    "translationCount": 4586
+    "translationCount": 4589
   },
   "translations": {
     "app.name": {
@@ -22934,6 +22934,21 @@
     "compactionProgress.failedSubtitle": {
       "translation": "您的家庭文件尚未更改。",
       "hash": "e9bllm",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.loadedOtherFamilyNeedsSignIn": {
+      "translation": "该文件属于另一个家庭，beanies 无法确定您在该家庭中是哪位成员。您的数据是安全的。请退出并重新登录以打开该家庭。",
+      "hash": "cijk7a",
+      "lastUpdated": "2026-09-07"
+    },
+    "podOlderVersion.inline": {
+      "translation": "此家庭文件由旧版本的beanies保存，无法再打开。您当前的家庭数据没有任何问题。如果这是您唯一的副本，请联系support@beanies.family ，我们将提供帮助。",
+      "hash": "ph1ytk",
+      "lastUpdated": "2026-09-07"
+    },
+    "resumeSetup.podOlderVersion": {
+      "translation": "此家庭文件由旧版本的beanies保存，无法再打开。您的家庭数据没有任何问题。如果这是您唯一的副本，请联系support@beanies.family。",
+      "hash": "45s4yn",
       "lastUpdated": "2026-09-07"
     }
   }

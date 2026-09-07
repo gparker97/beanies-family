@@ -70,6 +70,7 @@ export type PayloadFailureSource =
 const PAYLOAD_OVERLAY_KEY = {
   'credential-stale': 'resumeSetup.podCredentialStale',
   'needs-update': 'resumeSetup.podNewerVersion',
+  'too-old': 'resumeSetup.podOlderVersion',
   unreadable: 'resumeSetup.podCorrupted',
   'too-large': 'resumeSetup.podTooLarge',
   corrupt: 'resumeSetup.podCorrupted',
@@ -92,6 +93,9 @@ const PAYLOAD_OVERLAY_KEY = {
 const PAYLOAD_IS_INCIDENT = {
   'credential-stale': false,
   'needs-update': false,
+  //  - too-old: a file from the past is not an incident either. Nothing is
+  //    damaged and nothing this build does can change what that file is.
+  'too-old': false,
   unreadable: true,
   'too-large': false,
   corrupt: true,
@@ -282,6 +286,7 @@ const BLOCKER_OVERLAY_KEY = {
   'podMerge.failedInline': 'resumeSetup.podLineageBlocked',
   'podUnreadable.inline': 'resumeSetup.podCorrupted',
   'podNewerVersion.inline': 'resumeSetup.podNewerVersion',
+  'podOlderVersion.inline': 'resumeSetup.podOlderVersion',
   // ⚠️ ITS OWN COPY, and it names only actions that EXIST on a pre-shell
   // screen — close other tabs, reload. The inline copy points at "use the
   // family file" and Settings, neither of which is on the resume surface.
