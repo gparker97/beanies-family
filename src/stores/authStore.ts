@@ -52,6 +52,7 @@ import {
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { sweepHandoffFiles } from '@/utils/shareOrDownloadFile';
+import { clearKeptRecipe } from '@/utils/recipeKeepStash';
 import { useTranslationStore } from './translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { track } from '@/services/analytics/plausible';
@@ -2519,6 +2520,9 @@ export const useAuthStore = defineStore('auth', () => {
       // them — the delivery sweep is age-based and only runs on the NEXT
       // delivery, which may never come.
       sweepHandoffFiles: () => sweepHandoffFiles(),
+      // Tier-3 only (see signOutSteps): the stash already self-bounds via TTL +
+      // single-consume, so the lower tiers need no teardown for it.
+      clearKeptRecipe: () => clearKeptRecipe(),
     };
   }
 
