@@ -9,6 +9,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { useSounds } from '@/composables/useSounds';
 import { isUnshareableEmail } from '@/utils/email';
+import { buildInviteShareBody, buildInviteEmailSubject } from '@/utils/inviteShareText';
 import type { InviteFlow } from '@/composables/useInviteFlow';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 
@@ -71,6 +72,20 @@ const emailFieldRef = useTemplateRef<HTMLInputElement>('emailField');
  *  precedence over picker selection so the wizard stays consistent for
  *  callers that arrive prefilled. */
 const invitee = computed<Prefill | null>(() => props.prefill ?? pickedMember.value);
+
+/** The invite message + subject. Built here rather than inside `ShareChannelGrid`, which now
+ *  takes a finished message so one channel row can carry an invite or a recipe (#92). */
+const inviteShareBody = computed(() =>
+  buildInviteShareBody({
+    link: props.inviteFlow.inviteLink.value,
+    familyName: props.familyName,
+    memberName: invitee.value?.memberName ?? props.inviterName,
+    t,
+  })
+);
+const inviteEmailSubject = computed(() =>
+  buildInviteEmailSubject({ familyName: props.familyName, t })
+);
 
 /** Empty when the supplied email is missing or unshareable (system
  *  placeholder like *@temp.beanies.family). Drives the Step 1 prefill
@@ -659,9 +674,9 @@ function handleClose() {
 
       <ShareChannelGrid
         :link="inviteFlow.inviteLink.value"
-        :family-name="familyName"
-        :member-name="invitee?.memberName ?? inviterName"
-        hide-expiry-note
+        :body="inviteShareBody"
+        :email-subject="inviteEmailSubject"
+        surface="invite-wizard"
       />
 
       <p v-if="!isDriveProvider" class="dark:text-ink-soft text-center text-xs text-gray-500">

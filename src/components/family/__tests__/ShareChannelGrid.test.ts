@@ -16,10 +16,16 @@ vi.mock('@/composables/useClipboard', () => ({
   useClipboard: () => ({ copied: ref(false), copy: vi.fn().mockResolvedValue(true) }),
 }));
 
+const LINK = 'https://app.beanies.family/join?fam=abc&t=xyz';
+
+// The grid now takes a FINISHED message rather than templating one from a family + member
+// name (#92) — see `utils/inviteShareText.ts`, which owns the invite's templating and its
+// `$&` regression test.
 const defaultProps = {
-  link: 'https://app.beanies.family/join?fam=abc&t=xyz',
-  familyName: 'Ritterbusch',
-  memberName: 'Tim',
+  link: LINK,
+  body: `Tim invited you to Ritterbusch! Join here: ${LINK}`,
+  emailSubject: 'Join Ritterbusch on beanies',
+  surface: 'invite-share-test',
 };
 
 function mountGrid() {

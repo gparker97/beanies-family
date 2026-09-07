@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { BaseModal } from '@/components/ui';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { computed } from 'vue';
+import ShareSheetModal from '@/components/ui/ShareSheetModal.vue';
 import ShareChannelGrid from '@/components/family/ShareChannelGrid.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { buildInviteShareBody, buildInviteEmailSubject } from '@/utils/inviteShareText';
 
 const props = defineProps<{
   open: boolean;
@@ -24,62 +25,38 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+
+// The invite message is built HERE now, not inside the grid — the grid takes a finished
+// message so an invite and a recipe can share one channel implementation. See #92.
+const body = computed(() =>
+  buildInviteShareBody({
+    link: props.link,
+    familyName: props.familyName,
+    memberName: props.memberName,
+    t,
+  })
+);
+const emailSubject = computed(() => buildInviteEmailSubject({ familyName: props.familyName, t }));
 </script>
 
 <template>
-  <BaseModal :open="open" size="sm" layer="overlay" custom-header @close="emit('close')">
-    <template #header>
-      <!-- Warm branded hero header -->
-      <div
-        class="dark:border-line-strong/50 relative overflow-hidden rounded-t-3xl border-b border-[var(--color-sky-silk-300)]/30"
-      >
-        <!-- Background gradient -->
-        <div
-          class="dark:from-surface-overlay/80 dark:via-surface-raised dark:to-surface-overlay/60 absolute inset-0 bg-gradient-to-br from-[var(--tint-orange-8)] via-[var(--tint-silk-10)] to-[var(--tint-orange-4)]"
-        />
-
-        <!-- Decorative dots -->
-        <div
-          class="bg-primary-500/10 absolute top-2 left-3 h-1.5 w-1.5 rounded-full dark:bg-orange-400/15"
-        />
-        <div
-          class="absolute top-4 right-12 h-1.5 w-1.5 rounded-full bg-[var(--color-sky-silk-300)]/30 dark:bg-sky-300/20"
-        />
-        <div
-          class="bg-primary-500/8 absolute bottom-2 left-6 h-2 w-2 rounded-full dark:bg-orange-400/10"
-        />
-
-        <!-- Content -->
-        <div class="relative flex items-center gap-3 px-5 py-3">
-          <!-- Close button -->
-          <button
-            type="button"
-            class="dark:text-ink-faint dark:hover:bg-surface-hover/50 dark:hover:text-ink-soft absolute top-2 right-2 rounded-xl p-1.5 text-gray-400/60 transition-colors hover:bg-white/40 hover:text-gray-600"
-            @click="emit('close')"
-          >
-            <BeanieIcon name="close" size="md" />
-          </button>
-
-          <!-- Beanies family hugging illustration -->
-          <img
-            src="/brand/beanies_family_hugging_transparent_192x192.png"
-            :alt="t('inviteShare.familyImageAlt')"
-            class="h-16 w-16 flex-shrink-0 drop-shadow-sm"
-          />
-
-          <!-- Title & subtitle -->
-          <div class="min-w-0 pr-6">
-            <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-bold">
-              {{ props.title ?? t('share.title') }}
-            </h2>
-            <p class="dark:text-ink-soft text-xs text-gray-500">
-              {{ props.subtitle ?? t('share.subtitle') }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <ShareChannelGrid :link="link" :family-name="familyName" :member-name="memberName" />
-  </BaseModal>
+  <ShareSheetModal
+    :open="open"
+    :title="props.title ?? t('share.title')"
+    :subtitle="props.subtitle ?? t('share.subtitle')"
+    @close="emit('close')"
+  >
+    <ShareChannelGrid
+      :link="link"
+      :body="body"
+      :email-subject="emailSubject"
+      surface="invite-share"
+    >
+      <template #footer>
+        <p class="dark:text-ink-faint text-center text-xs text-gray-400">
+          🔒 {{ t('family.linkExpiry') }}
+        </p>
+      </template>
+    </ShareChannelGrid>
+  </ShareSheetModal>
 </template>

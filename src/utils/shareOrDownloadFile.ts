@@ -61,7 +61,7 @@ export interface ShareOrDownloadResult {
 /** `Directory.Cache/shared` — see `sweepShareDir` for why it is its own folder. */
 const SHARE_DIR = 'shared';
 
-function isAbortError(err: unknown): boolean {
+export function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
 }
 
@@ -69,8 +69,13 @@ function isAbortError(err: unknown): boolean {
  * `@capacitor/share` rejects a dismissed sheet with a MESSAGE rather than a DOM
  * `AbortError`. Matching on a message is inherently fragile, so the caller only
  * consults this at the one stage where a cancel is possible (`share`).
+ *
+ * EXPORTED, not copied. `useShareText` needs exactly the same two predicates for
+ * the same plugin (#92), and a second `/cancel/i` in a second file is a drift bug
+ * with a delay fuse: the day the plugin's message changes, one of them is fixed
+ * and the other silently reclassifies a dismissed sheet as a failure.
  */
-function isPluginCancel(err: unknown): boolean {
+export function isPluginCancel(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   return /cancel/i.test(msg);
 }
