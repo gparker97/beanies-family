@@ -2111,15 +2111,33 @@ export async function loadAndParseV4(): Promise<{
  * Open file picker to select an existing sync file, read it, and configure as sync target.
  */
 /**
- * ONE failure shape for the three file readers. A blocker (a file from a newer
- * beanies, a torn read) is carried out as `payloadError` so every caller can
- * render the same sentence, and `lastError` is set to that SAME translated
- * sentence rather than the raw exception: `syncStore.error` mirrors `lastError`
- * and both pages test it first, so the two channels must not disagree.
+ * ONE failure shape for the three file readers.
+ *
+ * A blocker (a file from a NEWER beanies, a torn read) travels out as
+ * `payloadError` and **only** as `payloadError`. It is deliberately NOT mirrored
+ * into `lastError`.
+ *
+ * ⚠️ THIS COMMENT USED TO SAY THE OPPOSITE, and the code it described made a
+ * refusal read as a success. `lastError` is the POD's error channel: it is
+ * mirrored into `syncStore.error` and rendered by the sync-failure slab, which
+ * carries **Reconnect Drive** and **Force Save** buttons. Putting "this file was
+ * saved by a newer beanies" there, over a family that is still open and
+ * unchanged, offered to force-save your way out of a file that was never loaded.
+ * A refused PICK is not a broken POD.
+ *
+ * The consequence, and the contract every reader owes: **a `payloadError` arm
+ * must come BEFORE the `syncStore.error` arm**, because for exactly the files
+ * that most need a sentence, `syncStore.error` is now empty. The non-blocker arm
+ * below still sets `lastError`, which is what keeps a torn or non-JSON file
+ * speaking.
  */
 function openFileFailure(e: unknown): OpenFileResult {
   if (isRemoteBlocker(e)) {
-    updateState({ isSyncing: false, lastError: useTranslationStore().t(e.inlineMessageKey) });
+    // ⚠️ `lastError: null`, NOT omitted. A stale sentence from an earlier
+    // attempt is still mirrored into `syncStore.error` and would render the
+    // amber slab behind the refusal. Same reasoning as the `AbortError` arm.
+    // `isSyncing: false` is load-bearing too: dropping it wedges the picker.
+    updateState({ isSyncing: false, lastError: null });
     // ⚠️ THE PICKER SURFACES WERE DARK. Only the poll, the rebind and the
     // Drive join reached the firehose, so "a person picked a file this build
     // cannot read" was unmeasurable on the three paths a person actually uses.

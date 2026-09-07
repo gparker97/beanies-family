@@ -1903,6 +1903,18 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
             </div>
           </div>
         </div>
+        <!-- ⚠️ ONE SITE, COVERING BOTH SUB-STATES. The two buttons that reach
+             `handleLoadFromFileConfirmed` live in different sibling divs, and
+             the not-configured one has no slab of any kind — which is the state
+             a locked-out person is in. `importError` had exactly one render
+             site, inside a `v-else` that can never render, so a refused file
+             said nothing here at all and the sentence surfaced instead in the
+             pod's sync-failure slab, beside a Force Save button. Two copies of
+             this markup would work and would be the same duplication that
+             produced the bug. -->
+        <div v-if="importError" class="mt-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+          <p class="dark:text-danger-lift text-sm text-red-600">{{ importError }}</p>
+        </div>
       </div>
 
       <!-- Fallback for older browsers -->

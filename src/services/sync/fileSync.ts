@@ -122,15 +122,24 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
 
   const obj = parsed as Record<string, unknown>;
 
-  // A string version this build does not know is a file from a NEWER beanies,
-  // not a damaged one: a typed, non-latching, non-corruption error, thrown at
-  // the one validator every reader funnels through so no caller has to
-  // classify it. A missing or non-string version is still simply not a beanpod.
-  if (typeof obj.version === 'string' && !KNOWN_BEANPOD_VERSIONS.has(obj.version)) {
-    throw new UnsupportedBeanpodVersionError(obj.version);
-  }
-  if (typeof obj.version !== 'string') {
+  // A version this build does not know is a file from a NEWER beanies, or a
+  // hand-edited one: a typed, non-latching, non-corruption error, thrown at the
+  // one validator every reader funnels through so no caller has to classify it.
+  // Only an ABSENT version means "not a beanpod at all".
+  //
+  // ⚠️ THE TYPE OF THE VALUE IS NOT THE QUESTION. This used to demand a string
+  // before it would even consider the known set, so `"version": 6.0` typed by
+  // hand — a JSON NUMBER — fell through to the generic "missing version" below:
+  // worse copy, no `FILE_NEWER_VERSION` classification, and nothing in
+  // CloudWatch. A number that is not a version we know is the same fact as a
+  // string that is not. (`String(6.0)` is `'6'`, because a JSON `6.0` and a `6`
+  // are the same value after parsing. That is unavoidable, and the constructor
+  // clamps the result anyway.)
+  if (obj.version === undefined || obj.version === null) {
     throw new Error(`Invalid beanpod: missing version`);
+  }
+  if (typeof obj.version !== 'string' || !KNOWN_BEANPOD_VERSIONS.has(obj.version)) {
+    throw new UnsupportedBeanpodVersionError(String(obj.version));
   }
 
   if (typeof obj.familyId !== 'string') throw new Error('Invalid beanpod: missing familyId');
