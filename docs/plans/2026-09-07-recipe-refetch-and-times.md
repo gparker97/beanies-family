@@ -56,10 +56,17 @@ beanies to look again.
   `PROMPT_VERSION` on ANY change" (currently `'2026-09-04.1'`) — and because the test asserts
   only _equality_, a missed bump passes silently, which is exactly the failure this plan must
   not make.
-- **The share task inherits the change for free.** `buildShareExtractionMessages`
-  interpolates `RECIPE_JSON_SHAPE` verbatim and `parseShareExtractionResult` delegates to
-  `parseRecipeExtractionResult`. No second parser and no second shape — that composition is
-  deliberate and must not be worked around.
+- **⚠️ The share task inherits the SHAPE, not the RULE — and that gap must close in the same
+  edit.** `buildShareExtractionMessages` interpolates `RECIPE_JSON_SHAPE` verbatim and
+  `parseShareExtractionResult` delegates to `parseRecipeExtractionResult`, so `inferredTimes`
+  parses on the share path for free. But the system RULES are per-builder: the carve-out lands
+  in `buildRecipeExtractionMessages` only, while the share prompt carries its own blanket
+  _"Never output any value that is not actually supported by the source"_
+  (`extractionPrompt.ts:559`). Left alone, a shared recipe is handed a field it is
+  simultaneously forbidden to fill — requirement 1 silently unmet on a live capture route,
+  from a self-contradictory prompt. The same sentence is therefore appended to the
+  `When kind="recipe"` block of the share system prompt, scoped to that kind so the event and
+  travel arms are untouched. Same three copies, same commit, same drift guard.
 - **Do not weaken the general no-guessing rule.** _"Never output a quantity, temperature or
   time that is not actually supported by the source"_ is what stops the model inventing
   "1 tsp salt" from "a shake of salt". The change is a **narrow carve-out** for three named
@@ -225,9 +232,11 @@ mobile.
 And in the same edit, collapse the disclosure state. Today there are two local refs
 (`:149-150`) plus two computeds that only rename them (`:196-197`); a third pair would make six
 declarations for one concept, and the bug documented at `:141-148` was precisely "one of these
-was left behind". Replace all of it with one
-`inferred = ref<{ ingredients: string[]; steps: string[]; times: RecipeTimeField[] }>()`, set
-in ONE statement inside `applyPrefill` so the reset can never be partial. Net effect: this file
+was left behind". Replace all of it with ONE ref, **initialised, never bare** —
+`const EMPTY_INFERRED = { ingredients: [], steps: [], times: [] }; const inferred =
+ref({ ...EMPTY_INFERRED });`. A bare `ref<{…}>()` defaults to `undefined` and would push `?.`
+into every template site, which is the opposite of the property this refactor exists for.
+Assigned in ONE statement inside `applyPrefill` so the reset can never be partial. Net effect: this file
 is **shorter** after the feature than before it.
 
 **8. Close the missed-bump hole, in the drift test itself.** `extractionPromptDrift.test.ts`
@@ -300,8 +309,10 @@ that leaks its dependency's whole API is a second public door onto the capture l
 and does not open the modal. Otherwise the diff is stored and the modal opens.
 
 **4. The budget.** `REFETCH_BUDGET: BudgetPolicy = { max: 1, windowMs: 10 * 60_000 }` and
-`refetchBudgetKey(recipeId)`, declared next to `SHARE_TEXT_BUDGET` with the same "per DEVICE,
-not a security boundary, the server limiter is the real bound" framing. A cooldown IS a
+`refetchBudgetKey(recipeId)`, both at **module scope in `useRecipeRefetch.ts`** — NOT in
+`services/share/types.ts` beside `SHARE_TEXT_BUDGET`, which is the cohesion rot the caveat
+rules out. The comment carries the same "per DEVICE, not a security boundary, the server
+limiter is the real bound" framing. A cooldown IS a
 budget of one. One shared refusal helper: one `logEvent` at `warn` plus one toast built with
 `fillTemplate({ resetsAt })`, so the refusal always says _when_ it lifts and peek/consume
 cannot drift into two messages.
@@ -367,37 +378,49 @@ with a `{resetsAt}` placeholder) and `recipeExtract.inferred.times` — all `en`
 **Created**
 
 - `src/constants/recipeTimeFields.ts`
+- `src/components/ui/InferredHint.vue`
 - `src/utils/recipeComparable.ts` (hoisted from `RecipeFormModal.baselinePayload`)
 - `src/utils/recipeDiff.ts`
-- `src/composables/useRecipeRefetch.ts`
+- `src/composables/useRecipeRefetch.ts` (also home to `REFETCH_BUDGET` + `refetchBudgetKey`)
+- `src/components/pod/RecipeRefetchAction.vue` (button + composable + modal, one unit)
 - `src/components/pod/RecipeRefetchModal.vue`
 - `src/utils/__tests__/recipeDiff.test.ts`
 - `src/composables/__tests__/useRecipeRefetch.test.ts`
 
 **Modified**
 
-- `scripts/spikes/extractionPrompt.mjs` — `inferredTimes` + the narrowed rule + `PROMPT_VERSION`
-- `infrastructure/lambda/ai-extract/extractionPrompt.mjs` — the mirrored change
+- `scripts/spikes/extractionPrompt.mjs` — `inferredTimes` in `RECIPE_JSON_SHAPE`; the narrowed
+  rule in `buildRecipeExtractionMessages`; the same sentence in the share builder's
+  `When kind="recipe"` block; `PROMPT_VERSION` bumped
+- `infrastructure/lambda/ai-extract/extractionPrompt.mjs` — the mirrored change, byte-identical
 - `src/services/ai/extractionPrompt.ts` — the mirrored change, plus `toStringList` in the parser
 - `src/services/ai/types.ts` — `inferredTimes: string[]` on `RecipeExtractionResult`
 - `src/utils/recipeExtractionToRecipe.ts` — required `inferredTimes` on `RecipePrefill`; the
   `isRecipeTimeField` filter + `console.warn`; `[]` in `jsonLdToPrefill`
 - `src/composables/useRecipeCapture.ts` — `inferredTimes: []` on the `titleOnly` literal; the
-  `attachAfterSave` ownership comment
-- `src/components/ui/FormFieldGroup.vue` — optional `hint` prop
-- `src/components/pod/RecipeFormModal.vue` — import the hoisted comparable;
-  `localInferredTimes`; five `:hint` bindings replacing two inline `<p>` blocks
-- `src/pages/RecipeDetailPage.vue` — the conditional re-fetch action (inside the existing
-  `canEditActivities` row) + modal host
-- `src/services/share/types.ts` — `REFETCH_BUDGET` + `refetchBudgetKey`
+  `attachAfterSave` ownership comment (`:566`) updated to name both owners
+- `src/components/pod/RecipeFormModal.vue` — import the hoisted comparable; the two local
+  inferred refs plus their two rename-only computeds collapsed into one initialised `inferred`
+  ref; five `<InferredHint>` uses replacing the two inline `<p>` blocks
+- `src/pages/RecipeDetailPage.vue` — one import and one `<RecipeRefetchAction>` line inside the
+  existing `canEditActivities` row. No new script state, no modal host.
 - `src/services/translation/uiStrings.ts`
+- Tests extended: `recipeExtractionParse.test.ts` (parse + the `RECIPE_TIME_FIELDS` sync
+  guard), `recipeExtractionToRecipe.test.ts`, `shareExtraction.test.ts`, the `RecipeFormModal`
+  hint tests
 
 **Deliberately NOT modified**
 
-- `src/composables/useExtractionErrorToast.ts` — every code is already mapped; a second
-  mapper is exactly what its header forbids.
-- `src/utils/diffPayload.ts` — used, never grown (its complexity budget is pinned by a test).
-- `src/utils/diagnosticContext.ts` — no new `ALLOWED_CONTEXT_KEYS`.
+- `src/components/ui/FormFieldGroup.vue` — a `hint` prop would bake a feature-specific
+  attention colour into the app's generic label/control primitive. `InferredHint` owns it.
+- `src/services/share/types.ts` — scoped by its own header to the share-target contract; the
+  re-fetch budget lives with the re-fetch.
+- `src/services/ai/__tests__/extractionPromptDrift.test.ts` — passes unchanged; the
+  fingerprint hardening is a follow-up, not this issue.
+- `src/composables/useExtractionErrorToast.ts` — every code is already mapped.
+- `src/utils/diffPayload.ts` — used, never grown.
+- `src/utils/diagnosticContext.ts` — no new `ALLOWED_CONTEXT_KEYS`; `errorReporter` types
+  `surface` as a plain `string`, so `recipe-refetch` needs no declaration either.
 
 ## Observability Coverage
 
@@ -408,7 +431,7 @@ Surface: **`recipe-refetch`** (the times work rides the existing `recipe-extract
 - `logEvent({ level:'info', …, message:'refetch found no changes', context:{ action:'refetch_nochange' } })` — distinguishes "worked, nothing new" from "did not work", which the failure rate depends on.
 - `logEvent({ level:'info', …, message:'refetch changes taken', context:{ action:'refetch_applied', count:<n> } })` — the acceptance rate is the measure of whether the diff is any good.
 - `logEvent({ level:'warn', …, message:'refetch refused by the local budget', context:{ action:'refused', detail:'quota' } })` — same vocabulary as the share budget, so the two are one query.
-- `reportError({ surface:'recipe-refetch', severity:'error', context:{ action:'apply_failed' } })` — the write failed after the user said yes. Fetch failures are NOT reported here: `processUrl` already logs and toasts them on `recipe-extract`, and duplicating them would double-count the funnel.
+- `logEvent({ level:'warn', …, message:'refetch changes could not be saved', context:{ action:'apply_failed' } })` — the write failed after the user said yes. Deliberately **`logEvent`, not `reportError`**: `updateRecipe` runs inside `wrapAsync`, whose error toast already carries the `Error` to Slack, so a `reportError` here would be a second report for one failure. Fetch failures are likewise NOT reported here: `processUrl` already logs and toasts them on `recipe-extract`.
 - Times: `logEvent({ level:'info', surface:'recipe-extract', message:'times filled', context:{ action:'times_filled', count:<stated>, detail:<inferred count as a fixed bucket> } })`.
 
 Counts ride the allowlisted `count` key rather than being embedded in `message`, because
@@ -465,8 +488,8 @@ a poor query key.
 
 - **Pass 1 (Initial draft)**: Drafted from the approved mockup; found the prompt mirrored under a drift guard; chose a parallel `inferredTimes` array over restructuring the three fields; made the JSON-LD rung's empty `inferredTimes` an explicit guarantee; added a local cooldown because re-fetch is metered.
 - **Pass 2 (DRY + error handling)**: Corrected the prompt to THREE mirrored copies — the spike copy is in the drift guard and Pass 1 missed it, so the plan as drafted would have failed CI — and added the `PROMPT_VERSION` bump every copy's header requires. Replaced the hand-rolled localStorage cooldown with the existing `attemptBudget` (already carries `resetsAt`, pruning and storage-failure tolerance, and `services/share/types.ts` names the link path as its intended next user). Replaced new comparison logic with a wrapper over `diffPayload`, and hoisted `RecipeFormModal.baselinePayload` so "the recipe as a payload" has one definition. Deleted the per-code failure mapping entirely: `useExtractionErrorToast` already maps every code and `processUrl` already calls it, so re-fetch now reuses `useRecipeCapture` wholesale rather than re-specifying the ladder's endings. Moved the enum filter out of the parser into the mapper and made the drop `console.warn` rather than silent. Made `inferredTimes` required so all THREE prefill construction sites must answer. Closed a data-loss hole — `ingredients`/`steps` are always-present arrays, so an empty re-read would have offered a DELETE — with a never-clear rule. Closed a duplicate-photo hole (`PhotoAttachment` has no source URL) by offering the photo only when the recipe has none. Added the missing ADR-030 consent step with peek-before-consent ordering, a `try/catch` around the apply, the `canEditActivities` gate, and folded five Heritage-Orange hints into one `FormFieldGroup` prop instead of tripling the class string.
-- **Pass 3 (Sustainability)**: _pending_
-- **Pass 4 (Fresh-eyes sweep)**: _pending_
+- **Pass 3 (Sustainability)**: Fixed a correctness error Pass 2 introduced: `recipesStore.updateRecipe` never throws — it runs inside `wrapAsync`, which catches, toasts and returns `null` — so the planned `try/catch` would have caught nothing and its extra toast would have double-reported one failure; replaced with the return-value check `RecipeFormModal.handleSave:476` already uses. Corrected the never-clear caveat, which named the wrong mechanism: `diffPayload` normalises only `''` and `null`, so an empty array wipes by ASSIGNMENT rather than by DELETE — and added the sharper second case, a present-but-`undefined` key, reachable on the recipe's NAME because `recipeExtractionToPrefill` deliberately accepts a nameless extraction; both now collapse into one `isEmptyish` filter plus a rest-spread rule for building the incoming side. Moved `REFETCH_BUDGET` out of `services/share/types.ts`, whose header scopes it to share-target adapters, and stated honestly that a per-recipe key is a cooldown and not a cost bound. Replaced the page wiring with a single `RecipeRefetchAction.vue` owning button, composable and modal — `RecipeDetailPage` is already 481 lines with three modals — keyed on `recipe.id`, which structurally removes a stale-diff-across-navigation bug the page's own delete watcher proves is reachable. Narrowed `useRecipeRefetch`'s return so the capture ladder does not gain a second public door, and wrote down what the second capture instance actually inherits. Rewrote the `attachAfterSave` ownership invariant rather than patching its comment. Dropped the `FormFieldGroup` prop — additive but it teaches a 45-call-site primitive a feature's attention colour — for a ten-line `InferredHint.vue`, and collapsed the form's five inferred-state declarations into one ref, leaving that file shorter after the feature than before. Gated the affordance on the page's existing `safeExternalHref` screen rather than truthiness.
+- **Pass 4 (Fresh-eyes sweep)**: Cut the `PROMPT_FINGERPRINTS` drift-test hardening to an explicit follow-up — it modifies a guard shared with the event and travel tasks and taxes every future prompt edit, to cover a risk this plan already carries as an acceptance criterion — keeping only the three-line `RECIPE_TIME_FIELDS` sync assertion, moved to the sibling recipe test where the `CATEGORY_OPTIONS_TEXT` idiom already lives. Corrected the claim that the share task "inherits the change for free": it inherits the SHAPE but not the RULE, so a shared recipe would have been handed `inferredTimes` while the share prompt's own blanket sentence (`extractionPrompt.ts:559`) forbade filling it — the carve-out is now added to the share builder's `When kind="recipe"` block too. Closed a burnt-cooldown bug: `processUrl` returns without a network call when offline (`useRecipeCapture.ts:411-415`), so the consume now sits behind an online check and a ten-minute lockout can no longer be spent on a press that never left the device. Resolved the plan's own contradictions — `Files Affected` still carried the Pass-2 `FormFieldGroup` prop, omitted `InferredHint` and `RecipeRefetchAction`, and put the budget in the file the caveats forbid; and `Observability` specified a `reportError` for `apply_failed` that would double-report what `wrapAsync` has already sent. Initialised the collapsed `inferred` ref rather than leaving it `undefined`.
 
 ## Prompt Log
 

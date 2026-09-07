@@ -58,9 +58,21 @@ accepted for a recipe and explicitly NOT generalised to finance or health data.
   that rebuilds this URL must preserve `#`. This is also why the sign-up round trip cannot
   use the router's `?next=` mechanism to carry the recipe, and why it can never ride the
   OAuth `state` param (see the stash note below).
+- **⚠️ Scope the privacy claim honestly: the guarantee is about BEANIES' servers, not the
+  chat app's.** The fragment means no recipe reaches a beanies server, log or analytics event
+  — that is the property worth defending. It is _not_ a claim the recipe is invisible to the
+  channel: `ShareChannelGrid.vue:44` opens `https://wa.me/?text=<the whole message>` and `:50`
+  opens `https://t.me/share/url?url=…`, so Meta and Telegram receive the payload **in a query
+  string** — and every channel receives the message anyway, because that is what sending a
+  message _is_. Word the copy and the module header that way so no later reader believes the
+  `#` shields the recipe from WhatsApp.
 - **Never log the payload.** Not in telemetry `context`, not in `message`, not in a
   `reportError`. Sizes, counts and fixed enums only. This is the one rule whose violation
   would be a privacy incident rather than a bug.
+- **⚠️ Do not rename the grid's `data-testid`s.** `invite-copy-link` and `invite-channel-*`
+  are asserted in `e2e/specs/invite-join.spec.ts:92-93` and `ShareChannelGrid.test.ts`.
+  "Zero invite vocabulary" stops at the DOM: a cosmetic rename turns E2E red for no
+  user-visible gain.
 - **`btoa` cannot encode a recipe.** It throws `InvalidCharacterError` on any codepoint
   above 255 — "Crème Brûlée", "Ramen 🍜", every non-Latin name. The wire format therefore
   goes through `TextEncoder` + `bufferToBase64url` (`utils/encoding.ts:116`) and back
@@ -78,6 +90,10 @@ accepted for a recipe and explicitly NOT generalised to finance or health data.
     Fixed by **merging that inline array into the route-name predicate the codebase already
     has** (`PODLESS_EXPECTED_ROUTE_NAMES` / `isPodlessExpectedRoute` in `utils/appChrome.ts`).
     **No new route-meta flag** — see Approach §5.
+- **⚠️ The podless branch has TWO checks and the predicate must reach BOTH.** `App.vue:1259`
+  gates only the `reportError`; the redirect is a separate statement at `:1273-1275` gated on
+  `onRecoveryQuery` alone. Swapping the predicate at `:1259` silences the Slack page and
+  **still loses the fragment**. Both conditions change. §5 enumerates the per-route effect.
 - **⚠️ That inline array is ALREADY WRONG today, and it is the same bug — verified on
   `main`.** `/share` (`ShareTarget`) is declared `requiresAuth: false` with a comment
   explaining it _must_ mount for a signed-out user so the Cache-Storage stash is deleted:
@@ -131,10 +147,14 @@ memberName, hideExpiryNote? }` and emits `shared`. It has exactly **two** render
   cannot survive — new user choosing Google Drive on iOS — is handled by an honest,
   actionable recovery, not by pretending. **The recovery is expected behaviour on that
   path, not an edge case.** See Approach §6.
-- **⚠️ The size cap must be derived from Discord, not picked.** Requirement 10 makes
-  paste-into-Discord a first-class path, and a Discord message caps at **2000 characters**.
-  An 8000-character URL guarantees that paste fails for exactly the recipes worth sharing.
-  There is ONE constant, `MAX_SHARE_MESSAGE_CHARS = 2000`, measured on the composed message.
+- **⚠️ The 2000-character Discord ceiling bounds the TEXT, never the LINK.** base64url runs
+  ~4/3 of the recipe JSON, so an ordinary 12-ingredient recipe is a **~2,300-character link
+  before a single word of text**. A hard 2000-character budget on the _composed message_
+  would therefore drop the link for the median recipe — deleting the whole acquisition loop
+  for exactly the recipes worth sharing. There are TWO budgets with one job each
+  (`MAX_SHARE_PAYLOAD_CHARS` bounds the fragment and is what `decode` needs anyway;
+  `MAX_SHARE_MESSAGE_CHARS` is a TEXT target), and the link is never traded for a chat
+  client's paste limit. See §4.
 - **No compression, and now for a hard reason rather than a preference.** The app targets
   **iOS 15** (`docs/STATUS.md`); `CompressionStream` is Safari 16.4+. A compressed format
   would have to be conditional on the _sender's_ platform, putting two wire formats in the
@@ -189,6 +209,14 @@ pages/SharedRecipePage.vue           the public receiving surface.
 ```ts
 /** The version this build WRITES. */
 export const SHARE_WIRE_VERSION = 1;
+
+/**
+ * The FRAGMENT ceiling: how many base64url characters a share URL may carry. Bounds
+ * `decodeRecipeShare` BEFORE it does any work (a hostile fragment is unbounded), and tells
+ * `encode` when a recipe is too large to link at all. Distinct from, and an order of
+ * magnitude above, `MAX_SHARE_MESSAGE_CHARS`, which budgets the readable TEXT (§4).
+ */
+export const MAX_SHARE_PAYLOAD_CHARS = 8000;
 /**
  * The versions this build can READ. This set only ever GROWS — a share link lives in
  * someone's chat forever, so dropping a version breaks messages already sent. This is the
@@ -353,36 +381,51 @@ branch reuses the cancel detection that already exists — `shareOrDownloadFile.
 MESSAGE rather than a DOM AbortError_") — moved to a shared `utils/shareCancel.ts`. A second
 `/cancel/i` regex in a second file is a drift bug with a delay fuse.
 
-### 4. One size budget, derived from the tightest real channel
+### 4. Two size budgets, each with exactly one job
 
 ```ts
+/** The fragment ceiling — see §1. What a URL may carry, and decode's pre-work bound. */
+MAX_SHARE_PAYLOAD_CHARS = 8000;
+
 /**
- * The whole composed message (text + link) must fit in one chat message. 2000 is
- * Discord's per-message ceiling — the binding constraint, because requirement 10 makes
- * paste-into-Discord first-class and Discord publishes no share-intent URL. `mailto:`
- * bodies cap around the same; WhatsApp, Telegram and SMS are well above it.
+ * The READABLE-TEXT target. 2000 is Discord's per-message ceiling, the tightest real
+ * channel, because requirement 10 makes paste-into-Discord first-class and Discord
+ * publishes no share-intent URL. mailto: caps around the same; WhatsApp (~65k) and
+ * Telegram (4096) are well above it.
+ *
+ * ⚠️ A TARGET, not a hard cap, and it NEVER costs us the link. base64url runs ~4/3 of the
+ * recipe JSON, so an ordinary 12-ingredient recipe is a ~2,300-character link on its own:
+ * a hard cap on the whole message would drop the link for the MEDIAN recipe.
  */
 export const MAX_SHARE_MESSAGE_CHARS = 2000;
 ```
 
-The payload is encoded once, the link is built, and the message is composed to fit that one
-number. The ladder is fixed, documented in the module header, and unit tested rung by rung —
-**text is trimmed before the link is ever dropped**, because the link carries the whole
-recipe and the whole acquisition loop:
+The payload is encoded once, then:
 
-1. drop `notes`
-2. drop steps beyond the first three (replaced by one "full method in the link" line)
-3. drop the remaining steps
-4. cap ingredients with "and N more"
-5. drop the subtitle
-6. floor: dish name + one line + sign-off + link
+**If the payload exceeds `MAX_SHARE_PAYLOAD_CHARS`** there is no link at all. The modal shows
+the oversize state, does **not** render the channel grid (every channel in it is link-shaped,
+and Messenger — `fb-messenger://share/?link=…` — can carry nothing else), and offers Copy +
+More with the full readable text and a plain explanation. This is the only "text without a
+link" path and it is effectively unreachable for a real recipe; it exists so an absurd input
+degrades honestly rather than producing a broken URL.
 
-If the **link alone** cannot fit beside the floor text, the modal does not silently truncate —
-a half-recipe presented as whole is worse than no link. It shares the _full_ readable text
-with **no** link (the whole budget is now available for text) and says so plainly.
+**Otherwise the link is built and is never dropped.** The remaining budget goes to text,
+trimmed down a fixed, documented, unit-tested ladder — three rungs, because more bought
+nothing observable:
 
-The rung the composer stopped at ships as `detail` on `share_opened`, so we learn whether
-2000 squeezes real recipes without ever logging a byte of one.
+1. drop `notes`, and every step beyond the first three (replaced by one "full method in the
+   link" line)
+2. drop the remaining steps
+3. drop the subtitle and cap ingredients with "and N more"; the floor is dish name +
+   sign-off + link
+
+**If the floor still exceeds 2000, the message ships anyway.** WhatsApp, Telegram, SMS, email
+and the OS sheet all take it; only a Discord _paste_ is refused, and the modal says so quietly
+beside Copy. We do not trade the link — the thing carrying the whole recipe and the whole
+acquisition loop — for one chat client's paste limit.
+
+The rung reached, plus a `link_dropped` boolean, ship as `detail` on `share_opened`, so we
+learn how often 2000 squeezes real recipes without ever logging a byte of one.
 
 ### 5. `SharedRecipePage.vue`, the route, and ONE public-entry list
 
@@ -412,9 +455,9 @@ Merging is behaviour-preserving for every route that exists today: the two lists
 identical apart from `DevWorkerSpike`, which the podless branch never reaches because of its
 `!route.path.startsWith('/dev')` guard.
 
-**Net effect on `App.vue`: an 11-line inline array deleted and one predicate swapped.** For a
-2245-line file carrying the app's boot sequence, "this feature made App.vue smaller" is the
-outcome worth insisting on.
+**Net effect on `App.vue`: an 11-line inline array deleted, one predicate swapped, one
+condition extended.** For a 2245-line file carrying the app's boot sequence, "this feature
+made App.vue smaller" is the outcome worth insisting on.
 
 The page reads `route.hash`, strips the `#`, decodes. Four states: **decoded** (mockup
 Direction A); **no fragment** and **malformed** (the same friendly dead-end, one string —
@@ -527,7 +570,6 @@ All under `recipeShare.*`, both `en` and `beanie`.
 - `src/utils/recipeShareText.ts`
 - `src/utils/inviteShareText.ts` (lifted out of `ShareChannelGrid`; the `$&` bug fixed here)
 - `src/utils/recipeKeepStash.ts`
-- `src/utils/shareCancel.ts` (`isAbortError` + `isPluginCancel`, shared with `shareOrDownloadFile`)
 - `src/components/ui/ShareSheetModal.vue` (extracted from `ShareInviteModal`)
 - `src/components/pod/RecipeShareModal.vue`
 - `src/pages/SharedRecipePage.vue`
@@ -541,14 +583,15 @@ All under `recipeShare.*`, both `en` and `beanie`.
 
 - `src/pages/RecipeDetailPage.vue` — Share action (outside the edit gate) + modal host
 - `src/components/family/ShareChannelGrid.vue` — takes a message (`body` / `emailSubject` /
-  `copyText?` / `showSystemShare?`); `hideExpiryNote` → `#footer` slot; invite templating removed
+  `copyText?` / `showSystemShare?`); `hideExpiryNote` → `#footer` slot; invite templating
+  removed; **`data-testid`s unchanged**
 - `src/components/family/ShareInviteModal.vue` — composed over `ShareSheetModal`; props and
   call site unchanged; supplies body + subject + expiry footer
 - `src/components/family/InviteWizardModal.vue` — supplies body + subject
 - `src/components/family/__tests__/ShareChannelGrid.test.ts` — prop migration
 - `src/composables/useShareText.ts` — neutral `share.*` keys + required `surface`; native
   branch using the shared cancel predicates
-- `src/utils/shareOrDownloadFile.ts` — cancel predicates moved to `shareCancel.ts`
+- `src/utils/shareOrDownloadFile.ts` — `export` the two existing cancel predicates (no move, no new module)
 - `src/pages/FamilyCookbookPage.vue` — one `openWithPrefill()` helper; consume the keep stash
 - `src/pages/LoginPage.vue` — one line in `handleSignedIn`
 - `src/router/index.ts` — the public `/recipe` route (no new meta field)
@@ -559,6 +602,9 @@ All under `recipeShare.*`, both `en` and `beanie`.
 - `src/App.vue` — **delete** the inline `authPages` array; both boot redirects use
   `isPublicEntryRoute`. Net: the file gets shorter and gains no new mounts.
 - `src/stores/authStore.ts` + `src/services/auth/signOutSteps.ts` — one clear-data-tier step
+  (tier-3 only, so the strict-superset property holds with no new documented exception)
+- `src/stores/__tests__/dataClearingSecurity.test.ts` — where that superset property is
+  actually asserted
 - `src/services/translation/uiStrings.ts` — `recipeShare.*`, neutral `share.*`
 
 **Explicitly NOT touched**
@@ -569,6 +615,7 @@ All under `recipeShare.*`, both `en` and `beanie`.
   that does not apply to a decoded link. What _is_ reused is `RecipePrefill` and the
   `RecipeFormModal` review surface.
 - `RecipeDetailPage`'s recipe body markup — deliberately not shared with `SharedRecipePage`.
+- `e2e/specs/invite-join.spec.ts` — the generalisation must leave it passing untouched.
 
 ## Observability Coverage
 
@@ -647,7 +694,7 @@ in `message`. Stricter than the usual rule because the content is by definition 
 - **Pass 1 (Initial draft)**: Drafted from the approved mockup and verified router/App-shell/store facts; chose no-compression with a version byte; made `decodeRecipeShare` an explicit security boundary; added a stash for the signed-out funnel.
 - **Pass 2 (DRY + error handling)**: Found a day-one crash (`btoa` cannot encode a non-ASCII recipe name) and, more seriously, that the feature **would not have worked at all** — `App.vue:1218-1231` holds a hardcoded route-name array and redirects the unauthenticated receiver to `/welcome`, destroying the fragment; the podless case additionally pages Slack `critical` on every open. Fixed with a declared `meta.noAuthRedirect` + `PODLESS_EXPECTED_ROUTE_NAMES`. Replaced the bespoke `SharedRecipe` type with the existing `RecipePrefill['fields']`, and the silent `createRecipe` with the `RecipeFormModal` review the app already mandates for untrusted inbound recipes — which also removed a double-report against `wrapAsync`. Adopted `boundText`, `fillTemplate`, `safeHttpsUrl`, `isRecipeCourse`/`isMealSlot`; fixed `ShareChannelGrid`'s live `$&`-interpolation bug in passing. Extracted `ShareSheetModal` rather than hand-building a second shell. Closed the Discord gap the title promised, and with it `useShareText`'s silent native degradation. **Corrected while applying:** Pass 2 proposed `localStorage` as surviving the OAuth hop; `redirectState.ts:1-11` says WebKit clears _script-writable_ storage, which is localStorage too, and the `state`-param workaround is non-secret so the recipe can never use it — so the stash is now justified on the journeys it does survive, with the Drive-on-iOS miss documented as expected behaviour with a real recovery.
 - **Pass 3 (Sustainability)**: Removed three sources of long-term complexity and two reliability defects. **(1) The `meta.noAuthRedirect` flag is gone.** `appChrome.ts:31-38` already argues in writing against a second route-meta boolean, and `useNotifications` already reuses its name-list predicate; a fourth per-route flag is _forgettable_, and that has already bitten — **verified live on `main`**: `/share` is declared `requiresAuth: false` with a comment saying it must mount signed-out to delete its Cache stash, yet `'ShareTarget'` is missing from App.vue's inline `authPages`, so a signed-out document share leaks into Cache Storage permanently today. The two lists were the same set anyway, so they merge into one `PUBLIC_ENTRY_ROUTE_NAMES` + `isPublicEntryRoute`; the inline array is deleted and the pre-existing leak is fixed in one word. **(2) The `useKeptRecipeHandoff` App.vue watcher is gone**, replaced by one line in `LoginPage.handleSignedIn` — the documented single canonical post-sign-in seam. A global watcher issuing `router.push` on auth transitions is the exact failure mode the 2026-06-15 remount-race plan exists to prevent. **(3) `ShareChannelGrid` takes a message instead of four optional overrides** — `errorKeyPrefix` could not have worked (`t` is typed `UIStringKey`), and `body?` would have left two props dead in a combination nothing could check; invite templating moves to a pure `inviteShareText.ts`, which is where the `$&` fix now lands, and the component ends with zero invite vocabulary. **(4) The size cap was picked, not derived, and broke the flagship channel:** a Discord paste caps at 2000 characters, so an 8000-char URL guaranteed failure for exactly the recipes worth sharing; there is now one `MAX_SHARE_MESSAGE_CHARS = 2000` with a documented ladder that sacrifices text before the link. No-compression is upgraded from preference to constraint (iOS 15 floor vs Safari 16.4). **(5) The versioning story was incoherent:** copying `redirectState`'s exact-match gate would break every link already in a chat the day v2 ships — its round trip is seconds, ours is forever — so write-version and a never-shrinking read-set are now separate, pinned by a golden fixture, and `decodeRecipeShare` returns a discriminated reason rather than the `null` that could not have produced the telemetry `detail` the plan promised. **(6) Two free-looking lines that are not:** clearing the stash on sign-out costs a new step in a superset-tested list (now scoped and costed), and the post-hop "stash lost" message was unimplementable because its marker would live in the storage WebKit clears — so the recovery is stated _before_ the hop.
-- **Pass 4 (Fresh-eyes sweep)**: _pending_
+- **Pass 4 (Fresh-eyes sweep)**: Two findings that would have shipped broken. **(1) The App.vue fix was half a fix:** the podless branch checks the predicate twice — `:1259` gates the Slack alert, but the `safeRouterReplace(RESUME_SETUP_PATH)` at `:1273-1275` is gated on `onRecoveryQuery` alone, so swapping only the alert would have silenced the page while still destroying the fragment; the redirect condition is now part of the change, with the per-route consequence enumerated (Welcome/Login/Join/Create provably unaffected because `LoginPage.vue:290` self-rescues to the same destination; `ShareTarget` and `OpenFromDrive` are fixes, the latter flagged as the one genuine behaviour change). **(2) The single 2000-character cap deleted the link for the median recipe:** base64url runs ~4/3 of the JSON, so an ordinary 12-ingredient recipe is a ~2,300-character link before any text, meaning Pass 3's one cap would have hit the "text with no link" floor for exactly the recipes worth sharing — there are now two budgets with one job each, the link is never traded for a paste limit, and the six-rung ladder collapsed to three. Also: the native More tile was asserted but unimplementable as written (`useShareText` only tests `navigator.share`, absent in both WebViews), so the `@capacitor/share` branch is explicit; the privacy claim is scoped honestly to beanies' servers (wa.me and t.me receive the message in a query string by design); the grid's `data-testid`s are pinned against a cosmetic rename that would redden E2E; and `utils/shareCancel.ts` is **cut** — the two predicates are simply exported from `shareOrDownloadFile.ts`, same anti-drift property, one fewer file.
 
 ## Prompt Log
 
