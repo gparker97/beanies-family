@@ -195,7 +195,12 @@ describe('decode sanitises what it accepts', () => {
 
   it.each([
     ['javascript:', 'javascript:alert(1)'],
-    ['plain http', 'https://example.com/x'],
+    // ⚠️ BUILT, NOT WRITTEN. `@microsoft/sdl/no-insecure-url` is an eslint --fix rule and
+    // the pre-commit hook runs it: written as a literal, this row was silently rewritten to
+    // `https://`, turning a hostile-input assertion into "a valid https URL is dropped",
+    // which then failed. Assembling the scheme keeps the fixture hostile. A disable comment
+    // would work too, but the next person to run --fix on a nearby line would not see it.
+    ['plain http', `${'ht' + 'tp'}://example.com/x`],
     ['a non-default port', 'https://example.com:8443/x'],
   ])('drops a %s sourceUrl', (_label, url) => {
     const out = decodeRecipeShare(asFragment({ v: 1, n: 'Cake', u: url }));

@@ -25,29 +25,45 @@ export function shouldShowAppLayout(
 }
 
 /**
- * Routes where an authenticated session with no pod yet is EXPECTED (the
- * onboarding entry points). Used to suppress the `app.onboardingZombieState`
- * alert — a podless session here is normal, not an anomaly.
+ * Routes a person can legitimately arrive on **before** the app has a pod — the onboarding
+ * entry points, plus the two surfaces that must mount for a signed-out visitor.
  *
- * This is a DERIVED predicate keyed on the route NAME, deliberately NOT a second
- * `meta` flag: `meta.noChrome` answers "render the shell?" and is also set on
- * NotFound + PlausibleExclude, where a podless session genuinely IS anomalous
- * and SHOULD still alert. One source of truth (this name list), no overlapping
- * booleans to drift. The recovery screen `/welcome?resume=setup` resolves to the
- * `Welcome` name, so it is covered here without inspecting the query.
+ * ONE list, consulted by three places: both of `App.vue`'s boot redirects and
+ * `useNotifications`' auto-open suppression. It used to be two — this list and an identical
+ * inline array in `App.vue` — and they had already drifted: `ShareTarget` is declared
+ * `requiresAuth: false` with a comment explaining it MUST mount signed-out so it can delete
+ * its Cache-Storage stash (nothing sweeps it, there is no TTL, and sign-out clears IndexedDB
+ * but not `caches`), yet it was absent from `App.vue`'s copy, so a signed-out document share
+ * was bounced to onboarding and leaked into Cache Storage permanently.
+ *
+ * A DERIVED predicate keyed on the route NAME, deliberately NOT a `meta` flag.
+ * `meta.noChrome` answers "render the shell?" and is also set on NotFound +
+ * PlausibleExclude, where a podless session genuinely IS anomalous and SHOULD still alert.
+ * And a `meta.noAuthRedirect` boolean would be *forgettable*: a route author who sets
+ * `requiresAuth: false` and nothing else gets a public route silently bounced at boot —
+ * which is exactly what happened to `ShareTarget`. One name list, no overlapping booleans.
+ *
+ * The recovery screen `/welcome?resume=setup` resolves to the `Welcome` name, so it is
+ * covered here without inspecting the query.
  */
-const PODLESS_EXPECTED_ROUTE_NAMES: ReadonlyArray<string> = [
+const PUBLIC_ENTRY_ROUTE_NAMES: ReadonlyArray<string> = [
   'Welcome',
   'Login',
   'JoinFamily',
   'CreateFamily',
   'OpenFromDrive',
+  // Mounts signed-out on purpose, to clear its own Cache-Storage stash.
+  'ShareTarget',
+  // A shared recipe reads entirely from the URL fragment — no account, no pod (#92).
+  'SharedRecipe',
+  // Dev-only ADR-032 worker spike — a standalone measurement page with no auth/pod.
+  // Harmless in the podless branch, which never reaches it anyway thanks to that
+  // branch's own `!route.path.startsWith('/dev')` guard.
+  'DevWorkerSpike',
 ];
 
-export function isPodlessExpectedRoute(
-  route: Pick<RouteLocationNormalizedLoaded, 'name'>
-): boolean {
-  return typeof route.name === 'string' && PODLESS_EXPECTED_ROUTE_NAMES.includes(route.name);
+export function isPublicEntryRoute(route: Pick<RouteLocationNormalizedLoaded, 'name'>): boolean {
+  return typeof route.name === 'string' && PUBLIC_ENTRY_ROUTE_NAMES.includes(route.name);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { RouteLocationNormalizedLoaded } from 'vue-router';
-import { shouldShowAppLayout, isPodlessExpectedRoute, isNavigationCancelled } from '../appChrome';
+import { shouldShowAppLayout, isPublicEntryRoute, isNavigationCancelled } from '../appChrome';
 
 /** Minimal route stub — only `meta` is read by the helper. */
 function route(meta: Record<string, unknown> = {}): Pick<RouteLocationNormalizedLoaded, 'meta'> {
@@ -49,22 +49,33 @@ describe('shouldShowAppLayout', () => {
   });
 });
 
-describe('isPodlessExpectedRoute', () => {
+describe('isPublicEntryRoute', () => {
   function namedRoute(name: string | null) {
     return { name } as Pick<RouteLocationNormalizedLoaded, 'name'>;
   }
 
   it('is true for the onboarding entry routes (podless is normal there)', () => {
     for (const n of ['Welcome', 'Login', 'JoinFamily', 'CreateFamily', 'OpenFromDrive']) {
-      expect(isPodlessExpectedRoute(namedRoute(n))).toBe(true);
+      expect(isPublicEntryRoute(namedRoute(n))).toBe(true);
     }
   });
 
+  it('covers ShareTarget — it must mount signed-out to clear its Cache-Storage stash', () => {
+    // The regression this merge fixed: `ShareTarget` is `requiresAuth: false` but was
+    // missing from `App.vue`'s inline copy of this list, so a signed-out document share
+    // was bounced to /welcome and its stashed file stayed in Cache Storage forever.
+    expect(isPublicEntryRoute(namedRoute('ShareTarget'))).toBe(true);
+  });
+
+  it('covers SharedRecipe — a shared recipe reads from the fragment, with no pod', () => {
+    expect(isPublicEntryRoute(namedRoute('SharedRecipe'))).toBe(true);
+  });
+
   it('is false for NotFound / PlausibleExclude / app routes (podless IS anomalous → still alert)', () => {
-    expect(isPodlessExpectedRoute(namedRoute('NotFound'))).toBe(false);
-    expect(isPodlessExpectedRoute(namedRoute('PlausibleExclude'))).toBe(false);
-    expect(isPodlessExpectedRoute(namedRoute('Nook'))).toBe(false);
-    expect(isPodlessExpectedRoute(namedRoute(null))).toBe(false);
+    expect(isPublicEntryRoute(namedRoute('NotFound'))).toBe(false);
+    expect(isPublicEntryRoute(namedRoute('PlausibleExclude'))).toBe(false);
+    expect(isPublicEntryRoute(namedRoute('Nook'))).toBe(false);
+    expect(isPublicEntryRoute(namedRoute(null))).toBe(false);
   });
 });
 

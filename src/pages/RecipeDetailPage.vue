@@ -21,6 +21,7 @@ import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
+import RecipeShareModal from '@/components/pod/RecipeShareModal.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
@@ -60,6 +61,7 @@ const stats = computed(() =>
 );
 
 const editRecipeOpen = ref(false);
+const shareRecipeOpen = ref(false);
 const cookLogOpen = ref(false);
 const editingEntry = ref<CookLogEntry | null>(null);
 
@@ -300,8 +302,9 @@ watch(recipe, (now, before) => {
             </strong>
           </a>
 
-          <div v-if="canEditActivities" class="mt-auto flex flex-wrap gap-2 pt-4">
+          <div class="mt-auto flex flex-wrap gap-2 pt-4">
             <button
+              v-if="canEditActivities"
               type="button"
               class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
               @click="editRecipeOpen = true"
@@ -309,7 +312,20 @@ watch(recipe, (now, before) => {
               <BeanieIcon name="edit" size="xs" />
               <span>{{ t('bean.hero.edit') }}</span>
             </button>
+            <!-- OUTSIDE the edit gate on purpose: sharing is not editing, and a view-only
+                 member must be able to send a recipe to a friend. Quiet variant — on this
+                 page the gradient is reserved for the one action that records something. -->
             <button
+              type="button"
+              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
+              data-testid="recipe-share-open"
+              @click="shareRecipeOpen = true"
+            >
+              <BeanieIcon name="share" size="xs" />
+              <span>{{ t('recipeShare.action') }}</span>
+            </button>
+            <button
+              v-if="canEditActivities"
               type="button"
               class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
               @click="openAddCookLog"
@@ -436,6 +452,7 @@ watch(recipe, (now, before) => {
         @close="editRecipeOpen = false"
         @deleted="onRecipeDeleted"
       />
+      <RecipeShareModal :open="shareRecipeOpen" :recipe="recipe" @close="shareRecipeOpen = false" />
       <CookLogFormModal
         :open="cookLogOpen"
         :recipe-id="recipe.id"

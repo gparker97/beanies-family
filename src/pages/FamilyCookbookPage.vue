@@ -9,7 +9,7 @@
  * matching the mockup's kraft-paper style.
  */
 import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
@@ -35,6 +35,8 @@ import { useRecipesStore } from '@/stores/recipesStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePhotoStore } from '@/stores/photoStore';
 import type { Recipe } from '@/types/models';
+import { consumeKeptRecipe } from '@/utils/recipeKeepStash';
+import { sharedRecipeToPrefill } from '@/utils/recipeShareLink';
 import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
 
 const router = useRouter();
@@ -60,12 +62,40 @@ const prefill = ref<RecipePrefill | null>(null);
 const linkModalOpen = ref(false);
 const { isPending } = useRecipePhotoPending();
 
+/**
+ * The ONE way this page opens the recipe form pre-filled.
+ *
+ * Two things arrive pre-filled now — an AI extraction and a recipe someone was sent (#92) —
+ * and `useFormModal` runs `onNew` on the open TRANSITION only, so a caller that sets the
+ * prefill in the wrong order gets a blank form and no error. Both paths go through here.
+ */
+function openWithPrefill(p: RecipePrefill): void {
+  prefill.value = p;
+  editing.value = null;
+  modalOpen.value = true;
+}
+
 const capture = useRecipeCapture({
-  onRecipeReady: (ready) => {
-    prefill.value = ready.prefill;
-    editing.value = null;
-    modalOpen.value = true;
-  },
+  onRecipeReady: (ready) => openWithPrefill(ready.prefill),
+});
+
+/**
+ * A recipe kept from a share link, waiting since before sign-up (#92).
+ *
+ * Read-and-delete, so it can only land once. It goes through the normal review form rather
+ * than straight into the pod — the same rule the inbound share boundary already follows:
+ * nothing arriving from outside is persisted without the user confirming it. That also means
+ * the save runs through `createRecipe` → `wrapAsync`, which already owns the failure toast
+ * and the report, so there is nothing to catch here.
+ *
+ * A miss is silent BY DESIGN at this end: the common cause is that no recipe was ever kept.
+ * The one case where a keep is genuinely lost (iOS clearing storage across the Drive OAuth
+ * hop) is warned about on the share page BEFORE the hop, because after it there is nothing
+ * left to detect it with.
+ */
+onMounted(() => {
+  const kept = consumeKeptRecipe();
+  if (kept) openWithPrefill(sharedRecipeToPrefill(kept));
 });
 
 function handlePastedLink(url: string): void {

@@ -37,6 +37,7 @@ import {
   RESUME_SETUP_PATH,
 } from '@/components/login/resumePaths';
 import { reportError } from '@/utils/errorReporter';
+import { hasPendingKeptRecipe, KEPT_RECIPE_DESTINATION } from '@/utils/recipeKeepStash';
 
 const router = useRouter();
 const route = useRoute();
@@ -662,7 +663,11 @@ function handleSignedIn(destination: string) {
   // Sole genuine login/resume registration site → stamp lastLoginAt (see
   // ensureRegistered). The country watcher's ensureRegistered() stays login-false.
   syncStore.ensureRegistered(true);
-  router.replace(destination);
+  // A recipe kept from a share link before signing up belongs in the cookbook, which is
+  // where it will be waiting for review (#92). One line here rather than a global watcher
+  // on auth/pod transitions: this function is the single canonical arrival point for EVERY
+  // entry path, so it already covers every journey a watcher would have had to guess at.
+  router.replace(hasPendingKeptRecipe() ? KEPT_RECIPE_DESTINATION : destination);
 }
 
 /** "Start over instead" from the resume-setup screen — abandon the half-finished onboarding. */
