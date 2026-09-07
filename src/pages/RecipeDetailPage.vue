@@ -22,6 +22,7 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import RecipeShareModal from '@/components/pod/RecipeShareModal.vue';
+import RecipeRefetchAction from '@/components/pod/RecipeRefetchAction.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
@@ -312,6 +313,15 @@ watch(recipe, (now, before) => {
               <BeanieIcon name="edit" size="xs" />
               <span>{{ t('bean.hero.edit') }}</span>
             </button>
+            <!-- Inside the edit gate, unlike Share: a re-fetch WRITES to the recipe. The
+                 `v-if` is the page's existing `safeExternalHref` screen, not truthiness on
+                 `sourceUrl` — offering to re-read a URL this page refuses to link would be
+                 incoherent. `:key` is load-bearing; see the component's own header. -->
+            <RecipeRefetchAction
+              v-if="canEditActivities && recipeSourceHref"
+              :key="recipe.id"
+              :recipe="recipe"
+            />
             <!-- OUTSIDE the edit gate on purpose: sharing is not editing, and a view-only
                  member must be able to send a recipe to a friend. Quiet variant — on this
                  page the gradient is reserved for the one action that records something. -->
